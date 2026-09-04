@@ -57,7 +57,6 @@ try:
 except ImportError:
     from anthropic.types.content_block import ContentBlock as TextBlock
 
-from sentry_sdk import start_transaction
 from sentry_sdk.ai.utils import transform_content_part, transform_message_content
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.anthropic import (
@@ -294,8 +293,7 @@ def test_nonstreaming_create_message_data_collection(
     )
     items = capture_items("transaction", "span")
 
-    with start_transaction(name="anthropic"):
-        client.messages.create(**create_kwargs)
+    client.messages.create(**create_kwargs)
 
     sentry_sdk.flush()
     spans = [item.payload for item in items if item.type == "span"]
@@ -366,8 +364,7 @@ def test_nonstreaming_create_message_data_collection_tools(
     )
     items = capture_items("transaction", "span")
 
-    with start_transaction(name="anthropic"):
-        client.messages.create(**create_kwargs)
+    client.messages.create(**create_kwargs)
 
     sentry_sdk.flush()
     spans = [item.payload for item in items if item.type == "span"]
@@ -444,8 +441,7 @@ async def test_nonstreaming_create_message_data_collection_async(
     )
     items = capture_items("transaction", "span")
 
-    with start_transaction(name="anthropic"):
-        await client.messages.create(**create_kwargs)
+    await client.messages.create(**create_kwargs)
 
     sentry_sdk.flush()
     spans = [item.payload for item in items if item.type == "span"]
@@ -545,8 +541,7 @@ def test_nonstreaming_create_message_data_collection_outputs(
     )
     items = capture_items("transaction", "span")
 
-    with start_transaction(name="anthropic"):
-        client.messages.create(**create_kwargs)
+    client.messages.create(**create_kwargs)
 
     sentry_sdk.flush()
     spans = [item.payload for item in items if item.type == "span"]
@@ -656,8 +651,7 @@ async def test_nonstreaming_create_message_data_collection_outputs_async(
     )
     items = capture_items("transaction", "span")
 
-    with start_transaction(name="anthropic"):
-        await client.messages.create(**create_kwargs)
+    await client.messages.create(**create_kwargs)
 
     sentry_sdk.flush()
     spans = [item.payload for item in items if item.type == "span"]
@@ -996,7 +990,7 @@ def test_streaming_create_message_data_collection(
         client._client,
         "send",
         return_value=response,
-    ), start_transaction(name="anthropic"):
+    ):
         message = client.messages.create(**create_kwargs)
         for _ in message:
             pass
@@ -1126,7 +1120,7 @@ def test_streaming_create_message_data_collection_outputs(
         client._client,
         "send",
         return_value=response,
-    ), start_transaction(name="anthropic"):
+    ):
         message = client.messages.create(**create_kwargs)
         for _ in message:
             pass
@@ -1592,9 +1586,7 @@ def test_stream_messages_data_collection_outputs(
         client._client,
         "send",
         return_value=response,
-    ), start_transaction(name="anthropic"), client.messages.stream(
-        **stream_kwargs
-    ) as stream:
+    ), client.messages.stream(**stream_kwargs) as stream:
         for _ in stream:
             pass
 
@@ -2073,7 +2065,7 @@ async def test_streaming_create_message_data_collection_outputs_async(
         client._client,
         "send",
         return_value=response,
-    ), start_transaction(name="anthropic"):
+    ):
         message = await client.messages.create(**create_kwargs)
         async for _ in message:
             pass
@@ -2554,7 +2546,7 @@ async def test_stream_messages_data_collection_outputs_async(
         client._client,
         "send",
         return_value=response,
-    ), start_transaction(name="anthropic"):
+    ):
         async with client.messages.stream(**stream_kwargs) as stream:
             async for _ in stream:
                 pass
@@ -3651,28 +3643,27 @@ def test_set_output_data_with_input_json_delta(sentry_init):
         trace_lifecycle="stream",
     )
 
-    with start_transaction(name="test"):
-        span = sentry_sdk.traces.start_span(name="test")
-        integration = AnthropicIntegration()
-        json_deltas = ["{'test': 'data',", "'more': 'json'}"]
-        _set_output_data(
-            span,
-            integration,
-            model="",
-            input_tokens=10,
-            output_tokens=20,
-            cache_read_input_tokens=0,
-            cache_write_input_tokens=0,
-            content_blocks=[{"text": "".join(json_deltas), "type": "text"}],
-        )
+    span = sentry_sdk.traces.start_span(name="test")
+    integration = AnthropicIntegration()
+    json_deltas = ["{'test': 'data',", "'more': 'json'}"]
+    _set_output_data(
+        span,
+        integration,
+        model="",
+        input_tokens=10,
+        output_tokens=20,
+        cache_read_input_tokens=0,
+        cache_write_input_tokens=0,
+        content_blocks=[{"text": "".join(json_deltas), "type": "text"}],
+    )
 
-        assert (
-            span._attributes.get(SPANDATA.GEN_AI_RESPONSE_TEXT)
-            == "{'test': 'data','more': 'json'}"
-        )
-        assert span._attributes.get(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS) == 10
-        assert span._attributes.get(SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS) == 20
-        assert span._attributes.get(SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS) == 30
+    assert (
+        span._attributes.get(SPANDATA.GEN_AI_RESPONSE_TEXT)
+        == "{'test': 'data','more': 'json'}"
+    )
+    assert span._attributes.get(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS) == 10
+    assert span._attributes.get(SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS) == 20
+    assert span._attributes.get(SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS) == 30
 
 
 # Test messages with mixed roles including "ai" that should be mapped to "assistant"
@@ -3725,10 +3716,7 @@ def test_anthropic_message_role_mapping(
     test_messages = [test_message]
     items = capture_items("span")
 
-    with start_transaction(name="anthropic tx"):
-        client.messages.create(
-            model="claude-3-opus", max_tokens=10, messages=test_messages
-        )
+    client.messages.create(model="claude-3-opus", max_tokens=10, messages=test_messages)
 
     sentry_sdk.flush()
     span = next(item.payload for item in items)
@@ -4748,8 +4736,7 @@ def test_message_with_url_image(
     ]
     items = capture_items("span")
 
-    with start_transaction(name="anthropic"):
-        client.messages.create(max_tokens=1024, messages=messages, model="model")
+    client.messages.create(max_tokens=1024, messages=messages, model="model")
 
     sentry_sdk.flush()
     spans = [item.payload for item in items]
@@ -4800,8 +4787,7 @@ def test_message_with_file_image(
     ]
     items = capture_items("span")
 
-    with start_transaction(name="anthropic"):
-        client.messages.create(max_tokens=1024, messages=messages, model="model")
+    client.messages.create(max_tokens=1024, messages=messages, model="model")
 
     sentry_sdk.flush()
     spans = [item.payload for item in items]
@@ -4851,8 +4837,7 @@ def test_message_with_url_pdf(
     ]
     items = capture_items("span")
 
-    with start_transaction(name="anthropic"):
-        client.messages.create(max_tokens=1024, messages=messages, model="model")
+    client.messages.create(max_tokens=1024, messages=messages, model="model")
 
     sentry_sdk.flush()
     spans = [item.payload for item in items]
@@ -4903,8 +4888,7 @@ def test_message_with_file_document(
     ]
     items = capture_items("span")
 
-    with start_transaction(name="anthropic"):
-        client.messages.create(max_tokens=1024, messages=messages, model="model")
+    client.messages.create(max_tokens=1024, messages=messages, model="model")
 
     sentry_sdk.flush()
     spans = [item.payload for item in items]
@@ -4955,8 +4939,7 @@ def test_binary_content_not_stored_when_pii_disabled(
     ]
     items = capture_items("span")
 
-    with start_transaction(name="anthropic"):
-        client.messages.create(max_tokens=1024, messages=messages, model="model")
+    client.messages.create(max_tokens=1024, messages=messages, model="model")
 
     sentry_sdk.flush()
     spans = [item.payload for item in items]
@@ -5000,8 +4983,7 @@ def test_binary_content_not_stored_when_prompts_disabled(
     ]
     items = capture_items("span")
 
-    with start_transaction(name="anthropic"):
-        client.messages.create(max_tokens=1024, messages=messages, model="model")
+    client.messages.create(max_tokens=1024, messages=messages, model="model")
 
     sentry_sdk.flush()
     spans = [item.payload for item in items]
@@ -5042,12 +5024,11 @@ def test_cache_tokens_nonstreaming(
     )
     items = capture_items("span")
 
-    with start_transaction(name="anthropic"):
-        client.messages.create(
-            max_tokens=1024,
-            messages=[{"role": "user", "content": "Hello"}],
-            model="claude-3-5-sonnet-20241022",
-        )
+    client.messages.create(
+        max_tokens=1024,
+        messages=[{"role": "user", "content": "Hello"}],
+        model="claude-3-5-sonnet-20241022",
+    )
 
     sentry_sdk.flush()
     (span,) = (item.payload for item in items)
@@ -5100,12 +5081,11 @@ def test_input_tokens_include_cache_write_nonstreaming(
     )
     items = capture_items("span")
 
-    with start_transaction(name="anthropic"):
-        client.messages.create(
-            max_tokens=1024,
-            messages=[{"role": "user", "content": "What is 3+3?"}],
-            model="claude-sonnet-4-20250514",
-        )
+    client.messages.create(
+        max_tokens=1024,
+        messages=[{"role": "user", "content": "What is 3+3?"}],
+        model="claude-sonnet-4-20250514",
+    )
 
     sentry_sdk.flush()
     (span,) = (item.payload for item in items)
@@ -5158,12 +5138,11 @@ def test_input_tokens_include_cache_read_nonstreaming(
     )
     items = capture_items("span")
 
-    with start_transaction(name="anthropic"):
-        client.messages.create(
-            max_tokens=1024,
-            messages=[{"role": "user", "content": "What is 5+5?"}],
-            model="claude-sonnet-4-20250514",
-        )
+    client.messages.create(
+        max_tokens=1024,
+        messages=[{"role": "user", "content": "What is 5+5?"}],
+        model="claude-sonnet-4-20250514",
+    )
 
     sentry_sdk.flush()
     (span,) = [item.payload for item in items]
@@ -5228,7 +5207,7 @@ def test_input_tokens_include_cache_read_streaming(
         client._client,
         "send",
         return_value=response,
-    ) as _, start_transaction(name="anthropic"):
+    ):
         for _ in client.messages.create(
             max_tokens=1024,
             messages=[{"role": "user", "content": "What is 5+5?"}],
@@ -5299,7 +5278,7 @@ def test_stream_messages_input_tokens_include_cache_read_streaming(
         client._client,
         "send",
         return_value=response,
-    ) as _, start_transaction(name="anthropic"), client.messages.stream(
+    ), client.messages.stream(
         max_tokens=1024,
         messages=[{"role": "user", "content": "What is 5+5?"}],
         model="claude-sonnet-4-20250514",
@@ -5351,12 +5330,11 @@ def test_input_tokens_unchanged_without_caching(
     )
     items = capture_items("span")
 
-    with start_transaction(name="anthropic"):
-        client.messages.create(
-            max_tokens=1024,
-            messages=[{"role": "user", "content": "What is 2+2?"}],
-            model="claude-sonnet-4-20250514",
-        )
+    client.messages.create(
+        max_tokens=1024,
+        messages=[{"role": "user", "content": "What is 2+2?"}],
+        model="claude-sonnet-4-20250514",
+    )
 
     sentry_sdk.flush()
     (span,) = (item.payload for item in items)
@@ -5414,7 +5392,7 @@ def test_cache_tokens_streaming(
         client._client,
         "send",
         return_value=response,
-    ) as _, start_transaction(name="anthropic"):
+    ):
         for _ in client.messages.create(
             max_tokens=1024,
             messages=[{"role": "user", "content": "Hello"}],
@@ -5482,7 +5460,7 @@ def test_stream_messages_cache_tokens(
         client._client,
         "send",
         return_value=response,
-    ) as _, start_transaction(name="anthropic"), client.messages.stream(
+    ), client.messages.stream(
         max_tokens=1024,
         messages=[{"role": "user", "content": "Hello"}],
         model="claude-3-5-sonnet-20241022",
