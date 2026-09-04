@@ -20,7 +20,7 @@ from sentry_sdk.utils import (
 )
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, Mapping, Optional, Union
+    from typing import Any, Dict, Optional, Union
 
     from botocore.model import ServiceId
 
@@ -132,37 +132,64 @@ def _get_client_span_attributes(
     return attributes
 
 
-def _get_response_span_attributes(
-    parsed: "Mapping[str, Any]",
-) -> "Dict[str, Any]":
-    metadata = parsed.get("ResponseMetadata")
+def _get_response_attributes(response: "Any") -> "Dict[str, Any]":
+    if not isinstance(response, dict):
+        return {}
+
+    metadata = response.get("ResponseMetadata")
     if not isinstance(metadata, dict):
         return {}
 
-    attributes = {}
+    attributes: "Dict[str, Any]" = {}
 
     status_code = metadata.get("HTTPStatusCode")
-    if status_code is not None:
+    # botocore injects HTTP status into `ResponseMetadata` after parsing.
+    # https://github.com/boto/botocore/blob/develop/botocore/parsers.py#L273-L284
+    if (
+        isinstance(status_code, int)
+        and not isinstance(status_code, bool)
+        and 100 <= status_code <= 599
+    ):
         attributes[SPANDATA.HTTP_STATUS_CODE] = status_code
+
+    retry_attempts = metadata.get("RetryAttempts")
+    # botocore represents retries as `attempts - 1`; omit zero.
+    # https://github.com/boto/botocore/blob/develop/botocore/endpoint.py#L221-L229
+    # https://opentelemetry.io/docs/specs/semconv/http/http-spans/#http-client-span
+    if (
+        isinstance(retry_attempts, int)
+        and not isinstance(retry_attempts, bool)
+        and retry_attempts > 0
+    ):
+        attributes["http.request.resend_count"] = retry_attempts
 
     headers = metadata.get("HTTPHeaders")
     if not isinstance(headers, dict):
         headers = {}
 
     request_id = metadata.get("RequestId")
-    if request_id is None:
-        request_id = (
-            headers.get("x-amzn-requestid")
-            or headers.get("x-amzn-request-id")
-            or headers.get("x-amz-request-id")
+    if not isinstance(request_id, str) or not request_id:
+        request_id = next(
+            (
+                value
+                for value in (
+                    headers.get("x-amzn-requestid"),
+                    headers.get("x-amzn-request-id"),
+                    headers.get("x-amz-request-id"),
+                )
+                if isinstance(value, str) and value
+            ),
+            None,
         )
-    if request_id is not None:
+    if isinstance(request_id, str) and request_id:
         attributes[SPANDATA.AWS_REQUEST_ID] = request_id
 
     # S3's `HostId` is the extended request ID returned in `x-amz-id-2`.
     # https://docs.aws.amazon.com/AmazonS3/latest/developerguide/get-request-ids.html
-    extended_request_id = metadata.get("HostId") or headers.get("x-amz-id-2")
-    if extended_request_id is not None:
+    extended_request_id = metadata.get("HostId")
+    if not isinstance(extended_request_id, str) or not extended_request_id:
+        extended_request_id = headers.get("x-amz-id-2")
+    if isinstance(extended_request_id, str) and extended_request_id:
         attributes[SPANDATA.AWS_EXTENDED_REQUEST_ID] = extended_request_id
 
     return attributes
@@ -174,8 +201,10 @@ def _get_error_type(exception: "BaseException") -> str:
         # identifies actual service-specific error, e.g. `AccessDenied`.
         # https://docs.aws.amazon.com/boto3/latest/guide/error-handling.html
         error = exception.response.get("Error")
-        if isinstance(error, dict) and error.get("Code") is not None:
-            return str(error["Code"])
+        if isinstance(error, dict):
+            error_code = error.get("Code")
+            if isinstance(error_code, str) and error_code:
+                return error_code
 
     # failures before a service response, have no error code. Use exception type
     # instead. https://opentelemetry.io/docs/specs/semconv/rpc/rpc-spans/
@@ -185,6 +214,15 @@ def _get_error_type(exception: "BaseException") -> str:
     if exception_module not in ("builtins", "__builtins__"):
         return "%s.%s" % (exception_module, exception_name)
     return exception_name
+
+
+def _get_error_attributes(exception: "BaseException") -> "Dict[str, Any]":
+    attributes = {}
+    if isinstance(exception, ClientError):
+        attributes.update(_get_response_attributes(exception.response))
+
+    attributes[SPANDATA.ERROR_TYPE] = _get_error_type(exception)
+    return attributes
 
 
 class Boto3Integration(Integration):
@@ -289,8 +327,10 @@ def _finish_client_span(
     span: "Union[Span, StreamedSpan]",
     parsed: "Dict[str, Any]",
 ) -> None:
-    # response metadata is only available after the call. Add before `__exit__()`.
-    _set_span_attributes(span, _get_response_span_attributes(parsed))
+    # response metadata is only available after the call. Keep enrichment
+    # isolated so failure cannot prevent `__exit__()` below.
+    with capture_internal_exceptions():
+        _set_span_attributes(span, _get_response_attributes(parsed))
     span.__exit__(None, None, None)
 
     body = parsed.get("Body")
@@ -332,10 +372,9 @@ def _finish_client_span(
             # enrichment must not replace exception raised by `orig_read()`.
             # finish span with error, then re-raise.
             with capture_internal_exceptions():
-                _set_span_attributes(
-                    streaming_span,
-                    {SPANDATA.ERROR_TYPE: _get_error_type(exc)},
-                )
+                _set_span_attributes(streaming_span, _get_error_attributes(exc))
+
+            with capture_internal_exceptions():
                 if isinstance(streaming_span, StreamedSpan):
                     streaming_span.__exit__(type(exc), exc, exc.__traceback__)
                 else:
@@ -359,11 +398,8 @@ def _finish_client_span_with_error(
     span: "Union[Span, StreamedSpan]",
     exception: "BaseException",
 ) -> None:
-    if isinstance(exception, ClientError):
-        _set_span_attributes(span, _get_response_span_attributes(exception.response))
-
-    # `error.type` is required when RPC operation fails.
-    _set_span_attributes(span, {SPANDATA.ERROR_TYPE: _get_error_type(exception)})
+    with capture_internal_exceptions():
+        _set_span_attributes(span, _get_error_attributes(exception))
     span.__exit__(type(exception), exception, exception.__traceback__)
 
 
