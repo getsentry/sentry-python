@@ -40,6 +40,7 @@ toxgen = [
     { name = "requests" },
 ]
 typing = [
+    { name = "aiohttp", specifier = ">=3.14.3" },
     { name = "anthropic", specifier = ">=1.2.0" },
     { name = "botocore-stubs" },
     { name = "certifi" },
