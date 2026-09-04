@@ -79,6 +79,7 @@ typing = [
     "openai>=3.7.0",
     "tiktoken>=0.14.0",
     "aiohttp>=3.14.3",
+    "litellm>=1.83.0",
 ]
 test = [
     "dataclasses ; python_full_version < '3.7'",

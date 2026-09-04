@@ -25,7 +25,7 @@ if TYPE_CHECKING:
     from typing import Any, Dict, List
 
 try:
-    import litellm  # type: ignore[import-not-found]
+    import litellm
     from litellm import failure_callback, input_callback, success_callback
 except ImportError:
     raise DidNotEnable("LiteLLM not installed")
