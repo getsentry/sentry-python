@@ -5,7 +5,6 @@ import sentry_sdk
 from sentry_sdk import consts
 from sentry_sdk.ai.monitoring import record_token_usage
 from sentry_sdk.ai.utils import (
-    get_start_span_function,
     set_data_normalized,
     transform_openai_content_part,
     truncate_and_annotate_embedding_inputs,
@@ -101,29 +100,17 @@ def _input_callback(kwargs: "Dict[str, Any]") -> None:
         operation = "chat"
 
     # Start a new span/transaction
-    if has_span_streaming_enabled(client.options):
-        span = sentry_sdk.traces.start_span(
-            name=f"{operation} {model}",
-            attributes={
-                "sentry.op": (
-                    consts.OP.GEN_AI_CHAT
-                    if operation == "chat"
-                    else consts.OP.GEN_AI_EMBEDDINGS
-                ),
-                "sentry.origin": LiteLLMIntegration.origin,
-            },
-        )
-    else:
-        span = get_start_span_function()(
-            op=(
+    span = sentry_sdk.traces.start_span(
+        name=f"{operation} {model}",
+        attributes={
+            "sentry.op": (
                 consts.OP.GEN_AI_CHAT
                 if operation == "chat"
                 else consts.OP.GEN_AI_EMBEDDINGS
             ),
-            name=f"{operation} {model}",
-            origin=LiteLLMIntegration.origin,
-        )
-        span.__enter__()
+            "sentry.origin": LiteLLMIntegration.origin,
+        },
+    )
 
     _store_span(kwargs, span)
 
