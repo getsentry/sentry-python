@@ -141,6 +141,27 @@ def test_transaction_or_segment_style(
         assert event["transaction_info"] == {"source": expected_source}
 
 
+def test_http_route(
+    sentry_init,
+    app,
+    capture_items,
+):
+    sentry_init(
+        integrations=[flask_sentry.FlaskIntegration()],
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+    )
+    items = capture_items("span")
+
+    client = app.test_client()
+    client.get("/message/123456")
+
+    sentry_sdk.flush()
+
+    (segment,) = (item.payload for item in items if item.payload.get("is_segment"))
+    assert segment["attributes"][SPANDATA.HTTP_ROUTE] == "/message/<int:message_id>"
+
+
 @pytest.mark.parametrize("debug", (True, False))
 @pytest.mark.parametrize("testing", (True, False))
 def test_errors(
