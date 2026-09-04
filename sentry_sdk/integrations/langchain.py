@@ -26,6 +26,7 @@ from sentry_sdk.tracing_utils import (
 )
 from sentry_sdk.utils import (
     capture_internal_exceptions,
+    event_from_exception,
     has_data_collection_enabled,
     logger,
 )
@@ -266,6 +267,15 @@ class LangchainIntegration(Integration):
         _patch_embeddings_provider(OllamaEmbeddings)
 
 
+def _capture_exception(exc: "Any", scope: "Optional[Any]" = None) -> None:
+    event, hint = event_from_exception(
+        exc,
+        client_options=sentry_sdk.get_client().options,
+        mechanism={"type": "langchain", "handled": False},
+    )
+    sentry_sdk.capture_event(event, hint=hint, scope=scope)
+
+
 class SentryLangchainCallback(BaseCallbackHandler):
     """Callback handler that creates Sentry spans."""
 
@@ -294,7 +304,7 @@ class SentryLangchainCallback(BaseCallbackHandler):
             if is_ignored:
                 span.__exit__(None, None, None)
             else:
-                sentry_sdk.capture_exception(
+                _capture_exception(
                     error, span._scope if isinstance(span, StreamedSpan) else span.scope
                 )
                 span.__exit__(type(error), error, error.__traceback__)
