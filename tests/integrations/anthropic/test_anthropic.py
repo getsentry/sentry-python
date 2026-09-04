@@ -172,12 +172,9 @@ def test_nonstreaming_create_message(
             "content": "Hello, Claude",
         },
     ]
-    items = capture_items("transaction", "span")
+    items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="anthropic"):
-        response = client.messages.create(
-            max_tokens=1024, messages=messages, model="model"
-        )
+    response = client.messages.create(max_tokens=1024, messages=messages, model="model")
 
     assert response == EXAMPLE_MESSAGE
     usage = response.usage
@@ -186,7 +183,7 @@ def test_nonstreaming_create_message(
     assert usage.output_tokens == 20
 
     sentry_sdk.flush()
-    spans = [item.payload for item in items if item.type == "span"]
+    spans = [item.payload for item in items]
     assert len(spans) == 2
 
     assert spans[1]["name"] == "anthropic"
@@ -291,12 +288,12 @@ def test_nonstreaming_create_message_data_collection(
         system="You are a helpful assistant.",
         messages=[{"role": "user", "content": "Hello, Claude"}],
     )
-    items = capture_items("transaction", "span")
+    items = capture_items("span")
 
     client.messages.create(**create_kwargs)
 
     sentry_sdk.flush()
-    spans = [item.payload for item in items if item.type == "span"]
+    spans = [item.payload for item in items]
     (span,) = [s for s in spans if s["attributes"]["sentry.op"] == OP.GEN_AI_CHAT]
     span_data = span["attributes"]
 
@@ -362,12 +359,12 @@ def test_nonstreaming_create_message_data_collection_tools(
         messages=[],
         tools=DATA_COLLECTION_EXAMPLE_TOOLS,
     )
-    items = capture_items("transaction", "span")
+    items = capture_items("span")
 
     client.messages.create(**create_kwargs)
 
     sentry_sdk.flush()
-    spans = [item.payload for item in items if item.type == "span"]
+    spans = [item.payload for item in items]
     (span,) = [s for s in spans if s["attributes"]["sentry.op"] == OP.GEN_AI_CHAT]
     span_data = span["attributes"]
 
@@ -439,12 +436,12 @@ async def test_nonstreaming_create_message_data_collection_async(
         system="You are a helpful assistant.",
         messages=[{"role": "user", "content": "Hello, Claude"}],
     )
-    items = capture_items("transaction", "span")
+    items = capture_items("span")
 
     await client.messages.create(**create_kwargs)
 
     sentry_sdk.flush()
-    spans = [item.payload for item in items if item.type == "span"]
+    spans = [item.payload for item in items]
     (span,) = [s for s in spans if s["attributes"]["sentry.op"] == OP.GEN_AI_CHAT]
     span_data = span["attributes"]
 
@@ -539,12 +536,12 @@ def test_nonstreaming_create_message_data_collection_outputs(
         messages=[{"role": "user", "content": "What is the weather in San Francisco?"}],
         tools=DATA_COLLECTION_EXAMPLE_TOOLS,
     )
-    items = capture_items("transaction", "span")
+    items = capture_items("span")
 
     client.messages.create(**create_kwargs)
 
     sentry_sdk.flush()
-    spans = [item.payload for item in items if item.type == "span"]
+    spans = [item.payload for item in items]
     (span,) = [s for s in spans if s["attributes"]["sentry.op"] == OP.GEN_AI_CHAT]
     span_data = span["attributes"]
 
@@ -649,12 +646,12 @@ async def test_nonstreaming_create_message_data_collection_outputs_async(
         messages=[{"role": "user", "content": "What is the weather in San Francisco?"}],
         tools=DATA_COLLECTION_EXAMPLE_TOOLS,
     )
-    items = capture_items("transaction", "span")
+    items = capture_items("span")
 
     await client.messages.create(**create_kwargs)
 
     sentry_sdk.flush()
-    spans = [item.payload for item in items if item.type == "span"]
+    spans = [item.payload for item in items]
     (span,) = [s for s in spans if s["attributes"]["sentry.op"] == OP.GEN_AI_CHAT]
     span_data = span["attributes"]
 
@@ -716,12 +713,11 @@ async def test_nonstreaming_create_message_async(
             "content": "Hello, Claude",
         },
     ]
-    items = capture_items("transaction", "span")
+    items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="anthropic"):
-        response = await client.messages.create(
-            max_tokens=1024, messages=messages, model="model"
-        )
+    response = await client.messages.create(
+        max_tokens=1024, messages=messages, model="model"
+    )
 
     assert response == EXAMPLE_MESSAGE
     usage = response.usage
@@ -730,7 +726,7 @@ async def test_nonstreaming_create_message_async(
     assert usage.output_tokens == 20
 
     sentry_sdk.flush()
-    spans = [item.payload for item in items if item.type == "span"]
+    spans = [item.payload for item in items]
     assert len(spans) == 2
 
     assert spans[1]["name"] == "anthropic"
@@ -842,13 +838,13 @@ def test_streaming_create_message(
             "content": "Hello, Claude",
         },
     ]
-    items = capture_items("transaction", "span")
+    items = capture_items("span")
 
     with mock.patch.object(
         client._client,
         "send",
         return_value=response,
-    ) as _, sentry_sdk.traces.start_span(name="anthropic"):
+    ):
         message = client.messages.create(
             max_tokens=1024, messages=messages, model="model", stream=True
         )
@@ -857,7 +853,7 @@ def test_streaming_create_message(
             pass
 
     sentry_sdk.flush()
-    spans = [item.payload for item in items if item.type == "span"]
+    spans = [item.payload for item in items]
     assert spans[1]["name"] == "anthropic"
     span = next(
         span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
@@ -984,7 +980,7 @@ def test_streaming_create_message_data_collection(
         messages=[{"role": "user", "content": "Hello, Claude"}],
         stream=True,
     )
-    items = capture_items("transaction", "span")
+    items = capture_items("span")
 
     with mock.patch.object(
         client._client,
@@ -996,7 +992,7 @@ def test_streaming_create_message_data_collection(
             pass
 
     sentry_sdk.flush()
-    spans = [item.payload for item in items if item.type == "span"]
+    spans = [item.payload for item in items]
     (span,) = [s for s in spans if s["attributes"]["sentry.op"] == OP.GEN_AI_CHAT]
     span_data = span["attributes"]
 
@@ -1114,7 +1110,7 @@ def test_streaming_create_message_data_collection_outputs(
         messages=[{"role": "user", "content": "Hello, Claude"}],
         stream=True,
     )
-    items = capture_items("transaction", "span")
+    items = capture_items("span")
 
     with mock.patch.object(
         client._client,
@@ -1126,7 +1122,7 @@ def test_streaming_create_message_data_collection_outputs(
             pass
 
     sentry_sdk.flush()
-    spans = [item.payload for item in items if item.type == "span"]
+    spans = [item.payload for item in items]
     (span,) = [s for s in spans if s["attributes"]["sentry.op"] == OP.GEN_AI_CHAT]
     span_data = span["attributes"]
 
@@ -1202,13 +1198,13 @@ def test_streaming_create_message_close(
             "content": "Hello, Claude",
         }
     ]
-    items = capture_items("transaction", "span")
+    items = capture_items("span")
 
     with mock.patch.object(
         client._client,
         "send",
         return_value=response,
-    ) as _, sentry_sdk.traces.start_span(name="anthropic"):
+    ):
         messages = client.messages.create(
             max_tokens=1024, messages=messages, model="model", stream=True
         )
@@ -1219,7 +1215,7 @@ def test_streaming_create_message_close(
         messages.close()
 
     sentry_sdk.flush()
-    spans = [item.payload for item in items if item.type == "span"]
+    spans = [item.payload for item in items]
     assert spans[1]["name"] == "anthropic"
     span = next(
         span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
@@ -1305,13 +1301,13 @@ def test_streaming_create_message_api_error(
             "content": "Hello, Claude",
         }
     ]
-    items = capture_items("transaction", "span")
+    items = capture_items("span")
 
     with pytest.raises(APIStatusError), mock.patch.object(
         client._client,
         "send",
         return_value=response,
-    ) as _, sentry_sdk.traces.start_span(name="anthropic"):
+    ):
         message = client.messages.create(
             max_tokens=1024, messages=messages, model="model", stream=True
         )
@@ -1320,7 +1316,7 @@ def test_streaming_create_message_api_error(
             pass
 
     sentry_sdk.flush()
-    spans = [item.payload for item in items if item.type == "span"]
+    spans = [item.payload for item in items]
     assert spans[1]["name"] == "anthropic"
     assert spans[1]["status"] == SpanStatus.ERROR
     span = next(
@@ -1425,13 +1421,13 @@ def test_stream_messages(
             "content": "Hello, Claude",
         },
     ]
-    items = capture_items("transaction", "span")
+    items = capture_items("span")
 
     with mock.patch.object(
         client._client,
         "send",
         return_value=response,
-    ) as _, sentry_sdk.traces.start_span(name="anthropic"), client.messages.stream(
+    ), client.messages.stream(
         max_tokens=1024,
         messages=messages,
         model="model",
@@ -1440,7 +1436,7 @@ def test_stream_messages(
             pass
 
     sentry_sdk.flush()
-    spans = [item.payload for item in items if item.type == "span"]
+    spans = [item.payload for item in items]
     assert spans[1]["name"] == "anthropic"
     span = next(
         span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
@@ -1580,7 +1576,7 @@ def test_stream_messages_data_collection_outputs(
         model="model",
         messages=[{"role": "user", "content": "Hello, Claude"}],
     )
-    items = capture_items("transaction", "span")
+    items = capture_items("span")
 
     with mock.patch.object(
         client._client,
@@ -1591,7 +1587,7 @@ def test_stream_messages_data_collection_outputs(
             pass
 
     sentry_sdk.flush()
-    spans = [item.payload for item in items if item.type == "span"]
+    spans = [item.payload for item in items]
     (span,) = [s for s in spans if s["attributes"]["sentry.op"] == OP.GEN_AI_CHAT]
     span_data = span["attributes"]
 
@@ -1667,13 +1663,13 @@ def test_stream_messages_close(
             "content": "Hello, Claude",
         }
     ]
-    items = capture_items("transaction", "span")
+    items = capture_items("span")
 
     with mock.patch.object(
         client._client,
         "send",
         return_value=response,
-    ) as _, sentry_sdk.traces.start_span(name="anthropic"), client.messages.stream(
+    ), client.messages.stream(
         max_tokens=1024,
         messages=messages,
         model="model",
@@ -1688,7 +1684,7 @@ def test_stream_messages_close(
         stream.close()
 
     sentry_sdk.flush()
-    spans = [item.payload for item in items if item.type == "span"]
+    spans = [item.payload for item in items]
     assert spans[1]["name"] == "anthropic"
     span = next(
         span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
@@ -1774,13 +1770,13 @@ def test_stream_messages_api_error(
             "content": "Hello, Claude",
         }
     ]
-    items = capture_items("transaction", "span")
+    items = capture_items("span")
 
     with pytest.raises(APIStatusError), mock.patch.object(
         client._client,
         "send",
         return_value=response,
-    ) as _, sentry_sdk.traces.start_span(name="anthropic"), client.messages.stream(
+    ), client.messages.stream(
         max_tokens=1024,
         messages=messages,
         model="model",
@@ -1789,7 +1785,7 @@ def test_stream_messages_api_error(
             pass
 
     sentry_sdk.flush()
-    spans = [item.payload for item in items if item.type == "span"]
+    spans = [item.payload for item in items]
     assert spans[1]["name"] == "anthropic"
     assert spans[1]["status"] == SpanStatus.ERROR
     span = next(
@@ -1899,13 +1895,13 @@ async def test_streaming_create_message_async(
             "content": "Hello, Claude",
         },
     ]
-    items = capture_items("transaction", "span")
+    items = capture_items("span")
 
     with mock.patch.object(
         client._client,
         "send",
         return_value=response,
-    ) as _, sentry_sdk.traces.start_span(name="anthropic"):
+    ):
         message = await client.messages.create(
             max_tokens=1024, messages=messages, model="model", stream=True
         )
@@ -1914,7 +1910,7 @@ async def test_streaming_create_message_async(
             pass
 
     sentry_sdk.flush()
-    spans = [item.payload for item in items if item.type == "span"]
+    spans = [item.payload for item in items]
     assert len(spans) == 2
 
     assert spans[1]["name"] == "anthropic"
@@ -2059,7 +2055,7 @@ async def test_streaming_create_message_data_collection_outputs_async(
         messages=[{"role": "user", "content": "Hello, Claude"}],
         stream=True,
     )
-    items = capture_items("transaction", "span")
+    items = capture_items("span")
 
     with mock.patch.object(
         client._client,
@@ -2071,7 +2067,7 @@ async def test_streaming_create_message_data_collection_outputs_async(
             pass
 
     sentry_sdk.flush()
-    spans = [item.payload for item in items if item.type == "span"]
+    spans = [item.payload for item in items]
     (span,) = [s for s in spans if s["attributes"]["sentry.op"] == OP.GEN_AI_CHAT]
     span_data = span["attributes"]
 
@@ -2151,13 +2147,13 @@ async def test_streaming_create_message_async_close(
             "content": "Hello, Claude",
         }
     ]
-    items = capture_items("transaction", "span")
+    items = capture_items("span")
 
     with mock.patch.object(
         client._client,
         "send",
         return_value=response,
-    ) as _, sentry_sdk.traces.start_span(name="anthropic"):
+    ):
         messages = await client.messages.create(
             max_tokens=1024, messages=messages, model="model", stream=True
         )
@@ -2167,7 +2163,7 @@ async def test_streaming_create_message_async_close(
         await messages.close()
 
     sentry_sdk.flush()
-    spans = [item.payload for item in items if item.type == "span"]
+    spans = [item.payload for item in items]
     assert spans[1]["name"] == "anthropic"
     span = next(
         span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
@@ -2257,13 +2253,13 @@ async def test_streaming_create_message_async_api_error(
             "content": "Hello, Claude",
         }
     ]
-    items = capture_items("transaction", "span")
+    items = capture_items("span")
 
     with pytest.raises(APIStatusError), mock.patch.object(
         client._client,
         "send",
         return_value=response,
-    ) as _, sentry_sdk.traces.start_span(name="anthropic"):
+    ):
         message = await client.messages.create(
             max_tokens=1024, messages=messages, model="model", stream=True
         )
@@ -2272,7 +2268,7 @@ async def test_streaming_create_message_async_api_error(
             pass
 
     sentry_sdk.flush()
-    spans = [item.payload for item in items if item.type == "span"]
+    spans = [item.payload for item in items]
     assert spans[1]["name"] == "anthropic"
     assert spans[1]["status"] == SpanStatus.ERROR
     span = next(
@@ -2381,13 +2377,13 @@ async def test_stream_message_async(
             "content": "Hello, Claude",
         },
     ]
-    items = capture_items("transaction", "span")
+    items = capture_items("span")
 
     with mock.patch.object(
         client._client,
         "send",
         return_value=response,
-    ) as _, sentry_sdk.traces.start_span(name="anthropic"):
+    ):
         async with client.messages.stream(
             max_tokens=1024,
             messages=messages,
@@ -2397,7 +2393,7 @@ async def test_stream_message_async(
                 pass
 
     sentry_sdk.flush()
-    spans = [item.payload for item in items if item.type == "span"]
+    spans = [item.payload for item in items]
     assert len(spans) == 2
 
     assert spans[1]["name"] == "anthropic"
@@ -2540,7 +2536,7 @@ async def test_stream_messages_data_collection_outputs_async(
         model="model",
         messages=[{"role": "user", "content": "Hello, Claude"}],
     )
-    items = capture_items("transaction", "span")
+    items = capture_items("span")
 
     with mock.patch.object(
         client._client,
@@ -2552,7 +2548,7 @@ async def test_stream_messages_data_collection_outputs_async(
                 pass
 
     sentry_sdk.flush()
-    spans = [item.payload for item in items if item.type == "span"]
+    spans = [item.payload for item in items]
     (span,) = [s for s in spans if s["attributes"]["sentry.op"] == OP.GEN_AI_CHAT]
     span_data = span["attributes"]
 
@@ -2631,13 +2627,13 @@ async def test_stream_messages_async_api_error(
             "content": "Hello, Claude",
         }
     ]
-    items = capture_items("transaction", "span")
+    items = capture_items("span")
 
     with pytest.raises(APIStatusError), mock.patch.object(
         client._client,
         "send",
         return_value=response,
-    ) as _, sentry_sdk.traces.start_span(name="anthropic"):
+    ):
         async with client.messages.stream(
             max_tokens=1024,
             messages=messages,
@@ -2647,7 +2643,7 @@ async def test_stream_messages_async_api_error(
                 pass
 
     sentry_sdk.flush()
-    spans = [item.payload for item in items if item.type == "span"]
+    spans = [item.payload for item in items]
     assert spans[1]["name"] == "anthropic"
     span = next(
         span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
@@ -2740,13 +2736,13 @@ async def test_stream_messages_async_close(
             "content": "Hello, Claude",
         }
     ]
-    items = capture_items("transaction", "span")
+    items = capture_items("span")
 
     with mock.patch.object(
         client._client,
         "send",
         return_value=response,
-    ) as _, sentry_sdk.traces.start_span(name="anthropic"):
+    ):
         async with client.messages.stream(
             max_tokens=1024,
             messages=messages,
@@ -2764,7 +2760,7 @@ async def test_stream_messages_async_close(
             await stream.close()
 
     sentry_sdk.flush()
-    spans = [item.payload for item in items if item.type == "span"]
+    spans = [item.payload for item in items]
     assert spans[1]["name"] == "anthropic"
     span = next(
         span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
@@ -2896,13 +2892,13 @@ def test_streaming_create_message_with_input_json_delta(
             "content": "What is the weather like in San Francisco?",
         }
     ]
-    items = capture_items("transaction", "span")
+    items = capture_items("span")
 
     with mock.patch.object(
         client._client,
         "send",
         return_value=response,
-    ) as _, sentry_sdk.traces.start_span(name="anthropic"):
+    ):
         message = client.messages.create(
             max_tokens=1024, messages=messages, model="model", stream=True
         )
@@ -2911,7 +2907,7 @@ def test_streaming_create_message_with_input_json_delta(
             pass
 
     sentry_sdk.flush()
-    spans = [item.payload for item in items if item.type == "span"]
+    spans = [item.payload for item in items]
     assert len(spans) == 2
 
     assert spans[1]["name"] == "anthropic"
@@ -3046,13 +3042,13 @@ def test_stream_messages_with_input_json_delta(
             "content": "What is the weather like in San Francisco?",
         }
     ]
-    items = capture_items("transaction", "span")
+    items = capture_items("span")
 
     with mock.patch.object(
         client._client,
         "send",
         return_value=response,
-    ) as _, sentry_sdk.traces.start_span(name="anthropic"), client.messages.stream(
+    ), client.messages.stream(
         max_tokens=1024,
         messages=messages,
         model="model",
@@ -3061,7 +3057,7 @@ def test_stream_messages_with_input_json_delta(
             pass
 
     sentry_sdk.flush()
-    spans = [item.payload for item in items if item.type == "span"]
+    spans = [item.payload for item in items]
     assert len(spans) == 2
 
     assert spans[1]["name"] == "anthropic"
@@ -3203,13 +3199,13 @@ async def test_streaming_create_message_with_input_json_delta_async(
             "content": "What is the weather like in San Francisco?",
         }
     ]
-    items = capture_items("transaction", "span")
+    items = capture_items("span")
 
     with mock.patch.object(
         client._client,
         "send",
         return_value=response,
-    ) as _, sentry_sdk.traces.start_span(name="anthropic"):
+    ):
         message = await client.messages.create(
             max_tokens=1024, messages=messages, model="model", stream=True
         )
@@ -3218,7 +3214,7 @@ async def test_streaming_create_message_with_input_json_delta_async(
             pass
 
     sentry_sdk.flush()
-    spans = [item.payload for item in items if item.type == "span"]
+    spans = [item.payload for item in items]
     assert len(spans) == 2
 
     assert spans[1]["name"] == "anthropic"
@@ -3361,13 +3357,13 @@ async def test_stream_message_with_input_json_delta_async(
             "content": "What is the weather like in San Francisco?",
         }
     ]
-    items = capture_items("transaction", "span")
+    items = capture_items("span")
 
     with mock.patch.object(
         client._client,
         "send",
         return_value=response,
-    ) as _, sentry_sdk.traces.start_span(name="anthropic"):
+    ):
         async with client.messages.stream(
             max_tokens=1024,
             messages=messages,
@@ -3377,7 +3373,7 @@ async def test_stream_message_with_input_json_delta_async(
                 pass
 
     sentry_sdk.flush()
-    spans = [item.payload for item in items if item.type == "span"]
+    spans = [item.payload for item in items]
     assert len(spans) == 2
 
     assert spans[1]["name"] == "anthropic"
@@ -3448,17 +3444,16 @@ def test_span_status_error(
     )
     items = capture_items("event", "span")
 
-    with sentry_sdk.traces.start_span(name="anthropic"):
-        client = Anthropic(api_key="z")
-        client.messages._post = mock.Mock(
-            side_effect=AnthropicError("API rate limit reached")
+    client = Anthropic(api_key="z")
+    client.messages._post = mock.Mock(
+        side_effect=AnthropicError("API rate limit reached")
+    )
+    with pytest.raises(AnthropicError):
+        client.messages.create(
+            model="some-model",
+            messages=[{"role": "system", "content": "I'm throwing an exception"}],
+            max_tokens=1024,
         )
-        with pytest.raises(AnthropicError):
-            client.messages.create(
-                model="some-model",
-                messages=[{"role": "system", "content": "I'm throwing an exception"}],
-                max_tokens=1024,
-            )
 
     (error,) = (item.payload for item in items if item.type == "event")
     assert error["level"] == "error"
@@ -3483,17 +3478,16 @@ async def test_span_status_error_async(
     )
     items = capture_items("event", "span")
 
-    with sentry_sdk.traces.start_span(name="anthropic"):
-        client = AsyncAnthropic(api_key="z")
-        client.messages._post = AsyncMock(
-            side_effect=AnthropicError("API rate limit reached")
+    client = AsyncAnthropic(api_key="z")
+    client.messages._post = AsyncMock(
+        side_effect=AnthropicError("API rate limit reached")
+    )
+    with pytest.raises(AnthropicError):
+        await client.messages.create(
+            model="some-model",
+            messages=[{"role": "system", "content": "I'm throwing an exception"}],
+            max_tokens=1024,
         )
-        with pytest.raises(AnthropicError):
-            await client.messages.create(
-                model="some-model",
-                messages=[{"role": "system", "content": "I'm throwing an exception"}],
-                max_tokens=1024,
-            )
 
     (error,) = (item.payload for item in items if item.type == "event")
     assert error["level"] == "error"
@@ -3554,13 +3548,12 @@ def test_span_origin(
             "content": "Hello, Claude",
         }
     ]
-    items = capture_items("transaction", "span")
+    items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="anthropic"):
-        client.messages.create(max_tokens=1024, messages=messages, model="model")
+    client.messages.create(max_tokens=1024, messages=messages, model="model")
 
     sentry_sdk.flush()
-    spans = [item.payload for item in items if item.type == "span"]
+    spans = [item.payload for item in items]
     assert spans[1]["attributes"]["sentry.origin"] == "manual"
     assert spans[0]["attributes"]["sentry.origin"] == "auto.ai.anthropic"
     assert spans[0]["attributes"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
@@ -3588,13 +3581,12 @@ async def test_span_origin_async(
             "content": "Hello, Claude",
         }
     ]
-    items = capture_items("transaction", "span")
+    items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="anthropic"):
-        await client.messages.create(max_tokens=1024, messages=messages, model="model")
+    await client.messages.create(max_tokens=1024, messages=messages, model="model")
 
     sentry_sdk.flush()
-    spans = [item.payload for item in items if item.type == "span"]
+    spans = [item.payload for item in items]
     assert spans[1]["attributes"]["sentry.origin"] == "manual"
     assert spans[0]["attributes"]["sentry.origin"] == "auto.ai.anthropic"
     assert spans[0]["attributes"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
@@ -3766,15 +3758,14 @@ def test_nonstreaming_create_message_with_system_prompt(
             "content": "Hello, Claude",
         }
     ]
-    items = capture_items("transaction", "span")
+    items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="anthropic"):
-        response = client.messages.create(
-            max_tokens=1024,
-            messages=messages,
-            model="model",
-            system="You are a helpful assistant.",
-        )
+    response = client.messages.create(
+        max_tokens=1024,
+        messages=messages,
+        model="model",
+        system="You are a helpful assistant.",
+    )
 
     assert response == EXAMPLE_MESSAGE
     usage = response.usage
@@ -3783,7 +3774,7 @@ def test_nonstreaming_create_message_with_system_prompt(
     assert usage.output_tokens == 20
 
     sentry_sdk.flush()
-    spans = [item.payload for item in items if item.type == "span"]
+    spans = [item.payload for item in items]
     assert len(spans) == 2
 
     assert spans[1]["name"] == "anthropic"
@@ -3858,15 +3849,14 @@ async def test_nonstreaming_create_message_with_system_prompt_async(
             "content": "Hello, Claude",
         }
     ]
-    items = capture_items("transaction", "span")
+    items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="anthropic"):
-        response = await client.messages.create(
-            max_tokens=1024,
-            messages=messages,
-            model="model",
-            system="You are a helpful assistant.",
-        )
+    response = await client.messages.create(
+        max_tokens=1024,
+        messages=messages,
+        model="model",
+        system="You are a helpful assistant.",
+    )
 
     assert response == EXAMPLE_MESSAGE
     usage = response.usage
@@ -3875,7 +3865,7 @@ async def test_nonstreaming_create_message_with_system_prompt_async(
     assert usage.output_tokens == 20
 
     sentry_sdk.flush()
-    spans = [item.payload for item in items if item.type == "span"]
+    spans = [item.payload for item in items]
     assert len(spans) == 2
 
     assert spans[1]["name"] == "anthropic"
@@ -3987,13 +3977,13 @@ def test_streaming_create_message_with_system_prompt(
             "content": "Hello, Claude",
         }
     ]
-    items = capture_items("transaction", "span")
+    items = capture_items("span")
 
     with mock.patch.object(
         client._client,
         "send",
         return_value=response,
-    ) as _, sentry_sdk.traces.start_span(name="anthropic"):
+    ):
         message = client.messages.create(
             max_tokens=1024,
             messages=messages,
@@ -4006,7 +3996,7 @@ def test_streaming_create_message_with_system_prompt(
             pass
 
     sentry_sdk.flush()
-    spans = [item.payload for item in items if item.type == "span"]
+    spans = [item.payload for item in items]
     assert len(spans) == 2
 
     assert spans[1]["name"] == "anthropic"
@@ -4118,13 +4108,13 @@ def test_stream_messages_with_system_prompt(
             "content": "Hello, Claude",
         }
     ]
-    items = capture_items("transaction", "span")
+    items = capture_items("span")
 
     with mock.patch.object(
         client._client,
         "send",
         return_value=response,
-    ) as _, sentry_sdk.traces.start_span(name="anthropic"), client.messages.stream(
+    ), client.messages.stream(
         max_tokens=1024,
         messages=messages,
         model="model",
@@ -4134,7 +4124,7 @@ def test_stream_messages_with_system_prompt(
             pass
 
     sentry_sdk.flush()
-    spans = [item.payload for item in items if item.type == "span"]
+    spans = [item.payload for item in items]
     assert len(spans) == 2
 
     assert spans[1]["name"] == "anthropic"
@@ -4248,13 +4238,13 @@ async def test_stream_message_with_system_prompt_async(
             "content": "Hello, Claude",
         }
     ]
-    items = capture_items("transaction", "span")
+    items = capture_items("span")
 
     with mock.patch.object(
         client._client,
         "send",
         return_value=response,
-    ) as _, sentry_sdk.traces.start_span(name="anthropic"):
+    ):
         async with client.messages.stream(
             max_tokens=1024,
             messages=messages,
@@ -4265,7 +4255,7 @@ async def test_stream_message_with_system_prompt_async(
                 pass
 
     sentry_sdk.flush()
-    spans = [item.payload for item in items if item.type == "span"]
+    spans = [item.payload for item in items]
     assert len(spans) == 2
 
     assert spans[1]["name"] == "anthropic"
@@ -4380,13 +4370,13 @@ async def test_streaming_create_message_with_system_prompt_async(
             "content": "Hello, Claude",
         }
     ]
-    items = capture_items("transaction", "span")
+    items = capture_items("span")
 
     with mock.patch.object(
         client._client,
         "send",
         return_value=response,
-    ) as _, sentry_sdk.traces.start_span(name="anthropic"):
+    ):
         message = await client.messages.create(
             max_tokens=1024,
             messages=messages,
@@ -4399,7 +4389,7 @@ async def test_streaming_create_message_with_system_prompt_async(
             pass
 
     sentry_sdk.flush()
-    spans = [item.payload for item in items if item.type == "span"]
+    spans = [item.payload for item in items]
 
     assert spans[1]["name"] == "anthropic"
     assert len(spans) == 2
@@ -4471,10 +4461,9 @@ def test_system_prompt_with_complex_structure(
     ]
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="anthropic"):
-        response = client.messages.create(
-            max_tokens=1024, messages=messages, model="model", system=system_prompt
-        )
+    response = client.messages.create(
+        max_tokens=1024, messages=messages, model="model", system=system_prompt
+    )
 
     assert response == EXAMPLE_MESSAGE
 
