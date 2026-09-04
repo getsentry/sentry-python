@@ -5,7 +5,6 @@ import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.traces import StreamedSpan
-from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import has_data_collection_enabled
 
 try:
@@ -210,41 +209,27 @@ def ai_client_span(
 
     client_options = sentry_sdk.get_client().options
 
-    span_streaming = has_span_streaming_enabled(client_options)
-    if span_streaming:
-        span = sentry_sdk.traces.start_span(
-            name=f"chat {model_name}",
-            attributes={
-                "sentry.op": OP.GEN_AI_CHAT,
-                "sentry.origin": SPAN_ORIGIN,
-                SPANDATA.GEN_AI_OPERATION_NAME: "chat",
-            },
-        )
-
-        set_on_span = span.set_attribute
-    else:
-        span = sentry_sdk.start_span(
-            op=OP.GEN_AI_CHAT,
-            name=f"chat {model_name}",
-            origin=SPAN_ORIGIN,
-        )
-        # TODO-anton: remove hardcoded stuff and replace something that also works for embedding and so on
-        span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "chat")
-
-        set_on_span = span.set_data
+    span = sentry_sdk.traces.start_span(
+        name=f"chat {model_name}",
+        attributes={
+            "sentry.op": OP.GEN_AI_CHAT,
+            "sentry.origin": SPAN_ORIGIN,
+            SPANDATA.GEN_AI_OPERATION_NAME: "chat",
+        },
+    )
 
     _set_agent_data(span, agent)
 
     if has_data_collection_enabled(client_options):
         if client_options["data_collection"]["gen_ai"]["inputs"]:
-            set_on_span(
+            span.set_attribute(
                 SPANDATA.GEN_AI_TOOL_DEFINITIONS,
                 json.dumps(_transform_tool_definitions(agent.tools)),
             )
     else:
         # This is set unconditionally prior to data collection being introduced.
         # Remove this block once data collection is fully rolled out
-        set_on_span(
+        span.set_attribute(
             SPANDATA.GEN_AI_TOOL_DEFINITIONS,
             json.dumps(_transform_tool_definitions(agent.tools)),
         )
@@ -255,7 +240,7 @@ def ai_client_span(
 
 
 def update_ai_client_span(
-    span: "Union[sentry_sdk.tracing.Span, StreamedSpan]",
+    span: "StreamedSpan",
     response: "Any",
     response_model: "Optional[str]" = None,
     agent: "Optional[Agent]" = None,
@@ -267,17 +252,13 @@ def update_ai_client_span(
     if hasattr(response, "output") and response.output:
         _set_output_data(span, response)
 
-    set_on_span = (
-        span.set_attribute if isinstance(span, StreamedSpan) else span.set_data
-    )
-
     if response_model is not None:
-        set_on_span(SPANDATA.GEN_AI_RESPONSE_MODEL, response_model)
+        span.set_attribute(SPANDATA.GEN_AI_RESPONSE_MODEL, response_model)
     elif hasattr(response, "model") and response.model:
-        set_on_span(SPANDATA.GEN_AI_RESPONSE_MODEL, str(response.model))
+        span.set_attribute(SPANDATA.GEN_AI_RESPONSE_MODEL, str(response.model))
 
     # Set conversation ID from agent if available
     if agent:
         conv_id = getattr(agent, "_sentry_conversation_id", None)
         if conv_id:
-            set_on_span(SPANDATA.GEN_AI_CONVERSATION_ID, conv_id)
+            span.set_attribute(SPANDATA.GEN_AI_CONVERSATION_ID, conv_id)

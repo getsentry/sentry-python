@@ -2,7 +2,6 @@ from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk.ai.utils import (
-    get_start_span_function,
     normalize_message_roles,
     set_data_normalized,
     truncate_and_annotate_messages,
@@ -28,26 +27,14 @@ def invoke_agent_span(
     context: "agents.RunContextWrapper", agent: "agents.Agent", kwargs: "dict[str, Any]"
 ) -> "Union[sentry_sdk.tracing.Span, StreamedSpan]":
     client_options = sentry_sdk.get_client().options
-    span_streaming = has_span_streaming_enabled(client_options)
-    if span_streaming:
-        span = sentry_sdk.traces.start_span(
-            name=f"invoke_agent {agent.name}",
-            attributes={
-                "sentry.op": OP.GEN_AI_INVOKE_AGENT,
-                "sentry.origin": SPAN_ORIGIN,
-                SPANDATA.GEN_AI_OPERATION_NAME: "invoke_agent",
-            },
-        )
-    else:
-        start_span_function = get_start_span_function()
-        span = start_span_function(
-            op=OP.GEN_AI_INVOKE_AGENT,
-            name=f"invoke_agent {agent.name}",
-            origin=SPAN_ORIGIN,
-        )
-        span.__enter__()
-
-        span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "invoke_agent")
+    span = sentry_sdk.traces.start_span(
+        name=f"invoke_agent {agent.name}",
+        attributes={
+            "sentry.op": OP.GEN_AI_INVOKE_AGENT,
+            "sentry.origin": SPAN_ORIGIN,
+            SPANDATA.GEN_AI_OPERATION_NAME: "invoke_agent",
+        },
+    )
 
     record_inputs = False
     if has_data_collection_enabled(client_options):
