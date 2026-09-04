@@ -77,7 +77,6 @@ typing = [
     "anthropic>=1.2.0",
     "google-genai>=2.21.0",
     "openai>=3.7.0",
-    "openai-agents>=0.22.0",
     "tiktoken>=0.14.0",
 ]
 test = [
