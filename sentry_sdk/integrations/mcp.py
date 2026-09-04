@@ -817,7 +817,7 @@ async def _resource_handler_wrapper(
     elif original_kwargs.get("uri"):
         handler_name = str(original_kwargs["uri"])
 
-    arguments = {}
+    arguments: "dict[str, Any]" = {}
 
     ctx = None
     try:
