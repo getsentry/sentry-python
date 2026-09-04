@@ -176,6 +176,7 @@ def test_presigned_urls_do_not_require_sentry_headers(sentry_init):
         traces_sample_rate=1.0,
         default_integrations=False,
         integrations=[Boto3Integration(), StdlibIntegration()],
+        trace_lifecycle="stream",
     )
     client = boto3.client(  # type: ignore[attr-defined]
         "s3",
