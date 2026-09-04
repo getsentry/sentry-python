@@ -36,7 +36,6 @@ from litellm.llms.custom_httpx.http_handler import AsyncHTTPHandler, HTTPHandler
 from openai import AsyncOpenAI, OpenAI
 from openai.types import CompletionUsage
 
-from sentry_sdk import start_transaction
 from sentry_sdk._types import BLOB_DATA_SUBSTITUTE
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.litellm import (
@@ -383,7 +382,7 @@ def test_streaming_chat_completion(
         client.completions._client._client,
         "send",
         return_value=model_response,
-    ), start_transaction(name="litellm test"):
+    ):
         response = litellm.completion(
             model="gpt-3.5-turbo",
             messages=messages,
@@ -460,7 +459,7 @@ async def test_async_streaming_chat_completion(
         client.completions._client._client,
         "send",
         return_value=model_response,
-    ), start_transaction(name="litellm test"):
+    ):
         response = await litellm.acompletion(
             model="gpt-3.5-turbo",
             messages=messages,
@@ -523,14 +522,13 @@ def test_embeddings_create(
         "send",
         return_value=model_response,
     ):
-        with start_transaction(name="litellm test"):
-            response = litellm.embedding(
-                model="text-embedding-ada-002",
-                input="Hello, world!",
-                client=client,
-            )
-            # Allow time for callbacks to complete (they may run in separate threads)
-            time.sleep(0.1)
+        response = litellm.embedding(
+            model="text-embedding-ada-002",
+            input="Hello, world!",
+            client=client,
+        )
+        # Allow time for callbacks to complete (they may run in separate threads)
+        time.sleep(0.1)
 
         # Response is processed by litellm, so just check it exists
         assert response is not None
@@ -595,15 +593,14 @@ async def test_async_embeddings_create(
         "send",
         return_value=model_response,
     ):
-        with start_transaction(name="litellm test"):
-            response = await litellm.aembedding(
-                model="text-embedding-ada-002",
-                input="Hello, world!",
-                client=client,
-            )
+        response = await litellm.aembedding(
+            model="text-embedding-ada-002",
+            input="Hello, world!",
+            client=client,
+        )
 
-            await GLOBAL_LOGGING_WORKER.flush()
-            await asyncio.sleep(0.5)
+        await GLOBAL_LOGGING_WORKER.flush()
+        await asyncio.sleep(0.5)
 
         # Response is processed by litellm, so just check it exists
         assert response is not None
@@ -662,14 +659,13 @@ def test_embeddings_create_with_list_input(
         "send",
         return_value=model_response,
     ):
-        with start_transaction(name="litellm test"):
-            response = litellm.embedding(
-                model="text-embedding-ada-002",
-                input=["First text", "Second text", "Third text"],
-                client=client,
-            )
-            # Allow time for callbacks to complete (they may run in separate threads)
-            time.sleep(0.1)
+        response = litellm.embedding(
+            model="text-embedding-ada-002",
+            input=["First text", "Second text", "Third text"],
+            client=client,
+        )
+        # Allow time for callbacks to complete (they may run in separate threads)
+        time.sleep(0.1)
 
         # Response is processed by litellm, so just check it exists
         assert response is not None
@@ -728,15 +724,14 @@ async def test_async_embeddings_create_with_list_input(
         "send",
         return_value=model_response,
     ):
-        with start_transaction(name="litellm test"):
-            response = await litellm.aembedding(
-                model="text-embedding-ada-002",
-                input=["First text", "Second text", "Third text"],
-                client=client,
-            )
+        response = await litellm.aembedding(
+            model="text-embedding-ada-002",
+            input=["First text", "Second text", "Third text"],
+            client=client,
+        )
 
-            await GLOBAL_LOGGING_WORKER.flush()
-            await asyncio.sleep(0.5)
+        await GLOBAL_LOGGING_WORKER.flush()
+        await asyncio.sleep(0.5)
 
         # Response is processed by litellm, so just check it exists
         assert response is not None
@@ -793,14 +788,13 @@ def test_embeddings_no_pii(
         "send",
         return_value=model_response,
     ):
-        with start_transaction(name="litellm test"):
-            response = litellm.embedding(
-                model="text-embedding-ada-002",
-                input="Hello, world!",
-                client=client,
-            )
-            # Allow time for callbacks to complete (they may run in separate threads)
-            time.sleep(0.1)
+        response = litellm.embedding(
+            model="text-embedding-ada-002",
+            input="Hello, world!",
+            client=client,
+        )
+        # Allow time for callbacks to complete (they may run in separate threads)
+        time.sleep(0.1)
 
         # Response is processed by litellm, so just check it exists
         assert response is not None
@@ -851,15 +845,14 @@ async def test_async_embeddings_no_pii(
         "send",
         return_value=model_response,
     ):
-        with start_transaction(name="litellm test"):
-            response = await litellm.aembedding(
-                model="text-embedding-ada-002",
-                input="Hello, world!",
-                client=client,
-            )
+        response = await litellm.aembedding(
+            model="text-embedding-ada-002",
+            input="Hello, world!",
+            client=client,
+        )
 
-            await GLOBAL_LOGGING_WORKER.flush()
-            await asyncio.sleep(0.5)
+        await GLOBAL_LOGGING_WORKER.flush()
+        await asyncio.sleep(0.5)
 
         # Response is processed by litellm, so just check it exists
         assert response is not None
@@ -903,7 +896,7 @@ def test_exception_handling(
         client.completions._client._client,
         "send",
         return_value=model_response,
-    ), start_transaction(name="litellm test"), pytest.raises(litellm.RateLimitError):
+    ), pytest.raises(litellm.RateLimitError):
         litellm.completion(
             model="gpt-3.5-turbo",
             messages=messages,
@@ -939,7 +932,7 @@ async def test_async_exception_handling(
         client.embeddings._client._client,
         "send",
         return_value=model_response,
-    ), start_transaction(name="litellm test"), pytest.raises(litellm.RateLimitError):
+    ), pytest.raises(litellm.RateLimitError):
         await litellm.acompletion(
             model="gpt-3.5-turbo",
             messages=messages,
@@ -1256,7 +1249,7 @@ def test_additional_parameters(
         client.completions._client._client,
         "send",
         return_value=model_response,
-    ), start_transaction(name="litellm test"):
+    ):
         litellm.completion(
             model="gpt-3.5-turbo",
             messages=messages,
@@ -1327,7 +1320,7 @@ async def test_async_additional_parameters(
         client.completions._client._client,
         "send",
         return_value=model_response,
-    ), start_transaction(name="litellm test"):
+    ):
         await litellm.acompletion(
             model="gpt-3.5-turbo",
             messages=messages,
@@ -1398,7 +1391,7 @@ def test_no_integration(
         client.completions._client._client,
         "send",
         return_value=model_response,
-    ), start_transaction(name="litellm test"):
+    ):
         litellm.completion(
             model="gpt-3.5-turbo",
             messages=messages,
@@ -1456,7 +1449,7 @@ async def test_async_no_integration(
         client.completions._client._client,
         "send",
         return_value=model_response,
-    ), start_transaction(name="litellm test"):
+    ):
         await litellm.acompletion(
             model="gpt-3.5-turbo",
             messages=messages,
@@ -1502,19 +1495,18 @@ def test_response_without_usage(
     )()
     items = capture_items("span")
 
-    with start_transaction(name="litellm test"):
-        kwargs = {
-            "model": "gpt-3.5-turbo",
-            "messages": messages,
-        }
+    kwargs = {
+        "model": "gpt-3.5-turbo",
+        "messages": messages,
+    }
 
-        _input_callback(kwargs)
-        _success_callback(
-            kwargs,
-            mock_response,
-            datetime.now(),
-            datetime.now(),
-        )
+    _input_callback(kwargs)
+    _success_callback(
+        kwargs,
+        mock_response,
+        datetime.now(),
+        datetime.now(),
+    )
 
     sentry_sdk.flush()
     (span,) = (item.payload for item in items)
@@ -1593,7 +1585,7 @@ def test_binary_content_encoding_image_url(
         client.completions._client._client,
         "send",
         return_value=model_response,
-    ), start_transaction(name="litellm test"):
+    ):
         litellm.completion(
             model="gpt-4-vision-preview",
             messages=messages,
@@ -1684,7 +1676,7 @@ async def test_async_binary_content_encoding_image_url(
         client.completions._client._client,
         "send",
         return_value=model_response,
-    ), start_transaction(name="litellm test"):
+    ):
         await litellm.acompletion(
             model="gpt-4-vision-preview",
             messages=messages,
@@ -1777,7 +1769,7 @@ def test_binary_content_encoding_mixed_content(
         client.completions._client._client,
         "send",
         return_value=model_response,
-    ), start_transaction(name="litellm test"):
+    ):
         litellm.completion(
             model="gpt-4-vision-preview",
             messages=messages,
@@ -1857,7 +1849,7 @@ async def test_async_binary_content_encoding_mixed_content(
         client.completions._client._client,
         "send",
         return_value=model_response,
-    ), start_transaction(name="litellm test"):
+    ):
         await litellm.acompletion(
             model="gpt-4-vision-preview",
             messages=messages,
@@ -1935,7 +1927,7 @@ def test_binary_content_encoding_uri_type(
         client.completions._client._client,
         "send",
         return_value=model_response,
-    ), start_transaction(name="litellm test"):
+    ):
         litellm.completion(
             model="gpt-4-vision-preview",
             messages=messages,
@@ -2020,7 +2012,7 @@ async def test_async_binary_content_encoding_uri_type(
         client.completions._client._client,
         "send",
         return_value=model_response,
-    ), start_transaction(name="litellm test"):
+    ):
         await litellm.acompletion(
             model="gpt-4-vision-preview",
             messages=messages,
@@ -2268,7 +2260,7 @@ def test_chat_completion_data_collection(
         client.completions._client._client,
         "send",
         return_value=model_response,
-    ), start_transaction(name="litellm test"):
+    ):
         litellm.completion(
             model="gpt-3.5-turbo",
             messages=messages,
@@ -2384,14 +2376,13 @@ def test_embeddings_data_collection(
         "send",
         return_value=model_response,
     ):
-        with start_transaction(name="litellm test"):
-            litellm.embedding(
-                model="text-embedding-ada-002",
-                input="Hello, world!",
-                client=client,
-            )
-            # Allow time for callbacks to complete (they may run in separate threads)
-            time.sleep(0.1)
+        litellm.embedding(
+            model="text-embedding-ada-002",
+            input="Hello, world!",
+            client=client,
+        )
+        # Allow time for callbacks to complete (they may run in separate threads)
+        time.sleep(0.1)
 
     spans = [item.payload for item in items]
     (span,) = [
