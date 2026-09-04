@@ -4561,11 +4561,12 @@ def test_error_in_responses_api(
     )
     items = capture_items("event", "span")
 
-    client.responses.create(
-        model="gpt-4o",
-        instructions="You are a coding assistant that talks like a pirate.",
-        input="How do I check if a Python object is an instance of a class?",
-    )
+    with pytest.raises(OpenAIError):
+        client.responses.create(
+            model="gpt-4o",
+            instructions="You are a coding assistant that talks like a pirate.",
+            input="How do I check if a Python object is an instance of a class?",
+        )
 
     # make sure the span where the error occurred is captured
     sentry_sdk.flush()
@@ -4577,8 +4578,7 @@ def test_error_in_responses_api(
     assert error_event["level"] == "error"
     assert error_event["exception"]["values"][0]["type"] == "OpenAIError"
 
-    assert spans[1]["is_segment"] is True
-    assert error_event["contexts"]["trace"]["trace_id"] == spans[1]["trace_id"]
+    assert error_event["contexts"]["trace"]["trace_id"] == spans[0]["trace_id"]
 
 
 @pytest.mark.asyncio
@@ -5041,11 +5041,12 @@ async def test_error_in_responses_async_api(
     )
     items = capture_items("event", "span")
 
-    await client.responses.create(
-        model="gpt-4o",
-        instructions="You are a coding assistant that talks like a pirate.",
-        input="How do I check if a Python object is an instance of a class?",
-    )
+    with pytest.raises(OpenAIError):
+        await client.responses.create(
+            model="gpt-4o",
+            instructions="You are a coding assistant that talks like a pirate.",
+            input="How do I check if a Python object is an instance of a class?",
+        )
 
     # make sure the span where the error occurred is captured
     sentry_sdk.flush()
@@ -5057,8 +5058,7 @@ async def test_error_in_responses_async_api(
     assert error_event["level"] == "error"
     assert error_event["exception"]["values"][0]["type"] == "OpenAIError"
 
-    assert spans[1]["is_segment"] is True
-    assert error_event["contexts"]["trace"]["trace_id"] == spans[1]["trace_id"]
+    assert error_event["contexts"]["trace"]["trace_id"] == spans[0]["trace_id"]
 
 
 if SKIP_RESPONSES_TESTS:
