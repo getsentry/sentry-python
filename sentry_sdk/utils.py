@@ -1823,14 +1823,31 @@ def match_regex_list(
 
 def is_sentry_url(client: "sentry_sdk.client.BaseClient", url: str) -> bool:
     """
-    Determines whether the given URL matches the Sentry DSN.
+    Determines whether the given URL's hostname matches the Sentry DSN.
+
+    ``url`` may be an absolute URL or a raw host with an optional port.
     """
-    return (
-        client is not None
-        and client.transport is not None
-        and client.transport.parsed_dsn is not None
-        and client.transport.parsed_dsn.netloc in url
-    )
+    if (
+        client is None
+        or client.transport is None
+        or client.transport.parsed_dsn is None
+    ):
+        return False
+
+    dsn_host = client.transport.parsed_dsn.host
+
+    # ``HTTPConnection.host`` is a raw hostname without brackets for IPv6.
+    if url.lower() == dsn_host.lower():
+        return True
+
+    candidate = url if "://" in url or url.startswith("//") else "//" + url
+
+    try:
+        hostname = urlsplit(candidate).hostname
+    except ValueError:
+        return False
+
+    return hostname is not None and hostname.lower() == dsn_host.lower()
 
 
 def _generate_installed_modules() -> "Iterator[Tuple[str, str]]":
