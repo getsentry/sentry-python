@@ -128,15 +128,6 @@ def has_span_streaming_enabled(options: "Optional[dict[str, Any]]") -> bool:
     return is_enabled_in_experiment_config
 
 
-def should_truncate_gen_ai_input(options: "Optional[dict[str, Any]]") -> bool:
-    if options is None:
-        return True
-
-    return not options.get(
-        "stream_gen_ai_spans", True
-    ) and not has_span_streaming_enabled(options)
-
-
 @contextlib.contextmanager
 def record_sql_queries(
     cursor: "Any",
