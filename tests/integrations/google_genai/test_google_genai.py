@@ -139,13 +139,13 @@ def test_nonstreaming_generate_content(
 
     # Mock the HTTP response at the _api_client.request() level
     mock_http_response = create_mock_http_response(EXAMPLE_API_RESPONSE_JSON)
-    items = capture_items("transaction", "span")
+    items = capture_items("span")
 
     with mock.patch.object(
         mock_genai_client._api_client,
         "request",
         return_value=mock_http_response,
-    ), sentry_sdk.traces.start_span(name="google_genai"):
+    ):
         config = create_test_config(temperature=0.7, max_output_tokens=100)
         mock_genai_client.models.generate_content(
             model="gemini-1.5-flash",
@@ -157,9 +157,8 @@ def test_nonstreaming_generate_content(
         )
 
     sentry_sdk.flush()
-    spans = [item.payload for item in items if item.type == "span"]
-    assert len(spans) == 2
-    assert spans[1]["name"] == "google_genai"
+    spans = [item.payload for item in items]
+    assert len(spans) == 1
     chat_span = next(item.payload for item in items if item.type == "span")
 
     # Check chat span
@@ -602,23 +601,19 @@ def test_span_origin(
     )
 
     mock_http_response = create_mock_http_response(EXAMPLE_API_RESPONSE_JSON)
-    items = capture_items("span", "transaction")
+    items = capture_items("span")
 
     with mock.patch.object(
         mock_genai_client._api_client, "request", return_value=mock_http_response
-    ), sentry_sdk.traces.start_span(name="google_genai"):
+    ):
         config = create_test_config()
         mock_genai_client.models.generate_content(
             model="gemini-1.5-flash", contents="Test origin", config=config
         )
 
     sentry_sdk.flush()
-    spans = [item.payload for item in items if item.type == "span"]
+    spans = [item.payload for item in items]
     for span in spans:
-        if span["is_segment"] is True:
-            assert span["attributes"]["sentry.origin"] == "manual"
-            continue
-
         assert span["attributes"]["sentry.origin"] == "auto.ai.google_genai"
 
 
@@ -1054,13 +1049,13 @@ def test_embed_content(
 
     # Mock the HTTP response at the _api_client.request() level
     mock_http_response = create_mock_http_response(EXAMPLE_EMBED_RESPONSE_JSON)
-    items = capture_items("transaction", "span")
+    items = capture_items("span")
 
     with mock.patch.object(
         mock_genai_client._api_client,
         "request",
         return_value=mock_http_response,
-    ), sentry_sdk.traces.start_span(name="google_genai_embeddings"):
+    ):
         mock_genai_client.models.embed_content(
             model="text-embedding-004",
             contents=[
@@ -1071,10 +1066,9 @@ def test_embed_content(
 
     # Should have 1 span for embeddings
     sentry_sdk.flush()
-    spans = [item.payload for item in items if item.type == "span"]
-    assert len(spans) == 2
-    assert spans[1]["name"] == "google_genai_embeddings"
-    (embed_span, _) = spans
+    spans = [item.payload for item in items]
+    assert len(spans) == 1
+    (embed_span,) = spans
 
     # Check embeddings span
     assert embed_span["attributes"]["sentry.op"] == OP.GEN_AI_EMBEDDINGS
@@ -1245,22 +1239,18 @@ def test_embed_content_span_origin(
     )
 
     mock_http_response = create_mock_http_response(EXAMPLE_EMBED_RESPONSE_JSON)
-    items = capture_items("transaction", "span")
+    items = capture_items("span")
     with mock.patch.object(
         mock_genai_client._api_client, "request", return_value=mock_http_response
-    ), sentry_sdk.traces.start_span(name="google_genai_embeddings"):
+    ):
         mock_genai_client.models.embed_content(
             model="text-embedding-004",
             contents=["Test origin"],
         )
 
     sentry_sdk.flush()
-    spans = [item.payload for item in items if item.type == "span"]
+    spans = [item.payload for item in items]
     for span in spans:
-        if span["is_segment"] is True:
-            assert span["attributes"]["sentry.origin"] == "manual"
-            continue
-
         assert span["attributes"]["sentry.origin"] == "auto.ai.google_genai"
 
 
@@ -1291,13 +1281,13 @@ async def test_async_embed_content(
 
     # Mock the async HTTP response
     mock_http_response = create_mock_http_response(EXAMPLE_EMBED_RESPONSE_JSON)
-    items = capture_items("transaction", "span")
+    items = capture_items("span")
 
     with mock.patch.object(
         mock_genai_client._api_client,
         "async_request",
         return_value=mock_http_response,
-    ), sentry_sdk.traces.start_span(name="google_genai_embeddings_async"):
+    ):
         await mock_genai_client.aio.models.embed_content(
             model="text-embedding-004",
             contents=[
@@ -1308,10 +1298,9 @@ async def test_async_embed_content(
 
     # Should have 1 span for embeddings
     sentry_sdk.flush()
-    spans = [item.payload for item in items if item.type == "span"]
-    assert len(spans) == 2
-    assert spans[1]["name"] == "google_genai_embeddings_async"
-    (embed_span, _) = spans
+    spans = [item.payload for item in items]
+    assert len(spans) == 1
+    (embed_span,) = spans
 
     # Check embeddings span
     assert embed_span["attributes"]["sentry.op"] == OP.GEN_AI_EMBEDDINGS
@@ -1489,25 +1478,21 @@ async def test_async_embed_content_span_origin(
     )
 
     mock_http_response = create_mock_http_response(EXAMPLE_EMBED_RESPONSE_JSON)
-    items = capture_items("transaction", "span")
+    items = capture_items("span")
 
     with mock.patch.object(
         mock_genai_client._api_client,
         "async_request",
         return_value=mock_http_response,
-    ), sentry_sdk.traces.start_span(name="google_genai_embeddings_async"):
+    ):
         await mock_genai_client.aio.models.embed_content(
             model="text-embedding-004",
             contents=["Test origin"],
         )
 
     sentry_sdk.flush()
-    spans = [item.payload for item in items if item.type == "span"]
+    spans = [item.payload for item in items]
     for span in spans:
-        if span["is_segment"] is True:
-            assert span["attributes"]["sentry.origin"] == "manual"
-            continue
-
         assert span["attributes"]["sentry.origin"] == "auto.ai.google_genai"
 
 
