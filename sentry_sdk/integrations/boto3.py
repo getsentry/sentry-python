@@ -1,4 +1,5 @@
 from typing import TYPE_CHECKING
+from urllib.parse import urlsplit
 
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
@@ -19,7 +20,7 @@ from sentry_sdk.utils import (
 )
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, Optional, Union
+    from typing import Any, Dict, Mapping, Optional, Union
 
     from botocore.model import ServiceId
 
@@ -28,9 +29,12 @@ try:
     from botocore import __version__ as BOTOCORE_VERSION
     from botocore.awsrequest import AWSRequest
     from botocore.client import BaseClient
+    from botocore.exceptions import ClientError
     from botocore.response import StreamingBody
 except ImportError:
     raise DidNotEnable("botocore is not installed")
+
+_AWS_RPC_SYSTEM_NAME = "aws-api"
 
 
 class _ClientCallContext:
@@ -57,19 +61,131 @@ class _ClientCallContext:
         service_model = client_meta.service_model
 
         self.client: "BaseClient" = client
-        # botocore's internal identifier, e.g. "apigateway".
+        # botocore's internal identifier, e.g. `apigateway`.
         self.service_name: str = service_model.service_name
-        # modeled display identity, e.g. "API gateway".
+        # modeled AWS service identity used in span names, e.g. `API Gateway`.
         self.service_id: "ServiceId" = service_model.service_id
         self.operation_name: str = operation_name
         self.region_name: "Optional[str]" = getattr(client_meta, "region_name", None)
-        self.endpoint_url: str = client_meta.endpoint_url
+        self.endpoint_url: "Optional[str]" = getattr(client_meta, "endpoint_url", None)
         self.api_version: str = service_model.api_version
-        # params may contain streams or arbitrary sdk objects; make shallow copy
+        # params may contain streams or arbitrary SDK objects; make a shallow copy
         # so nested values preserve original identity.
         self.api_params: "Dict[str, Any]" = (
             dict(api_params) if isinstance(api_params, dict) else {}
         )
+
+
+def _set_span_attributes(
+    span: "Union[Span, StreamedSpan]", attributes: "Dict[str, Any]"
+) -> None:
+    # streamed and legacy spans expose different attribute APIs.
+    if isinstance(span, StreamedSpan):
+        span.set_attributes(attributes)
+        return
+
+    for key, value in attributes.items():
+        span.set_data(key, value)
+
+
+def _get_server_attributes(endpoint_url: "Optional[str]") -> "Dict[str, Any]":
+    if not endpoint_url:
+        return {}
+
+    default_ports = {
+        "http": 80,
+        "https": 443,
+    }
+
+    try:
+        parsed_url = urlsplit(endpoint_url)
+        if parsed_url.scheme not in default_ports or not parsed_url.hostname:
+            return {}
+
+        # `server.port` is only defined together with `server.address`. Infer the
+        # effective port when the configured HTTP(S) endpoint omits it.
+        # https://opentelemetry.io/docs/specs/semconv/rpc/rpc-spans/
+        return {
+            SPANDATA.SERVER_ADDRESS: parsed_url.hostname,
+            SPANDATA.SERVER_PORT: parsed_url.port or default_ports[parsed_url.scheme],
+        }
+
+    except (TypeError, UnicodeError, ValueError):
+        # Invalid client metadata must not prevent the AWS call from running.
+        return {}
+
+
+def _get_client_span_attributes(
+    call_context: "_ClientCallContext",
+) -> "Dict[str, Any]":
+    # AWS SDK conventions define the operation as `rpc.method` and `aws-api` as
+    # the RPC system.
+    # https://opentelemetry.io/docs/specs/semconv/cloud-providers/aws-sdk/#aws-sdk-spans
+    attributes = {
+        SPANDATA.RPC_METHOD: call_context.operation_name,
+        SPANDATA.RPC_SYSTEM_NAME: _AWS_RPC_SYSTEM_NAME,
+    }
+
+    if call_context.region_name:
+        attributes[SPANDATA.CLOUD_REGION] = call_context.region_name
+
+    attributes.update(_get_server_attributes(call_context.endpoint_url))
+    return attributes
+
+
+def _get_response_span_attributes(
+    parsed: "Mapping[str, Any]",
+) -> "Dict[str, Any]":
+    metadata = parsed.get("ResponseMetadata")
+    if not isinstance(metadata, Mapping):
+        return {}
+
+    attributes = {}
+
+    status_code = metadata.get("HTTPStatusCode")
+    if status_code is not None:
+        attributes[SPANDATA.HTTP_STATUS_CODE] = status_code
+
+    headers = metadata.get("HTTPHeaders")
+    if not isinstance(headers, Mapping):
+        headers = {}
+
+    request_id = metadata.get("RequestId")
+    if request_id is None:
+        request_id = (
+            headers.get("x-amzn-requestid")
+            or headers.get("x-amzn-request-id")
+            or headers.get("x-amz-request-id")
+        )
+    if request_id is not None:
+        attributes[SPANDATA.AWS_REQUEST_ID] = request_id
+
+    # S3's `HostId` is the extended request ID returned in `x-amz-id-2`.
+    # https://docs.aws.amazon.com/AmazonS3/latest/developerguide/get-request-ids.html
+    extended_request_id = metadata.get("HostId") or headers.get("x-amz-id-2")
+    if extended_request_id is not None:
+        attributes[SPANDATA.AWS_EXTENDED_REQUEST_ID] = extended_request_id
+
+    return attributes
+
+
+def _get_error_type(exception: "BaseException") -> str:
+    if isinstance(exception, ClientError):
+        # botocore wraps all AWS service errors in `ClientError`; `Error.Code`
+        # identifies actual service-specific error, e.g. `AccessDenied`.
+        # https://docs.aws.amazon.com/boto3/latest/guide/error-handling.html
+        error = exception.response.get("Error")
+        if isinstance(error, dict) and error.get("Code") is not None:
+            return str(error["Code"])
+
+    # failures before a service response, have no error code. Use exception type
+    # instead. https://opentelemetry.io/docs/specs/semconv/rpc/rpc-spans/
+    exception_type = type(exception)
+    exception_name = exception_type.__qualname__
+    exception_module = exception_type.__module__
+    if exception_module not in ("builtins", "__builtins__"):
+        return "%s.%s" % (exception_module, exception_name)
+    return exception_name
 
 
 class Boto3Integration(Integration):
@@ -137,30 +253,34 @@ def _start_client_span(
     if client.get_integration(Boto3Integration) is None:
         return None
 
-    description = "aws.%s.%s" % (
-        call_context.service_id.hyphenize(),
-        call_context.operation_name,
-    )
+    # use format `Service.Operation`, e.g. `DynamoDB.GetItem`.
+    # https://opentelemetry.io/docs/specs/semconv/cloud-providers/aws-sdk/#aws-sdk-spans
+    span_name = "%s.%s" % (call_context.service_id, call_context.operation_name)
+    attributes = _get_client_span_attributes(call_context)
 
     if has_span_streaming_enabled(client.options):
         if sentry_sdk.traces.get_current_span() is None:
             return None
 
-        return sentry_sdk.traces.start_span(
-            name=description,
-            attributes={
+        # `start_span()` evaluates `ignore_spans` against the initial attributes.
+        # https://opentelemetry.io/docs/specs/semconv/rpc/rpc-spans/#rpc-client-span
+        attributes.update(
+            {
                 SPANDATA.SENTRY_OP: OP.HTTP_CLIENT,
                 SPANDATA.SENTRY_ORIGIN: Boto3Integration.origin,
-                SPANDATA.RPC_METHOD: "%s/%s"
-                % (call_context.service_id, call_context.operation_name),
-            },
+            }
+        )
+        return sentry_sdk.traces.start_span(
+            name=span_name,
+            attributes=attributes,
         )
 
     span = sentry_sdk.start_span(
-        name=description,
+        name=span_name,
         op=OP.HTTP_CLIENT,
         origin=Boto3Integration.origin,
     )
+    _set_span_attributes(span, attributes)
     span.set_tag("aws.service_id", call_context.service_id.hyphenize())
     span.set_tag("aws.operation_name", call_context.operation_name)
     return span
@@ -170,6 +290,8 @@ def _finish_client_span(
     span: "Union[Span, StreamedSpan]",
     parsed: "Dict[str, Any]",
 ) -> None:
+    # response metadata is only available after the call. Add before `__exit__()`.
+    _set_span_attributes(span, _get_response_span_attributes(parsed))
     span.__exit__(None, None, None)
 
     body = parsed.get("Body")
@@ -207,11 +329,15 @@ def _finish_client_span(
             else:
                 streaming_span.finish()
             return ret
-        except Exception:
-            if isinstance(streaming_span, StreamedSpan):
-                streaming_span.end()
-            else:
-                streaming_span.finish()
+        except Exception as exc:
+            # enrichment must not replace exception raised by `orig_read()`.
+            # finish span with error, then re-raise.
+            with capture_internal_exceptions():
+                _set_span_attributes(
+                    streaming_span,
+                    {SPANDATA.ERROR_TYPE: _get_error_type(exc)},
+                )
+                streaming_span.__exit__(type(exc), exc, exc.__traceback__)
             raise
 
     body.read = sentry_streaming_body_read  # type: ignore
@@ -230,6 +356,11 @@ def _finish_client_span_with_error(
     span: "Union[Span, StreamedSpan]",
     exception: "BaseException",
 ) -> None:
+    if isinstance(exception, ClientError):
+        _set_span_attributes(span, _get_response_span_attributes(exception.response))
+
+    # `error.type` is required when RPC operation fails.
+    _set_span_attributes(span, {SPANDATA.ERROR_TYPE: _get_error_type(exception)})
     span.__exit__(type(exception), exception, exception.__traceback__)
 
 
@@ -295,7 +426,8 @@ def _sentry_request_created(
     request: "AWSRequest", operation_name: str, **kwargs: "Any"
 ) -> None:
     """
-    Enrich a single `AWSRequest` attempt. Botocore creates a fresh `AWSRequest` on every retry.
+    Enrich a single `AWSRequest` attempt. Botocore creates a
+    fresh `AWSRequest` on every retry.
     https://github.com/boto/botocore/blob/develop/botocore/endpoint.py#L178-L202
     """
     client = sentry_sdk.get_client()
@@ -364,7 +496,6 @@ def _sentry_before_sign(
             combined_baggage = {
                 BAGGAGE_HEADER_NAME: ",".join(str(value) for value in existing_values)
             }
-            # preserve third-party baggage, replace stale `sentry-*` values
             add_sentry_baggage_to_headers(combined_baggage, header_value)
             _replace_header(
                 request, BAGGAGE_HEADER_NAME, combined_baggage[BAGGAGE_HEADER_NAME]
