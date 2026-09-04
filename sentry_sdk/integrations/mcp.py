@@ -286,7 +286,7 @@ async def _tool_handler_wrapper(
         handler_name = original_kwargs["name"]
 
     arguments = {}
-    if len(original_args) > 1:
+    if len(original_args) > 1 and original_args[1] is not None:
         arguments = original_args[1]
     elif original_kwargs.get("arguments"):
         arguments = original_kwargs["arguments"]
@@ -514,7 +514,7 @@ async def _prompt_handler_wrapper(
         handler_name = original_kwargs["name"]
 
     arguments = {}
-    if len(original_args) > 1:
+    if len(original_args) > 1 and original_args[1] is not None:
         arguments = original_args[1]
     elif original_kwargs.get("arguments"):
         arguments = original_kwargs["arguments"]
