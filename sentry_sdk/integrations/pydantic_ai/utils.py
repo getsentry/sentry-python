@@ -12,7 +12,7 @@ from sentry_sdk.utils import (
 )
 
 if TYPE_CHECKING:
-    from typing import Any, Optional, Union
+    from typing import Any, Optional
 
 
 # Store the current agent context in a contextvar for re-entrant safety
@@ -90,9 +90,7 @@ def _should_send_outputs() -> bool:
     return _should_send_prompts_legacy()
 
 
-def _set_agent_data(
-    span: "Union[sentry_sdk.tracing.Span, StreamedSpan]", agent: "Any"
-) -> None:
+def _set_agent_data(span: "StreamedSpan", agent: "Any") -> None:
     """Set agent-related data on a span.
 
     Args:
@@ -106,10 +104,7 @@ def _set_agent_data(
         agent_obj = get_current_agent()
 
     if agent_obj and hasattr(agent_obj, "name") and agent_obj.name:
-        if isinstance(span, StreamedSpan):
-            span.set_attribute(SPANDATA.GEN_AI_AGENT_NAME, agent_obj.name)
-        else:
-            span.set_data(SPANDATA.GEN_AI_AGENT_NAME, agent_obj.name)
+        span.set_attribute(SPANDATA.GEN_AI_AGENT_NAME, agent_obj.name)
 
 
 def _get_model_name(model_obj: "Any") -> "Optional[str]":
@@ -138,7 +133,7 @@ def _get_model_name(model_obj: "Any") -> "Optional[str]":
 
 
 def _set_model_data(
-    span: "Union[sentry_sdk.tracing.Span, StreamedSpan]",
+    span: "StreamedSpan",
     model: "Any",
     model_settings: "Any",
 ) -> None:
@@ -157,19 +152,15 @@ def _set_model_data(
     if not model_obj and agent_obj and hasattr(agent_obj, "model"):
         model_obj = agent_obj.model
 
-    set_on_span = (
-        span.set_attribute if isinstance(span, StreamedSpan) else span.set_data
-    )
-
     if model_obj:
         # Set system from model
         if hasattr(model_obj, "system"):
-            set_on_span(SPANDATA.GEN_AI_SYSTEM, model_obj.system)
+            span.set_attribute(SPANDATA.GEN_AI_SYSTEM, model_obj.system)
 
         # Set model name
         model_name = _get_model_name(model_obj)
         if model_name:
-            set_on_span(SPANDATA.GEN_AI_REQUEST_MODEL, model_name)
+            span.set_attribute(SPANDATA.GEN_AI_REQUEST_MODEL, model_name)
 
     # Extract model settings
     settings = model_settings
@@ -190,19 +181,17 @@ def _set_model_data(
             for setting_name, spandata_key in settings_map.items():
                 value = settings.get(setting_name)
                 if value is not None:
-                    set_on_span(spandata_key, value)
+                    span.set_attribute(spandata_key, value)
         else:
             # Fallback for object-style settings
             for setting_name, spandata_key in settings_map.items():
                 if hasattr(settings, setting_name):
                     value = getattr(settings, setting_name)
                     if value is not None:
-                        set_on_span(spandata_key, value)
+                        span.set_attribute(spandata_key, value)
 
 
-def _set_available_tools(
-    span: "Union[sentry_sdk.tracing.Span, StreamedSpan]", agent: "Any"
-) -> None:
+def _set_available_tools(span: "StreamedSpan", agent: "Any") -> None:
     """Set available tools data on a span from an agent's function toolset.
 
     Args:
@@ -237,14 +226,10 @@ def _set_available_tools(
                 tools.append(tool_info)
 
         if tools:
-            if isinstance(span, StreamedSpan):
-                span.set_attribute(
-                    SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS, safe_serialize(tools)
-                )
-            else:
-                span.set_data(
-                    SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS, safe_serialize(tools)
-                )
+            span.set_attribute(
+                SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS, safe_serialize(tools)
+            )
+
     except Exception:
         # If we can't extract tools, just skip it
         pass

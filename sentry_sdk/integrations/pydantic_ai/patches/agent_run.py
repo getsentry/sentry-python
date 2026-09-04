@@ -15,7 +15,7 @@ except ImportError:
     raise DidNotEnable("pydantic-ai not installed")
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Optional, Union
+    from typing import Any, Callable, Optional
 
 
 class _StreamingContextManagerWrapper:
@@ -37,7 +37,7 @@ class _StreamingContextManagerWrapper:
         self.model_settings = model_settings
         self.is_streaming = is_streaming
         self._isolation_scope: "Any" = None
-        self._span: "Optional[Union[sentry_sdk.tracing.Span, sentry_sdk.traces.StreamedSpan]]" = None
+        self._span: "Optional[sentry_sdk.traces.StreamedSpan]" = None
         self._result: "Any" = None
 
     async def __aenter__(self) -> "Any":
@@ -53,7 +53,6 @@ class _StreamingContextManagerWrapper:
             self.model_settings,
             self.is_streaming,
         )
-        self._span.__enter__()
 
         # Push agent to contextvar stack after span is successfully created and entered
         # This ensures proper pairing with pop_agent() in __aexit__ even if exceptions occur
