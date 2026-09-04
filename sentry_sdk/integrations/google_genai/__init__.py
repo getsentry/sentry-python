@@ -8,12 +8,10 @@ from typing import (
 )
 
 import sentry_sdk
-from sentry_sdk.ai.utils import get_start_span_function
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.traces import SpanStatus, StreamedSpan
 from sentry_sdk.tracing import SPANSTATUS
-from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import parse_version
 
 try:
@@ -80,30 +78,17 @@ def _wrap_generate_content_stream(f: "Callable[..., Any]") -> "Callable[..., Any
 
         _model, contents, model_name = prepare_generate_content_args(args, kwargs)
 
-        if has_span_streaming_enabled(client.options):
-            chat_span = sentry_sdk.traces.start_span(
-                name=f"chat {model_name}",
-                attributes={
-                    "sentry.op": OP.GEN_AI_CHAT,
-                    "sentry.origin": ORIGIN,
-                    SPANDATA.GEN_AI_OPERATION_NAME: "chat",
-                    SPANDATA.GEN_AI_SYSTEM: GEN_AI_SYSTEM,
-                    SPANDATA.GEN_AI_REQUEST_MODEL: model_name,
-                    SPANDATA.GEN_AI_RESPONSE_STREAMING: True,
-                },
-            )
-        else:
-            chat_span = get_start_span_function()(
-                op=OP.GEN_AI_CHAT,
-                name=f"chat {model_name}",
-                origin=ORIGIN,
-            )
-            chat_span.__enter__()
-
-            chat_span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "chat")
-            chat_span.set_data(SPANDATA.GEN_AI_SYSTEM, GEN_AI_SYSTEM)
-            chat_span.set_data(SPANDATA.GEN_AI_REQUEST_MODEL, model_name)
-            chat_span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, True)
+        chat_span = sentry_sdk.traces.start_span(
+            name=f"chat {model_name}",
+            attributes={
+                "sentry.op": OP.GEN_AI_CHAT,
+                "sentry.origin": ORIGIN,
+                SPANDATA.GEN_AI_OPERATION_NAME: "chat",
+                SPANDATA.GEN_AI_SYSTEM: GEN_AI_SYSTEM,
+                SPANDATA.GEN_AI_REQUEST_MODEL: model_name,
+                SPANDATA.GEN_AI_RESPONSE_STREAMING: True,
+            },
+        )
 
         set_span_data_for_request(chat_span, integration, model_name, contents, kwargs)
 
@@ -157,30 +142,17 @@ def _wrap_async_generate_content_stream(
 
         _model, contents, model_name = prepare_generate_content_args(args, kwargs)
 
-        if has_span_streaming_enabled(client.options):
-            chat_span = sentry_sdk.traces.start_span(
-                name=f"chat {model_name}",
-                attributes={
-                    "sentry.op": OP.GEN_AI_CHAT,
-                    "sentry.origin": ORIGIN,
-                    SPANDATA.GEN_AI_OPERATION_NAME: "chat",
-                    SPANDATA.GEN_AI_SYSTEM: GEN_AI_SYSTEM,
-                    SPANDATA.GEN_AI_REQUEST_MODEL: model_name,
-                    SPANDATA.GEN_AI_RESPONSE_STREAMING: True,
-                },
-            )
-        else:
-            chat_span = get_start_span_function()(
-                op=OP.GEN_AI_CHAT,
-                name=f"chat {model_name}",
-                origin=ORIGIN,
-            )
-            chat_span.__enter__()
-
-            chat_span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "chat")
-            chat_span.set_data(SPANDATA.GEN_AI_SYSTEM, GEN_AI_SYSTEM)
-            chat_span.set_data(SPANDATA.GEN_AI_REQUEST_MODEL, model_name)
-            chat_span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, True)
+        chat_span = sentry_sdk.traces.start_span(
+            name=f"chat {model_name}",
+            attributes={
+                "sentry.op": OP.GEN_AI_CHAT,
+                "sentry.origin": ORIGIN,
+                SPANDATA.GEN_AI_OPERATION_NAME: "chat",
+                SPANDATA.GEN_AI_SYSTEM: GEN_AI_SYSTEM,
+                SPANDATA.GEN_AI_REQUEST_MODEL: model_name,
+                SPANDATA.GEN_AI_RESPONSE_STREAMING: True,
+            },
+        )
 
         set_span_data_for_request(chat_span, integration, model_name, contents, kwargs)
 
@@ -230,54 +202,30 @@ def _wrap_generate_content(f: "Callable[..., Any]") -> "Callable[..., Any]":
 
         model, contents, model_name = prepare_generate_content_args(args, kwargs)
 
-        if has_span_streaming_enabled(client.options):
-            with sentry_sdk.traces.start_span(
-                name=f"chat {model_name}",
-                attributes={
-                    "sentry.op": OP.GEN_AI_CHAT,
-                    "sentry.origin": ORIGIN,
-                    SPANDATA.GEN_AI_OPERATION_NAME: "chat",
-                    SPANDATA.GEN_AI_SYSTEM: GEN_AI_SYSTEM,
-                    SPANDATA.GEN_AI_REQUEST_MODEL: model_name,
-                },
-            ) as chat_span:
-                set_span_data_for_request(
-                    chat_span, integration, model_name, contents, kwargs
-                )
+        with sentry_sdk.traces.start_span(
+            name=f"chat {model_name}",
+            attributes={
+                "sentry.op": OP.GEN_AI_CHAT,
+                "sentry.origin": ORIGIN,
+                SPANDATA.GEN_AI_OPERATION_NAME: "chat",
+                SPANDATA.GEN_AI_SYSTEM: GEN_AI_SYSTEM,
+                SPANDATA.GEN_AI_REQUEST_MODEL: model_name,
+            },
+        ) as chat_span:
+            set_span_data_for_request(
+                chat_span, integration, model_name, contents, kwargs
+            )
 
-                try:
-                    response = f(self, *args, **kwargs)
-                except Exception as exc:
-                    _capture_exception(exc)
-                    chat_span.status = SpanStatus.ERROR
-                    raise
+            try:
+                response = f(self, *args, **kwargs)
+            except Exception as exc:
+                _capture_exception(exc)
+                chat_span.status = SpanStatus.ERROR
+                raise
 
-                set_span_data_for_response(chat_span, integration, response)
+            set_span_data_for_response(chat_span, integration, response)
 
-                return response
-        else:
-            with get_start_span_function()(
-                op=OP.GEN_AI_CHAT,
-                name=f"chat {model_name}",
-                origin=ORIGIN,
-            ) as chat_span:
-                chat_span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "chat")
-                chat_span.set_data(SPANDATA.GEN_AI_SYSTEM, GEN_AI_SYSTEM)
-                chat_span.set_data(SPANDATA.GEN_AI_REQUEST_MODEL, model_name)
-                set_span_data_for_request(
-                    chat_span, integration, model_name, contents, kwargs
-                )
-
-                try:
-                    response = f(self, *args, **kwargs)
-                except Exception as exc:
-                    _capture_exception(exc)
-                    chat_span.set_status(SPANSTATUS.INTERNAL_ERROR)
-                    raise
-
-                set_span_data_for_response(chat_span, integration, response)
-
-                return response
+            return response
 
     return new_generate_content
 
@@ -294,52 +242,29 @@ def _wrap_async_generate_content(f: "Callable[..., Any]") -> "Callable[..., Any]
 
         model, contents, model_name = prepare_generate_content_args(args, kwargs)
 
-        if has_span_streaming_enabled(client.options):
-            with sentry_sdk.traces.start_span(
-                name=f"chat {model_name}",
-                attributes={
-                    "sentry.op": OP.GEN_AI_CHAT,
-                    "sentry.origin": ORIGIN,
-                    SPANDATA.GEN_AI_OPERATION_NAME: "chat",
-                    SPANDATA.GEN_AI_SYSTEM: GEN_AI_SYSTEM,
-                    SPANDATA.GEN_AI_REQUEST_MODEL: model_name,
-                },
-            ) as chat_span:
-                set_span_data_for_request(
-                    chat_span, integration, model_name, contents, kwargs
-                )
-                try:
-                    response = await f(self, *args, **kwargs)
-                except Exception as exc:
-                    _capture_exception(exc)
-                    chat_span.status = SpanStatus.ERROR
-                    raise
+        with sentry_sdk.traces.start_span(
+            name=f"chat {model_name}",
+            attributes={
+                "sentry.op": OP.GEN_AI_CHAT,
+                "sentry.origin": ORIGIN,
+                SPANDATA.GEN_AI_OPERATION_NAME: "chat",
+                SPANDATA.GEN_AI_SYSTEM: GEN_AI_SYSTEM,
+                SPANDATA.GEN_AI_REQUEST_MODEL: model_name,
+            },
+        ) as chat_span:
+            set_span_data_for_request(
+                chat_span, integration, model_name, contents, kwargs
+            )
+            try:
+                response = await f(self, *args, **kwargs)
+            except Exception as exc:
+                _capture_exception(exc)
+                chat_span.status = SpanStatus.ERROR
+                raise
 
-                set_span_data_for_response(chat_span, integration, response)
+            set_span_data_for_response(chat_span, integration, response)
 
-                return response
-        else:
-            with get_start_span_function()(
-                op=OP.GEN_AI_CHAT,
-                name=f"chat {model_name}",
-                origin=ORIGIN,
-            ) as chat_span:
-                chat_span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "chat")
-                chat_span.set_data(SPANDATA.GEN_AI_SYSTEM, GEN_AI_SYSTEM)
-                chat_span.set_data(SPANDATA.GEN_AI_REQUEST_MODEL, model_name)
-                set_span_data_for_request(
-                    chat_span, integration, model_name, contents, kwargs
-                )
-                try:
-                    response = await f(self, *args, **kwargs)
-                except Exception as exc:
-                    _capture_exception(exc)
-                    chat_span.set_status(SPANSTATUS.INTERNAL_ERROR)
-                    raise
-
-                set_span_data_for_response(chat_span, integration, response)
-
-                return response
+            return response
 
     return new_async_generate_content
 
@@ -354,50 +279,28 @@ def _wrap_embed_content(f: "Callable[..., Any]") -> "Callable[..., Any]":
 
         model_name, contents = prepare_embed_content_args(args, kwargs)
 
-        if has_span_streaming_enabled(client.options):
-            with sentry_sdk.traces.start_span(
-                name=f"embeddings {model_name}",
-                attributes={
-                    "sentry.op": OP.GEN_AI_EMBEDDINGS,
-                    "sentry.origin": ORIGIN,
-                    SPANDATA.GEN_AI_OPERATION_NAME: "embeddings",
-                    SPANDATA.GEN_AI_SYSTEM: GEN_AI_SYSTEM,
-                    SPANDATA.GEN_AI_REQUEST_MODEL: model_name,
-                },
-            ) as span:
-                set_span_data_for_embed_request(span, integration, contents, kwargs)
+        with sentry_sdk.traces.start_span(
+            name=f"embeddings {model_name}",
+            attributes={
+                "sentry.op": OP.GEN_AI_EMBEDDINGS,
+                "sentry.origin": ORIGIN,
+                SPANDATA.GEN_AI_OPERATION_NAME: "embeddings",
+                SPANDATA.GEN_AI_SYSTEM: GEN_AI_SYSTEM,
+                SPANDATA.GEN_AI_REQUEST_MODEL: model_name,
+            },
+        ) as span:
+            set_span_data_for_embed_request(span, integration, contents, kwargs)
 
-                try:
-                    response = f(self, *args, **kwargs)
-                except Exception as exc:
-                    _capture_exception(exc)
-                    span.status = SpanStatus.ERROR
-                    raise
+            try:
+                response = f(self, *args, **kwargs)
+            except Exception as exc:
+                _capture_exception(exc)
+                span.status = SpanStatus.ERROR
+                raise
 
-                set_span_data_for_embed_response(span, integration, response)
+            set_span_data_for_embed_response(span, integration, response)
 
-                return response
-        else:
-            with get_start_span_function()(
-                op=OP.GEN_AI_EMBEDDINGS,
-                name=f"embeddings {model_name}",
-                origin=ORIGIN,
-            ) as span:
-                span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "embeddings")
-                span.set_data(SPANDATA.GEN_AI_SYSTEM, GEN_AI_SYSTEM)
-                span.set_data(SPANDATA.GEN_AI_REQUEST_MODEL, model_name)
-                set_span_data_for_embed_request(span, integration, contents, kwargs)
-
-                try:
-                    response = f(self, *args, **kwargs)
-                except Exception as exc:
-                    _capture_exception(exc)
-                    span.set_status(SPANSTATUS.INTERNAL_ERROR)
-                    raise
-
-                set_span_data_for_embed_response(span, integration, response)
-
-                return response
+            return response
 
     return new_embed_content
 
@@ -414,49 +317,27 @@ def _wrap_async_embed_content(f: "Callable[..., Any]") -> "Callable[..., Any]":
 
         model_name, contents = prepare_embed_content_args(args, kwargs)
 
-        if has_span_streaming_enabled(client.options):
-            with sentry_sdk.traces.start_span(
-                name=f"embeddings {model_name}",
-                attributes={
-                    "sentry.op": OP.GEN_AI_EMBEDDINGS,
-                    "sentry.origin": ORIGIN,
-                    SPANDATA.GEN_AI_OPERATION_NAME: "embeddings",
-                    SPANDATA.GEN_AI_SYSTEM: GEN_AI_SYSTEM,
-                    SPANDATA.GEN_AI_REQUEST_MODEL: model_name,
-                },
-            ) as span:
-                set_span_data_for_embed_request(span, integration, contents, kwargs)
+        with sentry_sdk.traces.start_span(
+            name=f"embeddings {model_name}",
+            attributes={
+                "sentry.op": OP.GEN_AI_EMBEDDINGS,
+                "sentry.origin": ORIGIN,
+                SPANDATA.GEN_AI_OPERATION_NAME: "embeddings",
+                SPANDATA.GEN_AI_SYSTEM: GEN_AI_SYSTEM,
+                SPANDATA.GEN_AI_REQUEST_MODEL: model_name,
+            },
+        ) as span:
+            set_span_data_for_embed_request(span, integration, contents, kwargs)
 
-                try:
-                    response = await f(self, *args, **kwargs)
-                except Exception as exc:
-                    _capture_exception(exc)
-                    span.status = SpanStatus.ERROR
-                    raise
+            try:
+                response = await f(self, *args, **kwargs)
+            except Exception as exc:
+                _capture_exception(exc)
+                span.status = SpanStatus.ERROR
+                raise
 
-                set_span_data_for_embed_response(span, integration, response)
+            set_span_data_for_embed_response(span, integration, response)
 
-                return response
-        else:
-            with get_start_span_function()(
-                op=OP.GEN_AI_EMBEDDINGS,
-                name=f"embeddings {model_name}",
-                origin=ORIGIN,
-            ) as span:
-                span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "embeddings")
-                span.set_data(SPANDATA.GEN_AI_SYSTEM, GEN_AI_SYSTEM)
-                span.set_data(SPANDATA.GEN_AI_REQUEST_MODEL, model_name)
-                set_span_data_for_embed_request(span, integration, contents, kwargs)
-
-                try:
-                    response = await f(self, *args, **kwargs)
-                except Exception as exc:
-                    _capture_exception(exc)
-                    span.set_status(SPANSTATUS.INTERNAL_ERROR)
-                    raise
-
-                set_span_data_for_embed_response(span, integration, response)
-
-                return response
+            return response
 
     return new_async_embed_content
