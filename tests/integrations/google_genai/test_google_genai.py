@@ -7,7 +7,6 @@ from google.genai import types as genai_types
 from google.genai.types import Content, Part
 
 import sentry_sdk
-from sentry_sdk import start_transaction
 from sentry_sdk._types import BLOB_DATA_SUBSTITUTE
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.google_genai import GoogleGenAIIntegration
@@ -255,7 +254,7 @@ def test_generate_content_with_system_instruction(
 
     with mock.patch.object(
         mock_genai_client._api_client, "request", return_value=mock_http_response
-    ), start_transaction(name="google_genai"):
+    ):
         config = {
             "system_instruction": system_instructions,
             "temperature": 0.5,
@@ -344,7 +343,7 @@ def test_generate_content_with_tools(
 
     with mock.patch.object(
         mock_genai_client._api_client, "request", return_value=mock_http_response
-    ), start_transaction(name="google_genai"):
+    ):
         config = create_test_config(tools=[get_weather, mock_tool])
         mock_genai_client.models.generate_content(
             model="gemini-1.5-flash", contents="What's the weather?", config=config
@@ -396,8 +395,7 @@ def test_tool_execution(
     items = capture_items("span")
 
     # Execute the wrapped tool
-    with start_transaction(name="test_tool"):
-        result = wrapped_weather("San Francisco")
+    result = wrapped_weather("San Francisco")
 
     assert result == "The weather in San Francisco is sunny"
 
@@ -431,9 +429,7 @@ def test_error_handling(
     # Mock an error at the HTTP level
     with mock.patch.object(
         mock_genai_client._api_client, "request", side_effect=Exception("API Error")
-    ), start_transaction(name="google_genai"), pytest.raises(
-        Exception, match="API Error"
-    ):
+    ), pytest.raises(Exception, match="API Error"):
         mock_genai_client.models.generate_content(
             model="gemini-1.5-flash",
             contents="This will fail",
@@ -526,7 +522,7 @@ def test_streaming_generate_content(
 
     with mock.patch.object(
         mock_genai_client._api_client, "request_streamed", return_value=mock_stream
-    ), start_transaction(name="google_genai"):
+    ):
         config = create_test_config()
         stream = mock_genai_client.models.generate_content_stream(
             model="gemini-1.5-flash",
@@ -656,7 +652,7 @@ def test_response_without_usage_metadata(
 
     with mock.patch.object(
         mock_genai_client._api_client, "request", return_value=mock_http_response
-    ), start_transaction(name="google_genai"):
+    ):
         config = create_test_config()
         mock_genai_client.models.generate_content(
             model="gemini-1.5-flash", contents="Test", config=config
@@ -714,7 +710,7 @@ def test_multiple_candidates(
 
     with mock.patch.object(
         mock_genai_client._api_client, "request", return_value=mock_http_response
-    ), start_transaction(name="google_genai"):
+    ):
         config = create_test_config()
         mock_genai_client.models.generate_content(
             model="gemini-1.5-flash", contents="Generate multiple", config=config
@@ -759,7 +755,7 @@ def test_all_configuration_parameters(
 
     with mock.patch.object(
         mock_genai_client._api_client, "request", return_value=mock_http_response
-    ), start_transaction(name="google_genai"):
+    ):
         config = create_test_config(
             temperature=0.8,
             top_p=0.95,
@@ -805,7 +801,7 @@ def test_empty_response(
 
     with mock.patch.object(
         mock_genai_client._api_client, "request", return_value=mock_http_response
-    ), start_transaction(name="google_genai"):
+    ):
         response = mock_genai_client.models.generate_content(
             model="gemini-1.5-flash", contents="Test", config=create_test_config()
         )
@@ -852,7 +848,7 @@ def test_response_with_different_id_fields(
 
     with mock.patch.object(
         mock_genai_client._api_client, "request", return_value=mock_http_response
-    ), start_transaction(name="google_genai"):
+    ):
         mock_genai_client.models.generate_content(
             model="gemini-1.5-flash", contents="Test", config=create_test_config()
         )
@@ -906,7 +902,7 @@ def test_contents_as_none(
 
     with mock.patch.object(
         mock_genai_client._api_client, "request", return_value=mock_http_response
-    ), start_transaction(name="google_genai"):
+    ):
         mock_genai_client.models.generate_content(
             model="gemini-1.5-flash", contents=None, config=create_test_config()
         )
@@ -973,7 +969,7 @@ def test_tool_calls_extraction(
 
     with mock.patch.object(
         mock_genai_client._api_client, "request", return_value=mock_http_response
-    ), start_transaction(name="google_genai"):
+    ):
         mock_genai_client.models.generate_content(
             model="gemini-1.5-flash",
             contents="What's the weather and time?",
@@ -1140,7 +1136,7 @@ def test_embed_content_string_input(
 
     with mock.patch.object(
         mock_genai_client._api_client, "request", return_value=mock_http_response
-    ), start_transaction(name="google_genai_embeddings"):
+    ):
         mock_genai_client.models.embed_content(
             model="text-embedding-004",
             contents="Single text input",
@@ -1178,9 +1174,7 @@ def test_embed_content_error_handling(
         mock_genai_client._api_client,
         "request",
         side_effect=Exception("Embedding API Error"),
-    ), start_transaction(name="google_genai_embeddings"), pytest.raises(
-        Exception, match="Embedding API Error"
-    ):
+    ), pytest.raises(Exception, match="Embedding API Error"):
         mock_genai_client.models.embed_content(
             model="text-embedding-004",
             contents=["This will fail"],
@@ -1223,7 +1217,7 @@ def test_embed_content_without_statistics(
 
     with mock.patch.object(
         mock_genai_client._api_client, "request", return_value=mock_http_response
-    ), start_transaction(name="google_genai_embeddings"):
+    ):
         mock_genai_client.models.embed_content(
             model="text-embedding-004",
             contents=["Test without statistics", "Another test"],
@@ -1382,7 +1376,7 @@ async def test_async_embed_content_string_input(
         mock_genai_client._api_client,
         "async_request",
         return_value=mock_http_response,
-    ), start_transaction(name="google_genai_embeddings_async"):
+    ):
         await mock_genai_client.aio.models.embed_content(
             model="text-embedding-004",
             contents="Single text input",
@@ -1420,9 +1414,7 @@ async def test_async_embed_content_error_handling(
         mock_genai_client._api_client,
         "async_request",
         side_effect=Exception("Async Embedding API Error"),
-    ), start_transaction(name="google_genai_embeddings_async"), pytest.raises(
-        Exception, match="Async Embedding API Error"
-    ):
+    ), pytest.raises(Exception, match="Async Embedding API Error"):
         await mock_genai_client.aio.models.embed_content(
             model="text-embedding-004",
             contents=["This will fail"],
@@ -1468,7 +1460,7 @@ async def test_async_embed_content_without_statistics(
         mock_genai_client._api_client,
         "async_request",
         return_value=mock_http_response,
-    ), start_transaction(name="google_genai_embeddings_async"):
+    ):
         await mock_genai_client.aio.models.embed_content(
             model="text-embedding-004",
             contents=["Test without statistics", "Another test"],
@@ -1543,7 +1535,7 @@ def test_generate_content_with_content_object(
 
     with mock.patch.object(
         mock_genai_client._api_client, "request", return_value=mock_http_response
-    ), start_transaction(name="google_genai"):
+    ):
         mock_genai_client.models.generate_content(
             model="gemini-1.5-flash", contents=content, config=create_test_config()
         )
@@ -1581,7 +1573,7 @@ def test_generate_content_with_dict_format(
 
     with mock.patch.object(
         mock_genai_client._api_client, "request", return_value=mock_http_response
-    ), start_transaction(name="google_genai"):
+    ):
         mock_genai_client.models.generate_content(
             model="gemini-1.5-flash", contents=contents, config=create_test_config()
         )
@@ -1628,7 +1620,7 @@ def test_generate_content_with_file_data(
 
     with mock.patch.object(
         mock_genai_client._api_client, "request", return_value=mock_http_response
-    ), start_transaction(name="google_genai"):
+    ):
         mock_genai_client.models.generate_content(
             model="gemini-1.5-flash", contents=content, config=create_test_config()
         )
@@ -1680,7 +1672,7 @@ def test_generate_content_with_inline_data(
 
     with mock.patch.object(
         mock_genai_client._api_client, "request", return_value=mock_http_response
-    ), start_transaction(name="google_genai"):
+    ):
         mock_genai_client.models.generate_content(
             model="gemini-1.5-flash", contents=content, config=create_test_config()
         )
@@ -1740,10 +1732,9 @@ def test_generate_content_with_function_response(
     with mock.patch.object(
         mock_genai_client._api_client, "request", return_value=mock_http_response
     ):
-        with start_transaction(name="google_genai"):
-            mock_genai_client.models.generate_content(
-                model="gemini-1.5-flash", contents=contents, config=create_test_config()
-            )
+        mock_genai_client.models.generate_content(
+            model="gemini-1.5-flash", contents=contents, config=create_test_config()
+        )
 
     sentry_sdk.flush()
     spans = [item.payload for item in items]
@@ -1791,10 +1782,9 @@ def test_generate_content_with_mixed_string_and_content(
     with mock.patch.object(
         mock_genai_client._api_client, "request", return_value=mock_http_response
     ):
-        with start_transaction(name="google_genai"):
-            mock_genai_client.models.generate_content(
-                model="gemini-1.5-flash", contents=contents, config=create_test_config()
-            )
+        mock_genai_client.models.generate_content(
+            model="gemini-1.5-flash", contents=contents, config=create_test_config()
+        )
 
     sentry_sdk.flush()
     spans = [item.payload for item in items]
@@ -1828,7 +1818,7 @@ def test_generate_content_with_part_object_directly(
 
     with mock.patch.object(
         mock_genai_client._api_client, "request", return_value=mock_http_response
-    ), start_transaction(name="google_genai"):
+    ):
         mock_genai_client.models.generate_content(
             model="gemini-1.5-flash", contents=part, config=create_test_config()
         )
@@ -1874,10 +1864,9 @@ def test_generate_content_with_list_of_dicts(
     with mock.patch.object(
         mock_genai_client._api_client, "request", return_value=mock_http_response
     ):
-        with start_transaction(name="google_genai"):
-            mock_genai_client.models.generate_content(
-                model="gemini-1.5-flash", contents=contents, config=create_test_config()
-            )
+        mock_genai_client.models.generate_content(
+            model="gemini-1.5-flash", contents=contents, config=create_test_config()
+        )
 
     sentry_sdk.flush()
     spans = [item.payload for item in items]
@@ -1916,7 +1905,7 @@ def test_generate_content_with_dict_inline_data(
 
     with mock.patch.object(
         mock_genai_client._api_client, "request", return_value=mock_http_response
-    ), start_transaction(name="google_genai"):
+    ):
         mock_genai_client.models.generate_content(
             model="gemini-1.5-flash", contents=contents, config=create_test_config()
         )
@@ -1960,7 +1949,7 @@ def test_generate_content_without_parts_property_inline_data(
 
     with mock.patch.object(
         mock_genai_client._api_client, "request", return_value=mock_http_response
-    ), start_transaction(name="google_genai"):
+    ):
         mock_genai_client.models.generate_content(
             model="gemini-1.5-flash", contents=contents, config=create_test_config()
         )
@@ -2011,7 +2000,7 @@ def test_generate_content_without_parts_property_inline_data_and_binary_data_wit
 
     with mock.patch.object(
         mock_genai_client._api_client, "request", return_value=mock_http_response
-    ), start_transaction(name="google_genai"):
+    ):
         mock_genai_client.models.generate_content(
             model="gemini-1.5-flash", contents=contents, config=create_test_config()
         )
@@ -2490,7 +2479,7 @@ def test_generate_content_data_collection(
 
     with mock.patch.object(
         mock_genai_client._api_client, "request", return_value=mock_http_response
-    ), start_transaction(name="google_genai"):
+    ):
         mock_genai_client.models.generate_content(
             model="gemini-1.5-flash",
             contents="Tell me a joke",
@@ -2641,7 +2630,7 @@ def test_generate_content_data_collection_tools(
 
     with mock.patch.object(
         mock_genai_client._api_client, "request", return_value=mock_http_response
-    ), start_transaction(name="google_genai"):
+    ):
         mock_genai_client.models.generate_content(
             model="gemini-1.5-flash",
             contents="What's the weather?",
@@ -2823,7 +2812,7 @@ def test_streaming_generate_content_data_collection(
 
     with mock.patch.object(
         mock_genai_client._api_client, "request_streamed", return_value=mock_stream
-    ), start_transaction(name="google_genai"):
+    ):
         stream = mock_genai_client.models.generate_content_stream(
             model="gemini-1.5-flash",
             contents="Tell me a joke",
@@ -2974,7 +2963,7 @@ def test_streaming_generate_content_data_collection_tools(
 
     with mock.patch.object(
         mock_genai_client._api_client, "request_streamed", return_value=mock_stream
-    ), start_transaction(name="google_genai"):
+    ):
         stream = mock_genai_client.models.generate_content_stream(
             model="gemini-1.5-flash",
             contents="What's the weather?",
@@ -3104,7 +3093,7 @@ def test_embed_content_data_collection(
 
     with mock.patch.object(
         mock_genai_client._api_client, "request", return_value=mock_http_response
-    ), start_transaction(name="google_genai_embeddings"):
+    ):
         mock_genai_client.models.embed_content(
             model="text-embedding-004",
             contents=["What is your name?", "What is your favorite color?"],
@@ -3247,7 +3236,7 @@ async def test_async_generate_content_data_collection(
 
     with mock.patch.object(
         mock_genai_client._api_client, "async_request", return_value=mock_http_response
-    ), start_transaction(name="google_genai"):
+    ):
         await mock_genai_client.aio.models.generate_content(
             model="gemini-1.5-flash",
             contents="Tell me a joke",
@@ -3375,7 +3364,7 @@ async def test_async_embed_content_data_collection(
 
     with mock.patch.object(
         mock_genai_client._api_client, "async_request", return_value=mock_http_response
-    ), start_transaction(name="google_genai_embeddings"):
+    ):
         await mock_genai_client.aio.models.embed_content(
             model="text-embedding-004",
             contents=["What is your name?", "What is your favorite color?"],
