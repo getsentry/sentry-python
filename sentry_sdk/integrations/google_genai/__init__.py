@@ -10,8 +10,7 @@ from typing import (
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
-from sentry_sdk.traces import SpanStatus, StreamedSpan
-from sentry_sdk.tracing import SPANSTATUS
+from sentry_sdk.traces import SpanStatus
 from sentry_sdk.utils import parse_version
 
 try:
@@ -104,10 +103,7 @@ def _wrap_generate_content_stream(f: "Callable[..., Any]") -> "Callable[..., Any
                         yield chunk
                 except Exception as exc:
                     _capture_exception(exc)
-                    if isinstance(chat_span, StreamedSpan):
-                        chat_span.status = SpanStatus.ERROR
-                    else:
-                        chat_span.set_status(SPANSTATUS.INTERNAL_ERROR)
+                    chat_span.status = SpanStatus.ERROR
                     raise
                 finally:
                     # Accumulate all chunks and set final response data on spans
@@ -168,10 +164,7 @@ def _wrap_async_generate_content_stream(
                         yield chunk
                 except Exception as exc:
                     _capture_exception(exc)
-                    if isinstance(chat_span, StreamedSpan):
-                        chat_span.status = SpanStatus.ERROR
-                    else:
-                        chat_span.set_status(SPANSTATUS.INTERNAL_ERROR)
+                    chat_span.status = SpanStatus.ERROR
                     raise
                 finally:
                     # Accumulate all chunks and set final response data on spans
