@@ -7,8 +7,8 @@ from botocore.stub import Stubber
 
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
-from sentry_sdk.integrations.boto3 import (
-    Boto3Integration,
+from sentry_sdk.integrations.boto3 import Boto3Integration
+from sentry_sdk.integrations.boto3._instrumentation import (
     _get_error_attributes,
     _get_response_attributes,
     _get_server_attributes,
@@ -20,6 +20,11 @@ session = boto3.Session(  # type: ignore[attr-defined]
     aws_secret_access_key="-",
     region_name="eu-north-1",
 )
+
+
+def test_public_api():
+    assert Boto3Integration.__module__ == "sentry_sdk.integrations.boto3"
+    assert Boto3Integration.identifier == "boto3"
 
 
 @pytest.fixture
@@ -609,7 +614,7 @@ def test_response_attribute_extraction_failure_does_not_change_response(
         raise RuntimeError("attribute extraction failed")
 
     monkeypatch.setattr(
-        "sentry_sdk.integrations.boto3._get_response_attributes",
+        "sentry_sdk.integrations.boto3._instrumentation._get_response_attributes",
         fail_attribute_extraction,
     )
 
@@ -648,7 +653,7 @@ def test_error_attribute_extraction_failure_does_not_replace_original_exception(
 
     client.meta.events.register("before-parameter-build", raise_original_exception)
     monkeypatch.setattr(
-        "sentry_sdk.integrations.boto3._get_error_attributes",
+        "sentry_sdk.integrations.boto3._instrumentation._get_error_attributes",
         fail_attribute_extraction,
     )
 
