@@ -99,9 +99,7 @@ def _get_system_instructions(
     return permanent_instructions, current_instructions
 
 
-def _set_input_messages(
-    span: "Union[sentry_sdk.tracing.Span, StreamedSpan]", messages: "Any"
-) -> None:
+def _set_input_messages(span: "StreamedSpan", messages: "Any") -> None:
     """Set input messages data on a span."""
     if not _should_send_inputs():
         return
@@ -111,24 +109,14 @@ def _set_input_messages(
 
     permanent_instructions, current_instructions = _get_system_instructions(messages)
     if len(permanent_instructions) > 0 or len(current_instructions) > 0:
-        if isinstance(span, StreamedSpan):
-            span.set_attribute(
-                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
-                json.dumps(
-                    _transform_system_instructions(
-                        permanent_instructions, current_instructions
-                    )
-                ),
-            )
-        else:
-            span.set_data(
-                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
-                json.dumps(
-                    _transform_system_instructions(
-                        permanent_instructions, current_instructions
-                    )
-                ),
-            )
+        span.set_attribute(
+            SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+            json.dumps(
+                _transform_system_instructions(
+                    permanent_instructions, current_instructions
+                )
+            ),
+        )
 
     try:
         formatted_messages = []
@@ -224,7 +212,7 @@ def _set_input_messages(
 
 
 def _set_output_data(
-    span: "Union[sentry_sdk.tracing.Span, StreamedSpan]",
+    span: "StreamedSpan",
     response: "Optional[ModelResponse]",
 ) -> None:
     """Set output data on a span."""
@@ -233,10 +221,7 @@ def _set_output_data(
     if not response:
         return
 
-    set_on_span = (
-        span.set_attribute if isinstance(span, StreamedSpan) else span.set_data
-    )
-    set_on_span(SPANDATA.GEN_AI_RESPONSE_MODEL, response.model_name)  # type: ignore[arg-type]
+    span.set_attribute(SPANDATA.GEN_AI_RESPONSE_MODEL, response.model_name)  # type: ignore[arg-type]
 
     if not record_outputs:
         return
@@ -272,7 +257,7 @@ def _set_output_data(
                     parts.append(tool_part)
 
             if parts:
-                set_on_span(
+                span.set_attribute(
                     SPANDATA.GEN_AI_OUTPUT_MESSAGES,
                     json.dumps([{"role": "assistant", "parts": parts}]),
                 )
@@ -284,7 +269,7 @@ def _set_output_data(
 
 def ai_client_span(
     messages: "Any", agent: "Any", model: "Any", model_settings: "Any"
-) -> "Union[sentry_sdk.tracing.Span, StreamedSpan]":
+) -> "StreamedSpan":
     """Create a span for an AI client call (model request).
 
     Args:
@@ -325,7 +310,7 @@ def ai_client_span(
 
 
 def update_ai_client_span(
-    span: "Union[sentry_sdk.tracing.Span, StreamedSpan]",
+    span: "StreamedSpan",
     model_response: "Optional[ModelResponse]",
 ) -> None:
     """Update the AI client span with response data."""

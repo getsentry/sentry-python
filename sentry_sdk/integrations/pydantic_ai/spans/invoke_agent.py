@@ -22,7 +22,7 @@ from .utils import (
 )
 
 if TYPE_CHECKING:
-    from typing import Any, Union
+    from typing import Any
 
 try:
     from pydantic_ai.messages import BinaryContent, ImageUrl
@@ -37,7 +37,7 @@ def invoke_agent_span(
     model: "Any",
     model_settings: "Any",
     is_streaming: bool = False,
-) -> "Union[sentry_sdk.tracing.Span, StreamedSpan]":
+) -> "StreamedSpan":
     """Create a span for invoking the agent."""
     # Determine agent name for span
     name = "agent"
@@ -133,7 +133,7 @@ def invoke_agent_span(
 
 
 def update_invoke_agent_span(
-    span: "Union[sentry_sdk.tracing.Span, StreamedSpan]",
+    span: "StreamedSpan",
     result: "Any",
 ) -> None:
     """Update and close the invoke agent span."""
@@ -154,12 +154,7 @@ def update_invoke_agent_span(
         try:
             response = result.response
             if hasattr(response, "model_name") and response.model_name:
-                if isinstance(span, StreamedSpan):
-                    span.set_attribute(
-                        SPANDATA.GEN_AI_RESPONSE_MODEL, response.model_name
-                    )
-                else:
-                    span.set_data(SPANDATA.GEN_AI_RESPONSE_MODEL, response.model_name)
+                span.set_attribute(SPANDATA.GEN_AI_RESPONSE_MODEL, response.model_name)
         except Exception:
             # If response access fails, continue without setting model name
             pass

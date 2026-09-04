@@ -9,7 +9,7 @@ from ..consts import SPAN_ORIGIN
 from ..utils import _set_agent_data, _should_send_inputs, _should_send_outputs
 
 if TYPE_CHECKING:
-    from typing import Any, Optional, Union
+    from typing import Any, Optional
 
     from pydantic_ai._tool_manager import ToolDefinition  # type: ignore
 
@@ -19,7 +19,7 @@ def execute_tool_span(
     tool_args: "Any",
     agent: "Any",
     tool_definition: "Optional[ToolDefinition]" = None,
-) -> "Union[sentry_sdk.tracing.Span, StreamedSpan]":
+) -> "StreamedSpan":
     """Create a span for tool execution.
 
     Args:
@@ -52,9 +52,7 @@ def execute_tool_span(
     return span
 
 
-def update_execute_tool_span(
-    span: "Union[sentry_sdk.tracing.Span, StreamedSpan]", result: "Any"
-) -> None:
+def update_execute_tool_span(span: "StreamedSpan", result: "Any") -> None:
     """Update the execute tool span with the result."""
     if not span:
         return
@@ -62,7 +60,4 @@ def update_execute_tool_span(
     if not _should_send_outputs() or result is None:
         return
 
-    if isinstance(span, StreamedSpan):
-        span.set_attribute(SPANDATA.GEN_AI_TOOL_OUTPUT, safe_serialize(result))
-    else:
-        span.set_data(SPANDATA.GEN_AI_TOOL_OUTPUT, safe_serialize(result))
+    span.set_attribute(SPANDATA.GEN_AI_TOOL_OUTPUT, safe_serialize(result))

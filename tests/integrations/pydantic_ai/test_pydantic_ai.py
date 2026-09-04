@@ -1452,24 +1452,20 @@ async def test_model_settings_object_style(
         traces_sample_rate=1.0,
     )
 
-    with sentry_sdk.start_transaction(op="test", name="test") as transaction:
-        span = sentry_sdk.traces.start_span(name="test")
+    span = sentry_sdk.traces.start_span(name="test")
 
-        # Create mock settings object (not a dict)
-        mock_settings = MagicMock()
-        mock_settings.temperature = 0.8
-        mock_settings.max_tokens = 200
-        mock_settings.top_p = 0.95
-        mock_settings.frequency_penalty = 0.5
-        mock_settings.presence_penalty = 0.3
+    # Create mock settings object (not a dict)
+    mock_settings = MagicMock()
+    mock_settings.temperature = 0.8
+    mock_settings.max_tokens = 200
+    mock_settings.top_p = 0.95
+    mock_settings.frequency_penalty = 0.5
+    mock_settings.presence_penalty = 0.3
 
-        # Set model data with object-style settings
-        _set_model_data(span, None, mock_settings)
+    # Set model data with object-style settings
+    _set_model_data(span, None, mock_settings)
 
-        span.end()
-
-    # Should not crash and should set the settings
-    assert transaction is not None
+    span.end()
 
 
 @pytest.mark.asyncio
@@ -1692,16 +1688,12 @@ async def test_update_invoke_agent_span_with_none_output(
         send_default_pii=True,
     )
 
-    with sentry_sdk.start_transaction(op="test", name="test") as transaction:
-        span = sentry_sdk.start_span(op="test_span")
+    span = sentry_sdk.traces.start_span(name="test_span")
 
-        # Update with None output - should not raise
-        update_invoke_agent_span(span, None)
+    # Update with None output - should not raise
+    update_invoke_agent_span(span, None)
 
-        span.finish()
-
-    # Should not crash
-    assert transaction is not None
+    span.end()
 
 
 @pytest.mark.asyncio
@@ -1721,16 +1713,12 @@ async def test_update_ai_client_span_with_none_response(
         traces_sample_rate=1.0,
     )
 
-    with sentry_sdk.start_transaction(op="test", name="test") as transaction:
-        span = sentry_sdk.start_span(op="test_span")
+    span = sentry_sdk.traces.start_span(name="test_span")
 
-        # Update with None response - should not raise
-        update_ai_client_span(span, None)
+    # Update with None response - should not raise
+    update_ai_client_span(span, None)
 
-        span.finish()
-
-    # Should not crash
-    assert transaction is not None
+    span.end()
 
 
 @pytest.mark.asyncio
@@ -1774,19 +1762,15 @@ async def test_input_messages_error_handling(
         send_default_pii=True,
     )
 
-    with sentry_sdk.start_transaction(op="test", name="test") as transaction:
-        span = sentry_sdk.start_span(op="test_span")
+    span = sentry_sdk.traces.start_span(name="test_span")
 
-        # Pass invalid messages that would cause an error
-        invalid_messages = [object()]  # Plain object without expected attributes
+    # Pass invalid messages that would cause an error
+    invalid_messages = [object()]  # Plain object without expected attributes
 
-        # Should not raise, error is caught internally
-        _set_input_messages(span, invalid_messages)
+    # Should not raise, error is caught internally
+    _set_input_messages(span, invalid_messages)
 
-        span.finish()
-
-    # Should not crash
-    assert transaction is not None
+    span.end()
 
 
 @pytest.mark.asyncio
@@ -1806,20 +1790,16 @@ async def test_available_tools_error_handling(
         traces_sample_rate=1.0,
     )
 
-    with sentry_sdk.start_transaction(op="test", name="test") as transaction:
-        span = sentry_sdk.start_span(op="test_span")
+    span = sentry_sdk.traces.start_span(name="test_span")
 
-        # Create mock agent with invalid toolset
-        mock_agent = MagicMock()
-        mock_agent._function_toolset.tools.items.side_effect = Exception("Error")
+    # Create mock agent with invalid toolset
+    mock_agent = MagicMock()
+    mock_agent._function_toolset.tools.items.side_effect = Exception("Error")
 
-        # Should not raise, error is caught internally
-        _set_available_tools(span, mock_agent)
+    # Should not raise, error is caught internally
+    _set_available_tools(span, mock_agent)
 
-        span.finish()
-
-    # Should not crash
-    assert transaction is not None
+    span.end()
 
 
 @pytest.mark.asyncio
@@ -1837,16 +1817,12 @@ async def test_set_usage_data_with_none_usage(
         traces_sample_rate=1.0,
     )
 
-    with sentry_sdk.start_transaction(op="test", name="test") as transaction:
-        span = sentry_sdk.start_span(op="test_span")
+    span = sentry_sdk.traces.start_span(name="test_span")
 
-        # Pass None usage - should not raise
-        _set_usage_data(span, None)
+    # Pass None usage - should not raise
+    _set_usage_data(span, None)
 
-        span.finish()
-
-    # Should not crash
-    assert transaction is not None
+    span.end()
 
 
 @pytest.mark.asyncio
@@ -1866,22 +1842,18 @@ async def test_set_usage_data_with_partial_fields(
         traces_sample_rate=1.0,
     )
 
-    with sentry_sdk.start_transaction(op="test", name="test") as transaction:
-        span = sentry_sdk.start_span(op="test_span")
+    span = sentry_sdk.traces.start_span(name="test_span")
 
-        # Create usage object with only some fields
-        mock_usage = MagicMock()
-        mock_usage.input_tokens = 100
-        mock_usage.output_tokens = None  # Missing
-        mock_usage.total_tokens = 100
+    # Create usage object with only some fields
+    mock_usage = MagicMock()
+    mock_usage.input_tokens = 100
+    mock_usage.output_tokens = None  # Missing
+    mock_usage.total_tokens = 100
 
-        # Should only set the non-None fields
-        _set_usage_data(span, mock_usage)
+    # Should only set the non-None fields
+    _set_usage_data(span, mock_usage)
 
-        span.finish()
-
-    # Should not crash
-    assert transaction is not None
+    span.end()
 
 
 @pytest.mark.asyncio
@@ -1943,25 +1915,21 @@ async def test_message_parts_with_list_content(
         send_default_pii=True,
     )
 
-    with sentry_sdk.start_transaction(op="test", name="test") as transaction:
-        span = sentry_sdk.start_span(op="test_span")
+    span = sentry_sdk.traces.start_span(name="test_span")
 
-        # Create message with list content
-        mock_msg = MagicMock()
-        mock_part = MagicMock()
-        mock_part.content = ["item1", "item2", {"complex": "item"}]
-        mock_msg.parts = [mock_part]
-        mock_msg.instructions = None
+    # Create message with list content
+    mock_msg = MagicMock()
+    mock_part = MagicMock()
+    mock_part.content = ["item1", "item2", {"complex": "item"}]
+    mock_msg.parts = [mock_part]
+    mock_msg.instructions = None
 
-        messages = [mock_msg]
+    messages = [mock_msg]
 
-        # Should handle list content
-        _set_input_messages(span, messages)
+    # Should handle list content
+    _set_input_messages(span, messages)
 
-        span.finish()
-
-    # Should not crash
-    assert transaction is not None
+    span.end()
 
 
 @pytest.mark.asyncio
@@ -2059,21 +2027,17 @@ async def test_output_data_error_handling(
         send_default_pii=True,
     )
 
-    with sentry_sdk.start_transaction(op="test", name="test") as transaction:
-        span = sentry_sdk.start_span(op="test_span")
+    span = sentry_sdk.traces.start_span(name="test_span")
 
-        # Create mock response that will cause error
-        mock_response = MagicMock()
-        mock_response.model_name = "test-model"
-        mock_response.parts = [MagicMock(side_effect=Exception("Error"))]
+    # Create mock response that will cause error
+    mock_response = MagicMock()
+    mock_response.model_name = "test-model"
+    mock_response.parts = [MagicMock(side_effect=Exception("Error"))]
 
-        # Should catch error and not crash
-        _set_output_data(span, mock_response)
+    # Should catch error and not crash
+    _set_output_data(span, mock_response)
 
-        span.finish()
-
-    # Should not crash
-    assert transaction is not None
+    span.end()
 
 
 @pytest.mark.asyncio
@@ -2095,25 +2059,21 @@ async def test_message_with_system_prompt_part(
         send_default_pii=True,
     )
 
-    with sentry_sdk.start_transaction(op="test", name="test") as transaction:
-        span = sentry_sdk.start_span(op="test_span")
+    span = sentry_sdk.traces.start_span(name="test_span")
 
-        # Create message with SystemPromptPart
-        system_part = messages.SystemPromptPart(content="You are a helpful assistant")
+    # Create message with SystemPromptPart
+    system_part = messages.SystemPromptPart(content="You are a helpful assistant")
 
-        mock_msg = MagicMock()
-        mock_msg.parts = [system_part]
-        mock_msg.instructions = None
+    mock_msg = MagicMock()
+    mock_msg.parts = [system_part]
+    mock_msg.instructions = None
 
-        msgs = [mock_msg]
+    msgs = [mock_msg]
 
-        # Should handle system prompt
-        _set_input_messages(span, msgs)
+    # Should handle system prompt
+    _set_input_messages(span, msgs)
 
-        span.finish()
-
-    # Should not crash
-    assert transaction is not None
+    span.end()
 
 
 @pytest.mark.asyncio
@@ -2133,25 +2093,21 @@ async def test_message_with_instructions(
         send_default_pii=True,
     )
 
-    with sentry_sdk.start_transaction(op="test", name="test") as transaction:
-        span = sentry_sdk.start_span(op="test_span")
+    span = sentry_sdk.traces.start_span(name="test_span")
 
-        # Create message with instructions
-        mock_msg = MagicMock()
-        mock_msg.instructions = "System instructions here"
-        mock_part = MagicMock()
-        mock_part.content = "User message"
-        mock_msg.parts = [mock_part]
+    # Create message with instructions
+    mock_msg = MagicMock()
+    mock_msg.instructions = "System instructions here"
+    mock_part = MagicMock()
+    mock_part.content = "User message"
+    mock_msg.parts = [mock_part]
 
-        msgs = [mock_msg]
+    msgs = [mock_msg]
 
-        # Should extract system prompt from instructions
-        _set_input_messages(span, msgs)
+    # Should extract system prompt from instructions
+    _set_input_messages(span, msgs)
 
-        span.finish()
-
-    # Should not crash
-    assert transaction is not None
+    span.end()
 
 
 @pytest.mark.asyncio
@@ -2169,17 +2125,13 @@ async def test_set_input_messages_without_prompts(
         send_default_pii=True,
     )
 
-    with sentry_sdk.start_transaction(op="test", name="test") as transaction:
-        span = sentry_sdk.start_span(op="test_span")
+    span = sentry_sdk.traces.start_span(name="test_span")
 
-        # Even with messages, should not set them
-        messages = ["test"]
-        _set_input_messages(span, messages)
+    # Even with messages, should not set them
+    messages = ["test"]
+    _set_input_messages(span, messages)
 
-        span.finish()
-
-    # Should not crash and should not set messages
-    assert transaction is not None
+    span.end()
 
 
 @pytest.mark.asyncio
@@ -2268,21 +2220,17 @@ async def test_set_model_data_with_system(
         traces_sample_rate=1.0,
     )
 
-    with sentry_sdk.start_transaction(op="test", name="test") as transaction:
-        span = sentry_sdk.traces.start_span(name="test")
+    span = sentry_sdk.traces.start_span(name="test")
 
-        # Create model with system
-        mock_model = MagicMock()
-        mock_model.system = "openai"
-        mock_model.model_name = "gpt-4"
+    # Create model with system
+    mock_model = MagicMock()
+    mock_model.system = "openai"
+    mock_model.model_name = "gpt-4"
 
-        # Set model data
-        _set_model_data(span, mock_model, None)
+    # Set model data
+    _set_model_data(span, mock_model, None)
 
-        span.end()
-
-    # Should not crash
-    assert transaction is not None
+    span.end()
 
 
 @pytest.mark.asyncio
@@ -2302,24 +2250,20 @@ async def test_set_model_data_from_agent_scope(
         traces_sample_rate=1.0,
     )
 
-    with sentry_sdk.start_transaction(op="test", name="test") as transaction:
-        # Set agent in scope
-        scope = sentry_sdk.get_current_scope()
-        mock_agent = MagicMock()
-        mock_agent.model = MagicMock()
-        mock_agent.model.model_name = "test-model"
-        mock_agent.model_settings = {"temperature": 0.5}
-        scope._contexts["pydantic_ai_agent"] = {"_agent": mock_agent}
+    # Set agent in scope
+    scope = sentry_sdk.get_current_scope()
+    mock_agent = MagicMock()
+    mock_agent.model = MagicMock()
+    mock_agent.model.model_name = "test-model"
+    mock_agent.model_settings = {"temperature": 0.5}
+    scope._contexts["pydantic_ai_agent"] = {"_agent": mock_agent}
 
-        span = sentry_sdk.start_span(op="test_span")
+    span = sentry_sdk.traces.start_span(name="test_span")
 
-        # Pass None for model, should get from scope
-        _set_model_data(span, None, None)
+    # Pass None for model, should get from scope
+    _set_model_data(span, None, None)
 
-        span.finish()
-
-    # Should not crash
-    assert transaction is not None
+    span.end()
 
 
 @pytest.mark.asyncio
@@ -2337,23 +2281,19 @@ async def test_set_model_data_with_none_settings_values(
         traces_sample_rate=1.0,
     )
 
-    with sentry_sdk.start_transaction(op="test", name="test") as transaction:
-        span = sentry_sdk.traces.start_span(name="test")
+    span = sentry_sdk.traces.start_span(name="test")
 
-        # Create settings with None values
-        settings = {
-            "temperature": 0.7,
-            "max_tokens": None,  # Should be skipped
-            "top_p": None,  # Should be skipped
-        }
+    # Create settings with None values
+    settings = {
+        "temperature": 0.7,
+        "max_tokens": None,  # Should be skipped
+        "top_p": None,  # Should be skipped
+    }
 
-        # Set model data
-        _set_model_data(span, None, settings)
+    # Set model data
+    _set_model_data(span, None, settings)
 
-        span.end()
-
-    # Should not crash
-    assert transaction is not None
+    span.end()
 
 
 @pytest.mark.asyncio
@@ -2394,16 +2334,12 @@ async def test_set_agent_data_without_agent(
         traces_sample_rate=1.0,
     )
 
-    with sentry_sdk.start_transaction(op="test", name="test") as transaction:
-        span = sentry_sdk.start_span(op="test_span")
+    span = sentry_sdk.traces.start_span(name="test_span")
 
-        # Pass None agent, with no agent in scope
-        _set_agent_data(span, None)
+    # Pass None agent, with no agent in scope
+    _set_agent_data(span, None)
 
-        span.finish()
-
-    # Should not crash
-    assert transaction is not None
+    span.end()
 
 
 @pytest.mark.asyncio
@@ -2423,22 +2359,18 @@ async def test_set_agent_data_from_scope(
         traces_sample_rate=1.0,
     )
 
-    with sentry_sdk.start_transaction(op="test", name="test") as transaction:
-        # Set agent in scope
-        scope = sentry_sdk.get_current_scope()
-        mock_agent = MagicMock()
-        mock_agent.name = "test_agent_from_scope"
-        scope._contexts["pydantic_ai_agent"] = {"_agent": mock_agent}
+    # Set agent in scope
+    scope = sentry_sdk.get_current_scope()
+    mock_agent = MagicMock()
+    mock_agent.name = "test_agent_from_scope"
+    scope._contexts["pydantic_ai_agent"] = {"_agent": mock_agent}
 
-        span = sentry_sdk.start_span(op="test_span")
+    span = sentry_sdk.traces.start_span(name="test_span")
 
-        # Pass None for agent, should get from scope
-        _set_agent_data(span, None)
+    # Pass None for agent, should get from scope
+    _set_agent_data(span, None)
 
-        span.finish()
-
-    # Should not crash
-    assert transaction is not None
+    span.end()
 
 
 @pytest.mark.asyncio
@@ -2458,20 +2390,16 @@ async def test_set_agent_data_without_name(
         traces_sample_rate=1.0,
     )
 
-    with sentry_sdk.start_transaction(op="test", name="test") as transaction:
-        span = sentry_sdk.start_span(op="test_span")
+    span = sentry_sdk.traces.start_span(name="test_span")
 
-        # Create agent without name
-        mock_agent = MagicMock()
-        mock_agent.name = None  # No name
+    # Create agent without name
+    mock_agent = MagicMock()
+    mock_agent.name = None  # No name
 
-        # Should not set agent name
-        _set_agent_data(span, mock_agent)
+    # Should not set agent name
+    _set_agent_data(span, mock_agent)
 
-        span.finish()
-
-    # Should not crash
-    assert transaction is not None
+    span.end()
 
 
 @pytest.mark.asyncio
@@ -2491,20 +2419,16 @@ async def test_set_available_tools_without_toolset(
         traces_sample_rate=1.0,
     )
 
-    with sentry_sdk.start_transaction(op="test", name="test") as transaction:
-        span = sentry_sdk.start_span(op="test_span")
+    span = sentry_sdk.traces.start_span(name="test_span")
 
-        # Create agent without _function_toolset
-        mock_agent = MagicMock()
-        del mock_agent._function_toolset
+    # Create agent without _function_toolset
+    mock_agent = MagicMock()
+    del mock_agent._function_toolset
 
-        # Should handle gracefully
-        _set_available_tools(span, mock_agent)
+    # Should handle gracefully
+    _set_available_tools(span, mock_agent)
 
-        span.finish()
-
-    # Should not crash
-    assert transaction is not None
+    span.end()
 
 
 @pytest.mark.asyncio
@@ -2524,26 +2448,22 @@ async def test_set_available_tools_with_schema(
         traces_sample_rate=1.0,
     )
 
-    with sentry_sdk.start_transaction(op="test", name="test") as transaction:
-        span = sentry_sdk.start_span(op="test_span")
+    span = sentry_sdk.traces.start_span(name="test_span")
 
-        # Create agent with toolset containing schema
-        mock_agent = MagicMock()
-        mock_tool = MagicMock()
-        mock_schema = MagicMock()
-        mock_schema.description = "Test tool description"
-        mock_schema.json_schema = {"type": "object", "properties": {}}
-        mock_tool.function_schema = mock_schema
+    # Create agent with toolset containing schema
+    mock_agent = MagicMock()
+    mock_tool = MagicMock()
+    mock_schema = MagicMock()
+    mock_schema.description = "Test tool description"
+    mock_schema.json_schema = {"type": "object", "properties": {}}
+    mock_tool.function_schema = mock_schema
 
-        mock_agent._function_toolset.tools = {"test_tool": mock_tool}
+    mock_agent._function_toolset.tools = {"test_tool": mock_tool}
 
-        # Should extract schema
-        _set_available_tools(span, mock_agent)
+    # Should extract schema
+    _set_available_tools(span, mock_agent)
 
-        span.finish()
-
-    # Should not crash
-    assert transaction is not None
+    span.end()
 
 
 @pytest.mark.asyncio
@@ -2553,7 +2473,6 @@ async def test_execute_tool_span_creation(
     """
     Test direct creation of execute_tool span.
     """
-    import sentry_sdk
     from sentry_sdk.integrations.pydantic_ai.spans.execute_tool import (
         execute_tool_span,
         update_execute_tool_span,
@@ -2565,14 +2484,10 @@ async def test_execute_tool_span_creation(
         send_default_pii=True,
     )
 
-    with sentry_sdk.start_transaction(op="test", name="test") as transaction:
-        # Create execute_tool span
-        with execute_tool_span("test_tool", {"arg": "value"}, None, "function") as span:
-            # Update with result
-            update_execute_tool_span(span, {"result": "success"})
-
-    # Should not crash
-    assert transaction is not None
+    # Create execute_tool span
+    with execute_tool_span("test_tool", {"arg": "value"}, None, "function") as span:
+        # Update with result
+        update_execute_tool_span(span, {"result": "success"})
 
 
 @pytest.mark.asyncio
@@ -2582,7 +2497,6 @@ async def test_execute_tool_span_with_mcp_type(
     """
     Test execute_tool span with MCP tool type.
     """
-    import sentry_sdk
     from sentry_sdk.integrations.pydantic_ai.spans.execute_tool import (
         execute_tool_span,
     )
@@ -2593,14 +2507,10 @@ async def test_execute_tool_span_with_mcp_type(
         send_default_pii=True,
     )
 
-    with sentry_sdk.start_transaction(op="test", name="test") as transaction:
-        # Create execute_tool span with mcp type
-        with execute_tool_span("mcp_tool", {"arg": "value"}, None, "mcp") as span:
-            # Verify type is set
-            assert span is not None
-
-    # Should not crash
-    assert transaction is not None
+    # Create execute_tool span with mcp type
+    with execute_tool_span("mcp_tool", {"arg": "value"}, None, "mcp") as span:
+        # Verify type is set
+        assert span is not None
 
 
 @pytest.mark.asyncio
@@ -2610,7 +2520,6 @@ async def test_execute_tool_span_without_prompts(
     """
     Test that execute_tool span respects _should_send_prompts().
     """
-    import sentry_sdk
     from sentry_sdk.integrations.pydantic_ai.spans.execute_tool import (
         execute_tool_span,
         update_execute_tool_span,
@@ -2622,14 +2531,10 @@ async def test_execute_tool_span_without_prompts(
         send_default_pii=True,
     )
 
-    with sentry_sdk.start_transaction(op="test", name="test") as transaction:
-        # Create execute_tool span
-        with execute_tool_span("test_tool", {"arg": "value"}, None, "function") as span:
-            # Update with result - should not set input/output
-            update_execute_tool_span(span, {"result": "success"})
-
-    # Should not crash
-    assert transaction is not None
+    # Create execute_tool span
+    with execute_tool_span("test_tool", {"arg": "value"}, None, "function") as span:
+        # Update with result - should not set input/output
+        update_execute_tool_span(span, {"result": "success"})
 
 
 @pytest.mark.asyncio
@@ -2639,7 +2544,6 @@ async def test_execute_tool_span_with_none_args(
     """
     Test execute_tool span with None args.
     """
-    import sentry_sdk
     from sentry_sdk.integrations.pydantic_ai.spans.execute_tool import execute_tool_span
 
     sentry_init(
@@ -2648,13 +2552,9 @@ async def test_execute_tool_span_with_none_args(
         send_default_pii=True,
     )
 
-    with sentry_sdk.start_transaction(op="test", name="test") as transaction:
-        # Create execute_tool span with None args
-        with execute_tool_span("test_tool", None, None, "function") as span:
-            assert span is not None
-
-    # Should not crash
-    assert transaction is not None
+    # Create execute_tool span with None args
+    with execute_tool_span("test_tool", None, None, "function") as span:
+        assert span is not None
 
 
 @pytest.mark.asyncio
@@ -2687,7 +2587,6 @@ async def test_update_execute_tool_span_with_none_result(
     """
     Test that update_execute_tool_span handles None result gracefully.
     """
-    import sentry_sdk
     from sentry_sdk.integrations.pydantic_ai.spans.execute_tool import (
         execute_tool_span,
         update_execute_tool_span,
@@ -2699,14 +2598,10 @@ async def test_update_execute_tool_span_with_none_result(
         send_default_pii=True,
     )
 
-    with sentry_sdk.start_transaction(op="test", name="test") as transaction:
-        # Create execute_tool span
-        with execute_tool_span("test_tool", {"arg": "value"}, None, "function") as span:
-            # Update with None result
-            update_execute_tool_span(span, None)
-
-    # Should not crash
-    assert transaction is not None
+    # Create execute_tool span
+    with execute_tool_span("test_tool", {"arg": "value"}, None, "function") as span:
+        # Update with None result
+        update_execute_tool_span(span, None)
 
 
 @pytest.mark.asyncio
@@ -2749,7 +2644,6 @@ async def test_invoke_agent_span_with_callable_instruction(
     """
     from unittest.mock import MagicMock
 
-    import sentry_sdk
     from sentry_sdk.integrations.pydantic_ai.spans.invoke_agent import invoke_agent_span
 
     sentry_init(
@@ -2758,22 +2652,18 @@ async def test_invoke_agent_span_with_callable_instruction(
         send_default_pii=True,
     )
 
-    with sentry_sdk.start_transaction(op="test", name="test") as transaction:
-        # Create mock agent with callable instruction
-        mock_agent = MagicMock()
-        mock_agent.name = "test_agent"
-        mock_agent._system_prompts = []
+    # Create mock agent with callable instruction
+    mock_agent = MagicMock()
+    mock_agent.name = "test_agent"
+    mock_agent._system_prompts = []
 
-        # Add both string and callable instructions
-        mock_callable = lambda: "Dynamic instruction"
-        mock_agent._instructions = ["Static instruction", mock_callable]
+    # Add both string and callable instructions
+    mock_callable = lambda: "Dynamic instruction"
+    mock_agent._instructions = ["Static instruction", mock_callable]
 
-        # Create span
-        span = invoke_agent_span("Test prompt", mock_agent, None, None)
-        span.finish()
-
-    # Should not crash (callable should be skipped)
-    assert transaction is not None
+    # Create span
+    span = invoke_agent_span("Test prompt", mock_agent, None, None)
+    span.end()
 
 
 @pytest.mark.asyncio
@@ -2785,7 +2675,6 @@ async def test_invoke_agent_span_with_string_instructions(
     """
     from unittest.mock import MagicMock
 
-    import sentry_sdk
     from sentry_sdk.integrations.pydantic_ai.spans.invoke_agent import invoke_agent_span
 
     sentry_init(
@@ -2794,19 +2683,15 @@ async def test_invoke_agent_span_with_string_instructions(
         send_default_pii=True,
     )
 
-    with sentry_sdk.start_transaction(op="test", name="test") as transaction:
-        # Create mock agent with string instruction
-        mock_agent = MagicMock()
-        mock_agent.name = "test_agent"
-        mock_agent._system_prompts = []
-        mock_agent._instructions = "Single instruction string"
+    # Create mock agent with string instruction
+    mock_agent = MagicMock()
+    mock_agent.name = "test_agent"
+    mock_agent._system_prompts = []
+    mock_agent._instructions = "Single instruction string"
 
-        # Create span
-        span = invoke_agent_span("Test prompt", mock_agent, None, None)
-        span.finish()
-
-    # Should not crash
-    assert transaction is not None
+    # Create span
+    span = invoke_agent_span("Test prompt", mock_agent, None, None)
+    span.end()
 
 
 @pytest.mark.asyncio
@@ -2824,17 +2709,13 @@ async def test_ai_client_span_with_streaming_flag(
         traces_sample_rate=1.0,
     )
 
-    with sentry_sdk.start_transaction(op="test", name="test") as transaction:
-        # Set streaming flag in scope
-        scope = sentry_sdk.get_current_scope()
-        scope._contexts["pydantic_ai_agent"] = {"_streaming": True}
+    # Set streaming flag in scope
+    scope = sentry_sdk.get_current_scope()
+    scope._contexts["pydantic_ai_agent"] = {"_streaming": True}
 
-        # Create ai_client span
-        span = ai_client_span([], None, None, None)
-        span.finish()
-
-    # Should not crash
-    assert transaction is not None
+    # Create ai_client span
+    span = ai_client_span([], None, None, None)
+    span.end()
 
 
 @pytest.mark.asyncio
@@ -2854,21 +2735,17 @@ async def test_ai_client_span_gets_agent_from_scope(
         traces_sample_rate=1.0,
     )
 
-    with sentry_sdk.start_transaction(op="test", name="test") as transaction:
-        # Set agent in scope
-        scope = sentry_sdk.get_current_scope()
-        mock_agent = MagicMock()
-        mock_agent.name = "test_agent"
-        mock_agent._function_toolset = MagicMock()
-        mock_agent._function_toolset.tools = {}
-        scope._contexts["pydantic_ai_agent"] = {"_agent": mock_agent}
+    # Set agent in scope
+    scope = sentry_sdk.get_current_scope()
+    mock_agent = MagicMock()
+    mock_agent.name = "test_agent"
+    mock_agent._function_toolset = MagicMock()
+    mock_agent._function_toolset.tools = {}
+    scope._contexts["pydantic_ai_agent"] = {"_agent": mock_agent}
 
-        # Create ai_client span without passing agent
-        span = ai_client_span([], None, None, None)
-        span.finish()
-
-    # Should not crash
-    assert transaction is not None
+    # Create ai_client span without passing agent
+    span = ai_client_span([], None, None, None)
+    span.end()
 
 
 def _get_messages_from_span(span_data):
@@ -2920,7 +2797,7 @@ async def test_binary_content_encoding_image(
         mock_msg.instructions = None
 
         _set_input_messages(span, [mock_msg])
-        span.finish()
+        span.end()
 
     sentry_sdk.flush()
     spans = [item.payload for item in items]
@@ -2959,7 +2836,7 @@ async def test_binary_content_encoding_mixed_content(
         mock_msg.instructions = None
 
         _set_input_messages(span, [mock_msg])
-        span.finish()
+        span.end()
 
     sentry_sdk.flush()
     spans = [item.payload for item in items]
@@ -3038,7 +2915,7 @@ async def test_set_usage_data_with_cache_tokens(
             cache_write_tokens=20,
         )
         _set_usage_data(span, usage)
-        span.finish()
+        span.end()
 
     sentry_sdk.flush()
     spans = [item.payload for item in items]
@@ -3107,15 +2984,14 @@ def test_image_url_base64_content_in_span(
     found_image = False
     items = capture_items("span")
 
-    with sentry_sdk.start_transaction(op="test", name="test"):
-        image_url = ImageUrl(url=url, **image_url_kwargs)
-        user_part = UserPromptPart(content=["Look at this image:", image_url])
-        mock_msg = MagicMock()
-        mock_msg.parts = [user_part]
-        mock_msg.instructions = None
+    image_url = ImageUrl(url=url, **image_url_kwargs)
+    user_part = UserPromptPart(content=["Look at this image:", image_url])
+    mock_msg = MagicMock()
+    mock_msg.parts = [user_part]
+    mock_msg.instructions = None
 
-        span = ai_client_span([mock_msg], None, None, None)
-        span.finish()
+    span = ai_client_span([mock_msg], None, None, None)
+    span.end()
 
     sentry_sdk.flush()
     spans = [item.payload for item in items]
