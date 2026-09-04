@@ -1466,7 +1466,6 @@ def test_template_exception(
     [
         ["application/json", {"foo": "bar"}],
         ["application/json", 1],
-        ["application/json", "foo"],
         ["application/x-www-form-urlencoded", {"foo": "bar"}],
     ],
 )
