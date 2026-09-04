@@ -5,13 +5,9 @@ import sentry_sdk
 from sentry_sdk.ai.utils import (
     normalize_message_roles,
     set_data_normalized,
-    truncate_and_annotate_messages,
 )
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.traces import StreamedSpan
-from sentry_sdk.tracing_utils import (
-    has_span_streaming_enabled,
-)
 from sentry_sdk.utils import safe_serialize
 
 from ..consts import SPAN_ORIGIN
@@ -216,15 +212,11 @@ def _set_input_messages(
 
         if formatted_messages:
             normalized_messages = normalize_message_roles(formatted_messages)
-            client = sentry_sdk.get_client()
-            scope = sentry_sdk.get_current_scope()
-            messages_data = (
-                truncate_and_annotate_messages(normalized_messages, span, scope)
-                if not has_span_streaming_enabled(client.options)
-                else normalized_messages
-            )
             set_data_normalized(
-                span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data, unpack=False
+                span,
+                SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                normalized_messages,
+                unpack=False,
             )
     except Exception:
         # If we fail to format messages, just skip it
@@ -308,27 +300,15 @@ def ai_client_span(
 
     model_name = _get_model_name(model_obj) or "unknown"
 
-    span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
-    if span_streaming:
-        span = sentry_sdk.traces.start_span(
-            name=f"chat {model_name}",
-            attributes={
-                "sentry.op": OP.GEN_AI_CHAT,
-                "sentry.origin": SPAN_ORIGIN,
-                SPANDATA.GEN_AI_OPERATION_NAME: "chat",
-                SPANDATA.GEN_AI_RESPONSE_STREAMING: get_is_streaming(),
-            },
-        )
-    else:
-        span = sentry_sdk.start_span(
-            op=OP.GEN_AI_CHAT,
-            name=f"chat {model_name}",
-            origin=SPAN_ORIGIN,
-        )
-
-        span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "chat")
-        # Set streaming flag from contextvar
-        span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, get_is_streaming())
+    span = sentry_sdk.traces.start_span(
+        name=f"chat {model_name}",
+        attributes={
+            "sentry.op": OP.GEN_AI_CHAT,
+            "sentry.origin": SPAN_ORIGIN,
+            SPANDATA.GEN_AI_OPERATION_NAME: "chat",
+            SPANDATA.GEN_AI_RESPONSE_STREAMING: get_is_streaming(),
+        },
+    )
 
     _set_agent_data(span, agent)
     _set_model_data(span, model, model_settings)
