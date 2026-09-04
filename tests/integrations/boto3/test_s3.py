@@ -53,7 +53,7 @@ def test_basic(
         assert len(spans) == 2
         span = spans[0]
         assert span["attributes"]["sentry.op"] == "http.client"
-        assert span["name"] == "aws.s3.ListObjects"
+        assert span["name"] == "S3.ListObjects"
     else:
         events = capture_events()
 
@@ -71,7 +71,7 @@ def test_basic(
         assert len(event["spans"]) == 1
         (span,) = event["spans"]
         assert span["op"] == "http.client"
-        assert span["description"] == "aws.s3.ListObjects"
+        assert span["description"] == "S3.ListObjects"
 
 
 @pytest.mark.parametrize("send_default_pii", [True, False])
@@ -112,7 +112,7 @@ def test_streaming(
 
         span1 = spans[0]
         assert span1["attributes"]["sentry.op"] == "http.client"
-        assert span1["name"] == "aws.s3.GetObject"
+        assert span1["name"] == "S3.GetObject"
 
         expected_attrs = {
             "http.request.method": "GET",
@@ -140,7 +140,7 @@ def test_streaming(
 
         span2 = spans[1]
         assert span2["attributes"]["sentry.op"] == "http.client.stream"
-        assert span2["name"] == "aws.s3.GetObject"
+        assert span2["name"] == "S3.GetObject"
         assert span2["parent_span_id"] == span1["span_id"]
     else:
         events = capture_events()
@@ -161,7 +161,7 @@ def test_streaming(
 
         span1 = event["spans"][0]
         assert span1["op"] == "http.client"
-        assert span1["description"] == "aws.s3.GetObject"
+        assert span1["description"] == "S3.GetObject"
         assert span1["data"] == ApproxDict(
             {
                 "http.method": "GET",
@@ -173,7 +173,7 @@ def test_streaming(
 
         span2 = event["spans"][1]
         assert span2["op"] == "http.client.stream"
-        assert span2["description"] == "aws.s3.GetObject"
+        assert span2["description"] == "S3.GetObject"
         assert span2["parent_span_id"] == span1["span_id"]
 
 
