@@ -2,7 +2,7 @@ from typing import TYPE_CHECKING
 from urllib.parse import urlsplit
 
 import sentry_sdk
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.consts import OP, SPANDATA, SPANSTATUS
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing import BAGGAGE_HEADER_NAME, Span
@@ -336,7 +336,11 @@ def _finish_client_span(
                     streaming_span,
                     {SPANDATA.ERROR_TYPE: _get_error_type(exc)},
                 )
-                streaming_span.__exit__(type(exc), exc, exc.__traceback__)
+                if isinstance(streaming_span, StreamedSpan):
+                    streaming_span.__exit__(type(exc), exc, exc.__traceback__)
+                else:
+                    streaming_span.set_status(SPANSTATUS.INTERNAL_ERROR)
+                    streaming_span.finish()
             raise
 
     body.read = sentry_streaming_body_read  # type: ignore
