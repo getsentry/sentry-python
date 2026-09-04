@@ -928,7 +928,7 @@ def _accumulate_event_data(
 
 
 def _set_streaming_output_data(
-    span: "Span",
+    span: "StreamedSpan",
     integration: "AnthropicIntegration",
     model: "Optional[str]",
     usage: "_RecordedUsage",
