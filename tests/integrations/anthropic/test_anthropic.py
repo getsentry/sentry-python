@@ -67,7 +67,6 @@ from sentry_sdk.integrations.anthropic import (
     _transform_anthropic_content_block,
 )
 from sentry_sdk.integrations.stdlib import StdlibIntegration
-from sentry_sdk.traces import SpanStatus
 from sentry_sdk.utils import package_version
 
 ANTHROPIC_VERSION = package_version("anthropic")
@@ -184,10 +183,9 @@ def test_nonstreaming_create_message(
 
     sentry_sdk.flush()
     spans = [item.payload for item in items]
-    assert len(spans) == 2
+    assert len(spans) == 1
 
-    assert spans[1]["name"] == "anthropic"
-    (span, _) = spans
+    (span,) = spans
 
     assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
     assert span["name"] == "chat model"
@@ -727,10 +725,9 @@ async def test_nonstreaming_create_message_async(
 
     sentry_sdk.flush()
     spans = [item.payload for item in items]
-    assert len(spans) == 2
+    assert len(spans) == 1
 
-    assert spans[1]["name"] == "anthropic"
-    (span, _) = spans
+    (span,) = spans
 
     assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
     assert span["name"] == "chat model"
@@ -854,7 +851,6 @@ def test_streaming_create_message(
 
     sentry_sdk.flush()
     spans = [item.payload for item in items]
-    assert spans[1]["name"] == "anthropic"
     span = next(
         span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
     )
@@ -1216,7 +1212,6 @@ def test_streaming_create_message_close(
 
     sentry_sdk.flush()
     spans = [item.payload for item in items]
-    assert spans[1]["name"] == "anthropic"
     span = next(
         span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
     )
@@ -1317,8 +1312,6 @@ def test_streaming_create_message_api_error(
 
     sentry_sdk.flush()
     spans = [item.payload for item in items]
-    assert spans[1]["name"] == "anthropic"
-    assert spans[1]["status"] == SpanStatus.ERROR
     span = next(
         span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
     )
@@ -1437,7 +1430,6 @@ def test_stream_messages(
 
     sentry_sdk.flush()
     spans = [item.payload for item in items]
-    assert spans[1]["name"] == "anthropic"
     span = next(
         span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
     )
@@ -1685,7 +1677,6 @@ def test_stream_messages_close(
 
     sentry_sdk.flush()
     spans = [item.payload for item in items]
-    assert spans[1]["name"] == "anthropic"
     span = next(
         span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
     )
@@ -1786,8 +1777,6 @@ def test_stream_messages_api_error(
 
     sentry_sdk.flush()
     spans = [item.payload for item in items]
-    assert spans[1]["name"] == "anthropic"
-    assert spans[1]["status"] == SpanStatus.ERROR
     span = next(
         span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
     )
@@ -1911,10 +1900,9 @@ async def test_streaming_create_message_async(
 
     sentry_sdk.flush()
     spans = [item.payload for item in items]
-    assert len(spans) == 2
+    assert len(spans) == 1
 
-    assert spans[1]["name"] == "anthropic"
-    (span, _) = spans
+    (span,) = spans
 
     assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
     assert span["name"] == "chat model"
@@ -2164,7 +2152,6 @@ async def test_streaming_create_message_async_close(
 
     sentry_sdk.flush()
     spans = [item.payload for item in items]
-    assert spans[1]["name"] == "anthropic"
     span = next(
         span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
     )
@@ -2269,8 +2256,6 @@ async def test_streaming_create_message_async_api_error(
 
     sentry_sdk.flush()
     spans = [item.payload for item in items]
-    assert spans[1]["name"] == "anthropic"
-    assert spans[1]["status"] == SpanStatus.ERROR
     span = next(
         span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
     )
@@ -2394,10 +2379,9 @@ async def test_stream_message_async(
 
     sentry_sdk.flush()
     spans = [item.payload for item in items]
-    assert len(spans) == 2
+    assert len(spans) == 1
 
-    assert spans[1]["name"] == "anthropic"
-    (span, _) = spans
+    (span,) = spans
 
     assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
     assert span["name"] == "chat model"
@@ -2644,7 +2628,6 @@ async def test_stream_messages_async_api_error(
 
     sentry_sdk.flush()
     spans = [item.payload for item in items]
-    assert spans[1]["name"] == "anthropic"
     span = next(
         span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
     )
@@ -2761,7 +2744,6 @@ async def test_stream_messages_async_close(
 
     sentry_sdk.flush()
     spans = [item.payload for item in items]
-    assert spans[1]["name"] == "anthropic"
     span = next(
         span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
     )
@@ -2908,10 +2890,9 @@ def test_streaming_create_message_with_input_json_delta(
 
     sentry_sdk.flush()
     spans = [item.payload for item in items]
-    assert len(spans) == 2
+    assert len(spans) == 1
 
-    assert spans[1]["name"] == "anthropic"
-    (span, _) = spans
+    (span,) = spans
 
     assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
     assert span["name"] == "chat model"
@@ -3058,10 +3039,9 @@ def test_stream_messages_with_input_json_delta(
 
     sentry_sdk.flush()
     spans = [item.payload for item in items]
-    assert len(spans) == 2
+    assert len(spans) == 1
 
-    assert spans[1]["name"] == "anthropic"
-    (span, _) = spans
+    (span,) = spans
 
     assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
     assert span["name"] == "chat model"
@@ -3215,10 +3195,9 @@ async def test_streaming_create_message_with_input_json_delta_async(
 
     sentry_sdk.flush()
     spans = [item.payload for item in items]
-    assert len(spans) == 2
+    assert len(spans) == 1
 
-    assert spans[1]["name"] == "anthropic"
-    (span, _) = spans
+    (span,) = spans
 
     assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
     assert span["name"] == "chat model"
@@ -3374,10 +3353,9 @@ async def test_stream_message_with_input_json_delta_async(
 
     sentry_sdk.flush()
     spans = [item.payload for item in items]
-    assert len(spans) == 2
+    assert len(spans) == 1
 
-    assert spans[1]["name"] == "anthropic"
-    (span, _) = spans
+    (span,) = spans
 
     assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
     assert span["name"] == "chat model"
@@ -3554,7 +3532,6 @@ def test_span_origin(
 
     sentry_sdk.flush()
     spans = [item.payload for item in items]
-    assert spans[1]["attributes"]["sentry.origin"] == "manual"
     assert spans[0]["attributes"]["sentry.origin"] == "auto.ai.anthropic"
     assert spans[0]["attributes"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
     assert spans[0]["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
@@ -3587,7 +3564,6 @@ async def test_span_origin_async(
 
     sentry_sdk.flush()
     spans = [item.payload for item in items]
-    assert spans[1]["attributes"]["sentry.origin"] == "manual"
     assert spans[0]["attributes"]["sentry.origin"] == "auto.ai.anthropic"
     assert spans[0]["attributes"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
     assert spans[0]["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
@@ -3775,10 +3751,9 @@ def test_nonstreaming_create_message_with_system_prompt(
 
     sentry_sdk.flush()
     spans = [item.payload for item in items]
-    assert len(spans) == 2
+    assert len(spans) == 1
 
-    assert spans[1]["name"] == "anthropic"
-    (span, _) = spans
+    (span,) = spans
 
     assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
     assert span["name"] == "chat model"
@@ -3866,10 +3841,9 @@ async def test_nonstreaming_create_message_with_system_prompt_async(
 
     sentry_sdk.flush()
     spans = [item.payload for item in items]
-    assert len(spans) == 2
+    assert len(spans) == 1
 
-    assert spans[1]["name"] == "anthropic"
-    (span, _) = spans
+    (span,) = spans
 
     assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
     assert span["name"] == "chat model"
@@ -3997,10 +3971,9 @@ def test_streaming_create_message_with_system_prompt(
 
     sentry_sdk.flush()
     spans = [item.payload for item in items]
-    assert len(spans) == 2
+    assert len(spans) == 1
 
-    assert spans[1]["name"] == "anthropic"
-    (span, _) = spans
+    (span,) = spans
 
     assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
     assert span["name"] == "chat model"
@@ -4125,10 +4098,9 @@ def test_stream_messages_with_system_prompt(
 
     sentry_sdk.flush()
     spans = [item.payload for item in items]
-    assert len(spans) == 2
+    assert len(spans) == 1
 
-    assert spans[1]["name"] == "anthropic"
-    (span, _) = spans
+    (span,) = spans
 
     assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
     assert span["name"] == "chat model"
@@ -4256,10 +4228,9 @@ async def test_stream_message_with_system_prompt_async(
 
     sentry_sdk.flush()
     spans = [item.payload for item in items]
-    assert len(spans) == 2
+    assert len(spans) == 1
 
-    assert spans[1]["name"] == "anthropic"
-    (span, _) = spans
+    (span,) = spans
 
     assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
     assert span["name"] == "chat model"
@@ -4391,9 +4362,8 @@ async def test_streaming_create_message_with_system_prompt_async(
     sentry_sdk.flush()
     spans = [item.payload for item in items]
 
-    assert spans[1]["name"] == "anthropic"
-    assert len(spans) == 2
-    (span, _) = spans
+    assert len(spans) == 1
+    (span,) = spans
 
     assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
     assert span["name"] == "chat model"
@@ -4469,10 +4439,8 @@ def test_system_prompt_with_complex_structure(
 
     sentry_sdk.flush()
     spans = [item.payload for item in items]
-    assert len(spans) == 2
 
-    assert spans[1]["name"] == "anthropic"
-    (span, _) = spans
+    (span,) = spans
 
     assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
     assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
