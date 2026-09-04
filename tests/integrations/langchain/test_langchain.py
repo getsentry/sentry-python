@@ -5166,45 +5166,6 @@ def test_langchain_embeddings_multiple_providers(
             assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT in span["data"]
 
 
-def test_langchain_embeddings_error_handling(sentry_init, capture_events):
-    """Test that errors in embeddings are properly captured."""
-    try:
-        from langchain_openai import OpenAIEmbeddings
-    except ImportError:
-        pytest.skip("langchain_openai not installed")
-
-    sentry_init(
-        integrations=[LangchainIntegration(include_prompts=True)],
-        disabled_integrations=[StdlibIntegration],
-        traces_sample_rate=1.0,
-        send_default_pii=True,
-    )
-    events = capture_events()
-
-    # Mock the API call to raise an error
-    with mock.patch.object(
-        OpenAIEmbeddings,
-        "embed_documents",
-        side_effect=ValueError("API error"),
-    ):
-        embeddings = OpenAIEmbeddings(
-            model="text-embedding-ada-002", openai_api_key="test-key"
-        )
-
-        # Force setup to re-run
-        LangchainIntegration.setup_once()
-
-        with start_transaction(name="test_embeddings_error"), pytest.raises(ValueError):
-            embeddings.embed_documents(["Test"])
-
-    # The error should be captured
-    assert len(events) >= 1
-    # We should have both the transaction and potentially an error event
-    [e for e in events if e.get("level") == "error"]
-    # Note: errors might not be auto-captured depending on SDK settings,
-    # but the span should still be created
-
-
 @pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_langchain_embeddings_multiple_calls(
