@@ -34,7 +34,6 @@ except ImportError:
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from collections.abc import Container, Iterable
     from typing import Any, Optional
 
 SANIC_VERSION = tuple(map(int, SANIC_VERSION_RAW.split(".")))
@@ -355,7 +354,6 @@ class TransactionTestConfig:
 
     def __init__(
         self,
-        integration_args: "Iterable[Optional[Container[int]]]",
         url: str,
         expected_status: int,
         expected_transaction_name: "Optional[str]",
@@ -364,7 +362,6 @@ class TransactionTestConfig:
         """
         expected_transaction_name of None indicates we expect to not receive a transaction
         """
-        self.integration_args = integration_args
         self.url = url
         self.expected_status = expected_status
         self.expected_transaction_name = expected_transaction_name
@@ -377,7 +374,6 @@ class TransactionTestConfig:
     [
         TransactionTestConfig(
             # Transaction for successful page load
-            integration_args=(),
             url="/message",
             expected_status=200,
             expected_transaction_name="hi",
@@ -385,7 +381,6 @@ class TransactionTestConfig:
         ),
         TransactionTestConfig(
             # Transaction for successful page load with query string
-            integration_args=(),
             url="/message?foo=bar",
             expected_status=200,
             expected_transaction_name="hi",
@@ -393,15 +388,13 @@ class TransactionTestConfig:
         ),
         TransactionTestConfig(
             # Transaction still recorded when we have an internal server error
-            integration_args=(),
             url="/500",
             expected_status=500,
             expected_transaction_name="fivehundred",
             expected_source=TransactionSource.COMPONENT,
         ),
         TransactionTestConfig(
-            # With no ignored HTTP statuses, we should get transactions for 404 errors
-            integration_args=(None,),
+            # We should get transactions for 404 errors
             url="/404",
             expected_status=404,
             expected_transaction_name="/404",
@@ -418,7 +411,7 @@ def test_transactions(
 ) -> None:
     # Init the SanicIntegration with the desired arguments
     sentry_init(
-        integrations=[SanicIntegration(*test_config.integration_args)],
+        integrations=[SanicIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=send_pii,
         trace_lifecycle="stream",
