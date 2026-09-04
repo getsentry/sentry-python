@@ -5,8 +5,7 @@ import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.traces import SpanStatus, StreamedSpan
-from sentry_sdk.tracing import Span
+from sentry_sdk.traces import SpanStatus
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     has_data_collection_enabled,
@@ -29,6 +28,8 @@ if TYPE_CHECKING:
         CommandStartedEvent,
         CommandSucceededEvent,
     )
+
+    from sentry_sdk.traces import StreamedSpan
 
 
 SAFE_COMMAND_ATTRIBUTES = [
@@ -114,7 +115,7 @@ def _get_db_data(event: "Any") -> "Dict[str, Any]":
 
 class CommandTracer(monitoring.CommandListener):
     def __init__(self) -> None:
-        self._ongoing_operations: "Dict[int, Union[Span, StreamedSpan]]" = {}
+        self._ongoing_operations: "dict[int, StreamedSpan]" = {}
 
     def _operation_key(
         self,
