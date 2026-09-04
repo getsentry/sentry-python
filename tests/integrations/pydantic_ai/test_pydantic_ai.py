@@ -2784,20 +2784,19 @@ async def test_binary_content_encoding_image(
     )
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="test", attributes={"sentry.op": "test"}):
-        span = sentry_sdk.traces.start_span(
-            name="custom span", attributes={"sentry.op": "test_span"}
-        )
-        binary_content = BinaryContent(
-            data=b"fake_image_data_12345", media_type="image/png"
-        )
-        user_part = UserPromptPart(content=["Look at this image:", binary_content])
-        mock_msg = MagicMock()
-        mock_msg.parts = [user_part]
-        mock_msg.instructions = None
+    span = sentry_sdk.traces.start_span(
+        name="custom span", attributes={"sentry.op": "test_span"}
+    )
+    binary_content = BinaryContent(
+        data=b"fake_image_data_12345", media_type="image/png"
+    )
+    user_part = UserPromptPart(content=["Look at this image:", binary_content])
+    mock_msg = MagicMock()
+    mock_msg.parts = [user_part]
+    mock_msg.instructions = None
 
-        _set_input_messages(span, [mock_msg])
-        span.end()
+    _set_input_messages(span, [mock_msg])
+    span.end()
 
     sentry_sdk.flush()
     spans = [item.payload for item in items]
@@ -2821,22 +2820,19 @@ async def test_binary_content_encoding_mixed_content(
     )
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="test", attributes={"sentry.op": "test"}):
-        span = sentry_sdk.traces.start_span(
-            name="custom span", attributes={"sentry.op": "test_span"}
-        )
-        binary_content = BinaryContent(
-            data=b"fake_image_bytes", media_type="image/jpeg"
-        )
-        user_part = UserPromptPart(
-            content=["Here is an image:", binary_content, "What do you see?"]
-        )
-        mock_msg = MagicMock()
-        mock_msg.parts = [user_part]
-        mock_msg.instructions = None
+    span = sentry_sdk.traces.start_span(
+        name="custom span", attributes={"sentry.op": "test_span"}
+    )
+    binary_content = BinaryContent(data=b"fake_image_bytes", media_type="image/jpeg")
+    user_part = UserPromptPart(
+        content=["Here is an image:", binary_content, "What do you see?"]
+    )
+    mock_msg = MagicMock()
+    mock_msg.parts = [user_part]
+    mock_msg.instructions = None
 
-        _set_input_messages(span, [mock_msg])
-        span.end()
+    _set_input_messages(span, [mock_msg])
+    span.end()
 
     sentry_sdk.flush()
     spans = [item.payload for item in items]
@@ -2904,18 +2900,17 @@ async def test_set_usage_data_with_cache_tokens(
     )
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="test", attributes={"sentry.op": "test"}):
-        span = sentry_sdk.traces.start_span(
-            name="custom span", attributes={"sentry.op": "test_span"}
-        )
-        usage = RequestUsage(
-            input_tokens=100,
-            output_tokens=50,
-            cache_read_tokens=80,
-            cache_write_tokens=20,
-        )
-        _set_usage_data(span, usage)
-        span.end()
+    span = sentry_sdk.traces.start_span(
+        name="custom span", attributes={"sentry.op": "test_span"}
+    )
+    usage = RequestUsage(
+        input_tokens=100,
+        output_tokens=50,
+        cache_read_tokens=80,
+        cache_write_tokens=20,
+    )
+    _set_usage_data(span, usage)
+    span.end()
 
     sentry_sdk.flush()
     spans = [item.payload for item in items]
@@ -3369,7 +3364,7 @@ async def test_data_collection_gen_ai_outputs_gates_response_text_and_tool_outpu
     def add_numbers(a: int, b: int) -> int:
         return a + b
 
-    items = capture_items("transaction", "span")
+    items = capture_items("span")
 
     result = await test_agent.run("What is 5 + 3?")
     assert result is not None
@@ -3381,10 +3376,6 @@ async def test_data_collection_gen_ai_outputs_gates_response_text_and_tool_outpu
     invoke_agent_data = next(
         (data for op, data in spans if op == "gen_ai.invoke_agent"), None
     )
-    if invoke_agent_data is None:
-        (transaction,) = (item.payload for item in items if item.type == "transaction")
-
-        invoke_agent_data = transaction["contexts"]["trace"]["data"]
 
     chat_spans = [data for op, data in spans if op == "gen_ai.chat"]
     tool_spans = [data for op, data in spans if op == "gen_ai.execute_tool"]
