@@ -1093,8 +1093,6 @@ def test_multiple_providers(
     sentry_sdk.flush()
     spans = [item.payload for item in items]
     for span in spans:
-        if span["is_segment"] is True:
-            continue
         # The provider should be detected by litellm.get_llm_provider
         assert SPANDATA.GEN_AI_SYSTEM in span["attributes"]
 
@@ -1200,8 +1198,6 @@ async def test_async_multiple_providers(
     sentry_sdk.flush()
     spans = [item.payload for item in items]
     for span in spans:
-        if span["is_segment"] is True:
-            continue
         # The provider should be detected by litellm.get_llm_provider
         assert SPANDATA.GEN_AI_SYSTEM in span["attributes"]
 
@@ -2265,6 +2261,7 @@ def test_chat_completion_data_collection(
 
         litellm_utils.executor.shutdown(wait=True)
 
+    sentry_sdk.flush()
     spans = [item.payload for item in items]
     (span,) = [
         x
