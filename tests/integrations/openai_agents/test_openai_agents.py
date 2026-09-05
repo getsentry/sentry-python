@@ -2579,6 +2579,14 @@ async def test_handoff_span(
 
         sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
+
+        agent_spans = [
+            span
+            for span in spans
+            if span["attributes"].get("sentry.op") == OP.GEN_AI_INVOKE_AGENT
+        ]
+        assert len(agent_spans) == 2
+
         handoff_span = next(
             span
             for span in spans
@@ -2612,6 +2620,12 @@ async def test_handoff_span(
 
         (transaction,) = events
         spans = transaction["spans"]
+
+        agent_spans = [
+            span for span in spans if span.get("op") == OP.GEN_AI_INVOKE_AGENT
+        ]
+        assert len(agent_spans) == 2
+
         handoff_span = next(
             span for span in spans if span.get("op") == OP.GEN_AI_HANDOFF
         )
