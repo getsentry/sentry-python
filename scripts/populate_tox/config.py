@@ -205,8 +205,9 @@ TEST_SUITE_CONFIG = {
         },
         "python": ">=3.7",
     },
-    "httpx": {
+    "httpx0": {
         "package": "httpx",
+        "integration_name": "httpx",
         "deps": {
             "*": ["anyio>=3,<5", "pytest-asyncio"],
             "<0.24": ["anyio<4"],
