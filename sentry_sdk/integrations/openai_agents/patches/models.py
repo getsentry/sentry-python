@@ -71,6 +71,10 @@ def _get_model(
     # because we only patch its direct methods, all underlying data can remain unchanged.
     model = copy.copy(original_get_model(agent, run_config))
 
+    # Capture the request model name for spans (agent.model can be None when using defaults)
+    request_model_name = model.model if hasattr(model, "model") else str(model)
+    agent._sentry_request_model = request_model_name  # type: ignore[attr-defined]
+
     # Wrap _fetch_response if it exists (for OpenAI models) to capture response model
     if hasattr(model, "_fetch_response"):
         original_fetch_response = model._fetch_response

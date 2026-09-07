@@ -69,6 +69,8 @@ def _set_agent_data(
         model_name = agent.model.model
     elif isinstance(agent.model, str):
         model_name = agent.model
+    elif hasattr(agent, "_sentry_request_model"):
+        model_name = agent._sentry_request_model
 
     if model_name:
         set_on_span(SPANDATA.GEN_AI_REQUEST_MODEL, model_name)
