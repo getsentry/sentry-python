@@ -174,6 +174,34 @@ def _wrap_handler(handler: "F") -> "F":
                     elif should_send_default_pii():
                         additional_attributes["url.query"] = urlencode(qs)
 
+            if has_data_collection_enabled(client.options):
+                if client.options["data_collection"]["user_info"]:
+                    identity = request_data.get("requestContext", {}).get("identity")
+                    if identity is None:
+                        identity = {}
+                    user_info: "dict[str, Any]" = {}
+                    user_arn = identity.get("userArn")
+                    if user_arn is not None:
+                        user_info["id"] = user_arn
+                    ip = identity.get("sourceIp")
+                    if ip is not None:
+                        user_info["ip_address"] = ip
+                    if user_info:
+                        scope.set_user(user_info)
+            elif should_send_default_pii():
+                identity = request_data.get("requestContext", {}).get("identity")
+                if identity is None:
+                    identity = {}
+                user_info = {}
+                user_arn = identity.get("userArn")
+                if user_arn is not None:
+                    user_info["id"] = user_arn
+                ip = identity.get("sourceIp")
+                if ip is not None:
+                    user_info["ip_address"] = ip
+                if user_info:
+                    scope.set_user(user_info)
+
             sampling_context = {
                 "aws_event": aws_event,
                 "aws_context": aws_context,
