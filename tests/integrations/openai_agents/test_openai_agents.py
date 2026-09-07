@@ -3995,6 +3995,7 @@ async def test_hosted_mcp_tool_propagation_header_streamed(
         integrations=[OpenAIAgentsIntegration()],
         traces_sample_rate=1.0,
         release="d08ebdb9309e1b004c6f52202de58a09c2268e42",
+        stream_gen_ai_spans=False,
     )
 
     request_headers = {}
@@ -4160,6 +4161,7 @@ async def test_hosted_mcp_tool_propagation_headers(
         integrations=[OpenAIAgentsIntegration()],
         traces_sample_rate=1.0,
         release="d08ebdb9309e1b004c6f52202de58a09c2268e42",
+        stream_gen_ai_spans=False,
     )
 
     response = get_model_response(EXAMPLE_RESPONSE, serialize_pydantic=True)
@@ -6328,6 +6330,7 @@ async def test_streaming_ttft_on_chat_span(
     sentry_init(
         integrations=[OpenAIAgentsIntegration()],
         traces_sample_rate=1.0,
+        stream_gen_ai_spans=False,
     )
 
     request_headers = {}
