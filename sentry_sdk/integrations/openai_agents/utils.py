@@ -64,7 +64,6 @@ def _set_agent_data(
     if agent.model_settings.max_tokens:
         set_on_span(SPANDATA.GEN_AI_REQUEST_MAX_TOKENS, agent.model_settings.max_tokens)
 
-    # Get model name from agent.model or fall back to request model (for when agent.model is None/default)
     model_name = None
     if agent.model:
         model_name = agent.model.model if hasattr(agent.model, "model") else agent.model
