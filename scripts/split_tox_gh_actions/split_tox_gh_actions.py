@@ -127,7 +127,7 @@ GROUPS = {
     ],
     "Network": [
         "grpc",
-        "httpx",
+        "httpx0",
         "httpx2",
         "pyreqwest",
         "requests",
