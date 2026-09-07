@@ -146,7 +146,7 @@ a Python version older than 3.9 if the HTTPX version is 0.28 or higher, you can
 say:
 
 ```python
-"httpx": {
+"httpx0": {
     "python": {
         # run the test suite for httpx v0.28+ on Python 3.9+ only
         ">=0.28": ">=3.9",

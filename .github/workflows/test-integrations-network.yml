@@ -41,10 +41,10 @@ jobs:
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh "py${{ matrix.python-version }}-grpc"
-      - name: Test httpx
+      - name: Test httpx0
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-httpx"
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-httpx0"
       - name: Test httpx2
         run: |
           set -x # print commands that are executed

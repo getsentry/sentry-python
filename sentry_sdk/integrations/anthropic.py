@@ -84,7 +84,7 @@ if TYPE_CHECKING:
     from sentry_sdk._types import TextPart
 
     class _PatchedRawMessageStream(Stream[RawMessageStreamEvent]):
-        _span: StreamedSpan
+        _span: Union[Span, StreamedSpan]
         _integration: "AnthropicIntegration"
 
         _model: Optional[ModelParam]
@@ -94,7 +94,7 @@ if TYPE_CHECKING:
         _finish_reason: Optional[str]
 
     class _PatchedMessageStream(MessageStream):
-        _span: StreamedSpan
+        _span: Union[Span, StreamedSpan]
         _integration: "AnthropicIntegration"
 
         _model: Optional[ModelParam]
@@ -104,7 +104,7 @@ if TYPE_CHECKING:
         _finish_reason: Optional[str]
 
     class _PatchedRawAsyncMessageStream(AsyncStream[RawMessageStreamEvent]):
-        _span: StreamedSpan
+        _span: Union[Span, StreamedSpan]
         _integration: "AnthropicIntegration"
 
         _model: Optional[ModelParam]
@@ -114,7 +114,7 @@ if TYPE_CHECKING:
         _finish_reason: Optional[str]
 
     class _PatchedAsyncMessageStream(AsyncMessageStream):
-        _span: StreamedSpan
+        _span: Union[Span, StreamedSpan]
         _integration: "AnthropicIntegration"
 
         _model: Optional[ModelParam]
@@ -928,7 +928,7 @@ def _accumulate_event_data(
 
 
 def _set_streaming_output_data(
-    span: "StreamedSpan",
+    span: "Union[Span, StreamedSpan]",
     integration: "AnthropicIntegration",
     model: "Optional[str]",
     usage: "_RecordedUsage",
