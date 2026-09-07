@@ -475,8 +475,11 @@ def test_redis_backend_trace_propagation(init_celery, capture_items_forksafe):
 
     items = capture_items_forksafe("event", "span")
 
+    runs = []
+
     @celery.task(name="dummy_task", bind=True)
     def dummy_task(self):
+        runs.append(1)
         1 / 0
 
     with sentry_sdk.traces.start_span(name="submit_celery") as root_span:
@@ -484,6 +487,9 @@ def test_redis_backend_trace_propagation(init_celery, capture_items_forksafe):
 
     with pytest.raises(Exception):  # noqa: B017
         res.wait(timeout=10)
+
+    # if this is nonempty, the worker never really forked
+    assert not runs
 
     sentry_sdk.flush()
 
@@ -495,15 +501,30 @@ def test_redis_backend_trace_propagation(init_celery, capture_items_forksafe):
     worker_items = items.read_event()
     items.read_flush()
 
-    all_items = main_items + worker_items
+    # The worker child inherits the parent's telemetry list (via fork),
+    # so deduplicate spans by span_id.
+    seen_span_ids = set()
+    all_items = []
+    for item in main_items + worker_items:
+        if item["type"] == "span":
+            span_id = item["payload"]["span_id"]
+            if span_id in seen_span_ids:
+                continue
+            seen_span_ids.add(span_id)
+        all_items.append(item)
 
     error_events = [i for i in all_items if i["type"] == "event"]
     spans = [i for i in all_items if i["type"] == "span"]
 
-    assert len(error_events) == 1
-    (exception,) = error_events[0]["payload"]["exception"]["values"]
-    assert exception["type"] == "ZeroDivisionError"
+    # Submit-side: root segment span named "submit_celery"
+    submit_segment = [
+        s
+        for s in spans
+        if s["payload"].get("is_segment") and s["payload"]["name"] == "submit_celery"
+    ]
+    assert len(submit_segment) == 1
 
+    # Submit-side: queue.submit.celery span for the task
     submit_spans = [
         s
         for s in spans
@@ -512,12 +533,29 @@ def test_redis_backend_trace_propagation(init_celery, capture_items_forksafe):
     assert len(submit_spans) >= 1
     assert submit_spans[0]["payload"]["name"] == "dummy_task"
 
+    # Worker-side: error event with ZeroDivisionError
+    assert len(error_events) == 1
+    (exception,) = error_events[0]["payload"]["exception"]["values"]
+    assert exception["type"] == "ZeroDivisionError"
+
+    # Worker-side: segment span for the task execution
+    worker_segments = [
+        s
+        for s in spans
+        if s["payload"].get("is_segment") and s["payload"]["name"] == "dummy_task"
+    ]
+    assert len(worker_segments) == 1
+
+    # All items share the same trace_id
     for item in all_items:
         if item["type"] == "event":
             trace_id = item["payload"]["contexts"]["trace"]["trace_id"]
         else:
             trace_id = item["payload"]["trace_id"]
         assert trace_id == root_span.trace_id
+
+    # if this is nonempty, the worker never really forked
+    assert not runs
 
 
 @pytest.mark.forked
