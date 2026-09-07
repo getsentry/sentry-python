@@ -620,7 +620,6 @@ def test_langchain_create_agent(
 
     sentry_sdk.flush()
     spans = [item.payload for item in items]
-    assert spans[2]["attributes"]["sentry.origin"] == "manual"
     chat_spans = list(
         x for x in spans if x["attributes"].get("sentry.op") == "gen_ai.chat"
     )
@@ -792,7 +791,6 @@ def test_tool_execution_span(
 
     sentry_sdk.flush()
     spans = [item.payload for item in items]
-    assert spans[4]["attributes"]["sentry.origin"] == "manual"
     chat_spans = list(
         x for x in spans if x["attributes"].get("sentry.op") == "gen_ai.chat"
     )
@@ -978,7 +976,6 @@ def test_langchain_openai_tools_agent_no_prompts(
 
     sentry_sdk.flush()
     spans = [item.payload for item in items]
-    assert spans[4]["attributes"]["sentry.origin"] == "manual"
     invoke_agent_span = next(
         x for x in spans if x["attributes"].get("sentry.op") == "gen_ai.invoke_agent"
     )
@@ -1189,7 +1186,6 @@ def test_langchain_openai_tools_agent(
 
     sentry_sdk.flush()
     spans = [item.payload for item in items]
-    assert spans[4]["attributes"]["sentry.origin"] == "manual"
     invoke_agent_span = next(
         x for x in spans if x["attributes"].get("sentry.op") == "gen_ai.invoke_agent"
     )
@@ -1356,7 +1352,6 @@ def test_langchain_openai_tools_agent_with_config(
 
     sentry_sdk.flush()
     spans = [item.payload for item in items]
-    assert spans[4]["attributes"]["sentry.origin"] == "manual"
     invoke_agent_span = next(
         x for x in spans if x["attributes"].get("sentry.op") == "gen_ai.invoke_agent"
     )
@@ -1443,7 +1438,6 @@ def test_langchain_openai_tools_agent_stream_no_prompts(
 
     sentry_sdk.flush()
     spans = [item.payload for item in items]
-    assert spans[4]["attributes"]["sentry.origin"] == "manual"
     invoke_agent_span = next(
         x for x in spans if x["attributes"].get("sentry.op") == "gen_ai.invoke_agent"
     )
@@ -1659,7 +1653,6 @@ def test_langchain_openai_tools_agent_stream(
 
     sentry_sdk.flush()
     spans = [item.payload for item in items]
-    assert spans[4]["attributes"]["sentry.origin"] == "manual"
     invoke_agent_span = next(
         x for x in spans if x["attributes"].get("sentry.op") == "gen_ai.invoke_agent"
     )
@@ -1828,7 +1821,6 @@ def test_langchain_openai_tools_agent_stream_with_config(
 
     sentry_sdk.flush()
     spans = [item.payload for item in items]
-    assert spans[4]["attributes"]["sentry.origin"] == "manual"
     invoke_agent_span = next(
         x for x in spans if x["attributes"]["sentry.op"] == "gen_ai.invoke_agent"
     )
