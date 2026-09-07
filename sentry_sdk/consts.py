@@ -902,6 +902,13 @@ class SPANDATA:
     Example: GET
     """
 
+    HTTP_REQUEST_RESEND_COUNT = "http.request.resend_count"
+    """
+    The ordinal number of request resending attempt (for any reason, including redirects).
+
+    Example: 2
+    """
+
     HTTP_ROUTE = "http.route"
     """
     The matched route, that is, the path template used to match the request.
@@ -926,6 +933,13 @@ class SPANDATA:
     e.g. the queue name or topic.
     """
 
+    MESSAGING_BATCH_MESSAGE_COUNT = "messaging.batch.message_count"
+    """
+    The number of messages sent, received, or processed in the scope of the batching operation.
+
+    Example: 10
+    """
+
     MESSAGING_MESSAGE_ID = "messaging.message.id"
     """
     The message's identifier.
@@ -939,6 +953,20 @@ class SPANDATA:
     MESSAGING_MESSAGE_RETRY_COUNT = "messaging.message.retry.count"
     """
     Number of retries/attempts to process a message.
+    """
+
+    MESSAGING_OPERATION_NAME = "messaging.operation.name"
+    """
+    The name of the messaging operation being performed
+
+    Example: "send"
+    """
+
+    MESSAGING_OPERATION_TYPE = "messaging.operation.type"
+    """
+    A string identifying the type of the messaging operation
+
+    Example: "create"
     """
 
     MESSAGING_SYSTEM = "messaging.system"
