@@ -1514,6 +1514,7 @@ def test_render_spans_queryset_in_data(sentry_init, client, capture_events):
             )
         ],
         traces_sample_rate=1.0,
+        trace_lifecycle="stream",
     )
     events = capture_events()
 

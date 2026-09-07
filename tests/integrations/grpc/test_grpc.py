@@ -426,7 +426,11 @@ def test_grpc_client_and_servers_interceptors_integration(
 
 @pytest.mark.forked
 def test_stream_stream(sentry_init):
-    sentry_init(traces_sample_rate=1.0, integrations=[GRPCIntegration()])
+    sentry_init(
+        traces_sample_rate=1.0,
+        integrations=[GRPCIntegration()],
+        trace_lifecycle="stream",
+    )
     server, channel = _set_up()
 
     # Use the provided channel
@@ -444,7 +448,11 @@ def test_stream_unary(sentry_init):
     Test to verify stream-stream works.
     Tracing not supported for it yet.
     """
-    sentry_init(traces_sample_rate=1.0, integrations=[GRPCIntegration()])
+    sentry_init(
+        traces_sample_rate=1.0,
+        integrations=[GRPCIntegration()],
+        trace_lifecycle="stream",
+    )
     server, channel = _set_up()
 
     # Use the provided channel
