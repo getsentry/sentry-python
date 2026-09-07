@@ -25,23 +25,23 @@ except ImportError:
 try:
     from agents import ApplyPatchTool, ShellTool
 except ImportError:
-    ShellTool = None
-    ApplyPatchTool = None
+    ShellTool = None  # type: ignore[assignment,misc]
+    ApplyPatchTool = None  # type: ignore[assignment,misc]
 
 try:
     from agents import ToolSearchTool
 except ImportError:
-    ToolSearchTool = None
+    ToolSearchTool = None  # type: ignore[assignment,misc]
 
 try:
     from agents import CustomTool
 except ImportError:
-    CustomTool = None
+    CustomTool = None  # type: ignore[assignment,misc]
 
 try:
     from agents import ProgrammaticToolCallingTool
 except ImportError:
-    ProgrammaticToolCallingTool = None
+    ProgrammaticToolCallingTool = None  # type: ignore[assignment,misc]
 
 
 from ..consts import SPAN_ORIGIN

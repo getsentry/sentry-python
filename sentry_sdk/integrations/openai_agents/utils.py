@@ -26,7 +26,7 @@ from sentry_sdk.utils import (
 )
 
 if TYPE_CHECKING:
-    from typing import Any, Union
+    from typing import Any, Optional, Union
 
     from agents import TResponseInputItem, Usage
 
@@ -34,7 +34,7 @@ if TYPE_CHECKING:
 
 try:
     import agents
-
+    from agents import Model
 except ImportError:
     raise DidNotEnable("OpenAI Agents not installed")
 
@@ -65,9 +65,11 @@ def _set_agent_data(
         set_on_span(SPANDATA.GEN_AI_REQUEST_MAX_TOKENS, agent.model_settings.max_tokens)
 
     # Get model name from agent.model or fall back to request model (for when agent.model is None/default)
-    model_name = None
-    if agent.model:
-        model_name = agent.model.model if hasattr(agent.model, "model") else agent.model
+    model_name: "Optional[str]" = None
+    if isinstance(agent.model, Model) and hasattr(agent.model, "model"):
+        model_name = agent.model.model
+    elif isinstance(agent.model, str):
+        model_name = agent.model
 
     if model_name:
         set_on_span(SPANDATA.GEN_AI_REQUEST_MODEL, model_name)
