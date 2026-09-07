@@ -391,10 +391,11 @@ def test_span_origin_chat(sentry_init, capture_events, capture_items, span_strea
     sentry_init(
         integrations=[CohereIntegration()],
         traces_sample_rate=1.0,
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming:
-        items = capture_events("span")
+        items = capture_items("span")
 
         client = Client(api_key="z")
         HTTPXClient.request = mock.Mock(
@@ -423,7 +424,7 @@ def test_span_origin_chat(sentry_init, capture_events, capture_items, span_strea
         (span,) = (item.payload for item in items)
         assert span["attributes"]["sentry.origin"] == "auto.ai.cohere"
     else:
-        events = capture_items("span")
+        events = capture_events()
 
         client = Client(api_key="z")
         HTTPXClient.request = mock.Mock(
@@ -459,6 +460,7 @@ def test_span_origin_embed(sentry_init, capture_events, capture_items, span_stre
     sentry_init(
         integrations=[CohereIntegration()],
         traces_sample_rate=1.0,
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming:
@@ -489,7 +491,7 @@ def test_span_origin_embed(sentry_init, capture_events, capture_items, span_stre
         (span,) = (item.payload for item in items)
         assert span["attributes"]["sentry.origin"] == "auto.ai.cohere"
     else:
-        events = capture_items("span")
+        events = capture_events()
 
         client = Client(api_key="z")
         HTTPXClient.request = mock.Mock(
