@@ -26,8 +26,24 @@ if TYPE_CHECKING:
     from typing import Any, Dict, Optional, Union
 
     from sentry_sdk.integrations.boto3._client import _ClientCallContext
+    from sentry_sdk.integrations.boto3._services import _ServiceExtension
 
 _AWS_RPC_SYSTEM_NAME = "aws-api"
+# attributes that are not specific to a particular AWS service.
+_GENERIC_ATTRIBUTE_KEYS = frozenset(
+    (
+        SPANDATA.AWS_EXTENDED_REQUEST_ID,
+        SPANDATA.AWS_REQUEST_ID,
+        SPANDATA.CLOUD_REGION,
+        SPANDATA.ERROR_TYPE,
+        SPANDATA.HTTP_STATUS_CODE,
+        SPANDATA.RPC_METHOD,
+        SPANDATA.RPC_SYSTEM_NAME,
+        SPANDATA.SERVER_ADDRESS,
+        SPANDATA.SERVER_PORT,
+        SPANDATA.HTTP_REQUEST_RESEND_COUNT,
+    )
+)
 
 
 def _set_span_attributes(
@@ -69,7 +85,7 @@ def _get_server_attributes(endpoint_url: "Optional[str]") -> "Dict[str, Any]":
         return {}
 
 
-def _get_client_span_attributes(
+def _get_client_attributes(
     call_context: "_ClientCallContext",
 ) -> "Dict[str, Any]":
     # AWS keeps service and operation separate, so `rpc.method` is only the
@@ -84,6 +100,19 @@ def _get_client_span_attributes(
 
     attributes.update(_get_server_attributes(call_context.endpoint_url))
     return attributes
+
+
+def _merge_service_attributes(
+    attributes: "Dict[str, Any]",
+    service_attributes: "Any",
+) -> None:
+    if not isinstance(service_attributes, dict):
+        return
+
+    for key, value in service_attributes.items():
+        # protect generic attributes from being overwritten
+        if key not in _GENERIC_ATTRIBUTE_KEYS:
+            attributes[key] = value
 
 
 def _get_response_attributes(response: "Any") -> "Dict[str, Any]":
@@ -181,6 +210,7 @@ def _get_error_attributes(exception: "BaseException") -> "Dict[str, Any]":
 
 def _start_client_span(
     call_context: "_ClientCallContext",
+    service_extension: "Optional[_ServiceExtension]" = None,
 ) -> "Optional[Union[Span, StreamedSpan]]":
     client = sentry_sdk.get_client()
     if client.get_integration(Boto3Integration) is None:
@@ -189,7 +219,27 @@ def _start_client_span(
     # AWS client spans use `Service.Operation`, e.g. `DynamoDB.GetItem`.
     # https://opentelemetry.io/docs/specs/semconv/cloud-providers/aws-sdk/#aws-sdk-spans
     span_name = "%s.%s" % (call_context.service_id, call_context.operation_name)
-    attributes = _get_client_span_attributes(call_context)
+    attributes = _get_client_attributes(call_context)
+    span_op = OP.HTTP_CLIENT
+    span_origin = Boto3Integration.origin
+
+    # enrich with service-specific attributes
+    if service_extension is not None:
+        with capture_internal_exceptions():
+            _merge_service_attributes(
+                attributes,
+                service_extension.get_initial_span_attributes(call_context),
+            )
+
+        with capture_internal_exceptions():
+            service_span_op = service_extension.get_span_op(call_context)
+            if service_span_op and isinstance(service_span_op, str):
+                span_op = service_span_op
+
+        with capture_internal_exceptions():
+            service_span_origin = service_extension.get_span_origin(call_context)
+            if service_span_origin and isinstance(service_span_origin, str):
+                span_origin = service_span_origin
 
     if has_span_streaming_enabled(client.options):
         if sentry_sdk.traces.get_current_span() is None:
@@ -199,8 +249,8 @@ def _start_client_span(
         # https://opentelemetry.io/docs/specs/semconv/rpc/rpc-spans/#rpc-client-span
         attributes.update(
             {
-                SPANDATA.SENTRY_OP: OP.HTTP_CLIENT,
-                SPANDATA.SENTRY_ORIGIN: Boto3Integration.origin,
+                SPANDATA.SENTRY_OP: span_op,
+                SPANDATA.SENTRY_ORIGIN: span_origin,
             }
         )
         return sentry_sdk.traces.start_span(
@@ -210,8 +260,8 @@ def _start_client_span(
 
     span = sentry_sdk.start_span(
         name=span_name,
-        op=OP.HTTP_CLIENT,
-        origin=Boto3Integration.origin,
+        op=span_op,
+        origin=span_origin,
     )
     _set_span_attributes(span, attributes)
     span.set_tag("aws.service_id", call_context.service_id.hyphenize())
@@ -222,11 +272,24 @@ def _start_client_span(
 def _finish_client_span(
     span: "Union[Span, StreamedSpan]",
     parsed: "Dict[str, Any]",
+    call_context: "Optional[_ClientCallContext]" = None,
+    service_extension: "Optional[_ServiceExtension]" = None,
 ) -> None:
     # response metadata is only available after the call. Keep enrichment
     # isolated so failure cannot prevent `__exit__()` below.
+    attributes = {}
     with capture_internal_exceptions():
-        _set_span_attributes(span, _get_response_attributes(parsed))
+        attributes = _get_response_attributes(parsed)
+
+    if call_context is not None and service_extension is not None:
+        with capture_internal_exceptions():
+            _merge_service_attributes(
+                attributes,
+                service_extension.get_response_span_attributes(call_context, parsed),
+            )
+
+    with capture_internal_exceptions():
+        _set_span_attributes(span, attributes)
     span.__exit__(None, None, None)
 
     body = parsed.get("Body")
@@ -293,9 +356,22 @@ def _finish_client_span(
 def _finish_client_span_with_error(
     span: "Union[Span, StreamedSpan]",
     exception: "BaseException",
+    call_context: "Optional[_ClientCallContext]" = None,
+    service_extension: "Optional[_ServiceExtension]" = None,
 ) -> None:
+    attributes = {}
     with capture_internal_exceptions():
-        _set_span_attributes(span, _get_error_attributes(exception))
+        attributes = _get_error_attributes(exception)
+
+    if call_context is not None and service_extension is not None:
+        with capture_internal_exceptions():
+            _merge_service_attributes(
+                attributes,
+                service_extension.get_error_span_attributes(call_context, exception),
+            )
+
+    with capture_internal_exceptions():
+        _set_span_attributes(span, attributes)
     span.__exit__(type(exception), exception, exception.__traceback__)
 
 

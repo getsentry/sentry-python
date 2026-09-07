@@ -13,6 +13,7 @@ from sentry_sdk.integrations.boto3._instrumentation import (
     _get_response_attributes,
     _get_server_attributes,
 )
+from sentry_sdk.integrations.boto3._services import _ServiceExtension
 from tests.integrations.boto3.aws_mock import Body
 
 session = boto3.Session(  # type: ignore[attr-defined]
@@ -322,7 +323,6 @@ def test_client_call_has_common_attributes(
     assert attributes[SPANDATA.CLOUD_REGION] == "eu-north-1"
     assert attributes[SPANDATA.SERVER_ADDRESS] == server_address
     assert attributes[SPANDATA.SERVER_PORT] == 443
-
 
 def test_client_call_attributes_are_available_at_span_creation(
     sentry_init, capture_items
@@ -670,6 +670,86 @@ def test_error_attribute_extraction_failure_does_not_replace_original_exception(
     assert len(client_spans) == 1
     assert client_spans[0]["status"] in ("error", "internal_error")
     _assert_span_finished(client_spans[0], span_streaming)
+
+
+@pytest.mark.tests_internal_exceptions
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_service_response_enrichment_failure_preserves_response_and_finishes_span(
+    capture_items,
+    client_factory,
+    monkeypatch,
+    span_streaming,
+):
+    class FailingServiceExtension(_ServiceExtension):
+        def get_response_span_attributes(self, call_context, response):
+            raise RuntimeError("service response enrichment failed")
+
+    monkeypatch.setattr(
+        "sentry_sdk.integrations.boto3._client._resolve_service_extension",
+        lambda service_name: FailingServiceExtension(),
+    )
+    client = client_factory()
+    api_params = {"Bucket": "bucket", "Key": "foo"}
+    original_response = {"ResponseMetadata": {"HTTPStatusCode": 200}}
+    returned_responses = []
+
+    with Stubber(client) as stubber:
+        stubber.add_response("head_object", original_response, api_params)
+        spans_by_op = _capture_boto3_spans_by_op(
+            lambda: returned_responses.append(client.head_object(**api_params)),
+            capture_items,
+            span_streaming,
+        )
+
+    client_spans = spans_by_op.get(OP.HTTP_CLIENT, [])
+    assert returned_responses == [original_response]
+    assert returned_responses[0] is original_response
+    assert len(client_spans) == 1
+    assert (
+        _span_attributes(client_spans[0], span_streaming)[SPANDATA.HTTP_STATUS_CODE]
+        == 200
+    )
+    _assert_span_finished(client_spans[0], span_streaming)
+
+
+@pytest.mark.tests_internal_exceptions
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_service_error_enrichment_failure_preserves_exception_and_finishes_span(
+    capture_items,
+    client_factory,
+    monkeypatch,
+    span_streaming,
+):
+    class FailingServiceExtension(_ServiceExtension):
+        def get_error_span_attributes(self, call_context, exception):
+            raise RuntimeError("service error enrichment failed")
+
+    monkeypatch.setattr(
+        "sentry_sdk.integrations.boto3._client._resolve_service_extension",
+        lambda service_name: FailingServiceExtension(),
+    )
+    client = client_factory()
+    original_exception = ValueError("parameter processing failed")
+
+    def raise_original_exception(**kwargs):
+        raise original_exception
+
+    client.meta.events.register("before-parameter-build", raise_original_exception)
+
+    def invoke_failing_client_method():
+        with pytest.raises(ValueError) as exc_info:
+            client.head_object(Bucket="bucket", Key="foo")
+        assert exc_info.value is original_exception
+
+    spans_by_op = _capture_boto3_spans_by_op(
+        invoke_failing_client_method, capture_items, span_streaming
+    )
+    client_spans = spans_by_op.get(OP.HTTP_CLIENT, [])
+
+    _assert_one_failed_span(client_spans, span_streaming)
+    assert _span_attributes(client_spans[0], span_streaming)[SPANDATA.ERROR_TYPE] == (
+        "ValueError"
+    )
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])

@@ -11,6 +11,11 @@ from sentry_sdk.integrations.boto3._instrumentation import (
     _sentry_request_created,
     _start_client_span,
 )
+from sentry_sdk.integrations.boto3._services import (
+    _resolve_service_extension,
+)
+from sentry_sdk.traces import NoOpStreamedSpan
+from sentry_sdk.tracing import NoOpSpan
 from sentry_sdk.utils import capture_internal_exceptions
 
 if TYPE_CHECKING:
@@ -18,6 +23,7 @@ if TYPE_CHECKING:
 
     from botocore.model import ServiceId
 
+    from sentry_sdk.integrations.boto3._services import _ServiceExtension
     from sentry_sdk.traces import StreamedSpan
     from sentry_sdk.tracing import Span
 
@@ -84,25 +90,69 @@ def _patch_botocore_client() -> None:
         if client.get_integration(Boto3Integration) is None:
             return orig_make_api_call(self, operation_name, api_params)
 
+        call_context: "Optional[_ClientCallContext]" = None
+        service_extension: "Optional[_ServiceExtension]" = None
         span: "Optional[Union[Span, StreamedSpan]]" = None
 
         with capture_internal_exceptions():
             call_context = _ClientCallContext(self, operation_name, api_params)
-            span = _start_client_span(call_context)
-            if span is not None:
-                span.__enter__()
+
+        if call_context is not None:
+            with capture_internal_exceptions():
+                service_extension = _resolve_service_extension(
+                    call_context.service_name
+                )
+
+            with capture_internal_exceptions():
+                span = _start_client_span(call_context, service_extension)
+                if span is not None:
+                    span.__enter__()
+
+        instrumented_api_params = api_params
+        if (
+            call_context is not None
+            and service_extension is not None
+            and span is not None
+            and not isinstance(span, (NoOpSpan, NoOpStreamedSpan))
+            and client.options.get("propagate_traces")
+        ):
+            with capture_internal_exceptions():
+                # propagation must use current scope
+                headers = dict(
+                    sentry_sdk.get_current_scope().iter_trace_propagation_headers(
+                        span=span
+                    )
+                )
+                propagated_params = service_extension.inject_trace_context(
+                    call_context,
+                    api_params,
+                    headers,
+                )
+                # botocore does not validate the parameters, so we must do it here.
+                if isinstance(propagated_params, dict):
+                    instrumented_api_params = propagated_params
 
         try:
-            parsed = orig_make_api_call(self, operation_name, api_params)
+            parsed = orig_make_api_call(self, operation_name, instrumented_api_params)
         except BaseException as exc:
             if span is not None:
                 with capture_internal_exceptions():
-                    _finish_client_span_with_error(span, exc)
+                    _finish_client_span_with_error(
+                        span,
+                        exc,
+                        call_context,
+                        service_extension,
+                    )
             raise
 
         if span is not None:
             with capture_internal_exceptions():
-                _finish_client_span(span, parsed)
+                _finish_client_span(
+                    span,
+                    parsed,
+                    call_context,
+                    service_extension,
+                )
         return parsed
 
     BaseClient.__init__ = sentry_patched_init  # type: ignore
