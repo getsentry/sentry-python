@@ -1,12 +1,12 @@
 import sys
 from collections.abc import Mapping
+from contextlib import nullcontext
 from functools import wraps
 from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk import isolation_scope
-from sentry_sdk.api import continue_trace
-from sentry_sdk.consts import OP, SPANDATA, SPANSTATUS
+from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.integrations.celery.beat import (
     _patch_beat_apply_entry,
@@ -16,9 +16,9 @@ from sentry_sdk.integrations.celery.beat import (
 from sentry_sdk.integrations.celery.utils import _now_seconds_since_epoch
 from sentry_sdk.integrations.logging import ignore_logger_for_events
 from sentry_sdk.scope import Scope, should_send_default_pii
-from sentry_sdk.traces import SegmentNameSource, StreamedSpan, get_current_span
-from sentry_sdk.tracing import BAGGAGE_HEADER_NAME, Span, TransactionSource
-from sentry_sdk.tracing_utils import Baggage, has_span_streaming_enabled
+from sentry_sdk.traces import SegmentNameSource, StreamedSpan
+from sentry_sdk.tracing import BAGGAGE_HEADER_NAME
+from sentry_sdk.tracing_utils import Baggage
 from sentry_sdk.utils import (
     SENSITIVE_DATA_SUBSTITUTE,
     capture_internal_exceptions,
@@ -29,7 +29,7 @@ from sentry_sdk.utils import (
 )
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, List, Optional, TypeVar, Union
+    from typing import Any, Callable, List, Optional, TypeVar
 
     from sentry_sdk._types import Event, EventProcessor, ExcInfo, Hint
 
@@ -94,16 +94,11 @@ class CeleryIntegration(Integration):
 
 
 def _set_status(status: str) -> None:
-    client = sentry_sdk.get_client()
-    span_streaming = has_span_streaming_enabled(client.options)
-
     with capture_internal_exceptions():
-        scope = sentry_sdk.get_current_scope()
+        span = sentry_sdk.traces.get_current_span()
 
-        if span_streaming and scope.streamed_span is not None:
-            scope.streamed_span.status = "ok" if status == "ok" else "error"
-        elif not span_streaming and scope.span is not None:
-            scope.span.set_status(status)
+        if span is not None:
+            span.status = "ok" if status == "ok" else "error"
 
 
 def _capture_exception(task: "Any", exc_info: "ExcInfo") -> None:
@@ -175,7 +170,7 @@ def _make_event_processor(
 
 def _update_celery_task_headers(
     original_headers: "dict[str, Any]",
-    span: "Optional[Union[StreamedSpan, Span]]",
+    span: "Optional[StreamedSpan]",
     monitor_beat_tasks: bool,
 ) -> "dict[str, Any]":
     """
@@ -256,14 +251,6 @@ def _update_celery_task_headers(
     return updated_headers
 
 
-class NoOpMgr:
-    def __enter__(self) -> None:
-        return None
-
-    def __exit__(self, exc_type: "Any", exc_value: "Any", traceback: "Any") -> None:
-        return None
-
-
 def _wrap_task_run(f: "F") -> "F":
     @wraps(f)
     def apply_async(*args: "Any", **kwargs: "Any") -> "Any":
@@ -289,30 +276,22 @@ def _wrap_task_run(f: "F") -> "F":
         else:
             task_name = "<unknown Celery task>"
 
-        span_streaming = has_span_streaming_enabled(client.options)
-
         task_started_from_beat = sentry_sdk.get_isolation_scope()._name == "celery-beat"
 
-        span_mgr: "Union[StreamedSpan, Span, NoOpMgr]" = NoOpMgr()
-        if span_streaming:
-            if not task_started_from_beat and get_current_span() is not None:
-                span_mgr = sentry_sdk.traces.start_span(
-                    name=task_name,
-                    attributes={
-                        "sentry.op": OP.QUEUE_SUBMIT_CELERY,
-                        "sentry.origin": CeleryIntegration.origin,
-                    },
-                )
+        span = None
+        if (
+            not task_started_from_beat
+            and sentry_sdk.traces.get_current_span() is not None
+        ):
+            span = sentry_sdk.traces.start_span(
+                name=task_name,
+                attributes={
+                    "sentry.op": OP.QUEUE_SUBMIT_CELERY,
+                    "sentry.origin": CeleryIntegration.origin,
+                },
+            )
 
-        else:
-            if not task_started_from_beat:
-                span_mgr = sentry_sdk.start_span(
-                    op=OP.QUEUE_SUBMIT_CELERY,
-                    name=task_name,
-                    origin=CeleryIntegration.origin,
-                )
-
-        with span_mgr as span:
+        with span if span else nullcontext():
             kwargs["headers"] = _update_celery_task_headers(
                 kwarg_headers, span, integration.monitor_beat_tasks
             )
@@ -334,8 +313,6 @@ def _wrap_tracer(task: "Any", f: "F") -> "F":
         if client.get_integration(CeleryIntegration) is None:
             return f(*args, **kwargs)
 
-        span_streaming = has_span_streaming_enabled(client.options)
-
         with isolation_scope() as scope:
             scope._name = "celery"
             scope.clear_breadcrumbs()
@@ -355,52 +332,33 @@ def _wrap_tracer(task: "Any", f: "F") -> "F":
                     }
                 }
 
-            span: "Union[Span, StreamedSpan]"
-            span_ctx: "Union[StreamedSpan, Span, NoOpMgr]" = NoOpMgr()
+            span = None
 
             # Celery task objects are not a thing to be trusted. Even
             # something such as attribute access can fail.
             with capture_internal_exceptions():
                 headers = args[3].get("headers") or {}
-                if span_streaming:
-                    sentry_sdk.traces.continue_trace(headers)
-                    Scope.set_custom_sampling_context(custom_sampling_context)
-                    span = sentry_sdk.traces.start_span(
-                        name=task_name,
-                        parent_span=None,  # make this a segment
-                        attributes={
-                            "sentry.origin": CeleryIntegration.origin,
-                            "sentry.segment.name.source": SegmentNameSource.TASK.value,
-                            "sentry.op": OP.QUEUE_TASK_CELERY,
-                        },
-                    )
+                sentry_sdk.traces.continue_trace(headers)
 
-                    span_ctx = span
+                Scope.set_custom_sampling_context(custom_sampling_context)
 
-                else:
-                    span = continue_trace(
-                        headers,
-                        op=OP.QUEUE_TASK_CELERY,
-                        name=task_name,
-                        source=TransactionSource.TASK,
-                        origin=CeleryIntegration.origin,
-                    )
-                    span.set_status(SPANSTATUS.OK)
+                span = sentry_sdk.traces.start_span(
+                    name=task_name,
+                    parent_span=None,  # make this a segment
+                    attributes={
+                        "sentry.origin": CeleryIntegration.origin,
+                        "sentry.segment.name.source": SegmentNameSource.TASK.value,
+                        "sentry.op": OP.QUEUE_TASK_CELERY,
+                    },
+                )
 
-                    span_ctx = sentry_sdk.start_transaction(
-                        span,
-                        custom_sampling_context=custom_sampling_context,
-                    )
-
-            with span_ctx:
+            with span if span else nullcontext():
                 return f(*args, **kwargs)
 
     return _inner  # type: ignore
 
 
-def _set_messaging_destination_name(
-    task: "Any", span: "Union[StreamedSpan, Span]"
-) -> None:
+def _set_messaging_destination_name(task: "Any", span: "StreamedSpan") -> None:
     """Set "messaging.destination.name" tag for span"""
     with capture_internal_exceptions():
         delivery_info = task.request.delivery_info
@@ -409,10 +367,7 @@ def _set_messaging_destination_name(
             if delivery_info.get("exchange") == "" and routing_key is not None:
                 # Empty exchange indicates the default exchange, meaning the tasks
                 # are sent to the queue with the same name as the routing key.
-                if isinstance(span, StreamedSpan):
-                    span.set_attribute(SPANDATA.MESSAGING_DESTINATION_NAME, routing_key)
-                else:
-                    span.set_data(SPANDATA.MESSAGING_DESTINATION_NAME, routing_key)
+                span.set_attribute(SPANDATA.MESSAGING_DESTINATION_NAME, routing_key)
 
 
 def _wrap_task_call(task: "Any", f: "F") -> "F":
@@ -425,34 +380,17 @@ def _wrap_task_call(task: "Any", f: "F") -> "F":
         if client.get_integration(CeleryIntegration) is None:
             return f(*args, **kwargs)
 
-        span_streaming = has_span_streaming_enabled(client.options)
-
         try:
-            if span_streaming and get_current_span() is None:
+            if sentry_sdk.traces.get_current_span() is None:
                 return f(*args, **kwargs)
 
-            span: "Union[Span, StreamedSpan]"
-            if span_streaming:
-                span = sentry_sdk.traces.start_span(
-                    name=task.name,
-                    attributes={
-                        "sentry.op": OP.QUEUE_PROCESS,
-                        "sentry.origin": CeleryIntegration.origin,
-                    },
-                )
-            else:
-                span = sentry_sdk.start_span(
-                    op=OP.QUEUE_PROCESS,
-                    name=task.name,
-                    origin=CeleryIntegration.origin,
-                )
-
-            with span:
-                if isinstance(span, StreamedSpan):
-                    set_on_span = span.set_attribute
-                else:
-                    set_on_span = span.set_data
-
+            with sentry_sdk.traces.start_span(
+                name=task.name,
+                attributes={
+                    "sentry.op": OP.QUEUE_PROCESS,
+                    "sentry.origin": CeleryIntegration.origin,
+                },
+            ) as span:
                 _set_messaging_destination_name(task, span)
 
                 latency = None
@@ -467,25 +405,28 @@ def _wrap_task_call(task: "Any", f: "F") -> "F":
 
                 if latency is not None:
                     latency *= 1000  # milliseconds
-                    set_on_span(SPANDATA.MESSAGING_MESSAGE_RECEIVE_LATENCY, latency)
+                    span.set_attribute(
+                        SPANDATA.MESSAGING_MESSAGE_RECEIVE_LATENCY, latency
+                    )
 
                 with capture_internal_exceptions():
-                    set_on_span(SPANDATA.MESSAGING_MESSAGE_ID, task.request.id)
+                    span.set_attribute(SPANDATA.MESSAGING_MESSAGE_ID, task.request.id)
 
                 with capture_internal_exceptions():
-                    set_on_span(
+                    span.set_attribute(
                         SPANDATA.MESSAGING_MESSAGE_RETRY_COUNT,
                         task.request.retries,
                     )
 
                 with capture_internal_exceptions():
                     with task.app.connection() as conn:
-                        set_on_span(
+                        span.set_attribute(
                             SPANDATA.MESSAGING_SYSTEM,
                             conn.transport.driver_type,
                         )
 
                 return f(*args, **kwargs)
+
         except Exception:
             exc_info = sys.exc_info()
             with capture_internal_exceptions():
@@ -560,8 +501,6 @@ def _patch_producer_publish() -> None:
         if client.get_integration(CeleryIntegration) is None:
             return original_publish(self, *args, **kwargs)
 
-        span_streaming = has_span_streaming_enabled(client.options)
-
         kwargs_headers = kwargs.get("headers", {})
         if not isinstance(kwargs_headers, Mapping):
             # Ensure kwargs_headers is a Mapping, so we can safely call get().
@@ -578,45 +517,29 @@ def _patch_producer_publish() -> None:
         routing_key = kwargs.get("routing_key")
         exchange = kwargs.get("exchange")
 
-        span: "Union[StreamedSpan, Span, None]" = None
-        if span_streaming:
-            if get_current_span() is not None:
-                span = sentry_sdk.traces.start_span(
-                    name=task_name,
-                    attributes={
-                        "sentry.op": OP.QUEUE_PUBLISH,
-                        "sentry.origin": CeleryIntegration.origin,
-                    },
-                )
-        else:
-            span = sentry_sdk.start_span(
-                op=OP.QUEUE_PUBLISH,
-                name=task_name,
-                origin=CeleryIntegration.origin,
-            )
-
-        if span is None:
+        if sentry_sdk.traces.get_current_span() is None:
             return original_publish(self, *args, **kwargs)
 
-        with span:
-            if isinstance(span, StreamedSpan):
-                set_on_span = span.set_attribute
-            else:
-                set_on_span = span.set_data
-
+        with sentry_sdk.traces.start_span(
+            name=task_name,
+            attributes={
+                "sentry.op": OP.QUEUE_PUBLISH,
+                "sentry.origin": CeleryIntegration.origin,
+            },
+        ) as span:
             if task_id is not None:
-                set_on_span(SPANDATA.MESSAGING_MESSAGE_ID, task_id)
+                span.set_attribute(SPANDATA.MESSAGING_MESSAGE_ID, task_id)
 
             if exchange == "" and routing_key is not None:
                 # Empty exchange indicates the default exchange, meaning messages are
                 # routed to the queue with the same name as the routing key.
-                set_on_span(SPANDATA.MESSAGING_DESTINATION_NAME, routing_key)
+                span.set_attribute(SPANDATA.MESSAGING_DESTINATION_NAME, routing_key)
 
             if retries is not None:
-                set_on_span(SPANDATA.MESSAGING_MESSAGE_RETRY_COUNT, retries)
+                span.set_attribute(SPANDATA.MESSAGING_MESSAGE_RETRY_COUNT, retries)
 
             with capture_internal_exceptions():
-                set_on_span(
+                span.set_attribute(
                     SPANDATA.MESSAGING_SYSTEM, self.connection.transport.driver_type
                 )
 
