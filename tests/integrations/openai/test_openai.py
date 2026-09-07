@@ -2516,7 +2516,7 @@ def test_embeddings_create(
     assert span["attributes"]["gen_ai.usage.total_tokens"] == 30
 
 
-def _collect_embeddings_span_data(capture_events, capture_items, create):
+def _collect_embeddings_span_data(capture_items, create):
     items = capture_items("span")
 
     response = create()
@@ -2566,7 +2566,6 @@ def _collect_embeddings_span_data(capture_events, capture_items, create):
 )
 def test_embeddings_create_data_collection(
     sentry_init,
-    capture_events,
     capture_items,
     data_collection,
     send_default_pii,
@@ -2601,7 +2600,6 @@ def test_embeddings_create_data_collection(
     client.embeddings._post = mock.Mock(return_value=returned_embedding)
 
     span_data = _collect_embeddings_span_data(
-        capture_events,
         capture_items,
         lambda: client.embeddings.create(input="hello", model="text-embedding-3-large"),
     )
@@ -2632,7 +2630,6 @@ def test_embeddings_create_data_collection(
 )
 def test_embeddings_create_data_collection_inputs_disabled_input_shapes(
     sentry_init,
-    capture_events,
     capture_items,
     get_input,
 ):
@@ -2660,7 +2657,6 @@ def test_embeddings_create_data_collection_inputs_disabled_input_shapes(
     client.embeddings._post = mock.Mock(return_value=returned_embedding)
 
     span_data = _collect_embeddings_span_data(
-        capture_events,
         capture_items,
         lambda: client.embeddings.create(
             input=get_input(), model="text-embedding-3-large"
@@ -4202,7 +4198,7 @@ def _make_responses_api_response(output):
     )
 
 
-def _collect_responses_span_data(capture_events, capture_items, create):
+def _collect_responses_span_data(capture_items, create):
     items = capture_items("span")
 
     create()
@@ -4250,7 +4246,6 @@ def _collect_responses_span_data(capture_events, capture_items, create):
 @pytest.mark.skipif(SKIP_RESPONSES_TESTS, reason="Responses API not available")
 def test_responses_api_data_collection_outputs(
     sentry_init,
-    capture_events,
     capture_items,
     data_collection,
     send_default_pii,
@@ -4287,7 +4282,6 @@ def test_responses_api_data_collection_outputs(
     )
 
     span_data = _collect_responses_span_data(
-        capture_events,
         capture_items,
         lambda: client.responses.create(model="gpt-4o", input="hello"),
     )
@@ -4347,7 +4341,6 @@ def test_responses_api_data_collection_outputs(
 @pytest.mark.skipif(SKIP_RESPONSES_TESTS, reason="Responses API not available")
 def test_responses_api_data_collection_outputs_shapes(
     sentry_init,
-    capture_events,
     capture_items,
     get_output,
     expect_text,
@@ -4367,7 +4360,6 @@ def test_responses_api_data_collection_outputs_shapes(
     )
 
     span_data = _collect_responses_span_data(
-        capture_events,
         capture_items,
         lambda: client.responses.create(model="gpt-4o", input="hello"),
     )
