@@ -20,6 +20,8 @@ from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_ve
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.utils import (
+    capture_internal_exceptions,
+    event_from_exception,
     has_data_collection_enabled,
     package_version,
     safe_serialize,
@@ -98,6 +100,15 @@ class MCPIntegration(Integration):
 
         if FastMCP is not None:
             _patch_fastmcp()
+
+
+def _capture_exception(exc: "Any") -> None:
+    event, hint = event_from_exception(
+        exc,
+        client_options=sentry_sdk.get_client().options,
+        mechanism={"type": "mcp", "handled": False},
+    )
+    sentry_sdk.capture_event(event, hint=hint)
 
 
 @contextmanager
@@ -259,57 +270,6 @@ def _extract_text_from_content_blocks(content_blocks: "Any") -> "Any":
     return " ".join(texts) if texts else content_blocks
 
 
-def _extract_handler_data_from_args(
-    handler_type: str,
-    original_args: "tuple[Any, ...]",
-    original_kwargs: "Optional[dict[str, Any]]" = None,
-) -> "tuple[str, dict[str, Any]]":
-    """
-    Extract handler name and arguments from v1 positional args.
-
-    In MCP SDK v1, handlers receive positional args:
-    - Tool: (tool_name, arguments)
-    - Prompt: (name, arguments)
-    - Resource: (uri,)
-    """
-    original_kwargs = original_kwargs or {}
-
-    if handler_type == "tool":
-        if original_args:
-            handler_name = original_args[0]
-        elif original_kwargs.get("name"):
-            handler_name = original_kwargs["name"]
-
-        arguments = {}
-        if len(original_args) > 1:
-            arguments = original_args[1]
-        elif original_kwargs.get("arguments"):
-            arguments = original_kwargs["arguments"]
-
-    elif handler_type == "prompt":
-        if original_args:
-            handler_name = original_args[0]
-        elif original_kwargs.get("name"):
-            handler_name = original_kwargs["name"]
-
-        arguments = {}
-        if len(original_args) > 1:
-            arguments = original_args[1]
-        elif original_kwargs.get("arguments"):
-            arguments = original_kwargs["arguments"]
-
-    else:  # resource
-        handler_name = "unknown"
-        if original_args:
-            handler_name = str(original_args[0])
-        elif original_kwargs.get("uri"):
-            handler_name = str(original_kwargs["uri"])
-
-        arguments = {}
-
-    return handler_name, arguments
-
-
 async def _tool_handler_wrapper(
     func: "Callable[..., Awaitable[Union[CallToolResult, InputRequiredResult]]]",
     original_args: "tuple[Any, ...]",
@@ -329,12 +289,18 @@ async def _tool_handler_wrapper(
     """
     client = sentry_sdk.get_client()
 
-    if original_kwargs is None:
-        original_kwargs = {}
+    original_kwargs = original_kwargs or {}
 
-    handler_name, arguments = _extract_handler_data_from_args(
-        "tool", original_args, original_kwargs
-    )
+    if original_args:
+        handler_name = original_args[0]
+    elif original_kwargs.get("name"):
+        handler_name = original_kwargs["name"]
+
+    arguments = {}
+    if len(original_args) > 1 and original_args[1] is not None:
+        arguments = original_args[1]
+    elif original_kwargs.get("arguments"):
+        arguments = original_kwargs["arguments"]
 
     if has_data_collection_enabled(client.options):
         if not client.options["data_collection"]["gen_ai"]["inputs"]:
@@ -379,9 +345,9 @@ async def _tool_handler_wrapper(
             result = func(*original_args, **original_kwargs)
             if force_await or inspect.isawaitable(result):
                 result = await result
-
         except Exception as e:
-            sentry_sdk.capture_exception(e)
+            with capture_internal_exceptions():
+                _capture_exception(e)
             raise
 
         if result is None:
@@ -462,9 +428,9 @@ async def _instrument_v2_tool_call(
 
         try:
             result = await call_next(ctx)
-
         except Exception as e:
-            sentry_sdk.capture_exception(e)
+            with capture_internal_exceptions():
+                _capture_exception(e)
             raise
 
         if not isinstance(result, dict):
@@ -523,13 +489,20 @@ async def _prompt_handler_wrapper(
         original_kwargs: Original keyword arguments passed to the handler
         self: Optional instance for bound methods
     """
-    if original_kwargs is None:
-        original_kwargs = {}
-
     client = sentry_sdk.get_client()
-    handler_name, arguments = _extract_handler_data_from_args(
-        "prompt", original_args, original_kwargs
-    )
+
+    original_kwargs = original_kwargs or {}
+
+    if original_args:
+        handler_name = original_args[0]
+    elif original_kwargs.get("name"):
+        handler_name = original_kwargs["name"]
+
+    arguments = {}
+    if len(original_args) > 1 and original_args[1] is not None:
+        arguments = original_args[1]
+    elif original_kwargs.get("arguments"):
+        arguments = original_kwargs["arguments"]
 
     if has_data_collection_enabled(client.options):
         if not client.options["data_collection"]["gen_ai"]["inputs"]:
@@ -574,9 +547,9 @@ async def _prompt_handler_wrapper(
             result = func(*original_args, **original_kwargs)
             if force_await or inspect.isawaitable(result):
                 result = await result
-
         except Exception as e:
-            sentry_sdk.capture_exception(e)
+            with capture_internal_exceptions():
+                _capture_exception(e)
             raise
 
         if result is None:
@@ -712,7 +685,8 @@ async def _instrument_v2_prompt_get(
         try:
             result = await call_next(ctx)
         except Exception as e:
-            sentry_sdk.capture_exception(e)
+            with capture_internal_exceptions():
+                _capture_exception(e)
             raise
 
         if not isinstance(result, dict):
@@ -795,12 +769,15 @@ async def _resource_handler_wrapper(
         original_kwargs: Original keyword arguments passed to the handler
         self: Optional instance for bound methods
     """
-    if original_kwargs is None:
-        original_kwargs = {}
+    original_kwargs = original_kwargs or {}
 
-    handler_name, arguments = _extract_handler_data_from_args(
-        "resource", original_args, original_kwargs
-    )
+    handler_name = "unknown"
+    if original_args:
+        handler_name = str(original_args[0])
+    elif original_kwargs.get("uri"):
+        handler_name = str(original_kwargs["uri"])
+
+    arguments: "dict[str, Any]" = {}
 
     ctx = None
     try:
@@ -852,9 +829,9 @@ async def _resource_handler_wrapper(
             result = func(*original_args, **original_kwargs)
             if force_await or inspect.isawaitable(result):
                 result = await result
-
         except Exception as e:
-            sentry_sdk.capture_exception(e)
+            with capture_internal_exceptions():
+                _capture_exception(e)
             raise
 
     return result
@@ -904,9 +881,9 @@ async def _instrument_v2_resource_read(
 
         try:
             result = await call_next(ctx)
-
         except Exception as e:
-            sentry_sdk.capture_exception(e)
+            with capture_internal_exceptions():
+                _capture_exception(e)
             raise
 
     return result

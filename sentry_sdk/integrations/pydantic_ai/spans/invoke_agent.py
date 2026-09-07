@@ -2,16 +2,11 @@ from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk.ai.utils import (
-    get_start_span_function,
     normalize_message_roles,
     set_data_normalized,
-    truncate_and_annotate_messages,
 )
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.traces import StreamedSpan
-from sentry_sdk.tracing_utils import (
-    has_span_streaming_enabled,
-)
 
 from ..consts import SPAN_ORIGIN
 from ..utils import (
@@ -27,7 +22,7 @@ from .utils import (
 )
 
 if TYPE_CHECKING:
-    from typing import Any, Union
+    from typing import Any
 
 try:
     from pydantic_ai.messages import BinaryContent, ImageUrl
@@ -42,31 +37,21 @@ def invoke_agent_span(
     model: "Any",
     model_settings: "Any",
     is_streaming: bool = False,
-) -> "Union[sentry_sdk.tracing.Span, StreamedSpan]":
+) -> "StreamedSpan":
     """Create a span for invoking the agent."""
     # Determine agent name for span
     name = "agent"
     if agent and getattr(agent, "name", None):
         name = agent.name
 
-    span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
-    if span_streaming:
-        span = sentry_sdk.traces.start_span(
-            name=f"invoke_agent {name}",
-            attributes={
-                "sentry.op": OP.GEN_AI_INVOKE_AGENT,
-                "sentry.origin": SPAN_ORIGIN,
-                SPANDATA.GEN_AI_OPERATION_NAME: "invoke_agent",
-            },
-        )
-    else:
-        span = get_start_span_function()(
-            op=OP.GEN_AI_INVOKE_AGENT,
-            name=f"invoke_agent {name}",
-            origin=SPAN_ORIGIN,
-        )
-
-        span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "invoke_agent")
+    span = sentry_sdk.traces.start_span(
+        name=f"invoke_agent {name}",
+        attributes={
+            "sentry.op": OP.GEN_AI_INVOKE_AGENT,
+            "sentry.origin": SPAN_ORIGIN,
+            SPANDATA.GEN_AI_OPERATION_NAME: "invoke_agent",
+        },
+    )
 
     _set_agent_data(span, agent)
     _set_model_data(span, model, model_settings)
@@ -137,22 +122,18 @@ def invoke_agent_span(
 
         if messages:
             normalized_messages = normalize_message_roles(messages)
-            client = sentry_sdk.get_client()
-            scope = sentry_sdk.get_current_scope()
-            messages_data = (
-                truncate_and_annotate_messages(normalized_messages, span, scope)
-                if not has_span_streaming_enabled(client.options)
-                else normalized_messages
-            )
             set_data_normalized(
-                span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data, unpack=False
+                span,
+                SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                normalized_messages,
+                unpack=False,
             )
 
     return span
 
 
 def update_invoke_agent_span(
-    span: "Union[sentry_sdk.tracing.Span, StreamedSpan]",
+    span: "StreamedSpan",
     result: "Any",
 ) -> None:
     """Update and close the invoke agent span."""
@@ -173,12 +154,7 @@ def update_invoke_agent_span(
         try:
             response = result.response
             if hasattr(response, "model_name") and response.model_name:
-                if isinstance(span, StreamedSpan):
-                    span.set_attribute(
-                        SPANDATA.GEN_AI_RESPONSE_MODEL, response.model_name
-                    )
-                else:
-                    span.set_data(SPANDATA.GEN_AI_RESPONSE_MODEL, response.model_name)
+                span.set_attribute(SPANDATA.GEN_AI_RESPONSE_MODEL, response.model_name)
         except Exception:
             # If response access fails, continue without setting model name
             pass

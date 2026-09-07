@@ -16,7 +16,6 @@ from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import StreamedSpan
-from sentry_sdk.tracing import Span
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
@@ -782,8 +781,6 @@ def _sentry_patched_create_sync(f: "Any", *args: "Any", **kwargs: "Any") -> "Any
                 response_id=getattr(result, "id", None),
                 finish_reason=getattr(result, "stop_reason", None),
             )
-        elif isinstance(span, Span):
-            span.set_data("unknown_response", True)
 
         span.__exit__(None, None, None)
 
@@ -871,8 +868,6 @@ async def _sentry_patched_create_async(
                 response_id=getattr(result, "id", None),
                 finish_reason=getattr(result, "stop_reason", None),
             )
-        elif isinstance(span, Span):
-            span.set_data("unknown_response", True)
 
         span.__exit__(None, None, None)
 
