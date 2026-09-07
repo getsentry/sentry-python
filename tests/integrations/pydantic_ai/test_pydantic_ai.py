@@ -3209,7 +3209,6 @@ def _spans_by_op(items):
 @pytest.mark.asyncio
 async def test_data_collection_gen_ai_inputs_gates_request_messages_tool_inputs_and_available_tools(
     sentry_init,
-    capture_events,
     capture_items,
     get_test_agent,
     data_collection,
@@ -3339,7 +3338,6 @@ async def test_data_collection_gen_ai_inputs_gates_request_messages_tool_inputs_
 @pytest.mark.asyncio
 async def test_data_collection_gen_ai_outputs_gates_response_text_and_tool_outputs(
     sentry_init,
-    capture_events,
     capture_items,
     get_test_agent,
     data_collection,
@@ -3441,7 +3439,6 @@ async def test_data_collection_gen_ai_outputs_gates_response_text_and_tool_outpu
 @pytest.mark.asyncio
 async def test_data_collection_gen_ai_output_message_parts_follow_outputs_gate(
     sentry_init,
-    capture_events,
     capture_items,
     get_test_agent,
     gen_ai,
@@ -3500,7 +3497,6 @@ async def test_data_collection_gen_ai_output_message_parts_follow_outputs_gate(
 @pytest.mark.asyncio
 async def test_data_collection_gen_ai_request_messages_keep_tool_returns_when_outputs_disabled(
     sentry_init,
-    capture_events,
     capture_items,
     get_test_agent,
 ):
