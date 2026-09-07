@@ -112,7 +112,7 @@ class OpenAIAgentsIntegration(Integration):
                     *args: "Any", **kwargs: "Any"
                 ) -> "SingleStepResult":
                     return await _run_single_turn(
-                        run_loop.run_single_turn, *args, **kwargs
+                        run_loop.run_single_turn, use_run_hooks, *args, **kwargs
                     )
 
                 agents.run.run_single_turn = new_wrapped_run_single_turn
@@ -125,6 +125,7 @@ class OpenAIAgentsIntegration(Integration):
                 ) -> "SingleStepResult":
                     return await _run_single_turn_streamed(
                         original_run_single_turn_streamed,
+                        use_run_hooks,
                         *args,
                         **kwargs,
                     )
@@ -151,7 +152,7 @@ class OpenAIAgentsIntegration(Integration):
                     *args: "Any", **kwargs: "Any"
                 ) -> "SingleStepResult":
                     return await _execute_handoffs(
-                        original_execute_handoffs, *args, **kwargs
+                        original_execute_handoffs, use_run_hooks, *args, **kwargs
                     )
 
                 agents.run_internal.turn_resolution.execute_handoffs = (
@@ -207,7 +208,9 @@ class OpenAIAgentsIntegration(Integration):
         async def old_wrapped_run_single_turn(
             cls: "agents.Runner", *args: "Any", **kwargs: "Any"
         ) -> "SingleStepResult":
-            return await _run_single_turn(original_run_single_turn, *args, **kwargs)
+            return await _run_single_turn(
+                original_run_single_turn, use_run_hooks, *args, **kwargs
+            )
 
         agents.run.AgentRunner._run_single_turn = classmethod(
             old_wrapped_run_single_turn
@@ -220,7 +223,7 @@ class OpenAIAgentsIntegration(Integration):
             cls: "agents.Runner", *args: "Any", **kwargs: "Any"
         ) -> "SingleStepResult":
             return await _run_single_turn_streamed(
-                original_run_single_turn_streamed, *args, **kwargs
+                original_run_single_turn_streamed, use_run_hooks, *args, **kwargs
             )
 
         agents.run.AgentRunner._run_single_turn_streamed = classmethod(
@@ -233,7 +236,9 @@ class OpenAIAgentsIntegration(Integration):
         async def old_wrapped_execute_handoffs(
             cls: "agents.Runner", *args: "Any", **kwargs: "Any"
         ) -> "SingleStepResult":
-            return await _execute_handoffs(original_execute_handoffs, *args, **kwargs)
+            return await _execute_handoffs(
+                original_execute_handoffs, use_run_hooks, *args, **kwargs
+            )
 
         agents._run_impl.RunImpl.execute_handoffs = classmethod(
             old_wrapped_execute_handoffs
