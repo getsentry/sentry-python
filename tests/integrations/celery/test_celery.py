@@ -40,6 +40,7 @@ def init_celery(sentry_init, request):
                     monitor_beat_tasks=monitor_beat_tasks,
                 )
             ],
+            trace_lifecycle="stream",
             **kwargs,
         )
         celery = Celery(__name__)
@@ -128,7 +129,6 @@ def test_simple_with_performance(
     celery = init_celery(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
 
     @celery.task(name="dummy_task")
@@ -175,7 +175,6 @@ def test_simple_without_performance(
     celery = init_celery(
         traces_sample_rate=None,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
     events = capture_events()
 
@@ -284,7 +283,6 @@ def test_task_args_kwargs_data_collection(
 ):
     init_dict = {"send_default_pii": True, **init_kwargs}
     celery = init_celery(
-        trace_lifecycle="stream",
         **init_dict,
     )
 
@@ -324,7 +322,6 @@ def test_transaction_events(
 ):
     celery = init_celery(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     @celery.task(name="dummy_task")
@@ -406,7 +403,7 @@ def test_no_double_patching(celery):
 
 
 def test_simple_no_propagation(capture_events, init_celery):
-    celery = init_celery(propagate_traces=False, trace_lifecycle="stream")
+    celery = init_celery(propagate_traces=False)
     events = capture_events()
 
     @celery.task(name="dummy_task")
@@ -473,6 +470,57 @@ def test_retry(celery, capture_events):
 
 
 @pytest.mark.forked
+def test_redis_backend_trace_propagation(init_celery, capture_items_forksafe):
+    celery = init_celery(traces_sample_rate=1.0, backend="redis")
+
+    items = capture_items_forksafe("event", "span")
+
+    @celery.task(name="dummy_task", bind=True)
+    def dummy_task(self):
+        1 / 0
+
+    with sentry_sdk.traces.start_span(name="submit_celery") as root_span:
+        res = dummy_task.apply_async()
+
+    with pytest.raises(Exception):  # noqa: B017
+        res.wait(timeout=10)
+
+    sentry_sdk.flush()
+
+    # read_event() returns the batch written by flush()
+    main_items = items.read_event()
+    items.read_flush()
+
+    # The worker runs in a forked child; its items arrive via the pipe too
+    worker_items = items.read_event()
+    items.read_flush()
+
+    all_items = main_items + worker_items
+
+    error_events = [i for i in all_items if i["type"] == "event"]
+    spans = [i for i in all_items if i["type"] == "span"]
+
+    assert len(error_events) == 1
+    (exception,) = error_events[0]["payload"]["exception"]["values"]
+    assert exception["type"] == "ZeroDivisionError"
+
+    submit_spans = [
+        s
+        for s in spans
+        if s["payload"].get("attributes", {}).get("sentry.op") == "queue.submit.celery"
+    ]
+    assert len(submit_spans) >= 1
+    assert submit_spans[0]["payload"]["name"] == "dummy_task"
+
+    for item in all_items:
+        if item["type"] == "event":
+            trace_id = item["payload"]["contexts"]["trace"]["trace_id"]
+        else:
+            trace_id = item["payload"]["trace_id"]
+        assert trace_id == root_span.trace_id
+
+
+@pytest.mark.forked
 @pytest.mark.parametrize("newrelic_order", ["sentry_first", "sentry_last"])
 def test_newrelic_interference(init_celery, newrelic_order, celery_invocation):
     def instrument_newrelic():
@@ -520,7 +568,6 @@ def test_traces_sampler_gets_task_info_in_sampling_context(
     traces_sampler = mock.Mock(return_value=1.0)
     celery = init_celery(
         traces_sampler=traces_sampler,
-        trace_lifecycle="stream",
     )
 
     @celery.task(name="dog_walk")
@@ -540,8 +587,8 @@ def test_traces_sampler_gets_task_info_in_sampling_context(
     )
 
 
-def test_abstract_task(sentry_init, capture_events, celery, celery_invocation):
-    sentry_init(trace_lifecycle="stream")
+def test_abstract_task(init_celery, capture_events, celery, celery_invocation):
+    init_celery()
 
     events = capture_events()
 
@@ -593,9 +640,7 @@ def test_task_headers(celery):
 
 
 def test_baggage_propagation(init_celery):
-    celery = init_celery(
-        traces_sample_rate=1.0, trace_lifecycle="stream", release="abcdef"
-    )
+    celery = init_celery(traces_sample_rate=1.0, release="abcdef")
 
     @celery.task(name="dummy_task", bind=True)
     def dummy_task(self, x, y):
@@ -632,7 +677,6 @@ def test_sentry_propagate_traces_override(init_celery):
         propagate_traces=True,
         traces_sample_rate=1.0,
         release="abcdef",
-        trace_lifecycle="stream",
     )
 
     @celery.task(name="dummy_task", bind=True)
@@ -696,7 +740,6 @@ def test_messaging_destination_name_default_exchange(
 ):
     celery_app = init_celery(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     mock_request.delivery_info = {"routing_key": routing_key, "exchange": ""}
 
@@ -724,7 +767,6 @@ def test_messaging_destination_name_nondefault_exchange(
     """
     celery_app = init_celery(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     mock_request.delivery_info = {"routing_key": "celery", "exchange": "custom"}
 
@@ -741,7 +783,6 @@ def test_messaging_destination_name_nondefault_exchange(
 def test_messaging_id(init_celery, capture_items):
     celery = init_celery(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     @celery.task
@@ -757,7 +798,6 @@ def test_messaging_id(init_celery, capture_items):
 def test_retry_count_zero(init_celery, capture_items):
     celery = init_celery(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     @celery.task()
@@ -776,7 +816,6 @@ def test_retry_count_nonzero(mock_request, init_celery, capture_items):
 
     celery = init_celery(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     @celery.task()
@@ -793,7 +832,6 @@ def test_retry_count_nonzero(mock_request, init_celery, capture_items):
 def test_messaging_system(system, init_celery, capture_items):
     celery = init_celery(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     # Does not need to be a real URL, since we use always eager
@@ -851,7 +889,6 @@ def test_producer_span_data(system, monkeypatch, sentry_init, capture_items):
 def test_receive_latency(init_celery, capture_items):
     celery = init_celery(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     @celery.task()
@@ -868,7 +905,6 @@ def test_receive_latency(init_celery, capture_items):
 def tests_span_origin_consumer(init_celery, capture_items):
     celery = init_celery(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     celery.conf.broker_url = "redis://example.com"  # noqa: E231
 
@@ -980,7 +1016,6 @@ def test_user_custom_headers_accessible_in_task(init_celery):
     """
     celery = init_celery(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     @celery.task(name="custom_headers_task", bind=True)
