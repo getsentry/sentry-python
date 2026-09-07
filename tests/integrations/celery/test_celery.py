@@ -172,7 +172,11 @@ def test_simple_with_performance(
 def test_simple_without_performance(
     capture_events, init_celery, celery_invocation, send_default_pii
 ):
-    celery = init_celery(traces_sample_rate=None, send_default_pii=send_default_pii)
+    celery = init_celery(
+        traces_sample_rate=None,
+        send_default_pii=send_default_pii,
+        trace_lifecycle="stream",
+    )
     events = capture_events()
 
     @celery.task(name="dummy_task")
@@ -402,18 +406,18 @@ def test_no_double_patching(celery):
 
 
 def test_simple_no_propagation(capture_events, init_celery):
-    celery = init_celery(propagate_traces=False)
+    celery = init_celery(propagate_traces=False, trace_lifecycle="stream")
     events = capture_events()
 
     @celery.task(name="dummy_task")
     def dummy_task():
         1 / 0
 
-    with sentry_sdk.start_transaction() as transaction:
+    with sentry_sdk.traces.start_span(name="segment") as segment:
         dummy_task.delay()
 
     (event,) = events
-    assert event["contexts"]["trace"]["trace_id"] != transaction.trace_id
+    assert event["contexts"]["trace"]["trace_id"] != segment.trace_id
     assert event["transaction"] == "dummy_task"
     (exception,) = event["exception"]["values"]
     assert exception["type"] == "ZeroDivisionError"
@@ -466,61 +470,6 @@ def test_retry(celery, capture_events):
 
     for e in exceptions:
         assert e["type"] == "ZeroDivisionError"
-
-
-@pytest.mark.skip(
-    reason="This test is hanging when running test with `tox --parallel auto`. TODO: Figure out why and fix it!"
-)
-@pytest.mark.forked
-def test_redis_backend_trace_propagation(init_celery, capture_events_forksafe):
-    celery = init_celery(traces_sample_rate=1.0, backend="redis")
-
-    events = capture_events_forksafe()
-
-    runs = []
-
-    @celery.task(name="dummy_task", bind=True)
-    def dummy_task(self):
-        runs.append(1)
-        1 / 0
-
-    with sentry_sdk.start_transaction(name="submit_celery"):
-        # Curious: Cannot use delay() here or py2.7-celery-4.2 crashes
-        res = dummy_task.apply_async()
-
-    with pytest.raises(Exception):  # noqa: B017
-        # Celery 4.1 raises a gibberish exception
-        res.wait()
-
-    # if this is nonempty, the worker never really forked
-    assert not runs
-
-    submit_transaction = events.read_event()
-    assert submit_transaction["type"] == "transaction"
-    assert submit_transaction["transaction"] == "submit_celery"
-
-    assert len(submit_transaction["spans"]), (
-        4
-    )  # Because redis integration was auto enabled
-    span = submit_transaction["spans"][0]
-    assert span["op"] == "queue.submit.celery"
-    assert span["description"] == "dummy_task"
-
-    event = events.read_event()
-    (exception,) = event["exception"]["values"]
-    assert exception["type"] == "ZeroDivisionError"
-
-    transaction = events.read_event()
-    assert (
-        transaction["contexts"]["trace"]["trace_id"]
-        == event["contexts"]["trace"]["trace_id"]
-        == submit_transaction["contexts"]["trace"]["trace_id"]
-    )
-
-    events.read_flush()
-
-    # if this is nonempty, the worker never really forked
-    assert not runs
 
 
 @pytest.mark.forked
@@ -591,7 +540,9 @@ def test_traces_sampler_gets_task_info_in_sampling_context(
     )
 
 
-def test_abstract_task(capture_events, celery, celery_invocation):
+def test_abstract_task(sentry_init, capture_events, celery, celery_invocation):
+    sentry_init(trace_lifecycle="stream")
+
     events = capture_events()
 
     class AbstractTask(celery.Task):
@@ -607,7 +558,7 @@ def test_abstract_task(capture_events, celery, celery_invocation):
     def dummy_task(x, y):
         return x / y
 
-    with sentry_sdk.start_transaction():
+    with sentry_sdk.traces.start_span(name="task"):
         celery_invocation(dummy_task, 1, 0)
 
     assert not events
@@ -642,7 +593,9 @@ def test_task_headers(celery):
 
 
 def test_baggage_propagation(init_celery):
-    celery = init_celery(traces_sample_rate=1.0, release="abcdef")
+    celery = init_celery(
+        traces_sample_rate=1.0, trace_lifecycle="stream", release="abcdef"
+    )
 
     @celery.task(name="dummy_task", bind=True)
     def dummy_task(self, x, y):
@@ -650,7 +603,7 @@ def test_baggage_propagation(init_celery):
 
     # patch random.randrange to return a predictable sample_rand value
     with mock.patch("sentry_sdk.tracing_utils.Random.randrange", return_value=500000):
-        with sentry_sdk.start_transaction() as transaction:
+        with sentry_sdk.traces.start_span(name="segment") as segment:
             result = dummy_task.apply_async(
                 args=(1, 0),
                 headers={"baggage": "custom=value"},
@@ -659,12 +612,13 @@ def test_baggage_propagation(init_celery):
             assert sorted(result["baggage"].split(",")) == sorted(
                 [
                     "sentry-release=abcdef",
-                    "sentry-trace_id={}".format(transaction.trace_id),
+                    "sentry-trace_id={}".format(segment.trace_id),
                     "sentry-environment=production",
                     "sentry-sample_rand=0.500000",
                     "sentry-sample_rate=1.0",
                     "sentry-sampled=true",
                     "custom=value",
+                    "sentry-transaction=segment",
                 ]
             )
 
