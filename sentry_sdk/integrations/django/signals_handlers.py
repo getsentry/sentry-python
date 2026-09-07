@@ -18,8 +18,6 @@ def _get_receiver_name(receiver: "Callable[..., Any]") -> str:
 
     if hasattr(receiver, "__qualname__"):
         name = receiver.__qualname__
-    elif hasattr(receiver, "__name__"):  # Python 2.7 has no __qualname__
-        name = receiver.__name__
     elif hasattr(
         receiver, "func"
     ):  # certain functions (like partials) dont have a name

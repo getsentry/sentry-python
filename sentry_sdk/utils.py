@@ -144,7 +144,7 @@ def get_git_revision() -> "Optional[str]":
                 .strip()
                 .decode("utf-8")
             )
-    except (OSError, IOError, FileNotFoundError):
+    except OSError:
         return None
 
     return revision
@@ -484,7 +484,7 @@ def get_lines_from_file(
     if loader is not None and hasattr(loader, "get_source"):
         try:
             source_str: "Optional[str]" = loader.get_source(module)
-        except (ImportError, IOError):
+        except (ImportError, OSError):
             source_str = None
         if source_str is not None:
             source = source_str.splitlines()
@@ -492,7 +492,7 @@ def get_lines_from_file(
     if source is None:
         try:
             source = linecache.getlines(filename)
-        except (OSError, IOError):
+        except OSError:
             return [], None, []
 
     if not source:
@@ -1527,8 +1527,6 @@ def qualname_from_function(func: "Callable[..., Any]") -> "Optional[str]":
 
     if hasattr(func, "__qualname__"):
         func_qualname = func.__qualname__
-    elif hasattr(func, "__name__"):
-        func_qualname = func.__name__
 
     if func_qualname is not None:
         if hasattr(func, "__module__") and isinstance(func.__module__, str):
