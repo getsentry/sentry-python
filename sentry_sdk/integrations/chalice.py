@@ -6,6 +6,7 @@ from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_ve
 from sentry_sdk.integrations._wsgi_common import _filter_headers
 from sentry_sdk.integrations.aws_lambda import _make_request_event_processor
 from sentry_sdk.traces import (
+    SegmentNameSource,
     SpanStatus,
     StreamedSpan,
 )
@@ -75,6 +76,11 @@ def _get_view_function_response(
                         configured_time,
                     )
                 )
+
+            scope.set_transaction_name(
+                app.lambda_context.function_name,
+                source=SegmentNameSource.COMPONENT,
+            )
 
             current_span = sentry_sdk.traces.get_current_span()
             segment = None
