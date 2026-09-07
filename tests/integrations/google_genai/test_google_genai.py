@@ -2439,7 +2439,6 @@ DATA_COLLECTION_EMBED_EXPECTED_VALUES = {
 )
 def test_generate_content_data_collection(
     sentry_init,
-    capture_events,
     capture_items,
     mock_genai_client,
     data_collection,
@@ -2554,7 +2553,6 @@ def test_generate_content_data_collection(
 )
 def test_generate_content_data_collection_tools(
     sentry_init,
-    capture_events,
     capture_items,
     mock_genai_client,
     data_collection,
@@ -2736,7 +2734,6 @@ def test_generate_content_data_collection_tools(
 )
 def test_streaming_generate_content_data_collection(
     sentry_init,
-    capture_events,
     capture_items,
     mock_genai_client,
     data_collection,
@@ -2882,7 +2879,6 @@ def test_streaming_generate_content_data_collection(
 )
 def test_streaming_generate_content_data_collection_tools(
     sentry_init,
-    capture_events,
     capture_items,
     mock_genai_client,
     data_collection,
@@ -3053,7 +3049,6 @@ def test_streaming_generate_content_data_collection_tools(
 )
 def test_embed_content_data_collection(
     sentry_init,
-    capture_events,
     capture_items,
     mock_genai_client,
     data_collection,
@@ -3196,7 +3191,6 @@ def test_embed_content_data_collection(
 )
 async def test_async_generate_content_data_collection(
     sentry_init,
-    capture_events,
     capture_items,
     mock_genai_client,
     data_collection,
@@ -3324,7 +3318,6 @@ async def test_async_generate_content_data_collection(
 )
 async def test_async_embed_content_data_collection(
     sentry_init,
-    capture_events,
     capture_items,
     mock_genai_client,
     data_collection,
