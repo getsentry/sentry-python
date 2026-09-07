@@ -154,12 +154,15 @@ def patch_redis_async_client(
 
         try:
             value = await old_execute_command(self, name, *args, **kwargs)
+
+            if cache_span:
+                _set_cache_data(cache_span, self, cache_properties, value)
+
             return value
         finally:
             db_span.end()
 
             if cache_span:
-                _set_cache_data(cache_span, self, cache_properties, value)
                 cache_span.end()
 
     cls.execute_command = _sentry_execute_command  # type: ignore
