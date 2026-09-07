@@ -3621,6 +3621,8 @@ def test_langchain_error(
 
         error = events[0]
     assert error["level"] == "error"
+    assert error["exception"]["values"][0]["mechanism"]["type"] == "langchain"
+    assert not error["exception"]["values"][0]["mechanism"]["handled"]
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
@@ -3691,6 +3693,8 @@ def test_span_status_error(
 
         (error,) = (item.payload for item in items if item.type == "event")
         assert error["level"] == "error"
+        assert error["exception"]["values"][0]["mechanism"]["type"] == "langchain"
+        assert not error["exception"]["values"][0]["mechanism"]["handled"]
         sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
         assert spans[0]["status"] == "error"
@@ -3728,6 +3732,8 @@ def test_span_status_error(
 
         (error,) = (item.payload for item in items if item.type == "event")
         assert error["level"] == "error"
+        assert error["exception"]["values"][0]["mechanism"]["type"] == "langchain"
+        assert not error["exception"]["values"][0]["mechanism"]["handled"]
         sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
         assert spans[0]["status"] == "error"
@@ -3766,8 +3772,85 @@ def test_span_status_error(
 
         (error, transaction) = events
         assert error["level"] == "error"
+        assert error["exception"]["values"][0]["mechanism"]["type"] == "langchain"
+        assert not error["exception"]["values"][0]["mechanism"]["handled"]
         assert transaction["spans"][0]["status"] == "internal_error"
         assert transaction["spans"][0]["tags"]["status"] == "internal_error"
+
+
+@tool
+def failing_tool(word: str) -> int:
+    """Raises instead of returning a length."""
+    raise ValueError("Tool execution failed")
+
+
+@pytest.mark.skipif(
+    LANGCHAIN_VERSION < (1,),
+    reason="LangChain 1.0+ required (ONE AGENT refactor)",
+)
+def test_langchain_tool_error(
+    sentry_init,
+    capture_events,
+    get_model_response,
+    nonstreaming_responses_tool_call_model_responses,
+):
+    sentry_init(
+        integrations=[LangchainIntegration(include_prompts=True)],
+        disabled_integrations=[StdlibIntegration],
+        traces_sample_rate=1.0,
+    )
+
+    responses = nonstreaming_responses_tool_call_model_responses(
+        tool_name="failing_tool",
+        arguments='{"word": "eudca"}',
+        response_model="gpt-4-0613",
+        response_text="",
+        response_ids=iter(["resp_1"]),
+        usages=iter(
+            [
+                ResponseUsage(
+                    input_tokens=0,
+                    input_tokens_details=InputTokensDetails(
+                        cached_tokens=0,
+                        cache_write_tokens=0,
+                    ),
+                    output_tokens=0,
+                    output_tokens_details=OutputTokensDetails(
+                        reasoning_tokens=0,
+                    ),
+                    total_tokens=0,
+                ),
+            ]
+        ),
+    )
+    tool_response = get_model_response(
+        next(responses),
+        serialize_pydantic=True,
+        request_headers={
+            "X-Stainless-Raw-Response": "True",
+        },
+    )
+
+    llm = ChatOpenAI(
+        model_name="gpt-4",
+        temperature=0,
+        openai_api_key="badkey",
+        use_responses_api=True,
+    )
+    agent = create_agent(model=llm, tools=[failing_tool], name="failing_agent")
+
+    events = capture_events()
+
+    with patch.object(
+        llm.client._client._client, "send", side_effect=[tool_response]
+    ), start_transaction(name="tx"), pytest.raises(ValueError):
+        agent.invoke({"messages": [HumanMessage(content="hi")]})
+
+    error_events = [event for event in events if event.get("level") == "error"]
+    assert len(error_events) == 1
+    assert error_events[0]["exception"]["values"][0]["type"] == "ValueError"
+    assert error_events[0]["exception"]["values"][0]["mechanism"]["type"] == "langchain"
+    assert not error_events[0]["exception"]["values"][0]["mechanism"]["handled"]
 
 
 def test_manual_callback_no_duplication(sentry_init):
