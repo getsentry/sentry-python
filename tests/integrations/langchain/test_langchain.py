@@ -327,18 +327,18 @@ def test_langchain_text_completion(
         max_tokens=100,
         openai_api_key="badkey",
     )
-    items = capture_items("transaction", "span")
+    items = capture_items("span")
 
     with patch.object(
         model.client._client._client,
         "send",
         return_value=model_response,
-    ) as _, sentry_sdk.traces.start_span(name="custom parent"):
+    ):
         input_text = "What is the capital of France?"
         model.invoke(input_text, config={"run_name": "my-snazzy-pipeline"})
 
     sentry_sdk.flush()
-    spans = [item.payload for item in items if item.type == "span"]
+    spans = [item.payload for item in items]
     llm_spans = [
         span
         for span in spans
@@ -600,13 +600,13 @@ def test_langchain_create_agent(
         system_prompt=SystemMessage(content=system_instructions_content),
         name="word_length_agent",
     )
-    items = capture_items("transaction", "span")
+    items = capture_items("span")
 
     with patch.object(
         llm.client._client._client,
         "send",
         return_value=model_response,
-    ) as _, sentry_sdk.traces.start_span(name="custom parent"):
+    ):
         agent.invoke(
             {
                 "messages": [
@@ -619,7 +619,7 @@ def test_langchain_create_agent(
         )
 
     sentry_sdk.flush()
-    spans = [item.payload for item in items if item.type == "span"]
+    spans = [item.payload for item in items]
     assert spans[2]["attributes"]["sentry.origin"] == "manual"
     chat_spans = list(
         x for x in spans if x["attributes"].get("sentry.op") == "gen_ai.chat"
@@ -775,13 +775,13 @@ def test_tool_execution_span(
         tools=[get_word_length],
         name="word_length_agent",
     )
-    items = capture_items("transaction", "span")
+    items = capture_items("span")
 
     with patch.object(
         llm.client._client._client,
         "send",
         side_effect=[tool_response, final_response],
-    ) as _, sentry_sdk.traces.start_span(name="custom parent"):
+    ):
         agent.invoke(
             {
                 "messages": [
@@ -791,7 +791,7 @@ def test_tool_execution_span(
         )
 
     sentry_sdk.flush()
-    spans = [item.payload for item in items if item.type == "span"]
+    spans = [item.payload for item in items]
     assert spans[4]["attributes"]["sentry.origin"] == "manual"
     chat_spans = list(
         x for x in spans if x["attributes"].get("sentry.op") == "gen_ai.chat"
@@ -962,13 +962,13 @@ def test_langchain_openai_tools_agent_no_prompts(
     agent = create_openai_tools_agent(llm, [get_word_length], prompt)
 
     agent_executor = AgentExecutor(agent=agent, tools=[get_word_length], verbose=True)
-    items = capture_items("transaction", "span")
+    items = capture_items("span")
 
     with patch.object(
         llm.client._client._client,
         "send",
         side_effect=[tool_response, final_response],
-    ) as _, sentry_sdk.traces.start_span(name="custom parent"):
+    ):
         list(
             agent_executor.invoke(
                 {"input": "How many letters in the word eudca"},
@@ -977,7 +977,7 @@ def test_langchain_openai_tools_agent_no_prompts(
         )
 
     sentry_sdk.flush()
-    spans = [item.payload for item in items if item.type == "span"]
+    spans = [item.payload for item in items]
     assert spans[4]["attributes"]["sentry.origin"] == "manual"
     invoke_agent_span = next(
         x for x in spans if x["attributes"].get("sentry.op") == "gen_ai.invoke_agent"
@@ -1169,13 +1169,13 @@ def test_langchain_openai_tools_agent(
     agent = create_openai_tools_agent(llm, [get_word_length], prompt)
 
     agent_executor = AgentExecutor(agent=agent, tools=[get_word_length], verbose=True)
-    items = capture_items("transaction", "span")
+    items = capture_items("span")
 
     with patch.object(
         llm.client._client._client,
         "send",
         side_effect=[tool_response, final_response],
-    ) as _, sentry_sdk.traces.start_span(name="custom parent"):
+    ):
         list(
             agent_executor.stream(
                 {
@@ -1188,7 +1188,7 @@ def test_langchain_openai_tools_agent(
         )
 
     sentry_sdk.flush()
-    spans = [item.payload for item in items if item.type == "span"]
+    spans = [item.payload for item in items]
     assert spans[4]["attributes"]["sentry.origin"] == "manual"
     invoke_agent_span = next(
         x for x in spans if x["attributes"].get("sentry.op") == "gen_ai.invoke_agent"
@@ -1341,13 +1341,13 @@ def test_langchain_openai_tools_agent_with_config(
     )
 
     agent_executor = AgentExecutor(agent=agent, tools=[get_word_length], verbose=True)
-    items = capture_items("transaction", "span")
+    items = capture_items("span")
 
     with patch.object(
         llm.client._client._client,
         "send",
         side_effect=[tool_response, final_response],
-    ) as _, sentry_sdk.traces.start_span(name="custom parent"):
+    ):
         list(
             agent_executor.invoke(
                 {"input": "How many letters in the word eudca"},
@@ -1355,7 +1355,7 @@ def test_langchain_openai_tools_agent_with_config(
         )
 
     sentry_sdk.flush()
-    spans = [item.payload for item in items if item.type == "span"]
+    spans = [item.payload for item in items]
     assert spans[4]["attributes"]["sentry.origin"] == "manual"
     invoke_agent_span = next(
         x for x in spans if x["attributes"].get("sentry.op") == "gen_ai.invoke_agent"
@@ -1427,13 +1427,13 @@ def test_langchain_openai_tools_agent_stream_no_prompts(
     agent = create_openai_tools_agent(llm, [get_word_length], prompt)
 
     agent_executor = AgentExecutor(agent=agent, tools=[get_word_length], verbose=True)
-    items = capture_items("transaction", "span")
+    items = capture_items("span")
 
     with patch.object(
         llm.client._client._client,
         "send",
         side_effect=[tool_response, final_response],
-    ) as _, sentry_sdk.traces.start_span(name="custom parent"):
+    ):
         list(
             agent_executor.stream(
                 {"input": "How many letters in the word eudca"},
@@ -1442,7 +1442,7 @@ def test_langchain_openai_tools_agent_stream_no_prompts(
         )
 
     sentry_sdk.flush()
-    spans = [item.payload for item in items if item.type == "span"]
+    spans = [item.payload for item in items]
     assert spans[4]["attributes"]["sentry.origin"] == "manual"
     invoke_agent_span = next(
         x for x in spans if x["attributes"].get("sentry.op") == "gen_ai.invoke_agent"
@@ -1464,7 +1464,7 @@ def test_langchain_openai_tools_agent_stream_no_prompts(
     assert invoke_agent_span["attributes"]["gen_ai.function_id"] == "my-snazzy-pipeline"
 
     sentry_sdk.flush()
-    spans = [item.payload for item in items if item.type == "span"]
+    spans = [item.payload for item in items]
     # We can't guarantee anything about the "shape" of the langchain execution graph
     assert (
         len(list(x for x in spans if x["attributes"].get("sentry.op") == "gen_ai.chat"))
@@ -1638,13 +1638,13 @@ def test_langchain_openai_tools_agent_stream(
     agent = create_openai_tools_agent(llm, [get_word_length], prompt)
 
     agent_executor = AgentExecutor(agent=agent, tools=[get_word_length], verbose=True)
-    items = capture_items("transaction", "span")
+    items = capture_items("span")
 
     with patch.object(
         llm.client._client._client,
         "send",
         side_effect=[tool_response, final_response],
-    ) as _, sentry_sdk.traces.start_span(name="custom parent"):
+    ):
         list(
             agent_executor.stream(
                 {
@@ -1658,7 +1658,7 @@ def test_langchain_openai_tools_agent_stream(
         )
 
     sentry_sdk.flush()
-    spans = [item.payload for item in items if item.type == "span"]
+    spans = [item.payload for item in items]
     assert spans[4]["attributes"]["sentry.origin"] == "manual"
     invoke_agent_span = next(
         x for x in spans if x["attributes"].get("sentry.op") == "gen_ai.invoke_agent"
@@ -1813,13 +1813,13 @@ def test_langchain_openai_tools_agent_stream_with_config(
     )
 
     agent_executor = AgentExecutor(agent=agent, tools=[get_word_length], verbose=True)
-    items = capture_items("transaction", "span")
+    items = capture_items("span")
 
     with patch.object(
         llm.client._client._client,
         "send",
         side_effect=[tool_response, final_response],
-    ) as _, sentry_sdk.traces.start_span(name="custom parent"):
+    ):
         list(
             agent_executor.stream(
                 {"input": "How many letters in the word eudca"},
@@ -1827,7 +1827,7 @@ def test_langchain_openai_tools_agent_stream_with_config(
         )
 
     sentry_sdk.flush()
-    spans = [item.payload for item in items if item.type == "span"]
+    spans = [item.payload for item in items]
     assert spans[4]["attributes"]["sentry.origin"] == "manual"
     invoke_agent_span = next(
         x for x in spans if x["attributes"]["sentry.op"] == "gen_ai.invoke_agent"
@@ -1920,7 +1920,7 @@ def test_span_status_error(
         traces_sample_rate=1.0,
         trace_lifecycle="stream",
     )
-    items = capture_items("event", "transaction", "span")
+    items = capture_items("event", "span")
 
     prompt = ChatPromptTemplate.from_messages(
         [
