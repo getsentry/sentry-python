@@ -345,6 +345,7 @@ async def _tool_handler_wrapper(
             result = func(*original_args, **original_kwargs)
             if force_await or inspect.isawaitable(result):
                 result = await result
+
         except Exception as e:
             with capture_internal_exceptions():
                 _capture_exception(e)
@@ -547,6 +548,7 @@ async def _prompt_handler_wrapper(
             result = func(*original_args, **original_kwargs)
             if force_await or inspect.isawaitable(result):
                 result = await result
+
         except Exception as e:
             with capture_internal_exceptions():
                 _capture_exception(e)
@@ -829,6 +831,7 @@ async def _resource_handler_wrapper(
             result = func(*original_args, **original_kwargs)
             if force_await or inspect.isawaitable(result):
                 result = await result
+
         except Exception as e:
             with capture_internal_exceptions():
                 _capture_exception(e)
