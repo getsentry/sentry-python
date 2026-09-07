@@ -884,6 +884,7 @@ async def _instrument_v2_resource_read(
 
         try:
             result = await call_next(ctx)
+
         except Exception as e:
             with capture_internal_exceptions():
                 _capture_exception(e)
