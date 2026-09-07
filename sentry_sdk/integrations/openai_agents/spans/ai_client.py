@@ -205,8 +205,6 @@ def ai_client_span(
     model_name = None
     if agent.model:
         model_name = agent.model.model if hasattr(agent.model, "model") else agent.model
-    elif hasattr(agent, "_sentry_request_model"):
-        model_name = agent._sentry_request_model
 
     client_options = sentry_sdk.get_client().options
 
