@@ -152,14 +152,14 @@ def patch_redis_async_client(
         set_db_data_fn(db_span, self)
         _set_client_data(db_span, is_cluster, name, *args)
 
-        value = await old_execute_command(self, name, *args, **kwargs)
+        try:
+            value = await old_execute_command(self, name, *args, **kwargs)
+            return value
+        finally:
+            db_span.end()
 
-        db_span.end()
-
-        if cache_span:
-            _set_cache_data(cache_span, self, cache_properties, value)
-            cache_span.end()
-
-        return value
+            if cache_span:
+                _set_cache_data(cache_span, self, cache_properties, value)
+                cache_span.end()
 
     cls.execute_command = _sentry_execute_command  # type: ignore
