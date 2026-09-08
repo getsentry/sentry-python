@@ -6,11 +6,11 @@ from http.client import HTTPConnection, HTTPResponse
 from typing import TYPE_CHECKING
 
 import sentry_sdk
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.consts import _SENTRY_HEADER_NAMES, OP, SPANDATA
 from sentry_sdk.integrations import Integration
 from sentry_sdk.scope import add_global_event_processor
 from sentry_sdk.traces import StreamedSpan
-from sentry_sdk.tracing import BAGGAGE_HEADER_NAME, SENTRY_TRACE_HEADER_NAME, Span
+from sentry_sdk.tracing import SENTRY_TRACE_HEADER_NAME, Span
 from sentry_sdk.tracing_utils import (
     EnvironHeaders,
     add_http_breadcrumb,
@@ -42,9 +42,6 @@ _RUNTIME_CONTEXT: "dict[str, object]" = {
     "version": "%s.%s.%s" % (sys.version_info[:3]),
     "build": sys.version,
 }
-
-_SENTRY_HEADER_NAMES = frozenset((BAGGAGE_HEADER_NAME, SENTRY_TRACE_HEADER_NAME))
-
 try:
     from botocore.awsrequest import AWSHTTPConnection, AWSHTTPSConnection
 except ImportError:

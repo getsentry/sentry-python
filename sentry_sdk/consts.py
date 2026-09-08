@@ -7,6 +7,8 @@ DEFAULT_MAX_VALUE_LENGTH = None
 DEFAULT_MAX_STACK_FRAMES = 100
 DEFAULT_ADD_FULL_STACK = False
 
+_SENTRY_HEADER_NAMES = frozenset(("baggage", "sentry-trace"))
+
 
 # Also needs to be at the top to prevent circular import
 class EndpointType(Enum):
@@ -1846,4 +1848,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "2.69.0"
+VERSION = "2.69.1"

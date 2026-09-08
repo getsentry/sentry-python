@@ -875,7 +875,9 @@ async def test_crumb_capture_client_error_span_streaming(
 
 
 @pytest.mark.asyncio
-async def test_outgoing_trace_headers(sentry_init, aiohttp_raw_server, aiohttp_client):
+async def test_outgoing_trace_headers_adds_missing_unsigned_propagation_headers(
+    sentry_init, aiohttp_raw_server, aiohttp_client
+):
     sentry_init(
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
@@ -903,10 +905,11 @@ async def test_outgoing_trace_headers(sentry_init, aiohttp_raw_server, aiohttp_c
             parent_span_id=request_span.span_id,
             sampled=1,
         )
+        assert resp.request_info.headers["baggage"].count("sentry-trace_id=") == 1
 
 
 @pytest.mark.asyncio
-async def test_outgoing_trace_headers_append_to_baggage(
+async def test_outgoing_trace_headers_appends_baggage_but_preserves_sentry_trace(
     sentry_init, aiohttp_raw_server, aiohttp_client
 ):
     sentry_init(
@@ -927,12 +930,94 @@ async def test_outgoing_trace_headers_append_to_baggage(
             trace_id="0123456789012345678901234567890",
         ):
             client = await aiohttp_client(raw_server)
-            resp = await client.get("/", headers={"bagGage": "custom=value"})
+            resp = await client.get(
+                "/",
+                headers={
+                    "bagGage": "custom=value",
+                    "Sentry-Trace": "existing-trace",
+                },
+            )
 
             assert (
                 resp.request_info.headers["baggage"]
                 == "custom=value,sentry-trace_id=0123456789012345678901234567890,sentry-sample_rand=0.500000,sentry-environment=production,sentry-release=d08ebdb9309e1b004c6f52202de58a09c2268e42,sentry-transaction=/interactions/other-dogs/new-dog,sentry-sample_rate=1.0,sentry-sampled=true"
             )
+            # existing `sentry-trace`: leave as-is.
+            assert resp.request_info.headers["sentry-trace"] == "existing-trace"
+
+
+@pytest.mark.asyncio
+async def test_outgoing_trace_headers_preserves_signed_propagation_headers(
+    sentry_init, aiohttp_raw_server, aiohttp_client
+):
+    sentry_init(
+        integrations=[AioHttpIntegration()],
+        traces_sample_rate=1.0,
+    )
+
+    async def handler(request):
+        return web.Response(text="OK")
+
+    raw_server = await aiohttp_raw_server(handler)
+    # both propagation headers are named in `SignedHeaders`.
+    authorization = (
+        "AWS4-HMAC-SHA256 "
+        "Credential=test/20260804/eu-west-1/secretsmanager/aws4_request, "
+        "SignedHeaders=baggage;host;sentry-trace, "
+        "Signature=sixtyseven"
+    )
+
+    with start_transaction(name="test", sampled=True):
+        client = await aiohttp_client(raw_server)
+        resp = await client.get(
+            "/",
+            headers={
+                "baggage": "vendor=value",
+                "sentry-trace": "existing-trace",
+                "Authorization": authorization,
+            },
+        )
+
+    headers = resp.request_info.headers
+    # signed `baggage`: leave as-is.
+    assert headers["baggage"] == "vendor=value"
+    # signed `sentry-trace`: leave as-is.
+    assert headers["sentry-trace"] == "existing-trace"
+
+
+@pytest.mark.asyncio
+async def test_outgoing_trace_headers_preserves_query_signed_baggage(
+    sentry_init, aiohttp_raw_server, aiohttp_client
+):
+    sentry_init(
+        integrations=[AioHttpIntegration()],
+        traces_sample_rate=1.0,
+    )
+
+    async def handler(request):
+        return web.Response(text="OK")
+
+    raw_server = await aiohttp_raw_server(handler)
+    path = (
+        "/"
+        "?X-Amz-Algorithm=AWS4-HMAC-SHA256"
+        "&X-Amz-Credential="
+        "test%2F20260804%2Feu-west-1%2Fs3%2Faws4_request"
+        "&X-Amz-Date=20260804T120000Z"
+        "&X-Amz-Expires=60"
+        "&X-Amz-SignedHeaders=baggage%3Bhost"
+        "&X-Amz-Signature=sixtyseven"
+    )
+
+    with start_transaction(name="test", sampled=True):
+        client = await aiohttp_client(raw_server)
+        resp = await client.get(path, headers={"baggage": "vendor=value"})
+
+    headers = resp.request_info.headers
+    # query-signed `baggage`: leave as-is.
+    assert headers["baggage"] == "vendor=value"
+    # unsigned `sentry-trace`: add it.
+    assert "sentry-trace" in headers
 
 
 @pytest.mark.asyncio
