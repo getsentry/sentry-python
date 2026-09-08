@@ -161,7 +161,7 @@ def _wrap_end(f: "Callable[P, T]") -> "Callable[P, T]":
             sentry_sdk.get_isolation_scope().add_breadcrumb(
                 message=query,
                 category="query",
-                data={**breadcrumb_data},
+                data=breadcrumb_data,
             )
 
         span = getattr(instance.connection, "_sentry_span", None)
