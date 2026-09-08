@@ -915,6 +915,7 @@ async def test_outgoing_trace_headers_appends_baggage_but_preserves_sentry_trace
     sentry_init(
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
+        release="d08ebdb9309e1b004c6f52202de58a09c2268e42",
     )
 
     async def handler(request):
@@ -922,22 +923,27 @@ async def test_outgoing_trace_headers_appends_baggage_but_preserves_sentry_trace
 
     raw_server = await aiohttp_raw_server(handler)
 
-    with start_transaction(name="test", sampled=True):
-        client = await aiohttp_client(raw_server)
-        resp = await client.get(
-            "/",
-            headers={
-                "baggage": "vendor=value",
-                "sentry-trace": "existing-trace",
-            },
-        )
+    with mock.patch("sentry_sdk.tracing_utils.Random.randrange", return_value=500000):
+        with start_transaction(
+            name="/interactions/other-dogs/new-dog",
+            op="greeting.sniff",
+            trace_id="0123456789012345678901234567890",
+        ):
+            client = await aiohttp_client(raw_server)
+            resp = await client.get(
+                "/",
+                headers={
+                    "bagGage": "custom=value",
+                    "Sentry-Trace": "existing-trace",
+                },
+            )
 
-    headers = resp.request_info.headers
-    # unsigned `baggage`: append to the existing value.
-    assert headers["baggage"].startswith("vendor=value,")
-    assert headers["baggage"].count("sentry-trace_id=") == 1
-    # existing `sentry-trace`: leave as-is.
-    assert headers["sentry-trace"] == "existing-trace"
+            assert (
+                resp.request_info.headers["baggage"]
+                == "custom=value,sentry-trace_id=0123456789012345678901234567890,sentry-sample_rand=0.500000,sentry-environment=production,sentry-release=d08ebdb9309e1b004c6f52202de58a09c2268e42,sentry-transaction=/interactions/other-dogs/new-dog,sentry-sample_rate=1.0,sentry-sampled=true"
+            )
+            # existing `sentry-trace`: leave as-is.
+            assert resp.request_info.headers["sentry-trace"] == "existing-trace"
 
 
 @pytest.mark.asyncio
