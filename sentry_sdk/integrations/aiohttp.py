@@ -310,7 +310,7 @@ class AioHttpIntegration(Integration):
 
                         return response
 
-        Application._handle = sentry_app_handle
+        Application._handle = sentry_app_handle  # type: ignore[method-assign]
 
         old_urldispatcher_resolve = UrlDispatcher.resolve
 
@@ -350,7 +350,7 @@ class AioHttpIntegration(Integration):
 
             return rv
 
-        UrlDispatcher.resolve = sentry_urldispatcher_resolve
+        UrlDispatcher.resolve = sentry_urldispatcher_resolve  # type: ignore[method-assign]
 
         old_client_session_init = ClientSession.__init__
 
@@ -363,7 +363,7 @@ class AioHttpIntegration(Integration):
             kwargs["trace_configs"] = client_trace_configs
             return old_client_session_init(*args, **kwargs)
 
-        ClientSession.__init__ = init
+        ClientSession.__init__ = init  # type: ignore[method-assign]
 
 
 def create_trace_config() -> "TraceConfig":

@@ -693,6 +693,8 @@ async def test_tool_handler_with_error(
         assert (
             error_payload["exception"]["values"][0]["value"] == "Tool execution failed"
         )
+        assert error_payload["exception"]["values"][0]["mechanism"]["type"] == "mcp"
+        assert not error_payload["exception"]["values"][0]["mechanism"]["handled"]
 
         assert span["status"] == "error"
     else:
@@ -722,6 +724,8 @@ async def test_tool_handler_with_error(
         assert error_event["level"] == "error"
         assert error_event["exception"]["values"][0]["type"] == "ValueError"
         assert error_event["exception"]["values"][0]["value"] == "Tool execution failed"
+        assert error_event["exception"]["values"][0]["mechanism"]["type"] == "mcp"
+        assert not error_event["exception"]["values"][0]["mechanism"]["handled"]
 
         # Check transaction and span
         assert tx["type"] == "transaction"
@@ -1019,6 +1023,8 @@ async def test_prompt_handler_with_error(
 
         assert error_payload["level"] == "error"
         assert error_payload["exception"]["values"][0]["type"] == "RuntimeError"
+        assert error_payload["exception"]["values"][0]["mechanism"]["type"] == "mcp"
+        assert not error_payload["exception"]["values"][0]["mechanism"]["handled"]
         assert span["status"] == "error"
     else:
         events = capture_events()
@@ -1041,6 +1047,8 @@ async def test_prompt_handler_with_error(
 
         assert error_event["level"] == "error"
         assert error_event["exception"]["values"][0]["type"] == "RuntimeError"
+        assert error_event["exception"]["values"][0]["mechanism"]["type"] == "mcp"
+        assert not error_event["exception"]["values"][0]["mechanism"]["handled"]
 
         # Check transaction and span
         assert tx["type"] == "transaction"
@@ -1304,6 +1312,8 @@ async def test_resource_handler_with_error(
 
         assert error_payload["level"] == "error"
         assert error_payload["exception"]["values"][0]["type"] == "FileNotFoundError"
+        assert error_payload["exception"]["values"][0]["mechanism"]["type"] == "mcp"
+        assert not error_payload["exception"]["values"][0]["mechanism"]["handled"]
         assert span["status"] == "error"
     else:
         events = capture_events()
@@ -1323,6 +1333,8 @@ async def test_resource_handler_with_error(
 
         assert error_event["level"] == "error"
         assert error_event["exception"]["values"][0]["type"] == "FileNotFoundError"
+        assert error_event["exception"]["values"][0]["mechanism"]["type"] == "mcp"
+        assert not error_event["exception"]["values"][0]["mechanism"]["handled"]
 
         # Check transaction and span
         assert tx["type"] == "transaction"
@@ -2083,6 +2095,8 @@ async def test_streamable_http_scope_propagation(sentry_init, capture_events, js
 
     error_event = error_events[0]
     assert error_event["exception"]["values"][0]["type"] == "ValueError"
+    assert error_event["exception"]["values"][0]["mechanism"]["type"] == "mcp"
+    assert not error_event["exception"]["values"][0]["mechanism"]["handled"]
 
     # The captured error shares the trace of the MCP transaction, proving the
     # handler executed under the propagated request scope.
