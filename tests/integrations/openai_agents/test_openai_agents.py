@@ -799,7 +799,7 @@ async def test_data_collection_inputs(
 
         assert result is not None
     sentry_sdk.flush()
-    spans = [item.payload for item in items if item.type == "span"]
+    spans = [item.payload for item in items]
     ai_client_span = next(
         span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
     )
@@ -936,7 +936,7 @@ async def test_data_collection_outputs(
             run_config=test_run_config,
         )
     sentry_sdk.flush()
-    spans = [item.payload for item in items if item.type == "span"]
+    spans = [item.payload for item in items]
     chat_span_data = [
         span["attributes"]
         for span in spans
@@ -1755,7 +1755,7 @@ async def test_handoff_span(
             trace_lifecycle="stream",
         )
 
-        items = capture_items("transaction", "span")
+        items = capture_items("span")
 
         result = await agents.Runner.run(
             primary_agent,
@@ -1766,7 +1766,7 @@ async def test_handoff_span(
         assert result is not None
 
     sentry_sdk.flush()
-    spans = [item.payload for item in items if item.type == "span"]
+    spans = [item.payload for item in items]
     handoff_span = next(
         span
         for span in spans
@@ -1890,7 +1890,7 @@ async def test_max_turns_before_handoff_span(
             trace_lifecycle="stream",
         )
 
-        items = capture_items("transaction", "span")
+        items = capture_items("span")
 
         with pytest.raises(MaxTurnsExceeded):
             await agents.Runner.run(
@@ -1901,7 +1901,7 @@ async def test_max_turns_before_handoff_span(
             )
 
     sentry_sdk.flush()
-    spans = [item.payload for item in items if item.type == "span"]
+    spans = [item.payload for item in items]
     handoff_span = next(
         span
         for span in spans
@@ -2550,7 +2550,6 @@ async def test_tool_execution_span_non_pii_data_always_set(
     assert tool_span_data[SPANDATA.GEN_AI_CONVERSATION_ID] == "conv_tool_test_456"
 
 
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 async def test_hosted_mcp_tool_propagation_header_streamed(
     sentry_init,
@@ -2559,7 +2558,6 @@ async def test_hosted_mcp_tool_propagation_header_streamed(
     get_model_response,
     async_iterator,
     server_side_event_chunks,
-    stream_gen_ai_spans,
 ):
     """
     Test responses API is given trace propagation headers with HostedMCPTool.
@@ -2589,7 +2587,6 @@ async def test_hosted_mcp_tool_propagation_header_streamed(
         integrations=[OpenAIAgentsIntegration()],
         traces_sample_rate=1.0,
         release="d08ebdb9309e1b004c6f52202de58a09c2268e42",
-        stream_gen_ai_spans=stream_gen_ai_spans,
         trace_lifecycle="stream",
     )
 
@@ -2732,14 +2729,12 @@ async def test_hosted_mcp_tool_propagation_header_streamed(
         assert hosted_mcp_tool["headers"]["baggage"] == expected_outgoing_baggage
 
 
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 async def test_hosted_mcp_tool_propagation_headers(
     sentry_init,
     capture_items,
     test_agent,
     get_model_response,
-    stream_gen_ai_spans,
 ):
     """
     Test responses API is given trace propagation headers with HostedMCPTool.
@@ -2768,7 +2763,6 @@ async def test_hosted_mcp_tool_propagation_headers(
         integrations=[OpenAIAgentsIntegration()],
         traces_sample_rate=1.0,
         release="d08ebdb9309e1b004c6f52202de58a09c2268e42",
-        stream_gen_ai_spans=stream_gen_ai_spans,
         trace_lifecycle="stream",
     )
 
@@ -3285,7 +3279,7 @@ async def test_tool_execution_error_tracing(
             send_default_pii=True,
             trace_lifecycle="stream",
         )
-        items = capture_items("span", "transaction")
+        items = capture_items("span")
 
         # Note: The agents library catches tool exceptions internally,
         # so we don't expect this to raise
@@ -3296,7 +3290,7 @@ async def test_tool_execution_error_tracing(
         )
 
     sentry_sdk.flush()
-    spans = [item.payload for item in items if item.type == "span"]
+    spans = [item.payload for item in items]
 
     # Find the execute_tool span
     execute_tool_span = None
@@ -3384,7 +3378,7 @@ async def test_invoke_agent_span_includes_usage_data(
             send_default_pii=True,
             trace_lifecycle="stream",
         )
-        items = capture_items("span", "transaction")
+        items = capture_items("span")
 
         result = await agents.Runner.run(
             agent, "Test input", run_config=test_run_config
@@ -3393,7 +3387,7 @@ async def test_invoke_agent_span_includes_usage_data(
         assert result is not None
 
     sentry_sdk.flush()
-    spans = [item.payload for item in items if item.type == "span"]
+    spans = [item.payload for item in items]
     invoke_agent_span = next(
         span
         for span in spans
@@ -3479,7 +3473,7 @@ async def test_ai_client_span_includes_response_model(
             send_default_pii=True,
             trace_lifecycle="stream",
         )
-        items = capture_items("span", "transaction")
+        items = capture_items("span")
 
         result = await agents.Runner.run(
             agent, "Test input", run_config=test_run_config
@@ -3488,7 +3482,7 @@ async def test_ai_client_span_includes_response_model(
         assert result is not None
 
     sentry_sdk.flush()
-    spans = [item.payload for item in items if item.type == "span"]
+    spans = [item.payload for item in items]
     ai_client_span = next(
         span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
     )
@@ -3570,7 +3564,7 @@ async def test_ai_client_span_response_model_with_chat_completions(
             trace_lifecycle="stream",
         )
 
-        items = capture_items("span", "transaction")
+        items = capture_items("span")
 
         result = await agents.Runner.run(
             agent, "Test input", run_config=test_run_config
@@ -3579,7 +3573,7 @@ async def test_ai_client_span_response_model_with_chat_completions(
         assert result is not None
 
     sentry_sdk.flush()
-    spans = [item.payload for item in items if item.type == "span"]
+    spans = [item.payload for item in items]
     ai_client_span = next(
         span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
     )
@@ -3791,7 +3785,7 @@ async def test_invoke_agent_span_includes_response_model(
             trace_lifecycle="stream",
         )
 
-        items = capture_items("span", "transaction")
+        items = capture_items("span")
 
         result = await agents.Runner.run(
             agent, "Test input", run_config=test_run_config
@@ -3800,7 +3794,7 @@ async def test_invoke_agent_span_includes_response_model(
         assert result is not None
 
     sentry_sdk.flush()
-    spans = [item.payload for item in items if item.type == "span"]
+    spans = [item.payload for item in items]
     ai_client_span = next(
         span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
     )
@@ -4036,7 +4030,6 @@ async def test_streaming_span_update_captures_response_data(
         assert span._attributes["gen_ai.response.model"] == "gpt-4-streaming"
 
 
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 async def test_streaming_ttft_on_chat_span(
     sentry_init,
@@ -4045,7 +4038,6 @@ async def test_streaming_ttft_on_chat_span(
     get_model_response,
     async_iterator,
     server_side_event_chunks,
-    stream_gen_ai_spans,
 ):
     """
     Test that time-to-first-token (TTFT) is recorded on chat spans during streaming.
@@ -4071,7 +4063,6 @@ async def test_streaming_ttft_on_chat_span(
     sentry_init(
         integrations=[OpenAIAgentsIntegration()],
         traces_sample_rate=1.0,
-        stream_gen_ai_spans=stream_gen_ai_spans,
         trace_lifecycle="stream",
     )
 
@@ -4173,7 +4164,7 @@ async def test_streaming_ttft_on_chat_span(
         agent_with_tool.model._client._client,
         "send",
         return_value=response,
-    ) as _, sentry_sdk.traces.start_span(name="test_ttft"):
+    ) as _:
         result = agents.Runner.run_streamed(
             agent_with_tool,
             "Please use the simple test tool",

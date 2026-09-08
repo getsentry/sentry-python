@@ -18,14 +18,14 @@ from ..consts import SPAN_ORIGIN
 from ..utils import _set_agent_data, _set_usage_data
 
 if TYPE_CHECKING:
-    from typing import Any, Optional, Union
+    from typing import Any, Optional
 
     import agents
 
 
 def invoke_agent_span(
     context: "agents.RunContextWrapper", agent: "agents.Agent", kwargs: "dict[str, Any]"
-) -> "Union[sentry_sdk.tracing.Span, StreamedSpan]":
+) -> "StreamedSpan":
     client_options = sentry_sdk.get_client().options
 
     span = sentry_sdk.traces.start_span(
@@ -96,7 +96,7 @@ def invoke_agent_span(
 
 
 def update_invoke_agent_span(
-    span: "Union[sentry_sdk.tracing.Span, StreamedSpan]",
+    span: "StreamedSpan",
     context: "Optional[agents.RunContextWrapper]",
     agent: "Optional[agents.Agent]",
     output: "Any" = None,
