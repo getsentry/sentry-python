@@ -4,45 +4,23 @@
 
 ### New Features ✨
 
-#### Data Collection
-
-- Support outgoing_response in http_bodies for GraphQL by @ericapisani in [#7296](https://github.com/getsentry/sentry-python/pull/7296)
-- Support KeyValueCollectionBehaviour for stack_frame_variables by @ericapisani in [#7265](https://github.com/getsentry/sentry-python/pull/7265)
-
-#### Utils
-
-- Filter stack frame variables via data_collection option by @ericapisani in [#7274](https://github.com/getsentry/sentry-python/pull/7274)
-- Respect data_collection.frame_context_lines option by @ericapisani in [#7264](https://github.com/getsentry/sentry-python/pull/7264)
-
 #### Other
 
 - (aiohttp) Add `http.route` attribute by @alexander-alderman-webb in [#7341](https://github.com/getsentry/sentry-python/pull/7341)
-- (boto3) Support data_collection filtering for URL query params by @ericapisani in [#7290](https://github.com/getsentry/sentry-python/pull/7290)
 - (bottle) Add `http.route` attribute by @alexander-alderman-webb in [#7343](https://github.com/getsentry/sentry-python/pull/7343)
 - (clickhouse_driver) Set breadcrumbs in the streaming trace lifecycle by @alexander-alderman-webb in [#7325](https://github.com/getsentry/sentry-python/pull/7325)
-- (cohere) Support data_collection filtering for inputs and outputs by @ericapisani in [#7289](https://github.com/getsentry/sentry-python/pull/7289)
 - (docs) Add Plausible analytics to Sphinx docs by @ericapisani in [#7319](https://github.com/getsentry/sentry-python/pull/7319)
 - (falcon) Add `http.route` attribute by @alexander-alderman-webb in [#7340](https://github.com/getsentry/sentry-python/pull/7340)
 - (fastapi) Add `http.route` attribute by @alexander-alderman-webb in [#7322](https://github.com/getsentry/sentry-python/pull/7322)
 - (flask) Add `http.route` attribute by @alexander-alderman-webb in [#7344](https://github.com/getsentry/sentry-python/pull/7344)
-- (httpx) Support data_collection filtering for URL query params by @ericapisani in [#7286](https://github.com/getsentry/sentry-python/pull/7286)
-- (httpx2) Support data_collection filtering for URL query params by @ericapisani in [#7287](https://github.com/getsentry/sentry-python/pull/7287)
 - (pyramid) Add `http.route` attribute by @alexander-alderman-webb in [#7347](https://github.com/getsentry/sentry-python/pull/7347)
-- (pyreqwest) Support data_collection filtering for URL query params by @ericapisani in [#7288](https://github.com/getsentry/sentry-python/pull/7288)
 - (quart) Add `http.route` attribute by @alexander-alderman-webb in [#7348](https://github.com/getsentry/sentry-python/pull/7348)
 - (sqlalchemy) Add more db system names for span data by @ericapisani in [#7329](https://github.com/getsentry/sentry-python/pull/7329)
 - (starlette) Add `http.route` attribute by @alexander-alderman-webb in [#7338](https://github.com/getsentry/sentry-python/pull/7338)
-- (stdlib) Support data_collection filtering for URL query params by @ericapisani in [#7291](https://github.com/getsentry/sentry-python/pull/7291)
-- (tracing) Gate create_span gen_ai attributes via data_collection by @ericapisani in [#7295](https://github.com/getsentry/sentry-python/pull/7295)
 - (types) Export SpanJSON type by @ericapisani in [#7331](https://github.com/getsentry/sentry-python/pull/7331)
 - Add Python 3.15 to test matrix by @sentrivana in [#7326](https://github.com/getsentry/sentry-python/pull/7326)
 
 ### Bug Fixes 🐛
-
-#### Aiohttp
-
-- Gate server request query_string via data_collection option by @ericapisani in [#7300](https://github.com/getsentry/sentry-python/pull/7300)
-- Gate request body collection on data_collection experiment by @ericapisani in [#7249](https://github.com/getsentry/sentry-python/pull/7249)
 
 #### Mcp
 
@@ -57,35 +35,19 @@
 #### Starlette
 
 - Use `url` transaction source for host routing by @mjq in [#7266](https://github.com/getsentry/sentry-python/pull/7266)
-- Gate request body collection on data_collection experiment by @ericapisani in [#7253](https://github.com/getsentry/sentry-python/pull/7253)
 - Set transaction name on current scope in sync handler by @mjq in [#7201](https://github.com/getsentry/sentry-python/pull/7201)
 
 #### Other
 
-- (aws_lambda) Gate request body collection on data_collection experiment by @ericapisani in [#7258](https://github.com/getsentry/sentry-python/pull/7258)
 - (batcher) Do not let a failed flush kill the flusher thread (#7138) by @zkasuran in [#7186](https://github.com/getsentry/sentry-python/pull/7186)
 - (boto3) Fix botocore SigV4 failures caused by post-sign trace propagation by @pabloDeputter in [#7050](https://github.com/getsentry/sentry-python/pull/7050)
-- (dramatiq) Gate request body collection on data_collection experiment by @ericapisani in [#7250](https://github.com/getsentry/sentry-python/pull/7250)
-- (fastapi) Gate request body collection on data_collection experiment by @ericapisani in [#7252](https://github.com/getsentry/sentry-python/pull/7252)
-- (gcp) Gate request body collection on data_collection experiment by @ericapisani in [#7254](https://github.com/getsentry/sentry-python/pull/7254)
 - (httpx,httpx2) Always capture breadcrumb by @sentrivana in [#7351](https://github.com/getsentry/sentry-python/pull/7351)
-- (integrations) Gate REMOTE_ADDR on data_collection.user_info by @ericapisani in [#7298](https://github.com/getsentry/sentry-python/pull/7298)
-- (litestar) Gate request body collection on data_collection experiment by @ericapisani in [#7259](https://github.com/getsentry/sentry-python/pull/7259)
 - (mcp,langchain) Add mechanism to captured exceptions by @gmassello in [#7226](https://github.com/getsentry/sentry-python/pull/7226)
 - (openai-agents) Use `isinstance` to determine tool type by @alexander-alderman-webb in [#7412](https://github.com/getsentry/sentry-python/pull/7412)
 - (quart) Skip quart-flask-patch and adjust error test for quart>=0.23 by @ericapisani in [#7320](https://github.com/getsentry/sentry-python/pull/7320)
-- (starlite) Gate request body collection on data_collection experiment by @ericapisani in [#7260](https://github.com/getsentry/sentry-python/pull/7260)
 - Allow to correctly compare parsed versions by @sentrivana in [#7184](https://github.com/getsentry/sentry-python/pull/7184)
 
 ### Internal Changes 🔧
-
-#### Deps
-
-- Update anthropics/claude-code-action action to v1.0.207 by @renovate in [#7267](https://github.com/getsentry/sentry-python/pull/7267)
-- Update anthropics/claude-code-action action to v1.0.206 by @renovate in [#7245](https://github.com/getsentry/sentry-python/pull/7245)
-- Lock file maintenance by @renovate in [#7220](https://github.com/getsentry/sentry-python/pull/7220)
-- Update dependency actions/setup-java to v6 by @renovate in [#7242](https://github.com/getsentry/sentry-python/pull/7242)
-- Update github workflows by @renovate in [#7203](https://github.com/getsentry/sentry-python/pull/7203)
 
 #### Openai Agents
 
