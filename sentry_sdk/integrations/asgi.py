@@ -6,6 +6,7 @@ Based on Tom Christie's `sentry-asgi <https://github.com/encode/sentry-asgi>`.
 
 import inspect
 import sys
+from contextlib import nullcontext
 from contextvars import ContextVar
 from copy import deepcopy
 from functools import partial
@@ -50,7 +51,7 @@ from sentry_sdk.utils import (
 )
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, Optional, Tuple
+    from typing import Any, ContextManager, Dict, Optional, Tuple
 
     from sentry_sdk._types import Attributes, Event, Hint
 
@@ -217,7 +218,7 @@ class SentryAsgiMiddleware:
 
                     method = scope.get("method", "").upper()
 
-                    span: "Optional[StreamedSpan]" = None
+                    span: "Optional[ContextManager[Optional[StreamedSpan]]]" = None
                     attributes: "Attributes" = {
                         "sentry.segment.name.source": getattr(
                             transaction_source, "value", transaction_source
@@ -264,24 +265,13 @@ class SentryAsgiMiddleware:
                         )
                         sentry_scope.get_current_scope()._server_segment_span = span
 
-                    if span is None:
-                        try:
-                            if asgi_version == 2:
-                                return await self.app(scope)(receive, send)
-                            else:
-                                return await self.app(scope, receive, send)
-                        except Exception as exc:
-                            exc_info = sys.exc_info()
-                            with capture_internal_exceptions():
-                                self._capture_request_exception(exc)
-                            reraise(*exc_info)
-
-                    with span:
-                        for attribute, value in _get_request_attributes(
-                            scope,
-                            root_path_in_path=self.root_path_in_path,
-                        ).items():
-                            span.set_attribute(attribute, value)
+                    with span or nullcontext() as span:
+                        if span is not None:
+                            for attribute, value in _get_request_attributes(
+                                scope,
+                                root_path_in_path=self.root_path_in_path,
+                            ).items():
+                                span.set_attribute(attribute, value)
 
                         try:
 
@@ -320,27 +310,30 @@ class SentryAsgiMiddleware:
                             reraise(*exc_info)
 
                         finally:
-                            already_set = (
-                                span is not None
-                                and span.name != _DEFAULT_TRANSACTION_NAME
-                                and span.get_attributes().get(
-                                    "sentry.segment.name.source"
+                            if span is not None:
+                                already_set = (
+                                    span is not None
+                                    and span.name != _DEFAULT_TRANSACTION_NAME
+                                    and span.get_attributes().get(
+                                        "sentry.segment.name.source"
+                                    )
+                                    in [
+                                        SegmentNameSource.COMPONENT.value,
+                                        SegmentNameSource.ROUTE.value,
+                                        SegmentNameSource.CUSTOM.value,
+                                    ]
                                 )
-                                in [
-                                    SegmentNameSource.COMPONENT.value,
-                                    SegmentNameSource.ROUTE.value,
-                                    SegmentNameSource.CUSTOM.value,
-                                ]
-                            )
-                            with capture_internal_exceptions():
-                                if not already_set:
-                                    name, source = self._get_segment_name_and_source(
-                                        self.transaction_style, scope
-                                    )
-                                    span.name = name
-                                    span.set_attribute(
-                                        "sentry.segment.name.source", source
-                                    )
+                                with capture_internal_exceptions():
+                                    if not already_set:
+                                        name, source = (
+                                            self._get_segment_name_and_source(
+                                                self.transaction_style, scope
+                                            )
+                                        )
+                                        span.name = name
+                                        span.set_attribute(
+                                            "sentry.segment.name.source", source
+                                        )
         finally:
             _asgi_middleware_applied.set(False)
 
