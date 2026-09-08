@@ -52,7 +52,7 @@ from ..utils import (
 )
 
 if TYPE_CHECKING:
-    from typing import Any, Optional, Union
+    from typing import Any, Optional
 
     from agents import Agent, Tool
 
@@ -198,7 +198,7 @@ def _transform_tool_definitions(tools: "list[Tool]") -> "list[ToolDefinition]":
 
 def ai_client_span(
     agent: "Agent", get_response_kwargs: "dict[str, Any]"
-) -> "Union[sentry_sdk.tracing.Span, StreamedSpan]":
+) -> "StreamedSpan":
     # TODO-anton: implement other types of operations. Now "chat" is hardcoded.
     # Get model name from agent.model or fall back to request model (for when agent.model is None/default)
     model_name = None
