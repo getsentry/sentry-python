@@ -42,6 +42,20 @@ TIMEOUT_WARNING_BUFFER = 1500  # Buffer time required to send timeout warning to
 MILLIS_TO_SECONDS = 1000.0
 
 
+def _get_user_from_event(aws_event: "dict[str, Any]") -> "dict[str, Any]":
+    identity = aws_event.get("requestContext", {}).get("identity")
+    if identity is None:
+        identity = {}
+    user_info: "dict[str, Any]" = {}
+    user_arn = identity.get("userArn")
+    if user_arn is not None:
+        user_info["id"] = user_arn
+    ip = identity.get("sourceIp")
+    if ip is not None:
+        user_info["ip_address"] = ip
+    return user_info
+
+
 def _wrap_init_error(init_error: "F") -> "F":
     @ensure_integration_enabled(AwsLambdaIntegration, init_error)
     def sentry_init_error(*args: "Any", **kwargs: "Any") -> "Any":
@@ -174,33 +188,16 @@ def _wrap_handler(handler: "F") -> "F":
                     elif should_send_default_pii():
                         additional_attributes["url.query"] = urlencode(qs)
 
-            if has_data_collection_enabled(client.options):
-                if client.options["data_collection"]["user_info"]:
-                    identity = request_data.get("requestContext", {}).get("identity")
-                    if identity is None:
-                        identity = {}
-                    user_info: "dict[str, Any]" = {}
-                    user_arn = identity.get("userArn")
-                    if user_arn is not None:
-                        user_info["id"] = user_arn
-                    ip = identity.get("sourceIp")
-                    if ip is not None:
-                        user_info["ip_address"] = ip
+            if not scope._user:
+                if has_data_collection_enabled(client.options):
+                    if client.options["data_collection"]["user_info"]:
+                        user_info = _get_user_from_event(request_data)
+                        if user_info:
+                            scope.set_user(user_info)
+                elif should_send_default_pii():
+                    user_info = _get_user_from_event(request_data)
                     if user_info:
                         scope.set_user(user_info)
-            elif should_send_default_pii():
-                identity = request_data.get("requestContext", {}).get("identity")
-                if identity is None:
-                    identity = {}
-                user_info = {}
-                user_arn = identity.get("userArn")
-                if user_arn is not None:
-                    user_info["id"] = user_arn
-                ip = identity.get("sourceIp")
-                if ip is not None:
-                    user_info["ip_address"] = ip
-                if user_info:
-                    scope.set_user(user_info)
 
             sampling_context = {
                 "aws_event": aws_event,
@@ -413,38 +410,22 @@ def _make_request_event_processor(
         client_options = sentry_sdk.get_client().options
         if has_data_collection_enabled(client_options):
             if client_options["data_collection"]["user_info"]:
-                user_info = sentry_event.setdefault("user", {})
-
-                identity = aws_event.get("requestContext", {}).get("identity")
-                if identity is None:
-                    identity = {}
-
-                id = identity.get("userArn")
-                if id is not None:
-                    user_info.setdefault("id", id)
-
-                ip = identity.get("sourceIp")
-                if ip is not None:
-                    user_info.setdefault("ip_address", ip)
+                extracted_user = _get_user_from_event(aws_event)
+                if extracted_user:
+                    user_info = sentry_event.setdefault("user", {})
+                    for key, value in extracted_user.items():
+                        user_info.setdefault(key, value)
 
             if "incoming_request" in client_options["data_collection"]["http_bodies"]:
                 if "body" in aws_event:
                     request["data"] = aws_event.get("body", "")
 
         elif should_send_default_pii():
-            user_info = sentry_event.setdefault("user", {})
-
-            identity = aws_event.get("requestContext", {}).get("identity")
-            if identity is None:
-                identity = {}
-
-            id = identity.get("userArn")
-            if id is not None:
-                user_info.setdefault("id", id)
-
-            ip = identity.get("sourceIp")
-            if ip is not None:
-                user_info.setdefault("ip_address", ip)
+            extracted_user = _get_user_from_event(aws_event)
+            if extracted_user:
+                user_info = sentry_event.setdefault("user", {})
+                for key, value in extracted_user.items():
+                    user_info.setdefault(key, value)
 
             if "body" in aws_event:
                 request["data"] = aws_event.get("body", "")
