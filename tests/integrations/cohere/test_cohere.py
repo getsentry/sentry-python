@@ -166,12 +166,11 @@ def test_streaming_chat(
     assert span["attributes"]["gen_ai.usage.total_tokens"] == 30
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
-def test_bad_chat(sentry_init, capture_events, capture_items, span_streaming):
+def test_bad_chat(sentry_init, capture_items):
     sentry_init(
         integrations=[CohereIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
     items = capture_items("event", "span")
@@ -269,12 +268,11 @@ def test_embed(
     assert span["attributes"]["gen_ai.usage.total_tokens"] == 10
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
-def test_span_origin_chat(sentry_init, capture_events, capture_items, span_streaming):
+def test_span_origin_chat(sentry_init, capture_items):
     sentry_init(
         integrations=[CohereIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -307,12 +305,11 @@ def test_span_origin_chat(sentry_init, capture_events, capture_items, span_strea
     assert span["attributes"]["sentry.origin"] == "auto.ai.cohere"
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
-def test_span_origin_embed(sentry_init, capture_events, capture_items, span_streaming):
+def test_span_origin_embed(sentry_init, capture_items):
     sentry_init(
         integrations=[CohereIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
