@@ -215,13 +215,13 @@ async def test_http_route(
 
     items = capture_items("span")
 
-    comm = HttpCommunicator(application, "GET", "/projects/1")
+    comm = HttpCommunicator(application, "GET", "async_message")
     await comm.get_response()
     await comm.wait()
 
     sentry_sdk.flush()
     (segment,) = (item.payload for item in items if item.payload.get("is_segment"))
-    assert segment["attributes"][SPANDATA.HTTP_ROUTE] == "/projects/{project_id}"
+    assert segment["attributes"][SPANDATA.HTTP_ROUTE] == "async_message"
 
 
 @pytest.mark.parametrize("application", APPS)
