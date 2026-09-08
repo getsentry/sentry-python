@@ -6,7 +6,6 @@ Based on Tom Christie's `sentry-asgi <https://github.com/encode/sentry-asgi>`.
 
 import inspect
 import sys
-from contextlib import nullcontext
 from contextvars import ContextVar
 from copy import deepcopy
 from functools import partial
@@ -265,7 +264,19 @@ class SentryAsgiMiddleware:
                         )
                         sentry_scope.get_current_scope()._server_segment_span = span
 
-                    with span or nullcontext() as span:
+                    if span is None:
+                        try:
+                            if asgi_version == 2:
+                                return await self.app(scope)(receive, send)
+                            else:
+                                return await self.app(scope, receive, send)
+                        except Exception as exc:
+                            exc_info = sys.exc_info()
+                            with capture_internal_exceptions():
+                                self._capture_request_exception(exc)
+                            reraise(*exc_info)
+
+                    with span:
                         for attribute, value in _get_request_attributes(
                             scope,
                             root_path_in_path=self.root_path_in_path,
