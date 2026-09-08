@@ -591,12 +591,9 @@ class Scope:
         if not has_tracing_enabled(client.options):
             return self.get_active_propagation_context().to_traceparent()
 
-        span_streaming = has_span_streaming_enabled(client.options)
         # If we have an active span, return traceparent from there
-        if span_streaming and self.streamed_span is not None:
+        if self.streamed_span is not None:
             return self.streamed_span._to_traceparent()
-        elif not span_streaming and self.span is not None:
-            return self.span._to_traceparent()
 
         # else return traceparent from the propagation context
         return self.get_active_propagation_context().to_traceparent()
@@ -611,12 +608,9 @@ class Scope:
         if not has_tracing_enabled(client.options):
             return self.get_active_propagation_context().get_baggage()
 
-        span_streaming = has_span_streaming_enabled(client.options)
         # If we have an active span, return baggage from there
-        if span_streaming and self.streamed_span is not None:
+        if self.streamed_span is not None:
             return self.streamed_span._to_baggage()
-        elif not span_streaming and self.span is not None:
-            return self.span._to_baggage()
 
         # else return baggage from the propagation context
         return self.get_active_propagation_context().get_baggage()
@@ -686,8 +680,7 @@ class Scope:
 
         span = kwargs.pop("span", None)
         if not span:
-            span_streaming = has_span_streaming_enabled(client.options)
-            span = self.streamed_span if span_streaming else self.span
+            span = self.streamed_span
 
         if (
             has_tracing_enabled(client.options)
@@ -1458,9 +1451,6 @@ class Scope:
             return
 
         client = self.get_client()
-        if not has_span_streaming_enabled(client.options):
-            return
-
         merged_scope = self._merge_scopes()
         client._capture_span(span, scope=merged_scope)
 
