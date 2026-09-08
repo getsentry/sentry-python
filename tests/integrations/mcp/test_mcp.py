@@ -1578,6 +1578,7 @@ async def test_streamable_http_scope_propagation(sentry_init, capture_items, jso
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
+        trace_lifecycle="stream",
     )
 
     server = Server("test-server")
