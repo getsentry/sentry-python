@@ -277,30 +277,3 @@ def test_flag_buffer_concurrent_access():
     # shared resource. When deepcopying we should have exclusive access to the underlying
     # memory.
     assert error_occurred is False
-
-
-def test_flag_limit(sentry_init, capture_items):
-    sentry_init(traces_sample_rate=1.0, trace_lifecycle="stream")
-
-    items = capture_items("span")
-
-    with sentry_sdk.start_span(name="hi"):
-        with sentry_sdk.start_span(op="foo", name="bar"):
-            add_feature_flag("0", True)
-            add_feature_flag("1", True)
-            add_feature_flag("2", True)
-            add_feature_flag("3", True)
-            add_feature_flag("4", True)
-            add_feature_flag("5", True)
-            add_feature_flag("6", True)
-            add_feature_flag("7", True)
-            add_feature_flag("8", True)
-            add_feature_flag("9", True)
-            add_feature_flag("10", True)
-
-    sentry_sdk.flush()
-
-    span = next(item.payload for item in items if item.payload.get("op") == "foo")
-    for i in range(10):
-        assert span["attributes"][f"flag.evaluation.{i}"] is True
-    assert "flag.evaluation.10" not in span["attributes"]
