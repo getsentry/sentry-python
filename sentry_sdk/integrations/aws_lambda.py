@@ -45,14 +45,18 @@ MILLIS_TO_SECONDS = 1000.0
 def _get_user_from_event(aws_event: "dict[str, Any]") -> "dict[str, Any]":
     identity = aws_event.get("requestContext", {}).get("identity")
     if identity is None:
-        identity = {}
+        return {}
+
     user_info: "dict[str, Any]" = {}
+
     user_arn = identity.get("userArn")
     if user_arn is not None:
         user_info["id"] = user_arn
+
     ip = identity.get("sourceIp")
     if ip is not None:
         user_info["ip_address"] = ip
+
     return user_info
 
 
