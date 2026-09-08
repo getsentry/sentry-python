@@ -443,7 +443,11 @@ async def test_websocket(
 async def test_auto_session_tracking_with_aggregates(
     sentry_init, asgi3_app, capture_envelopes
 ):
-    sentry_init(send_default_pii=True, traces_sample_rate=1.0)
+    sentry_init(
+        send_default_pii=True,
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+    )
     app = SentryAsgiMiddleware(asgi3_app)
 
     scope = {
@@ -683,6 +687,7 @@ async def test_get_request_data_url_with_filtered_host(
     # substituted "[Filtered]" value.
     sentry_init(
         traces_sample_rate=1.0,
+        trace_lifecycle="stream",
         _experiments={
             "data_collection": {
                 "http_headers": {"request": {"mode": "allowlist", "terms": []}}
@@ -856,7 +861,7 @@ def _http_scope():
 async def test_get_request_data_query_string_data_collection(
     sentry_init, capture_events, asgi3_app, init_kwargs, expected_query_string
 ):
-    sentry_init(traces_sample_rate=1.0, **init_kwargs)
+    sentry_init(traces_sample_rate=1.0, trace_lifecycle="stream", **init_kwargs)
     app = SentryAsgiMiddleware(asgi3_app)
 
     events = capture_events()
@@ -879,7 +884,11 @@ async def test_get_request_data_query_string_empty_legacy_is_none(
     sentry_init, capture_events, asgi3_app
 ):
     # Legacy path: the query string is always set even when empty (``None``).
-    sentry_init(send_default_pii=True, traces_sample_rate=1.0)
+    sentry_init(
+        send_default_pii=True,
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+    )
     app = SentryAsgiMiddleware(asgi3_app)
 
     events = capture_events()
@@ -896,7 +905,11 @@ async def test_get_request_data_query_string_empty_legacy_is_none(
 async def test_get_request_data_empty_query_string_dropped_with_data_collection(
     sentry_init, capture_events, asgi3_app
 ):
-    sentry_init(traces_sample_rate=1.0, _experiments={"data_collection": {}})
+    sentry_init(
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+        _experiments={"data_collection": {}},
+    )
     app = SentryAsgiMiddleware(asgi3_app)
 
     events = capture_events()
@@ -1057,7 +1070,7 @@ USER_INFO_CASES = [
 async def test_get_request_data_env_user_info(
     sentry_init, capture_events, asgi3_app, init_kwargs, has_client, expect_ip
 ):
-    sentry_init(traces_sample_rate=1.0, **init_kwargs)
+    sentry_init(traces_sample_rate=1.0, trace_lifecycle="stream", **init_kwargs)
     app = SentryAsgiMiddleware(asgi3_app)
 
     scope = _http_scope()
