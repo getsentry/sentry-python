@@ -117,7 +117,4 @@ def update_invoke_agent_span(
     # Add conversation ID from agent
     conv_id = getattr(agent, "_sentry_conversation_id", None)
     if conv_id:
-        if isinstance(span, StreamedSpan):
-            span.set_attribute(SPANDATA.GEN_AI_CONVERSATION_ID, conv_id)
-        else:
-            span.set_data(SPANDATA.GEN_AI_CONVERSATION_ID, conv_id)
+        span.set_attribute(SPANDATA.GEN_AI_CONVERSATION_ID, conv_id)
