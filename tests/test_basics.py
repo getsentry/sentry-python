@@ -843,7 +843,8 @@ def _hello_world(word):
     return "Hello, {}".format(word)
 
 
-def test_functions_to_trace(sentry_init, capture_events):
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_functions_to_trace(sentry_init, capture_events, capture_items, span_streaming):
     functions_to_trace = [
         {"qualified_name": "tests.test_basics._hello_world"},
         {"qualified_name": "time.sleep"},
@@ -857,27 +858,48 @@ def test_functions_to_trace(sentry_init, capture_events):
         sentry_init(
             traces_sample_rate=1.0,
             functions_to_trace=functions_to_trace,
+            trace_lifecycle="stream" if span_streaming else "static",
         )
 
-        events = capture_events()
+        if span_streaming:
+            items = capture_items("span")
+        else:
+            events = capture_events()
 
-        with start_transaction(name="something"):
-            time.sleep(0)
+        if span_streaming:
+            with sentry_sdk.traces.start_span(name="something"):
+                time.sleep(0)
 
-            for word in ["World", "You"]:
-                _hello_world(word)
+                for word in ["World", "You"]:
+                    _hello_world(word)
+
+            sentry_sdk.flush()
+            spans = [item.payload for item in items]
+            child_spans = [s for s in spans if not s.get("is_segment")]
+            child_spans.sort(key=lambda s: s["start_timestamp"])
+
+            assert len(child_spans) == 3
+            assert child_spans[0]["name"] == "time.sleep"
+            assert child_spans[1]["name"] == "tests.test_basics._hello_world"
+            assert child_spans[2]["name"] == "tests.test_basics._hello_world"
+        else:
+            with start_transaction(name="something"):
+                time.sleep(0)
+
+                for word in ["World", "You"]:
+                    _hello_world(word)
+
+            assert len(events) == 1
+
+            (event,) = events
+
+            assert len(event["spans"]) == 3
+            assert event["spans"][0]["description"] == "time.sleep"
+            assert event["spans"][1]["description"] == "tests.test_basics._hello_world"
+            assert event["spans"][2]["description"] == "tests.test_basics._hello_world"
     finally:
         _hello_world = original_hello_world
         time.sleep = original_sleep
-
-    assert len(events) == 1
-
-    (event,) = events
-
-    assert len(event["spans"]) == 3
-    assert event["spans"][0]["description"] == "time.sleep"
-    assert event["spans"][1]["description"] == "tests.test_basics._hello_world"
-    assert event["spans"][2]["description"] == "tests.test_basics._hello_world"
 
 
 class WorldGreeter:
@@ -888,7 +910,10 @@ class WorldGreeter:
         return "Hello, {}".format(new_word if new_word else self.word)
 
 
-def test_functions_to_trace_with_class(sentry_init, capture_events):
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_functions_to_trace_with_class(
+    sentry_init, capture_events, capture_items, span_streaming
+):
     functions_to_trace = [
         {"qualified_name": "tests.test_basics.WorldGreeter.greet"},
     ]
@@ -899,24 +924,48 @@ def test_functions_to_trace_with_class(sentry_init, capture_events):
         sentry_init(
             traces_sample_rate=1.0,
             functions_to_trace=functions_to_trace,
+            trace_lifecycle="stream" if span_streaming else "static",
         )
 
-        events = capture_events()
+        if span_streaming:
+            items = capture_items("span")
+        else:
+            events = capture_events()
 
-        with start_transaction(name="something"):
-            wg = WorldGreeter("World")
-            wg.greet()
-            wg.greet("You")
+        if span_streaming:
+            with sentry_sdk.traces.start_span(name="something"):
+                wg = WorldGreeter("World")
+                wg.greet()
+                wg.greet("You")
+
+            sentry_sdk.flush()
+            spans = [item.payload for item in items]
+            child_spans = [s for s in spans if not s.get("is_segment")]
+
+            assert len(child_spans) == 2
+            assert child_spans[0]["name"] == "tests.test_basics.WorldGreeter.greet"
+            assert child_spans[1]["name"] == "tests.test_basics.WorldGreeter.greet"
+        else:
+            with start_transaction(name="something"):
+                wg = WorldGreeter("World")
+                wg.greet()
+                wg.greet("You")
+
+            assert len(events) == 1
+
+            (event,) = events
+
+            assert len(event["spans"]) == 2
+            assert (
+                event["spans"][0]["description"]
+                == "tests.test_basics.WorldGreeter.greet"
+            )
+            assert (
+                event["spans"][1]["description"]
+                == "tests.test_basics.WorldGreeter.greet"
+            )
     finally:
         WorldGreeter.greet = original_function
-
-    assert len(events) == 1
-
-    (event,) = events
-
-    assert len(event["spans"]) == 2
-    assert event["spans"][0]["description"] == "tests.test_basics.WorldGreeter.greet"
-    assert event["spans"][1]["description"] == "tests.test_basics.WorldGreeter.greet"
 
 
 def test_multiple_setup_integrations_calls():
@@ -939,98 +988,166 @@ class TracingTestClass:
 
 # We need to fork here because the test modifies tests.test_basics.TracingTestClass
 @pytest.mark.forked
-def test_staticmethod_class_tracing(sentry_init, capture_events):
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_staticmethod_class_tracing(
+    sentry_init, capture_events, capture_items, span_streaming
+):
     sentry_init(
         debug=True,
         traces_sample_rate=1.0,
         functions_to_trace=[
             {"qualified_name": "tests.test_basics.TracingTestClass.static"}
         ],
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
-    events = capture_events()
+    if span_streaming:
+        items = capture_items("span")
 
-    with sentry_sdk.start_transaction(name="test"):
-        assert TracingTestClass.static(1) == 1
+        with sentry_sdk.traces.start_span(name="test"):
+            assert TracingTestClass.static(1) == 1
 
-    (event,) = events
-    assert event["type"] == "transaction"
-    assert event["transaction"] == "test"
+        sentry_sdk.flush()
+        spans = [item.payload for item in items]
+        child_spans = [s for s in spans if not s.get("is_segment")]
 
-    (span,) = event["spans"]
-    assert span["description"] == "tests.test_basics.TracingTestClass.static"
+        assert len(child_spans) == 1
+        assert child_spans[0]["name"] == "tests.test_basics.TracingTestClass.static"
+    else:
+        events = capture_events()
+
+        with sentry_sdk.start_transaction(name="test"):
+            assert TracingTestClass.static(1) == 1
+
+        (event,) = events
+        assert event["type"] == "transaction"
+        assert event["transaction"] == "test"
+
+        (span,) = event["spans"]
+        assert span["description"] == "tests.test_basics.TracingTestClass.static"
 
 
 # We need to fork here because the test modifies tests.test_basics.TracingTestClass
 @pytest.mark.forked
-def test_staticmethod_instance_tracing(sentry_init, capture_events):
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_staticmethod_instance_tracing(
+    sentry_init, capture_events, capture_items, span_streaming
+):
     sentry_init(
         debug=True,
         traces_sample_rate=1.0,
         functions_to_trace=[
             {"qualified_name": "tests.test_basics.TracingTestClass.static"}
         ],
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
-    events = capture_events()
+    if span_streaming:
+        items = capture_items("span")
 
-    with sentry_sdk.start_transaction(name="test"):
-        assert TracingTestClass().static(1) == 1
+        with sentry_sdk.traces.start_span(name="test"):
+            assert TracingTestClass().static(1) == 1
 
-    (event,) = events
-    assert event["type"] == "transaction"
-    assert event["transaction"] == "test"
+        sentry_sdk.flush()
+        spans = [item.payload for item in items]
+        child_spans = [s for s in spans if not s.get("is_segment")]
 
-    (span,) = event["spans"]
-    assert span["description"] == "tests.test_basics.TracingTestClass.static"
+        assert len(child_spans) == 1
+        assert child_spans[0]["name"] == "tests.test_basics.TracingTestClass.static"
+    else:
+        events = capture_events()
+
+        with sentry_sdk.start_transaction(name="test"):
+            assert TracingTestClass().static(1) == 1
+
+        (event,) = events
+        assert event["type"] == "transaction"
+        assert event["transaction"] == "test"
+
+        (span,) = event["spans"]
+        assert span["description"] == "tests.test_basics.TracingTestClass.static"
 
 
 # We need to fork here because the test modifies tests.test_basics.TracingTestClass
 @pytest.mark.forked
-def test_classmethod_class_tracing(sentry_init, capture_events):
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_classmethod_class_tracing(
+    sentry_init, capture_events, capture_items, span_streaming
+):
     sentry_init(
         debug=True,
         traces_sample_rate=1.0,
         functions_to_trace=[
             {"qualified_name": "tests.test_basics.TracingTestClass.class_"}
         ],
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
-    events = capture_events()
+    if span_streaming:
+        items = capture_items("span")
 
-    with sentry_sdk.start_transaction(name="test"):
-        assert TracingTestClass.class_(1) == (TracingTestClass, 1)
+        with sentry_sdk.traces.start_span(name="test"):
+            assert TracingTestClass.class_(1) == (TracingTestClass, 1)
 
-    (event,) = events
-    assert event["type"] == "transaction"
-    assert event["transaction"] == "test"
+        sentry_sdk.flush()
+        spans = [item.payload for item in items]
+        child_spans = [s for s in spans if not s.get("is_segment")]
 
-    (span,) = event["spans"]
-    assert span["description"] == "tests.test_basics.TracingTestClass.class_"
+        assert len(child_spans) == 1
+        assert child_spans[0]["name"] == "tests.test_basics.TracingTestClass.class_"
+    else:
+        events = capture_events()
+
+        with sentry_sdk.start_transaction(name="test"):
+            assert TracingTestClass.class_(1) == (TracingTestClass, 1)
+
+        (event,) = events
+        assert event["type"] == "transaction"
+        assert event["transaction"] == "test"
+
+        (span,) = event["spans"]
+        assert span["description"] == "tests.test_basics.TracingTestClass.class_"
 
 
 # We need to fork here because the test modifies tests.test_basics.TracingTestClass
 @pytest.mark.forked
-def test_classmethod_instance_tracing(sentry_init, capture_events):
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_classmethod_instance_tracing(
+    sentry_init, capture_events, capture_items, span_streaming
+):
     sentry_init(
         debug=True,
         traces_sample_rate=1.0,
         functions_to_trace=[
             {"qualified_name": "tests.test_basics.TracingTestClass.class_"}
         ],
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
-    events = capture_events()
+    if span_streaming:
+        items = capture_items("span")
 
-    with sentry_sdk.start_transaction(name="test"):
-        assert TracingTestClass().class_(1) == (TracingTestClass, 1)
+        with sentry_sdk.traces.start_span(name="test"):
+            assert TracingTestClass().class_(1) == (TracingTestClass, 1)
 
-    (event,) = events
-    assert event["type"] == "transaction"
-    assert event["transaction"] == "test"
+        sentry_sdk.flush()
+        spans = [item.payload for item in items]
+        child_spans = [s for s in spans if not s.get("is_segment")]
 
-    (span,) = event["spans"]
-    assert span["description"] == "tests.test_basics.TracingTestClass.class_"
+        assert len(child_spans) == 1
+        assert child_spans[0]["name"] == "tests.test_basics.TracingTestClass.class_"
+    else:
+        events = capture_events()
+
+        with sentry_sdk.start_transaction(name="test"):
+            assert TracingTestClass().class_(1) == (TracingTestClass, 1)
+
+        (event,) = events
+        assert event["type"] == "transaction"
+        assert event["transaction"] == "test"
+
+        (span,) = event["spans"]
+        assert span["description"] == "tests.test_basics.TracingTestClass.class_"
 
 
 def test_functions_to_trace_no_dot_does_not_crash(sentry_init):
