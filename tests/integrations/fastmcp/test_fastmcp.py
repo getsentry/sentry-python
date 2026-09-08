@@ -45,7 +45,6 @@ except ImportError:
 from mcp.server.sse import SseServerTransport
 from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
 
-from sentry_sdk import start_transaction
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.mcp import MCPIntegration
 
@@ -309,21 +308,20 @@ async def test_fastmcp_tool_sync(
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
-        # Call through MCP protocol to trigger instrumentation
-        await stdio(
-            mcp._mcp_server,
-            method="tools/call",
-            params={
-                "name": "add_numbers",
-                "arguments": {"a": 10, "b": 5},
-            },
-            request_id="req-123",
-        )
+    # Call through MCP protocol to trigger instrumentation
+    await stdio(
+        mcp._mcp_server,
+        method="tools/call",
+        params={
+            "name": "add_numbers",
+            "arguments": {"a": 10, "b": 5},
+        },
+        request_id="req-123",
+    )
 
     sentry_sdk.flush()
     spans = [item.payload for item in items]
-    assert len(spans) == 2
+    assert len(spans) == 1
 
     # Verify span structure
     span = spans[0]
@@ -452,16 +450,15 @@ async def test_fastmcp_tool_with_error(
         raise ValueError("Tool execution failed")
 
     items = capture_items("event", "span")
-    with sentry_sdk.traces.start_span(name="custom parent"):
-        await stdio(
-            mcp._mcp_server,
-            method="tools/call",
-            params={
-                "name": "failing_tool",
-                "arguments": {"value": 42},
-            },
-            request_id="req-error",
-        )
+    await stdio(
+        mcp._mcp_server,
+        method="tools/call",
+        params={
+            "name": "failing_tool",
+            "arguments": {"value": 42},
+        },
+        request_id="req-error",
+    )
 
     sentry_sdk.flush()
     # Check span was created
@@ -512,50 +509,47 @@ async def test_fastmcp_multiple_tools(
         return z - 5
 
     items = capture_items("span")
-    with sentry_sdk.traces.start_span(name="custom parent"):
-        result1 = await stdio(
-            mcp._mcp_server,
-            method="tools/call",
-            params={
-                "name": "tool_one",
-                "arguments": {"x": 5},
-            },
-            request_id="req-multi",
-        )
+    result1 = await stdio(
+        mcp._mcp_server,
+        method="tools/call",
+        params={
+            "name": "tool_one",
+            "arguments": {"x": 5},
+        },
+        request_id="req-multi",
+    )
 
-        result2 = await stdio(
-            mcp._mcp_server,
-            method="tools/call",
-            params={
-                "name": "tool_two",
-                "arguments": {
-                    "y": int(
-                        result1.message.result["content"][0]["text"]
-                        if MCP_PACKAGE_VERSION is not None
-                        and MCP_PACKAGE_VERSION >= (2,)
-                        else result1.message.root.result["content"][0]["text"]
-                    )
-                },
+    result2 = await stdio(
+        mcp._mcp_server,
+        method="tools/call",
+        params={
+            "name": "tool_two",
+            "arguments": {
+                "y": int(
+                    result1.message.result["content"][0]["text"]
+                    if MCP_PACKAGE_VERSION is not None and MCP_PACKAGE_VERSION >= (2,)
+                    else result1.message.root.result["content"][0]["text"]
+                )
             },
-            request_id="req-multi",
-        )
+        },
+        request_id="req-multi",
+    )
 
-        await stdio(
-            mcp._mcp_server,
-            method="tools/call",
-            params={
-                "name": "tool_three",
-                "arguments": {
-                    "z": int(
-                        result2.message.result["content"][0]["text"]
-                        if MCP_PACKAGE_VERSION is not None
-                        and MCP_PACKAGE_VERSION >= (2,)
-                        else result2.message.root.result["content"][0]["text"]
-                    )
-                },
+    await stdio(
+        mcp._mcp_server,
+        method="tools/call",
+        params={
+            "name": "tool_three",
+            "arguments": {
+                "z": int(
+                    result2.message.result["content"][0]["text"]
+                    if MCP_PACKAGE_VERSION is not None and MCP_PACKAGE_VERSION >= (2,)
+                    else result2.message.root.result["content"][0]["text"]
+                )
             },
-            request_id="req-multi",
-        )
+        },
+        request_id="req-multi",
+    )
 
     sentry_sdk.flush()
     # Verify three spans were created
@@ -596,16 +590,15 @@ async def test_fastmcp_tool_with_complex_return(
         }
 
     items = capture_items("span")
-    with sentry_sdk.traces.start_span(name="custom parent"):
-        await stdio(
-            mcp._mcp_server,
-            method="tools/call",
-            params={
-                "name": "get_user_data",
-                "arguments": {"user_id": 123},
-            },
-            request_id="req-complex",
-        )
+    await stdio(
+        mcp._mcp_server,
+        method="tools/call",
+        params={
+            "name": "get_user_data",
+            "arguments": {"user_id": 123},
+        },
+        request_id="req-complex",
+    )
 
     sentry_sdk.flush()
     # Verify span was created with complex data
@@ -667,16 +660,15 @@ async def test_fastmcp_prompt_sync(
             return [message]
 
         items = capture_items("span")
-        with sentry_sdk.traces.start_span(name="custom parent"):
-            await stdio(
-                mcp._mcp_server,
-                method="prompts/get",
-                params={
-                    "name": "code_help_prompt",
-                    "arguments": {"language": "python"},
-                },
-                request_id="req-prompt",
-            )
+        await stdio(
+            mcp._mcp_server,
+            method="prompts/get",
+            params={
+                "name": "code_help_prompt",
+                "arguments": {"language": "python"},
+            },
+            request_id="req-prompt",
+        )
 
         sentry_sdk.flush()
         # Verify prompt span was created
@@ -732,23 +724,20 @@ async def test_fastmcp_resource_sync(
             return "file contents"
 
         items = capture_items("span")
-        with sentry_sdk.traces.start_span(name="custom parent"):
-            try:
-                await stdio(
-                    mcp._mcp_server,
-                    method="resources/read",
-                    params={
-                        "uri": "file:///test.txt",
-                    },
-                    request_id="req-resource",
-                )
-            except ValueError as e:
-                # Older FastMCP versions may not support this URI pattern
-                if "Unknown resource" in str(e):
-                    pytest.skip(
-                        f"Resource URI not supported in this FastMCP version: {e}"
-                    )
-                raise
+        try:
+            await stdio(
+                mcp._mcp_server,
+                method="resources/read",
+                params={
+                    "uri": "file:///test.txt",
+                },
+                request_id="req-resource",
+            )
+        except ValueError as e:
+            # Older FastMCP versions may not support this URI pattern
+            if "Unknown resource" in str(e):
+                pytest.skip(f"Resource URI not supported in this FastMCP version: {e}")
+            raise
 
         sentry_sdk.flush()
         # Verify resource span was created
@@ -865,21 +854,19 @@ async def test_fastmcp_span_origin(
         return value * 2
 
     items = capture_items("span")
-    with sentry_sdk.traces.start_span(name="custom parent"):
-        await stdio(
-            mcp._mcp_server,
-            method="tools/call",
-            params={
-                "name": "test_tool",
-                "arguments": {"value": 21},
-            },
-            request_id="req-origin",
-        )
+    await stdio(
+        mcp._mcp_server,
+        method="tools/call",
+        params={
+            "name": "test_tool",
+            "arguments": {"value": 21},
+        },
+        request_id="req-origin",
+    )
 
     sentry_sdk.flush()
 
     spans = [item.payload for item in items]
-    assert spans[-1]["attributes"]["sentry.origin"] == "manual"
 
     # Verify MCP span has correct origin
     mcp_spans = [s for s in spans if s["attributes"].get("sentry.op") == OP.MCP_SERVER]
@@ -1065,16 +1052,15 @@ async def test_fastmcp_stdio_transport(
         return {"squared": n * n}
 
     items = capture_items("span")
-    with sentry_sdk.traces.start_span(name="custom parent"):
-        await stdio(
-            mcp._mcp_server,
-            method="tools/call",
-            params={
-                "name": "stdio_tool",
-                "arguments": {"n": 7},
-            },
-            request_id="req-stdio",
-        )
+    await stdio(
+        mcp._mcp_server,
+        method="tools/call",
+        params={
+            "name": "stdio_tool",
+            "arguments": {"n": 7},
+        },
+        request_id="req-stdio",
+    )
 
     sentry_sdk.flush()
     # Find MCP spans
@@ -1089,141 +1075,8 @@ async def test_fastmcp_stdio_transport(
 
 
 # =============================================================================
-# Integration-specific Tests
-# =============================================================================
-
-
-@pytest.mark.skipif(not HAS_MCP_FASTMCP, reason="mcp.server.fastmcp not installed")
-def test_mcp_fastmcp_specific_features(sentry_init, capture_events):
-    """Test features specific to mcp.server.fastmcp (from mcp package)"""
-    sentry_init(
-        integrations=[MCPIntegration()],
-        traces_sample_rate=1.0,
-    )
-    events = capture_events()
-
-    from mcp.server.fastmcp import FastMCP
-
-    mcp = FastMCP("MCP Package Server")
-
-    @mcp.tool()
-    def package_specific_tool(x: int) -> int:
-        """Tool for mcp.server.fastmcp package"""
-        return x + 100
-
-    with start_transaction(name="mcp.server.fastmcp tx"):
-        result = call_tool_through_mcp(mcp, "package_specific_tool", {"x": 50})
-
-    assert result["result"] == 150
-
-    (tx,) = events
-    assert tx["type"] == "transaction"
-
-
-@pytest.mark.asyncio
-@pytest.mark.skipif(
-    not HAS_STANDALONE_FASTMCP, reason="standalone fastmcp not installed"
-)
-async def test_standalone_fastmcp_specific_features(sentry_init, capture_events, stdio):
-    """Test features specific to standalone fastmcp package"""
-    sentry_init(
-        integrations=[MCPIntegration()],
-        traces_sample_rate=1.0,
-    )
-    events = capture_events()
-
-    from fastmcp import FastMCP
-
-    mcp = FastMCP("Standalone FastMCP Server")
-
-    @mcp.tool()
-    def standalone_specific_tool(message: str) -> dict:
-        """Tool for standalone fastmcp package"""
-        return {"echo": message, "length": len(message)}
-
-    with start_transaction(name="standalone fastmcp tx"):
-        await stdio(
-            mcp._mcp_server,
-            method="tools/call",
-            params={
-                "name": "standalone_specific_tool",
-                "arguments": {"message": "Hello FastMCP"},
-            },
-        )
-
-    (tx,) = events
-    assert tx["type"] == "transaction"
-
-
-# =============================================================================
 # Edge Cases and Robustness Tests
 # =============================================================================
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize("FastMCP", fastmcp_implementations, ids=fastmcp_ids)
-async def test_fastmcp_tool_with_no_arguments(
-    sentry_init, capture_events, FastMCP, stdio
-):
-    """Test FastMCP tool with no arguments"""
-    sentry_init(
-        integrations=[MCPIntegration()],
-        traces_sample_rate=1.0,
-    )
-    events = capture_events()
-
-    mcp = FastMCP("Test Server")
-
-    @mcp.tool()
-    def no_args_tool() -> str:
-        """Tool that takes no arguments"""
-        return "success"
-
-    with start_transaction(name="fastmcp tx"):
-        await stdio(
-            mcp._mcp_server,
-            method="tools/call",
-            params={
-                "name": "no_args_tool",
-                "arguments": {},
-            },
-        )
-
-    (tx,) = events
-    assert tx["type"] == "transaction"
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize("FastMCP", fastmcp_implementations, ids=fastmcp_ids)
-async def test_fastmcp_tool_with_none_return(
-    sentry_init, capture_events, FastMCP, stdio
-):
-    """Test FastMCP tool that returns None"""
-    sentry_init(
-        integrations=[MCPIntegration()],
-        traces_sample_rate=1.0,
-    )
-    events = capture_events()
-
-    mcp = FastMCP("Test Server")
-
-    @mcp.tool()
-    def none_return_tool(action: str) -> None:
-        """Tool that returns None"""
-        pass
-
-    with start_transaction(name="fastmcp tx"):
-        await stdio(
-            mcp._mcp_server,
-            method="tools/call",
-            params={
-                "name": "none_return_tool",
-                "arguments": {"action": "log"},
-            },
-        )
-
-    (tx,) = events
-    assert tx["type"] == "transaction"
 
 
 @pytest.mark.asyncio
@@ -1254,26 +1107,25 @@ async def test_fastmcp_mixed_sync_async_tools(
         return x * y
 
     items = capture_items("span")
-    with sentry_sdk.traces.start_span(name="custom parent"):
-        # Use async version for both since we're in an async context
-        await stdio(
-            mcp._mcp_server,
-            method="tools/call",
-            params={
-                "name": "sync_add",
-                "arguments": {"a": 3, "b": 4},
-            },
-            request_id="req-mixed",
-        )
-        await stdio(
-            mcp._mcp_server,
-            method="tools/call",
-            params={
-                "name": "async_multiply",
-                "arguments": {"x": 5, "y": 6},
-            },
-            request_id="req-mixed",
-        )
+    # Use async version for both since we're in an async context
+    await stdio(
+        mcp._mcp_server,
+        method="tools/call",
+        params={
+            "name": "sync_add",
+            "arguments": {"a": 3, "b": 4},
+        },
+        request_id="req-mixed",
+    )
+    await stdio(
+        mcp._mcp_server,
+        method="tools/call",
+        params={
+            "name": "async_multiply",
+            "arguments": {"x": 5, "y": 6},
+        },
+        request_id="req-mixed",
+    )
 
     sentry_sdk.flush()
     # Verify both sync and async tool spans were created

@@ -73,7 +73,6 @@ from starlette.routing import Mount, Route
 from starlette.testclient import TestClient
 
 import sentry_sdk
-from sentry_sdk import start_transaction
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.mcp import MCPIntegration
 
@@ -188,13 +187,12 @@ async def test_tool_handler_constructor_registration(sentry_init, capture_items,
 
     server = Server("test-server", on_call_tool=test_tool)
     items = capture_items("span")
-    with sentry_sdk.traces.start_span(name="mcp tx"):
-        await stdio(
-            server,
-            method="tools/call",
-            params={"name": "calculate", "arguments": {"x": 10}},
-            request_id="req-ctor",
-        )
+    await stdio(
+        server,
+        method="tools/call",
+        params={"name": "calculate", "arguments": {"x": 10}},
+        request_id="req-ctor",
+    )
     sentry_sdk.flush()
     span = _find_mcp_span(items, method_name="tools/call")
     assert span is not None
@@ -228,13 +226,12 @@ async def test_mcpserver_high_level_tool_instrumented(
         return a + b
 
     items = capture_items("span")
-    with start_transaction(name="mcp tx"):
-        await stdio(
-            mcp_server._lowlevel_server,
-            method="tools/call",
-            params={"name": "add", "arguments": {"a": 2, "b": 3}},
-            request_id="req-mcpserver",
-        )
+    await stdio(
+        mcp_server._lowlevel_server,
+        method="tools/call",
+        params={"name": "add", "arguments": {"a": 2, "b": 3}},
+        request_id="req-mcpserver",
+    )
 
     sentry_sdk.flush()
     span = _find_mcp_span(items, method_name="tools/call")
@@ -267,13 +264,12 @@ async def test_wrapping_handler_is_idempotent(sentry_init, capture_items, stdio)
     entry = server.get_request_handler("tools/call")
     server.add_request_handler("tools/call", CallToolRequestParams, entry.handler)
     items = capture_items("span")
-    with sentry_sdk.traces.start_span(name="mcp tx"):
-        await stdio(
-            server,
-            method="tools/call",
-            params={"name": "add", "arguments": {}},
-            request_id="req-idempotent",
-        )
+    await stdio(
+        server,
+        method="tools/call",
+        params={"name": "add", "arguments": {}},
+        request_id="req-idempotent",
+    )
     sentry_sdk.flush()
     mcp_spans = [
         item.payload
@@ -328,16 +324,15 @@ async def test_tool_handler_stdio(
             return {"result": "success", "value": 42}
 
     items = capture_items("span")
-    with sentry_sdk.traces.start_span(name="mcp tx"):
-        result = await stdio(
-            server,
-            method="tools/call",
-            params={
-                "name": "calculate",
-                "arguments": {"x": 10, "y": 5},
-            },
-            request_id="req-123",
-        )
+    result = await stdio(
+        server,
+        method="tools/call",
+        params={
+            "name": "calculate",
+            "arguments": {"x": 10, "y": 5},
+        },
+        request_id="req-123",
+    )
     sentry_sdk.flush()
 
     if IS_MCP_V2:
@@ -568,16 +563,15 @@ async def test_tool_handler_with_error(sentry_init, capture_items, stdio):
             raise ValueError("Tool execution failed")
 
     items = capture_items("event", "span")
-    with sentry_sdk.traces.start_span(name="mcp tx"):
-        result = await stdio(
-            server,
-            method="tools/call",
-            params={
-                "name": "bad_tool",
-                "arguments": {},
-            },
-            request_id="req-error",
-        )
+    result = await stdio(
+        server,
+        method="tools/call",
+        params={
+            "name": "bad_tool",
+            "arguments": {},
+        },
+        request_id="req-error",
+    )
     sentry_sdk.flush()
 
     resp = _get_response(result)
@@ -644,16 +638,15 @@ async def test_prompt_handler_stdio(
             return prompt_result
 
     items = capture_items("span")
-    with sentry_sdk.traces.start_span(name="mcp tx"):
-        result = await stdio(
-            server,
-            method="prompts/get",
-            params={
-                "name": "code_help",
-                "arguments": {"language": "python"},
-            },
-            request_id="req-prompt",
-        )
+    result = await stdio(
+        server,
+        method="prompts/get",
+        params={
+            "name": "code_help",
+            "arguments": {"language": "python"},
+        },
+        request_id="req-prompt",
+    )
     sentry_sdk.flush()
 
     assert _get_response(result).result["messages"][0]["role"] == "user"
@@ -803,16 +796,15 @@ async def test_prompt_handler_with_error(sentry_init, capture_items, stdio):
             raise RuntimeError("Prompt not found")
 
     items = capture_items("event", "span")
-    with sentry_sdk.traces.start_span(name="mcp tx"):
-        response = await stdio(
-            server,
-            method="prompts/get",
-            params={
-                "name": "code_help",
-                "arguments": {"language": "python"},
-            },
-            request_id="req-error-prompt",
-        )
+    response = await stdio(
+        server,
+        method="prompts/get",
+        params={
+            "name": "code_help",
+            "arguments": {"language": "python"},
+        },
+        request_id="req-error-prompt",
+    )
     sentry_sdk.flush()
 
     assert _get_response(response).error.message == "Prompt not found"
@@ -867,15 +859,14 @@ async def test_resource_handler_stdio(sentry_init, capture_items, stdio):
             ]
 
     items = capture_items("span")
-    with sentry_sdk.traces.start_span(name="mcp tx"):
-        result = await stdio(
-            server,
-            method="resources/read",
-            params={
-                "uri": "file:///path/to/file.txt",
-            },
-            request_id="req-resource",
-        )
+    result = await stdio(
+        server,
+        method="resources/read",
+        params={
+            "uri": "file:///path/to/file.txt",
+        },
+        request_id="req-resource",
+    )
     sentry_sdk.flush()
 
     assert _get_response(result).result["contents"][0]["text"] == json.dumps(
@@ -1004,15 +995,14 @@ async def test_resource_handler_with_error(sentry_init, capture_items, stdio):
             raise FileNotFoundError("Resource not found")
 
     items = capture_items("event", "span")
-    with sentry_sdk.traces.start_span(name="mcp tx"):
-        await stdio(
-            server,
-            method="resources/read",
-            params={
-                "uri": "file:///missing.txt",
-            },
-            request_id="req-error-resource",
-        )
+    await stdio(
+        server,
+        method="resources/read",
+        params={
+            "uri": "file:///missing.txt",
+        },
+        request_id="req-error-resource",
+    )
     sentry_sdk.flush()
 
     error_payload = next(item.payload for item in items if item.type == "event")
@@ -1066,16 +1056,15 @@ async def test_tool_result_extraction_tuple(
             return (unstructured, structured)
 
     items = capture_items("span")
-    with sentry_sdk.traces.start_span(name="mcp tx"):
-        await stdio(
-            server,
-            method="tools/call",
-            params={
-                "name": "calculate",
-                "arguments": {},
-            },
-            request_id="req-tuple",
-        )
+    await stdio(
+        server,
+        method="tools/call",
+        params={
+            "name": "calculate",
+            "arguments": {},
+        },
+        request_id="req-tuple",
+    )
     sentry_sdk.flush()
 
     span = _find_mcp_span(items, method_name="tools/call")
@@ -1140,16 +1129,15 @@ async def test_tool_result_extraction_unstructured(
             ]
 
     items = capture_items("span")
-    with sentry_sdk.traces.start_span(name="mcp tx"):
-        await stdio(
-            server,
-            method="tools/call",
-            params={
-                "name": "text_tool",
-                "arguments": {},
-            },
-            request_id="req-unstructured",
-        )
+    await stdio(
+        server,
+        method="tools/call",
+        params={
+            "name": "text_tool",
+            "arguments": {},
+        },
+        request_id="req-unstructured",
+    )
     sentry_sdk.flush()
 
     span = _find_mcp_span(items, method_name="tools/call")
@@ -1319,16 +1307,15 @@ async def test_prompt_with_dict_result(
             }
 
     items = capture_items("span")
-    with sentry_sdk.traces.start_span(name="mcp tx"):
-        await stdio(
-            server,
-            method="prompts/get",
-            params={
-                "name": "dict_prompt",
-                "arguments": {},
-            },
-            request_id="req-dict-prompt",
-        )
+    await stdio(
+        server,
+        method="prompts/get",
+        params={
+            "name": "dict_prompt",
+            "arguments": {},
+        },
+        request_id="req-dict-prompt",
+    )
     sentry_sdk.flush()
 
     span = _find_mcp_span(items, method_name="prompts/get")
@@ -1378,16 +1365,15 @@ async def test_tool_with_complex_arguments(sentry_init, capture_items, stdio):
         "number": 42,
     }
     items = capture_items("span")
-    with sentry_sdk.traces.start_span(name="mcp tx"):
-        await stdio(
-            server,
-            method="tools/call",
-            params={
-                "name": "complex_tool",
-                "arguments": complex_args,
-            },
-            request_id="req-complex",
-        )
+    await stdio(
+        server,
+        method="tools/call",
+        params={
+            "name": "complex_tool",
+            "arguments": complex_args,
+        },
+        request_id="req-complex",
+    )
     sentry_sdk.flush()
 
     span = _find_mcp_span(items, method_name="tools/call")
@@ -1713,8 +1699,7 @@ async def test_tool_data_collection_inputs(
         "arguments": {"x": 10, "y": 5},
     }
     items = capture_items("span")
-    with sentry_sdk.traces.start_span(name="mcp tx"):
-        await stdio(server, method="tools/call", params=params, request_id="req-1")
+    await stdio(server, method="tools/call", params=params, request_id="req-1")
     sentry_sdk.flush()
     span = _find_mcp_span(items, method_name="tools/call")
     assert span is not None
@@ -1825,8 +1810,7 @@ async def test_tool_data_collection_outputs(
         "arguments": {"x": 10, "y": 5},
     }
     items = capture_items("span")
-    with sentry_sdk.traces.start_span(name="mcp tx"):
-        await stdio(server, method="tools/call", params=params, request_id="req-1")
+    await stdio(server, method="tools/call", params=params, request_id="req-1")
     sentry_sdk.flush()
     span = _find_mcp_span(items, method_name="tools/call")
     assert span is not None
@@ -1937,10 +1921,7 @@ async def test_prompt_data_collection_inputs(
         "arguments": {"language": "python"},
     }
     items = capture_items("span")
-    with sentry_sdk.traces.start_span(name="mcp tx"):
-        await stdio(
-            server, method="prompts/get", params=params, request_id="req-prompt"
-        )
+    await stdio(server, method="prompts/get", params=params, request_id="req-prompt")
     sentry_sdk.flush()
     span = _find_mcp_span(items, method_name="prompts/get")
     assert span is not None
@@ -1999,8 +1980,7 @@ async def test_include_prompts_ignored_when_data_collection_set(
 
     params = {"name": "calculate", "arguments": {"x": 10}}
     items = capture_items("span")
-    with sentry_sdk.traces.start_span(name="mcp tx"):
-        await stdio(server, method="tools/call", params=params, request_id="req-1")
+    await stdio(server, method="tools/call", params=params, request_id="req-1")
     sentry_sdk.flush()
     span = _find_mcp_span(items, method_name="tools/call")
     assert span is not None
