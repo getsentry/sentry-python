@@ -140,6 +140,7 @@ class CommandTracer(monitoring.CommandListener):
             collection_name = command.get(event.command_name)
             operation_name = event.command_name
 
+            command.pop("lsid", None)
             if has_data_collection_enabled(client.options):
                 if not client.options["data_collection"]["database_query_data"]:
                     command = _strip_pii(command)
