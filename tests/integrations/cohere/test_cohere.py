@@ -249,20 +249,43 @@ def test_streaming_chat(
         assert span["data"]["gen_ai.usage.total_tokens"] == 30
 
 
-def test_bad_chat(sentry_init, capture_events):
-    sentry_init(integrations=[CohereIntegration()], traces_sample_rate=1.0)
-    events = capture_events()
-
-    client = Client(api_key="z")
-    HTTPXClient.request = mock.Mock(
-        side_effect=httpx.HTTPError("API rate limit reached")
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_bad_chat(sentry_init, capture_events, capture_items, span_streaming):
+    sentry_init(
+        integrations=[CohereIntegration()],
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream" if span_streaming else "static",
     )
-    with pytest.raises(httpx.HTTPError):
-        client.chat(model="some-model", message="hello")
 
-    (event, transaction) = events
-    assert event["level"] == "error"
-    assert transaction["contexts"]["trace"]["status"] == "internal_error"
+    if span_streaming:
+        items = capture_items("event", "span")
+
+        client = Client(api_key="z")
+        HTTPXClient.request = mock.Mock(
+            side_effect=httpx.HTTPError("API rate limit reached")
+        )
+        with pytest.raises(httpx.HTTPError):
+            client.chat(model="some-model", message="hello")
+
+        (event,) = (item.payload for item in items if item.type == "event")
+        assert event["level"] == "error"
+
+        sentry_sdk.flush()
+        (span,) = (item.payload for item in items if item.type == "span")
+        assert span["status"] == "error"
+    else:
+        events = capture_events()
+
+        client = Client(api_key="z")
+        HTTPXClient.request = mock.Mock(
+            side_effect=httpx.HTTPError("API rate limit reached")
+        )
+        with pytest.raises(httpx.HTTPError):
+            client.chat(model="some-model", message="hello")
+
+        (event, transaction) = events
+        assert event["level"] == "error"
+        assert transaction["contexts"]["trace"]["status"] == "internal_error"
 
 
 def test_span_status_error(sentry_init, capture_events):
@@ -386,74 +409,138 @@ def test_embed(
         assert span["data"]["gen_ai.usage.total_tokens"] == 10
 
 
-def test_span_origin_chat(sentry_init, capture_events):
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_span_origin_chat(sentry_init, capture_events, capture_items, span_streaming):
     sentry_init(
         integrations=[CohereIntegration()],
         traces_sample_rate=1.0,
+        trace_lifecycle="stream" if span_streaming else "static",
     )
-    events = capture_events()
 
-    client = Client(api_key="z")
-    HTTPXClient.request = mock.Mock(
-        return_value=httpx.Response(
-            200,
-            json={
-                "text": "the model response",
-                "meta": {
-                    "billed_units": {
-                        "output_tokens": 10,
-                        "input_tokens": 20,
-                    }
+    if span_streaming:
+        items = capture_items("span")
+
+        client = Client(api_key="z")
+        HTTPXClient.request = mock.Mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "text": "the model response",
+                    "meta": {
+                        "billed_units": {
+                            "output_tokens": 10,
+                            "input_tokens": 20,
+                        }
+                    },
                 },
-            },
+            )
         )
-    )
 
-    with start_transaction(name="cohere tx"):
-        client.chat(
-            model="some-model",
-            chat_history=[ChatMessage(role="SYSTEM", message="some context")],
-            message="hello",
-        ).text
+        with start_transaction(name="cohere tx"):
+            client.chat(
+                model="some-model",
+                chat_history=[ChatMessage(role="SYSTEM", message="some context")],
+                message="hello",
+            ).text
 
-    (event,) = events
+        sentry_sdk.flush()
+        (span,) = (item.payload for item in items)
+        assert span["attributes"]["sentry.origin"] == "auto.ai.cohere"
+    else:
+        events = capture_events()
 
-    assert event["contexts"]["trace"]["origin"] == "manual"
-    assert event["spans"][0]["origin"] == "auto.ai.cohere"
+        client = Client(api_key="z")
+        HTTPXClient.request = mock.Mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "text": "the model response",
+                    "meta": {
+                        "billed_units": {
+                            "output_tokens": 10,
+                            "input_tokens": 20,
+                        }
+                    },
+                },
+            )
+        )
+
+        with start_transaction(name="cohere tx"):
+            client.chat(
+                model="some-model",
+                chat_history=[ChatMessage(role="SYSTEM", message="some context")],
+                message="hello",
+            ).text
+
+        (event,) = events
+
+        assert event["contexts"]["trace"]["origin"] == "manual"
+        assert event["spans"][0]["origin"] == "auto.ai.cohere"
 
 
-def test_span_origin_embed(sentry_init, capture_events):
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_span_origin_embed(sentry_init, capture_events, capture_items, span_streaming):
     sentry_init(
         integrations=[CohereIntegration()],
         traces_sample_rate=1.0,
+        trace_lifecycle="stream" if span_streaming else "static",
     )
-    events = capture_events()
 
-    client = Client(api_key="z")
-    HTTPXClient.request = mock.Mock(
-        return_value=httpx.Response(
-            200,
-            json={
-                "response_type": "embeddings_floats",
-                "id": "1",
-                "texts": ["hello"],
-                "embeddings": [[1.0, 2.0, 3.0]],
-                "meta": {
-                    "billed_units": {
-                        "input_tokens": 10,
-                    }
+    if span_streaming:
+        items = capture_items("span")
+
+        client = Client(api_key="z")
+        HTTPXClient.request = mock.Mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "response_type": "embeddings_floats",
+                    "id": "1",
+                    "texts": ["hello"],
+                    "embeddings": [[1.0, 2.0, 3.0]],
+                    "meta": {
+                        "billed_units": {
+                            "input_tokens": 10,
+                        }
+                    },
                 },
-            },
+            )
         )
-    )
 
-    with start_transaction(name="cohere tx"):
-        client.embed(texts=["hello"], model="text-embedding-3-large")
+        with start_transaction(name="cohere tx"):
+            client.embed(texts=["hello"], model="text-embedding-3-large")
 
-    (event,) = events
+        sentry_sdk.flush()
+        (span,) = (item.payload for item in items)
+        assert span["attributes"]["sentry.origin"] == "auto.ai.cohere"
+    else:
+        events = capture_events()
 
-    assert event["contexts"]["trace"]["origin"] == "manual"
-    assert event["spans"][0]["origin"] == "auto.ai.cohere"
+        client = Client(api_key="z")
+        HTTPXClient.request = mock.Mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "response_type": "embeddings_floats",
+                    "id": "1",
+                    "texts": ["hello"],
+                    "embeddings": [[1.0, 2.0, 3.0]],
+                    "meta": {
+                        "billed_units": {
+                            "input_tokens": 10,
+                        }
+                    },
+                },
+            )
+        )
+
+        with start_transaction(name="cohere tx"):
+            client.embed(texts=["hello"], model="text-embedding-3-large")
+
+        (event,) = events
+
+        assert event["contexts"]["trace"]["origin"] == "manual"
+        assert event["spans"][0]["origin"] == "auto.ai.cohere"
 
 
 # data_collection config, send_default_pii, include_prompts, expect_inputs, expect_outputs
