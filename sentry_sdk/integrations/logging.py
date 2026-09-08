@@ -395,7 +395,6 @@ class SentryLogsHandler(_BaseHandler):
 
     def emit(self, record: "LogRecord") -> "Any":
         with capture_internal_exceptions():
-            self.format(record)
             if not self._can_record(record):
                 return
 
@@ -420,6 +419,7 @@ class SentryLogsHandler(_BaseHandler):
             if not should_capture_logs:
                 return
 
+            self.format(record)
             self._capture_log_from_record(client, record)
 
     def _capture_log_from_record(
