@@ -200,10 +200,12 @@ def _wrap_handler(handler: "F") -> "F":
                         additional_attributes["url.query"] = urlencode(qs)
 
             if not scope._user:
-                if (
-                    has_data_collection_enabled(client.options)
-                    and client.options["data_collection"]["user_info"]
-                ) or should_send_default_pii():
+                if has_data_collection_enabled(client.options):
+                    if client.options["data_collection"]["user_info"]:
+                        user_info = _get_user_from_event(request_data)
+                        if user_info:
+                            scope.set_user(user_info)
+                elif should_send_default_pii():
                     user_info = _get_user_from_event(request_data)
                     if user_info:
                         scope.set_user(user_info)
