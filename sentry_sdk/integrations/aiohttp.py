@@ -4,7 +4,7 @@ from functools import wraps
 
 import sentry_sdk
 from sentry_sdk.api import continue_trace
-from sentry_sdk.consts import OP, SPANDATA, SPANSTATUS
+from sentry_sdk.consts import _SENTRY_HEADER_NAMES, OP, SPANDATA, SPANSTATUS
 from sentry_sdk.data_collection import (
     _apply_data_collection_filtering_to_query_string,
 )
@@ -84,7 +84,6 @@ if TYPE_CHECKING:
 
 
 TRANSACTION_STYLE_VALUES = ("handler_name", "method_and_path_pattern")
-_SENTRY_HEADER_NAMES = frozenset((BAGGAGE_HEADER_NAME, SENTRY_TRACE_HEADER_NAME))
 
 
 class AioHttpIntegration(Integration):
