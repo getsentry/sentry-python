@@ -3961,6 +3961,7 @@ async def test_tool_execution_span_non_pii_data_always_set(
 @pytest.mark.asyncio
 async def test_hosted_mcp_tool_propagation_header_streamed(
     sentry_init,
+    capture_events,
     test_agent,
     get_model_response,
     async_iterator,
@@ -3994,6 +3995,7 @@ async def test_hosted_mcp_tool_propagation_header_streamed(
         integrations=[OpenAIAgentsIntegration()],
         traces_sample_rate=1.0,
         release="d08ebdb9309e1b004c6f52202de58a09c2268e42",
+        stream_gen_ai_spans=False,
     )
 
     request_headers = {}
@@ -4070,6 +4072,8 @@ async def test_hosted_mcp_tool_propagation_header_streamed(
         request_headers=request_headers,
     )
 
+    events = capture_events()
+
     # Patching https://github.com/openai/openai-python/blob/656e3cab4a18262a49b961d41293367e45ee71b9/src/openai/_base_client.py#L1604
     with patch.object(
         agent_with_tool.model._client._client,
@@ -4092,11 +4096,11 @@ async def test_hosted_mcp_tool_propagation_header_streamed(
             async for event in result.stream_events():
                 pass
 
-            ai_client_span = next(
-                span
-                for span in transaction._span_recorder.spans
-                if span.op == OP.GEN_AI_CHAT
-            )
+        (transaction_event,) = events
+
+        ai_client_span = next(
+            span for span in transaction_event["spans"] if span["op"] == OP.GEN_AI_CHAT
+        )
 
         args, kwargs = create.call_args
 
@@ -4108,7 +4112,7 @@ async def test_hosted_mcp_tool_propagation_header_streamed(
             "sentry-trace"
         ] == "{trace_id}-{parent_span_id}-{sampled}".format(
             trace_id=transaction.trace_id,
-            parent_span_id=ai_client_span.span_id,
+            parent_span_id=ai_client_span["span_id"],
             sampled=1,
         )
 
@@ -4128,7 +4132,7 @@ async def test_hosted_mcp_tool_propagation_header_streamed(
 
 @pytest.mark.asyncio
 async def test_hosted_mcp_tool_propagation_headers(
-    sentry_init, test_agent, get_model_response
+    sentry_init, capture_events, test_agent, get_model_response
 ):
     """
     Test responses API is given trace propagation headers with HostedMCPTool.
@@ -4157,9 +4161,12 @@ async def test_hosted_mcp_tool_propagation_headers(
         integrations=[OpenAIAgentsIntegration()],
         traces_sample_rate=1.0,
         release="d08ebdb9309e1b004c6f52202de58a09c2268e42",
+        stream_gen_ai_spans=False,
     )
 
     response = get_model_response(EXAMPLE_RESPONSE, serialize_pydantic=True)
+
+    events = capture_events()
 
     with patch.object(
         agent_with_tool.model._client._client,
@@ -4179,11 +4186,11 @@ async def test_hosted_mcp_tool_propagation_headers(
                 run_config=test_run_config,
             )
 
-            ai_client_span = next(
-                span
-                for span in transaction._span_recorder.spans
-                if span.op == OP.GEN_AI_CHAT
-            )
+        (transaction_event,) = events
+
+        ai_client_span = next(
+            span for span in transaction_event["spans"] if span["op"] == OP.GEN_AI_CHAT
+        )
 
         args, kwargs = send.call_args
 
@@ -4195,7 +4202,7 @@ async def test_hosted_mcp_tool_propagation_headers(
             "sentry-trace"
         ] == "{trace_id}-{parent_span_id}-{sampled}".format(
             trace_id=transaction.trace_id,
-            parent_span_id=ai_client_span.span_id,
+            parent_span_id=ai_client_span["span_id"],
             sampled=1,
         )
 
@@ -6293,6 +6300,7 @@ async def test_streaming_span_update_captures_response_data(
 @pytest.mark.asyncio
 async def test_streaming_ttft_on_chat_span(
     sentry_init,
+    capture_events,
     test_agent,
     get_model_response,
     async_iterator,
@@ -6322,6 +6330,7 @@ async def test_streaming_ttft_on_chat_span(
     sentry_init(
         integrations=[OpenAIAgentsIntegration()],
         traces_sample_rate=1.0,
+        stream_gen_ai_spans=False,
     )
 
     request_headers = {}
@@ -6416,12 +6425,14 @@ async def test_streaming_ttft_on_chat_span(
         request_headers=request_headers,
     )
 
+    events = capture_events()
+
     # Patching https://github.com/openai/openai-python/blob/656e3cab4a18262a49b961d41293367e45ee71b9/src/openai/_base_client.py#L1604
     with patch.object(
         agent_with_tool.model._client._client,
         "send",
         return_value=response,
-    ) as _, sentry_sdk.start_transaction(name="test_ttft", sampled=True) as transaction:
+    ) as _, sentry_sdk.start_transaction(name="test_ttft", sampled=True):
         result = agents.Runner.run_streamed(
             agent_with_tool,
             "Please use the simple test tool",
@@ -6431,15 +6442,15 @@ async def test_streaming_ttft_on_chat_span(
         async for event in result.stream_events():
             pass
 
-        # Verify TTFT is recorded on the chat span (must be inside transaction context)
-        chat_spans = [
-            s for s in transaction._span_recorder.spans if s.op == "gen_ai.chat"
-        ]
-        assert len(chat_spans) >= 1
-        chat_span = chat_spans[0]
+    (transaction_event,) = events
 
-        assert SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN in chat_span._data
-        assert chat_span._data.get(SPANDATA.GEN_AI_RESPONSE_STREAMING) is True
+    # Verify TTFT is recorded on the chat span
+    chat_spans = [s for s in transaction_event["spans"] if s["op"] == "gen_ai.chat"]
+    assert len(chat_spans) >= 1
+    chat_span = chat_spans[0]
+
+    assert SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN in chat_span["data"]
+    assert chat_span["data"].get(SPANDATA.GEN_AI_RESPONSE_STREAMING) is True
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
