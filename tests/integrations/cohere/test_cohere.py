@@ -7,7 +7,6 @@ from cohere import ChatMessage, Client
 from httpx import Client as HTTPXClient
 
 import sentry_sdk
-from sentry_sdk import start_transaction
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.cohere import CohereIntegration
 
@@ -46,12 +45,11 @@ def test_nonstreaming_chat(
     )
     items = capture_items("span")
 
-    with start_transaction(name="cohere tx"):
-        response = client.chat(
-            model="some-model",
-            chat_history=[ChatMessage(role="SYSTEM", message="some context")],
-            message="hello",
-        ).text
+    response = client.chat(
+        model="some-model",
+        chat_history=[ChatMessage(role="SYSTEM", message="some context")],
+        message="hello",
+    ).text
 
     assert response == "the model response"
     sentry_sdk.flush()
@@ -128,15 +126,14 @@ def test_streaming_chat(
     )
     items = capture_items("span")
 
-    with start_transaction(name="cohere tx"):
-        responses = list(
-            client.chat_stream(
-                model="some-model",
-                chat_history=[ChatMessage(role="SYSTEM", message="some context")],
-                message="hello",
-            )
+    responses = list(
+        client.chat_stream(
+            model="some-model",
+            chat_history=[ChatMessage(role="SYSTEM", message="some context")],
+            message="hello",
         )
-        response_string = responses[-1].response.text
+    )
+    response_string = responses[-1].response.text
 
     assert response_string == "the model response"
     sentry_sdk.flush()
@@ -202,9 +199,8 @@ def test_span_status_error(sentry_init, capture_items):
     HTTPXClient.request = mock.Mock(
         side_effect=httpx.HTTPError("API rate limit reached")
     )
-    with start_transaction(name="test"):
-        with pytest.raises(httpx.HTTPError):
-            client.chat(model="some-model", message="hello")
+    with pytest.raises(httpx.HTTPError):
+        client.chat(model="some-model", message="hello")
 
     sentry_sdk.flush()
 
@@ -249,8 +245,7 @@ def test_embed(
     )
     items = capture_items("span")
 
-    with start_transaction(name="cohere tx"):
-        response = client.embed(texts=["hello"], model="text-embedding-3-large")
+    response = client.embed(texts=["hello"], model="text-embedding-3-large")
 
     assert len(response.embeddings[0]) == 3
     sentry_sdk.flush()
@@ -293,12 +288,11 @@ def test_span_origin_chat(sentry_init, capture_items):
         )
     )
 
-    with start_transaction(name="cohere tx"):
-        client.chat(
-            model="some-model",
-            chat_history=[ChatMessage(role="SYSTEM", message="some context")],
-            message="hello",
-        ).text
+    client.chat(
+        model="some-model",
+        chat_history=[ChatMessage(role="SYSTEM", message="some context")],
+        message="hello",
+    ).text
 
     sentry_sdk.flush()
     (span,) = (item.payload for item in items)
@@ -332,8 +326,7 @@ def test_span_origin_embed(sentry_init, capture_items):
         )
     )
 
-    with start_transaction(name="cohere tx"):
-        client.embed(texts=["hello"], model="text-embedding-3-large")
+    client.embed(texts=["hello"], model="text-embedding-3-large")
 
     sentry_sdk.flush()
     (span,) = (item.payload for item in items)
@@ -465,13 +458,12 @@ def test_nonstreaming_chat_data_collection(
     )
     items = capture_items("span")
 
-    with start_transaction(name="cohere tx"):
-        client.chat(
-            model="some-model",
-            chat_history=[ChatMessage(role="SYSTEM", message="some context")],
-            message="hello",
-            preamble="be concise",
-        )
+    client.chat(
+        model="some-model",
+        chat_history=[ChatMessage(role="SYSTEM", message="some context")],
+        message="hello",
+        preamble="be concise",
+    )
     sentry_sdk.flush()
     assert len(items) == 1
     attributes = items[0].payload["attributes"]
@@ -556,15 +548,14 @@ def test_streaming_chat_data_collection(
     )
     items = capture_items("span")
 
-    with start_transaction(name="cohere tx"):
-        list(
-            client.chat_stream(
-                model="some-model",
-                chat_history=[ChatMessage(role="SYSTEM", message="some context")],
-                message="hello",
-                preamble="be concise",
-            )
+    list(
+        client.chat_stream(
+            model="some-model",
+            chat_history=[ChatMessage(role="SYSTEM", message="some context")],
+            message="hello",
+            preamble="be concise",
         )
+    )
     sentry_sdk.flush()
     assert len(items) == 1
     attributes = items[0].payload["attributes"]
@@ -629,8 +620,7 @@ def test_embed_data_collection(
     )
     items = capture_items("span")
 
-    with start_transaction(name="cohere tx"):
-        client.embed(texts=["hello"], model="text-embedding-3-large")
+    client.embed(texts=["hello"], model="text-embedding-3-large")
     sentry_sdk.flush()
     assert len(items) == 1
     attributes = items[0].payload["attributes"]
