@@ -538,9 +538,17 @@ def _attempt_resolve_again(
 
     route_path = None
     if hasattr(request, "urlconf"):
-        route_path = LEGACY_RESOLVER.resolve(request.path_info, urlconf=request.urlconf)
+        try:
+            route_path = LEGACY_RESOLVER.resolve(
+                request.path_info, urlconf=request.urlconf
+            )
+        except Exception:
+            pass
     else:
-        route_path = LEGACY_RESOLVER.resolve(request.path_info)
+        try:
+            route_path = LEGACY_RESOLVER.resolve(request.path_info)
+        except Exception:
+            pass
 
     server_span = sentry_sdk.get_current_scope()._server_segment_span
     if server_span is not None and route_path is not None:
