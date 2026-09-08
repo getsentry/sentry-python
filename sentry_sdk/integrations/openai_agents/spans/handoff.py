@@ -7,16 +7,20 @@ from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from ..consts import SPAN_ORIGIN
 
 if TYPE_CHECKING:
+    from typing import Optional
+
     import agents
 
 
 def handoff_span(
-    context: "agents.RunContextWrapper", from_agent: "agents.Agent", to_agent_name: str
+    context: "Optional[agents.RunContextWrapper]",
+    from_agent: "Optional[agents.Agent]",
+    to_agent_name: str,
 ) -> None:
     span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
     if span_streaming:
         with sentry_sdk.traces.start_span(
-            name=f"handoff from {from_agent.name} to {to_agent_name}",
+            name=f"handoff from {from_agent.name} to {to_agent_name}",  # type: ignore[union-attr]
             attributes={
                 "sentry.op": OP.GEN_AI_HANDOFF,
                 "sentry.origin": SPAN_ORIGIN,
@@ -30,7 +34,7 @@ def handoff_span(
     else:
         with sentry_sdk.start_span(
             op=OP.GEN_AI_HANDOFF,
-            name=f"handoff from {from_agent.name} to {to_agent_name}",
+            name=f"handoff from {from_agent.name} to {to_agent_name}",  # type: ignore[union-attr]
             origin=SPAN_ORIGIN,
         ) as span:
             span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "handoff")

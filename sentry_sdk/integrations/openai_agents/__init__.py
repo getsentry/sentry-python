@@ -34,9 +34,9 @@ try:
     # https://github.com/openai/openai-agents-python/commit/3ce7c24d349b77bb750062b7e0e856d9ff48a5d5#diff-7470b3a5c5cbe2fcbb2703dc24f326f45a5819d853be2b1f395d122d278cd911
     from agents.run_internal import run_loop, turn_preparation, turn_resolution
 except ImportError:
-    run_loop = None
-    turn_preparation = None
-    turn_resolution = None
+    run_loop = None  # type: ignore[assignment]
+    turn_preparation = None  # type: ignore[assignment]
+    turn_resolution = None  # type: ignore[assignment]
 
 from typing import TYPE_CHECKING
 
@@ -50,13 +50,13 @@ def _patch_runner(use_run_hooks: "bool") -> None:
     # Create the root span for one full agent run (including eventual handoffs)
     # Note agents.run.DEFAULT_AGENT_RUNNER.run_sync is a wrapper around
     # agents.run.DEFAULT_AGENT_RUNNER.run. It does not need to be wrapped separately.
-    agents.run.DEFAULT_AGENT_RUNNER.run = _create_run_wrapper(
+    agents.run.DEFAULT_AGENT_RUNNER.run = _create_run_wrapper(  # type: ignore[method-assign]
         agents.run.DEFAULT_AGENT_RUNNER.run,
         use_run_hooks=use_run_hooks,
     )
 
     # Patch streaming runner
-    agents.run.DEFAULT_AGENT_RUNNER.run_streamed = _create_run_streamed_wrapper(
+    agents.run.DEFAULT_AGENT_RUNNER.run_streamed = _create_run_streamed_wrapper(  # type: ignore[method-assign]
         agents.run.DEFAULT_AGENT_RUNNER.run_streamed,
         use_run_hooks=use_run_hooks,
     )
@@ -177,9 +177,9 @@ class OpenAIAgentsIntegration(Integration):
             return
 
         if not use_run_hooks:
-            original_get_all_tools = AgentRunner._get_all_tools
+            original_get_all_tools = AgentRunner._get_all_tools  # type: ignore[attr-defined]
 
-            @wraps(AgentRunner._get_all_tools.__func__)
+            @wraps(AgentRunner._get_all_tools.__func__)  # type: ignore[attr-defined]
             async def old_wrapped_get_all_tools(
                 cls: "agents.Runner",
                 agent: "agents.Agent",
@@ -189,35 +189,35 @@ class OpenAIAgentsIntegration(Integration):
                     original_get_all_tools, agent, context_wrapper
                 )
 
-            agents.run.AgentRunner._get_all_tools = classmethod(
-                old_wrapped_get_all_tools
+            agents.run.AgentRunner._get_all_tools = classmethod(  # type: ignore[attr-defined]
+                old_wrapped_get_all_tools  # type: ignore[arg-type]
             )
 
-        original_get_model = AgentRunner._get_model
+        original_get_model = AgentRunner._get_model  # type: ignore[attr-defined]
 
-        @wraps(AgentRunner._get_model.__func__)
+        @wraps(AgentRunner._get_model.__func__)  # type: ignore[attr-defined]
         def old_wrapped_get_model(
             cls: "agents.Runner", agent: "agents.Agent", run_config: "agents.RunConfig"
         ) -> "agents.Model":
             return _get_model(original_get_model, agent, run_config)
 
-        agents.run.AgentRunner._get_model = classmethod(old_wrapped_get_model)
+        agents.run.AgentRunner._get_model = classmethod(old_wrapped_get_model)  # type: ignore[arg-type,attr-defined]
 
-        original_run_single_turn = AgentRunner._run_single_turn
+        original_run_single_turn = AgentRunner._run_single_turn  # type: ignore[attr-defined]
 
-        @wraps(AgentRunner._run_single_turn.__func__)
+        @wraps(AgentRunner._run_single_turn.__func__)  # type: ignore[attr-defined]
         async def old_wrapped_run_single_turn(
             cls: "agents.Runner", *args: "Any", **kwargs: "Any"
         ) -> "SingleStepResult":
             return await _run_single_turn(original_run_single_turn, *args, **kwargs)
 
-        agents.run.AgentRunner._run_single_turn = classmethod(
-            old_wrapped_run_single_turn
+        agents.run.AgentRunner._run_single_turn = classmethod(  # type: ignore[attr-defined]
+            old_wrapped_run_single_turn  # type: ignore[arg-type]
         )
 
-        original_run_single_turn_streamed = AgentRunner._run_single_turn_streamed
+        original_run_single_turn_streamed = AgentRunner._run_single_turn_streamed  # type: ignore[attr-defined]
 
-        @wraps(AgentRunner._run_single_turn_streamed.__func__)
+        @wraps(AgentRunner._run_single_turn_streamed.__func__)  # type: ignore[attr-defined]
         async def old_wrapped_run_single_turn_streamed(
             cls: "agents.Runner", *args: "Any", **kwargs: "Any"
         ) -> "SingleStepResult":
@@ -225,8 +225,8 @@ class OpenAIAgentsIntegration(Integration):
                 original_run_single_turn_streamed, *args, **kwargs
             )
 
-        agents.run.AgentRunner._run_single_turn_streamed = classmethod(
-            old_wrapped_run_single_turn_streamed
+        agents.run.AgentRunner._run_single_turn_streamed = classmethod(  # type: ignore[attr-defined]
+            old_wrapped_run_single_turn_streamed  # type: ignore[arg-type]
         )
 
         original_execute_handoffs = agents._run_impl.RunImpl.execute_handoffs
@@ -238,7 +238,7 @@ class OpenAIAgentsIntegration(Integration):
             return await _execute_handoffs(original_execute_handoffs, *args, **kwargs)
 
         agents._run_impl.RunImpl.execute_handoffs = classmethod(
-            old_wrapped_execute_handoffs
+            old_wrapped_execute_handoffs  # type: ignore[arg-type]
         )
 
         original_execute_final_output = agents._run_impl.RunImpl.execute_final_output
@@ -252,5 +252,5 @@ class OpenAIAgentsIntegration(Integration):
             )
 
         agents._run_impl.RunImpl.execute_final_output = classmethod(
-            old_wrapped_final_output
+            old_wrapped_final_output  # type: ignore[arg-type]
         )
