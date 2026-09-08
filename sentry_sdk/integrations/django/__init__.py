@@ -462,7 +462,7 @@ def _set_transaction_name_and_source(
             fn = resolve(request.path).func
             transaction_name = transaction_from_function(getattr(fn, "view_class", fn))
 
-        elif transaction_style == "url":
+        elif transaction_style == "url" and route_path is not None:
             transaction_name = route_path
 
         if transaction_name is None:
