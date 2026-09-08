@@ -10,14 +10,14 @@ from ..consts import SPAN_ORIGIN
 from ..utils import _set_agent_data
 
 if TYPE_CHECKING:
-    from typing import Any, Union
+    from typing import Any
 
     import agents
 
 
 def execute_tool_span(
     tool: "agents.Tool", *args: "Any", **kwargs: "Any"
-) -> "Union[sentry_sdk.tracing.Span, StreamedSpan]":
+) -> "StreamedSpan":
     span = sentry_sdk.traces.start_span(
         name=f"execute_tool {tool.name}",
         attributes={
@@ -33,7 +33,7 @@ def execute_tool_span(
 
 
 def update_execute_tool_span(
-    span: "Union[sentry_sdk.tracing.Span, StreamedSpan]",
+    span: "StreamedSpan",
     agent: "agents.Agent",
     tool: "agents.Tool",
     result: "Any",
