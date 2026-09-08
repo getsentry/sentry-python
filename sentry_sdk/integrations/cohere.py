@@ -4,15 +4,13 @@ from typing import TYPE_CHECKING
 
 from sentry_sdk import consts
 from sentry_sdk.ai.monitoring import record_token_usage
-from sentry_sdk.ai.utils import get_start_span_function, set_data_normalized
+from sentry_sdk.ai.utils import set_data_normalized
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.traces import StreamedSpan
-from sentry_sdk.tracing_utils import has_span_streaming_enabled
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Iterator, Union
+    from typing import Any, Callable, Iterator
 
-    from sentry_sdk.tracing import Span
 
 import sentry_sdk
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
@@ -112,16 +110,9 @@ def _capture_exception(exc: "Any") -> None:
     sentry_sdk.capture_event(event, hint=hint)
 
 
-def _end_span(span: "Any") -> None:
-    if isinstance(span, StreamedSpan):
-        span.end()
-    else:
-        span.__exit__(None, None, None)
-
-
 def _wrap_chat(f: "Callable[..., Any]", streaming: bool) -> "Callable[..., Any]":
     def collect_chat_response_fields(
-        span: "Union[Span, StreamedSpan]",
+        span: "StreamedSpan",
         res: "NonStreamedChatResponse",
         include_pii: bool,
     ) -> None:
@@ -160,9 +151,6 @@ def _wrap_chat(f: "Callable[..., Any]", streaming: bool) -> "Callable[..., Any]"
     @wraps(f)
     def new_chat(*args: "Any", **kwargs: "Any") -> "Any":
         integration = sentry_sdk.get_client().get_integration(CohereIntegration)
-        is_span_streaming_enabled = has_span_streaming_enabled(
-            sentry_sdk.get_client().options
-        )
 
         if (
             integration is None
@@ -173,21 +161,14 @@ def _wrap_chat(f: "Callable[..., Any]", streaming: bool) -> "Callable[..., Any]"
 
         message = kwargs.get("message")
 
-        if is_span_streaming_enabled:
-            span = sentry_sdk.traces.start_span(
-                name="cohere.client.Chat",
-                attributes={
-                    "sentry.op": consts.OP.COHERE_CHAT_COMPLETIONS_CREATE,
-                    "sentry.origin": CohereIntegration.origin,
-                },
-            )
-        else:
-            span = get_start_span_function()(
-                op=consts.OP.COHERE_CHAT_COMPLETIONS_CREATE,
-                name="cohere.client.Chat",
-                origin=CohereIntegration.origin,
-            )
-            span.__enter__()
+        span = sentry_sdk.traces.start_span(
+            name="cohere.client.Chat",
+            attributes={
+                "sentry.op": consts.OP.COHERE_CHAT_COMPLETIONS_CREATE,
+                "sentry.origin": CohereIntegration.origin,
+            },
+        )
+
         try:
             res = f(*args, **kwargs)
         except Exception as e:
@@ -238,7 +219,7 @@ def _wrap_chat(f: "Callable[..., Any]", streaming: bool) -> "Callable[..., Any]"
                                     include_pii=_should_record(integration, "outputs"),
                                 )
                             yield x
-                    _end_span(span)
+                    span.end()
 
                 return new_iterator()
             elif isinstance(res, NonStreamedChatResponse):
@@ -247,10 +228,10 @@ def _wrap_chat(f: "Callable[..., Any]", streaming: bool) -> "Callable[..., Any]"
                     res,
                     include_pii=_should_record(integration, "outputs"),
                 )
-                _end_span(span)
+                span.end()
             else:
                 set_data_normalized(span, "unknown_response", True)
-                _end_span(span)
+                span.end()
         return res
 
     return new_chat
@@ -263,26 +244,13 @@ def _wrap_embed(f: "Callable[..., Any]") -> "Callable[..., Any]":
         if integration is None:
             return f(*args, **kwargs)
 
-        is_span_streaming_enabled = has_span_streaming_enabled(
-            sentry_sdk.get_client().options
-        )
-
-        if is_span_streaming_enabled:
-            span_ctx = sentry_sdk.traces.start_span(
-                name="Cohere Embedding Creation",
-                attributes={
-                    "sentry.op": consts.OP.COHERE_EMBEDDINGS_CREATE,
-                    "sentry.origin": CohereIntegration.origin,
-                },
-            )
-        else:
-            span_ctx = get_start_span_function()(
-                op=consts.OP.COHERE_EMBEDDINGS_CREATE,
-                name="Cohere Embedding Creation",
-                origin=CohereIntegration.origin,
-            )
-
-        with span_ctx as span:
+        with sentry_sdk.traces.start_span(
+            name="Cohere Embedding Creation",
+            attributes={
+                "sentry.op": consts.OP.COHERE_EMBEDDINGS_CREATE,
+                "sentry.origin": CohereIntegration.origin,
+            },
+        ) as span:
             if "texts" in kwargs and _should_record(integration, "inputs"):
                 if isinstance(kwargs["texts"], str):
                     set_data_normalized(span, SPANDATA.AI_TEXTS, [kwargs["texts"]])
