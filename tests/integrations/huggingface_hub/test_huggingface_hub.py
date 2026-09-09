@@ -1194,10 +1194,9 @@ def test_text_generation_data_collection(
 
     captured = capture_items("span")
 
-    with sentry_sdk.start_transaction(name="test"):
-        client.text_generation("Hello", stream=False, details=True)
+    client.text_generation("Hello", stream=False, details=True)
     sentry_sdk.flush()
-    spans = [item.payload for item in captured if item.type == "span"]
+    spans = [item.payload for item in captured]
     (span,) = [sp for sp in spans if sp["attributes"]["sentry.op"].startswith("gen_ai")]
     span_data = span["attributes"]
 
@@ -1330,11 +1329,10 @@ def test_text_generation_streaming_data_collection(
 
     captured = capture_items("span")
 
-    with sentry_sdk.start_transaction(name="test"):
-        for _ in client.text_generation(prompt="Hello", stream=True, details=True):
-            pass
+    for _ in client.text_generation(prompt="Hello", stream=True, details=True):
+        pass
     sentry_sdk.flush()
-    spans = [item.payload for item in captured if item.type == "span"]
+    spans = [item.payload for item in captured]
     (span,) = [sp for sp in spans if sp["attributes"]["sentry.op"].startswith("gen_ai")]
     span_data = span["attributes"]
 
@@ -1476,14 +1474,13 @@ def test_chat_completion_data_collection_tools(
 
     captured = capture_items("span")
 
-    with sentry_sdk.start_transaction(name="test"):
-        client.chat_completion(
-            messages=[{"role": "user", "content": "What is the weather in Paris?"}],
-            tools=DATA_COLLECTION_TOOLS,
-            tool_choice="auto",
-        )
+    client.chat_completion(
+        messages=[{"role": "user", "content": "What is the weather in Paris?"}],
+        tools=DATA_COLLECTION_TOOLS,
+        tool_choice="auto",
+    )
     sentry_sdk.flush()
-    spans = [item.payload for item in captured if item.type == "span"]
+    spans = [item.payload for item in captured]
     (span,) = [sp for sp in spans if sp["attributes"]["sentry.op"].startswith("gen_ai")]
     span_data = span["attributes"]
 
@@ -1638,16 +1635,15 @@ def test_chat_completion_streaming_data_collection_tools(
 
     captured = capture_items("span")
 
-    with sentry_sdk.start_transaction(name="test"):
-        for _ in client.chat_completion(
-            messages=[{"role": "user", "content": "What is the weather in Paris?"}],
-            tools=DATA_COLLECTION_TOOLS,
-            tool_choice="auto",
-            stream=True,
-        ):
-            pass
+    for _ in client.chat_completion(
+        messages=[{"role": "user", "content": "What is the weather in Paris?"}],
+        tools=DATA_COLLECTION_TOOLS,
+        tool_choice="auto",
+        stream=True,
+    ):
+        pass
     sentry_sdk.flush()
-    spans = [item.payload for item in captured if item.type == "span"]
+    spans = [item.payload for item in captured]
     (span,) = [sp for sp in spans if sp["attributes"]["sentry.op"].startswith("gen_ai")]
     span_data = span["attributes"]
 
