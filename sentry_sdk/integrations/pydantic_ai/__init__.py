@@ -1,7 +1,10 @@
 import functools
 
+import sentry_sdk
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
-from sentry_sdk.utils import parse_version
+from sentry_sdk.utils import capture_internal_exceptions, parse_version
+
+from .utils import _capture_exception
 
 try:
     import pydantic_ai  # noqa: F401
@@ -23,8 +26,20 @@ from .spans.ai_client import ai_client_span, update_ai_client_span
 if TYPE_CHECKING:
     from typing import Any
 
-    from pydantic_ai import ModelRequestContext, RunContext
-    from pydantic_ai.capabilities import Hooks, WrapModelRequestHandler
+    from pydantic.ValidationError import ValidationError
+    from pydantic_ai import (
+        ModelRequestContext,
+        ModelRetry,
+        RunContext,
+        ToolCallPart,
+        ToolDefinition,
+    )
+    from pydantic_ai.capabilities import (
+        Hooks,
+        RawToolArgs,
+        ValidatedToolArgs,
+        WrapModelRequestHandler,
+    )
     from pydantic_ai.messages import ModelResponse
 
 
@@ -50,6 +65,24 @@ def register_hooks(hooks: "Hooks") -> None:
 
             update_ai_client_span(span, response)
             return response
+
+    @hooks.on.tool_validate_error
+    async def sentry_on_tool_validate_error(
+        ctx: "RunContext[Any]",
+        *,
+        call: "ToolCallPart",
+        tool_def: "ToolDefinition",
+        args: "RawToolArgs",
+        error: "ValidationError | ModelRetry",
+    ) -> "ValidatedToolArgs":
+        with capture_internal_exceptions():
+            integration = sentry_sdk.get_client().get_integration(
+                PydanticAIIntegration,
+            )
+            if integration is not None and integration.handled_tool_call_exceptions:
+                _capture_exception(error, handled=True)
+
+        raise error
 
     original_init = Agent.__init__
 

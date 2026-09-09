@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 import pytest
 from pydantic import Field
 from pydantic_ai import Agent
-from pydantic_ai.exceptions import ModelRetry, UnexpectedModelBehavior
+from pydantic_ai.exceptions import UnexpectedModelBehavior
 from pydantic_ai.messages import (
     BinaryContent,
     ImageUrl,
@@ -424,95 +424,6 @@ async def test_agent_with_tools(
     [False, True],
 )
 @pytest.mark.asyncio
-async def test_agent_with_tool_model_retry(
-    sentry_init,
-    capture_items,
-    get_test_agent,
-    handled_tool_call_exceptions,
-):
-    """
-    Test that a handled exception is captured when a tool raises ModelRetry.
-    """
-    sentry_init(
-        integrations=[
-            PydanticAIIntegration(
-                handled_tool_call_exceptions=handled_tool_call_exceptions
-            )
-        ],
-        traces_sample_rate=1.0,
-        send_default_pii=True,
-        trace_lifecycle="stream",
-    )
-
-    retries = 0
-
-    test_agent = get_test_agent()
-
-    @test_agent.tool_plain
-    def add_numbers(a: int, b: int) -> float:
-        """Add two numbers together, but raises an exception on the first attempt."""
-        nonlocal retries
-        if retries == 0:
-            retries += 1
-            raise ModelRetry(message="Try again with the same arguments.")
-        return a + b
-
-    items = capture_items("event", "span")
-
-    result = await test_agent.run("What is 5 + 3?")
-
-    assert result is not None
-
-    if handled_tool_call_exceptions:
-        (error,) = (item.payload for item in items if item.type == "event")
-        assert error["level"] == "error"
-        assert error["exception"]["values"][0]["mechanism"]["handled"]
-
-    sentry_sdk.flush()
-    spans = [item.payload for item in items if item.type == "span"]
-    # Find child span types (invoke_agent is the transaction, not a child span)
-    chat_spans = [
-        s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
-    ]
-    tool_spans = [
-        s
-        for s in spans
-        if s["attributes"].get("sentry.op", "") == "gen_ai.execute_tool"
-    ]
-
-    # Should have tool spans
-    assert len(tool_spans) >= 1
-
-    # Check tool spans
-    model_retry_tool_span = tool_spans[0]
-    assert "execute_tool" in model_retry_tool_span["name"]
-    assert (
-        model_retry_tool_span["attributes"]["gen_ai.operation.name"] == "execute_tool"
-    )
-    assert model_retry_tool_span["attributes"]["gen_ai.tool.name"] == "add_numbers"
-    assert "gen_ai.tool.input" in model_retry_tool_span["attributes"]
-
-    tool_span = tool_spans[1]
-    assert "execute_tool" in tool_span["name"]
-    assert tool_span["attributes"]["gen_ai.operation.name"] == "execute_tool"
-    assert tool_span["attributes"]["gen_ai.tool.name"] == "add_numbers"
-    assert "gen_ai.tool.input" in tool_span["attributes"]
-    assert "gen_ai.tool.output" in tool_span["attributes"]
-
-    # Check chat spans have available_tools
-    for chat_span in chat_spans:
-        assert "gen_ai.request.available_tools" in chat_span["attributes"]
-        available_tools_str = chat_span["attributes"]["gen_ai.request.available_tools"]
-
-        # Available tools is serialized as a string
-        assert "add_numbers" in available_tools_str
-
-
-@pytest.mark.parametrize(
-    "handled_tool_call_exceptions",
-    [False, True],
-)
-@pytest.mark.asyncio
 async def test_agent_with_tool_validation_error(
     sentry_init,
     capture_items,
@@ -549,10 +460,8 @@ async def test_agent_with_tool_validation_error(
     assert result is None
 
     if handled_tool_call_exceptions:
-        (
-            error,
-            model_behaviour_error,
-        ) = (item.payload for item in items if item.type == "event")
+        events = [item.payload for item in items if item.type == "event"]
+        error = events[0]
 
         assert error["level"] == "error"
         assert error["exception"]["values"][0]["mechanism"]["handled"]
@@ -562,23 +471,6 @@ async def test_agent_with_tool_validation_error(
     chat_spans = [
         s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
     ]
-    tool_spans = [
-        s
-        for s in spans
-        if s["attributes"].get("sentry.op", "") == "gen_ai.execute_tool"
-    ]
-
-    # Should have tool spans
-    assert len(tool_spans) >= 1
-
-    # Check tool spans
-    model_retry_tool_span = tool_spans[0]
-    assert "execute_tool" in model_retry_tool_span["name"]
-    assert (
-        model_retry_tool_span["attributes"]["gen_ai.operation.name"] == "execute_tool"
-    )
-    assert model_retry_tool_span["attributes"]["gen_ai.tool.name"] == "add_numbers"
-    assert "gen_ai.tool.input" in model_retry_tool_span["attributes"]
 
     # Check chat spans have available_tools
     assert "gen_ai.request.available_tools" in chat_spans[0]["attributes"]

@@ -1,13 +1,11 @@
-import sys
 from functools import wraps
 from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk.integrations import DidNotEnable
-from sentry_sdk.utils import capture_internal_exceptions, reraise
 
 from ..spans import execute_tool_span, update_execute_tool_span
-from ..utils import _capture_exception, get_current_agent
+from ..utils import get_current_agent
 
 if TYPE_CHECKING:
     from typing import Any
@@ -17,8 +15,6 @@ try:
         from pydantic_ai.tool_manager import ToolManager
     except ImportError:
         from pydantic_ai._tool_manager import ToolManager  # type: ignore
-
-    from pydantic_ai.exceptions import ToolRetryError
 except ImportError:
     raise DidNotEnable("pydantic-ai not installed")
 
@@ -35,7 +31,7 @@ def _patch_execute_tool_call() -> None:
     async def wrapped_execute_tool_call(
         self: "Any", validated: "Any", *args: "Any", **kwargs: "Any"
     ) -> "Any":
-        if not validated or not hasattr(validated, "call"):
+        if not validated or not hasattr(validated, "call") or not validated.args_valid:
             return await original_execute_tool_call(self, validated, *args, **kwargs)
 
         # Extract tool info before calling original
@@ -62,32 +58,14 @@ def _patch_execute_tool_call() -> None:
                     agent,
                     tool_definition=selected_tool_definition,
                 ) as span:
-                    try:
-                        result = await original_execute_tool_call(
-                            self,
-                            validated,
-                            *args,
-                            **kwargs,
-                        )
-                        update_execute_tool_span(span, result)
-                        return result
-                    except ToolRetryError as exc:
-                        exc_info = sys.exc_info()
-                        with capture_internal_exceptions():
-                            # Avoid circular import due to multi-file integration structure
-                            from sentry_sdk.integrations.pydantic_ai import (
-                                PydanticAIIntegration,
-                            )
-
-                            integration = sentry_sdk.get_client().get_integration(
-                                PydanticAIIntegration
-                            )
-                            if (
-                                integration is not None
-                                and integration.handled_tool_call_exceptions
-                            ):
-                                _capture_exception(exc, handled=True)
-                        reraise(*exc_info)
+                    result = await original_execute_tool_call(
+                        self,
+                        validated,
+                        *args,
+                        **kwargs,
+                    )
+                    update_execute_tool_span(span, result)
+                    return result
 
         return await original_execute_tool_call(self, validated, *args, **kwargs)
 
