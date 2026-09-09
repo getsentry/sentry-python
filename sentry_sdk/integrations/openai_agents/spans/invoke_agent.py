@@ -4,14 +4,10 @@ import sentry_sdk
 from sentry_sdk.ai.utils import (
     normalize_message_roles,
     set_data_normalized,
-    truncate_and_annotate_messages,
 )
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import StreamedSpan
-from sentry_sdk.tracing_utils import (
-    has_span_streaming_enabled,
-)
 from sentry_sdk.utils import has_data_collection_enabled, safe_serialize
 
 from ..consts import SPAN_ORIGIN
@@ -75,18 +71,11 @@ def invoke_agent_span(
 
         if len(messages) > 0:
             normalized_messages = normalize_message_roles(messages)
-            client = sentry_sdk.get_client()
-            scope = sentry_sdk.get_current_scope()
-            messages_data = (
-                truncate_and_annotate_messages(normalized_messages, span, scope)
-                if not has_span_streaming_enabled(client.options)
-                else normalized_messages
-            )
-            if messages_data is not None:
+            if normalized_messages is not None:
                 set_data_normalized(
                     span,
                     SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                    messages_data,
+                    normalized_messages,
                     unpack=False,
                 )
 

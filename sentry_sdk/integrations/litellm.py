@@ -7,15 +7,10 @@ from sentry_sdk.ai.monitoring import record_token_usage
 from sentry_sdk.ai.utils import (
     set_data_normalized,
     transform_openai_content_part,
-    truncate_and_annotate_embedding_inputs,
-    truncate_and_annotate_messages,
 )
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.tracing_utils import (
-    has_span_streaming_enabled,
-)
 from sentry_sdk.utils import (
     event_from_exception,
     has_data_collection_enabled,
@@ -130,41 +125,29 @@ def _input_callback(kwargs: "Dict[str, Any]") -> None:
             # For embeddings, look for the 'input' parameter
             embedding_input = kwargs.get("input")
             if embedding_input:
-                scope = sentry_sdk.get_current_scope()
                 # Normalize to list format
                 input_list = (
                     embedding_input
                     if isinstance(embedding_input, list)
                     else [embedding_input]
                 )
-                messages_data = (
-                    truncate_and_annotate_embedding_inputs(input_list, span, scope)
-                    if not has_span_streaming_enabled(client.options)
-                    else input_list
-                )
-                if messages_data is not None:
+                if input_list is not None:
                     set_data_normalized(
                         span,
                         SPANDATA.GEN_AI_EMBEDDINGS_INPUT,
-                        messages_data,
+                        input_list,
                         unpack=False,
                     )
         else:
             # For chat, look for the 'messages' parameter
             messages = kwargs.get("messages", [])
             if messages:
-                scope = sentry_sdk.get_current_scope()
                 messages = _convert_message_parts(messages)
-                messages_data = (
-                    truncate_and_annotate_messages(messages, span, scope)
-                    if not has_span_streaming_enabled(client.options)
-                    else messages
-                )
-                if messages_data is not None:
+                if messages is not None:
                     set_data_normalized(
                         span,
                         SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                        messages_data,
+                        messages,
                         unpack=False,
                     )
 
