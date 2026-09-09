@@ -6,16 +6,13 @@ from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import StreamedSpan
-from sentry_sdk.tracing import Span
-from sentry_sdk.tracing_utils import has_span_streaming_enabled
-from sentry_sdk.utils import capture_internal_exceptions, has_data_collection_enabled
+from sentry_sdk.utils import has_data_collection_enabled
 
 # Hack to get new Python features working in older versions
 # without introducing a hard dependency on `typing_extensions`
 # from: https://stackoverflow.com/a/71944042/300572
 if TYPE_CHECKING:
-    from collections.abc import Iterator
-    from typing import Any, Callable, Optional, ParamSpec, Union
+    from typing import Any, Callable, Optional, ParamSpec
 else:
     # Fake ParamSpec
     class ParamSpec:
@@ -81,48 +78,27 @@ def _wrap_start(f: "Callable[P, T]") -> "Callable[P, T]":
 
         connection: "Connection" = args[0]
         query = args[1]
-        query_id = args[2] if len(args) > 2 else kwargs.get("query_id")
-        params = args[3] if len(args) > 3 else kwargs.get("params")
 
-        if has_span_streaming_enabled(client.options):
-            span = None
-            if sentry_sdk.traces.get_current_span() is not None:
-                span = sentry_sdk.traces.start_span(
-                    name=query,  # type: ignore
-                    attributes={
-                        "sentry.op": OP.DB,
-                        "sentry.origin": ClickhouseDriverIntegration.origin,
-                        SPANDATA.DB_QUERY_TEXT: str(query),
-                    },
-                )
-
-            connection._query = query
-            connection._breadcrumb_data = {
-                SPANDATA.DB_SYSTEM: "clickhouse",
-                SPANDATA.DB_NAME: connection.database,
-                SPANDATA.DB_DRIVER_NAME: "clickhouse-driver",
-                SPANDATA.SERVER_ADDRESS: connection.host,
-                SPANDATA.SERVER_PORT: connection.port,
-                SPANDATA.DB_USER: connection.user,
-            }
-        else:
-            span = sentry_sdk.start_span(
-                op=OP.DB,
-                name=query,
-                origin=ClickhouseDriverIntegration.origin,
+        span = None
+        if sentry_sdk.traces.get_current_span() is not None:
+            span = sentry_sdk.traces.start_span(
+                name=query,  # type: ignore
+                attributes={
+                    "sentry.op": OP.DB,
+                    "sentry.origin": ClickhouseDriverIntegration.origin,
+                    SPANDATA.DB_QUERY_TEXT: str(query),
+                },
             )
 
-            span.set_data("query", query)
-
-            if query_id:
-                span.set_data("db.query_id", query_id)
-
-            if params:
-                if has_data_collection_enabled(client.options):
-                    if client.options["data_collection"]["database_query_data"]:
-                        span.set_data("db.params", params)
-                elif should_send_default_pii():
-                    span.set_data("db.params", params)
+        connection._query = query
+        connection._breadcrumb_data = {
+            SPANDATA.DB_SYSTEM: "clickhouse",
+            SPANDATA.DB_NAME: connection.database,
+            SPANDATA.DB_DRIVER_NAME: "clickhouse-driver",
+            SPANDATA.SERVER_ADDRESS: connection.host,
+            SPANDATA.SERVER_PORT: connection.port,
+            SPANDATA.DB_USER: connection.user,
+        }
 
         connection._sentry_span = span
 
@@ -169,23 +145,7 @@ def _wrap_end(f: "Callable[P, T]") -> "Callable[P, T]":
         if span is None:
             return res
 
-        if isinstance(span, StreamedSpan):
-            span.end()
-        else:
-            if res is not None:
-                client_options = sentry_sdk.get_client().options
-                if has_data_collection_enabled(client_options):
-                    if client_options["data_collection"]["database_query_data"]:
-                        span.set_data("db.result", res)
-                elif should_send_default_pii():
-                    span.set_data("db.result", res)
-
-            with capture_internal_exceptions():
-                span.scope.add_breadcrumb(
-                    message=span._data.pop("query"), category="query", data=span._data
-                )
-
-            span.finish()
+        span.end()
 
         return res
 
@@ -198,61 +158,9 @@ def _wrap_send_data() -> None:
     def _inner_send_data(  # type: ignore[no-untyped-def] # clickhouse-driver does not type send_data
         self, sample_block, data, types_check=False, columnar=False, *args, **kwargs
     ):
-        span = getattr(self.connection, "_sentry_span", None)
+        span: "Optional[StreamedSpan]" = getattr(self.connection, "_sentry_span", None)
 
-        if isinstance(span, StreamedSpan):
-            _set_db_data(span, self.connection)
-            return original_send_data(
-                self, sample_block, data, types_check, columnar, *args, **kwargs
-            )
-
-        if span is not None:
-            _set_db_data(span, self.connection)
-
-            client_options = sentry_sdk.get_client().options
-            if has_data_collection_enabled(client_options):
-                if client_options["data_collection"]["database_query_data"]:
-                    db_params = span._data.get("db.params", [])
-                    if isinstance(data, (list, tuple)):
-                        db_params.extend(data)
-
-                    else:  # data is a generic iterator
-                        orig_data = data
-
-                        # Wrap the generator to add items to db.params as they are yielded.
-                        # This allows us to send the params to Sentry without needing to allocate
-                        # memory for the entire generator at once.
-                        def wrapped_generator() -> "Iterator[Any]":
-                            for item in orig_data:
-                                db_params.append(item)
-                                yield item
-
-                        # Replace the original iterator with the wrapped one.
-                        data = wrapped_generator()
-
-                    span.set_data("db.params", db_params)
-            elif should_send_default_pii():
-                db_params = span._data.get("db.params", [])
-
-                if isinstance(data, (list, tuple)):
-                    db_params.extend(data)
-
-                else:  # data is a generic iterator
-                    orig_data = data
-
-                    # Wrap the generator to add items to db.params as they are yielded.
-                    # This allows us to send the params to Sentry without needing to allocate
-                    # memory for the entire generator at once.
-                    def wrapped_generator() -> "Iterator[Any]":
-                        for item in orig_data:
-                            db_params.append(item)
-                            yield item
-
-                    # Replace the original iterator with the wrapped one.
-                    data = wrapped_generator()
-
-                span.set_data("db.params", db_params)
-
+        _set_db_data(span, self.connection)
         return original_send_data(
             self, sample_block, data, types_check, columnar, *args, **kwargs
         )
@@ -260,19 +168,13 @@ def _wrap_send_data() -> None:
     Client.send_data = _inner_send_data
 
 
-def _set_db_data(span: "Union[Span, StreamedSpan]", connection: "Connection") -> None:
-    if isinstance(span, StreamedSpan):
-        span.set_attribute(SPANDATA.DB_SYSTEM_NAME, "clickhouse")
-        span.set_attribute(SPANDATA.DB_NAMESPACE, connection.database)
+def _set_db_data(span: "Optional[StreamedSpan]", connection: "Connection") -> None:
+    if span is None:
+        return
 
-        set_on_span = span.set_attribute
-    else:
-        span.set_data(SPANDATA.DB_SYSTEM, "clickhouse")
-        span.set_data(SPANDATA.DB_NAME, connection.database)
-
-        set_on_span = span.set_data
-
-    set_on_span(SPANDATA.DB_DRIVER_NAME, "clickhouse-driver")
-    set_on_span(SPANDATA.SERVER_ADDRESS, connection.host)
-    set_on_span(SPANDATA.SERVER_PORT, connection.port)
-    set_on_span(SPANDATA.DB_USER, connection.user)
+    span.set_attribute(SPANDATA.DB_SYSTEM_NAME, "clickhouse")
+    span.set_attribute(SPANDATA.DB_NAMESPACE, connection.database)
+    span.set_attribute(SPANDATA.DB_DRIVER_NAME, "clickhouse-driver")
+    span.set_attribute(SPANDATA.SERVER_ADDRESS, connection.host)
+    span.set_attribute(SPANDATA.SERVER_PORT, connection.port)
+    span.set_attribute(SPANDATA.DB_USER, connection.user)
