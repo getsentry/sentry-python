@@ -11,10 +11,6 @@ import sentry_sdk
 from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.utils import logger
 
-MAX_GEN_AI_MESSAGE_BYTES = 20_000  # 20KB
-# Maximum characters when only a single message is left after bytes truncation
-MAX_SINGLE_MESSAGE_CONTENT_CHARS = 10_000
-
 
 class GEN_AI_ALLOWED_MESSAGE_ROLES:
     SYSTEM = "system"

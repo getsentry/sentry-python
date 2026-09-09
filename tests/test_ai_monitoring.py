@@ -11,39 +11,6 @@ from sentry_sdk.ai.utils import (
 )
 
 
-@pytest.fixture
-def sample_messages():
-    """Sample messages similar to what gen_ai integrations would use"""
-    return [
-        {"role": "system", "content": "You are a helpful assistant."},
-        {
-            "role": "user",
-            "content": "What is the difference between a list and a tuple in Python?",
-        },
-        {
-            "role": "assistant",
-            "content": "Lists are mutable and use [], tuples are immutable and use ().",
-        },
-        {"role": "user", "content": "Can you give me some examples?"},
-        {
-            "role": "assistant",
-            "content": "Sure! Here are examples:\n\n```python\n# List\nmy_list = [1, 2, 3]\nmy_list.append(4)\n\n# Tuple\nmy_tuple = (1, 2, 3)\n# my_tuple.append(4) would error\n```",
-        },
-    ]
-
-
-@pytest.fixture
-def large_messages():
-    """Messages that will definitely exceed size limits"""
-    large_content = "This is a very long message. " * 100
-    return [
-        {"role": "system", "content": large_content},
-        {"role": "user", "content": large_content},
-        {"role": "assistant", "content": large_content},
-        {"role": "user", "content": large_content},
-    ]
-
-
 class TestParseDataUri:
     def test_parses_base64_image_data_uri(self):
         """Test parsing a standard base64-encoded image data URI"""
