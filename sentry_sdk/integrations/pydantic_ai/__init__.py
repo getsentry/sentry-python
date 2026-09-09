@@ -51,41 +51,6 @@ def register_hooks(hooks: "Hooks") -> None:
             update_ai_client_span(span, response)
             return response
 
-    # @hooks.on.tool_execute
-    # async def sentry_wrap_tool_execute(
-    #     ctx: "RunContext[Any]",
-    #     *,
-    #     call: "ToolCallPart",
-    #     tool_def: "ToolDefinition",
-    #     args: "ValidatedToolArgs",
-    #     handler: "WrapToolExecuteHandler",
-    # ) -> "Any":
-    #     with execute_tool_span(
-    #         call.tool_name,
-    #         args,
-    #         ctx.agent,
-    #         tool_definition=tool_def,
-    #     ) as span:
-    #         try:
-    #             result = await handler(args)
-    #             update_execute_tool_span(span, result)
-    #             return result
-    #         except ToolRetryError as exc:
-    #             exc_info = sys.exc_info()
-    #             with capture_internal_exceptions():
-    #                 from sentry_sdk.integrations.pydantic_ai import (
-    #                     PydanticAIIntegration,
-    #                 )
-    #                 integration = sentry_sdk.get_client().get_integration(
-    #                     PydanticAIIntegration,
-    #                 )
-    #                 if (
-    #                     integration is not None
-    #                     and integration.handled_tool_call_exceptions
-    #                 ):
-    #                     _capture_exception(exc, handled=True)
-    #             reraise(*exc_info)
-
     original_init = Agent.__init__
 
     @functools.wraps(original_init)
