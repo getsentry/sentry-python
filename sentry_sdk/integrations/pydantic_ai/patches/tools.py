@@ -27,10 +27,6 @@ def _patch_tool_execution() -> None:
     if hasattr(ToolManager, "execute_tool_call"):
         _patch_execute_tool_call()
 
-    elif hasattr(ToolManager, "_call_tool"):
-        # older versions
-        _patch_call_tool()
-
 
 def _patch_execute_tool_call() -> None:
     original_execute_tool_call = ToolManager.execute_tool_call
@@ -96,82 +92,3 @@ def _patch_execute_tool_call() -> None:
         return await original_execute_tool_call(self, validated, *args, **kwargs)
 
     ToolManager.execute_tool_call = wrapped_execute_tool_call  # type: ignore[method-assign]
-
-
-def _patch_call_tool() -> None:
-    """
-    Patch ToolManager._call_tool to create execute_tool spans.
-
-    This is the single point where ALL tool calls flow through in pydantic_ai,
-    regardless of toolset type (function, MCP, combined, wrapper, etc.).
-
-    By patching here, we avoid:
-    - Patching multiple toolset classes
-    - Dealing with signature mismatches from instrumented MCP servers
-    - Complex nested toolset handling
-    """
-    original_call_tool = ToolManager._call_tool  # type: ignore[attr-defined]
-
-    @wraps(original_call_tool)
-    async def wrapped_call_tool(
-        self: "Any", call: "Any", *args: "Any", **kwargs: "Any"
-    ) -> "Any":
-        # Extract tool info before calling original
-        name = call.tool_name
-        tool = self.tools.get(name) if self.tools else None
-        selected_tool_definition = getattr(tool, "tool_def", None)
-
-        # Get agent from contextvar
-        agent = get_current_agent()
-
-        if agent and tool:
-            try:
-                args_dict = call.args_as_dict()
-            except Exception:
-                args_dict = call.args if isinstance(call.args, dict) else {}
-
-            # Create execute_tool span
-            # Nesting is handled by isolation_scope() to ensure proper parent-child relationships
-            with sentry_sdk.isolation_scope():
-                with execute_tool_span(
-                    name,
-                    args_dict,
-                    agent,
-                    tool_definition=selected_tool_definition,
-                ) as span:
-                    try:
-                        result = await original_call_tool(
-                            self,
-                            call,
-                            *args,
-                            **kwargs,
-                        )
-                        update_execute_tool_span(span, result)
-                        return result
-                    except ToolRetryError as exc:
-                        exc_info = sys.exc_info()
-                        with capture_internal_exceptions():
-                            # Avoid circular import due to multi-file integration structure
-                            from sentry_sdk.integrations.pydantic_ai import (
-                                PydanticAIIntegration,
-                            )
-
-                            integration = sentry_sdk.get_client().get_integration(
-                                PydanticAIIntegration
-                            )
-                            if (
-                                integration is not None
-                                and integration.handled_tool_call_exceptions
-                            ):
-                                _capture_exception(exc, handled=True)
-                        reraise(*exc_info)
-
-        # No span context - just call original
-        return await original_call_tool(
-            self,
-            call,
-            *args,
-            **kwargs,
-        )
-
-    ToolManager._call_tool = wrapped_call_tool  # type: ignore[attr-defined]
