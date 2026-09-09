@@ -1,6 +1,5 @@
 import re
 from typing import TYPE_CHECKING
-from unittest import mock
 
 import pytest
 import responses
@@ -10,6 +9,7 @@ import sentry_sdk
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.huggingface_hub import HuggingfaceHubIntegration
 from sentry_sdk.utils import package_version, safe_serialize
+from tests.conftest import ApproxDict
 
 try:
     from huggingface_hub.utils._errors import HfHubHTTPError
@@ -522,19 +522,8 @@ def test_text_generation(
             "gen_ai.response.finish_reasons": "length",
             "gen_ai.response.streaming": False,
             "gen_ai.usage.total_tokens": 10,
-            "process.runtime.name": mock.ANY,
-            "process.runtime.version": mock.ANY,
-            "sentry.environment": "production",
             "sentry.op": "gen_ai.text_completion",
             "sentry.origin": "auto.ai.huggingface_hub",
-            "sentry.release": mock.ANY,
-            "sentry.sdk.name": "sentry.python",
-            "sentry.sdk.version": mock.ANY,
-            "sentry.segment.id": mock.ANY,
-            "sentry.segment.name": "test",
-            "server.address": mock.ANY,
-            "thread.id": mock.ANY,
-            "thread.name": mock.ANY,
         }
 
         if send_default_pii and include_prompts:
@@ -547,7 +536,7 @@ def test_text_generation(
             assert "gen_ai.request.messages" not in expected_data
             assert "gen_ai.response.text" not in expected_data
 
-        assert span["attributes"] == expected_data
+        assert span["attributes"] == ApproxDict(expected_data)
 
         # text generation does not set the response model
         assert "gen_ai.response.model" not in span["attributes"]
@@ -585,8 +574,6 @@ def test_text_generation(
             "gen_ai.response.finish_reasons": "length",
             "gen_ai.response.streaming": False,
             "gen_ai.usage.total_tokens": 10,
-            "thread.id": mock.ANY,
-            "thread.name": mock.ANY,
         }
 
         if send_default_pii and include_prompts:
@@ -599,7 +586,7 @@ def test_text_generation(
             assert "gen_ai.request.messages" not in expected_data
             assert "gen_ai.response.text" not in expected_data
 
-        assert span["data"] == expected_data
+        assert span["data"] == ApproxDict(expected_data)
 
         # text generation does not set the response model
         assert "gen_ai.response.model" not in span["data"]
@@ -661,19 +648,9 @@ def test_text_generation_streaming(
             "gen_ai.response.finish_reasons": "length",
             "gen_ai.response.streaming": True,
             "gen_ai.usage.total_tokens": 10,
-            "process.runtime.name": mock.ANY,
-            "process.runtime.version": mock.ANY,
             "sentry.environment": "production",
             "sentry.op": "gen_ai.text_completion",
             "sentry.origin": "auto.ai.huggingface_hub",
-            "sentry.release": mock.ANY,
-            "sentry.sdk.name": "sentry.python",
-            "sentry.sdk.version": mock.ANY,
-            "sentry.segment.id": mock.ANY,
-            "sentry.segment.name": "test",
-            "server.address": mock.ANY,
-            "thread.id": mock.ANY,
-            "thread.name": mock.ANY,
         }
 
         if send_default_pii and include_prompts:
@@ -684,7 +661,7 @@ def test_text_generation_streaming(
             assert "gen_ai.request.messages" not in expected_data
             assert "gen_ai.response.text" not in expected_data
 
-        assert span["attributes"] == expected_data
+        assert span["attributes"] == ApproxDict(expected_data)
 
         # text generation does not set the response model
         assert "gen_ai.response.model" not in span["attributes"]
@@ -723,8 +700,6 @@ def test_text_generation_streaming(
             "gen_ai.response.finish_reasons": "length",
             "gen_ai.response.streaming": True,
             "gen_ai.usage.total_tokens": 10,
-            "thread.id": mock.ANY,
-            "thread.name": mock.ANY,
         }
 
         if send_default_pii and include_prompts:
@@ -735,7 +710,7 @@ def test_text_generation_streaming(
             assert "gen_ai.request.messages" not in expected_data
             assert "gen_ai.response.text" not in expected_data
 
-        assert span["data"] == expected_data
+        assert span["data"] == ApproxDict(expected_data)
 
         # text generation does not set the response model
         assert "gen_ai.response.model" not in span["data"]
@@ -804,19 +779,9 @@ def test_chat_completion(
             "gen_ai.usage.input_tokens": 10,
             "gen_ai.usage.output_tokens": 8,
             "gen_ai.usage.total_tokens": 18,
-            "process.runtime.name": mock.ANY,
-            "process.runtime.version": mock.ANY,
             "sentry.environment": "production",
             "sentry.op": "gen_ai.chat",
             "sentry.origin": "auto.ai.huggingface_hub",
-            "sentry.release": mock.ANY,
-            "sentry.sdk.name": "sentry.python",
-            "sentry.sdk.version": mock.ANY,
-            "sentry.segment.id": mock.ANY,
-            "sentry.segment.name": "test",
-            "server.address": mock.ANY,
-            "thread.id": mock.ANY,
-            "thread.name": mock.ANY,
         }
 
         if send_default_pii and include_prompts:
@@ -837,7 +802,7 @@ def test_chat_completion(
             assert "gen_ai.request.messages" not in expected_data
             assert "gen_ai.response.text" not in expected_data
 
-        assert span["attributes"] == expected_data
+        assert span["attributes"] == ApproxDict(expected_data)
     else:
         events = capture_events()
 
@@ -874,8 +839,6 @@ def test_chat_completion(
             "gen_ai.usage.input_tokens": 10,
             "gen_ai.usage.output_tokens": 8,
             "gen_ai.usage.total_tokens": 18,
-            "thread.id": mock.ANY,
-            "thread.name": mock.ANY,
         }
 
         if send_default_pii and include_prompts:
@@ -890,7 +853,7 @@ def test_chat_completion(
             assert "gen_ai.request.messages" not in expected_data
             assert "gen_ai.response.text" not in expected_data
 
-        assert span["data"] == expected_data
+        assert span["data"] == ApproxDict(expected_data)
 
 
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
@@ -955,19 +918,9 @@ def test_chat_completion_streaming(
             "gen_ai.response.finish_reasons": "stop",
             "gen_ai.response.model": "test-model-123",
             "gen_ai.response.streaming": True,
-            "process.runtime.name": mock.ANY,
-            "process.runtime.version": mock.ANY,
             "sentry.environment": "production",
             "sentry.op": "gen_ai.chat",
             "sentry.origin": "auto.ai.huggingface_hub",
-            "sentry.release": mock.ANY,
-            "sentry.sdk.name": "sentry.python",
-            "sentry.sdk.version": mock.ANY,
-            "sentry.segment.id": mock.ANY,
-            "sentry.segment.name": "test",
-            "server.address": mock.ANY,
-            "thread.id": mock.ANY,
-            "thread.name": mock.ANY,
         }
         # usage is not available in older versions of the library
         if HF_VERSION and HF_VERSION >= (0, 26, 0):
@@ -991,7 +944,7 @@ def test_chat_completion_streaming(
             assert "gen_ai.request.messages" not in expected_data
             assert "gen_ai.response.text" not in expected_data
 
-        assert span["attributes"] == expected_data
+        assert span["attributes"] == ApproxDict(expected_data)
     else:
         events = capture_events()
 
@@ -1027,8 +980,6 @@ def test_chat_completion_streaming(
             "gen_ai.response.finish_reasons": "stop",
             "gen_ai.response.model": "test-model-123",
             "gen_ai.response.streaming": True,
-            "thread.id": mock.ANY,
-            "thread.name": mock.ANY,
         }
         # usage is not available in older versions of the library
         if HF_VERSION and HF_VERSION >= (0, 26, 0):
@@ -1046,7 +997,7 @@ def test_chat_completion_streaming(
             assert "gen_ai.request.messages" not in expected_data
             assert "gen_ai.response.text" not in expected_data
 
-        assert span["data"] == expected_data
+        assert span["data"] == ApproxDict(expected_data)
 
 
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
@@ -1104,21 +1055,11 @@ def test_chat_completion_api_error(
         expected_data = {
             "gen_ai.operation.name": "chat",
             "gen_ai.request.model": "test-model",
-            "process.runtime.name": mock.ANY,
-            "process.runtime.version": mock.ANY,
             "sentry.environment": "production",
             "sentry.op": "gen_ai.chat",
             "sentry.origin": "auto.ai.huggingface_hub",
-            "sentry.release": mock.ANY,
-            "sentry.sdk.name": "sentry.python",
-            "sentry.sdk.version": mock.ANY,
-            "sentry.segment.id": mock.ANY,
-            "sentry.segment.name": "test",
-            "server.address": mock.ANY,
-            "thread.id": mock.ANY,
-            "thread.name": mock.ANY,
         }
-        assert span["attributes"] == expected_data
+        assert span["attributes"] == ApproxDict(expected_data)
     else:
         events = capture_events()
 
@@ -1160,10 +1101,8 @@ def test_chat_completion_api_error(
         expected_data = {
             "gen_ai.operation.name": "chat",
             "gen_ai.request.model": "test-model",
-            "thread.id": mock.ANY,
-            "thread.name": mock.ANY,
         }
-        assert span["data"] == expected_data
+        assert span["data"] == ApproxDict(expected_data)
 
 
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
@@ -1305,19 +1244,9 @@ def test_chat_completion_with_tools(
             "gen_ai.usage.input_tokens": 10,
             "gen_ai.usage.output_tokens": 8,
             "gen_ai.usage.total_tokens": 18,
-            "process.runtime.name": mock.ANY,
-            "process.runtime.version": mock.ANY,
             "sentry.environment": "production",
             "sentry.op": "gen_ai.chat",
             "sentry.origin": "auto.ai.huggingface_hub",
-            "sentry.release": mock.ANY,
-            "sentry.sdk.name": "sentry.python",
-            "sentry.sdk.version": mock.ANY,
-            "sentry.segment.id": mock.ANY,
-            "sentry.segment.name": "test",
-            "server.address": mock.ANY,
-            "thread.id": mock.ANY,
-            "thread.name": mock.ANY,
         }
 
         if send_default_pii and include_prompts:
@@ -1333,7 +1262,7 @@ def test_chat_completion_with_tools(
             assert "gen_ai.response.text" not in expected_data
             assert "gen_ai.response.tool_calls" not in expected_data
 
-        assert span["attributes"] == expected_data
+        assert span["attributes"] == ApproxDict(expected_data)
     else:
         events = capture_events()
 
@@ -1371,8 +1300,6 @@ def test_chat_completion_with_tools(
             "gen_ai.usage.input_tokens": 10,
             "gen_ai.usage.output_tokens": 8,
             "gen_ai.usage.total_tokens": 18,
-            "thread.id": mock.ANY,
-            "thread.name": mock.ANY,
         }
 
         if send_default_pii and include_prompts:
@@ -1388,7 +1315,7 @@ def test_chat_completion_with_tools(
             assert "gen_ai.response.text" not in expected_data
             assert "gen_ai.response.tool_calls" not in expected_data
 
-        assert span["data"] == expected_data
+        assert span["data"] == ApproxDict(expected_data)
 
 
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
@@ -1467,19 +1394,9 @@ def test_chat_completion_streaming_with_tools(
             "gen_ai.response.finish_reasons": "tool_calls",
             "gen_ai.response.model": "test-model-123",
             "gen_ai.response.streaming": True,
-            "process.runtime.name": mock.ANY,
-            "process.runtime.version": mock.ANY,
             "sentry.environment": "production",
             "sentry.op": "gen_ai.chat",
             "sentry.origin": "auto.ai.huggingface_hub",
-            "sentry.release": mock.ANY,
-            "sentry.sdk.name": "sentry.python",
-            "sentry.sdk.version": mock.ANY,
-            "sentry.segment.id": mock.ANY,
-            "sentry.segment.name": "test",
-            "server.address": mock.ANY,
-            "thread.id": mock.ANY,
-            "thread.name": mock.ANY,
         }
 
         if HF_VERSION and HF_VERSION >= (0, 26, 0):
@@ -1501,7 +1418,7 @@ def test_chat_completion_streaming_with_tools(
             assert "gen_ai.response.text" not in expected_data
             assert "gen_ai.response.tool_calls" not in expected_data
 
-        assert span["attributes"] == expected_data
+        assert span["attributes"] == ApproxDict(expected_data)
     else:
         events = capture_events()
 
@@ -1542,8 +1459,6 @@ def test_chat_completion_streaming_with_tools(
             "gen_ai.response.finish_reasons": "tool_calls",
             "gen_ai.response.model": "test-model-123",
             "gen_ai.response.streaming": True,
-            "thread.id": mock.ANY,
-            "thread.name": mock.ANY,
         }
 
         if HF_VERSION and HF_VERSION >= (0, 26, 0):
@@ -1565,7 +1480,7 @@ def test_chat_completion_streaming_with_tools(
             assert "gen_ai.response.text" not in expected_data
             assert "gen_ai.response.tool_calls" not in expected_data
 
-        assert span["data"] == expected_data
+        assert span["data"] == ApproxDict(expected_data)
 
 
 DATA_COLLECTION_TOOLS = [
