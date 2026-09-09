@@ -753,28 +753,32 @@ def _http_scope():
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "init_kwargs, expected_query, expected_url_full",
+    "init_kwargs, request_url, expected_query, expected_url_full",
     [
         pytest.param(
             {"send_default_pii": True},
+            "/foo?" + QUERY_STRING,
             QUERY_STRING,
             "http://example.com/foo?" + QUERY_STRING,
             id="send_default_pii_true",
         ),
         pytest.param(
             {"send_default_pii": False},
+            "/foo?" + QUERY_STRING,
             None,
             None,
             id="send_default_pii_false",
         ),
         pytest.param(
             {},
+            "/foo?" + QUERY_STRING,
             None,
             None,
             id="defaults",
         ),
         pytest.param(
             {"_experiments": {"data_collection": {}}},
+            "/foo?" + QUERY_STRING,
             "token=%5BFiltered%5D&theme=dark&lang=en&session=%5BFiltered%5D",
             "http://example.com/foo?token=%5BFiltered%5D&theme=dark&lang=en&session=%5BFiltered%5D",
             id="data_collection_denylist_default",
@@ -787,6 +791,7 @@ def _http_scope():
                     }
                 }
             },
+            "/foo?" + QUERY_STRING,
             "token=%5BFiltered%5D&theme=dark&lang=%5BFiltered%5D&session=%5BFiltered%5D",
             "http://example.com/foo?token=%5BFiltered%5D&theme=dark&lang=%5BFiltered%5D&session=%5BFiltered%5D",
             id="data_collection_allowlist",
@@ -797,6 +802,7 @@ def _http_scope():
                     "data_collection": {"url_query_params": {"mode": "off"}}
                 }
             },
+            "/foo?" + QUERY_STRING,
             None,
             "http://example.com/foo",
             id="data_collection_off",
@@ -808,9 +814,17 @@ def _http_scope():
                     "data_collection": {"url_query_params": {"mode": "off"}}
                 },
             },
+            "/foo?" + QUERY_STRING,
             None,
             "http://example.com/foo",
             id="data_collection_wins_over_send_default_pii",
+        ),
+        pytest.param(
+            {"_experiments": {"data_collection": {}}},
+            "/foo",
+            None,
+            "http://example.com/foo",
+            id="empty_query_string",
         ),
     ],
 )
@@ -819,6 +833,7 @@ async def test_get_request_attributes_query_data_collection(
     capture_items,
     asgi3_app,
     init_kwargs,
+    request_url,
     expected_query,
     expected_url_full,
 ):
@@ -831,7 +846,7 @@ async def test_get_request_attributes_query_data_collection(
 
     items = capture_items("span")
     async with TestClient(app, scope=_http_scope()) as client:
-        await client.get(f"/foo?{QUERY_STRING}", headers={"host": "example.com"})
+        await client.get(request_url, headers={"host": "example.com"})
 
     sentry_sdk.flush()
 
