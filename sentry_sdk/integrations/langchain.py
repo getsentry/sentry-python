@@ -11,7 +11,6 @@ from sentry_sdk.ai.utils import (
     normalize_message_roles,
     set_data_normalized,
     transform_content_part,
-    truncate_and_annotate_messages,
 )
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
@@ -19,7 +18,6 @@ from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing_utils import (
     _get_value,
-    has_span_streaming_enabled,
 )
 from sentry_sdk.utils import (
     capture_internal_exceptions,
@@ -424,20 +422,12 @@ class SentryLangchainCallback(BaseCallbackHandler):
                     }
                     for prompt in prompts
                 ]
-
-                scope = sentry_sdk.get_current_scope()
-                messages_data = (
-                    truncate_and_annotate_messages(normalized_messages, span, scope)
-                    if not has_span_streaming_enabled(client.options)
-                    else normalized_messages
+                set_data_normalized(
+                    span,
+                    SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                    normalized_messages,
+                    unpack=False,
                 )
-                if messages_data is not None:
-                    set_data_normalized(
-                        span,
-                        SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                        messages_data,
-                        unpack=False,
-                    )
 
     def on_chat_model_start(
         self: "SentryLangchainCallback",
@@ -536,20 +526,12 @@ class SentryLangchainCallback(BaseCallbackHandler):
                             self._normalize_langchain_message(message)
                         )
                 normalized_messages = normalize_message_roles(normalized_messages)
-
-                scope = sentry_sdk.get_current_scope()
-                messages_data = (
-                    truncate_and_annotate_messages(normalized_messages, span, scope)
-                    if not has_span_streaming_enabled(client.options)
-                    else normalized_messages
+                set_data_normalized(
+                    span,
+                    SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                    normalized_messages,
+                    unpack=False,
                 )
-                if messages_data is not None:
-                    set_data_normalized(
-                        span,
-                        SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                        messages_data,
-                        unpack=False,
-                    )
 
     def on_chat_model_end(
         self: "SentryLangchainCallback",
@@ -1157,20 +1139,12 @@ def _wrap_agent_executor_invoke(f: "Callable[..., Any]") -> "Callable[..., Any]"
             input = result.get("input")
             if input is not None and record_inputs:
                 normalized_messages = normalize_message_roles([input])
-
-                scope = sentry_sdk.get_current_scope()
-                messages_data = (
-                    truncate_and_annotate_messages(normalized_messages, span, scope)
-                    if not has_span_streaming_enabled(client.options)
-                    else normalized_messages
+                set_data_normalized(
+                    span,
+                    SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                    normalized_messages,
+                    unpack=False,
                 )
-                if messages_data is not None:
-                    set_data_normalized(
-                        span,
-                        SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                        messages_data,
-                        unpack=False,
-                    )
 
             output = result.get("output")
             if output is not None and record_outputs:
@@ -1219,20 +1193,12 @@ def _wrap_agent_executor_stream(f: "Callable[..., Any]") -> "Callable[..., Any]"
         input = args[0].get("input") if len(args) >= 1 else None
         if input is not None and record_inputs:
             normalized_messages = normalize_message_roles([input])
-
-            scope = sentry_sdk.get_current_scope()
-            messages_data = (
-                truncate_and_annotate_messages(normalized_messages, span, scope)
-                if not has_span_streaming_enabled(client.options)
-                else normalized_messages
+            set_data_normalized(
+                span,
+                SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                normalized_messages,
+                unpack=False,
             )
-            if messages_data is not None:
-                set_data_normalized(
-                    span,
-                    SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                    messages_data,
-                    unpack=False,
-                )
 
         # Run the agent
         result = f(self, *args, **kwargs)

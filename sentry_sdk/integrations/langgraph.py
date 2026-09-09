@@ -5,7 +5,6 @@ import sentry_sdk
 from sentry_sdk.ai.utils import (
     normalize_message_roles,
     set_data_normalized,
-    truncate_and_annotate_messages,
 )
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
@@ -14,9 +13,6 @@ from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_ve
 from sentry_sdk.integrations.langchain import LangchainIntegration
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import StreamedSpan
-from sentry_sdk.tracing_utils import (
-    has_span_streaming_enabled,
-)
 from sentry_sdk.utils import (
     has_data_collection_enabled,
     package_version,
@@ -163,22 +159,12 @@ def _wrap_pregel_invoke(f: "Callable[..., Any]") -> "Callable[..., Any]":
                 input_messages = _parse_langgraph_messages(args[0])
                 if input_messages and _should_record_inputs(integration):
                     normalized_input_messages = normalize_message_roles(input_messages)
-
-                    scope = sentry_sdk.get_current_scope()
-                    messages_data = (
-                        truncate_and_annotate_messages(
-                            normalized_input_messages, span, scope
-                        )
-                        if not has_span_streaming_enabled(client.options)
-                        else normalized_input_messages
+                    set_data_normalized(
+                        span,
+                        SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                        normalized_input_messages,
+                        unpack=False,
                     )
-                    if messages_data is not None:
-                        set_data_normalized(
-                            span,
-                            SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                            messages_data,
-                            unpack=False,
-                        )
 
             result = f(self, *args, **kwargs)
 
@@ -216,22 +202,12 @@ def _wrap_pregel_ainvoke(f: "Callable[..., Any]") -> "Callable[..., Any]":
                 input_messages = _parse_langgraph_messages(args[0])
                 if input_messages and _should_record_inputs(integration):
                     normalized_input_messages = normalize_message_roles(input_messages)
-
-                    scope = sentry_sdk.get_current_scope()
-                    messages_data = (
-                        truncate_and_annotate_messages(
-                            normalized_input_messages, span, scope
-                        )
-                        if not has_span_streaming_enabled(client.options)
-                        else normalized_input_messages
+                    set_data_normalized(
+                        span,
+                        SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                        normalized_input_messages,
+                        unpack=False,
                     )
-                    if messages_data is not None:
-                        set_data_normalized(
-                            span,
-                            SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                            messages_data,
-                            unpack=False,
-                        )
 
             result = await f(self, *args, **kwargs)
 
