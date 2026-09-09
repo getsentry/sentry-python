@@ -21,7 +21,6 @@ from typing import TYPE_CHECKING
 
 from .patches import (
     _patch_agent_run,
-    _patch_graph_nodes,
 )
 from .spans.ai_client import ai_client_span, update_ai_client_span
 
@@ -187,11 +186,6 @@ class PydanticAIIntegration(Integration):
             return
 
         _patch_agent_run()
-
-        # ModelRequestContext.model added in https://github.com/pydantic/pydantic-ai/commit/f1260dfe09907f17688eee1646daf898fc428d4c
-        if PYDANTIC_AI_VERSION < (1, 73):
-            _patch_graph_nodes()
-            return
 
         try:
             from pydantic_ai.capabilities import Hooks
