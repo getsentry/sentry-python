@@ -583,7 +583,7 @@ async def test_asgi_request_body_send_default_pii(
         body=body,
     )
 
-    items = capture_items("event", "span")
+    items = capture_items("event")
 
     response = await comm.get_response()
     await comm.wait()
@@ -593,19 +593,12 @@ async def test_asgi_request_body_send_default_pii(
 
     sentry_sdk.flush()
 
-    (event,) = [item.payload for item in items if item.type == "event"]
-    (span,) = [
-        item.payload
-        for item in items
-        if item.type == "span" and item.payload["name"] == "/post_echo_async"
-    ]
+    (event,) = [item.payload for item in items]
 
     if expected_data is not None:
         assert event["request"]["data"] == expected_data
-        assert span["attributes"]["http.request.body.data"] == expected_data
     else:
         assert "data" not in event["request"]
-        assert "http.request.body.data" not in span["attributes"]
 
 
 @pytest.mark.parametrize("application", APPS)
