@@ -158,7 +158,7 @@ def _wrap_send_data() -> None:
     def _inner_send_data(  # type: ignore[no-untyped-def] # clickhouse-driver does not type send_data
         self, sample_block, data, types_check=False, columnar=False, *args, **kwargs
     ):
-        span = getattr(self.connection, "_sentry_span", None)
+        span: "Optional[StreamedSpan]" = getattr(self.connection, "_sentry_span", None)
 
         _set_db_data(span, self.connection)
         return original_send_data(
@@ -168,7 +168,10 @@ def _wrap_send_data() -> None:
     Client.send_data = _inner_send_data
 
 
-def _set_db_data(span: "StreamedSpan", connection: "Connection") -> None:
+def _set_db_data(span: "Optional[StreamedSpan]", connection: "Connection") -> None:
+    if span is None:
+        return
+
     span.set_attribute(SPANDATA.DB_DRIVER_NAME, "clickhouse-driver")
     span.set_attribute(SPANDATA.SERVER_ADDRESS, connection.host)
     span.set_attribute(SPANDATA.SERVER_PORT, connection.port)
