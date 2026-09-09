@@ -753,57 +753,6 @@ def test_crumb_capture_client_error(
 
     events = capture_events()
 
-    with sentry_sdk.start_transaction():
-        client = SyncClientBuilder().build()
-        response = client.get(url).build().send()
-        assert response.status == status_code
-
-        capture_message("Testing!")
-
-    (event,) = events
-
-    crumb = event["breadcrumbs"]["values"][0]
-    assert crumb["type"] == "http"
-    assert crumb["category"] == "httplib"
-
-    if level is None:
-        assert "level" not in crumb
-    else:
-        assert crumb["level"] == level
-
-    assert crumb["data"] == ApproxDict(
-        {
-            SPANDATA.HTTP_METHOD: "GET",
-            SPANDATA.HTTP_STATUS_CODE: status_code,
-        }
-    )
-
-
-@pytest.mark.parametrize(
-    "status_code,level",
-    [
-        (200, None),
-        (301, None),
-        (403, "warning"),
-        (405, "warning"),
-        (500, "error"),
-    ],
-)
-def test_crumb_capture_client_error_span_streaming(
-    sentry_init,
-    capture_events,
-    server_port,
-    status_code,
-    level,
-):
-    sentry_init(
-        integrations=[PyreqwestIntegration()],
-    )
-
-    url = f"http://localhost:{server_port}/status/{status_code}"
-
-    events = capture_events()
-
     with sentry_sdk.traces.start_span(name="segment"):
         client = SyncClientBuilder().build()
         response = client.get(url).build().send()
@@ -907,7 +856,7 @@ def test_crumb_capture_client_error_span_streaming(
         ),
     ],
 )
-def test_url_query_data_collection_span_streaming_sync(
+def test_url_query_data_collection_sync(
     sentry_init,
     capture_items,
     server_port,
@@ -1018,7 +967,7 @@ def test_url_query_data_collection_span_streaming_sync(
         ),
     ],
 )
-async def test_url_query_data_collection_span_streaming_async(
+async def test_url_query_data_collection_async(
     sentry_init,
     capture_items,
     server_port,
@@ -1077,7 +1026,7 @@ async def test_url_query_data_collection_span_streaming_async(
         ),
     ],
 )
-def test_url_full_reassembly_span_streaming_sync(
+def test_url_full_reassembly_sync(
     sentry_init,
     capture_items,
     server_port,
@@ -1135,7 +1084,7 @@ def test_url_full_reassembly_span_streaming_sync(
         ),
     ],
 )
-async def test_url_full_reassembly_span_streaming_async(
+async def test_url_full_reassembly_async(
     sentry_init,
     capture_items,
     server_port,
@@ -1195,7 +1144,7 @@ async def test_url_full_reassembly_span_streaming_async(
         ),
     ],
 )
-def test_url_query_params_off_keeps_bare_url_span_streaming_sync(
+def test_url_query_params_off_keeps_bare_url_sync(
     sentry_init,
     capture_items,
     server_port,
@@ -1263,7 +1212,7 @@ def test_url_query_params_off_keeps_bare_url_span_streaming_sync(
         ),
     ],
 )
-async def test_url_query_params_off_keeps_bare_url_span_streaming_async(
+async def test_url_query_params_off_keeps_bare_url_async(
     sentry_init,
     capture_items,
     server_port,
@@ -1441,7 +1390,7 @@ async def test_crumb_url_query_data_collection_async(
 
 
 @pytest.mark.tests_internal_exceptions
-def test_omit_url_data_if_parsing_fails_span_streaming(
+def test_omit_url_data_if_parsing_fails_data_collection(
     sentry_init,
     capture_events,
     capture_items,
