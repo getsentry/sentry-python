@@ -1,9 +1,15 @@
 import re
 from array import array
+from dataclasses import dataclass
 
 import pytest
 
-from sentry_sdk.serializer import MAX_DATABAG_BREADTH, MAX_DATABAG_DEPTH, serialize
+from sentry_sdk.serializer import (
+    MAX_DATABAG_BREADTH,
+    MAX_DATABAG_DEPTH,
+    MAX_REPR_LENGTH,
+    serialize,
+)
 
 try:
     import hypothesis.strategies as st
@@ -219,3 +225,65 @@ def test_serialize_local_vars():
     assert result["custom"].startswith(
         "<tests.test_serializer.test_serialize_local_vars.<locals>.Custom object at"
     )
+
+
+def test_small_object_repr_is_unchanged():
+    # A normal object/dataclass local is still serialized to its exact repr().
+    @dataclass
+    class Point:
+        x: int
+        y: str
+
+    point = Point(1, "hi")
+    result = serialize({"point": point}, is_vars=True)["point"]
+    assert result == repr(point)
+    assert "Point(x=1, y='hi')" in result
+
+
+def test_large_object_repr_is_not_fully_materialized():
+    # Regression test for #6649: serializing a local whose repr walks a large
+    # object graph must not build the whole repr and then throw most of it
+    # away. FastAPI's _IncludedRouter is the real-world trigger; here we use a
+    # dataclass with an oversized field followed by a sentinel whose __repr__
+    # records whether it was reached.
+    reached = []
+
+    class Tail:
+        def __repr__(self):
+            reached.append(True)
+            return "<tail>"
+
+    @dataclass
+    class Big:
+        head: list
+        tail: object
+
+    big = Big(head=list(range(200000)), tail=Tail())
+
+    result = serialize({"big": big}, is_vars=True)["big"]
+
+    # We stopped before reaching tail instead of rendering the full graph, so
+    # tail was never repr'd. Reverting the fix walks the whole graph and trips
+    # this.
+    assert reached == []
+    # What we kept is a real, truncation-marked prefix of the object's repr.
+    assert "Big(head=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10," in result
+    assert result.endswith("...")
+    assert MAX_REPR_LENGTH <= len(result) < MAX_REPR_LENGTH + 100
+
+
+def test_large_object_repr_respects_max_value_length():
+    # With max_value_length set, the bounded repr yields exactly what the old
+    # build-the-whole-repr-then-truncate path produced: capped to the limit
+    # and a genuine prefix of repr().
+    @dataclass
+    class Big:
+        data: list
+
+    big = Big(data=list(range(100000)))
+
+    result = serialize({"big": big}, is_vars=True, max_value_length=1024)["big"]
+
+    assert len(result) == 1024
+    assert result.endswith("...")
+    assert repr(big).startswith(result[:-3])
