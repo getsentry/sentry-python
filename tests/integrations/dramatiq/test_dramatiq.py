@@ -163,12 +163,10 @@ def test_task_transaction(
 @pytest.mark.parametrize(
     "broker",
     [
-        (
-            {
-                "traces_sample_rate": 1.0,
-                "trace_lifecycle": "stream",
-            },
-        ),
+        {
+            "traces_sample_rate": 1.0,
+            "trace_lifecycle": "stream",
+        },
     ],
     indirect=["broker"],
 )
@@ -527,12 +525,10 @@ def test_that_retry_exceptions_are_not_captured(
 @pytest.mark.parametrize(
     "broker",
     [
-        (
-            {
-                "traces_sample_rate": 1.0,
-                "trace_lifecycle": "stream",
-            },
-        ),
+        {
+            "traces_sample_rate": 1.0,
+            "trace_lifecycle": "stream",
+        },
     ],
     indirect=["broker"],
 )

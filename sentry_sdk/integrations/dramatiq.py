@@ -136,6 +136,8 @@ class SentryMiddleware(Middleware):  # type: ignore[misc]
             # start new trace in case of retrying
             sentry_headers = {}
 
+        scope.set_transaction_name(message.actor_name, source=SegmentNameSource.TASK)
+
         sentry_sdk.traces.continue_trace(sentry_headers)
         span = sentry_sdk.traces.start_span(
             name=message.actor_name,
