@@ -485,17 +485,16 @@ def test_text_generation(
     )
 
     client = InferenceClient(model="test-model")
-    items = capture_items("transaction", "span")
+    items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="test"):
-        client.text_generation(
-            "Hello",
-            stream=False,
-            details=True,
-        )
+    client.text_generation(
+        "Hello",
+        stream=False,
+        details=True,
+    )
 
     sentry_sdk.flush()
-    spans = [item.payload for item in items if item.type == "span"]
+    spans = [item.payload for item in items]
     span = None
     for sp in spans:
         if "sentry.op" in sp["attributes"] and sp["attributes"]["sentry.op"].startswith(
@@ -558,16 +557,15 @@ def test_text_generation_streaming(
     client = InferenceClient(model="test-model")
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="test"):
-        for _ in client.text_generation(
-            prompt="Hello",
-            stream=True,
-            details=True,
-        ):
-            pass
+    for _ in client.text_generation(
+        prompt="Hello",
+        stream=True,
+        details=True,
+    ):
+        pass
 
     sentry_sdk.flush()
-    spans = [item.payload for item in items if item.type == "span"]
+    spans = [item.payload for item in items]
     span = None
     for sp in spans:
         if "sentry.op" in sp["attributes"] and sp["attributes"]["sentry.op"].startswith(
@@ -631,20 +629,19 @@ def test_chat_completion(
     client = get_hf_provider_inference_client()
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="test"):
-        client.chat_completion(
-            messages=[
-                {
-                    "role": "user",
-                    "content": "Message demonstrating the absence of truncation.",
-                },
-                {"role": "user", "content": "Hello!"},
-            ],
-            stream=False,
-        )
+    client.chat_completion(
+        messages=[
+            {
+                "role": "user",
+                "content": "Message demonstrating the absence of truncation.",
+            },
+            {"role": "user", "content": "Hello!"},
+        ],
+        stream=False,
+    )
 
     sentry_sdk.flush()
-    spans = [item.payload for item in items if item.type == "span"]
+    spans = [item.payload for item in items]
     span = None
     for sp in spans:
         if "sentry.op" in sp["attributes"] and sp["attributes"]["sentry.op"].startswith(
@@ -718,22 +715,21 @@ def test_chat_completion_streaming(
     client = get_hf_provider_inference_client()
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="test"):
-        _ = list(
-            client.chat_completion(
-                [
-                    {
-                        "role": "user",
-                        "content": "Message demonstrating the absence of truncation.",
-                    },
-                    {"role": "user", "content": "Hello!"},
-                ],
-                stream=True,
-            )
+    _ = list(
+        client.chat_completion(
+            [
+                {
+                    "role": "user",
+                    "content": "Message demonstrating the absence of truncation.",
+                },
+                {"role": "user", "content": "Hello!"},
+            ],
+            stream=True,
         )
+    )
 
     sentry_sdk.flush()
-    spans = [item.payload for item in items if item.type == "span"]
+    spans = [item.payload for item in items]
     span = None
     for sp in spans:
         if "sentry.op" in sp["attributes"] and sp["attributes"]["sentry.op"].startswith(
@@ -801,7 +797,7 @@ def test_chat_completion_api_error(
     client = get_hf_provider_inference_client()
     items = capture_items("event", "span")
 
-    with sentry_sdk.traces.start_span(name="test"), pytest.raises(HfHubHTTPError):
+    with pytest.raises(HfHubHTTPError):
         client.chat_completion(
             messages=[{"role": "user", "content": "Hello!"}],
         )
@@ -832,9 +828,7 @@ def test_chat_completion_api_error(
     assert span["attributes"]["sentry.origin"] == "auto.ai.huggingface_hub"
     assert span["status"] == "error"
 
-    (manual_span,) = (span for span in spans if span["name"] == "test")
-
-    assert error["contexts"]["trace"]["trace_id"] == manual_span["trace_id"]
+    assert error["contexts"]["trace"]["trace_id"] == span["trace_id"]
     expected_data = {
         "gen_ai.operation.name": "chat",
         "gen_ai.request.model": "test-model",
@@ -859,7 +853,7 @@ def test_span_status_error(
     )
     items = capture_items("event", "span")
 
-    with sentry_sdk.traces.start_span(name="test"), pytest.raises(HfHubHTTPError):
+    with pytest.raises(HfHubHTTPError):
         client.chat_completion(
             messages=[{"role": "user", "content": "Hello!"}],
         )
@@ -920,15 +914,14 @@ def test_chat_completion_with_tools(
     ]
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="test"):
-        client.chat_completion(
-            messages=[{"role": "user", "content": "What is the weather in Paris?"}],
-            tools=tools,
-            tool_choice="auto",
-        )
+    client.chat_completion(
+        messages=[{"role": "user", "content": "What is the weather in Paris?"}],
+        tools=tools,
+        tool_choice="auto",
+    )
 
     sentry_sdk.flush()
-    spans = [item.payload for item in items if item.type == "span"]
+    spans = [item.payload for item in items]
     span = None
     for sp in spans:
         if "sentry.op" in sp["attributes"] and sp["attributes"]["sentry.op"].startswith(
@@ -1012,18 +1005,17 @@ def test_chat_completion_streaming_with_tools(
     ]
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="test"):
-        _ = list(
-            client.chat_completion(
-                messages=[{"role": "user", "content": "What is the weather in Paris?"}],
-                stream=True,
-                tools=tools,
-                tool_choice="auto",
-            )
+    _ = list(
+        client.chat_completion(
+            messages=[{"role": "user", "content": "What is the weather in Paris?"}],
+            stream=True,
+            tools=tools,
+            tool_choice="auto",
         )
+    )
 
     sentry_sdk.flush()
-    spans = [item.payload for item in items if item.type == "span"]
+    spans = [item.payload for item in items]
     span = None
     for sp in spans:
         if "sentry.op" in sp["attributes"] and sp["attributes"]["sentry.op"].startswith(
@@ -1644,7 +1636,7 @@ def test_chat_completion_streaming_data_collection_tools(
 
     client = get_hf_provider_inference_client()
 
-    captured = capture_items("transaction", "span")
+    captured = capture_items("span")
 
     with sentry_sdk.start_transaction(name="test"):
         for _ in client.chat_completion(
