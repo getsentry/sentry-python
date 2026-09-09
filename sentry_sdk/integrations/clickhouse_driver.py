@@ -172,6 +172,8 @@ def _set_db_data(span: "Optional[StreamedSpan]", connection: "Connection") -> No
     if span is None:
         return
 
+    span.set_attribute(SPANDATA.DB_SYSTEM_NAME, "clickhouse")
+    span.set_attribute(SPANDATA.DB_NAMESPACE, connection.database)
     span.set_attribute(SPANDATA.DB_DRIVER_NAME, "clickhouse-driver")
     span.set_attribute(SPANDATA.SERVER_ADDRESS, connection.host)
     span.set_attribute(SPANDATA.SERVER_PORT, connection.port)
