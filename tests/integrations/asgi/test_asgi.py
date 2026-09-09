@@ -475,6 +475,9 @@ async def test_auto_session_tracking_with_aggregates(
     assert count_item_types["sessions"] == 1
     assert len(envelopes) == 5
 
+    (session,) = [
+        envelope for envelope in envelopes if envelope.items[0].type == "sessions"
+    ]
     session_aggregates = envelopes[-1].items[0].payload.json["aggregates"]
     assert session_aggregates[0]["exited"] == 2
     assert session_aggregates[0]["crashed"] == 1
