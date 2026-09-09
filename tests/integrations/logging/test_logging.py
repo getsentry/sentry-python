@@ -246,7 +246,7 @@ def test_sentry_logs_collection_off_by_default(sentry_init, capture_items, reque
 
 
 def test_sentry_logs_handler_skips_format_when_disabled(sentry_init):
-    sentry_init()
+    sentry_init(integrations=[LoggingIntegration(capture_sentry_logs=False)])
     handler = SentryLogsHandler()
     record = logging.LogRecord(
         name="test-logger",
