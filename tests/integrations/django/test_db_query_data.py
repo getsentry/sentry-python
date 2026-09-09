@@ -105,83 +105,6 @@ def test_query_source_disabled(
 
 @pytest.mark.forked
 @pytest_mark_django_db_decorator(transaction=True)
-@pytest.mark.parametrize("enable_db_query_source", [None, True])
-@pytest.mark.parametrize("span_streaming", [True, False])
-def test_query_source_enabled(
-    sentry_init,
-    client,
-    capture_events,
-    capture_items,
-    enable_db_query_source,
-    span_streaming,
-):
-    sentry_options = {
-        "integrations": [DjangoIntegration()],
-        "send_default_pii": True,
-        "traces_sample_rate": 1.0,
-        "db_query_source_threshold_ms": 0,
-        "trace_lifecycle": "stream" if span_streaming else "static",
-    }
-
-    if enable_db_query_source is not None:
-        sentry_options["enable_db_query_source"] = enable_db_query_source
-
-    sentry_init(**sentry_options)
-
-    if "postgres" not in connections:
-        pytest.skip("postgres tests disabled")
-
-    # trigger Django to open a new connection by marking the existing one as None.
-    connections["postgres"].connection = None
-
-    if span_streaming:
-        items = capture_items("span")
-
-        _, status, _ = unpack_werkzeug_response(
-            client.get(reverse("postgres_select_orm"))
-        )
-        assert status == "200 OK"
-
-        sentry_sdk.flush()
-        spans = [item.payload for item in items]
-
-        for span in spans:
-            if span["attributes"].get("sentry.op") == "db" and "auth_user" in span.get(
-                "name"
-            ):
-                attributes = span.get("attributes", {})
-
-                assert SPANDATA.CODE_LINE_NUMBER in attributes
-                assert SPANDATA.CODE_NAMESPACE in attributes
-                assert SPANDATA.CODE_FILE_PATH in attributes
-                assert SPANDATA.CODE_FUNCTION in attributes
-                break
-        else:
-            raise AssertionError("No db span found")
-    else:
-        events = capture_events()
-
-        _, status, _ = unpack_werkzeug_response(
-            client.get(reverse("postgres_select_orm"))
-        )
-        assert status == "200 OK"
-
-        (event,) = events
-        for span in event["spans"]:
-            if span.get("op") == "db" and "auth_user" in span.get("description"):
-                data = span.get("data", {})
-
-                assert SPANDATA.CODE_LINENO in data
-                assert SPANDATA.CODE_NAMESPACE in data
-                assert SPANDATA.CODE_FILEPATH in data
-                assert SPANDATA.CODE_FUNCTION in data
-                break
-        else:
-            raise AssertionError("No db span found")
-
-
-@pytest.mark.forked
-@pytest_mark_django_db_decorator(transaction=True)
 @pytest.mark.parametrize("span_streaming", [True, False])
 def test_query_source(
     sentry_init,
@@ -190,11 +113,12 @@ def test_query_source(
     capture_items,
     span_streaming,
 ):
+    # enable_db_query_source is left at its default (True) on purpose:
+    # this test pins that query source attributes are attached by default.
     sentry_init(
         integrations=[DjangoIntegration()],
         send_default_pii=True,
         traces_sample_rate=1.0,
-        enable_db_query_source=True,
         db_query_source_threshold_ms=0,
         trace_lifecycle="stream" if span_streaming else "static",
     )
