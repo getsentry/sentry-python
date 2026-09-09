@@ -49,6 +49,10 @@ class _ServiceExtension:
 # store import targets instead of importing service modules eagerly; avoids loading
 # service-specific code unnecessarily; service_name -> (module_name, class_name)
 _SERVICE_EXTENSIONS: "Dict[str, Tuple[str, str]]" = {
+    "dynamodb": (
+        "sentry_sdk.integrations.boto3._services.dynamodb",
+        "_DynamoDbExtension",
+    ),
     "sqs": (
         "sentry_sdk.integrations.boto3._services.sqs",
         "_SqsExtension",
