@@ -29,7 +29,7 @@ if TYPE_CHECKING:
 
 
 class _ClientCallContext:
-    """Inputs and client metadata for one botocore client call."""
+    """Inputs and client metadata for a single botocore client call."""
 
     __slots__ = (
         "client",
@@ -75,7 +75,7 @@ def _patch_botocore_client() -> None:
         orig_init(self, *args, **kwargs)
         meta = self.meta
         meta.events.register("request-created", _sentry_request_created)
-        # Run after other `before-sign` handlers so existing baggage is preserved.
+        # run after other `before-sign` handlers so existing baggage is preserved.
         meta.events.register_last("before-sign", _sentry_before_sign)
 
     def sentry_patched_make_api_call(

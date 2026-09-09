@@ -20,16 +20,11 @@ class _ServiceExtension:
     # avoid arbitrary attributes by disabling per-instance `__dict__`.
     __slots__ = ()
 
-    def get_span_op(self, call_context: "_ClientCallContext") -> "Optional[str]":
-        return None
-
-    def get_span_origin(self, call_context: "_ClientCallContext") -> "Optional[str]":
-        return None
-
-    def get_initial_span_attributes(
+    def get_span_data(
         self, call_context: "_ClientCallContext"
-    ) -> "Dict[str, Any]":
-        return {}
+    ) -> "Optional[Tuple[Optional[str], Optional[str], Dict[str, Any]]]":
+        """Returns (operation name, origin, and initial attributes)."""
+        return None
 
     def get_response_span_attributes(
         self, call_context: "_ClientCallContext", response: "Any"

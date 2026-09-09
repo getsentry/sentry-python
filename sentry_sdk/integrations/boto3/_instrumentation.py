@@ -225,21 +225,18 @@ def _start_client_span(
 
     # enrich with service-specific attributes
     if service_extension is not None:
+        service_span_data = None
         with capture_internal_exceptions():
-            _merge_service_attributes(
-                attributes,
-                service_extension.get_initial_span_attributes(call_context),
-            )
+            service_span_data = service_extension.get_span_data(call_context)
 
         with capture_internal_exceptions():
-            service_span_op = service_extension.get_span_op(call_context)
-            if service_span_op and isinstance(service_span_op, str):
-                span_op = service_span_op
-
-        with capture_internal_exceptions():
-            service_span_origin = service_extension.get_span_origin(call_context)
-            if service_span_origin and isinstance(service_span_origin, str):
-                span_origin = service_span_origin
+            if service_span_data is not None:
+                service_op, service_origin, service_attributes = service_span_data
+                _merge_service_attributes(attributes, service_attributes)
+                if service_op and isinstance(service_op, str):
+                    span_op = service_op
+                if service_origin and isinstance(service_origin, str):
+                    span_origin = service_origin
 
     if has_span_streaming_enabled(client.options):
         if sentry_sdk.traces.get_current_span() is None:
