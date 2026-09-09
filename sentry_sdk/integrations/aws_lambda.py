@@ -46,6 +46,9 @@ MILLIS_TO_SECONDS = 1000.0
 
 
 def _get_user_from_event(aws_event: "dict[str, Any]") -> "dict[str, Any]":
+    if not isinstance(aws_event, dict):
+        return {}
+
     identity = aws_event.get("requestContext", {}).get("identity")
     if identity is None:
         return {}
