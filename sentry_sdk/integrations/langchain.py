@@ -422,14 +422,12 @@ class SentryLangchainCallback(BaseCallbackHandler):
                     }
                     for prompt in prompts
                 ]
-
-                if normalized_messages is not None:
-                    set_data_normalized(
-                        span,
-                        SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                        normalized_messages,
-                        unpack=False,
-                    )
+                set_data_normalized(
+                    span,
+                    SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                    normalized_messages,
+                    unpack=False,
+                )
 
     def on_chat_model_start(
         self: "SentryLangchainCallback",
@@ -528,14 +526,12 @@ class SentryLangchainCallback(BaseCallbackHandler):
                             self._normalize_langchain_message(message)
                         )
                 normalized_messages = normalize_message_roles(normalized_messages)
-
-                if normalized_messages is not None:
-                    set_data_normalized(
-                        span,
-                        SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                        normalized_messages,
-                        unpack=False,
-                    )
+                set_data_normalized(
+                    span,
+                    SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                    normalized_messages,
+                    unpack=False,
+                )
 
     def on_chat_model_end(
         self: "SentryLangchainCallback",
@@ -1143,14 +1139,12 @@ def _wrap_agent_executor_invoke(f: "Callable[..., Any]") -> "Callable[..., Any]"
             input = result.get("input")
             if input is not None and record_inputs:
                 normalized_messages = normalize_message_roles([input])
-
-                if normalized_messages is not None:
-                    set_data_normalized(
-                        span,
-                        SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                        normalized_messages,
-                        unpack=False,
-                    )
+                set_data_normalized(
+                    span,
+                    SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                    normalized_messages,
+                    unpack=False,
+                )
 
             output = result.get("output")
             if output is not None and record_outputs:
@@ -1199,14 +1193,12 @@ def _wrap_agent_executor_stream(f: "Callable[..., Any]") -> "Callable[..., Any]"
         input = args[0].get("input") if len(args) >= 1 else None
         if input is not None and record_inputs:
             normalized_messages = normalize_message_roles([input])
-
-            if normalized_messages is not None:
-                set_data_normalized(
-                    span,
-                    SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                    normalized_messages,
-                    unpack=False,
-                )
+            set_data_normalized(
+                span,
+                SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                normalized_messages,
+                unpack=False,
+            )
 
         # Run the agent
         result = f(self, *args, **kwargs)

@@ -71,13 +71,12 @@ def invoke_agent_span(
 
         if len(messages) > 0:
             normalized_messages = normalize_message_roles(messages)
-            if normalized_messages is not None:
-                set_data_normalized(
-                    span,
-                    SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                    normalized_messages,
-                    unpack=False,
-                )
+            set_data_normalized(
+                span,
+                SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                normalized_messages,
+                unpack=False,
+            )
 
     _set_agent_data(span, agent)
 

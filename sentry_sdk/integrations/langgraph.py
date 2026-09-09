@@ -159,14 +159,12 @@ def _wrap_pregel_invoke(f: "Callable[..., Any]") -> "Callable[..., Any]":
                 input_messages = _parse_langgraph_messages(args[0])
                 if input_messages and _should_record_inputs(integration):
                     normalized_input_messages = normalize_message_roles(input_messages)
-
-                    if normalized_input_messages is not None:
-                        set_data_normalized(
-                            span,
-                            SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                            normalized_input_messages,
-                            unpack=False,
-                        )
+                    set_data_normalized(
+                        span,
+                        SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                        normalized_input_messages,
+                        unpack=False,
+                    )
 
             result = f(self, *args, **kwargs)
 
@@ -204,14 +202,12 @@ def _wrap_pregel_ainvoke(f: "Callable[..., Any]") -> "Callable[..., Any]":
                 input_messages = _parse_langgraph_messages(args[0])
                 if input_messages and _should_record_inputs(integration):
                     normalized_input_messages = normalize_message_roles(input_messages)
-
-                    if normalized_input_messages is not None:
-                        set_data_normalized(
-                            span,
-                            SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                            normalized_input_messages,
-                            unpack=False,
-                        )
+                    set_data_normalized(
+                        span,
+                        SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                        normalized_input_messages,
+                        unpack=False,
+                    )
 
             result = await f(self, *args, **kwargs)
 

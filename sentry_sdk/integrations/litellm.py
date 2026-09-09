@@ -143,13 +143,12 @@ def _input_callback(kwargs: "Dict[str, Any]") -> None:
             messages = kwargs.get("messages", [])
             if messages:
                 messages = _convert_message_parts(messages)
-                if messages is not None:
-                    set_data_normalized(
-                        span,
-                        SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                        messages,
-                        unpack=False,
-                    )
+                set_data_normalized(
+                    span,
+                    SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                    messages,
+                    unpack=False,
+                )
 
     # Record other parameters
     params = {

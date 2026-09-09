@@ -174,13 +174,12 @@ def _set_input_data(
                 )
 
     normalized_messages = normalize_message_roles(request_messages)
-    if normalized_messages is not None:
-        set_data_normalized(
-            span,
-            SPANDATA.GEN_AI_REQUEST_MESSAGES,
-            normalized_messages,
-            unpack=False,
-        )
+    set_data_normalized(
+        span,
+        SPANDATA.GEN_AI_REQUEST_MESSAGES,
+        normalized_messages,
+        unpack=False,
+    )
 
 
 def _set_output_data(span: "StreamedSpan", result: "Any") -> None:
