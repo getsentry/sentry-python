@@ -26,7 +26,7 @@ from .spans.ai_client import ai_client_span, update_ai_client_span
 if TYPE_CHECKING:
     from typing import Any
 
-    from pydantic.ValidationError import ValidationError
+    from pydantic import ValidationError
     from pydantic_ai import (
         ModelRequestContext,
         ModelRetry,
