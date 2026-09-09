@@ -8,6 +8,7 @@ from sentry_sdk import get_client
 from sentry_sdk.consts import VERSION
 from sentry_sdk.integrations.logging import (
     LoggingIntegration,
+    SentryLogsHandler,
     ignore_logger,
     ignore_logger_for_sentry_logs,
     unignore_logger,
@@ -242,6 +243,23 @@ def test_sentry_logs_collection_off_by_default(sentry_init, capture_items, reque
     get_client().flush()
 
     assert not items
+
+
+def test_sentry_logs_handler_skips_format_when_disabled(sentry_init):
+    sentry_init(integrations=[LoggingIntegration(capture_sentry_logs=False)])
+    handler = SentryLogsHandler()
+    record = logging.LogRecord(
+        name="test-logger",
+        level=logging.INFO,
+        pathname=__file__,
+        lineno=1,
+        msg="hello %s",
+        args=("world",),
+        exc_info=None,
+    )
+    with mock.patch.object(handler, "format") as formatted:
+        handler.emit(record)
+    formatted.assert_not_called()
 
 
 def test_sentry_logs_collection_opt_in(sentry_init, capture_items, request):
