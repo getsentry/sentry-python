@@ -7,7 +7,7 @@ from sentry_sdk._types import BLOB_DATA_SUBSTITUTE
 from sentry_sdk.ai.consts import DATA_URL_BASE64_REGEX
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+    from typing import Any, Dict, List, Optional, Tuple, Union
 
     from sentry_sdk.tracing import Span
 
@@ -534,15 +534,6 @@ def normalize_message_roles(messages: "list[dict[str, Any]]") -> "list[dict[str,
         normalized_messages.append(normalized_message)
 
     return normalized_messages
-
-
-def get_start_span_function() -> "Callable[..., Any]":
-    current_span = sentry_sdk.get_current_span()
-
-    transaction_exists = (
-        current_span is not None and current_span.containing_transaction is not None
-    )
-    return sentry_sdk.start_span if transaction_exists else sentry_sdk.start_transaction
 
 
 def _truncate_single_message_content_if_present(
