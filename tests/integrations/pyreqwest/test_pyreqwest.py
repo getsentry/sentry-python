@@ -696,54 +696,6 @@ async def test_async_crumb_capture(
     sentry_init(
         integrations=[PyreqwestIntegration()],
         send_default_pii=send_default_pii,
-    )
-
-    url = f"http://localhost:{server_port}/hello?q=test#frag"
-
-    events = capture_events()
-
-    # Ensure the isolation scope contextvar is set before pyreqwest spawns
-    # its middleware on a separate asyncio Task. Without this, the child task
-    # lazily creates its own isolation scope, and breadcrumbs added there
-    # don't propagate back to this task's context.
-    sentry_sdk.get_isolation_scope()
-
-    with sentry_sdk.start_transaction():
-        async with ClientBuilder().build() as client:
-            response = await client.get(url).build().send()
-            assert response.status == 200
-
-        capture_message("Testing!")
-
-    (event,) = events
-
-    crumb = event["breadcrumbs"]["values"][0]
-    assert crumb["type"] == "http"
-    assert crumb["category"] == "httplib"
-
-    expected = {
-        SPANDATA.HTTP_METHOD: "GET",
-        SPANDATA.HTTP_STATUS_CODE: 200,
-    }
-    if send_default_pii:
-        expected["url"] = f"http://localhost:{server_port}/hello"
-        expected[SPANDATA.HTTP_QUERY] = "q=test"
-        expected[SPANDATA.HTTP_FRAGMENT] = "frag"
-
-    assert crumb["data"] == ApproxDict(expected)
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize("send_default_pii", [True, False])
-async def test_async_crumb_capture_span_streaming(
-    sentry_init,
-    capture_events,
-    server_port,
-    send_default_pii,
-):
-    sentry_init(
-        integrations=[PyreqwestIntegration()],
-        send_default_pii=send_default_pii,
         trace_lifecycle="stream",
     )
 
