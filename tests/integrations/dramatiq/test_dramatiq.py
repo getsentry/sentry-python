@@ -6,11 +6,9 @@ from dramatiq.brokers.stub import StubBroker
 from dramatiq.middleware import Middleware, SkipMessage
 
 import sentry_sdk
-from sentry_sdk import start_transaction
 from sentry_sdk.consts import SPANDATA, SPANSTATUS
 from sentry_sdk.integrations.dramatiq import DramatiqIntegration
 from sentry_sdk.integrations.logging import ignore_logger_for_events
-from sentry_sdk.tracing import Transaction, TransactionSource
 
 ignore_logger_for_events("dramatiq.worker.WorkerThread")
 
@@ -70,12 +68,8 @@ def test_that_a_single_error_is_captured(broker, worker, capture_events, fail_fa
 
 
 @pytest.mark.parametrize(
-    "broker,expected_span_status,fail_fast,span_streaming",
+    "broker,expected_span_status,fail_fast",
     [
-        ({"traces_sample_rate": 1.0}, SPANSTATUS.INTERNAL_ERROR, False, False),
-        ({"traces_sample_rate": 1.0}, SPANSTATUS.OK, False, False),
-        ({"traces_sample_rate": 1.0}, SPANSTATUS.INTERNAL_ERROR, True, False),
-        ({"traces_sample_rate": 1.0}, SPANSTATUS.OK, True, False),
         (
             {
                 "traces_sample_rate": 1.0,
@@ -83,7 +77,6 @@ def test_that_a_single_error_is_captured(broker, worker, capture_events, fail_fa
             },
             SPANSTATUS.INTERNAL_ERROR,
             False,
-            True,
         ),
         (
             {
@@ -92,7 +85,6 @@ def test_that_a_single_error_is_captured(broker, worker, capture_events, fail_fa
             },
             SPANSTATUS.OK,
             False,
-            True,
         ),
         (
             {
@@ -101,7 +93,6 @@ def test_that_a_single_error_is_captured(broker, worker, capture_events, fail_fa
             },
             SPANSTATUS.INTERNAL_ERROR,
             True,
-            True,
         ),
         (
             {
@@ -109,7 +100,6 @@ def test_that_a_single_error_is_captured(broker, worker, capture_events, fail_fa
                 "trace_lifecycle": "stream",
             },
             SPANSTATUS.OK,
-            True,
             True,
         ),
     ],
@@ -118,10 +108,6 @@ def test_that_a_single_error_is_captured(broker, worker, capture_events, fail_fa
         "success",
         "error_fail_fast",
         "success_fail_fast",
-        "error_stream",
-        "success_stream",
-        "error_fail_fast_stream",
-        "success_fail_fast_stream",
     ],
     indirect=["broker"],
 )
@@ -132,14 +118,10 @@ def test_task_transaction(
     capture_items,
     expected_span_status,
     fail_fast,
-    span_streaming,
 ):
     task_fails = expected_span_status == SPANSTATUS.INTERNAL_ERROR
 
-    if span_streaming:
-        items = capture_items("event", "span")
-    else:
-        events = capture_events()
+    items = capture_items("event", "span")
 
     @dramatiq.actor(max_retries=0)
     def dummy_actor(x, y):
@@ -156,99 +138,58 @@ def test_task_transaction(
     worker.join()
     sentry_sdk.flush()
 
-    if span_streaming:
-        if task_fails:
-            error_item, segment_item = items
-            error_event = error_item.payload
-            exception = error_event["exception"]["values"][0]
-            assert exception["type"] == "ZeroDivisionError"
-            assert exception["mechanism"]["type"] == DramatiqIntegration.identifier
-        else:
-            (segment_item,) = items
-
-        segment = segment_item.payload
-        assert segment_item.type == "span"
-        assert segment["name"] == "dummy_actor"
-        assert segment["is_segment"] is True
-        assert segment["attributes"]["sentry.op"] == "queue.task.dramatiq"
-        assert segment["attributes"]["sentry.segment.name.source"] == "task"
-        assert (
-            segment["attributes"][SPANDATA.MESSAGING_DESTINATION_NAME]
-            == dummy_actor.queue_name
-        )
-        assert segment["status"] == ("error" if task_fails else "ok")
+    if task_fails:
+        error_item, segment_item = items
+        error_event = error_item.payload
+        exception = error_event["exception"]["values"][0]
+        assert exception["type"] == "ZeroDivisionError"
+        assert exception["mechanism"]["type"] == DramatiqIntegration.identifier
     else:
-        if task_fails:
-            error_event = events.pop(0)
-            exception = error_event["exception"]["values"][0]
-            assert exception["type"] == "ZeroDivisionError"
-            assert exception["mechanism"]["type"] == DramatiqIntegration.identifier
+        (segment_item,) = items
 
-        (event,) = events
-        assert event["type"] == "transaction"
-        assert event["transaction"] == "dummy_actor"
-        assert event["transaction_info"] == {"source": TransactionSource.TASK}
-        assert (
-            event["contexts"]["trace"]["data"][SPANDATA.MESSAGING_DESTINATION_NAME]
-            == dummy_actor.queue_name
-        )
-        assert event["contexts"]["trace"]["status"] == expected_span_status
+    segment = segment_item.payload
+    assert segment_item.type == "span"
+    assert segment["name"] == "dummy_actor"
+    assert segment["is_segment"] is True
+    assert segment["attributes"]["sentry.op"] == "queue.task.dramatiq"
+    assert segment["attributes"]["sentry.segment.name.source"] == "task"
+    assert (
+        segment["attributes"][SPANDATA.MESSAGING_DESTINATION_NAME]
+        == dummy_actor.queue_name
+    )
+    assert segment["status"] == ("error" if task_fails else "ok")
 
 
 @pytest.mark.parametrize(
-    "broker,span_streaming",
+    "broker",
     [
-        ({"traces_sample_rate": 1.0}, False),
-        (
-            {
-                "traces_sample_rate": 1.0,
-                "trace_lifecycle": "stream",
-            },
-            True,
-        ),
+        {
+            "traces_sample_rate": 1.0,
+            "trace_lifecycle": "stream",
+        },
     ],
-    ids=["static", "stream"],
     indirect=["broker"],
 )
-def test_dramatiq_propagate_trace(
-    broker, worker, capture_events, capture_items, span_streaming
-):
-    if span_streaming:
-        items = capture_items("span")
+def test_dramatiq_propagate_trace(broker, worker, capture_items):
+    items = capture_items("span")
 
-        with sentry_sdk.traces.start_span(name="outer") as outer_span:
-
-            @dramatiq.actor(max_retries=0)
-            def propagated_trace_task():
-                pass
-
-            propagated_trace_task.send()
-            broker.join(propagated_trace_task.queue_name)
-            worker.join()
-
-        sentry_sdk.flush()
-
-        inner_segment, outer_segment = [i.payload for i in items]
-        assert inner_segment["name"] == "propagated_trace_task"
-        assert inner_segment["attributes"]["sentry.op"] == "queue.task.dramatiq"
-        assert inner_segment["trace_id"] == outer_span.trace_id
-        assert outer_segment["name"] == "outer"
-    else:
-        events = capture_events()
+    with sentry_sdk.traces.start_span(name="outer") as outer_span:
 
         @dramatiq.actor(max_retries=0)
         def propagated_trace_task():
             pass
 
-        with start_transaction() as outer_transaction:
-            propagated_trace_task.send()
-            broker.join(propagated_trace_task.queue_name)
-            worker.join()
+        propagated_trace_task.send()
+        broker.join(propagated_trace_task.queue_name)
+        worker.join()
 
-        assert (
-            events[0]["transaction"] == "propagated_trace_task"
-        )  # the "inner" transaction
-        assert events[0]["contexts"]["trace"]["trace_id"] == outer_transaction.trace_id
+    sentry_sdk.flush()
+
+    inner_segment, outer_segment = [i.payload for i in items]
+    assert inner_segment["name"] == "propagated_trace_task"
+    assert inner_segment["attributes"]["sentry.op"] == "queue.task.dramatiq"
+    assert inner_segment["trace_id"] == outer_span.trace_id
+    assert outer_segment["name"] == "outer"
 
 
 @pytest.mark.parametrize(
@@ -582,37 +523,28 @@ def test_that_retry_exceptions_are_not_captured(
 
 
 @pytest.mark.parametrize(
-    "broker,span_streaming",
+    "broker",
     [
-        ({"traces_sample_rate": 1.0}, False),
-        (
-            {
-                "traces_sample_rate": 1.0,
-                "trace_lifecycle": "stream",
-            },
-            True,
-        ),
+        {
+            "traces_sample_rate": 1.0,
+            "trace_lifecycle": "stream",
+        },
     ],
-    ids=["static", "stream"],
     indirect=["broker"],
 )
 def test_that_skip_message_cleans_up_scope_and_transaction(
-    broker, worker, capture_events, capture_items, span_streaming
+    broker, worker, capture_items
 ):
     captured_spans: list = []
 
     class SkipMessageMiddleware(Middleware):
         def before_process_message(self, broker, message):
-            if span_streaming:
-                captured_spans.append(sentry_sdk.get_current_span())
-            else:
-                captured_spans.append(sentry_sdk.get_current_scope().transaction)
+            captured_spans.append(sentry_sdk.get_current_span())
             raise SkipMessage()
 
     broker.add_middleware(SkipMessageMiddleware())
 
-    if span_streaming:
-        items = capture_items("span")
+    items = capture_items("span")
 
     @dramatiq.actor(max_retries=0)
     def skipped_actor(): ...
@@ -622,12 +554,7 @@ def test_that_skip_message_cleans_up_scope_and_transaction(
     broker.join(skipped_actor.queue_name)
     worker.join()
 
-    if span_streaming:
-        sentry_sdk.flush()
-        (segment_payload,) = [i.payload for i in items]
-        assert segment_payload["name"] == "skipped_actor"
-        assert segment_payload["end_timestamp"] is not None
-    else:
-        (transaction,) = captured_spans
-        assert isinstance(transaction, Transaction)
-        assert transaction.timestamp is not None
+    sentry_sdk.flush()
+    (segment_payload,) = [i.payload for i in items]
+    assert segment_payload["name"] == "skipped_actor"
+    assert segment_payload["end_timestamp"] is not None
