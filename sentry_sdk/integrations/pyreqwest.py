@@ -8,7 +8,6 @@ from sentry_sdk.tracing_utils import (
     add_http_breadcrumb,
     add_http_request_source,
     get_url_attributes,
-    has_span_streaming_enabled,
     propagate_trace_headers,
 )
 from sentry_sdk.utils import (
@@ -99,11 +98,8 @@ def _get_breadcrumb_url_data(
     if parsed_url is None or not url_attributes:
         return {}
 
-    # Legacy spans keep the bare URL in breadcrumbs; only span streaming
-    # reports the full URL
     url = parsed_url.url
-    if has_span_streaming_enabled(sentry_sdk.get_client().options):
-        url = url_attributes.get(SPANDATA.URL_FULL, url)
+    url = url_attributes.get(SPANDATA.URL_FULL, url)
 
     return {
         "url": url,
