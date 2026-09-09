@@ -388,6 +388,140 @@ class SPANDATA:
     Example: ["Token limit exceeded"]
     """
 
+    AWS_DYNAMODB_ATTRIBUTE_DEFINITIONS = "aws.dynamodb.attribute_definitions"
+    """
+    The JSON-serialized value of each item in the `AttributeDefinitions` request field.
+    Example: `["{ \"AttributeName\": \"string\", \"AttributeType\": \"string\" }"]`
+    """
+
+    AWS_DYNAMODB_ATTRIBUTES_TO_GET = "aws.dynamodb.attributes_to_get"
+    """
+    The value of the `AttributesToGet` request parameter.
+    Example: `["lives", "id"]`
+    """
+
+    AWS_DYNAMODB_CONSISTENT_READ = "aws.dynamodb.consistent_read"
+    """
+    The value of the `ConsistentRead` request parameter.
+    Example: true
+    """
+
+    AWS_DYNAMODB_CONSUMED_CAPACITY = "aws.dynamodb.consumed_capacity"
+    """
+    The JSON-serialized value of each item in the `ConsumedCapacity` response field.
+    Example: `["{ \"CapacityUnits\": number, \"GlobalSecondaryIndexes\": { \"string\" : { \"CapacityUnits\": number, \"ReadCapacityUnits\": number, \"WriteCapacityUnits\": number } }, \"LocalSecondaryIndexes\": { \"string\" : { \"CapacityUnits\": number, \"ReadCapacityUnits\": number, \"WriteCapacityUnits\": number } }, \"ReadCapacityUnits\": number, \"Table\": { \"CapacityUnits\": number, \"ReadCapacityUnits\": number, \"WriteCapacityUnits\": number }, \"TableName\": \"string\", \"WriteCapacityUnits\": number }"]`
+    """
+
+    AWS_DYNAMODB_COUNT = "aws.dynamodb.count"
+    """
+    The value of the `Count` response parameter.
+    Example: 10
+    """
+
+    AWS_DYNAMODB_EXCLUSIVE_START_TABLE = "aws.dynamodb.exclusive_start_table"
+    """
+    The value of the `ExclusiveStartTableName` request parameter.
+    Example: "Users"
+    """
+
+    AWS_DYNAMODB_GLOBAL_SECONDARY_INDEXES = "aws.dynamodb.global_secondary_indexes"
+    """
+    The JSON-serialized value of each item of the `GlobalSecondaryIndexes` request field.
+    Example: `["{ \"Create\": { \"IndexName\": \"string\", \"KeySchema\": [ { \"AttributeName\": \"string\", \"KeyType\": \"string\" } ], \"Projection\": { \"NonKeyAttributes\": [ \"string\" ], \"ProjectionType\": \"string\" }, \"ProvisionedThroughput\": { \"ReadCapacityUnits\": number, \"WriteCapacityUnits\": number } }"]`
+    """
+
+    AWS_DYNAMODB_GLOBAL_SECONDARY_INDEX_UPDATES = (
+        "aws.dynamodb.global_secondary_index_updates"
+    )
+    """
+    The JSON-serialized value of each item in the `GlobalSecondaryIndexUpdates` request field.
+    Example: `["{ \"IndexName\": \"string\", \"KeySchema\": [ { \"AttributeName\": \"string\", \"KeyType\": \"string\" } ], \"Projection\": { \"NonKeyAttributes\": [ \"string\" ], \"ProjectionType\": \"string\" }, \"ProvisionedThroughput\": { \"ReadCapacityUnits\": number, \"WriteCapacityUnits\": number } }"]`
+    """
+
+    AWS_DYNAMODB_INDEX_NAME = "aws.dynamodb.index_name"
+    """
+    The value of the `IndexName` request parameter.
+    Example: "name_to_group"
+    """
+
+    AWS_DYNAMODB_ITEM_COLLECTION_METRICS = "aws.dynamodb.item_collection_metrics"
+    """
+    The JSON-serialized value of the `ItemCollectionMetrics` response field.
+    Example: `{ "string" : [ { "ItemCollectionKey": { "string" : { "B": blob, "BOOL": boolean, "BS": [ blob ], "L": [ "AttributeValue" ], "M": { "string" : "AttributeValue" }, "N": "string", "NS": [ "string" ], "NULL": boolean, "S": "string", "SS": [ "string" ] } }, "SizeEstimateRangeGB": [ number ] } ] }`
+    """
+
+    AWS_DYNAMODB_LIMIT = "aws.dynamodb.limit"
+    """
+    The value of the `Limit` request parameter.
+    Example: 10
+    """
+
+    AWS_DYNAMODB_LOCAL_SECONDARY_INDEXES = "aws.dynamodb.local_secondary_indexes"
+    """
+    The JSON-serialized value of each item of the `LocalSecondaryIndexes` request field.
+    Example: `["{ \"IndexArn\": \"string\", \"IndexName\": \"string\", \"IndexSizeBytes\": number, \"ItemCount\": number, \"KeySchema\": [ { \"AttributeName\": \"string\", \"KeyType\": \"string\" } ], \"Projection\": { \"NonKeyAttributes\": [ \"string\" ], \"ProjectionType\": \"string\" } }"]`
+    """
+
+    AWS_DYNAMODB_PROJECTION = "aws.dynamodb.projection"
+    """
+    The value of the `ProjectionExpression` request parameter.
+    Example: "Title, Price, Color"
+    """
+
+    AWS_DYNAMODB_PROVISIONED_READ_CAPACITY = "aws.dynamodb.provisioned_read_capacity"
+    """
+    The value of the `ProvisionedThroughput.ReadCapacityUnits` request parameter.
+    Example: 1
+    """
+
+    AWS_DYNAMODB_PROVISIONED_WRITE_CAPACITY = "aws.dynamodb.provisioned_write_capacity"
+    """
+    The value of the `ProvisionedThroughput.WriteCapacityUnits` request parameter.
+    Example: 2
+    """
+
+    AWS_DYNAMODB_SCANNED_COUNT = "aws.dynamodb.scanned_count"
+    """
+    The value of the `ScannedCount` response parameter.
+    Example: 50
+    """
+
+    AWS_DYNAMODB_SCAN_FORWARD = "aws.dynamodb.scan_forward"
+    """
+    The value of the `ScanIndexForward` request parameter.
+    Example: true
+    """
+
+    AWS_DYNAMODB_SEGMENT = "aws.dynamodb.segment"
+    """
+    The value of the `Segment` request parameter.
+    Example: 10
+    """
+
+    AWS_DYNAMODB_SELECT = "aws.dynamodb.select"
+    """
+    The value of the `Select` request parameter.
+    Example: "ALL_ATTRIBUTES"
+    """
+
+    AWS_DYNAMODB_TABLE_COUNT = "aws.dynamodb.table_count"
+    """
+    The number of items in the `TableNames` response parameter.
+    Example: 20
+    """
+
+    AWS_DYNAMODB_TABLE_NAMES = "aws.dynamodb.table_names"
+    """
+    A list of table names.
+    Example: ["Users", "Cats"]
+    """
+
+    AWS_DYNAMODB_TOTAL_SEGMENTS = "aws.dynamodb.total_segments"
+    """
+    The value of the `TotalSegments` request parameter.
+    Example: 100
+    """
+
     AWS_EXTENDED_REQUEST_ID = "aws.extended_request_id"
     """
     The AWS extended request ID as returned in the response headers.
@@ -398,6 +532,13 @@ class SPANDATA:
     """
     The AWS request ID as returned in the response headers.
     Example: "79b9da39-b7ae-508a-a6bc-864b2829c622"
+    """
+
+    # TODO - add to semconv.
+    AWS_SQS_QUEUE_URL = "aws.sqs.queue.url"
+    """
+    The URL of the AWS SQS Queue. It's a unique identifier for a queue in Amazon Simple Queue Service (SQS) and is used to access the queue and perform actions on it.
+    Example: "https://sqs.us-east-1.amazonaws.com/123456789012/MyQueue"
     """
 
     CACHE_HIT = "cache.hit"
@@ -491,6 +632,12 @@ class SPANDATA:
     Example: public.users; customers
     """
 
+    DB_COLLECTION_NAME = "db.collection.name"
+    """
+    The name of a collection (table, container) within the database.
+    Example: "users"
+    """
+
     DB_NAME = "db.name"
     """
     .. deprecated::
@@ -526,6 +673,12 @@ class SPANDATA:
     """
     The name of the operation being executed.
     Example: "SELECT"
+    """
+
+    DB_OPERATION_BATCH_SIZE = "db.operation.batch.size"
+    """
+    The number of queries included in a batch operation. Operations are only considered batches when they contain two or more operations, and so `db.operation.batch.size` SHOULD never be 1.
+    Example: 2
     """
 
     DB_SYSTEM = "db.system"
@@ -938,6 +1091,12 @@ class SPANDATA:
     The number of messages sent, received, or processed in the scope of the batching operation.
 
     Example: 10
+    """
+
+    MESSAGING_MESSAGE_BODY_SIZE = "messaging.message.body.size"
+    """
+    The size of the message body in bytes.
+    Example: 839
     """
 
     MESSAGING_MESSAGE_ID = "messaging.message.id"
