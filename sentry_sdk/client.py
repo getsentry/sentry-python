@@ -520,7 +520,7 @@ class _Client(BaseClient):
     """
 
     def __init__(self, *args: "Any", **kwargs: "Any") -> None:
-        super(_Client, self).__init__(options=get_options(*args, **kwargs))
+        super().__init__(options=get_options(*args, **kwargs))
         self._init_impl()
 
     def __getstate__(self) -> "Any":

@@ -8,7 +8,6 @@ from sentry_sdk import (
     get_global_scope,
     get_isolation_scope,
 )
-from sentry_sdk._compat import with_metaclass
 from sentry_sdk.client import Client
 from sentry_sdk.consts import INSTRUMENTER
 from sentry_sdk.scope import _ScopeManager
@@ -109,7 +108,7 @@ class HubMeta(type):
         return GLOBAL_HUB
 
 
-class Hub(with_metaclass(HubMeta)):  # type: ignore
+class Hub(metaclass=HubMeta):
     """
     .. deprecated:: 2.0.0
         The Hub is deprecated. Its functionality will be merged into :py:class:`sentry_sdk.scope.Scope`.
