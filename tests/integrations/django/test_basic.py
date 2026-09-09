@@ -963,6 +963,26 @@ def test_transaction_style_tracing_disabled(
     assert event["transaction"] == expected_transaction
 
 
+def test_http_route(
+    sentry_init,
+    client,
+    capture_items,
+):
+    sentry_init(
+        integrations=[DjangoIntegration()],
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+    )
+
+    items = capture_items("span")
+
+    unpack_werkzeug_response(client.get("/message"))
+
+    sentry_sdk.flush()
+    (segment,) = (item.payload for item in items if item.payload.get("is_segment"))
+    assert segment["attributes"][SPANDATA.HTTP_ROUTE] == "/message"
+
+
 def test_request_body(
     sentry_init,
     client,

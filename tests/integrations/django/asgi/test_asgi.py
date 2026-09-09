@@ -138,6 +138,33 @@ async def test_async_views(
     }
 
 
+@pytest.mark.parametrize("application", APPS)
+@pytest.mark.asyncio
+@pytest.mark.skipif(
+    django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
+)
+async def test_http_route(
+    sentry_init,
+    capture_items,
+    application,
+):
+    sentry_init(
+        integrations=[DjangoIntegration()],
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+    )
+
+    items = capture_items("span")
+
+    comm = HttpCommunicator(application, "GET", "/async_message")
+    await comm.get_response()
+    await comm.wait()
+
+    sentry_sdk.flush()
+    (segment,) = (item.payload for item in items if item.payload.get("is_segment"))
+    assert segment["attributes"][SPANDATA.HTTP_ROUTE] == "/async_message"
+
+
 @pytest.mark.asyncio
 @pytest.mark.skipif(
     django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"

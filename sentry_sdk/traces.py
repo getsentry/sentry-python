@@ -20,7 +20,6 @@ from sentry_sdk.profiler.continuous_profiler import (
     try_autostart_continuous_profiler,
     try_profile_lifecycle_trace_start,
 )
-from sentry_sdk.tracing_utils import Baggage
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     deprecation_warning,
@@ -885,3 +884,7 @@ def get_current_span(
     scope = scope or sentry_sdk.get_current_scope()
     current_span = scope.streamed_span
     return current_span
+
+
+# Circular import
+from sentry_sdk.tracing_utils import Baggage  # noqa: E402, F401, I001

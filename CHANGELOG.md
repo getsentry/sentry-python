@@ -1,5 +1,27 @@
 # Changelog
 
+## 2.69.1
+
+### New Features ✨
+
+- (django) Add `http.route` attribute by @alexander-alderman-webb in [#7428](https://github.com/getsentry/sentry-python/pull/7428)
+
+### Bug Fixes 🐛
+
+- (aiohttp) Preserve SigV4-signed propagation headers by @Robinbinu in [#7427](https://github.com/getsentry/sentry-python/pull/7427)
+
+### Internal Changes 🔧
+
+#### Mcp
+
+- Parametrize tests on the streaming trace lifecycle by @alexander-alderman-webb in [#7424](https://github.com/getsentry/sentry-python/pull/7424)
+- Remove vacuous tests by @alexander-alderman-webb in [#7420](https://github.com/getsentry/sentry-python/pull/7420)
+
+#### Other
+
+- (cohere) Parametrize tests on the streaming trace lifecycle by @alexander-alderman-webb in [#7419](https://github.com/getsentry/sentry-python/pull/7419)
+- (openai-agents) Parametrize tests on `stream_gen_ai_spans` and the streaming trace lifecycle by @alexander-alderman-webb in [#7405](https://github.com/getsentry/sentry-python/pull/7405)
+
 ## 2.69.0
 
 ### New Features ✨

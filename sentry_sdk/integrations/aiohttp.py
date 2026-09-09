@@ -3,7 +3,7 @@ import weakref
 from functools import wraps
 
 import sentry_sdk
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.consts import _SENTRY_HEADER_NAMES, OP, SPANDATA
 from sentry_sdk.data_collection import (
     _apply_data_collection_filtering_to_query_string,
 )
@@ -27,6 +27,7 @@ from sentry_sdk.traces import (
 )
 from sentry_sdk.tracing import (
     BAGGAGE_HEADER_NAME,
+    SENTRY_TRACE_HEADER_NAME,
     SOURCE_FOR_STYLE,
 )
 from sentry_sdk.tracing_utils import (
@@ -37,6 +38,8 @@ from sentry_sdk.tracing_utils import (
 from sentry_sdk.utils import (
     SENSITIVE_DATA_SUBSTITUTE,
     AnnotatedValue,
+    _get_aws_sigv4_signed_headers_from_authorization_header,
+    _get_aws_sigv4_signed_headers_from_url_query_string,
     _register_control_flow_exception,
     capture_internal_exceptions,
     ensure_integration_enabled,
@@ -389,12 +392,50 @@ def create_trace_config() -> "TraceConfig":
             span = sentry_sdk.traces.start_span(name=span_name, attributes=attributes)
 
         if should_propagate_trace(client, str(params.url)):
+            # existing `sentry-trace`: skip so it is not duplicated.
+            headers_to_skip: "set[str]" = set()
+            if SENTRY_TRACE_HEADER_NAME in params.headers:
+                headers_to_skip.add(SENTRY_TRACE_HEADER_NAME)
+
+            with capture_internal_exceptions():
+                authorization = params.headers.get("Authorization")
+                if authorization:
+                    if isinstance(authorization, bytes):
+                        authorization = authorization.decode("latin-1")
+                    # `SignedHeaders` lists fields covered by SigV4.
+                    signed_headers = (
+                        _get_aws_sigv4_signed_headers_from_authorization_header(
+                            authorization
+                        )
+                    )
+                    # skip signed `sentry-trace` and `baggage`.
+                    headers_to_skip.update(
+                        _SENTRY_HEADER_NAMES.intersection(signed_headers)
+                    )
+
+                # presigned URLs list signed names in the query string.
+                query_signed_headers = (
+                    _get_aws_sigv4_signed_headers_from_url_query_string(str(params.url))
+                )
+                headers_to_skip.update(
+                    _SENTRY_HEADER_NAMES.intersection(query_signed_headers)
+                )
+
             for (
                 key,
                 value,
             ) in sentry_sdk.get_current_scope().iter_trace_propagation_headers(
                 span=span
             ):
+                # skip signed headers and an existing `sentry-trace`.
+                if key.lower() in headers_to_skip:
+                    logger.debug(
+                        "[Tracing] Not adding `{key}` header to outgoing request "
+                        "to {url}: it already exists or is covered by the AWS "
+                        "SigV4 signature.".format(key=key, url=params.url)
+                    )
+                    continue
+
                 logger.debug(
                     "[Tracing] Adding `{key}` header {value} to outgoing request to {url}.".format(
                         key=key, value=value, url=params.url
