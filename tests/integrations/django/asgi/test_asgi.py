@@ -558,7 +558,7 @@ BODY_FORM_CONTENT_LENGTH = str(len(BODY_FORM)).encode("utf-8")
 @pytest.mark.skipif(
     django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
 )
-async def test_asgi_request_body(
+async def test_asgi_request_body_send_default_pii(
     sentry_init,
     capture_items,
     application,
@@ -583,7 +583,7 @@ async def test_asgi_request_body(
         body=body,
     )
 
-    items = capture_items("event")
+    items = capture_items("event", "span")
 
     response = await comm.get_response()
     await comm.wait()
@@ -592,12 +592,20 @@ async def test_asgi_request_body(
     assert response["body"] == body
 
     sentry_sdk.flush()
-    (event,) = (item.payload for item in items)
+
+    (event,) = [item.payload for item in items if item.type == "event"]
+    (span,) = [
+        item.payload
+        for item in items
+        if item.type == "span" and item.payload["name"] == "/post_echo_async"
+    ]
 
     if expected_data is not None:
         assert event["request"]["data"] == expected_data
+        assert span["attributes"]["http.request.body.data"] == expected_data
     else:
         assert "data" not in event["request"]
+        assert "http.request.body.data" not in span["attributes"]
 
 
 @pytest.mark.parametrize("application", APPS)
@@ -688,39 +696,6 @@ async def test_asgi_request_body_dropped_with_form_and_files_data_collection(
 
     assert "data" not in event["request"]
     assert "data" not in event.get("_meta", {}).get("request", {})
-
-
-@pytest.mark.parametrize("application", APPS)
-@pytest.mark.asyncio
-@pytest.mark.skipif(
-    django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
-)
-async def test_asgi_transaction_request_body_data_collection(
-    sentry_init, capture_events, application
-):
-    sentry_init(
-        integrations=[DjangoIntegration()],
-        traces_sample_rate=1.0,
-        _experiments={"data_collection": {"http_bodies": []}},
-    )
-    events = capture_events()
-
-    comm = HttpCommunicator(
-        application,
-        method="POST",
-        headers=[(b"content-type", b"application/json")],
-        path=reverse("post_echo_async"),
-        body=json.dumps({"hey": 42}).encode("utf-8"),
-    )
-    response = await comm.get_response()
-    await comm.wait()
-
-    assert response["status"] == 200
-
-    (event, transaction_event) = events
-
-    assert "data" not in event["request"]
-    assert "data" not in transaction_event["request"]
 
 
 @pytest.mark.parametrize("application", APPS)
