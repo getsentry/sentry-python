@@ -10,7 +10,6 @@ from sentry_sdk.traces import StreamedSpan
 
 from ..consts import SPAN_ORIGIN
 from ..utils import (
-    _set_agent_data,
     _set_available_tools,
     _set_model_data,
     _should_send_inputs,
@@ -53,8 +52,7 @@ def invoke_agent_span(
         },
     )
 
-    _set_agent_data(span, agent)
-    _set_model_data(span, model, model_settings)
+    _set_model_data(span, agent, model, model_settings)
     _set_available_tools(span, agent)
 
     # Add user prompt and system prompts if available and prompts are enabled

@@ -19,10 +19,8 @@ except ImportError:
 from importlib.metadata import PackageNotFoundError, version
 from typing import TYPE_CHECKING
 
-from .patches import (
-    _patch_agent_run,
-)
 from .spans.ai_client import ai_client_span, update_ai_client_span
+from .spans.invoke_agent import invoke_agent_span, update_invoke_agent_span
 
 if TYPE_CHECKING:
     from typing import Any
@@ -35,11 +33,13 @@ if TYPE_CHECKING:
         ToolCallPart,
         ToolDefinition,
     )
+    from pydantic_ai.agent import AgentRunResult
     from pydantic_ai.capabilities import (
         Hooks,
         RawToolArgs,
         ValidatedToolArgs,
         WrapModelRequestHandler,
+        WrapRunHandler,
         WrapToolExecuteHandler,
     )
     from pydantic_ai.messages import ModelResponse
@@ -59,7 +59,7 @@ def register_hooks(hooks: "Hooks") -> None:
     ) -> "ModelResponse":
         with ai_client_span(
             messages=request_context.messages,
-            agent=None,
+            agent=ctx.agent,
             model=request_context.model,
             model_settings=request_context.model_settings,
         ) as span:
@@ -116,6 +116,28 @@ def register_hooks(hooks: "Hooks") -> None:
                         and integration.handled_tool_call_exceptions
                     ):
                         _capture_exception(exc, handled=True)
+                reraise(*exc_info)
+
+    @hooks.on.run
+    async def sentry_wrap_run(
+        ctx: "RunContext[Any]",
+        *,
+        handler: "WrapRunHandler",
+    ) -> "AgentRunResult[Any]":
+        with invoke_agent_span(
+            user_prompt=ctx.prompt,
+            agent=ctx.agent,
+            model=ctx.model,
+            model_settings=ctx.model_settings,
+        ) as span:
+            try:
+                result = await handler()
+                update_invoke_agent_span(span, result)
+                return result
+            except Exception as exc:
+                exc_info = sys.exc_info()
+                with capture_internal_exceptions():
+                    _capture_exception(exc, handled=False)
                 reraise(*exc_info)
 
     original_init = Agent.__init__
@@ -184,8 +206,6 @@ class PydanticAIIntegration(Integration):
         _check_minimum_version(PydanticAIIntegration, PYDANTIC_AI_VERSION)
         if PYDANTIC_AI_VERSION is None:
             return
-
-        _patch_agent_run()
 
         try:
             from pydantic_ai.capabilities import Hooks

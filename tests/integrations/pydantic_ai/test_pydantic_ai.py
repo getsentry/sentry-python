@@ -121,7 +121,6 @@ async def test_agent_run_async(
     chat_span = chat_spans[0]
     assert "chat" in chat_span["name"]
     assert chat_span["attributes"]["gen_ai.operation.name"] == "chat"
-    assert chat_span["attributes"]["gen_ai.response.streaming"] is False
     assert json.loads(chat_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]) == [
         {
             "role": "user",
@@ -211,9 +210,6 @@ def test_agent_run_sync(
     ]
     assert len(chat_spans) == 1
 
-    # Verify streaming flag is False for sync
-    assert chat_spans[0]["attributes"]["gen_ai.response.streaming"] is False
-
 
 def test_agent_run_sync_model_error(
     sentry_init,
@@ -285,8 +281,6 @@ async def test_agent_run_stream(
     ]
     assert len(chat_spans) == 1
 
-    # Verify streaming flag is True for streaming
-    assert chat_spans[0]["attributes"]["gen_ai.response.streaming"] is True
     assert json.loads(
         chat_spans[0]["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
     ) == [
@@ -353,9 +347,6 @@ async def test_agent_run_stream_events(
         s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
     ]
     assert len(chat_spans) == 1
-
-    # run_stream_events uses run() internally, so streaming should be False
-    assert chat_spans[0]["attributes"]["gen_ai.response.streaming"] is False
 
 
 @pytest.mark.asyncio
@@ -601,10 +592,6 @@ async def test_agent_with_tools_streaming(
     sentry_sdk.flush()
     spans = [item.payload for item in items]
 
-    # Find span types
-    chat_spans = [
-        s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
-    ]
     tool_spans = [
         s
         for s in spans
@@ -613,9 +600,6 @@ async def test_agent_with_tools_streaming(
 
     # Should have tool spans
     assert len(tool_spans) >= 1
-
-    # Verify streaming flag is True
-    assert chat_spans[0]["attributes"]["gen_ai.response.streaming"] is True
 
     # Check tool span
     tool_span = tool_spans[0]
@@ -2298,89 +2282,6 @@ async def test_should_send_prompts_without_pii(
     # Should return False
     assert _should_send_inputs() is False
     assert _should_send_outputs() is False
-
-
-@pytest.mark.asyncio
-async def test_set_agent_data_without_agent(
-    sentry_init,
-):
-    """
-    Test that _set_agent_data handles None agent gracefully.
-    """
-    import sentry_sdk
-    from sentry_sdk.integrations.pydantic_ai.utils import _set_agent_data
-
-    sentry_init(
-        integrations=[PydanticAIIntegration()],
-        traces_sample_rate=1.0,
-    )
-
-    span = sentry_sdk.traces.start_span(name="test_span")
-
-    # Pass None agent, with no agent in scope
-    _set_agent_data(span, None)
-
-    span.end()
-
-
-@pytest.mark.asyncio
-async def test_set_agent_data_from_scope(
-    sentry_init,
-):
-    """
-    Test that _set_agent_data retrieves agent from scope when not passed.
-    """
-    from unittest.mock import MagicMock
-
-    import sentry_sdk
-    from sentry_sdk.integrations.pydantic_ai.utils import _set_agent_data
-
-    sentry_init(
-        integrations=[PydanticAIIntegration()],
-        traces_sample_rate=1.0,
-    )
-
-    # Set agent in scope
-    scope = sentry_sdk.get_current_scope()
-    mock_agent = MagicMock()
-    mock_agent.name = "test_agent_from_scope"
-    scope._contexts["pydantic_ai_agent"] = {"_agent": mock_agent}
-
-    span = sentry_sdk.traces.start_span(name="test_span")
-
-    # Pass None for agent, should get from scope
-    _set_agent_data(span, None)
-
-    span.end()
-
-
-@pytest.mark.asyncio
-async def test_set_agent_data_without_name(
-    sentry_init,
-):
-    """
-    Test that _set_agent_data handles agent without name attribute.
-    """
-    from unittest.mock import MagicMock
-
-    import sentry_sdk
-    from sentry_sdk.integrations.pydantic_ai.utils import _set_agent_data
-
-    sentry_init(
-        integrations=[PydanticAIIntegration()],
-        traces_sample_rate=1.0,
-    )
-
-    span = sentry_sdk.traces.start_span(name="test_span")
-
-    # Create agent without name
-    mock_agent = MagicMock()
-    mock_agent.name = None  # No name
-
-    # Should not set agent name
-    _set_agent_data(span, mock_agent)
-
-    span.end()
 
 
 @pytest.mark.asyncio

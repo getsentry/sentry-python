@@ -1,4 +1,3 @@
-from contextvars import ContextVar
 from typing import TYPE_CHECKING
 
 import sentry_sdk
@@ -13,44 +12,6 @@ from sentry_sdk.utils import (
 
 if TYPE_CHECKING:
     from typing import Any, Optional
-
-
-# Store the current agent context in a contextvar for re-entrant safety
-# Using a list as a stack to support nested agent calls
-_agent_context_stack: "ContextVar[list[dict[str, Any]]]" = ContextVar(
-    "pydantic_ai_agent_context_stack", default=[]
-)
-
-
-def push_agent(agent: "Any", is_streaming: bool = False) -> None:
-    """Push an agent context onto the stack along with its streaming flag."""
-    stack = _agent_context_stack.get().copy()
-    stack.append({"agent": agent, "is_streaming": is_streaming})
-    _agent_context_stack.set(stack)
-
-
-def pop_agent() -> None:
-    """Pop an agent context from the stack."""
-    stack = _agent_context_stack.get().copy()
-    if stack:
-        stack.pop()
-    _agent_context_stack.set(stack)
-
-
-def get_current_agent() -> "Any":
-    """Get the current agent from the contextvar stack."""
-    stack = _agent_context_stack.get()
-    if stack:
-        return stack[-1]["agent"]
-    return None
-
-
-def get_is_streaming() -> bool:
-    """Get the streaming flag from the contextvar stack."""
-    stack = _agent_context_stack.get()
-    if stack:
-        return stack[-1].get("is_streaming", False)
-    return False
 
 
 def _should_send_prompts_legacy() -> bool:
@@ -90,23 +51,6 @@ def _should_send_outputs() -> bool:
     return _should_send_prompts_legacy()
 
 
-def _set_agent_data(span: "StreamedSpan", agent: "Any") -> None:
-    """Set agent-related data on a span.
-
-    Args:
-        span: The span to set data on
-        agent: Agent object (can be None, will try to get from contextvar if not provided)
-    """
-    # Extract agent name from agent object or contextvar
-    agent_obj = agent
-    if not agent_obj:
-        # Try to get from contextvar
-        agent_obj = get_current_agent()
-
-    if agent_obj and hasattr(agent_obj, "name") and agent_obj.name:
-        span.set_attribute(SPANDATA.GEN_AI_AGENT_NAME, agent_obj.name)
-
-
 def _get_model_name(model_obj: "Any") -> "Optional[str]":
     """Extract model name from a model object.
 
@@ -134,6 +78,7 @@ def _get_model_name(model_obj: "Any") -> "Optional[str]":
 
 def _set_model_data(
     span: "StreamedSpan",
+    agent: "Any",
     model: "Any",
     model_settings: "Any",
 ) -> None:
@@ -144,13 +89,10 @@ def _set_model_data(
         model: Model object (can be None, will try to get from agent if not provided)
         model_settings: Model settings (can be None, will try to get from agent if not provided)
     """
-    # Try to get agent from contextvar if we need it
-    agent_obj = get_current_agent()
-
     # Extract model information
     model_obj = model
-    if not model_obj and agent_obj and hasattr(agent_obj, "model"):
-        model_obj = agent_obj.model
+    if not model_obj and agent and hasattr(agent, "model"):
+        model_obj = agent.model
 
     if model_obj:
         # Set system from model
@@ -164,8 +106,8 @@ def _set_model_data(
 
     # Extract model settings
     settings = model_settings
-    if not settings and agent_obj and hasattr(agent_obj, "model_settings"):
-        settings = agent_obj.model_settings
+    if not settings and agent and hasattr(agent, "model_settings"):
+        settings = agent.model_settings
 
     if settings:
         settings_map = {

@@ -13,13 +13,10 @@ from sentry_sdk.utils import safe_serialize
 from ..consts import SPAN_ORIGIN
 from ..utils import (
     _get_model_name,
-    _set_agent_data,
     _set_available_tools,
     _set_model_data,
     _should_send_inputs,
     _should_send_outputs,
-    get_current_agent,
-    get_is_streaming,
 )
 from .utils import (
     _serialize_binary_content_item,
@@ -291,16 +288,11 @@ def ai_client_span(
             "sentry.op": OP.GEN_AI_CHAT,
             "sentry.origin": SPAN_ORIGIN,
             SPANDATA.GEN_AI_OPERATION_NAME: "chat",
-            SPANDATA.GEN_AI_RESPONSE_STREAMING: get_is_streaming(),
         },
     )
 
-    _set_agent_data(span, agent)
-    _set_model_data(span, model, model_settings)
-
-    # Add available tools if agent is available
-    agent_obj = agent or get_current_agent()
-    _set_available_tools(span, agent_obj)
+    _set_model_data(span, agent, model, model_settings)
+    _set_available_tools(span, agent)
 
     # Set input messages (full conversation history)
     if messages:

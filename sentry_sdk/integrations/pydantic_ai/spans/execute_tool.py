@@ -6,7 +6,7 @@ from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.utils import safe_serialize
 
 from ..consts import SPAN_ORIGIN
-from ..utils import _set_agent_data, _should_send_inputs, _should_send_outputs
+from ..utils import _should_send_inputs, _should_send_outputs
 
 if TYPE_CHECKING:
     from typing import Any, Optional
@@ -43,8 +43,6 @@ def execute_tool_span(
             SPANDATA.GEN_AI_TOOL_DESCRIPTION,
             tool_definition.description,
         )
-
-    _set_agent_data(span, agent)
 
     if _should_send_inputs() and tool_args is not None:
         span.set_attribute(SPANDATA.GEN_AI_TOOL_INPUT, safe_serialize(tool_args))
