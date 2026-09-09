@@ -480,7 +480,6 @@ async def test_tool_handler_streamable_http(
 async def test_tool_handler_stateless_streamable_http(
     sentry_init,
     capture_items,
-    select_transactions_with_mcp_spans,
 ):
     """A stateless StreamableHTTP server is still reported as the http transport.
 

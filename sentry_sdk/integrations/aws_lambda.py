@@ -9,7 +9,6 @@ from typing import TYPE_CHECKING
 from urllib.parse import urlencode
 
 import sentry_sdk
-from sentry_sdk.api import continue_trace
 from sentry_sdk.consts import OP
 from sentry_sdk.data_collection import _apply_key_value_collection_filtering
 from sentry_sdk.integrations import Integration
@@ -20,8 +19,6 @@ from sentry_sdk.integrations.cloud_resource_context import (
 )
 from sentry_sdk.scope import Scope, should_send_default_pii
 from sentry_sdk.traces import SegmentNameSource
-from sentry_sdk.tracing import TransactionSource
-from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
     AnnotatedValue,
     TimeoutThread,
@@ -43,6 +40,27 @@ if TYPE_CHECKING:
 # Constants
 TIMEOUT_WARNING_BUFFER = 1500  # Buffer time required to send timeout warning to Sentry
 MILLIS_TO_SECONDS = 1000.0
+
+
+def _get_user_from_event(aws_event: "dict[str, Any]") -> "dict[str, Any]":
+    if not isinstance(aws_event, dict):
+        return {}
+
+    identity = aws_event.get("requestContext", {}).get("identity")
+    if identity is None:
+        return {}
+
+    user_info: "dict[str, Any]" = {}
+
+    user_arn = identity.get("userArn")
+    if user_arn is not None:
+        user_info["id"] = user_arn
+
+    ip = identity.get("sourceIp")
+    if ip is not None:
+        user_info["ip_address"] = ip
+
+    return user_info
 
 
 def _wrap_init_error(init_error: "F") -> "F":
@@ -177,6 +195,17 @@ def _wrap_handler(handler: "F") -> "F":
                     elif should_send_default_pii():
                         additional_attributes["url.query"] = urlencode(qs)
 
+            if not scope._user:
+                if has_data_collection_enabled(client.options):
+                    if client.options["data_collection"]["user_info"]:
+                        user_info = _get_user_from_event(request_data)
+                        if user_info:
+                            scope.set_user(user_info)
+                elif should_send_default_pii():
+                    user_info = _get_user_from_event(request_data)
+                    if user_info:
+                        scope.set_user(user_info)
+
             sampling_context = {
                 "aws_event": aws_event,
                 "aws_context": aws_context,
@@ -184,45 +213,31 @@ def _wrap_handler(handler: "F") -> "F":
 
             function_name = aws_context.function_name
 
-            if has_span_streaming_enabled(client.options):
-                sentry_sdk.traces.continue_trace(headers)
-                Scope.set_custom_sampling_context(sampling_context)
-                span_ctx = sentry_sdk.traces.start_span(
-                    name=function_name,
-                    parent_span=None,
-                    attributes={
-                        "sentry.op": OP.FUNCTION_AWS,
-                        "sentry.origin": AwsLambdaIntegration.origin,
-                        "sentry.segment.name.source": SegmentNameSource.COMPONENT,
-                        "cloud.region": aws_region,
-                        "cloud.resource_id": aws_context.invoked_function_arn,
-                        "cloud.platform": CLOUD_PLATFORM.AWS_LAMBDA,
-                        "cloud.provider": CLOUD_PROVIDER.AWS,
-                        "faas.name": function_name,
-                        "faas.invocation_id": aws_context.aws_request_id,
-                        "faas.version": aws_context.function_version,
-                        "aws.lambda.invoked_arn": aws_context.invoked_function_arn,
-                        "aws.log.group.names": [aws_context.log_group_name],
-                        "aws.log.stream.names": [aws_context.log_stream_name],
-                        "messaging.batch.message_count": batch_size,
-                        **header_attributes,
-                        **additional_attributes,
-                    },
-                )
-            else:
-                transaction = continue_trace(
-                    headers,
-                    op=OP.FUNCTION_AWS,
-                    name=function_name,
-                    source=TransactionSource.COMPONENT,
-                    origin=AwsLambdaIntegration.origin,
-                )
+            sentry_sdk.traces.continue_trace(headers)
+            Scope.set_custom_sampling_context(sampling_context)
 
-                span_ctx = sentry_sdk.start_transaction(
-                    transaction, custom_sampling_context=sampling_context
-                )
-
-            with span_ctx:
+            with sentry_sdk.traces.start_span(
+                name=function_name,
+                parent_span=None,
+                attributes={
+                    "sentry.op": OP.FUNCTION_AWS,
+                    "sentry.origin": AwsLambdaIntegration.origin,
+                    "sentry.segment.name.source": SegmentNameSource.COMPONENT,
+                    "cloud.region": aws_region,
+                    "cloud.resource_id": aws_context.invoked_function_arn,
+                    "cloud.platform": CLOUD_PLATFORM.AWS_LAMBDA,
+                    "cloud.provider": CLOUD_PROVIDER.AWS,
+                    "faas.name": function_name,
+                    "faas.invocation_id": aws_context.aws_request_id,
+                    "faas.version": aws_context.function_version,
+                    "aws.lambda.invoked_arn": aws_context.invoked_function_arn,
+                    "aws.log.group.names": [aws_context.log_group_name],
+                    "aws.log.stream.names": [aws_context.log_stream_name],
+                    "messaging.batch.message_count": batch_size,
+                    **header_attributes,
+                    **additional_attributes,
+                },
+            ):
                 try:
                     return handler(aws_event, aws_context, *args, **kwargs)
                 except Exception:
@@ -402,38 +417,22 @@ def _make_request_event_processor(
         client_options = sentry_sdk.get_client().options
         if has_data_collection_enabled(client_options):
             if client_options["data_collection"]["user_info"]:
-                user_info = sentry_event.setdefault("user", {})
-
-                identity = aws_event.get("requestContext", {}).get("identity")
-                if identity is None:
-                    identity = {}
-
-                id = identity.get("userArn")
-                if id is not None:
-                    user_info.setdefault("id", id)
-
-                ip = identity.get("sourceIp")
-                if ip is not None:
-                    user_info.setdefault("ip_address", ip)
+                extracted_user = _get_user_from_event(aws_event)
+                if extracted_user:
+                    user_info = sentry_event.setdefault("user", {})
+                    for key, value in extracted_user.items():
+                        user_info.setdefault(key, value)
 
             if "incoming_request" in client_options["data_collection"]["http_bodies"]:
                 if "body" in aws_event:
                     request["data"] = aws_event.get("body", "")
 
         elif should_send_default_pii():
-            user_info = sentry_event.setdefault("user", {})
-
-            identity = aws_event.get("requestContext", {}).get("identity")
-            if identity is None:
-                identity = {}
-
-            id = identity.get("userArn")
-            if id is not None:
-                user_info.setdefault("id", id)
-
-            ip = identity.get("sourceIp")
-            if ip is not None:
-                user_info.setdefault("ip_address", ip)
+            extracted_user = _get_user_from_event(aws_event)
+            if extracted_user:
+                user_info = sentry_event.setdefault("user", {})
+                for key, value in extracted_user.items():
+                    user_info.setdefault(key, value)
 
             if "body" in aws_event:
                 request["data"] = aws_event.get("body", "")

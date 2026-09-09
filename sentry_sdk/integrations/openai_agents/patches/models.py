@@ -17,9 +17,8 @@ from sentry_sdk.utils import logger
 from ..spans import ai_client_span, update_ai_client_span
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Union
+    from typing import Any, Callable
 
-    from sentry_sdk.tracing import Span
 
 try:
     import agents
@@ -29,7 +28,7 @@ except ImportError:
 
 
 def _inject_trace_propagation_headers(
-    hosted_tool: "HostedMCPTool", span: "Union[Span, StreamedSpan]"
+    hosted_tool: "HostedMCPTool", span: "StreamedSpan"
 ) -> None:
     headers = hosted_tool.tool_config.get("headers")
     if headers is None:
@@ -73,7 +72,7 @@ def _get_model(
 
     # Capture the request model name for spans (agent.model can be None when using defaults)
     request_model_name = model.model if hasattr(model, "model") else str(model)
-    agent._sentry_request_model = request_model_name
+    agent._sentry_request_model = request_model_name  # type: ignore[attr-defined]
 
     # Wrap _fetch_response if it exists (for OpenAI models) to capture response model
     if hasattr(model, "_fetch_response"):
@@ -83,7 +82,7 @@ def _get_model(
         async def wrapped_fetch_response(*args: "Any", **kwargs: "Any") -> "Any":
             response = await original_fetch_response(*args, **kwargs)
             if hasattr(response, "model") and response.model:
-                agent._sentry_response_model = str(response.model)
+                agent._sentry_response_model = str(response.model)  # type: ignore[attr-defined]
             return response
 
         model._fetch_response = wrapped_fetch_response
@@ -114,7 +113,7 @@ def _get_model(
 
         return result
 
-    model.get_response = wrapped_get_response
+    model.get_response = wrapped_get_response  # type: ignore[method-assign]
 
     # Also wrap stream_response for streaming support
     if hasattr(model, "stream_response"):
@@ -141,12 +140,7 @@ def _get_model(
                 for hosted_tool in hosted_tools:
                     _inject_trace_propagation_headers(hosted_tool, span=span)
 
-                set_on_span = (
-                    span.set_attribute
-                    if isinstance(span, StreamedSpan)
-                    else span.set_data
-                )
-                set_on_span(SPANDATA.GEN_AI_RESPONSE_STREAMING, True)
+                span.set_attribute(SPANDATA.GEN_AI_RESPONSE_STREAMING, True)
 
                 streaming_response = None
                 ttft_recorded = False
@@ -157,7 +151,9 @@ def _get_model(
                     # Detect first content token (text delta event)
                     if not ttft_recorded and hasattr(event, "delta"):
                         ttft = time.perf_counter() - start_time
-                        set_on_span(SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN, ttft)
+                        span.set_attribute(
+                            SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN, ttft
+                        )
                         ttft_recorded = True
 
                     # Capture the full response from ResponseCompletedEvent
@@ -177,6 +173,6 @@ def _get_model(
                         span, streaming_response, response_model, agent
                     )
 
-        model.stream_response = wrapped_stream_response
+        model.stream_response = wrapped_stream_response  # type: ignore[method-assign]
 
     return model

@@ -660,15 +660,16 @@ async def test_fastmcp_prompt_sync(
             return [message]
 
         items = capture_items("span")
-        await stdio(
-            mcp._mcp_server,
-            method="prompts/get",
-            params={
-                "name": "code_help_prompt",
-                "arguments": {"language": "python"},
-            },
-            request_id="req-prompt",
-        )
+        with sentry_sdk.traces.start_span(name="custom parent"):
+            await stdio(
+                mcp._mcp_server,
+                method="prompts/get",
+                params={
+                    "name": "code_help_prompt",
+                    "arguments": {"language": "python"},
+                },
+                request_id="req-prompt",
+            )
 
         sentry_sdk.flush()
         # Verify prompt span was created
@@ -1072,11 +1073,6 @@ async def test_fastmcp_stdio_transport(
     # Check that stdio transport is detected
 
     assert span["attributes"].get(SPANDATA.MCP_TRANSPORT) == "stdio"
-
-
-# =============================================================================
-# Edge Cases and Robustness Tests
-# =============================================================================
 
 
 @pytest.mark.asyncio

@@ -5,7 +5,6 @@ import sentry_sdk
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.utils import has_data_collection_enabled
 
 from ..spans import execute_tool_span, update_execute_tool_span
@@ -15,6 +14,7 @@ if TYPE_CHECKING:
 
 try:
     import agents
+    from agents import FunctionTool
 except ImportError:
     raise DidNotEnable("OpenAI Agents not installed")
 
@@ -30,10 +30,10 @@ async def _get_all_tools(
     # Get the original tools
     tools = await original_get_all_tools(agent, context_wrapper)
 
-    wrapped_tools = []
+    wrapped_tools: "list[agents.Tool]" = []
     for tool in tools:
         # Wrap only the function tools (for now)
-        if tool.__class__.__name__ != "FunctionTool":
+        if not isinstance(tool, FunctionTool):
             wrapped_tools.append(tool)
             continue
 
@@ -41,7 +41,7 @@ async def _get_all_tools(
         original_on_invoke = tool.on_invoke_tool
 
         def create_wrapped_invoke(
-            current_tool: "agents.Tool", current_on_invoke: "Callable[..., Any]"
+            current_tool: "FunctionTool", current_on_invoke: "Callable[..., Any]"
         ) -> "Callable[..., Any]":
             @wraps(current_on_invoke)
             async def sentry_wrapped_on_invoke_tool(
@@ -65,10 +65,7 @@ async def _get_all_tools(
                     elif not should_send_default_pii():
                         return result
 
-                    if isinstance(span, StreamedSpan):
-                        span.set_attribute(SPANDATA.GEN_AI_TOOL_INPUT, args[1])
-                    else:
-                        span.set_data(SPANDATA.GEN_AI_TOOL_INPUT, args[1])
+                    span.set_attribute(SPANDATA.GEN_AI_TOOL_INPUT, args[1])
 
                 return result
 

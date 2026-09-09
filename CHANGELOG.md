@@ -1,5 +1,109 @@
 # Changelog
 
+## 2.69.1
+
+### New Features ✨
+
+- (django) Add `http.route` attribute by @alexander-alderman-webb in [#7428](https://github.com/getsentry/sentry-python/pull/7428)
+
+### Bug Fixes 🐛
+
+- (aiohttp) Preserve SigV4-signed propagation headers by @Robinbinu in [#7427](https://github.com/getsentry/sentry-python/pull/7427)
+
+### Internal Changes 🔧
+
+#### Mcp
+
+- Parametrize tests on the streaming trace lifecycle by @alexander-alderman-webb in [#7424](https://github.com/getsentry/sentry-python/pull/7424)
+- Remove vacuous tests by @alexander-alderman-webb in [#7420](https://github.com/getsentry/sentry-python/pull/7420)
+
+#### Other
+
+- (cohere) Parametrize tests on the streaming trace lifecycle by @alexander-alderman-webb in [#7419](https://github.com/getsentry/sentry-python/pull/7419)
+- (openai-agents) Parametrize tests on `stream_gen_ai_spans` and the streaming trace lifecycle by @alexander-alderman-webb in [#7405](https://github.com/getsentry/sentry-python/pull/7405)
+
+## 2.69.0
+
+### New Features ✨
+
+#### Other
+
+- (aiohttp) Add `http.route` attribute by @alexander-alderman-webb in [#7341](https://github.com/getsentry/sentry-python/pull/7341)
+- (bottle) Add `http.route` attribute by @alexander-alderman-webb in [#7343](https://github.com/getsentry/sentry-python/pull/7343)
+- (clickhouse_driver) Set breadcrumbs in the streaming trace lifecycle by @alexander-alderman-webb in [#7325](https://github.com/getsentry/sentry-python/pull/7325)
+- (docs) Add Plausible analytics to Sphinx docs by @ericapisani in [#7319](https://github.com/getsentry/sentry-python/pull/7319)
+- (falcon) Add `http.route` attribute by @alexander-alderman-webb in [#7340](https://github.com/getsentry/sentry-python/pull/7340)
+- (fastapi) Add `http.route` attribute by @alexander-alderman-webb in [#7322](https://github.com/getsentry/sentry-python/pull/7322)
+- (flask) Add `http.route` attribute by @alexander-alderman-webb in [#7344](https://github.com/getsentry/sentry-python/pull/7344)
+- (pyramid) Add `http.route` attribute by @alexander-alderman-webb in [#7347](https://github.com/getsentry/sentry-python/pull/7347)
+- (quart) Add `http.route` attribute by @alexander-alderman-webb in [#7348](https://github.com/getsentry/sentry-python/pull/7348)
+- (sqlalchemy) Add more db system names for span data by @ericapisani in [#7329](https://github.com/getsentry/sentry-python/pull/7329)
+- (starlette) Add `http.route` attribute by @alexander-alderman-webb in [#7338](https://github.com/getsentry/sentry-python/pull/7338)
+- (types) Export SpanJSON type by @ericapisani in [#7331](https://github.com/getsentry/sentry-python/pull/7331)
+- Add Python 3.15 to test matrix by @sentrivana in [#7326](https://github.com/getsentry/sentry-python/pull/7326)
+
+### Bug Fixes 🐛
+
+#### Mcp
+
+- Handle `None` arguments in tool and prompt handlers by @alexander-alderman-webb in [#7387](https://github.com/getsentry/sentry-python/pull/7387)
+- Don't report stateless StreamableHTTP servers as stdio by @Snaylaker in [#7224](https://github.com/getsentry/sentry-python/pull/7224)
+
+#### Openai
+
+- Read `input_text` parts for the Responses API by @alexander-alderman-webb in [#7333](https://github.com/getsentry/sentry-python/pull/7333)
+- Check `Response.output` is a `list` before iterating by @alexander-alderman-webb in [#7238](https://github.com/getsentry/sentry-python/pull/7238)
+
+#### Starlette
+
+- Use `url` transaction source for host routing by @mjq in [#7266](https://github.com/getsentry/sentry-python/pull/7266)
+- Set transaction name on current scope in sync handler by @mjq in [#7201](https://github.com/getsentry/sentry-python/pull/7201)
+
+#### Other
+
+- (batcher) Do not let a failed flush kill the flusher thread (#7138) by @zkasuran in [#7186](https://github.com/getsentry/sentry-python/pull/7186)
+- (boto3) Fix botocore SigV4 failures caused by post-sign trace propagation by @pabloDeputter in [#7050](https://github.com/getsentry/sentry-python/pull/7050)
+- (httpx,httpx2) Always capture breadcrumb by @sentrivana in [#7351](https://github.com/getsentry/sentry-python/pull/7351)
+- (mcp,langchain) Add mechanism to captured exceptions by @gmassello in [#7226](https://github.com/getsentry/sentry-python/pull/7226)
+- (openai-agents) Use `isinstance` to determine tool type by @alexander-alderman-webb in [#7412](https://github.com/getsentry/sentry-python/pull/7412)
+- (quart) Skip quart-flask-patch and adjust error test for quart>=0.23 by @ericapisani in [#7320](https://github.com/getsentry/sentry-python/pull/7320)
+- Allow to correctly compare parsed versions by @sentrivana in [#7184](https://github.com/getsentry/sentry-python/pull/7184)
+
+### Internal Changes 🔧
+
+#### Openai Agents
+
+- Capture spans instead of reading from span recorder by @alexander-alderman-webb in [#7404](https://github.com/getsentry/sentry-python/pull/7404)
+- Pin `openai` version when incompatible by @alexander-alderman-webb in [#7236](https://github.com/getsentry/sentry-python/pull/7236)
+
+#### Pydantic Ai
+
+- Replace individual hooks with `hooks.on.model_request` by @alexander-alderman-webb in [#7327](https://github.com/getsentry/sentry-python/pull/7327)
+- Fix instructions test for pydantic-ai >=2.36.0 by @ericapisani in [#7321](https://github.com/getsentry/sentry-python/pull/7321)
+
+#### Other
+
+- (aiohttp) Remove dead segment name code by @mjq in [#7284](https://github.com/getsentry/sentry-python/pull/7284)
+- (anthropic) Include `StreamedSpan` in type annotations by @alexander-alderman-webb in [#7373](https://github.com/getsentry/sentry-python/pull/7373)
+- (mcp) Inline `_extract_handler_data_from_args()` by @alexander-alderman-webb in [#7386](https://github.com/getsentry/sentry-python/pull/7386)
+- (quart) Fix flake caused by flushing spans on segment end by @alexander-alderman-webb in [#7240](https://github.com/getsentry/sentry-python/pull/7240)
+- (stdlib) Remove urllib3 workaround by @pabloDeputter in [#7283](https://github.com/getsentry/sentry-python/pull/7283)
+- Add `openai-agents` to uv typing group by @alexander-alderman-webb in [#7415](https://github.com/getsentry/sentry-python/pull/7415)
+- Add `aiohttp` to uv typing group by @alexander-alderman-webb in [#7395](https://github.com/getsentry/sentry-python/pull/7395)
+- Isolate `httpx` test suite from `httpx2` by @ZaafirRizwan in [#7398](https://github.com/getsentry/sentry-python/pull/7398)
+- Remove `test_langchain_embeddings_error_handling()` by @alexander-alderman-webb in [#7389](https://github.com/getsentry/sentry-python/pull/7389)
+- Add `tiktoken` to uv typing group by @alexander-alderman-webb in [#7394](https://github.com/getsentry/sentry-python/pull/7394)
+- Reference renamed coverage action by @MathurAditya724 in [#7371](https://github.com/getsentry/sentry-python/pull/7371)
+- Remove flaky detector by @sl0thentr0py in [#7363](https://github.com/getsentry/sentry-python/pull/7363)
+- Add `openai` to uv typing group by @alexander-alderman-webb in [#7334](https://github.com/getsentry/sentry-python/pull/7334)
+- 🤖 Update test matrix with new releases (08/31) by @github-actions in [#7303](https://github.com/getsentry/sentry-python/pull/7303)
+- Add `anthropic` to uv typing group by @alexander-alderman-webb in [#7324](https://github.com/getsentry/sentry-python/pull/7324)
+- Add `google-genai` to uv typing group by @alexander-alderman-webb in [#7323](https://github.com/getsentry/sentry-python/pull/7323)
+- Use tagged versions for `getsentry/codecov-action` by @alexander-alderman-webb in [#7241](https://github.com/getsentry/sentry-python/pull/7241)
+- Update test matrix with new releases (08/24) by @alexander-alderman-webb in [#7228](https://github.com/getsentry/sentry-python/pull/7228)
+- Add `httpx` dependency to tests relying on `get_model_response()` by @alexander-alderman-webb in [#7235](https://github.com/getsentry/sentry-python/pull/7235)
+- Access the 'type' in an event using `.get` by @ericapisani in [#7239](https://github.com/getsentry/sentry-python/pull/7239)
+
 ## 2.68.1
 
 ### `enable_logs`
