@@ -57,7 +57,7 @@ try:
 except ImportError:
     from anthropic.types.content_block import ContentBlock as TextBlock
 
-from sentry_sdk.ai.utils import transform_content_part, transform_message_content
+from sentry_sdk.ai.utils import transform_content_part
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.anthropic import (
     AnthropicIntegration,
@@ -4622,39 +4622,6 @@ def test_transform_content_part_text_block():
     result = transform_content_part(content_block)
 
     assert result is None
-
-
-def test_transform_message_content_string():
-    """Test that string content is returned as-is."""
-    result = transform_message_content("Hello, world!")
-    assert result == "Hello, world!"
-
-
-def test_transform_message_content_list_anthropic():
-    """Test that list content with Anthropic format is transformed correctly."""
-    content = [
-        {"type": "text", "text": "Hello!"},
-        {
-            "type": "image",
-            "source": {
-                "type": "base64",
-                "media_type": "image/png",
-                "data": "base64data...",
-            },
-        },
-    ]
-
-    result = transform_message_content(content)
-
-    assert len(result) == 2
-    # Text block stays as-is (transform returns None, keeps original)
-    assert result[0] == {"type": "text", "text": "Hello!"}
-    assert result[1] == {
-        "type": "blob",
-        "modality": "image",
-        "mime_type": "image/png",
-        "content": "base64data...",
-    }
 
 
 # Integration tests for binary data in messages

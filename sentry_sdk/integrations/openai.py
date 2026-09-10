@@ -442,13 +442,12 @@ def _set_responses_api_input_data(
     # Input was provided as a single string
     if isinstance(messages, str):
         normalized_messages = normalize_message_roles([messages])  # type: ignore
-        if normalized_messages is not None:
-            set_data_normalized(
-                span,
-                SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                normalized_messages,
-                unpack=False,
-            )
+        set_data_normalized(
+            span,
+            SPANDATA.GEN_AI_REQUEST_MESSAGES,
+            normalized_messages,
+            unpack=False,
+        )
         return
 
     # Input was provided as a list (potentially a multi-turn conversation)
@@ -457,13 +456,12 @@ def _set_responses_api_input_data(
     ]
     if len(non_system_messages) > 0:
         normalized_messages = normalize_message_roles(non_system_messages)  # type: ignore
-        if normalized_messages is not None:
-            set_data_normalized(
-                span,
-                SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                normalized_messages,
-                unpack=False,
-            )
+        set_data_normalized(
+            span,
+            SPANDATA.GEN_AI_REQUEST_MESSAGES,
+            normalized_messages,
+            unpack=False,
+        )
 
 
 def _set_completions_api_input_data(
@@ -537,13 +535,12 @@ def _set_completions_api_input_data(
 
     if isinstance(messages, str):
         normalized_messages = normalize_message_roles([messages])  # type: ignore
-        if normalized_messages is not None:
-            set_data_normalized(
-                span,
-                SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                normalized_messages,
-                unpack=False,
-            )
+        set_data_normalized(
+            span,
+            SPANDATA.GEN_AI_REQUEST_MESSAGES,
+            normalized_messages,
+            unpack=False,
+        )
         return
 
     # dict special case following https://github.com/openai/openai-python/blob/3e0c05b84a2056870abf3bd6a5e7849020209cc3/src/openai/_utils/_transform.py#L194-L197
@@ -568,13 +565,12 @@ def _set_completions_api_input_data(
     if len(non_system_messages) > 0:
         normalized_messages = normalize_message_roles(non_system_messages)  # type: ignore
         client = sentry_sdk.get_client()
-        if normalized_messages is not None:
-            set_data_normalized(
-                span,
-                SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                normalized_messages,
-                unpack=False,
-            )
+        set_data_normalized(
+            span,
+            SPANDATA.GEN_AI_REQUEST_MESSAGES,
+            normalized_messages,
+            unpack=False,
+        )
 
 
 def _set_embeddings_input_data(
