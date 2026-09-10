@@ -3175,6 +3175,7 @@ def test_openai_agents_message_role_mapping(sentry_init, test_message, expected_
     sentry_init(
         integrations=[OpenAIAgentsIntegration()],
         traces_sample_rate=1.0,
+        trace_lifecycle="stream",
         send_default_pii=True,
     )
 

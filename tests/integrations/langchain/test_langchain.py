@@ -1965,6 +1965,7 @@ def test_langchain_tool_error(
         integrations=[LangchainIntegration(include_prompts=True)],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
+        trace_lifecycle="stream",
     )
 
     responses = nonstreaming_responses_tool_call_model_responses(
@@ -2108,6 +2109,7 @@ def test_langchain_callback_manager(sentry_init):
         integrations=[LangchainIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
+        trace_lifecycle="stream",
     )
     local_manager = BaseCallbackManager(handlers=[])
 
@@ -2141,6 +2143,7 @@ def test_langchain_callback_manager_with_sentry_callback(sentry_init):
         integrations=[LangchainIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
+        trace_lifecycle="stream",
     )
     sentry_callback = SentryLangchainCallback(False)
     local_manager = BaseCallbackManager(handlers=[sentry_callback])
@@ -2174,6 +2177,7 @@ def test_langchain_callback_list(sentry_init):
         integrations=[LangchainIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
+        trace_lifecycle="stream",
     )
     local_callbacks = []
 
@@ -2207,6 +2211,7 @@ def test_langchain_callback_list_existing_callback(sentry_init):
         integrations=[LangchainIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
+        trace_lifecycle="stream",
     )
     sentry_callback = SentryLangchainCallback(False)
     local_callbacks = [sentry_callback]

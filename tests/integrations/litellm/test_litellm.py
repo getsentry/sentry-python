@@ -1514,6 +1514,7 @@ def test_integration_setup(sentry_init):
         integrations=[LiteLLMIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
+        trace_lifecycle="stream",
     )
 
     # Check that callbacks are registered
