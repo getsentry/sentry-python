@@ -19,6 +19,7 @@ if TYPE_CHECKING:
 
 
 METHODS_TO_INSTRUMENT = [
+    "add",
     "set",
     "set_many",
     "get",
@@ -52,7 +53,7 @@ def _patch_cache_method(
         address: "Optional[str]",
         port: "Optional[int]",
     ) -> "Any":
-        is_set_operation = method_name.startswith("set")
+        is_set_operation = method_name.startswith("set") or method_name == "add"
         is_get_method = method_name == "get"
         is_get_many_method = method_name == "get_many"
 
