@@ -29,7 +29,6 @@ class CompressionAlgo(Enum):
 
 if TYPE_CHECKING:
     from typing import (
-        AbstractSet,
         Any,
         Callable,
         Dict,
@@ -92,16 +91,6 @@ FALSE_VALUES = [
     "n",
     "0",
 ]
-
-
-class SPANTEMPLATE(str, Enum):
-    DEFAULT = "default"
-    AI_AGENT = "ai_agent"
-    AI_TOOL = "ai_tool"
-    AI_CHAT = "ai_chat"
-
-    def __str__(self) -> str:
-        return self.value
 
 
 class SPANNAME:
@@ -1344,7 +1333,6 @@ class ClientConstructor:
         add_full_stack: bool = DEFAULT_ADD_FULL_STACK,
         max_stack_frames: "Optional[int]" = DEFAULT_MAX_STACK_FRAMES,
         before_send_log: "Optional[Callable[[Log, Hint], Optional[Log]]]" = None,
-        trace_ignore_status_codes: "AbstractSet[int]" = frozenset(),
         before_send_metric: "Optional[Callable[[Metric, Hint], Optional[Metric]]]" = None,
         before_send_span: "Optional[Callable[[SpanJSON, Hint], Optional[SpanJSON]]]" = None,
         org_id: "Optional[str]" = None,
@@ -1724,16 +1712,6 @@ class ClientConstructor:
             before they're sent to Sentry. Any modifications to the log in this
             function will be retained. If the function returns None, the log will
             not be sent to Sentry.
-
-        :param trace_ignore_status_codes: An optional property that disables tracing for
-            HTTP requests with certain status codes.
-
-            Requests are not traced if the status code is contained in the provided set.
-
-            If `trace_ignore_status_codes` is not provided, requests with any status code
-            may be traced.
-
-            This option has no effect in span streaming mode (`trace_lifecycle="stream"`).
 
         :param strict_trace_continuation: If set to `True`, the SDK will only continue a trace if the `org_id` of the incoming trace found in the
            `baggage` header matches the `org_id` of the current Sentry client and only if BOTH are present.

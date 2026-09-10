@@ -26,6 +26,7 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 - In the AWS Lambda and GCP integrations, the message of the warning the SDK optionally emits if a function is about to time out has changed.
 - We changed the way we emit warnings. Deprecations will from now on be always emitted using `warnings.warn()`, while all other warnings will be emitted using `logger.warning()`.
 - `sentry_sdk.init()` can no longer be used as a context manager.
+- The `@trace` decorator doesn't accept a `template` parameter anymore.
 
 ### Logging
 
@@ -150,6 +151,7 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 - The SDK won't set any tags on its own anymore.
 - The `update_current_span` API was removed.
 - `SanicIntegration` no longer accepts `unsampled_statuses`.
+- The `trace_ignore_status_codes` option was removed.
 
 
 ## Deprecated
