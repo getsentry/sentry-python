@@ -124,7 +124,7 @@ def register_hooks(hooks: "Hooks") -> None:
         *,
         handler: "WrapRunHandler",
     ) -> "AgentRunResult[Any]":
-        with invoke_agent_span(
+        with sentry_sdk.isolation_scope(), invoke_agent_span(
             user_prompt=ctx.prompt,
             agent=ctx.agent,
             model=ctx.model,
