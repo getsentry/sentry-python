@@ -392,8 +392,7 @@ def test_option_trace_propagation_targets_sync(
         integrations=[Httpx2Integration()],
     )
 
-    with sentry_sdk.traces.start_span(name="span"):
-        httpx2.Client().get(url)
+    httpx2.Client().get(url)
 
     request_headers = httpx2_mock.get_request().headers
 
@@ -471,8 +470,7 @@ async def test_option_trace_propagation_targets_async(
         integrations=[Httpx2Integration()],
     )
 
-    with sentry_sdk.traces.start_span(name="span"):
-        await httpx2.AsyncClient().get(url)
+    await httpx2.AsyncClient().get(url)
 
     request_headers = httpx2_mock.get_request().headers
 
@@ -634,7 +632,6 @@ def test_outgoing_trace_headers_no_current_span(sentry_init, httpx2_mock):
 
     httpx2_client = httpx2.Client()
 
-    # No start_span / start_transaction -> get_current_span() is None
     assert sentry_sdk.traces.get_current_span() is None
 
     response = httpx2_client.get(url)
@@ -672,7 +669,6 @@ async def test_outgoing_trace_headers_no_current_span_async(sentry_init, httpx2_
 
     httpx2_client = httpx2.AsyncClient()
 
-    # No start_span / start_transaction -> get_current_span() is None
     assert sentry_sdk.traces.get_current_span() is None
 
     response = await httpx2_client.get(url)

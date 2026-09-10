@@ -22,6 +22,7 @@ def broker(request, sentry_init):
         sentry_init(
             integrations=[DramatiqIntegration()],
             traces_sample_rate=param,
+            trace_lifecycle="stream",
         )
     broker = StubBroker()
     broker.emit_after("process_boot")

@@ -68,7 +68,6 @@ except ImportError:
 from typing import Any, cast
 
 import sentry_sdk
-from sentry_sdk import start_span
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.logging import LoggingIntegration
 from sentry_sdk.integrations.openai_agents import OpenAIAgentsIntegration
@@ -3175,18 +3174,19 @@ def test_openai_agents_message_role_mapping(sentry_init, test_message, expected_
     sentry_init(
         integrations=[OpenAIAgentsIntegration()],
         traces_sample_rate=1.0,
+        trace_lifecycle="stream",
         send_default_pii=True,
     )
 
     get_response_kwargs = {"input": [test_message]}
 
-    with start_span(op="test") as span:
+    with sentry_sdk.traces.start_span(name="test") as span:
         _set_input_data(span, get_response_kwargs)
 
     # Verify that messages were processed and roles were mapped
     from sentry_sdk.consts import SPANDATA
 
-    stored_messages = json.loads(span._data[SPANDATA.GEN_AI_REQUEST_MESSAGES])
+    stored_messages = json.loads(span._attributes[SPANDATA.GEN_AI_REQUEST_MESSAGES])
 
     # Verify roles were properly mapped
     assert stored_messages[0]["role"] == expected_role

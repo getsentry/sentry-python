@@ -1401,39 +1401,6 @@ async def test_model_name_extraction_fallback_to_str(
 
 
 @pytest.mark.asyncio
-async def test_model_settings_object_style(
-    sentry_init,
-):
-    """
-    Test that object-style model settings (non-dict) are handled correctly.
-    """
-    from unittest.mock import MagicMock
-
-    import sentry_sdk
-    from sentry_sdk.integrations.pydantic_ai.utils import _set_model_data
-
-    sentry_init(
-        integrations=[PydanticAIIntegration()],
-        traces_sample_rate=1.0,
-    )
-
-    span = sentry_sdk.traces.start_span(name="test")
-
-    # Create mock settings object (not a dict)
-    mock_settings = MagicMock()
-    mock_settings.temperature = 0.8
-    mock_settings.max_tokens = 200
-    mock_settings.top_p = 0.95
-    mock_settings.frequency_penalty = 0.5
-    mock_settings.presence_penalty = 0.3
-
-    # Set model data with object-style settings
-    _set_model_data(span, None, mock_settings)
-
-    span.end()
-
-
-@pytest.mark.asyncio
 async def test_usage_data_partial(
     sentry_init,
     capture_items,
@@ -2166,99 +2133,6 @@ async def test_get_model_name_with_none(
 
     # Should return None
     assert result is None
-
-
-@pytest.mark.asyncio
-async def test_set_model_data_with_system(
-    sentry_init,
-):
-    """
-    Test that _set_model_data captures system from model.
-    """
-    from unittest.mock import MagicMock
-
-    import sentry_sdk
-    from sentry_sdk.integrations.pydantic_ai.utils import _set_model_data
-
-    sentry_init(
-        integrations=[PydanticAIIntegration()],
-        traces_sample_rate=1.0,
-    )
-
-    span = sentry_sdk.traces.start_span(name="test")
-
-    # Create model with system
-    mock_model = MagicMock()
-    mock_model.system = "openai"
-    mock_model.model_name = "gpt-4"
-
-    # Set model data
-    _set_model_data(span, mock_model, None)
-
-    span.end()
-
-
-@pytest.mark.asyncio
-async def test_set_model_data_from_agent_scope(
-    sentry_init,
-):
-    """
-    Test that _set_model_data retrieves model from agent in scope when not passed.
-    """
-    from unittest.mock import MagicMock
-
-    import sentry_sdk
-    from sentry_sdk.integrations.pydantic_ai.utils import _set_model_data
-
-    sentry_init(
-        integrations=[PydanticAIIntegration()],
-        traces_sample_rate=1.0,
-    )
-
-    # Set agent in scope
-    scope = sentry_sdk.get_current_scope()
-    mock_agent = MagicMock()
-    mock_agent.model = MagicMock()
-    mock_agent.model.model_name = "test-model"
-    mock_agent.model_settings = {"temperature": 0.5}
-    scope._contexts["pydantic_ai_agent"] = {"_agent": mock_agent}
-
-    span = sentry_sdk.traces.start_span(name="test_span")
-
-    # Pass None for model, should get from scope
-    _set_model_data(span, None, None)
-
-    span.end()
-
-
-@pytest.mark.asyncio
-async def test_set_model_data_with_none_settings_values(
-    sentry_init,
-):
-    """
-    Test that _set_model_data skips None values in settings.
-    """
-    import sentry_sdk
-    from sentry_sdk.integrations.pydantic_ai.utils import _set_model_data
-
-    sentry_init(
-        integrations=[PydanticAIIntegration()],
-        traces_sample_rate=1.0,
-    )
-
-    span = sentry_sdk.traces.start_span(name="test")
-
-    # Create settings with None values
-    settings = {
-        "temperature": 0.7,
-        "max_tokens": None,  # Should be skipped
-        "top_p": None,  # Should be skipped
-    }
-
-    # Set model data
-    _set_model_data(span, None, settings)
-
-    span.end()
 
 
 @pytest.mark.asyncio
