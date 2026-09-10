@@ -13,6 +13,8 @@ from sentry_sdk.utils import (
 if TYPE_CHECKING:
     from typing import Any, Optional
 
+    from pydantic_ai.models import Model
+
 
 def _should_send_prompts_legacy() -> bool:
     """
@@ -51,7 +53,7 @@ def _should_send_outputs() -> bool:
     return _should_send_prompts_legacy()
 
 
-def _get_model_name(model_obj: "Any") -> "Optional[str]":
+def _get_model_name(model_obj: "Model") -> "Optional[str]":
     """Extract model name from a model object.
 
     Args:
