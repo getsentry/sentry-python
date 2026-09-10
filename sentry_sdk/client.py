@@ -364,11 +364,6 @@ def _get_options(*args: "Optional[str]", **kwargs: "Any") -> "Dict[str, Any]":
             env_to_bool(os.environ.get("SENTRY_KEEP_ALIVE"), strict=True) or False
         )
 
-    if rv["trace_ignore_status_codes"] and has_span_streaming_enabled(rv):
-        logger.warning(
-            "The `trace_ignore_status_codes` parameter is ignored in span streaming mode.",
-        )
-
     if rv["ignore_spans"] and not has_span_streaming_enabled(rv):
         logger.warning(
             "The `ignore_spans` parameter only works when `trace_lifecycle` is set to `stream`.",
