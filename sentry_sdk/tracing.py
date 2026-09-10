@@ -915,32 +915,6 @@ class Transaction(Span):
 
         super().finish(scope, end_timestamp)
 
-        status_code = self._data.get(SPANDATA.HTTP_STATUS_CODE)
-        if (
-            status_code is not None
-            and status_code in client.options["trace_ignore_status_codes"]
-        ):
-            logger.debug(
-                "[Tracing] Discarding {transaction_description} because the HTTP status code {status_code} is matched by trace_ignore_status_codes: {trace_ignore_status_codes}".format(
-                    transaction_description=self._get_log_representation(),
-                    status_code=self._data[SPANDATA.HTTP_STATUS_CODE],
-                    trace_ignore_status_codes=client.options[
-                        "trace_ignore_status_codes"
-                    ],
-                )
-            )
-            if client.transport:
-                client.transport.record_lost_event(
-                    "event_processor", data_category="transaction"
-                )
-
-                num_spans = len(self._span_recorder.spans) + 1
-                client.transport.record_lost_event(
-                    "event_processor", data_category="span", quantity=num_spans
-                )
-
-            self.sampled = False
-
         if not self.sampled:
             # At this point a `sampled = None` should have already been resolved
             # to a concrete decision.
