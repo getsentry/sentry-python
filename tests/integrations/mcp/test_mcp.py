@@ -151,6 +151,7 @@ def test_integration_patches_server(sentry_init):
         sentry_init(
             integrations=[MCPIntegration()],
             traces_sample_rate=1.0,
+            trace_lifecycle="stream",
         )
 
         assert Server.call_tool is not original_call_tool

@@ -226,23 +226,6 @@ def test_logs_message_params(sentry_init, capture_items):
     assert "sentry.message.template" not in logs[5]["attributes"]
 
 
-def test_logs_tied_to_transactions(sentry_init, capture_items):
-    """
-    Log messages are also tied to transactions.
-    """
-    sentry_init(traces_sample_rate=1.0)
-    items = capture_items("log")
-
-    with sentry_sdk.start_transaction(name="test-transaction") as trx:
-        sentry_sdk.logger.warning("This is a log tied to a transaction")
-
-    get_client().flush()
-    logs = [item.payload for item in items]
-
-    assert "span_id" in logs[0]
-    assert logs[0]["span_id"] == trx.span_id
-
-
 def test_logs_tied_to_segments(sentry_init, capture_items):
     """
     Log messages are also tied to segments.
@@ -278,22 +261,6 @@ def test_logs_no_span_id_without_active_span(sentry_init, capture_items):
 
 
 def test_logs_tied_to_spans(sentry_init, capture_items):
-    """
-    Log messages are also tied to spans.
-    """
-    sentry_init(traces_sample_rate=1.0)
-    items = capture_items("log")
-
-    with sentry_sdk.start_transaction(name="test-transaction"):
-        with sentry_sdk.start_span(name="test-span") as span:
-            sentry_sdk.logger.warning("This is a log tied to a span")
-
-    get_client().flush()
-    logs = [item.payload for item in items]
-    assert logs[0]["span_id"] == span.span_id
-
-
-def test_logs_tied_to_spans_span_streaming(sentry_init, capture_items):
     """
     Log messages are also tied to spans.
     """

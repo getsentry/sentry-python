@@ -1,4 +1,5 @@
 import sys
+from contextlib import nullcontext
 from functools import wraps
 from typing import TYPE_CHECKING
 
@@ -56,11 +57,15 @@ def _patch_execute_tool_call() -> None:
             # Create execute_tool span
             # Nesting is handled by isolation_scope() to ensure proper parent-child relationships
             with sentry_sdk.isolation_scope():
-                with execute_tool_span(
-                    name,
-                    args_dict,
-                    agent,
-                    tool_definition=selected_tool_definition,
+                with (
+                    execute_tool_span(
+                        name,
+                        args_dict,
+                        agent,
+                        tool_definition=selected_tool_definition,
+                    )
+                    if validated.args_valid
+                    else nullcontext()
                 ) as span:
                     try:
                         result = await original_execute_tool_call(
@@ -69,7 +74,8 @@ def _patch_execute_tool_call() -> None:
                             *args,
                             **kwargs,
                         )
-                        update_execute_tool_span(span, result)
+                        if span is not None:
+                            update_execute_tool_span(span, result)
                         return result
                     except ToolRetryError as exc:
                         exc_info = sys.exc_info()

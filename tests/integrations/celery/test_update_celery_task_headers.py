@@ -70,41 +70,41 @@ def test_monitor_beat_tasks_with_headers(monitor_beat_tasks):
 
 
 def test_span_with_transaction(sentry_init):
-    sentry_init(traces_sample_rate=1.0)
+    sentry_init(traces_sample_rate=1.0, trace_lifecycle="stream")
     headers = {}
     monitor_beat_tasks = False
 
-    with sentry_sdk.start_transaction(name="test_transaction") as transaction:
-        with sentry_sdk.start_span(op="test_span") as span:
+    with sentry_sdk.traces.start_span(name="test_segment") as segment:
+        with sentry_sdk.traces.start_span(name="test_span") as span:
             outgoing_headers = _update_celery_task_headers(
                 headers, span, monitor_beat_tasks
             )
 
-            assert outgoing_headers["sentry-trace"] == span.to_traceparent()
-            assert outgoing_headers["headers"]["sentry-trace"] == span.to_traceparent()
-            assert outgoing_headers["baggage"] == transaction.get_baggage().serialize()
+            assert outgoing_headers["sentry-trace"] == span._to_traceparent()
+            assert outgoing_headers["headers"]["sentry-trace"] == span._to_traceparent()
+            assert outgoing_headers["baggage"] == segment._get_baggage().serialize()
             assert (
                 outgoing_headers["headers"]["baggage"]
-                == transaction.get_baggage().serialize()
+                == segment._get_baggage().serialize()
             )
 
 
 def test_span_with_transaction_custom_headers(sentry_init):
-    sentry_init(traces_sample_rate=1.0)
+    sentry_init(traces_sample_rate=1.0, trace_lifecycle="stream")
     headers = {
         "baggage": BAGGAGE_VALUE,
         "sentry-trace": SENTRY_TRACE_VALUE,
     }
 
-    with sentry_sdk.start_transaction(name="test_transaction") as transaction:
-        with sentry_sdk.start_span(op="test_span") as span:
+    with sentry_sdk.traces.start_span(name="test_segment") as segment:
+        with sentry_sdk.traces.start_span(name="test_span") as span:
             outgoing_headers = _update_celery_task_headers(headers, span, False)
 
-            assert outgoing_headers["sentry-trace"] == span.to_traceparent()
-            assert outgoing_headers["headers"]["sentry-trace"] == span.to_traceparent()
+            assert outgoing_headers["sentry-trace"] == span._to_traceparent()
+            assert outgoing_headers["headers"]["sentry-trace"] == span._to_traceparent()
 
             incoming_baggage = Baggage.from_incoming_header(headers["baggage"])
-            combined_baggage = copy(transaction.get_baggage())
+            combined_baggage = copy(segment._get_baggage())
             combined_baggage.sentry_items.update(incoming_baggage.sentry_items)
             combined_baggage.third_party_items = ",".join(
                 [
@@ -169,7 +169,7 @@ def test_celery_trace_propagation_traces_sample_rate(
     The Celery integration has its own mechanism to propagate traces:
     https://docs.sentry.io/platforms/python/integrations/celery/#distributed-traces
     """
-    sentry_init(traces_sample_rate=traces_sample_rate)
+    sentry_init(traces_sample_rate=traces_sample_rate, trace_lifecycle="stream")
 
     headers = {}
     span = None

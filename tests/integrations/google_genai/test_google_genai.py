@@ -863,6 +863,7 @@ def test_tool_with_async_function(sentry_init):
     sentry_init(
         integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
+        trace_lifecycle="stream",
     )
 
     # Create an async tool function
