@@ -388,6 +388,7 @@ def test_option_trace_propagation_targets_sync(
         release="test",
         trace_propagation_targets=trace_propagation_targets,
         traces_sample_rate=1.0,
+        trace_lifecycle="stream",
         integrations=[HttpxIntegration()],
     )
 
@@ -466,6 +467,7 @@ async def test_option_trace_propagation_targets_async(
         release="test",
         trace_propagation_targets=trace_propagation_targets,
         traces_sample_rate=1.0,
+        trace_lifecycle="stream",
         integrations=[HttpxIntegration()],
     )
 
