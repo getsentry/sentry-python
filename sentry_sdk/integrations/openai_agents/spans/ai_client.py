@@ -46,6 +46,7 @@ except ImportError:
 
 from ..consts import SPAN_ORIGIN
 from ..utils import (
+    _get_request_model_name,
     _set_agent_data,
     _set_input_data,
     _set_output_data,
@@ -201,11 +202,7 @@ def ai_client_span(
     agent: "Agent", get_response_kwargs: "dict[str, Any]"
 ) -> "Union[sentry_sdk.tracing.Span, StreamedSpan]":
     # TODO-anton: implement other types of operations. Now "chat" is hardcoded.
-    model_name = None
-    if agent.model:
-        model_name = agent.model.model if hasattr(agent.model, "model") else agent.model
-    elif hasattr(agent, "_sentry_request_model"):
-        model_name = agent._sentry_request_model
+    model_name = _get_request_model_name(agent)
 
     client_options = sentry_sdk.get_client().options
 
