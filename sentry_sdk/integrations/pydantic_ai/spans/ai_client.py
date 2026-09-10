@@ -13,6 +13,7 @@ from sentry_sdk.utils import safe_serialize
 from ..consts import SPAN_ORIGIN
 from ..utils import (
     _get_model_name,
+    _set_agent_data,
     _set_available_tools,
     _set_model_data,
     _should_send_inputs,
@@ -292,6 +293,7 @@ def ai_client_span(
         },
     )
 
+    _set_agent_data(span, agent)
     _set_model_data(span, agent, model, model_settings)
     _set_available_tools(span, agent)
 

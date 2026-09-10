@@ -56,6 +56,17 @@ def _should_send_outputs() -> bool:
     return _should_send_prompts_legacy()
 
 
+def _set_agent_data(span: "StreamedSpan", agent: "Optional[Agent]") -> None:
+    """Set agent-related data on a span.
+
+    Args:
+        span: The span to set data on
+        agent: Agent object
+    """
+    if agent and hasattr(agent, "name") and agent.name:
+        span.set_attribute(SPANDATA.GEN_AI_AGENT_NAME, agent.name)
+
+
 def _get_model_name(
     model_obj: "Optional[Union[AbstractModel, Model, str]]",
 ) -> "Optional[str]":
