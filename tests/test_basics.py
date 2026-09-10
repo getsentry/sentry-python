@@ -630,7 +630,7 @@ def test_dedupe_doesnt_take_into_account_dropped_exception(sentry_init, capture_
 def test_event_processor_drop_records_client_report(
     sentry_init, capture_events, capture_record_lost_event_calls
 ):
-    sentry_init(traces_sample_rate=1.0)
+    sentry_init(traces_sample_rate=1.0, trace_lifecycle="stream")
     events = capture_events()
     record_lost_event_calls = capture_record_lost_event_calls()
 
@@ -654,7 +654,6 @@ def test_event_processor_drop_records_client_report(
         assert Counter(record_lost_event_calls) == Counter(
             [
                 ("event_processor", "error", None, 1),
-                ("event_processor", "span", None, 1),
             ]
         )
 
