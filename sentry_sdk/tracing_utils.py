@@ -41,7 +41,6 @@ if TYPE_CHECKING:
         Dict,
         Generator,
         Iterator,
-        Literal,
         Optional,
         Tuple,
         Union,
@@ -1258,14 +1257,6 @@ def _get_value(source: "Any", key: str) -> "Optional[Any]":
             except Exception:
                 value = None
     return value
-
-
-def _should_collect_gen_ai(kind: 'Literal["inputs", "outputs"]') -> bool:
-    client = sentry_sdk.get_client()
-    if has_data_collection_enabled(client.options):
-        return bool(client.options["data_collection"]["gen_ai"][kind])
-
-    return client.should_send_default_pii()
 
 
 def _get_usage_attributes(usage: "Any") -> "dict[str, Any]":
