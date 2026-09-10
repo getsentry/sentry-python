@@ -208,7 +208,7 @@ def test_spans_from_threadpool(
     outer_submit_spans = {}
     inner_run_spans = {}
 
-    with sentry_sdk.traces.start_span(name="outer") as outer:
+    with sentry_sdk.traces.start_span(name="outer-seg") as outer:
         with futures.ThreadPoolExecutor(max_workers=1) as executor:
             for number in range(5):
                 with sentry_sdk.traces.start_span(
