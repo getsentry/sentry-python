@@ -11,14 +11,15 @@ from ..utils import _should_send_inputs, _should_send_outputs
 if TYPE_CHECKING:
     from typing import Any, Optional
 
+    from pydantic_ai import Agent
     from pydantic_ai._tool_manager import ToolDefinition  # type: ignore
 
 
 def execute_tool_span(
     tool_name: str,
-    tool_args: "Any",
-    agent: "Any",
-    tool_definition: "Optional[ToolDefinition]" = None,
+    tool_args: "dict[str, Any]",
+    agent: "Optional[Agent[Any, Any]]",
+    tool_definition: "ToolDefinition",
 ) -> "StreamedSpan":
     """Create a span for tool execution.
 

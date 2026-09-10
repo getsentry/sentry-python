@@ -96,9 +96,9 @@ def register_hooks(hooks: "Hooks") -> None:
         handler: "WrapToolExecuteHandler",
     ) -> "Any":
         with execute_tool_span(
-            call.tool_name,
-            args,
-            ctx.agent,
+            tool_name=call.tool_name,
+            tool_args=args,
+            agent=ctx.agent,
             tool_definition=tool_def,
         ) as span:
             try:
