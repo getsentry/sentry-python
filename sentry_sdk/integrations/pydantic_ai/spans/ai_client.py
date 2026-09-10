@@ -18,8 +18,6 @@ from ..utils import (
     _set_model_data,
     _should_send_inputs,
     _should_send_outputs,
-    get_current_agent,
-    get_is_streaming,
 )
 from .utils import (
     _serialize_binary_content_item,
@@ -30,6 +28,7 @@ from .utils import (
 if TYPE_CHECKING:
     from typing import Any, Dict, List, Optional, Union
 
+    from pydantic_ai import Agent
     from pydantic_ai.messages import ModelMessage, ModelResponse, SystemPromptPart
     from pydantic_ai.models import Model
     from pydantic_ai.settings import ModelSettings
@@ -271,7 +270,7 @@ def _set_output_data(
 
 def ai_client_span(
     messages: "list[ModelMessage]",
-    agent: "Any",
+    agent: "Optional[Agent[Any, Any]]",
     model: "Model",
     model_settings: "Optional[ModelSettings]",
 ) -> "StreamedSpan":
@@ -283,12 +282,7 @@ def ai_client_span(
         model: Model object
         model_settings: Model settings
     """
-    # Determine model name for span name
-    model_obj = model
-    if agent and hasattr(agent, "model"):
-        model_obj = agent.model
-
-    model_name = _get_model_name(model_obj) or "unknown"
+    model_name = _get_model_name(model) or "unknown"
 
     span = sentry_sdk.traces.start_span(
         name=f"chat {model_name}",
@@ -296,16 +290,12 @@ def ai_client_span(
             "sentry.op": OP.GEN_AI_CHAT,
             "sentry.origin": SPAN_ORIGIN,
             SPANDATA.GEN_AI_OPERATION_NAME: "chat",
-            SPANDATA.GEN_AI_RESPONSE_STREAMING: get_is_streaming(),
         },
     )
 
     _set_agent_data(span, agent)
-    _set_model_data(span, model, model_settings)
-
-    # Add available tools if agent is available
-    agent_obj = agent or get_current_agent()
-    _set_available_tools(span, agent_obj)
+    _set_model_data(span, agent, model, model_settings)
+    _set_available_tools(span, agent)
 
     # Set input messages (full conversation history)
     if messages:
