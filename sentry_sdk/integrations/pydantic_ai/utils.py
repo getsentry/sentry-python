@@ -11,9 +11,12 @@ from sentry_sdk.utils import (
 )
 
 if TYPE_CHECKING:
-    from typing import Any, Optional
+    from typing import Any, Optional, Union
 
-    from pydantic_ai.models import Model
+    from pydantic_ai import Agent
+    from pydantic_ai.models import AbstractModel, Model
+    from pydantic_ai.realtime.settings import RealtimeModelSettings
+    from pydantic_ai.settings import ModelSettings
 
 
 def _should_send_prompts_legacy() -> bool:
@@ -53,7 +56,9 @@ def _should_send_outputs() -> bool:
     return _should_send_prompts_legacy()
 
 
-def _get_model_name(model_obj: "Model") -> "Optional[str]":
+def _get_model_name(
+    model_obj: "Optional[Union[AbstractModel, Model, str]]",
+) -> "Optional[str]":
     """Extract model name from a model object.
 
     Args:
@@ -80,9 +85,9 @@ def _get_model_name(model_obj: "Model") -> "Optional[str]":
 
 def _set_model_data(
     span: "StreamedSpan",
-    agent: "Any",
-    model: "Any",
-    model_settings: "Any",
+    agent: "Optional[Agent]",
+    model: "Union[Model, AbstractModel]",
+    model_settings: "Optional[Union[ModelSettings, RealtimeModelSettings]]",
 ) -> None:
     """Set model-related data on a span.
 
@@ -125,7 +130,7 @@ def _set_model_data(
             for setting_name, spandata_key in settings_map.items():
                 value = settings.get(setting_name)
                 if value is not None:
-                    span.set_attribute(spandata_key, value)
+                    span.set_attribute(spandata_key, value)  # type: ignore[arg-type]
         else:
             # Fallback for object-style settings
             for setting_name, spandata_key in settings_map.items():
@@ -135,7 +140,9 @@ def _set_model_data(
                         span.set_attribute(spandata_key, value)
 
 
-def _set_available_tools(span: "StreamedSpan", agent: "Any") -> None:
+def _set_available_tools(
+    span: "StreamedSpan", agent: "Optional[Agent[Any, Any]]"
+) -> None:
     """Set available tools data on a span from an agent's function toolset.
 
     Args:
@@ -155,7 +162,7 @@ def _set_available_tools(span: "StreamedSpan", agent: "Any") -> None:
         # Get tools from the function toolset
         if hasattr(agent._function_toolset, "tools"):
             for tool_name, tool in agent._function_toolset.tools.items():
-                tool_info = {"name": tool_name}
+                tool_info: "dict[str, Any]" = {"name": tool_name}
 
                 # Add description from function_schema if available
                 if hasattr(tool, "function_schema"):

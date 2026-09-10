@@ -27,6 +27,7 @@ from .utils import (
 if TYPE_CHECKING:
     from typing import Any, Dict, List, Optional, Union
 
+    from pydantic_ai import Agent
     from pydantic_ai.messages import ModelMessage, ModelResponse, SystemPromptPart
     from pydantic_ai.models import Model
     from pydantic_ai.settings import ModelSettings
@@ -268,7 +269,7 @@ def _set_output_data(
 
 def ai_client_span(
     messages: "list[ModelMessage]",
-    agent: "Any",
+    agent: "Optional[Agent[Any, Any]]",
     model: "Model",
     model_settings: "Optional[ModelSettings]",
 ) -> "StreamedSpan":
