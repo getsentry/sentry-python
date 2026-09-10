@@ -967,14 +967,12 @@ def set_span_data_for_request(
 
         if messages:
             normalized_messages = normalize_message_roles(messages)
-            client = sentry_sdk.get_client()
-            if normalized_messages is not None:
-                set_data_normalized(
-                    span,
-                    SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                    normalized_messages,
-                    unpack=False,
-                )
+            set_data_normalized(
+                span,
+                SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                normalized_messages,
+                unpack=False,
+            )
 
     # Extract parameters directly from config (not nested under generation_config)
     for param, span_key in [

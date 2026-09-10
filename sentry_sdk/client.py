@@ -35,8 +35,7 @@ from sentry_sdk.profiler.continuous_profiler import setup_continuous_profiler
 from sentry_sdk.scrubber import EventScrubber
 from sentry_sdk.serializer import serialize
 from sentry_sdk.sessions import SessionFlusher
-from sentry_sdk.traces import SpanStatus, StreamedSpan
-from sentry_sdk.tracing import trace
+from sentry_sdk.traces import SpanStatus, StreamedSpan, trace
 from sentry_sdk.transport import (
     AsyncHttpTransport,
     HttpTransportCore,
@@ -493,7 +492,7 @@ class _Client(BaseClient):
         self, functions_to_trace: "Sequence[Dict[str, str]]"
     ) -> None:
         """
-        Instruments the functions given in the list `functions_to_trace` with the `@sentry_sdk.tracing.trace` decorator.
+        Instruments the functions given in the list `functions_to_trace` with a trace decorator.
         """
         for function in functions_to_trace:
             class_name = None

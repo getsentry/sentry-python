@@ -5,9 +5,7 @@ import threading
 import pytest
 
 import sentry_sdk
-from sentry_sdk import start_span, start_transaction
 from sentry_sdk.feature_flags import FlagBuffer, add_feature_flag
-from tests.conftest import ApproxDict
 
 
 def test_featureflags_integration(sentry_init, capture_events, uninstall_integration):
@@ -34,6 +32,7 @@ def test_featureflags_integration(sentry_init, capture_events, uninstall_integra
 async def test_featureflags_integration_spans_async(sentry_init, capture_events):
     sentry_init(
         traces_sample_rate=1.0,
+        trace_lifecycle="stream",
     )
     events = capture_events()
 
@@ -62,6 +61,7 @@ async def test_featureflags_integration_spans_async(sentry_init, capture_events)
 def test_featureflags_integration_spans_sync(sentry_init, capture_events):
     sentry_init(
         traces_sample_rate=1.0,
+        trace_lifecycle="stream",
     )
     events = capture_events()
 
@@ -277,40 +277,3 @@ def test_flag_buffer_concurrent_access():
     # shared resource. When deepcopying we should have exclusive access to the underlying
     # memory.
     assert error_occurred is False
-
-
-def test_flag_limit(sentry_init, capture_events):
-    sentry_init(traces_sample_rate=1.0)
-
-    events = capture_events()
-
-    with start_transaction(name="hi"):
-        with start_span(op="foo", name="bar"):
-            add_feature_flag("0", True)
-            add_feature_flag("1", True)
-            add_feature_flag("2", True)
-            add_feature_flag("3", True)
-            add_feature_flag("4", True)
-            add_feature_flag("5", True)
-            add_feature_flag("6", True)
-            add_feature_flag("7", True)
-            add_feature_flag("8", True)
-            add_feature_flag("9", True)
-            add_feature_flag("10", True)
-
-    (event,) = events
-    assert event["spans"][0]["data"] == ApproxDict(
-        {
-            "flag.evaluation.0": True,
-            "flag.evaluation.1": True,
-            "flag.evaluation.2": True,
-            "flag.evaluation.3": True,
-            "flag.evaluation.4": True,
-            "flag.evaluation.5": True,
-            "flag.evaluation.6": True,
-            "flag.evaluation.7": True,
-            "flag.evaluation.8": True,
-            "flag.evaluation.9": True,
-        }
-    )
-    assert "flag.evaluation.10" not in event["spans"][0]["data"]

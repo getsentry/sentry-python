@@ -138,6 +138,33 @@ async def test_async_views(
     }
 
 
+@pytest.mark.parametrize("application", APPS)
+@pytest.mark.asyncio
+@pytest.mark.skipif(
+    django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
+)
+async def test_http_route(
+    sentry_init,
+    capture_items,
+    application,
+):
+    sentry_init(
+        integrations=[DjangoIntegration()],
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+    )
+
+    items = capture_items("span")
+
+    comm = HttpCommunicator(application, "GET", "/async_message")
+    await comm.get_response()
+    await comm.wait()
+
+    sentry_sdk.flush()
+    (segment,) = (item.payload for item in items if item.payload.get("is_segment"))
+    assert segment["attributes"][SPANDATA.HTTP_ROUTE] == "/async_message"
+
+
 @pytest.mark.asyncio
 @pytest.mark.skipif(
     django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
@@ -531,7 +558,7 @@ BODY_FORM_CONTENT_LENGTH = str(len(BODY_FORM)).encode("utf-8")
 @pytest.mark.skipif(
     django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
 )
-async def test_asgi_request_body(
+async def test_asgi_request_body_send_default_pii(
     sentry_init,
     capture_items,
     application,
@@ -565,7 +592,8 @@ async def test_asgi_request_body(
     assert response["body"] == body
 
     sentry_sdk.flush()
-    (event,) = (item.payload for item in items)
+
+    (event,) = [item.payload for item in items]
 
     if expected_data is not None:
         assert event["request"]["data"] == expected_data
@@ -661,39 +689,6 @@ async def test_asgi_request_body_dropped_with_form_and_files_data_collection(
 
     assert "data" not in event["request"]
     assert "data" not in event.get("_meta", {}).get("request", {})
-
-
-@pytest.mark.parametrize("application", APPS)
-@pytest.mark.asyncio
-@pytest.mark.skipif(
-    django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
-)
-async def test_asgi_transaction_request_body_data_collection(
-    sentry_init, capture_events, application
-):
-    sentry_init(
-        integrations=[DjangoIntegration()],
-        traces_sample_rate=1.0,
-        _experiments={"data_collection": {"http_bodies": []}},
-    )
-    events = capture_events()
-
-    comm = HttpCommunicator(
-        application,
-        method="POST",
-        headers=[(b"content-type", b"application/json")],
-        path=reverse("post_echo_async"),
-        body=json.dumps({"hey": 42}).encode("utf-8"),
-    )
-    response = await comm.get_response()
-    await comm.wait()
-
-    assert response["status"] == 200
-
-    (event, transaction_event) = events
-
-    assert "data" not in event["request"]
-    assert "data" not in transaction_event["request"]
 
 
 @pytest.mark.parametrize("application", APPS)

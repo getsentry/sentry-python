@@ -12,13 +12,11 @@ from sentry_sdk.ai.utils import (
     normalize_message_role,
     normalize_message_roles,
     set_data_normalized,
-    truncate_and_annotate_messages,
 )
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import StreamedSpan
-from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
     event_from_exception,
     has_data_collection_enabled,
@@ -176,19 +174,12 @@ def _set_input_data(
                 )
 
     normalized_messages = normalize_message_roles(request_messages)
-    scope = sentry_sdk.get_current_scope()
-    messages_data = (
-        truncate_and_annotate_messages(normalized_messages, span, scope)
-        if not has_span_streaming_enabled(client.options)
-        else normalized_messages
+    set_data_normalized(
+        span,
+        SPANDATA.GEN_AI_REQUEST_MESSAGES,
+        normalized_messages,
+        unpack=False,
     )
-    if messages_data is not None:
-        set_data_normalized(
-            span,
-            SPANDATA.GEN_AI_REQUEST_MESSAGES,
-            messages_data,
-            unpack=False,
-        )
 
 
 def _set_output_data(span: "StreamedSpan", result: "Any") -> None:

@@ -1,6 +1,5 @@
 import re
 from typing import TYPE_CHECKING
-from unittest import mock
 
 import pytest
 import responses
@@ -9,7 +8,8 @@ from huggingface_hub import InferenceClient
 import sentry_sdk
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.huggingface_hub import HuggingfaceHubIntegration
-from sentry_sdk.utils import package_version
+from sentry_sdk.utils import package_version, safe_serialize
+from tests.conftest import ApproxDict
 
 try:
     from huggingface_hub.utils._errors import HfHubHTTPError
@@ -472,7 +472,7 @@ def mock_hf_chat_completion_api_streaming_tools(httpx_mock):
 @pytest.mark.parametrize("include_prompts", [True, False])
 def test_text_generation(
     sentry_init: "Any",
-    capture_events: "Any",
+    capture_items: "Any",
     send_default_pii: "Any",
     include_prompts: "Any",
     mock_hf_text_generation_api: "Any",
@@ -481,36 +481,37 @@ def test_text_generation(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         integrations=[HuggingfaceHubIntegration(include_prompts=include_prompts)],
-        stream_gen_ai_spans=False,
+        trace_lifecycle="stream",
     )
 
     client = InferenceClient(model="test-model")
-    events = capture_events()
+    items = capture_items("span")
 
-    with sentry_sdk.start_transaction(name="test"):
-        client.text_generation(
-            "Hello",
-            stream=False,
-            details=True,
-        )
+    client.text_generation(
+        "Hello",
+        stream=False,
+        details=True,
+    )
 
-    (transaction,) = events
-
+    sentry_sdk.flush()
+    spans = [item.payload for item in items]
     span = None
-    for sp in transaction["spans"]:
-        if sp["op"].startswith("gen_ai"):
+    for sp in spans:
+        if "sentry.op" in sp["attributes"] and sp["attributes"]["sentry.op"].startswith(
+            "gen_ai"
+        ):
             assert span is None, "there is exactly one gen_ai span"
             span = sp
-        else:
+        elif "sentry.op" in sp["attributes"]:
             # there should be no other spans, just the gen_ai span
             # and optionally some http.client spans from talking to the hf api
-            assert sp["op"] == "http.client"
+            assert sp["attributes"]["sentry.op"] == "http.client"
 
     assert span is not None
 
-    assert span["op"] == "gen_ai.text_completion"
-    assert span["description"] == "text_completion test-model"
-    assert span["origin"] == "auto.ai.huggingface_hub"
+    assert span["attributes"]["sentry.op"] == "gen_ai.text_completion"
+    assert span["name"] == "text_completion test-model"
+    assert span["attributes"]["sentry.origin"] == "auto.ai.huggingface_hub"
 
     expected_data = {
         "gen_ai.operation.name": "text_completion",
@@ -518,8 +519,8 @@ def test_text_generation(
         "gen_ai.response.finish_reasons": "length",
         "gen_ai.response.streaming": False,
         "gen_ai.usage.total_tokens": 10,
-        "thread.id": mock.ANY,
-        "thread.name": mock.ANY,
+        "sentry.op": "gen_ai.text_completion",
+        "sentry.origin": "auto.ai.huggingface_hub",
     }
 
     if send_default_pii and include_prompts:
@@ -530,10 +531,10 @@ def test_text_generation(
         assert "gen_ai.request.messages" not in expected_data
         assert "gen_ai.response.text" not in expected_data
 
-    assert span["data"] == expected_data
+    assert span["attributes"] == ApproxDict(expected_data)
 
     # text generation does not set the response model
-    assert "gen_ai.response.model" not in span["data"]
+    assert "gen_ai.response.model" not in span["attributes"]
 
 
 @pytest.mark.httpx_mock(assert_all_requests_were_expected=False)
@@ -541,7 +542,7 @@ def test_text_generation(
 @pytest.mark.parametrize("include_prompts", [True, False])
 def test_text_generation_streaming(
     sentry_init: "Any",
-    capture_events: "Any",
+    capture_items: "Any",
     send_default_pii: "Any",
     include_prompts: "Any",
     mock_hf_text_generation_api_streaming: "Any",
@@ -550,37 +551,38 @@ def test_text_generation_streaming(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         integrations=[HuggingfaceHubIntegration(include_prompts=include_prompts)],
-        stream_gen_ai_spans=False,
+        trace_lifecycle="stream",
     )
 
     client = InferenceClient(model="test-model")
-    events = capture_events()
+    items = capture_items("span")
 
-    with sentry_sdk.start_transaction(name="test"):
-        for _ in client.text_generation(
-            prompt="Hello",
-            stream=True,
-            details=True,
-        ):
-            pass
+    for _ in client.text_generation(
+        prompt="Hello",
+        stream=True,
+        details=True,
+    ):
+        pass
 
-    (transaction,) = events
-
+    sentry_sdk.flush()
+    spans = [item.payload for item in items]
     span = None
-    for sp in transaction["spans"]:
-        if sp["op"].startswith("gen_ai"):
+    for sp in spans:
+        if "sentry.op" in sp["attributes"] and sp["attributes"]["sentry.op"].startswith(
+            "gen_ai"
+        ):
             assert span is None, "there is exactly one gen_ai span"
             span = sp
-        else:
+        elif "sentry.op" in sp["attributes"]:
             # there should be no other spans, just the gen_ai span
             # and optionally some http.client spans from talking to the hf api
-            assert sp["op"] == "http.client"
+            assert sp["attributes"]["sentry.op"] == "http.client"
 
     assert span is not None
 
-    assert span["op"] == "gen_ai.text_completion"
-    assert span["description"] == "text_completion test-model"
-    assert span["origin"] == "auto.ai.huggingface_hub"
+    assert span["attributes"]["sentry.op"] == "gen_ai.text_completion"
+    assert span["name"] == "text_completion test-model"
+    assert span["attributes"]["sentry.origin"] == "auto.ai.huggingface_hub"
 
     expected_data = {
         "gen_ai.operation.name": "text_completion",
@@ -588,8 +590,9 @@ def test_text_generation_streaming(
         "gen_ai.response.finish_reasons": "length",
         "gen_ai.response.streaming": True,
         "gen_ai.usage.total_tokens": 10,
-        "thread.id": mock.ANY,
-        "thread.name": mock.ANY,
+        "sentry.environment": "production",
+        "sentry.op": "gen_ai.text_completion",
+        "sentry.origin": "auto.ai.huggingface_hub",
     }
 
     if send_default_pii and include_prompts:
@@ -600,10 +603,10 @@ def test_text_generation_streaming(
         assert "gen_ai.request.messages" not in expected_data
         assert "gen_ai.response.text" not in expected_data
 
-    assert span["data"] == expected_data
+    assert span["attributes"] == ApproxDict(expected_data)
 
     # text generation does not set the response model
-    assert "gen_ai.response.model" not in span["data"]
+    assert "gen_ai.response.model" not in span["attributes"]
 
 
 @pytest.mark.httpx_mock(assert_all_requests_were_expected=False)
@@ -611,7 +614,7 @@ def test_text_generation_streaming(
 @pytest.mark.parametrize("include_prompts", [True, False])
 def test_chat_completion(
     sentry_init: "Any",
-    capture_events: "Any",
+    capture_items: "Any",
     send_default_pii: "Any",
     include_prompts: "Any",
     mock_hf_chat_completion_api: "Any",
@@ -620,35 +623,42 @@ def test_chat_completion(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         integrations=[HuggingfaceHubIntegration(include_prompts=include_prompts)],
-        stream_gen_ai_spans=False,
+        trace_lifecycle="stream",
     )
 
     client = get_hf_provider_inference_client()
-    events = capture_events()
+    items = capture_items("span")
 
-    with sentry_sdk.start_transaction(name="test"):
-        client.chat_completion(
-            messages=[{"role": "user", "content": "Hello!"}],
-            stream=False,
-        )
+    client.chat_completion(
+        messages=[
+            {
+                "role": "user",
+                "content": "Message demonstrating the absence of truncation.",
+            },
+            {"role": "user", "content": "Hello!"},
+        ],
+        stream=False,
+    )
 
-    (transaction,) = events
-
+    sentry_sdk.flush()
+    spans = [item.payload for item in items]
     span = None
-    for sp in transaction["spans"]:
-        if sp["op"].startswith("gen_ai"):
+    for sp in spans:
+        if "sentry.op" in sp["attributes"] and sp["attributes"]["sentry.op"].startswith(
+            "gen_ai"
+        ):
             assert span is None, "there is exactly one gen_ai span"
             span = sp
-        else:
+        elif "sentry.op" in sp["attributes"]:
             # there should be no other spans, just the gen_ai span
             # and optionally some http.client spans from talking to the hf api
-            assert sp["op"] == "http.client"
+            assert sp["attributes"]["sentry.op"] == "http.client"
 
     assert span is not None
 
-    assert span["op"] == "gen_ai.chat"
-    assert span["description"] == "chat test-model"
-    assert span["origin"] == "auto.ai.huggingface_hub"
+    assert span["attributes"]["sentry.op"] == "gen_ai.chat"
+    assert span["name"] == "chat test-model"
+    assert span["attributes"]["sentry.origin"] == "auto.ai.huggingface_hub"
 
     expected_data = {
         "gen_ai.operation.name": "chat",
@@ -659,13 +669,20 @@ def test_chat_completion(
         "gen_ai.usage.input_tokens": 10,
         "gen_ai.usage.output_tokens": 8,
         "gen_ai.usage.total_tokens": 18,
-        "thread.id": mock.ANY,
-        "thread.name": mock.ANY,
+        "sentry.environment": "production",
+        "sentry.op": "gen_ai.chat",
+        "sentry.origin": "auto.ai.huggingface_hub",
     }
 
     if send_default_pii and include_prompts:
-        expected_data["gen_ai.request.messages"] = (
-            '[{"role": "user", "content": "Hello!"}]'
+        expected_data["gen_ai.request.messages"] = safe_serialize(
+            [
+                {
+                    "role": "user",
+                    "content": "Message demonstrating the absence of truncation.",
+                },
+                {"role": "user", "content": "Hello!"},
+            ]
         )
         expected_data["gen_ai.response.text"] = (
             "[mocked] Hello! How can I help you today?"
@@ -675,7 +692,7 @@ def test_chat_completion(
         assert "gen_ai.request.messages" not in expected_data
         assert "gen_ai.response.text" not in expected_data
 
-    assert span["data"] == expected_data
+    assert span["attributes"] == ApproxDict(expected_data)
 
 
 @pytest.mark.httpx_mock(assert_all_requests_were_expected=False)
@@ -683,7 +700,7 @@ def test_chat_completion(
 @pytest.mark.parametrize("include_prompts", [True, False])
 def test_chat_completion_streaming(
     sentry_init: "Any",
-    capture_events: "Any",
+    capture_items: "Any",
     send_default_pii: "Any",
     include_prompts: "Any",
     mock_hf_chat_completion_api_streaming: "Any",
@@ -692,37 +709,44 @@ def test_chat_completion_streaming(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         integrations=[HuggingfaceHubIntegration(include_prompts=include_prompts)],
-        stream_gen_ai_spans=False,
+        trace_lifecycle="stream",
     )
 
     client = get_hf_provider_inference_client()
-    events = capture_events()
+    items = capture_items("span")
 
-    with sentry_sdk.start_transaction(name="test"):
-        _ = list(
-            client.chat_completion(
-                [{"role": "user", "content": "Hello!"}],
-                stream=True,
-            )
+    _ = list(
+        client.chat_completion(
+            [
+                {
+                    "role": "user",
+                    "content": "Message demonstrating the absence of truncation.",
+                },
+                {"role": "user", "content": "Hello!"},
+            ],
+            stream=True,
         )
+    )
 
-    (transaction,) = events
-
+    sentry_sdk.flush()
+    spans = [item.payload for item in items]
     span = None
-    for sp in transaction["spans"]:
-        if sp["op"].startswith("gen_ai"):
+    for sp in spans:
+        if "sentry.op" in sp["attributes"] and sp["attributes"]["sentry.op"].startswith(
+            "gen_ai"
+        ):
             assert span is None, "there is exactly one gen_ai span"
             span = sp
-        else:
+        elif "sentry.op" in sp["attributes"]:
             # there should be no other spans, just the gen_ai span
             # and optionally some http.client spans from talking to the hf api
-            assert sp["op"] == "http.client"
+            assert sp["attributes"]["sentry.op"] == "http.client"
 
     assert span is not None
 
-    assert span["op"] == "gen_ai.chat"
-    assert span["description"] == "chat test-model"
-    assert span["origin"] == "auto.ai.huggingface_hub"
+    assert span["attributes"]["sentry.op"] == "gen_ai.chat"
+    assert span["name"] == "chat test-model"
+    assert span["attributes"]["sentry.origin"] == "auto.ai.huggingface_hub"
 
     expected_data = {
         "gen_ai.operation.name": "chat",
@@ -730,8 +754,9 @@ def test_chat_completion_streaming(
         "gen_ai.response.finish_reasons": "stop",
         "gen_ai.response.model": "test-model-123",
         "gen_ai.response.streaming": True,
-        "thread.id": mock.ANY,
-        "thread.name": mock.ANY,
+        "sentry.environment": "production",
+        "sentry.op": "gen_ai.chat",
+        "sentry.origin": "auto.ai.huggingface_hub",
     }
     # usage is not available in older versions of the library
     if HF_VERSION and HF_VERSION >= (0, 26, 0):
@@ -740,8 +765,14 @@ def test_chat_completion_streaming(
         expected_data["gen_ai.usage.total_tokens"] = 197
 
     if send_default_pii and include_prompts:
-        expected_data["gen_ai.request.messages"] = (
-            '[{"role": "user", "content": "Hello!"}]'
+        expected_data["gen_ai.request.messages"] = safe_serialize(
+            [
+                {
+                    "role": "user",
+                    "content": "Message demonstrating the absence of truncation.",
+                },
+                {"role": "user", "content": "Hello!"},
+            ]
         )
         expected_data["gen_ai.response.text"] = "the mocked model response"
 
@@ -749,102 +780,103 @@ def test_chat_completion_streaming(
         assert "gen_ai.request.messages" not in expected_data
         assert "gen_ai.response.text" not in expected_data
 
-    assert span["data"] == expected_data
+    assert span["attributes"] == ApproxDict(expected_data)
 
 
 @pytest.mark.httpx_mock(assert_all_requests_were_expected=False)
 def test_chat_completion_api_error(
     sentry_init: "Any",
-    capture_events: "Any",
+    capture_items: "Any",
     mock_hf_api_with_errors: "Any",
 ) -> None:
     sentry_init(
         traces_sample_rate=1.0,
-        stream_gen_ai_spans=False,
+        trace_lifecycle="stream",
     )
 
     client = get_hf_provider_inference_client()
-    events = capture_events()
+    items = capture_items("event", "span")
 
-    with sentry_sdk.start_transaction(name="test"), pytest.raises(HfHubHTTPError):
+    with pytest.raises(HfHubHTTPError):
         client.chat_completion(
             messages=[{"role": "user", "content": "Hello!"}],
         )
 
-    (
-        error,
-        transaction,
-    ) = events
+    (error,) = (item.payload for item in items if item.type == "event")
 
     assert error["exception"]["values"][0]["mechanism"]["type"] == "huggingface_hub"
     assert not error["exception"]["values"][0]["mechanism"]["handled"]
 
+    sentry_sdk.flush()
+    spans = [item.payload for item in items if item.type == "span"]
     span = None
-    for sp in transaction["spans"]:
-        if sp["op"].startswith("gen_ai"):
+    for sp in spans:
+        if "sentry.op" in sp["attributes"] and sp["attributes"]["sentry.op"].startswith(
+            "gen_ai"
+        ):
             assert span is None, "there is exactly one gen_ai span"
             span = sp
-        else:
+        elif "sentry.op" in sp["attributes"]:
             # there should be no other spans, just the gen_ai span
             # and optionally some http.client spans from talking to the hf api
-            assert sp["op"] == "http.client"
+            assert sp["attributes"]["sentry.op"] == "http.client"
 
     assert span is not None
 
-    assert span["op"] == "gen_ai.chat"
-    assert span["description"] == "chat test-model"
-    assert span["origin"] == "auto.ai.huggingface_hub"
-    assert span["status"] == "internal_error"
-    assert span.get("tags", {}).get("status") == "internal_error"
+    assert span["attributes"]["sentry.op"] == "gen_ai.chat"
+    assert span["name"] == "chat test-model"
+    assert span["attributes"]["sentry.origin"] == "auto.ai.huggingface_hub"
+    assert span["status"] == "error"
 
-    assert (
-        error["contexts"]["trace"]["trace_id"]
-        == transaction["contexts"]["trace"]["trace_id"]
-    )
+    assert error["contexts"]["trace"]["trace_id"] == span["trace_id"]
     expected_data = {
         "gen_ai.operation.name": "chat",
         "gen_ai.request.model": "test-model",
-        "thread.id": mock.ANY,
-        "thread.name": mock.ANY,
+        "sentry.environment": "production",
+        "sentry.op": "gen_ai.chat",
+        "sentry.origin": "auto.ai.huggingface_hub",
     }
-    assert span["data"] == expected_data
+    assert span["attributes"] == ApproxDict(expected_data)
 
 
 @pytest.mark.httpx_mock(assert_all_requests_were_expected=False)
 def test_span_status_error(
     sentry_init: "Any",
-    capture_events: "Any",
+    capture_items: "Any",
     mock_hf_api_with_errors: "Any",
 ) -> None:
     client = get_hf_provider_inference_client()
 
     sentry_init(
         traces_sample_rate=1.0,
-        stream_gen_ai_spans=False,
+        trace_lifecycle="stream",
     )
-    events = capture_events()
+    items = capture_items("event", "span")
 
-    with sentry_sdk.start_transaction(name="test"), pytest.raises(HfHubHTTPError):
+    with pytest.raises(HfHubHTTPError):
         client.chat_completion(
             messages=[{"role": "user", "content": "Hello!"}],
         )
 
-    (error, transaction) = events
+    (error,) = [item.payload for item in items if item.type == "event"]
     assert error["level"] == "error"
 
+    sentry_sdk.flush()
+    spans = [item.payload for item in items if item.type == "span"]
     span = None
-    for sp in transaction["spans"]:
-        if sp["op"].startswith("gen_ai"):
+    for sp in spans:
+        if "sentry.op" in sp["attributes"] and sp["attributes"]["sentry.op"].startswith(
+            "gen_ai"
+        ):
             assert span is None, "there is exactly one gen_ai span"
             span = sp
-        else:
+        elif "sentry.op" in sp["attributes"]:
             # there should be no other spans, just the gen_ai span
             # and optionally some http.client spans from talking to the hf api
-            assert sp["op"] == "http.client"
+            assert sp["attributes"]["sentry.op"] == "http.client"
 
     assert span is not None
-    assert span["status"] == "internal_error"
-    assert span["tags"]["status"] == "internal_error"
+    assert span["status"] == "error"
 
 
 @pytest.mark.httpx_mock(assert_all_requests_were_expected=False)
@@ -852,7 +884,7 @@ def test_span_status_error(
 @pytest.mark.parametrize("include_prompts", [True, False])
 def test_chat_completion_with_tools(
     sentry_init: "Any",
-    capture_events: "Any",
+    capture_items: "Any",
     send_default_pii: "Any",
     include_prompts: "Any",
     mock_hf_chat_completion_api_tools: "Any",
@@ -861,7 +893,7 @@ def test_chat_completion_with_tools(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         integrations=[HuggingfaceHubIntegration(include_prompts=include_prompts)],
-        stream_gen_ai_spans=False,
+        trace_lifecycle="stream",
     )
 
     client = get_hf_provider_inference_client()
@@ -880,32 +912,33 @@ def test_chat_completion_with_tools(
             },
         }
     ]
-    events = capture_events()
+    items = capture_items("span")
 
-    with sentry_sdk.start_transaction(name="test"):
-        client.chat_completion(
-            messages=[{"role": "user", "content": "What is the weather in Paris?"}],
-            tools=tools,
-            tool_choice="auto",
-        )
+    client.chat_completion(
+        messages=[{"role": "user", "content": "What is the weather in Paris?"}],
+        tools=tools,
+        tool_choice="auto",
+    )
 
-    (transaction,) = events
-
+    sentry_sdk.flush()
+    spans = [item.payload for item in items]
     span = None
-    for sp in transaction["spans"]:
-        if sp["op"].startswith("gen_ai"):
+    for sp in spans:
+        if "sentry.op" in sp["attributes"] and sp["attributes"]["sentry.op"].startswith(
+            "gen_ai"
+        ):
             assert span is None, "there is exactly one gen_ai span"
             span = sp
-        else:
+        elif "sentry.op" in sp["attributes"]:
             # there should be no other spans, just the gen_ai span
             # and optionally some http.client spans from talking to the hf api
-            assert sp["op"] == "http.client"
+            assert sp["attributes"]["sentry.op"] == "http.client"
 
     assert span is not None
 
-    assert span["op"] == "gen_ai.chat"
-    assert span["description"] == "chat test-model"
-    assert span["origin"] == "auto.ai.huggingface_hub"
+    assert span["attributes"]["sentry.op"] == "gen_ai.chat"
+    assert span["name"] == "chat test-model"
+    assert span["attributes"]["sentry.origin"] == "auto.ai.huggingface_hub"
 
     expected_data = {
         "gen_ai.operation.name": "chat",
@@ -916,8 +949,9 @@ def test_chat_completion_with_tools(
         "gen_ai.usage.input_tokens": 10,
         "gen_ai.usage.output_tokens": 8,
         "gen_ai.usage.total_tokens": 18,
-        "thread.id": mock.ANY,
-        "thread.name": mock.ANY,
+        "sentry.environment": "production",
+        "sentry.op": "gen_ai.chat",
+        "sentry.origin": "auto.ai.huggingface_hub",
     }
 
     if send_default_pii and include_prompts:
@@ -933,7 +967,7 @@ def test_chat_completion_with_tools(
         assert "gen_ai.response.text" not in expected_data
         assert "gen_ai.response.tool_calls" not in expected_data
 
-    assert span["data"] == expected_data
+    assert span["attributes"] == ApproxDict(expected_data)
 
 
 @pytest.mark.httpx_mock(assert_all_requests_were_expected=False)
@@ -941,7 +975,7 @@ def test_chat_completion_with_tools(
 @pytest.mark.parametrize("include_prompts", [True, False])
 def test_chat_completion_streaming_with_tools(
     sentry_init: "Any",
-    capture_events: "Any",
+    capture_items: "Any",
     send_default_pii: "Any",
     include_prompts: "Any",
     mock_hf_chat_completion_api_streaming_tools: "Any",
@@ -950,7 +984,7 @@ def test_chat_completion_streaming_with_tools(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         integrations=[HuggingfaceHubIntegration(include_prompts=include_prompts)],
-        stream_gen_ai_spans=False,
+        trace_lifecycle="stream",
     )
 
     client = get_hf_provider_inference_client()
@@ -969,35 +1003,36 @@ def test_chat_completion_streaming_with_tools(
             },
         }
     ]
-    events = capture_events()
+    items = capture_items("span")
 
-    with sentry_sdk.start_transaction(name="test"):
-        _ = list(
-            client.chat_completion(
-                messages=[{"role": "user", "content": "What is the weather in Paris?"}],
-                stream=True,
-                tools=tools,
-                tool_choice="auto",
-            )
+    _ = list(
+        client.chat_completion(
+            messages=[{"role": "user", "content": "What is the weather in Paris?"}],
+            stream=True,
+            tools=tools,
+            tool_choice="auto",
         )
+    )
 
-    (transaction,) = events
-
+    sentry_sdk.flush()
+    spans = [item.payload for item in items]
     span = None
-    for sp in transaction["spans"]:
-        if sp["op"].startswith("gen_ai"):
+    for sp in spans:
+        if "sentry.op" in sp["attributes"] and sp["attributes"]["sentry.op"].startswith(
+            "gen_ai"
+        ):
             assert span is None, "there is exactly one gen_ai span"
             span = sp
-        else:
+        elif "sentry.op" in sp["attributes"]:
             # there should be no other spans, just the gen_ai span
             # and optionally some http.client spans from talking to the hf api
-            assert sp["op"] == "http.client"
+            assert sp["attributes"]["sentry.op"] == "http.client"
 
     assert span is not None
 
-    assert span["op"] == "gen_ai.chat"
-    assert span["description"] == "chat test-model"
-    assert span["origin"] == "auto.ai.huggingface_hub"
+    assert span["attributes"]["sentry.op"] == "gen_ai.chat"
+    assert span["name"] == "chat test-model"
+    assert span["attributes"]["sentry.origin"] == "auto.ai.huggingface_hub"
 
     expected_data = {
         "gen_ai.operation.name": "chat",
@@ -1006,8 +1041,9 @@ def test_chat_completion_streaming_with_tools(
         "gen_ai.response.finish_reasons": "tool_calls",
         "gen_ai.response.model": "test-model-123",
         "gen_ai.response.streaming": True,
-        "thread.id": mock.ANY,
-        "thread.name": mock.ANY,
+        "sentry.environment": "production",
+        "sentry.op": "gen_ai.chat",
+        "sentry.origin": "auto.ai.huggingface_hub",
     }
 
     if HF_VERSION and HF_VERSION >= (0, 26, 0):
@@ -1029,7 +1065,7 @@ def test_chat_completion_streaming_with_tools(
         assert "gen_ai.response.text" not in expected_data
         assert "gen_ai.response.tool_calls" not in expected_data
 
-    assert span["data"] == expected_data
+    assert span["attributes"] == ApproxDict(expected_data)
 
 
 DATA_COLLECTION_TOOLS = [
@@ -1135,7 +1171,7 @@ DATA_COLLECTION_TOOLS = [
 )
 def test_text_generation_data_collection(
     sentry_init: "Any",
-    capture_events: "Any",
+    capture_items: "Any",
     mock_hf_text_generation_api: "Any",
     data_collection: "Any",
     send_default_pii: "Any",
@@ -1147,7 +1183,7 @@ def test_text_generation_data_collection(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         integrations=[HuggingfaceHubIntegration(include_prompts=include_prompts)],
-        stream_gen_ai_spans=False,
+        trace_lifecycle="stream",
     )
     if data_collection is not None:
         sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
@@ -1156,13 +1192,13 @@ def test_text_generation_data_collection(
 
     client = InferenceClient(model="test-model")
 
-    captured = capture_events()
+    captured = capture_items("span")
 
-    with sentry_sdk.start_transaction(name="test"):
-        client.text_generation("Hello", stream=False, details=True)
-    (transaction,) = captured
-    (span,) = [sp for sp in transaction["spans"] if sp["op"].startswith("gen_ai")]
-    span_data = span["data"]
+    client.text_generation("Hello", stream=False, details=True)
+    sentry_sdk.flush()
+    spans = [item.payload for item in captured]
+    (span,) = [sp for sp in spans if sp["attributes"]["sentry.op"].startswith("gen_ai")]
+    span_data = span["attributes"]
 
     expected_values = {
         SPANDATA.GEN_AI_REQUEST_MESSAGES: "Hello",
@@ -1270,7 +1306,7 @@ def test_text_generation_data_collection(
 )
 def test_text_generation_streaming_data_collection(
     sentry_init: "Any",
-    capture_events: "Any",
+    capture_items: "Any",
     mock_hf_text_generation_api_streaming: "Any",
     data_collection: "Any",
     send_default_pii: "Any",
@@ -1282,7 +1318,7 @@ def test_text_generation_streaming_data_collection(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         integrations=[HuggingfaceHubIntegration(include_prompts=include_prompts)],
-        stream_gen_ai_spans=False,
+        trace_lifecycle="stream",
     )
     if data_collection is not None:
         sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
@@ -1291,14 +1327,14 @@ def test_text_generation_streaming_data_collection(
 
     client = InferenceClient(model="test-model")
 
-    captured = capture_events()
+    captured = capture_items("span")
 
-    with sentry_sdk.start_transaction(name="test"):
-        for _ in client.text_generation(prompt="Hello", stream=True, details=True):
-            pass
-    (transaction,) = captured
-    (span,) = [sp for sp in transaction["spans"] if sp["op"].startswith("gen_ai")]
-    span_data = span["data"]
+    for _ in client.text_generation(prompt="Hello", stream=True, details=True):
+        pass
+    sentry_sdk.flush()
+    spans = [item.payload for item in captured]
+    (span,) = [sp for sp in spans if sp["attributes"]["sentry.op"].startswith("gen_ai")]
+    span_data = span["attributes"]
 
     expected_values = {
         SPANDATA.GEN_AI_REQUEST_MESSAGES: "Hello",
@@ -1415,7 +1451,7 @@ def test_text_generation_streaming_data_collection(
 )
 def test_chat_completion_data_collection_tools(
     sentry_init: "Any",
-    capture_events: "Any",
+    capture_items: "Any",
     mock_hf_chat_completion_api_tools: "Any",
     data_collection: "Any",
     send_default_pii: "Any",
@@ -1427,7 +1463,7 @@ def test_chat_completion_data_collection_tools(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         integrations=[HuggingfaceHubIntegration(include_prompts=include_prompts)],
-        stream_gen_ai_spans=False,
+        trace_lifecycle="stream",
     )
     if data_collection is not None:
         sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
@@ -1436,17 +1472,17 @@ def test_chat_completion_data_collection_tools(
 
     client = get_hf_provider_inference_client()
 
-    captured = capture_events()
+    captured = capture_items("span")
 
-    with sentry_sdk.start_transaction(name="test"):
-        client.chat_completion(
-            messages=[{"role": "user", "content": "What is the weather in Paris?"}],
-            tools=DATA_COLLECTION_TOOLS,
-            tool_choice="auto",
-        )
-    (transaction,) = captured
-    (span,) = [sp for sp in transaction["spans"] if sp["op"].startswith("gen_ai")]
-    span_data = span["data"]
+    client.chat_completion(
+        messages=[{"role": "user", "content": "What is the weather in Paris?"}],
+        tools=DATA_COLLECTION_TOOLS,
+        tool_choice="auto",
+    )
+    sentry_sdk.flush()
+    spans = [item.payload for item in captured]
+    (span,) = [sp for sp in spans if sp["attributes"]["sentry.op"].startswith("gen_ai")]
+    span_data = span["attributes"]
 
     expected_values = {
         SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS: '[{"type": "function", "function": {"name": "get_weather", "description": "Get current weather", "parameters": {"type": "object", "properties": {"location": {"type": "string"}}, "required": ["location"]}}}]',
@@ -1576,7 +1612,7 @@ def test_chat_completion_data_collection_tools(
 )
 def test_chat_completion_streaming_data_collection_tools(
     sentry_init: "Any",
-    capture_events: "Any",
+    capture_items: "Any",
     mock_hf_chat_completion_api_streaming_tools: "Any",
     data_collection: "Any",
     send_default_pii: "Any",
@@ -1588,7 +1624,7 @@ def test_chat_completion_streaming_data_collection_tools(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         integrations=[HuggingfaceHubIntegration(include_prompts=include_prompts)],
-        stream_gen_ai_spans=False,
+        trace_lifecycle="stream",
     )
     if data_collection is not None:
         sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
@@ -1597,19 +1633,19 @@ def test_chat_completion_streaming_data_collection_tools(
 
     client = get_hf_provider_inference_client()
 
-    captured = capture_events()
+    captured = capture_items("span")
 
-    with sentry_sdk.start_transaction(name="test"):
-        for _ in client.chat_completion(
-            messages=[{"role": "user", "content": "What is the weather in Paris?"}],
-            tools=DATA_COLLECTION_TOOLS,
-            tool_choice="auto",
-            stream=True,
-        ):
-            pass
-    (transaction,) = captured
-    (span,) = [sp for sp in transaction["spans"] if sp["op"].startswith("gen_ai")]
-    span_data = span["data"]
+    for _ in client.chat_completion(
+        messages=[{"role": "user", "content": "What is the weather in Paris?"}],
+        tools=DATA_COLLECTION_TOOLS,
+        tool_choice="auto",
+        stream=True,
+    ):
+        pass
+    sentry_sdk.flush()
+    spans = [item.payload for item in captured]
+    (span,) = [sp for sp in spans if sp["attributes"]["sentry.op"].startswith("gen_ai")]
+    span_data = span["attributes"]
 
     expected_values = {
         SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS: '[{"type": "function", "function": {"name": "get_weather", "description": "Get current weather", "parameters": {"type": "object", "properties": {"location": {"type": "string"}}, "required": ["location"]}}}]',

@@ -399,7 +399,6 @@ class LogsHandler(_BaseHandler):
 
     def emit(self, record: "LogRecord") -> "Any":
         with capture_internal_exceptions():
-            self.format(record)
             if not self._can_record(record):
                 return
 
@@ -407,6 +406,7 @@ class LogsHandler(_BaseHandler):
             if not client.is_active():
                 return
 
+            self.format(record)
             self._capture_log_from_record(client, record)
 
     def _capture_log_from_record(
