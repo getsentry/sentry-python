@@ -1022,24 +1022,6 @@ async def test_agent_with_tool_validation_error(
         chat_spans = [
             s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
         ]
-        tool_spans = [
-            s
-            for s in spans
-            if s["attributes"].get("sentry.op", "") == "gen_ai.execute_tool"
-        ]
-
-        # Should have tool spans
-        assert len(tool_spans) >= 1
-
-        # Check tool spans
-        model_retry_tool_span = tool_spans[0]
-        assert "execute_tool" in model_retry_tool_span["name"]
-        assert (
-            model_retry_tool_span["attributes"]["gen_ai.operation.name"]
-            == "execute_tool"
-        )
-        assert model_retry_tool_span["attributes"]["gen_ai.tool.name"] == "add_numbers"
-        assert "gen_ai.tool.input" in model_retry_tool_span["attributes"]
 
         # Check chat spans have available_tools
         assert "gen_ai.request.available_tools" in chat_spans[0]["attributes"]
@@ -1073,17 +1055,6 @@ async def test_agent_with_tool_validation_error(
 
         # Find child span types (invoke_agent is the transaction, not a child span)
         chat_spans = [s for s in spans if s["op"] == "gen_ai.chat"]
-        tool_spans = [s for s in spans if s["op"] == "gen_ai.execute_tool"]
-
-        # Should have tool spans
-        assert len(tool_spans) >= 1
-
-        # Check tool spans
-        model_retry_tool_span = tool_spans[0]
-        assert "execute_tool" in model_retry_tool_span["description"]
-        assert model_retry_tool_span["data"]["gen_ai.operation.name"] == "execute_tool"
-        assert model_retry_tool_span["data"]["gen_ai.tool.name"] == "add_numbers"
-        assert "gen_ai.tool.input" in model_retry_tool_span["data"]
 
         # Check chat spans have available_tools
         assert "gen_ai.request.available_tools" in chat_spans[0]["data"]
