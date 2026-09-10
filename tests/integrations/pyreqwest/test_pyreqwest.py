@@ -11,7 +11,7 @@ from pyreqwest.simple.request import pyreqwest_get as async_pyreqwest_get
 from pyreqwest.simple.sync_request import pyreqwest_get as sync_pyreqwest_get
 
 import sentry_sdk
-from sentry_sdk import capture_message, start_transaction
+from sentry_sdk import capture_message
 from sentry_sdk.consts import MATCH_ALL, SPANDATA
 from sentry_sdk.integrations.pyreqwest import PyreqwestIntegration
 from tests.conftest import ApproxDict, get_free_port
@@ -350,9 +350,8 @@ def test_trace_propagation_targets(
 
     url = f"http://localhost:{server_port}/propagation"
 
-    with start_transaction():
-        client = SyncClientBuilder().build()
-        client.get(url).build().send()
+    client = SyncClientBuilder().build()
+    client.get(url).build().send()
 
     assert len(PyreqwestMockHandler.captured_requests) == 1
     headers = PyreqwestMockHandler.captured_requests[0]["headers"]
