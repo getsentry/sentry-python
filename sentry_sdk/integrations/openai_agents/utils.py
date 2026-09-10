@@ -48,6 +48,23 @@ def _capture_exception(exc: "Any") -> None:
     sentry_sdk.capture_event(event, hint=hint)
 
 
+def _get_request_model_name(agent: "agents.Agent") -> "Optional[str]":
+    """Resolve the request model name used on openai-agents spans.
+
+    Precedence matches the previous duplicated lookups:
+    1. ``agent.model.model`` when ``agent.model`` is a ``Model`` instance
+    2. ``agent.model`` when it is a string
+    3. ``agent._sentry_request_model`` when the agent uses a default model
+    """
+    if isinstance(agent.model, Model) and hasattr(agent.model, "model"):
+        return agent.model.model
+    if isinstance(agent.model, str):
+        return agent.model
+    if hasattr(agent, "_sentry_request_model"):
+        return agent._sentry_request_model
+    return None
+
+
 def _set_agent_data(
     span: "Union[sentry_sdk.tracing.Span, StreamedSpan]", agent: "agents.Agent"
 ) -> None:
@@ -64,14 +81,7 @@ def _set_agent_data(
     if agent.model_settings.max_tokens:
         set_on_span(SPANDATA.GEN_AI_REQUEST_MAX_TOKENS, agent.model_settings.max_tokens)
 
-    model_name: "Optional[str]" = None
-    if isinstance(agent.model, Model) and hasattr(agent.model, "model"):
-        model_name = agent.model.model
-    elif isinstance(agent.model, str):
-        model_name = agent.model
-    elif hasattr(agent, "_sentry_request_model"):
-        model_name = agent._sentry_request_model
-
+    model_name = _get_request_model_name(agent)
     if model_name:
         set_on_span(SPANDATA.GEN_AI_REQUEST_MODEL, model_name)
 
