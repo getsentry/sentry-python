@@ -1158,13 +1158,6 @@ def create_streaming_span_decorator(
 
         @functools.wraps(f)
         async def async_wrapper(*args: "Any", **kwargs: "Any") -> "Any":
-            client = sentry_sdk.get_client()
-            if client.is_active() and not has_span_streaming_enabled(client.options):
-                logger.warning(
-                    "Using span streaming API in non-span-streaming mode. Use "
-                    "@sentry_sdk.trace instead.",
-                )
-
             span_name = name or qualname_from_function(f) or ""
 
             with start_streaming_span(
@@ -1180,13 +1173,6 @@ def create_streaming_span_decorator(
 
         @functools.wraps(f)
         def sync_wrapper(*args: "Any", **kwargs: "Any") -> "Any":
-            client = sentry_sdk.get_client()
-            if client.is_active() and not has_span_streaming_enabled(client.options):
-                logger.warning(
-                    "Using span streaming API in non-span-streaming mode. Use "
-                    "@sentry_sdk.trace instead.",
-                )
-
             span_name = name or qualname_from_function(f) or ""
 
             with start_streaming_span(

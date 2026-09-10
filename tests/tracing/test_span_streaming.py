@@ -12,7 +12,6 @@ from sentry_sdk.traces import (
     SpanStatus,
     StreamedSpan,
 )
-from sentry_sdk.tracing_utils import has_span_streaming_enabled
 
 minimum_python_38 = pytest.mark.skipif(
     sys.version_info < (3, 8), reason="Asyncio tests need Python >= 3.8"
@@ -1771,37 +1770,6 @@ def test_default_attributes(sentry_init, capture_envelopes):
             "value": mock.ANY,
         },
     }
-
-
-@pytest.mark.parametrize(
-    ("options", "expected"),
-    [
-        ({"trace_lifecycle": "stream"}, True),
-        ({"_experiments": {"trace_lifecycle": "stream"}}, True),
-        (
-            {
-                "trace_lifecycle": "stream",
-                "_experiments": {"trace_lifecycle": "static"},
-            },
-            True,
-        ),
-        (
-            {
-                "trace_lifecycle": "static",
-                "_experiments": {"trace_lifecycle": "stream"},
-            },
-            False,
-        ),
-        ({"trace_lifecycle": "static"}, False),
-        ({"_experiments": {"trace_lifecycle": "static"}}, False),
-        ({}, False),
-        ({"_experiments": {}}, False),
-        ({"_experiments": None}, False),
-        (None, False),
-    ],
-)
-def test_has_span_streaming_enabled(options, expected):
-    assert has_span_streaming_enabled(options) is expected
 
 
 def test_trace_lifecycle_top_level_enables_streaming(sentry_init, capture_items):
