@@ -122,5 +122,8 @@ def test_start_transaction_updates_scope_name(sentry_init):
 
     scope = sentry_sdk.get_current_scope()
 
-    with sentry_sdk.traces.start_span(name="foobar"):
+    with sentry_sdk.traces.start_span(
+        name="foobar", attributes={"sentry.segment.name.source": "test"}
+    ):
         assert scope._transaction == "foobar"
+        assert scope._transaction_info == {"source": "test"}

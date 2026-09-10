@@ -1212,8 +1212,6 @@ class Scope:
         if parent_span is None:
             propagation_context = self.get_active_propagation_context()
 
-            self._transaction = name
-
             if is_ignored_span(name, attributes):
                 return NoOpStreamedSpan(
                     name=name,
