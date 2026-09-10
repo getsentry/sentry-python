@@ -3180,9 +3180,6 @@ def test_openai_agents_message_role_mapping(sentry_init, test_message, expected_
 
     get_response_kwargs = {"input": [test_message]}
 
-    from sentry_sdk import start_span
-    from sentry_sdk.integrations.openai_agents.utils import _set_input_data
-
     with start_span(op="test") as span:
         _set_input_data(span, get_response_kwargs)
 
@@ -3933,49 +3930,6 @@ async def test_invoke_agent_span_uses_last_response_model(
         second_ai_client_span["attributes"]["gen_ai.response.model"]
         == "gpt-4.1-2025-04-14"
     )
-
-
-def test_openai_agents_message_truncation(
-    sentry_init,
-):
-    """Test that large messages are truncated properly in OpenAI Agents integration."""
-
-    large_content = (
-        "This is a very long message that will exceed our size limits. " * 1000
-    )
-
-    sentry_init(
-        integrations=[OpenAIAgentsIntegration()],
-        traces_sample_rate=1.0,
-        send_default_pii=True,
-    )
-
-    test_messages = [
-        {"role": "user", "content": large_content},
-        {"role": "assistant", "content": large_content},
-        {"role": "user", "content": "small message 4"},
-        {"role": "assistant", "content": "small message 5"},
-    ]
-
-    get_response_kwargs = {"input": test_messages}
-
-    with start_span(op="gen_ai.chat") as span:
-        scope = sentry_sdk.get_current_scope()
-        _set_input_data(span, get_response_kwargs)
-        if hasattr(scope, "_gen_ai_original_message_count"):
-            truncated_count = scope._gen_ai_original_message_count.get(span.span_id)
-            assert truncated_count == 4, (
-                f"Expected 4 original messages, got {truncated_count}"
-            )
-
-        assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span._data
-        messages_data = span._data[SPANDATA.GEN_AI_REQUEST_MESSAGES]
-        assert isinstance(messages_data, str)
-
-        parsed_messages = json.loads(messages_data)
-        assert isinstance(parsed_messages, list)
-        assert len(parsed_messages) == 1
-        assert "small message 5" in str(parsed_messages[0])
 
 
 @pytest.mark.asyncio

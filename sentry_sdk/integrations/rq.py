@@ -7,7 +7,6 @@ from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_ve
 from sentry_sdk.integrations.logging import ignore_logger_for_events
 from sentry_sdk.scope import Scope, should_send_default_pii
 from sentry_sdk.traces import SegmentNameSource
-from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
     SENSITIVE_DATA_SUBSTITUTE,
     capture_internal_exceptions,
@@ -139,12 +138,7 @@ class RqIntegration(Integration):
                 return old_enqueue_job(self, job, **kwargs)
 
             scope = sentry_sdk.get_current_scope()
-            span = (
-                scope.streamed_span
-                if has_span_streaming_enabled(client.options)
-                else scope.span
-            )
-            if span is not None:
+            if scope.streamed_span is not None:
                 job.meta["_sentry_trace_headers"] = dict(
                     scope.iter_trace_propagation_headers()
                 )

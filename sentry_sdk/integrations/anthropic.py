@@ -547,13 +547,12 @@ def _set_common_input_data(
 
         role_normalized_messages = normalize_message_roles(normalized_messages)
 
-        if role_normalized_messages is not None:
-            set_data_normalized(
-                span,
-                SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                role_normalized_messages,
-                unpack=False,
-            )
+        set_data_normalized(
+            span,
+            SPANDATA.GEN_AI_REQUEST_MESSAGES,
+            role_normalized_messages,
+            unpack=False,
+        )
 
 
 def _set_create_input_data(
