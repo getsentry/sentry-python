@@ -365,8 +365,14 @@ class Span:
         )
 
     def __enter__(self) -> "Span":
-        self._context_manager_state = None  # early return sentinel
-        return self
+        if has_span_streaming_enabled(sentry_sdk.get_client().options):
+            self._context_manager_state = None  # early return sentinel
+            return self
+
+        scope = self.scope or sentry_sdk.get_current_scope()
+        old_span = scope.span
+        scope.span = self
+        self._context_manager_state = (scope, old_span)
 
     def __exit__(
         self, ty: "Optional[Any]", value: "Optional[Any]", tb: "Optional[Any]"
@@ -1348,5 +1354,6 @@ from sentry_sdk.tracing_utils import (
     EnvironHeaders,
     _generate_sample_rand,
     extract_sentrytrace_data,
+    has_span_streaming_enabled,
     has_tracing_enabled,
 )
