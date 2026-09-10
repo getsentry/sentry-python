@@ -982,7 +982,7 @@ def test_trace_context_tracing(sentry_init):
 
     assert trace_context["trace_id"] == segment.trace_id
     assert trace_context["span_id"] == span.span_id
-    assert trace_context["parent_span_id"] == span.parent_span_id
+    assert trace_context["parent_span_id"] == span._parent_span_id
     assert "dynamic_sampling_context" in trace_context
 
 
