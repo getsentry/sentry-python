@@ -549,10 +549,8 @@ async def test_agent_with_tool_validation_error(
     assert result is None
 
     if handled_tool_call_exceptions:
-        (
-            error,
-            model_behaviour_error,
-        ) = (item.payload for item in items if item.type == "event")
+        events = [item.payload for item in items if item.type == "event"]
+        error = events[0]
 
         assert error["level"] == "error"
         assert error["exception"]["values"][0]["mechanism"]["handled"]
