@@ -4,7 +4,7 @@ from enum import Enum
 from typing import TYPE_CHECKING, cast
 
 import sentry_sdk
-from sentry_sdk.consts import SPANDATA, SPANSTATUS, SPANTEMPLATE
+from sentry_sdk.consts import SPANDATA, SPANSTATUS
 from sentry_sdk.profiler.continuous_profiler import get_profiler_id
 from sentry_sdk.utils import (
     capture_internal_exceptions,
@@ -1222,7 +1222,6 @@ if TYPE_CHECKING:
         op: "Optional[str]" = None,
         name: "Optional[str]" = None,
         attributes: "Optional[dict[str, Any]]" = None,
-        template: "SPANTEMPLATE" = SPANTEMPLATE.DEFAULT,
     ) -> "Callable[[Callable[P, R]], Callable[P, R]]":
         # Handles: @trace() and @trace(op="custom")
         pass
@@ -1239,7 +1238,6 @@ def trace(
     op: "Optional[str]" = None,
     name: "Optional[str]" = None,
     attributes: "Optional[dict[str, Any]]" = None,
-    template: "SPANTEMPLATE" = SPANTEMPLATE.DEFAULT,
 ) -> "Union[Callable[P, R], Callable[[Callable[P, R]], Callable[P, R]]]":
     """
     Decorator to start a child span around a function call.
@@ -1269,13 +1267,6 @@ def trace(
         attributes provide additional context about the span's execution.
     :type attributes: dict[str, Any] or None
 
-    :param template: The type of span to create. This determines what kind of
-        span instrumentation and data collection will be applied. Use predefined
-        constants from :py:class:`sentry_sdk.consts.SPANTEMPLATE`.
-        The default is `SPANTEMPLATE.DEFAULT` which is the right choice for most
-        use cases.
-    :type template: :py:class:`sentry_sdk.consts.SPANTEMPLATE`
-
     :returns: When used as ``@trace``, returns the decorated function. When used as
         ``@trace(...)`` with parameters, returns a decorator function.
     :rtype: Callable or decorator function
@@ -1283,7 +1274,7 @@ def trace(
     Example::
 
         import sentry_sdk
-        from sentry_sdk.consts import OP, SPANTEMPLATE
+        from sentry_sdk.consts import OP
 
         # Simple usage with default values
         @sentry_sdk.trace
@@ -1300,12 +1291,6 @@ def trace(
         def make_db_query(sql):
             # Function implementation
             pass
-
-        # With a custom template
-        @sentry_sdk.trace(template=SPANTEMPLATE.AI_TOOL)
-        def calculate_interest_rate(amount, rate, years):
-            # Function implementation
-            pass
     """
     from sentry_sdk.tracing_utils import create_span_decorator
 
@@ -1313,7 +1298,6 @@ def trace(
         op=op,
         name=name,
         attributes=attributes,
-        template=template,
     )
 
     if func:
