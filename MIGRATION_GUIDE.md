@@ -114,6 +114,7 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 - Dropped support for Litestar below 2.0.
 - Dropped support for PySpark below 3.0.
 - Dropped support for redis-py below 4.2.
+- Dropped support for Pydantic AI below 1.76.
 - Removed the RedisIntegration `max_data_size` option.
 - Removed the possibility to supply a specific client to the LaunchDarklyIntegration.
 - The `enable_tracing` option was removed. Use `traces_sample_rate=1.0` instead.

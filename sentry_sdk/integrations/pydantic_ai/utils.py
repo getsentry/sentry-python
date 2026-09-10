@@ -14,6 +14,8 @@ from sentry_sdk.utils import (
 if TYPE_CHECKING:
     from typing import Any, Optional
 
+    from pydantic_ai.models import Model
+
 
 # Store the current agent context in a contextvar for re-entrant safety
 # Using a list as a stack to support nested agent calls
@@ -107,7 +109,7 @@ def _set_agent_data(span: "StreamedSpan", agent: "Any") -> None:
         span.set_attribute(SPANDATA.GEN_AI_AGENT_NAME, agent_obj.name)
 
 
-def _get_model_name(model_obj: "Any") -> "Optional[str]":
+def _get_model_name(model_obj: "Model") -> "Optional[str]":
     """Extract model name from a model object.
 
     Args:

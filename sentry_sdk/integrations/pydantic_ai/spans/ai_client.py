@@ -31,6 +31,8 @@ if TYPE_CHECKING:
     from typing import Any, Dict, List, Optional, Union
 
     from pydantic_ai.messages import ModelMessage, ModelResponse, SystemPromptPart
+    from pydantic_ai.models import Model
+    from pydantic_ai.settings import ModelSettings
 
     from sentry_sdk import _types
 
@@ -99,7 +101,7 @@ def _get_system_instructions(
     return permanent_instructions, current_instructions
 
 
-def _set_input_messages(span: "StreamedSpan", messages: "Any") -> None:
+def _set_input_messages(span: "StreamedSpan", messages: "list[ModelMessage]") -> None:
     """Set input messages data on a span."""
     if not _should_send_inputs():
         return
@@ -268,7 +270,10 @@ def _set_output_data(
 
 
 def ai_client_span(
-    messages: "Any", agent: "Any", model: "Any", model_settings: "Any"
+    messages: "list[ModelMessage]",
+    agent: "Any",
+    model: "Model",
+    model_settings: "Optional[ModelSettings]",
 ) -> "StreamedSpan":
     """Create a span for an AI client call (model request).
 

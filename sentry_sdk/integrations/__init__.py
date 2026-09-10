@@ -157,7 +157,7 @@ _MIN_VERSIONS = {
     "openai": (1, 0, 0),
     "openai_agents": (0, 0, 19),
     "openfeature": (0, 7, 1),
-    "pydantic_ai": (1, 0, 0),
+    "pydantic_ai": (1, 76, 0),
     "pymongo": (3, 5, 0),
     "pyramid": (2, 0),
     "pyreqwest": (0, 11, 6),
