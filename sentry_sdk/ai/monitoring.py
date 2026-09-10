@@ -1,4 +1,3 @@
-from contextvars import ContextVar
 from typing import TYPE_CHECKING
 
 from sentry_sdk.ai.utils import _set_span_data_attribute
@@ -11,18 +10,6 @@ if TYPE_CHECKING:
 
     F = TypeVar("F", bound=Union[Callable[..., Any], Callable[..., Awaitable[Any]]])
 
-_ai_pipeline_name: "ContextVar[Optional[str]]" = ContextVar(
-    "ai_pipeline_name", default=None
-)
-
-
-def set_ai_pipeline_name(name: "Optional[str]") -> None:
-    _ai_pipeline_name.set(name)
-
-
-def get_ai_pipeline_name() -> "Optional[str]":
-    return _ai_pipeline_name.get()
-
 
 def record_token_usage(
     span: "Union[Span, StreamedSpan]",
@@ -33,11 +20,6 @@ def record_token_usage(
     output_tokens_reasoning: "Optional[int]" = None,
     total_tokens: "Optional[int]" = None,
 ) -> None:
-    # TODO: move pipeline name elsewhere
-    ai_pipeline_name = get_ai_pipeline_name()
-    if ai_pipeline_name:
-        _set_span_data_attribute(span, SPANDATA.GEN_AI_PIPELINE_NAME, ai_pipeline_name)
-
     if input_tokens is not None:
         _set_span_data_attribute(span, SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, input_tokens)
 
