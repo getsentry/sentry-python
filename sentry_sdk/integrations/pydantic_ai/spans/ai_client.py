@@ -281,12 +281,7 @@ def ai_client_span(
         model: Model object
         model_settings: Model settings
     """
-    # Determine model name for span name
-    model_obj = model
-    if agent and hasattr(agent, "model"):
-        model_obj = agent.model
-
-    model_name = _get_model_name(model_obj) or "unknown"
+    model_name = _get_model_name(model) or "unknown"
 
     span = sentry_sdk.traces.start_span(
         name=f"chat {model_name}",
