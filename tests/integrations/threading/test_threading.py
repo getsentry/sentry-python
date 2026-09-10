@@ -1,6 +1,5 @@
 import sys
 from concurrent import futures
-from textwrap import dedent
 from threading import Thread
 
 import pytest
@@ -193,59 +192,58 @@ def test_spans_from_multiple_threads(
     ids=["propagate_scope=True", "propagate_scope=False"],
 )
 def test_spans_from_threadpool(
-    sentry_init, capture_events, render_span_tree, propagate_scope
+    sentry_init, capture_items, render_span_tree, propagate_scope
 ):
     sentry_init(
         traces_sample_rate=1.0,
+        trace_lifecycle="stream",
         integrations=[ThreadingIntegration(propagate_scope=propagate_scope)],
     )
-    events = capture_events()
+    items = capture_items()
 
     def do_some_work(number):
-        with sentry_sdk.start_span(
-            op=f"inner-run-{number}", name=f"Thread: child-{number}"
-        ):
-            pass
+        with sentry_sdk.traces.start_span(name=f"inner-run-{number}") as span:
+            inner_run_spans[number] = span
 
-    with sentry_sdk.start_transaction(op="outer-trx"):
+    outer_submit_spans = {}
+    inner_run_spans = {}
+
+    with sentry_sdk.traces.start_span(name="outer-seg") as outer:
         with futures.ThreadPoolExecutor(max_workers=1) as executor:
             for number in range(5):
-                with sentry_sdk.start_span(
-                    op=f"outer-submit-{number}", name="Thread: main"
-                ):
+                with sentry_sdk.traces.start_span(
+                    name=f"outer-submit-{number}"
+                ) as span:
+                    outer_submit_spans[number] = span
                     future = executor.submit(do_some_work, number)
                     future.result()
 
-    (event,) = events
+    sentry_sdk.flush()
+
+    spans = [item.payload for item in items]
+    assert len(spans) == 11
+
+    # Free-threaded builds set thread_inherit_context to True, otherwise thread_inherit_context is False
+    for span in spans:
+        if span["name"] == "outer-seg":
+            assert span["is_segment"] is True
+            assert "parent_span_id" not in span
+
+        if span["name"].startswith("outer-submit-"):
+            assert span["is_segment"] is False
+            assert span["parent_span_id"] == outer.span_id
 
     # Free-threaded builds set thread_inherit_context to True, otherwise thread_inherit_context is False
     if propagate_scope or getattr(sys.flags, "thread_inherit_context", None):
-        assert event["type"] == "transaction"
-        assert render_span_tree(event["spans"], event["contexts"]["trace"]) == dedent(
-            """\
-            - op="outer-trx": description=null
-              - op="outer-submit-0": description="Thread: main"
-                - op="inner-run-0": description="Thread: child-0"
-              - op="outer-submit-1": description="Thread: main"
-                - op="inner-run-1": description="Thread: child-1"
-              - op="outer-submit-2": description="Thread: main"
-                - op="inner-run-2": description="Thread: child-2"
-              - op="outer-submit-3": description="Thread: main"
-                - op="inner-run-3": description="Thread: child-3"
-              - op="outer-submit-4": description="Thread: main"
-                - op="inner-run-4": description="Thread: child-4"\
-"""
-        )
+        for span in spans:
+            if span["name"].startswith("inner-run-"):
+                num = int(span["name"][-1])
+                assert span["is_segment"] is False
+                assert span["parent_span_id"] == outer_submit_spans[num].span_id
 
     elif not propagate_scope:
-        assert event["type"] == "transaction"
-        assert render_span_tree(event["spans"], event["contexts"]["trace"]) == dedent(
-            """\
-            - op="outer-trx": description=null
-              - op="outer-submit-0": description="Thread: main"
-              - op="outer-submit-1": description="Thread: main"
-              - op="outer-submit-2": description="Thread: main"
-              - op="outer-submit-3": description="Thread: main"
-              - op="outer-submit-4": description="Thread: main"\
-"""
-        )
+        for span in spans:
+            if span["name"].startswith("inner-run-"):
+                num = int(span["name"][-1])
+                assert span["is_segment"] is True
+                assert "parent_span_id" not in span
