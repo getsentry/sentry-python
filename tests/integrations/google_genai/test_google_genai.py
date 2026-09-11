@@ -201,7 +201,7 @@ def test_nonstreaming_generate_content(
     # Output tokens now include reasoning tokens: candidates_token_count (20) + thoughts_token_count (3) = 23
     assert chat_span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 23
     assert chat_span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
-    assert chat_span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 5
+    assert chat_span["attributes"][SPANDATA.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS] == 5
     assert chat_span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS_REASONING] == 3
 
 
@@ -582,7 +582,7 @@ def test_streaming_generate_content(
     assert chat_span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
     assert chat_span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
     assert chat_span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 25
-    assert chat_span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 5
+    assert chat_span["attributes"][SPANDATA.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS] == 5
     assert chat_span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS_REASONING] == 3
 
     # Verify model name
