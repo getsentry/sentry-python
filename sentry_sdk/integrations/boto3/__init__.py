@@ -6,6 +6,7 @@ try:
 except ImportError:
     raise DidNotEnable("botocore is not installed")
 
+
 class Boto3Integration(Integration):
     identifier = "boto3"
     origin = f"auto.http.{identifier}"
