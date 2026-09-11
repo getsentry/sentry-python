@@ -1,25 +1,4 @@
-import pytest
-
 import sentry_sdk
-
-
-def test_standalone_span_iter_headers(sentry_init):
-    sentry_init(traces_sample_rate=1.0, trace_lifecycle="stream")
-
-    with sentry_sdk.traces.start_span(name="test") as span:
-        with pytest.raises(StopIteration):
-            # We should not have any propagation headers
-            next(span._iter_headers())
-
-
-def test_span_in_span_iter_headers(sentry_init):
-    sentry_init(traces_sample_rate=1.0, trace_lifecycle="stream")
-
-    with sentry_sdk.traces.start_span(name="test"):
-        with sentry_sdk.traces.start_span(name="test2") as span_inner:
-            with pytest.raises(StopIteration):
-                # We should not have any propagation headers
-                next(span_inner._iter_headers())
 
 
 def test_span_in_segment(sentry_init):

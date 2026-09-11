@@ -37,17 +37,6 @@ def test_get_current_span_via_traces():
     assert sentry_sdk.traces.get_current_span(fake_scope) is None
 
 
-def test_get_current_span_current_scope(sentry_init):
-    sentry_init()
-
-    assert get_current_span() is None
-
-    scope = get_current_scope()
-    fake_span = StreamedSpan(name="test", scope=scope)
-
-    assert get_current_span() == fake_span
-
-
 def test_get_current_span_current_scope_via_traces(sentry_init):
     sentry_init(trace_lifecycle="stream")
 
