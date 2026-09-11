@@ -668,7 +668,7 @@ class NoOpStreamedSpan(StreamedSpan):
         self._start()
 
     def __repr__(self) -> str:
-        return f"<{self.__class__.__name__}(sampled={self.sampled})>"
+        return f"<{self.__class__.__name__}(name={self.name}, sampled={self.sampled})>"
 
     def __enter__(self) -> "NoOpStreamedSpan":
         return self
