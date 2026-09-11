@@ -907,7 +907,7 @@ def set_span_data_for_request(
 ) -> None:
     """Set span data for the request."""
     client = sentry_sdk.get_client()
-    span.set_attribute(SPANDATA.GEN_AI_SYSTEM, GEN_AI_SYSTEM)
+    span.set_attribute(SPANDATA.GEN_AI_PROVIDER_NAME, GEN_AI_SYSTEM)
     span.set_attribute(SPANDATA.GEN_AI_REQUEST_MODEL, model)
 
     if kwargs.get("stream", False):

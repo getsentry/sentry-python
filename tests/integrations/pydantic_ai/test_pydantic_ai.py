@@ -932,8 +932,8 @@ async def test_gen_ai_system(
 
     chat_span = chat_spans[0]
     # gen_ai.system should be set from the model (TestModel -> 'test')
-    assert "gen_ai.system" in chat_span["attributes"]
-    assert chat_span["attributes"]["gen_ai.system"] == "test"
+    assert SPANDATA.GEN_AI_PROVIDER_NAME in chat_span["attributes"]
+    assert chat_span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "test"
 
 
 @pytest.mark.asyncio
