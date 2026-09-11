@@ -593,6 +593,12 @@ class SPANDATA:
     Example: [{"role": "assistant", "parts": [{"type": "text", "content": "The weather in Paris is currently rainy with a temperature of 57°F."}], "finish_reason": "stop"}]
     """
 
+    GEN_AI_RESPONSE_TIME_TO_FIRST_CHUNK = "gen_ai.response.time_to_first_chunk"
+    """
+    Time in seconds when the first response content chunk arrived in streaming responses.
+    Example: 0.6853435
+    """
+
     GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN = "gen_ai.response.time_to_first_token"
     """
     The time it took to receive the first token from the model.

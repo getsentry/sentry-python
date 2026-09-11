@@ -4991,7 +4991,7 @@ async def test_ai_client_span_streaming_responses_async_api(
         "gen_ai.response.model": "response-model-id",
         "gen_ai.response.streaming": True,
         "gen_ai.system": "openai",
-        "gen_ai.response.time_to_first_token": mock.ANY,
+        SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_CHUNK: mock.ANY,
         "gen_ai.usage.input_tokens": 20,
         "gen_ai.usage.input_tokens.cached": 5,
         "gen_ai.usage.output_tokens": 10,
@@ -5481,8 +5481,8 @@ def test_streaming_chat_completion_ttft(
     assert span["attributes"]["sentry.op"] == "gen_ai.chat"
 
     # Verify TTFT is captured
-    assert SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN in span["attributes"]
-    ttft = span["attributes"][SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN]
+    assert SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_CHUNK in span["attributes"]
+    ttft = span["attributes"][SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_CHUNK]
 
     assert isinstance(ttft, float)
     assert ttft > 0
@@ -5564,8 +5564,8 @@ async def test_streaming_chat_completion_ttft_async(
     assert span["attributes"]["sentry.op"] == "gen_ai.chat"
 
     # Verify TTFT is captured
-    assert SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN in span["attributes"]
-    ttft = span["attributes"][SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN]
+    assert SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_CHUNK in span["attributes"]
+    ttft = span["attributes"][SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_CHUNK]
 
     assert isinstance(ttft, float)
     assert ttft > 0
@@ -5614,8 +5614,8 @@ def test_streaming_responses_api_ttft(
     assert span["attributes"]["sentry.op"] == "gen_ai.responses"
 
     # Verify TTFT is captured
-    assert SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN in span["attributes"]
-    ttft = span["attributes"][SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN]
+    assert SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_CHUNK in span["attributes"]
+    ttft = span["attributes"][SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_CHUNK]
 
     assert isinstance(ttft, float)
     assert ttft > 0
@@ -5666,8 +5666,8 @@ async def test_streaming_responses_api_ttft_async(
     assert span["attributes"]["sentry.op"] == "gen_ai.responses"
 
     # Verify TTFT is captured
-    assert SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN in span["attributes"]
-    ttft = span["attributes"][SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN]
+    assert SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_CHUNK in span["attributes"]
+    ttft = span["attributes"][SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_CHUNK]
 
     assert isinstance(ttft, float)
     assert ttft > 0
