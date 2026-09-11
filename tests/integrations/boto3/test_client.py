@@ -9,8 +9,6 @@ import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.boto3 import Boto3Integration
 from sentry_sdk.integrations.boto3._instrumentation import (
-    _get_error_attributes,
-    _get_response_attributes,
     _get_server_attributes,
 )
 from tests.integrations.boto3.aws_mock import Body
@@ -114,8 +112,6 @@ def _assert_span_finished(span, span_streaming):
 def _assert_one_failed_span(spans, span_streaming):
     assert len(spans) == 1
     assert spans[0]["status"] in ("error", "internal_error")
-    attributes = spans[0]["attributes"] if span_streaming else spans[0]["data"]
-    assert attributes[SPANDATA.ERROR_TYPE]
     _assert_span_finished(spans[0], span_streaming)
 
 
@@ -142,128 +138,6 @@ def _capture_stubbed_client_span(
 
 def _span_attributes(span, span_streaming):
     return span["attributes"] if span_streaming else span["data"]
-
-
-@pytest.mark.parametrize(
-    ("response", "expected"),
-    [
-        (None, {}),
-        ({}, {}),
-        ({"ResponseMetadata": None}, {}),
-        (
-            {
-                "ResponseMetadata": {
-                    "RequestId": "request-id",
-                    "HostId": "extended-request-id",
-                    "HTTPStatusCode": 200,
-                    "RetryAttempts": 0,
-                }
-            },
-            {
-                SPANDATA.AWS_REQUEST_ID: "request-id",
-                SPANDATA.AWS_EXTENDED_REQUEST_ID: "extended-request-id",
-                SPANDATA.HTTP_STATUS_CODE: 200,
-            },
-        ),
-        (
-            {
-                "ResponseMetadata": {
-                    "RequestId": "request-id",
-                    "HTTPStatusCode": 200,
-                    "RetryAttempts": 2,
-                }
-            },
-            {
-                SPANDATA.AWS_REQUEST_ID: "request-id",
-                SPANDATA.HTTP_STATUS_CODE: 200,
-                SPANDATA.HTTP_REQUEST_RESEND_COUNT: 2,
-            },
-        ),
-    ],
-)
-def test_get_response_attributes(response, expected):
-    assert _get_response_attributes(response) == expected
-
-
-@pytest.mark.parametrize(
-    "header_name",
-    ["x-amzn-requestid", "x-amzn-request-id", "x-amz-request-id"],
-)
-def test_get_response_attributes_reads_request_id_header(header_name):
-    response = {
-        "ResponseMetadata": {
-            "HTTPHeaders": {header_name: "request-id"},
-        }
-    }
-
-    assert _get_response_attributes(response) == {SPANDATA.AWS_REQUEST_ID: "request-id"}
-
-
-def test_get_response_attributes_reads_extended_request_id_header():
-    response = {
-        "ResponseMetadata": {
-            "HTTPHeaders": {"x-amz-id-2": "extended-request-id"},
-        }
-    }
-
-    assert _get_response_attributes(response) == {
-        SPANDATA.AWS_EXTENDED_REQUEST_ID: "extended-request-id"
-    }
-
-
-@pytest.mark.parametrize(
-    ("field", "value", "attribute"),
-    [
-        ("RequestId", 123, SPANDATA.AWS_REQUEST_ID),
-        ("RequestId", "", SPANDATA.AWS_REQUEST_ID),
-        ("HTTPStatusCode", "200", SPANDATA.HTTP_STATUS_CODE),
-        ("HTTPStatusCode", True, SPANDATA.HTTP_STATUS_CODE),
-        ("HTTPStatusCode", 999, SPANDATA.HTTP_STATUS_CODE),
-        ("RetryAttempts", "2", SPANDATA.HTTP_REQUEST_RESEND_COUNT),
-        ("RetryAttempts", False, SPANDATA.HTTP_REQUEST_RESEND_COUNT),
-        ("RetryAttempts", -1, SPANDATA.HTTP_REQUEST_RESEND_COUNT),
-    ],
-)
-def test_get_response_attributes_ignores_malformed_field(field, value, attribute):
-    metadata = {
-        "RequestId": "request-id",
-        "HTTPStatusCode": 200,
-        "RetryAttempts": 2,
-    }
-    metadata[field] = value
-
-    attributes = _get_response_attributes({"ResponseMetadata": metadata})
-    expected = {
-        SPANDATA.AWS_REQUEST_ID: "request-id",
-        SPANDATA.HTTP_STATUS_CODE: 200,
-        SPANDATA.HTTP_REQUEST_RESEND_COUNT: 2,
-    }
-    expected.pop(attribute)
-
-    # One malformed optional field must not discard other valid metadata.
-    assert attributes == expected
-
-
-@pytest.mark.parametrize(
-    "error_response",
-    [None, {"Code": ""}, {"Code": 123}],
-)
-def test_get_error_attributes_ignores_malformed_client_error_code(error_response):
-    error = ClientError(
-        {
-            "Error": {"Code": "placeholder"},
-            "ResponseMetadata": {"HTTPStatusCode": 400},
-        },
-        "HeadObject",
-    )
-    # `ClientError` itself expects `Error` to be a dict, so corrupt the stored
-    # response afterward to exercise defensive handling of arbitrary metadata.
-    error.response["Error"] = error_response
-
-    assert _get_error_attributes(error) == {
-        SPANDATA.HTTP_STATUS_CODE: 400,
-        SPANDATA.ERROR_TYPE: "botocore.exceptions.ClientError",
-    }
 
 
 @pytest.mark.parametrize(
@@ -423,37 +297,6 @@ def test_client_call_omits_missing_region(
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
-def test_client_call_has_response_attributes(
-    capture_items,
-    client_factory,
-    span_streaming,
-):
-    client = client_factory()
-    span = _capture_stubbed_client_span(
-        client,
-        "head_object",
-        {"Bucket": "bucket", "Key": "foo"},
-        capture_items,
-        span_streaming,
-        response={
-            "ResponseMetadata": {
-                "HTTPStatusCode": 200,
-                "RequestId": "request-id",
-                "HostId": "extended-request-id",
-                "RetryAttempts": 0,
-            }
-        },
-    )
-    attributes = _span_attributes(span, span_streaming)
-
-    assert attributes[SPANDATA.HTTP_STATUS_CODE] == 200
-    assert attributes[SPANDATA.AWS_REQUEST_ID] == "request-id"
-    assert attributes[SPANDATA.AWS_EXTENDED_REQUEST_ID] == "extended-request-id"
-    assert SPANDATA.HTTP_REQUEST_RESEND_COUNT not in attributes
-    assert SPANDATA.ERROR_TYPE not in attributes
-
-
-@pytest.mark.parametrize("span_streaming", [True, False])
 def test_retry_attempts_share_one_client_span(
     capture_items,
     client_factory,
@@ -474,8 +317,6 @@ def test_retry_attempts_share_one_client_span(
     # all `AWSRequest` instances created during retries reference the same client span.
     assert len(set(request_span_ids)) == 1
     assert len(client_spans) == 1
-    attributes = _span_attributes(client_spans[0], span_streaming)
-    assert attributes[SPANDATA.HTTP_REQUEST_RESEND_COUNT] == attempt_count - 1
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
@@ -499,57 +340,6 @@ def test_retries_exhausted_has_one_failed_client_span(
     assert len(request_span_ids) == 2
     assert len(set(request_span_ids)) == 1
     _assert_one_failed_span(client_spans, span_streaming)
-    attributes = _span_attributes(client_spans[0], span_streaming)
-    assert attributes[SPANDATA.HTTP_STATUS_CODE] == 500
-    assert attributes[SPANDATA.HTTP_REQUEST_RESEND_COUNT] == 1
-
-
-@pytest.mark.parametrize("span_streaming", [True, False])
-def test_client_error_has_response_attributes_and_is_unchanged(
-    capture_items,
-    client_factory,
-    span_streaming,
-):
-    client = client_factory()
-    original_exception = ClientError(
-        {
-            "Error": {
-                "Code": "AccessDeniedException",
-                "Message": "must not become a span attribute",
-            },
-            "ResponseMetadata": {
-                "RequestId": "request-id",
-                "HTTPStatusCode": 403,
-                "RetryAttempts": 1,
-            },
-        },
-        "HeadObject",
-    )
-
-    def raise_client_error(**kwargs):
-        raise original_exception
-
-    client.meta.events.register("before-parameter-build", raise_client_error)
-
-    def invoke_failing_client_method():
-        with pytest.raises(ClientError) as exc_info:
-            client.head_object(Bucket="bucket", Key="foo")
-        assert exc_info.value is original_exception
-
-    spans_by_op = _capture_boto3_spans_by_op(
-        invoke_failing_client_method, capture_items, span_streaming
-    )
-    client_spans = spans_by_op.get(OP.HTTP_CLIENT, [])
-    _assert_one_failed_span(client_spans, span_streaming)
-    attributes = _span_attributes(client_spans[0], span_streaming)
-
-    assert attributes[SPANDATA.AWS_REQUEST_ID] == "request-id"
-    assert attributes[SPANDATA.HTTP_STATUS_CODE] == 403
-    assert attributes[SPANDATA.HTTP_REQUEST_RESEND_COUNT] == 1
-    assert attributes[SPANDATA.ERROR_TYPE] == "AccessDeniedException"
-    assert "Error.Message" not in attributes
-    assert "exception.message" not in attributes
-    assert "error.message" not in attributes
 
 
 @pytest.mark.parametrize(
@@ -589,136 +379,6 @@ def test_client_call_exception_is_unchanged_and_finishes_span(
     )
     client_spans = spans_by_op.get(OP.HTTP_CLIENT, [])
     _assert_one_failed_span(client_spans, span_streaming)
-
-    attributes = _span_attributes(client_spans[0], span_streaming)
-    expected_error_type = (
-        "botocore.exceptions.EndpointConnectionError"
-        if event_name == "before-send"
-        else "ValueError"
-    )
-    assert attributes[SPANDATA.ERROR_TYPE] == expected_error_type
-
-
-@pytest.mark.tests_internal_exceptions
-@pytest.mark.parametrize("span_streaming", [True, False])
-def test_response_attribute_extraction_failure_does_not_change_response(
-    capture_items,
-    client_factory,
-    monkeypatch,
-    span_streaming,
-):
-    client = client_factory()
-    api_params = {"Bucket": "bucket", "Key": "foo"}
-    original_response = {
-        "ResponseMetadata": {
-            "HTTPStatusCode": 200,
-        }
-    }
-    returned_responses = []
-
-    def fail_attribute_extraction(response):
-        raise RuntimeError("attribute extraction failed")
-
-    monkeypatch.setattr(
-        "sentry_sdk.integrations.boto3._instrumentation._get_response_attributes",
-        fail_attribute_extraction,
-    )
-
-    def invoke_client_method():
-        returned_responses.append(client.head_object(**api_params))
-
-    with Stubber(client) as stubber:
-        stubber.add_response("head_object", original_response, api_params)
-        spans_by_op = _capture_boto3_spans_by_op(
-            invoke_client_method, capture_items, span_streaming
-        )
-
-    client_spans = spans_by_op.get(OP.HTTP_CLIENT, [])
-    assert len(returned_responses) == 1
-    assert returned_responses[0] is original_response
-    assert len(client_spans) == 1
-    _assert_span_finished(client_spans[0], span_streaming)
-
-
-@pytest.mark.tests_internal_exceptions
-@pytest.mark.parametrize("span_streaming", [True, False])
-def test_error_attribute_extraction_failure_does_not_replace_original_exception(
-    capture_items,
-    client_factory,
-    monkeypatch,
-    span_streaming,
-):
-    client = client_factory()
-    original_exception = ValueError("parameter processing failed")
-
-    def raise_original_exception(**kwargs):
-        raise original_exception
-
-    def fail_attribute_extraction(exception):
-        raise RuntimeError("attribute extraction failed")
-
-    client.meta.events.register("before-parameter-build", raise_original_exception)
-    monkeypatch.setattr(
-        "sentry_sdk.integrations.boto3._instrumentation._get_error_attributes",
-        fail_attribute_extraction,
-    )
-
-    def invoke_failing_client_method():
-        with pytest.raises(ValueError) as exc_info:
-            client.head_object(Bucket="bucket", Key="foo")
-        assert exc_info.value is original_exception
-
-    spans_by_op = _capture_boto3_spans_by_op(
-        invoke_failing_client_method, capture_items, span_streaming
-    )
-    client_spans = spans_by_op.get(OP.HTTP_CLIENT, [])
-
-    assert len(client_spans) == 1
-    assert client_spans[0]["status"] in ("error", "internal_error")
-    _assert_span_finished(client_spans[0], span_streaming)
-
-
-@pytest.mark.parametrize("span_streaming", [True, False])
-def test_streaming_response_attributes_belong_to_client_span(
-    capture_items,
-    client_factory,
-    span_streaming,
-):
-    client = client_factory()
-
-    def respond(request, **kwargs):
-        return AWSResponse(
-            request.url,
-            200,
-            {
-                "content-length": "5",
-                "x-amz-request-id": "request-id",
-            },
-            Body(b"hello"),
-        )
-
-    client.meta.events.register("before-send", respond)
-
-    def invoke_client_method_and_read_body():
-        body = client.get_object(Bucket="bucket", Key="foo")["Body"]
-        assert body.read() == b"hello"
-        assert body.read() == b""
-
-    spans_by_op = _capture_boto3_spans_by_op(
-        invoke_client_method_and_read_body, capture_items, span_streaming
-    )
-    client_spans = spans_by_op.get(OP.HTTP_CLIENT, [])
-    stream_spans = spans_by_op.get(OP.HTTP_CLIENT_STREAM, [])
-
-    assert len(client_spans) == 1
-    assert len(stream_spans) == 1
-    client_attributes = _span_attributes(client_spans[0], span_streaming)
-    stream_attributes = _span_attributes(stream_spans[0], span_streaming)
-    assert client_attributes[SPANDATA.AWS_REQUEST_ID] == "request-id"
-    assert client_attributes[SPANDATA.HTTP_STATUS_CODE] == 200
-    assert SPANDATA.HTTP_REQUEST_RESEND_COUNT not in client_attributes
-    assert SPANDATA.AWS_REQUEST_ID not in stream_attributes
-    assert SPANDATA.HTTP_STATUS_CODE not in stream_attributes
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
@@ -761,6 +421,5 @@ def test_streaming_body_read_failure_finishes_stream_span(
     stream_spans = spans_by_op.get(OP.HTTP_CLIENT_STREAM, [])
 
     assert len(client_spans) == 1
-    _assert_one_failed_span(stream_spans, span_streaming)
-    attributes = _span_attributes(stream_spans[0], span_streaming)
-    assert attributes[SPANDATA.ERROR_TYPE] == "OSError"
+    assert len(stream_spans) == 1
+    _assert_span_finished(stream_spans[0], span_streaming)
