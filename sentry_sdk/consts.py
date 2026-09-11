@@ -55,7 +55,6 @@ if TYPE_CHECKING:
         Metric,
         SpanJSON,
         TracesSampler,
-        TransactionProcessor,
     )
 
     # Experiments are feature flags to enable and disable certain unstable SDK
@@ -1310,7 +1309,6 @@ class ClientConstructor:
         send_client_reports: bool = True,
         _experiments: "Experiments" = {},  # noqa: B006
         proxy_headers: "Optional[Dict[str, str]]" = None,
-        before_send_transaction: "Optional[TransactionProcessor]" = None,
         project_root: "Optional[str]" = None,
         include_local_variables: "Optional[bool]" = True,
         include_source_context: "Optional[bool]" = True,
