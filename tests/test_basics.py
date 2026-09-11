@@ -940,11 +940,12 @@ def test_functions_to_trace_no_dot_does_not_crash(sentry_init):
     sentry_init(
         traces_sample_rate=1.0,
         functions_to_trace=[{"qualified_name": "my_function"}],
+        trace_lifecycle="stream",
     )
 
 
 def test_last_event_id(sentry_init):
-    sentry_init(traces_sample_rate=1.0)
+    sentry_init(traces_sample_rate=1.0, trace_lifecycle="stream")
 
     assert last_event_id() is None
 
@@ -954,7 +955,7 @@ def test_last_event_id(sentry_init):
 
 
 def test_last_event_id_scope(sentry_init):
-    sentry_init(traces_sample_rate=1.0)
+    sentry_init(traces_sample_rate=1.0, trace_lifecycle="stream")
 
     # Should not crash
     with isolation_scope() as scope:

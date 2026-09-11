@@ -16,7 +16,6 @@ from sentry_sdk import (
 )
 from sentry_sdk.client import Client, NonRecordingClient
 from sentry_sdk.traces import StreamedSpan
-from sentry_sdk.tracing import Span
 from tests.conftest import TestTransportWithOptions
 
 
@@ -29,7 +28,7 @@ def test_get_current_span():
     assert get_current_span(fake_scope) is None
 
 
-def test_get_current_span_span_streaming():
+def test_get_current_span_via_traces():
     fake_scope = mock.MagicMock()
     fake_scope.streamed_span = mock.MagicMock()
     assert sentry_sdk.traces.get_current_span(fake_scope) == fake_scope.streamed_span
@@ -38,19 +37,7 @@ def test_get_current_span_span_streaming():
     assert sentry_sdk.traces.get_current_span(fake_scope) is None
 
 
-def test_get_current_span_current_scope(sentry_init):
-    sentry_init()
-
-    assert get_current_span() is None
-
-    scope = get_current_scope()
-    fake_span = Span()
-    scope.span = fake_span
-
-    assert get_current_span() == fake_span
-
-
-def test_get_current_span_current_scope_span_streaming(sentry_init):
+def test_get_current_span_current_scope_via_traces(sentry_init):
     sentry_init(trace_lifecycle="stream")
 
     assert sentry_sdk.traces.get_current_span() is None
@@ -83,17 +70,6 @@ def test_traceparent_with_tracing_enabled(sentry_init):
 
 
 def test_traceparent_with_tracing_disabled(sentry_init):
-    sentry_init()
-
-    propagation_context = get_isolation_scope()._propagation_context
-    expected_traceparent = "%s-%s" % (
-        propagation_context.trace_id,
-        propagation_context.span_id,
-    )
-    assert get_traceparent() == expected_traceparent
-
-
-def test_traceparent_with_tracing_disabled_span_streaming(sentry_init):
     sentry_init(trace_lifecycle="stream")
 
     propagation_context = get_isolation_scope()._propagation_context
@@ -105,17 +81,6 @@ def test_traceparent_with_tracing_disabled_span_streaming(sentry_init):
 
 
 def test_baggage_with_tracing_disabled(sentry_init):
-    sentry_init(release="1.0.0", environment="dev")
-    propagation_context = get_isolation_scope()._propagation_context
-    expected_baggage = (
-        "sentry-trace_id={},sentry-environment=dev,sentry-release=1.0.0".format(
-            propagation_context.trace_id
-        )
-    )
-    assert get_baggage() == expected_baggage
-
-
-def test_baggage_with_tracing_disabled_span_streaming(sentry_init):
     sentry_init(release="1.0.0", environment="dev", trace_lifecycle="stream")
     propagation_context = get_isolation_scope()._propagation_context
     expected_baggage = (

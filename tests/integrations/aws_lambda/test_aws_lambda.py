@@ -335,20 +335,6 @@ def test_user_info_with_data_collection_user_info_on(lambda_client, test_environ
     assert _get_span_attr(attrs, "user.id") == "42"
 
 
-def test_user_info_with_data_collection_user_info_off(lambda_client, test_environment):
-    lambda_client.invoke(
-        FunctionName="BasicOkDataCollectionUserInfoOff",
-        Payload=USER_INFO_PAYLOAD,
-    )
-    span_items = test_environment["server"].span_items
-
-    segment_spans = [s for s in span_items if s.get("is_segment")]
-    assert len(segment_spans) == 1
-    attrs = segment_spans[0]["attributes"]
-
-    assert "user.id" not in attrs
-
-
 def test_request_data_with_data_collection_allowlist(lambda_client, test_environment):
     payload = b"""
         {
@@ -902,9 +888,7 @@ def test_url_query_params_with_data_collection(lambda_client, test_environment):
     )
 
 
-def test_span_streaming_user_info_with_send_default_pii(
-    lambda_client, test_environment
-):
+def test_user_info_with_send_default_pii(lambda_client, test_environment):
     payload = b"""
         {
           "resource": "/asd",
@@ -944,25 +928,7 @@ def test_span_streaming_user_info_with_send_default_pii(
     assert _get_span_attr(attrs, "user.id") == "42"
 
 
-def test_span_streaming_user_info_with_data_collection_user_info_on(
-    lambda_client, test_environment
-):
-    lambda_client.invoke(
-        FunctionName="BasicOkSpanStreamingDataCollectionUserInfoOn",
-        Payload=USER_INFO_PAYLOAD,
-    )
-    span_items = test_environment["server"].span_items
-
-    segment_spans = [s for s in span_items if s.get("is_segment")]
-    assert len(segment_spans) == 1
-    attrs = segment_spans[0]["attributes"]
-
-    assert _get_span_attr(attrs, "user.id") == "42"
-
-
-def test_span_streaming_user_info_with_data_collection_user_info_off(
-    lambda_client, test_environment
-):
+def test_user_info_with_data_collection_user_info_off(lambda_client, test_environment):
     lambda_client.invoke(
         FunctionName="BasicOkSpanStreamingDataCollectionUserInfoOff",
         Payload=USER_INFO_PAYLOAD,

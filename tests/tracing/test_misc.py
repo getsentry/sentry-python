@@ -109,6 +109,7 @@ def test_should_propagate_trace_to_sentry(
     sentry_init(
         dsn=dsn,
         traces_sample_rate=1.0,
+        trace_lifecycle="stream",
     )
 
     client = sentry_sdk.get_client()

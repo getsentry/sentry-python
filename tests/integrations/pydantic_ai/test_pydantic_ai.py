@@ -1093,6 +1093,7 @@ async def test_context_cleanup_after_run(sentry_init, get_test_agent):
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        trace_lifecycle="stream",
     )
 
     # Verify context is not set before run
@@ -1116,6 +1117,7 @@ def test_context_cleanup_after_run_sync(sentry_init, get_test_agent, sync_event_
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        trace_lifecycle="stream",
     )
 
     # Verify context is not set before run
@@ -1140,6 +1142,7 @@ async def test_context_cleanup_after_streaming(sentry_init, get_test_agent):
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        trace_lifecycle="stream",
     )
 
     # Verify context is not set before run
@@ -1166,6 +1169,7 @@ async def test_context_cleanup_on_error(sentry_init, get_test_agent):
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        trace_lifecycle="stream",
     )
 
     test_agent = get_test_agent()
@@ -1200,6 +1204,7 @@ async def test_context_isolation_concurrent_agents(sentry_init, get_test_agent):
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        trace_lifecycle="stream",
     )
 
     # Create a second agent
@@ -1355,6 +1360,7 @@ async def test_model_name_extraction_with_callable(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        trace_lifecycle="stream",
     )
 
     # Test the utility function directly
@@ -1384,6 +1390,7 @@ async def test_model_name_extraction_fallback_to_str(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        trace_lifecycle="stream",
     )
 
     # Test the utility function directly
@@ -1617,6 +1624,7 @@ async def test_update_invoke_agent_span_with_none_output(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        trace_lifecycle="stream",
         send_default_pii=True,
     )
 
@@ -1643,6 +1651,7 @@ async def test_update_ai_client_span_with_none_response(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        trace_lifecycle="stream",
     )
 
     span = sentry_sdk.traces.start_span(name="test_span")
@@ -1691,6 +1700,7 @@ async def test_input_messages_error_handling(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        trace_lifecycle="stream",
         send_default_pii=True,
     )
 
@@ -1720,6 +1730,7 @@ async def test_available_tools_error_handling(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        trace_lifecycle="stream",
     )
 
     span = sentry_sdk.traces.start_span(name="test_span")
@@ -1747,6 +1758,7 @@ async def test_set_usage_data_with_none_usage(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        trace_lifecycle="stream",
     )
 
     span = sentry_sdk.traces.start_span(name="test_span")
@@ -1772,6 +1784,7 @@ async def test_set_usage_data_with_partial_fields(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        trace_lifecycle="stream",
     )
 
     span = sentry_sdk.traces.start_span(name="test_span")
@@ -1844,6 +1857,7 @@ async def test_message_parts_with_list_content(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        trace_lifecycle="stream",
         send_default_pii=True,
     )
 
@@ -1956,6 +1970,7 @@ async def test_output_data_error_handling(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        trace_lifecycle="stream",
         send_default_pii=True,
     )
 
@@ -1988,6 +2003,7 @@ async def test_message_with_system_prompt_part(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        trace_lifecycle="stream",
         send_default_pii=True,
     )
 
@@ -2022,6 +2038,7 @@ async def test_message_with_instructions(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        trace_lifecycle="stream",
         send_default_pii=True,
     )
 
@@ -2054,6 +2071,7 @@ async def test_set_input_messages_without_prompts(
     sentry_init(
         integrations=[PydanticAIIntegration(include_prompts=False)],
         traces_sample_rate=1.0,
+        trace_lifecycle="stream",
         send_default_pii=True,
     )
 
@@ -2080,6 +2098,7 @@ async def test_get_model_name_with_exception_in_callable(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        trace_lifecycle="stream",
     )
 
     # Create model with callable name that raises exception
@@ -2105,6 +2124,7 @@ async def test_get_model_name_with_string_model(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        trace_lifecycle="stream",
     )
 
     # Pass a string as model
@@ -2126,6 +2146,7 @@ async def test_get_model_name_with_none(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        trace_lifecycle="stream",
     )
 
     # Pass None
@@ -2150,6 +2171,7 @@ async def test_should_send_prompts_without_pii(
     sentry_init(
         integrations=[PydanticAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
+        trace_lifecycle="stream",
         send_default_pii=False,  # PII disabled,
     )
 
@@ -2173,6 +2195,7 @@ async def test_set_available_tools_without_toolset(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        trace_lifecycle="stream",
     )
 
     span = sentry_sdk.traces.start_span(name="test_span")
@@ -2202,6 +2225,7 @@ async def test_set_available_tools_with_schema(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        trace_lifecycle="stream",
     )
 
     span = sentry_sdk.traces.start_span(name="test_span")
@@ -2237,6 +2261,7 @@ async def test_execute_tool_span_creation(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        trace_lifecycle="stream",
         send_default_pii=True,
     )
 
@@ -2260,6 +2285,7 @@ async def test_execute_tool_span_with_mcp_type(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        trace_lifecycle="stream",
         send_default_pii=True,
     )
 
@@ -2284,6 +2310,7 @@ async def test_execute_tool_span_without_prompts(
     sentry_init(
         integrations=[PydanticAIIntegration(include_prompts=False)],
         traces_sample_rate=1.0,
+        trace_lifecycle="stream",
         send_default_pii=True,
     )
 
@@ -2305,6 +2332,7 @@ async def test_execute_tool_span_with_none_args(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        trace_lifecycle="stream",
         send_default_pii=True,
     )
 
@@ -2327,6 +2355,7 @@ async def test_update_execute_tool_span_with_none_span(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        trace_lifecycle="stream",
     )
 
     # Update with None span - should not raise
@@ -2351,6 +2380,7 @@ async def test_update_execute_tool_span_with_none_result(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        trace_lifecycle="stream",
         send_default_pii=True,
     )
 
@@ -2373,6 +2403,7 @@ async def test_tool_execution_without_span_context(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        trace_lifecycle="stream",
     )
 
     # Create a simple agent with no tools (won't have function_toolset)
@@ -2405,6 +2436,7 @@ async def test_invoke_agent_span_with_callable_instruction(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        trace_lifecycle="stream",
         send_default_pii=True,
     )
 
@@ -2436,6 +2468,7 @@ async def test_invoke_agent_span_with_string_instructions(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        trace_lifecycle="stream",
         send_default_pii=True,
     )
 
@@ -2463,6 +2496,7 @@ async def test_ai_client_span_with_streaming_flag(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        trace_lifecycle="stream",
     )
 
     # Set streaming flag in scope
@@ -2489,6 +2523,7 @@ async def test_ai_client_span_gets_agent_from_scope(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        trace_lifecycle="stream",
     )
 
     # Set agent in scope
