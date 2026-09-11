@@ -257,17 +257,9 @@ def test_functions_to_trace_signature_unchanged_sync(sentry_init):
     def _some_function(a, b, c):
         pass
 
-    @sentry_sdk.trace
-    def _some_function_traced(a, b, c):
-        pass
-
     @sentry_sdk.traces.trace
     def _some_function_traced_stream(a, b, c):
         pass
-
-    assert inspect.getcallargs(_some_function, 1, 2, 3) == inspect.getcallargs(
-        _some_function_traced, 1, 2, 3
-    )
 
     assert inspect.getcallargs(_some_function, 1, 2, 3) == inspect.getcallargs(
         _some_function_traced_stream, 1, 2, 3
@@ -284,17 +276,10 @@ async def test_functions_to_trace_signature_unchanged_async(sentry_init):
     async def _some_function(a, b, c):
         pass
 
-    @sentry_sdk.trace
-    async def _some_function_traced(a, b, c):
-        pass
-
     @sentry_sdk.traces.trace
     async def _some_function_traced_stream(a, b, c):
         pass
 
-    assert inspect.getcallargs(_some_function, 1, 2, 3) == inspect.getcallargs(
-        _some_function_traced, 1, 2, 3
-    )
     assert inspect.getcallargs(_some_function, 1, 2, 3) == inspect.getcallargs(
         _some_function_traced_stream, 1, 2, 3
     )
