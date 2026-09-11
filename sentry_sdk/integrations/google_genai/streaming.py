@@ -143,7 +143,7 @@ def set_span_data_for_streaming_response(
 
     if accumulated_response["usage_metadata"]["output_tokens_reasoning"]:
         span.set_attribute(
-            SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS_REASONING,
+            SPANDATA.GEN_AI_USAGE_REASONING_OUTPUT_TOKENS,
             accumulated_response["usage_metadata"]["output_tokens_reasoning"],
         )
 

@@ -45,7 +45,7 @@ def record_token_usage(
     if output_tokens_reasoning is not None:
         _set_span_data_attribute(
             span,
-            SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS_REASONING,
+            SPANDATA.GEN_AI_USAGE_REASONING_OUTPUT_TOKENS,
             output_tokens_reasoning,
         )
 

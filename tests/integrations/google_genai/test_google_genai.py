@@ -202,7 +202,7 @@ def test_nonstreaming_generate_content(
     assert chat_span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 23
     assert chat_span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
     assert chat_span["attributes"][SPANDATA.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS] == 5
-    assert chat_span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS_REASONING] == 3
+    assert chat_span["attributes"][SPANDATA.GEN_AI_USAGE_REASONING_OUTPUT_TOKENS] == 3
 
 
 @pytest.mark.parametrize("generate_content_config", (False, True))
@@ -583,7 +583,7 @@ def test_streaming_generate_content(
     assert chat_span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
     assert chat_span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 25
     assert chat_span["attributes"][SPANDATA.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS] == 5
-    assert chat_span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS_REASONING] == 3
+    assert chat_span["attributes"][SPANDATA.GEN_AI_USAGE_REASONING_OUTPUT_TOKENS] == 3
 
     # Verify model name
     assert chat_span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "gemini-1.5-flash"
