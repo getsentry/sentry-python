@@ -389,17 +389,6 @@ class SPANDATA:
     Warning messages generated during model execution.
     Example: ["Token limit exceeded"]
     """
-    AWS_EXTENDED_REQUEST_ID = "aws.extended_request_id"
-    """
-    The AWS extended request ID as returned in the response headers.
-    Example: "wzHcyEWfmOGDIE5QOhTAqFDoDWP3y8IUvpNINCwL9N4TEHbUw0/gZJ+VZTmCNCWR7fezEN3eCiQ="
-    """
-
-    AWS_REQUEST_ID = "aws.request_id"
-    """
-    The AWS request ID as returned in the response headers.
-    Example: "79b9da39-b7ae-508a-a6bc-864b2829c622"
-    """
 
     CACHE_HIT = "cache.hit"
     """
@@ -556,12 +545,6 @@ class SPANDATA:
     The name of the database user used for connecting to the database.
     See: https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/semantic_conventions/database.md
     Example: my_user
-    """
-
-    ERROR_TYPE = "error.type"
-    """
-    Describes a class of error the operation ended with.
-    Example: "timeout"
     """
 
     GEN_AI_AGENT_NAME = "gen_ai.agent.name"
@@ -901,13 +884,6 @@ class SPANDATA:
     """
     The HTTP method used.
     Example: GET
-    """
-
-    HTTP_REQUEST_RESEND_COUNT = "http.request.resend_count"
-    """
-    The ordinal number of request resending attempt (for any reason, including redirects).
-
-    Example: 2
     """
 
     HTTP_ROUTE = "http.route"

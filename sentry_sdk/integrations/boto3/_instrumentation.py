@@ -2,11 +2,10 @@ from typing import TYPE_CHECKING
 from urllib.parse import urlsplit
 
 from botocore.awsrequest import AWSRequest
-from botocore.exceptions import ClientError
 from botocore.response import StreamingBody
 
 import sentry_sdk
-from sentry_sdk.consts import OP, SPANDATA, SPANSTATUS
+from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.boto3 import Boto3Integration
 from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing import BAGGAGE_HEADER_NAME, Span
@@ -91,99 +90,6 @@ def _get_client_attributes(
     return attributes
 
 
-def _get_response_attributes(response: "Any") -> "Attributes":
-    if not isinstance(response, dict):
-        return {}
-
-    metadata = response.get("ResponseMetadata")
-    if not isinstance(metadata, dict):
-        return {}
-
-    attributes: "Attributes" = {}
-
-    status_code = metadata.get("HTTPStatusCode")
-    # botocore injects HTTP status into `ResponseMetadata` after parsing.
-    # https://github.com/boto/botocore/blob/develop/botocore/parsers.py#L273-L284
-    if (
-        isinstance(status_code, int)
-        and not isinstance(status_code, bool)
-        and 100 <= status_code <= 599
-    ):
-        attributes[SPANDATA.HTTP_STATUS_CODE] = status_code
-
-    retry_attempts = metadata.get("RetryAttempts")
-    # botocore represents retries as `attempts - 1`; omit zero.
-    # https://github.com/boto/botocore/blob/develop/botocore/endpoint.py#L221-L229
-    # https://opentelemetry.io/docs/specs/semconv/http/http-spans/#http-client-span
-    if (
-        isinstance(retry_attempts, int)
-        and not isinstance(retry_attempts, bool)
-        and retry_attempts > 0
-    ):
-        attributes[SPANDATA.HTTP_REQUEST_RESEND_COUNT] = retry_attempts
-
-    headers = metadata.get("HTTPHeaders")
-    if not isinstance(headers, dict):
-        headers = {}
-
-    request_id = metadata.get("RequestId")
-    if not isinstance(request_id, str) or not request_id:
-        request_id = next(
-            (
-                value
-                for value in (
-                    headers.get("x-amzn-requestid"),
-                    headers.get("x-amzn-request-id"),
-                    headers.get("x-amz-request-id"),
-                )
-                if isinstance(value, str) and value
-            ),
-            None,
-        )
-    if isinstance(request_id, str) and request_id:
-        attributes[SPANDATA.AWS_REQUEST_ID] = request_id
-
-    # S3's `HostId` is the extended request ID returned in `x-amz-id-2`.
-    # https://docs.aws.amazon.com/AmazonS3/latest/developerguide/get-request-ids.html
-    extended_request_id = metadata.get("HostId")
-    if not isinstance(extended_request_id, str) or not extended_request_id:
-        extended_request_id = headers.get("x-amz-id-2")
-    if isinstance(extended_request_id, str) and extended_request_id:
-        attributes[SPANDATA.AWS_EXTENDED_REQUEST_ID] = extended_request_id
-
-    return attributes
-
-
-def _get_error_type(exception: "BaseException") -> str:
-    if isinstance(exception, ClientError):
-        # botocore wraps all AWS service errors in `ClientError`; `Error.Code`
-        # identifies actual service-specific error, e.g. `AccessDenied`.
-        # https://docs.aws.amazon.com/boto3/latest/guide/error-handling.html
-        error = exception.response.get("Error")
-        if isinstance(error, dict):
-            error_code = error.get("Code")
-            if isinstance(error_code, str) and error_code:
-                return error_code
-
-    # failures before a service response, have no error code. Use exception type
-    # instead. https://opentelemetry.io/docs/specs/semconv/rpc/rpc-spans/
-    exception_type = type(exception)
-    exception_name = exception_type.__qualname__
-    exception_module = exception_type.__module__
-    if exception_module not in ("builtins", "__builtins__"):
-        return "%s.%s" % (exception_module, exception_name)
-    return exception_name
-
-
-def _get_error_attributes(exception: "BaseException") -> "Attributes":
-    attributes: "Attributes" = {}
-    if isinstance(exception, ClientError):
-        attributes.update(_get_response_attributes(exception.response))
-
-    attributes[SPANDATA.ERROR_TYPE] = _get_error_type(exception)
-    return attributes
-
-
 def _start_client_span(
     ctx: "AwsCallContext",
 ) -> "Optional[Union[Span, StreamedSpan]]":
@@ -230,14 +136,6 @@ def _finish_client_span(
     span: "Union[Span, StreamedSpan]",
     parsed: "Dict[str, Any]",
 ) -> None:
-    # response metadata is only available after the call. Keep enrichment
-    # isolated so failure cannot prevent `__exit__()` below.
-    attributes: "Attributes" = {}
-    with capture_internal_exceptions():
-        attributes = _get_response_attributes(parsed)
-
-    with capture_internal_exceptions():
-        _set_span_attributes(span, attributes)
     span.__exit__(None, None, None)
 
     body = parsed.get("Body")
@@ -275,18 +173,11 @@ def _finish_client_span(
             else:
                 streaming_span.finish()
             return ret
-        except Exception as exc:
-            # enrichment must not replace exception raised by `orig_read()`.
-            # finish span with error, then re-raise.
-            with capture_internal_exceptions():
-                _set_span_attributes(streaming_span, _get_error_attributes(exc))
-
-            with capture_internal_exceptions():
-                if isinstance(streaming_span, StreamedSpan):
-                    streaming_span.__exit__(type(exc), exc, exc.__traceback__)
-                else:
-                    streaming_span.set_status(SPANSTATUS.INTERNAL_ERROR)
-                    streaming_span.finish()
+        except Exception:
+            if isinstance(streaming_span, StreamedSpan):
+                streaming_span.end()
+            else:
+                streaming_span.finish()
             raise
 
     body.read = sentry_streaming_body_read  # type: ignore
@@ -305,12 +196,6 @@ def _finish_client_span_with_error(
     span: "Union[Span, StreamedSpan]",
     exception: "BaseException",
 ) -> None:
-    attributes: "Attributes" = {}
-    with capture_internal_exceptions():
-        attributes = _get_error_attributes(exception)
-
-    with capture_internal_exceptions():
-        _set_span_attributes(span, attributes)
     span.__exit__(type(exception), exception, exception.__traceback__)
 
 
