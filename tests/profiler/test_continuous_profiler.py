@@ -1,12 +1,14 @@
 import threading
 import time
 from collections import defaultdict
+from contextlib import contextmanager
 from unittest import mock
 
 import pytest
 
 import sentry_sdk
 from sentry_sdk.consts import VERSION
+from sentry_sdk.profiler import continuous_profiler as continuous_profiler_module
 from sentry_sdk.profiler.continuous_profiler import (
     get_profiler_id,
     is_profile_session_sampled,
@@ -27,7 +29,7 @@ except ImportError:
 requires_gevent = pytest.mark.skipif(gevent is None, reason="gevent not enabled")
 
 
-def wait_for_profiler_to_stop(envelopes, timeout=1.0):
+def wait_for_profiler_to_stop(envelopes, timeout=5.0):
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         profiler_stopped = get_profiler_id() is None
@@ -46,6 +48,36 @@ def wait_for_profiler_to_stop(envelopes, timeout=1.0):
         for envelope in envelopes
         for item in envelope.items
     ), "profiler should have flushed a profile chunk"
+
+
+@contextmanager
+def suspend_profiler_sampling():
+    """
+    Pause the continuous profiler's sampler thread until sampling is resumed.
+
+    While suspended, the scheduler cannot observe stopped profiles, so it
+    neither removes them nor enters soft shutdown: the profiler stays up no
+    matter how long the test is preempted for. This removes the need to race
+    the profiler's shutdown grace period with a fixed sleep.
+
+    Yields a callable that resumes sampling. Sampling is also resumed, and
+    the original sampler restored, when the block exits.
+    """
+    scheduler = continuous_profiler_module._scheduler
+    assert scheduler is not None, "profiler should have been set up"
+    resumed = threading.Event()
+    real_sampler = scheduler.sampler
+
+    def suspended_sampler(*args, **kwargs):
+        resumed.wait()
+        return real_sampler(*args, **kwargs)
+
+    scheduler.sampler = suspended_sampler
+    try:
+        yield resumed.set
+    finally:
+        resumed.set()
+        scheduler.sampler = real_sampler
 
 
 def get_client_options(use_top_level_profiler_mode):
@@ -810,23 +842,25 @@ def test_continuous_profiler_auto_start_and_stop_sampled(
             assert profiler_id is not None, "profiler should be running"
             profiler_ids.add(profiler_id)
 
-        time.sleep(0.03)
-
-        # the profiler takes a while to stop in auto mode so if we start
-        # a transaction immediately, it'll be part of the same chunk
-        profiler_id = get_profiler_id()
-        assert profiler_id is not None, "profiler should be running"
-        profiler_ids.add(profiler_id)
-
-        with sentry_sdk.start_transaction(name="profiling 2"):
+        # While the sampler is suspended it cannot observe that the
+        # transaction's profile was stopped, so the scheduler cannot
+        # soft-shutdown: the profiler stays up and the next transaction
+        # deterministically reuses the same profiler session and chunk.
+        with suspend_profiler_sampling() as resume_sampling:
             profiler_id = get_profiler_id()
             assert profiler_id is not None, "profiler should be running"
             profiler_ids.add(profiler_id)
-            with sentry_sdk.start_span(op="op"):
-                time.sleep(0.1)
-            profiler_id = get_profiler_id()
-            assert profiler_id is not None, "profiler should be running"
-            profiler_ids.add(profiler_id)
+
+            with sentry_sdk.start_transaction(name="profiling 2"):
+                resume_sampling()
+                profiler_id = get_profiler_id()
+                assert profiler_id is not None, "profiler should be running"
+                profiler_ids.add(profiler_id)
+                with sentry_sdk.start_span(op="op"):
+                    time.sleep(0.1)
+                profiler_id = get_profiler_id()
+                assert profiler_id is not None, "profiler should be running"
+                profiler_ids.add(profiler_id)
 
         wait_for_profiler_to_stop(envelopes)
 
@@ -892,23 +926,25 @@ def test_continuous_profiler_auto_start_and_stop_sampled_span_streaming(
             assert profiler_id is not None, "profiler should be running"
             profiler_ids.add(profiler_id)
 
-        time.sleep(0.03)
-
-        # the profiler takes a while to stop in auto mode so if we start
-        # a transaction immediately, it'll be part of the same chunk
-        profiler_id = get_profiler_id()
-        assert profiler_id is not None, "profiler should be running"
-        profiler_ids.add(profiler_id)
-
-        with sentry_sdk.traces.start_span(name="profiling 2"):
+        # While the sampler is suspended it cannot observe that the
+        # segment's profile was stopped, so the scheduler cannot
+        # soft-shutdown: the profiler stays up and the next segment
+        # deterministically reuses the same profiler session and chunk.
+        with suspend_profiler_sampling() as resume_sampling:
             profiler_id = get_profiler_id()
             assert profiler_id is not None, "profiler should be running"
             profiler_ids.add(profiler_id)
-            with sentry_sdk.traces.start_span(name="op"):
-                time.sleep(0.1)
-            profiler_id = get_profiler_id()
-            assert profiler_id is not None, "profiler should be running"
-            profiler_ids.add(profiler_id)
+
+            with sentry_sdk.traces.start_span(name="profiling 2"):
+                resume_sampling()
+                profiler_id = get_profiler_id()
+                assert profiler_id is not None, "profiler should be running"
+                profiler_ids.add(profiler_id)
+                with sentry_sdk.traces.start_span(name="op"):
+                    time.sleep(0.1)
+                profiler_id = get_profiler_id()
+                assert profiler_id is not None, "profiler should be running"
+                profiler_ids.add(profiler_id)
 
         wait_for_profiler_to_stop(envelopes)
 
