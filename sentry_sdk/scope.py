@@ -20,11 +20,6 @@ from sentry_sdk.consts import (
     SPANDATA,
 )
 from sentry_sdk.feature_flags import DEFAULT_FLAG_CAPACITY, FlagBuffer
-from sentry_sdk.profiler.continuous_profiler import (
-    get_profiler_id,
-    try_autostart_continuous_profiler,
-    try_profile_lifecycle_trace_start,
-)
 from sentry_sdk.session import Session
 from sentry_sdk.traces import (
     _DEFAULT_PARENT_SPAN,
@@ -75,8 +70,6 @@ if TYPE_CHECKING:
         Union,
     )
 
-    from typing_extensions import Unpack
-
     import sentry_sdk
     from sentry_sdk._types import (
         Attributes,
@@ -91,10 +84,8 @@ if TYPE_CHECKING:
         Log,
         LogLevelStr,
         Metric,
-        SamplingContext,
         Type,
     )
-    from sentry_sdk.tracing import TransactionKwargs
 
     P = ParamSpec("P")
     R = TypeVar("R")
@@ -1040,152 +1031,6 @@ class Scope:
         while len(self._breadcrumbs) > max_breadcrumbs:
             self._breadcrumbs.popleft()
             self._n_breadcrumbs_truncated += 1
-
-    def start_transaction(
-        self,
-        transaction: "Optional[Transaction]" = None,
-        custom_sampling_context: "Optional[SamplingContext]" = None,
-        **kwargs: "Unpack[TransactionKwargs]",
-    ) -> "Union[Transaction, NoOpSpan]":
-        """
-        Start and return a transaction.
-
-        Start an existing transaction if given, otherwise create and start a new
-        transaction with kwargs.
-
-        This is the entry point to manual tracing instrumentation.
-
-        A tree structure can be built by adding child spans to the transaction,
-        and child spans to other spans. To start a new child span within the
-        transaction or any span, call the respective `.start_child()` method.
-
-        Every child span must be finished before the transaction is finished,
-        otherwise the unfinished spans are discarded.
-
-        When used as context managers, spans and transactions are automatically
-        finished at the end of the `with` block. If not using context managers,
-        call the `.finish()` method.
-
-        When the transaction is finished, it will be sent to Sentry with all its
-        finished child spans.
-
-        :param transaction: The transaction to start. If omitted, we create and
-            start a new transaction.
-        :param custom_sampling_context: The transaction's custom sampling context.
-        :param kwargs: Optional keyword arguments to be passed to the Transaction
-            constructor. See :py:class:`sentry_sdk.tracing.Transaction` for
-            available arguments.
-        """
-        client = self.get_client()
-        if has_span_streaming_enabled(client.options):
-            deprecation_warning(
-                "Scope.start_transaction is not available in streaming mode.",
-            )
-            return NoOpSpan()
-
-        kwargs.setdefault("scope", self)
-
-        try_autostart_continuous_profiler()
-
-        custom_sampling_context = custom_sampling_context or {}
-
-        # kwargs at this point has type TransactionKwargs, since we have removed
-        # the client and custom_sampling_context from it.
-        transaction_kwargs: "TransactionKwargs" = kwargs
-
-        # if we haven't been given a transaction, make one
-        if transaction is None:
-            transaction = Transaction(**transaction_kwargs)
-
-        # use traces_sample_rate, traces_sampler, and/or inheritance to make a
-        # sampling decision
-        sampling_context = {
-            "transaction_context": transaction.to_json(),
-            "parent_sampled": transaction.parent_sampled,
-        }
-        sampling_context.update(custom_sampling_context)
-        transaction._set_initial_sampling_decision(sampling_context=sampling_context)
-
-        # update the sample rate in the dsc
-        if transaction.sample_rate is not None:
-            propagation_context = self.get_active_propagation_context()
-            baggage = propagation_context.baggage
-
-            if baggage is not None:
-                baggage.sentry_items["sample_rate"] = str(transaction.sample_rate)
-
-            if transaction._baggage:
-                transaction._baggage.sentry_items["sample_rate"] = str(
-                    transaction.sample_rate
-                )
-
-        if transaction.sampled:
-            transaction._continuous_profile = try_profile_lifecycle_trace_start()
-
-            # Typically, the profiler is set when the transaction is created. But when
-            # using the auto lifecycle, the profiler isn't running when the first
-            # transaction is started. So make sure we update the profiler id on it.
-            if transaction._continuous_profile is not None:
-                transaction.set_profiler_id(get_profiler_id())
-
-            # we don't bother to keep spans if we already know we're not going to
-            # send the transaction
-            max_spans = (client.options["_experiments"].get("max_spans")) or 1000
-            transaction.init_span_recorder(maxlen=max_spans)
-
-        return transaction
-
-    def start_span(self, **kwargs: "Any") -> "Span":
-        """
-        Start a span whose parent is the currently active span or transaction, if any.
-
-        The return value is a :py:class:`sentry_sdk.tracing.Span` instance,
-        typically used as a context manager to start and stop timing in a `with`
-        block.
-
-        Only spans contained in a transaction are sent to Sentry. Most
-        integrations start a transaction at the appropriate time, for example
-        for every incoming HTTP request. Use
-        :py:meth:`sentry_sdk.start_transaction` to start a new transaction when
-        one is not already in progress.
-
-        For supported `**kwargs` see :py:class:`sentry_sdk.tracing.Span`.
-        """
-        client = sentry_sdk.get_client()
-        if has_span_streaming_enabled(client.options):
-            deprecation_warning(
-                "Scope.start_span is not available in streaming mode.",
-            )
-            return NoOpSpan()
-
-        if kwargs.get("description") is not None:
-            deprecation_warning(
-                "The `description` parameter is deprecated. Please use `name` instead.",
-            )
-
-        with new_scope():
-            kwargs.setdefault("scope", self)
-
-            client = self.get_client()
-
-            # get current span or transaction
-            span = self.span or self.get_isolation_scope().span
-            if isinstance(span, StreamedSpan):
-                # make mypy happy
-                return NoOpSpan()
-
-            if span is None:
-                # New spans get the `trace_id` from the scope
-                if "trace_id" not in kwargs:
-                    propagation_context = self.get_active_propagation_context()
-                    kwargs["trace_id"] = propagation_context.trace_id
-
-                span = Span(**kwargs)
-            else:
-                # Children take `trace_id`` from the parent span.
-                span = span.start_child(**kwargs)
-
-            return span
 
     def start_streamed_span(
         self,

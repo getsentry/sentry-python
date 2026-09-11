@@ -41,7 +41,6 @@ Performance Monitoring
 .. autofunction:: sentry_sdk.api.continue_trace
 .. autofunction:: sentry_sdk.api.get_current_span
 .. autofunction:: sentry_sdk.api.start_span
-.. autofunction:: sentry_sdk.api.start_transaction
 
 
 Distributed Tracing

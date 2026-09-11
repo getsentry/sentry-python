@@ -46,6 +46,7 @@ __all__ = [
     "capture_exception",
     "capture_message",
     "continue_trace",
+    "new_trace",
     "flush",
     "flush_async",
     "get_baggage",
@@ -298,9 +299,16 @@ def get_baggage() -> "Optional[str]":
 
 def continue_trace(incoming: "Dict[str, Any]") -> None:
     """
-    Sets the propagation context from environment or headers and returns a transaction.
+    Sets the propagation context from environment or headers.
     """
     return traces.continue_trace(incoming)
+
+
+def new_trace() -> None:
+    """
+    Resets the propagation context, forcing a new trace.
+    """
+    return traces.new_trace()
 
 
 @scopemethod
