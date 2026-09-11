@@ -1032,14 +1032,13 @@ class Scope:
             self._breadcrumbs.popleft()
             self._n_breadcrumbs_truncated += 1
 
-    def start_streamed_span(
+    def start_span(
         self,
         name: str,
         attributes: "Optional[Attributes]",
         parent_span: "Optional[StreamedSpan]",
         active: bool,
     ) -> "StreamedSpan":
-        # TODO: rename to start_span once we drop the old API
         if isinstance(parent_span, NoOpStreamedSpan):
             # parent_span is only set if the user explicitly set it
             logger.debug(
