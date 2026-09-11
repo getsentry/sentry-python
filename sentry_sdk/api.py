@@ -267,15 +267,11 @@ async def flush_async(
 
 
 @scopemethod
-def start_span(
-    **kwargs: "Any",
-) -> "StreamedSpan":
+def start_span(**kwargs: "Any") -> "StreamedSpan":
     return traces.start_span(**kwargs)
 
 
-def get_current_span(
-    scope: "Optional[Scope]" = None,
-) -> "Optional[StreamedSpan]":
+def get_current_span(scope: "Optional[Scope]" = None) -> "Optional[StreamedSpan]":
     """
     Returns the currently active span if there is one running, otherwise `None`
     """
