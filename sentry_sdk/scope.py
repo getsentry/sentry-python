@@ -1546,8 +1546,7 @@ class Scope:
         # create the envelope.
         attachments_to_send = hint.get("attachments") or []
         for attachment in self._attachments:
-            if attachment.add_to_transactions:
-                attachments_to_send.append(attachment)
+            attachments_to_send.append(attachment)
         hint["attachments"] = attachments_to_send
 
         self._apply_contexts_to_event(event, hint, options)
