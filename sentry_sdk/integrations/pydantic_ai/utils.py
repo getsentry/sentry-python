@@ -1,4 +1,3 @@
-from contextvars import ContextVar
 from typing import TYPE_CHECKING
 
 import sentry_sdk
@@ -12,45 +11,12 @@ from sentry_sdk.utils import (
 )
 
 if TYPE_CHECKING:
-    from typing import Any, Optional
+    from typing import Any, Optional, Union
 
-
-# Store the current agent context in a contextvar for re-entrant safety
-# Using a list as a stack to support nested agent calls
-_agent_context_stack: "ContextVar[list[dict[str, Any]]]" = ContextVar(
-    "pydantic_ai_agent_context_stack", default=[]
-)
-
-
-def push_agent(agent: "Any", is_streaming: bool = False) -> None:
-    """Push an agent context onto the stack along with its streaming flag."""
-    stack = _agent_context_stack.get().copy()
-    stack.append({"agent": agent, "is_streaming": is_streaming})
-    _agent_context_stack.set(stack)
-
-
-def pop_agent() -> None:
-    """Pop an agent context from the stack."""
-    stack = _agent_context_stack.get().copy()
-    if stack:
-        stack.pop()
-    _agent_context_stack.set(stack)
-
-
-def get_current_agent() -> "Any":
-    """Get the current agent from the contextvar stack."""
-    stack = _agent_context_stack.get()
-    if stack:
-        return stack[-1]["agent"]
-    return None
-
-
-def get_is_streaming() -> bool:
-    """Get the streaming flag from the contextvar stack."""
-    stack = _agent_context_stack.get()
-    if stack:
-        return stack[-1].get("is_streaming", False)
-    return False
+    from pydantic_ai import Agent
+    from pydantic_ai.models import AbstractModel, Model
+    from pydantic_ai.realtime.settings import RealtimeModelSettings
+    from pydantic_ai.settings import ModelSettings
 
 
 def _should_send_prompts_legacy() -> bool:
@@ -90,24 +56,20 @@ def _should_send_outputs() -> bool:
     return _should_send_prompts_legacy()
 
 
-def _set_agent_data(span: "StreamedSpan", agent: "Any") -> None:
+def _set_agent_data(span: "StreamedSpan", agent: "Optional[Agent]") -> None:
     """Set agent-related data on a span.
 
     Args:
         span: The span to set data on
-        agent: Agent object (can be None, will try to get from contextvar if not provided)
+        agent: Agent object
     """
-    # Extract agent name from agent object or contextvar
-    agent_obj = agent
-    if not agent_obj:
-        # Try to get from contextvar
-        agent_obj = get_current_agent()
-
-    if agent_obj and hasattr(agent_obj, "name") and agent_obj.name:
-        span.set_attribute(SPANDATA.GEN_AI_AGENT_NAME, agent_obj.name)
+    if agent and hasattr(agent, "name") and agent.name:
+        span.set_attribute(SPANDATA.GEN_AI_AGENT_NAME, agent.name)
 
 
-def _get_model_name(model_obj: "Any") -> "Optional[str]":
+def _get_model_name(
+    model_obj: "Optional[Union[AbstractModel, Model, str]]",
+) -> "Optional[str]":
     """Extract model name from a model object.
 
     Args:
@@ -134,8 +96,9 @@ def _get_model_name(model_obj: "Any") -> "Optional[str]":
 
 def _set_model_data(
     span: "StreamedSpan",
-    model: "Any",
-    model_settings: "Any",
+    agent: "Optional[Agent]",
+    model: "Union[Model, AbstractModel]",
+    model_settings: "Optional[Union[ModelSettings, RealtimeModelSettings]]",
 ) -> None:
     """Set model-related data on a span.
 
@@ -144,13 +107,10 @@ def _set_model_data(
         model: Model object (can be None, will try to get from agent if not provided)
         model_settings: Model settings (can be None, will try to get from agent if not provided)
     """
-    # Try to get agent from contextvar if we need it
-    agent_obj = get_current_agent()
-
     # Extract model information
     model_obj = model
-    if not model_obj and agent_obj and hasattr(agent_obj, "model"):
-        model_obj = agent_obj.model
+    if not model_obj and agent and hasattr(agent, "model"):
+        model_obj = agent.model
 
     if model_obj:
         # Set system from model
@@ -164,8 +124,8 @@ def _set_model_data(
 
     # Extract model settings
     settings = model_settings
-    if not settings and agent_obj and hasattr(agent_obj, "model_settings"):
-        settings = agent_obj.model_settings
+    if not settings and agent and hasattr(agent, "model_settings"):
+        settings = agent.model_settings
 
     if settings:
         settings_map = {
@@ -181,7 +141,7 @@ def _set_model_data(
             for setting_name, spandata_key in settings_map.items():
                 value = settings.get(setting_name)
                 if value is not None:
-                    span.set_attribute(spandata_key, value)
+                    span.set_attribute(spandata_key, value)  # type: ignore[arg-type]
         else:
             # Fallback for object-style settings
             for setting_name, spandata_key in settings_map.items():
@@ -191,7 +151,9 @@ def _set_model_data(
                         span.set_attribute(spandata_key, value)
 
 
-def _set_available_tools(span: "StreamedSpan", agent: "Any") -> None:
+def _set_available_tools(
+    span: "StreamedSpan", agent: "Optional[Agent[Any, Any]]"
+) -> None:
     """Set available tools data on a span from an agent's function toolset.
 
     Args:
@@ -211,7 +173,7 @@ def _set_available_tools(span: "StreamedSpan", agent: "Any") -> None:
         # Get tools from the function toolset
         if hasattr(agent._function_toolset, "tools"):
             for tool_name, tool in agent._function_toolset.tools.items():
-                tool_info = {"name": tool_name}
+                tool_info: "dict[str, Any]" = {"name": tool_name}
 
                 # Add description from function_schema if available
                 if hasattr(tool, "function_schema"):

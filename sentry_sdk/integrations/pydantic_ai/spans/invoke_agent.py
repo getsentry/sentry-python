@@ -22,7 +22,12 @@ from .utils import (
 )
 
 if TYPE_CHECKING:
-    from typing import Any
+    from typing import Any, Optional, Sequence, Union
+
+    from pydantic_ai import Agent, UserContent
+    from pydantic_ai.models import AbstractModel
+    from pydantic_ai.realtime.settings import RealtimeModelSettings
+    from pydantic_ai.settings import ModelSettings
 
 try:
     from pydantic_ai.messages import BinaryContent, ImageUrl
@@ -32,11 +37,10 @@ except ImportError:
 
 
 def invoke_agent_span(
-    user_prompt: "Any",
-    agent: "Any",
-    model: "Any",
-    model_settings: "Any",
-    is_streaming: bool = False,
+    user_prompt: "Optional[Union[str, Sequence[UserContent]]]",
+    agent: "Optional[Agent]",
+    model: "AbstractModel",
+    model_settings: "Optional[Union[ModelSettings, RealtimeModelSettings]]",
 ) -> "StreamedSpan":
     """Create a span for invoking the agent."""
     # Determine agent name for span
@@ -54,7 +58,7 @@ def invoke_agent_span(
     )
 
     _set_agent_data(span, agent)
-    _set_model_data(span, model, model_settings)
+    _set_model_data(span, agent, model, model_settings)
     _set_available_tools(span, agent)
 
     # Add user prompt and system prompts if available and prompts are enabled

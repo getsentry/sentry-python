@@ -1,11 +1,17 @@
 import functools
+import sys
 
+import sentry_sdk
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
-from sentry_sdk.utils import parse_version
+from sentry_sdk.utils import capture_internal_exceptions, parse_version, reraise
+
+from .spans import execute_tool_span, update_execute_tool_span
+from .utils import _capture_exception
 
 try:
     import pydantic_ai  # noqa: F401
     from pydantic_ai import Agent
+    from pydantic_ai.exceptions import ToolRetryError
 except ImportError:
     raise DidNotEnable("pydantic-ai not installed")
 
@@ -13,18 +19,29 @@ except ImportError:
 from importlib.metadata import PackageNotFoundError, version
 from typing import TYPE_CHECKING
 
-from .patches import (
-    _patch_agent_run,
-    _patch_graph_nodes,
-    _patch_tool_execution,
-)
 from .spans.ai_client import ai_client_span, update_ai_client_span
+from .spans.invoke_agent import invoke_agent_span, update_invoke_agent_span
 
 if TYPE_CHECKING:
     from typing import Any
 
-    from pydantic_ai import ModelRequestContext, RunContext
-    from pydantic_ai.capabilities import Hooks, WrapModelRequestHandler
+    from pydantic import ValidationError
+    from pydantic_ai import (
+        ModelRequestContext,
+        ModelRetry,
+        RunContext,
+        ToolCallPart,
+        ToolDefinition,
+    )
+    from pydantic_ai.agent import AgentRunResult
+    from pydantic_ai.capabilities import (
+        Hooks,
+        RawToolArgs,
+        ValidatedToolArgs,
+        WrapModelRequestHandler,
+        WrapRunHandler,
+        WrapToolExecuteHandler,
+    )
     from pydantic_ai.messages import ModelResponse
 
 
@@ -42,7 +59,7 @@ def register_hooks(hooks: "Hooks") -> None:
     ) -> "ModelResponse":
         with ai_client_span(
             messages=request_context.messages,
-            agent=None,
+            agent=ctx.agent,
             model=request_context.model,
             model_settings=request_context.model_settings,
         ) as span:
@@ -50,6 +67,78 @@ def register_hooks(hooks: "Hooks") -> None:
 
             update_ai_client_span(span, response)
             return response
+
+    @hooks.on.tool_validate_error
+    async def sentry_on_tool_validate_error(
+        ctx: "RunContext[Any]",
+        *,
+        call: "ToolCallPart",
+        tool_def: "ToolDefinition",
+        args: "RawToolArgs",
+        error: "ValidationError | ModelRetry",
+    ) -> "ValidatedToolArgs":
+        with capture_internal_exceptions():
+            integration = sentry_sdk.get_client().get_integration(
+                PydanticAIIntegration,
+            )
+            if integration is not None and integration.handled_tool_call_exceptions:
+                _capture_exception(error, handled=True)
+
+        raise error
+
+    @hooks.on.tool_execute
+    async def sentry_wrap_tool_execute(
+        ctx: "RunContext[Any]",
+        *,
+        call: "ToolCallPart",
+        tool_def: "ToolDefinition",
+        args: "ValidatedToolArgs",
+        handler: "WrapToolExecuteHandler",
+    ) -> "Any":
+        with execute_tool_span(
+            tool_name=call.tool_name,
+            tool_args=args,
+            agent=ctx.agent,
+            tool_definition=tool_def,
+        ) as span:
+            try:
+                result = await handler(args)
+                update_execute_tool_span(span, result)
+                return result
+            except ToolRetryError as exc:
+                exc_info = sys.exc_info()
+                with capture_internal_exceptions():
+                    integration = sentry_sdk.get_client().get_integration(
+                        PydanticAIIntegration,
+                    )
+                    if (
+                        integration is not None
+                        and integration.handled_tool_call_exceptions
+                    ):
+                        _capture_exception(exc, handled=True)
+                reraise(*exc_info)
+
+    @hooks.on.run
+    async def sentry_wrap_run(
+        ctx: "RunContext[Any]",
+        *,
+        handler: "WrapRunHandler",
+    ) -> "AgentRunResult[Any]":
+        with sentry_sdk.isolation_scope(), invoke_agent_span(
+            user_prompt=ctx.prompt,
+            agent=ctx.agent,
+            model=ctx.model,
+            model_settings=ctx.model_settings,
+        ) as span:
+            try:
+                result = await handler()
+                update_invoke_agent_span(span, result)
+                return result
+            except Exception as exc:
+                exc_info = sys.exc_info()
+                with capture_internal_exceptions():
+                    _capture_exception(exc, handled=False)
+                reraise(*exc_info)
 
     original_init = Agent.__init__
 
@@ -116,14 +205,6 @@ class PydanticAIIntegration(Integration):
         PYDANTIC_AI_VERSION = parse_version(PYDANTIC_AI_VERSION)
         _check_minimum_version(PydanticAIIntegration, PYDANTIC_AI_VERSION)
         if PYDANTIC_AI_VERSION is None:
-            return
-
-        _patch_agent_run()
-        _patch_tool_execution()
-
-        # ModelRequestContext.model added in https://github.com/pydantic/pydantic-ai/commit/f1260dfe09907f17688eee1646daf898fc428d4c
-        if PYDANTIC_AI_VERSION < (1, 73):
-            _patch_graph_nodes()
             return
 
         try:
