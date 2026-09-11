@@ -176,7 +176,7 @@ def _span_attributes(span, span_streaming):
             {
                 SPANDATA.AWS_REQUEST_ID: "request-id",
                 SPANDATA.HTTP_STATUS_CODE: 200,
-                "http.request.resend_count": 2,
+                SPANDATA.HTTP_REQUEST_RESEND_COUNT: 2,
             },
         ),
     ],
@@ -219,9 +219,9 @@ def test_get_response_attributes_reads_extended_request_id_header():
         ("HTTPStatusCode", "200", SPANDATA.HTTP_STATUS_CODE),
         ("HTTPStatusCode", True, SPANDATA.HTTP_STATUS_CODE),
         ("HTTPStatusCode", 999, SPANDATA.HTTP_STATUS_CODE),
-        ("RetryAttempts", "2", "http.request.resend_count"),
-        ("RetryAttempts", False, "http.request.resend_count"),
-        ("RetryAttempts", -1, "http.request.resend_count"),
+        ("RetryAttempts", "2", SPANDATA.HTTP_REQUEST_RESEND_COUNT),
+        ("RetryAttempts", False, SPANDATA.HTTP_REQUEST_RESEND_COUNT),
+        ("RetryAttempts", -1, SPANDATA.HTTP_REQUEST_RESEND_COUNT),
     ],
 )
 def test_get_response_attributes_ignores_malformed_field(field, value, attribute):
@@ -236,7 +236,7 @@ def test_get_response_attributes_ignores_malformed_field(field, value, attribute
     expected = {
         SPANDATA.AWS_REQUEST_ID: "request-id",
         SPANDATA.HTTP_STATUS_CODE: 200,
-        "http.request.resend_count": 2,
+        SPANDATA.HTTP_REQUEST_RESEND_COUNT: 2,
     }
     expected.pop(attribute)
 
@@ -449,7 +449,7 @@ def test_client_call_has_response_attributes(
     assert attributes[SPANDATA.HTTP_STATUS_CODE] == 200
     assert attributes[SPANDATA.AWS_REQUEST_ID] == "request-id"
     assert attributes[SPANDATA.AWS_EXTENDED_REQUEST_ID] == "extended-request-id"
-    assert "http.request.resend_count" not in attributes
+    assert SPANDATA.HTTP_REQUEST_RESEND_COUNT not in attributes
     assert SPANDATA.ERROR_TYPE not in attributes
 
 
@@ -475,7 +475,7 @@ def test_retry_attempts_share_one_client_span(
     assert len(set(request_span_ids)) == 1
     assert len(client_spans) == 1
     attributes = _span_attributes(client_spans[0], span_streaming)
-    assert attributes["http.request.resend_count"] == attempt_count - 1
+    assert attributes[SPANDATA.HTTP_REQUEST_RESEND_COUNT] == attempt_count - 1
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
@@ -501,7 +501,7 @@ def test_retries_exhausted_has_one_failed_client_span(
     _assert_one_failed_span(client_spans, span_streaming)
     attributes = _span_attributes(client_spans[0], span_streaming)
     assert attributes[SPANDATA.HTTP_STATUS_CODE] == 500
-    assert attributes["http.request.resend_count"] == 1
+    assert attributes[SPANDATA.HTTP_REQUEST_RESEND_COUNT] == 1
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
@@ -545,7 +545,7 @@ def test_client_error_has_response_attributes_and_is_unchanged(
 
     assert attributes[SPANDATA.AWS_REQUEST_ID] == "request-id"
     assert attributes[SPANDATA.HTTP_STATUS_CODE] == 403
-    assert attributes["http.request.resend_count"] == 1
+    assert attributes[SPANDATA.HTTP_REQUEST_RESEND_COUNT] == 1
     assert attributes[SPANDATA.ERROR_TYPE] == "AccessDeniedException"
     assert "Error.Message" not in attributes
     assert "exception.message" not in attributes
@@ -716,7 +716,7 @@ def test_streaming_response_attributes_belong_to_client_span(
     stream_attributes = _span_attributes(stream_spans[0], span_streaming)
     assert client_attributes[SPANDATA.AWS_REQUEST_ID] == "request-id"
     assert client_attributes[SPANDATA.HTTP_STATUS_CODE] == 200
-    assert "http.request.resend_count" not in client_attributes
+    assert SPANDATA.HTTP_REQUEST_RESEND_COUNT not in client_attributes
     assert SPANDATA.AWS_REQUEST_ID not in stream_attributes
     assert SPANDATA.HTTP_STATUS_CODE not in stream_attributes
 
