@@ -395,7 +395,7 @@ def capture_events(monkeypatch):
 
         def append_event(envelope):
             for item in envelope:
-                if item.headers.get("type") in ("event", "transaction"):
+                if item.headers.get("type") == "event":
                     events.append(item.payload.json)
             return old_capture_envelope(envelope)
 
@@ -991,35 +991,6 @@ def json_rpc():
             )
 
             return session_id, response
-
-    return inner
-
-
-@pytest.fixture()
-def select_mcp_transactions():
-    def inner(events):
-        return [
-            event
-            for event in events
-            if event["type"] == "transaction"
-            and event["contexts"]["trace"]["op"] == "mcp.server"
-        ]
-
-    return inner
-
-
-@pytest.fixture()
-def select_transactions_with_mcp_spans():
-    def inner(events, method_name):
-        return [
-            transaction
-            for transaction in events
-            if transaction.get("type") == "transaction"
-            and any(
-                span["data"].get("mcp.method.name") == method_name
-                for span in transaction.get("spans", [])
-            )
-        ]
 
     return inner
 
