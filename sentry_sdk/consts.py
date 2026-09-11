@@ -910,12 +910,6 @@ class SPANDATA:
     Example: 2
     """
 
-    HTTP_RESPONSE_BODY_SIZE = "http.response.body.size"
-    """
-    The encoded body size of the response (in bytes).
-    Example: 123
-    """
-
     HTTP_ROUTE = "http.route"
     """
     The matched route, that is, the path template used to match the request.
