@@ -31,7 +31,6 @@ from sentry_sdk import (
     add_breadcrumb,
     capture_message,
     isolation_scope,
-    new_scope,
 )
 from sentry_sdk._compat import PY37, PY38
 from sentry_sdk.envelope import Envelope, Item, PayloadRef, parse_json
@@ -514,40 +513,45 @@ def test_data_category_limits(
 
     capturing_server.respond_with(
         code=response_code,
-        headers={"X-Sentry-Rate-Limits": "4711:attachment:organization"},
+        headers={"X-Sentry-Rate-Limits": "4711:session:organization"},
     )
 
-    with new_scope() as scope:
-        scope.add_attachment(bytes=b"Hello", filename="hello.txt")
-        client.capture_event({"type": "error"}, scope=scope)
+    session_envelope = Envelope()
+    session_envelope.add_item(
+        Item(payload=PayloadRef(json={"sid": "123"}), type="session")
+    )
+    client.transport.capture_envelope(session_envelope)
     client.flush()
 
     assert len(capturing_server.captured) == 1
     assert capturing_server.captured[0].path == "/api/132/envelope/"
     capturing_server.clear_captured()
 
-    assert set(client.transport._disabled_until) == set(["attachment"])
+    assert set(client.transport._disabled_until) == set(["session"])
 
-    with new_scope() as scope:
-        scope.add_attachment(bytes=b"Hello", filename="hello.txt")
-        client.capture_event({"type": "error"}, scope=scope)
-    with new_scope() as scope:
-        scope.add_attachment(bytes=b"Hello", filename="hello.txt")
-        client.capture_event({"type": "error"}, scope=scope)
+    session_envelope = Envelope()
+    session_envelope.add_item(
+        Item(payload=PayloadRef(json={"sid": "456"}), type="session")
+    )
+    client.transport.capture_envelope(session_envelope)
+    session_envelope = Envelope()
+    session_envelope.add_item(
+        Item(payload=PayloadRef(json={"sid": "789"}), type="session")
+    )
+    client.transport.capture_envelope(session_envelope)
     client.flush()
 
-    # events go through but attachments are dropped
-    assert len(capturing_server.captured) == 2
+    assert not capturing_server.captured
 
-    client.capture_event({"type": "error"})
+    client.capture_event({"type": "event"})
     client.flush()
 
-    assert len(capturing_server.captured) == 3
-    assert capturing_server.captured[2].path == "/api/132/envelope/"
+    assert len(capturing_server.captured) == 1
+    assert capturing_server.captured[0].path == "/api/132/envelope/"
 
     assert captured_outcomes == [
-        ("ratelimit_backoff", "attachment"),
-        ("ratelimit_backoff", "attachment"),
+        ("ratelimit_backoff", "session"),
+        ("ratelimit_backoff", "session"),
     ]
 
 
@@ -560,7 +564,7 @@ def test_data_category_limits_reporting(
     capturing_server.respond_with(
         code=response_code,
         headers={
-            "X-Sentry-Rate-Limits": "4711:error:organization, 4711:attachment:organization"
+            "X-Sentry-Rate-Limits": "4711:session:organization, 4711:attachment:organization"
         },
     )
 
@@ -577,23 +581,29 @@ def test_data_category_limits_reporting(
     # get rid of threading making things hard to track
     monkeypatch.setattr(client.transport._worker, "submit", lambda x: x() or True)
 
-    with new_scope() as scope:
-        scope.add_attachment(bytes=b"Hello World", filename="hello.txt")
-        client.capture_event({"type": "error"}, scope=scope)
+    session_envelope = Envelope()
+    session_envelope.add_item(
+        Item(payload=PayloadRef(json={"sid": "123"}), type="session")
+    )
+    client.transport.capture_envelope(session_envelope)
     client.flush()
 
     assert len(capturing_server.captured) == 1
     assert capturing_server.captured[0].path == "/api/132/envelope/"
     capturing_server.clear_captured()
 
-    assert set(client.transport._disabled_until) == set(["attachment", "error"])
+    assert set(client.transport._disabled_until) == set(["attachment", "session"])
 
-    with new_scope() as scope:
-        scope.add_attachment(bytes=b"Hello World", filename="hello.txt")
-        client.capture_event({"type": "error"}, scope=scope)
-    with new_scope() as scope:
-        scope.add_attachment(bytes=b"Hello World", filename="hello.txt")
-        client.capture_event({"type": "error"}, scope=scope)
+    session_envelope = Envelope()
+    session_envelope.add_item(
+        Item(payload=PayloadRef(json={"sid": "456"}), type="session")
+    )
+    client.transport.capture_envelope(session_envelope)
+    session_envelope = Envelope()
+    session_envelope.add_item(
+        Item(payload=PayloadRef(json={"sid": "789"}), type="session")
+    )
+    client.transport.capture_envelope(session_envelope)
     capturing_server.clear_captured()
 
     # flush out the events but don't flush the client reports
@@ -601,45 +611,59 @@ def test_data_category_limits_reporting(
     client.transport._last_client_report_sent = 0
     outcomes_enabled = True
 
-    client.capture_event({"type": "error"})
+    with isolation_scope() as scope:
+        scope.add_attachment(bytes=b"Hello World", filename="hello.txt")
+        client.capture_event({"type": "error"}, scope=scope)
     client.flush()
 
-    # the client report is flushed alongside the event (which is also dropped
-    # because error is rate-limited)
+    # the error goes through (not rate-limited), attachment is dropped;
+    # the client report piggybacks on the error envelope
     assert len(capturing_server.captured) == 1
     envelope = capturing_server.captured[0].envelope
-    assert envelope.items[0].type == "client_report"
-    report = parse_json(envelope.items[0].get_bytes())
+    assert envelope.items[0].type == "event"
+    assert envelope.items[1].type == "client_report"
+    report = parse_json(envelope.items[1].get_bytes())
 
     discarded_events = report["discarded_events"]
 
     assert len(discarded_events) == 2
     assert {
-        "category": "error",
+        "category": "session",
         "reason": "ratelimit_backoff",
-        "quantity": 3,
+        "quantity": 2,
     } in discarded_events
     assert {
         "category": "attachment",
         "reason": "ratelimit_backoff",
-        "quantity": 22,
+        "quantity": 11,
     } in discarded_events
 
     capturing_server.clear_captured()
 
-    # send more events (error is still rate-limited)
-    client.capture_event({"type": "error"})
+    # send a session (dropped) and a normal error (goes through)
+    session_envelope = Envelope()
+    session_envelope.add_item(
+        Item(payload=PayloadRef(json={"sid": "000"}), type="session")
+    )
+    client.transport.capture_envelope(session_envelope)
+    client.capture_event({"type": "error", "release": "foo"})
     client.flush()
 
-    assert len(capturing_server.captured) == 1
-    envelope = capturing_server.captured[0].envelope
+    assert len(capturing_server.captured) == 2
+
+    assert len(capturing_server.captured[0].envelope.items) == 1
+    event = capturing_server.captured[0].envelope.items[0].get_event()
+    assert event["type"] == "error"
+    assert event["release"] == "foo"
+
+    envelope = capturing_server.captured[1].envelope
     assert envelope.items[0].type == "client_report"
     report = parse_json(envelope.items[0].get_bytes())
 
     discarded_events = report["discarded_events"]
     assert len(discarded_events) == 1
     assert {
-        "category": "error",
+        "category": "session",
         "reason": "ratelimit_backoff",
         "quantity": 1,
     } in discarded_events
