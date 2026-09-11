@@ -1,11 +1,10 @@
 import inspect
 from typing import TYPE_CHECKING
 
-from sentry_sdk import Client, tracing_utils
+from sentry_sdk import Client, traces
 from sentry_sdk._init_implementation import init
 from sentry_sdk.crons import monitor
 from sentry_sdk.scope import Scope, isolation_scope, new_scope
-from sentry_sdk.tracing import NoOpSpan, Transaction, trace
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -19,8 +18,6 @@ if TYPE_CHECKING:
         overload,
     )
 
-    from typing_extensions import Unpack
-
     from sentry_sdk._types import (
         Breadcrumb,
         BreadcrumbHint,
@@ -28,10 +25,9 @@ if TYPE_CHECKING:
         ExcInfo,
         Hint,
         LogLevelStr,
-        SamplingContext,
     )
     from sentry_sdk.client import BaseClient
-    from sentry_sdk.tracing import Span, TransactionKwargs
+    from sentry_sdk.traces import StreamedSpan
 
     T = TypeVar("T")
     F = TypeVar("F", bound=Callable[..., Any])
@@ -73,8 +69,6 @@ __all__ = [
     "set_tags",
     "set_user",
     "start_span",
-    "start_transaction",
-    "trace",
     "monitor",
     "start_session",
     "end_session",
@@ -275,57 +269,17 @@ async def flush_async(
 @scopemethod
 def start_span(
     **kwargs: "Any",
-) -> "Span":
-    return get_current_scope().start_span(**kwargs)
-
-
-@scopemethod
-def start_transaction(
-    transaction: "Optional[Transaction]" = None,
-    custom_sampling_context: "Optional[SamplingContext]" = None,
-    **kwargs: "Unpack[TransactionKwargs]",
-) -> "Union[Transaction, NoOpSpan]":
-    """
-    Start and return a transaction on the current scope.
-
-    Start an existing transaction if given, otherwise create and start a new
-    transaction with kwargs.
-
-    This is the entry point to manual tracing instrumentation.
-
-    A tree structure can be built by adding child spans to the transaction,
-    and child spans to other spans. To start a new child span within the
-    transaction or any span, call the respective `.start_child()` method.
-
-    Every child span must be finished before the transaction is finished,
-    otherwise the unfinished spans are discarded.
-
-    When used as context managers, spans and transactions are automatically
-    finished at the end of the `with` block. If not using context managers,
-    call the `.finish()` method.
-
-    When the transaction is finished, it will be sent to Sentry with all its
-    finished child spans.
-
-    :param transaction: The transaction to start. If omitted, we create and
-        start a new transaction.
-    :param custom_sampling_context: The transaction's custom sampling context.
-    :param kwargs: Optional keyword arguments to be passed to the Transaction
-        constructor. See :py:class:`sentry_sdk.tracing.Transaction` for
-        available arguments.
-    """
-    return get_current_scope().start_transaction(
-        transaction, custom_sampling_context, **kwargs
-    )
+) -> "StreamedSpan":
+    return traces.start_span(**kwargs)
 
 
 def get_current_span(
     scope: "Optional[Scope]" = None,
-) -> "Optional[Span]":
+) -> "Optional[StreamedSpan]":
     """
     Returns the currently active span if there is one running, otherwise `None`
     """
-    return tracing_utils.get_current_span(scope)
+    return traces.get_current_span(scope)
 
 
 def get_traceparent() -> "Optional[str]":
@@ -346,19 +300,11 @@ def get_baggage() -> "Optional[str]":
     return None
 
 
-def continue_trace(
-    environ_or_headers: "Dict[str, Any]",
-    op: "Optional[str]" = None,
-    name: "Optional[str]" = None,
-    source: "Optional[str]" = None,
-    origin: str = "manual",
-) -> "Transaction":
+def continue_trace(incoming: "Dict[str, Any]") -> None:
     """
     Sets the propagation context from environment or headers and returns a transaction.
     """
-    return get_isolation_scope().continue_trace(
-        environ_or_headers, op, name, source, origin
-    )
+    return traces.continue_trace(incoming)
 
 
 @scopemethod
