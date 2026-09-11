@@ -4136,7 +4136,7 @@ async def test_streaming_ttft_on_chat_span(
     assert len(chat_spans) >= 1
     chat_span = chat_spans[0]
 
-    assert SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN in chat_span["attributes"]
+    assert SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_CHUNK in chat_span["attributes"]
     assert chat_span["attributes"].get(SPANDATA.GEN_AI_RESPONSE_STREAMING) is True
 
 
