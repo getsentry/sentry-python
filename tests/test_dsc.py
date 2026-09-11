@@ -140,7 +140,7 @@ def test_dsc_continuation_of_trace(sentry_init, capture_envelopes):
     }
 
     # We continue the incoming trace and start a new segment
-    sentry_sdk.continue_trace(incoming_http_headers)
+    sentry_sdk.traces.continue_trace(incoming_http_headers)
     with sentry_sdk.traces.start_span(name="foo"):
         pass
 
@@ -222,7 +222,7 @@ def test_dsc_continuation_of_trace_sample_rate_changed_in_traces_sampler(
 
     # We continue the incoming trace and start a new segment
     with mock.patch("sentry_sdk.tracing_utils.Random.randrange", return_value=125000):
-        sentry_sdk.continue_trace(incoming_http_headers)
+        sentry_sdk.traces.continue_trace(incoming_http_headers)
         with sentry_sdk.traces.start_span(name="foo"):
             pass
 
@@ -473,7 +473,7 @@ def test_dsc_issue_twp(sentry_init, capture_envelopes, traces_sample_rate):
 
     # We continue the trace (meaning: saving the incoming trace information on the scope)
     # but in this test, we do not start a transaction.
-    sentry_sdk.continue_trace(incoming_http_headers)
+    sentry_sdk.traces.continue_trace(incoming_http_headers)
 
     # No transaction is started, just an error is captured
     try:
@@ -564,7 +564,7 @@ def test_dsc_issue_twp_span_streaming(
 
     # We continue the trace (meaning: saving the incoming trace information on the scope)
     # but in this test, we do not start a segment.
-    sentry_sdk.continue_trace(incoming_http_headers)
+    sentry_sdk.traces.continue_trace(incoming_http_headers)
 
     # No segment is started, just an error is captured
     try:

@@ -39,8 +39,8 @@ async def test_featureflags_integration_spans_async(sentry_init, capture_events)
     add_feature_flag("hello", False)
 
     try:
-        with sentry_sdk.start_span(name="test-span"):
-            with sentry_sdk.start_span(name="test-span-2"):
+        with sentry_sdk.traces.start_span(name="test-span"):
+            with sentry_sdk.traces.start_span(name="test-span-2"):
                 raise ValueError("something wrong!")
     except ValueError as e:
         sentry_sdk.capture_exception(e)
@@ -68,8 +68,8 @@ def test_featureflags_integration_spans_sync(sentry_init, capture_events):
     add_feature_flag("hello", False)
 
     try:
-        with sentry_sdk.start_span(name="test-span"):
-            with sentry_sdk.start_span(name="test-span-2"):
+        with sentry_sdk.traces.start_span(name="test-span"):
+            with sentry_sdk.traces.start_span(name="test-span-2"):
                 raise ValueError("something wrong!")
     except ValueError as e:
         sentry_sdk.capture_exception(e)
