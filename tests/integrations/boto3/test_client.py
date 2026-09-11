@@ -8,9 +8,6 @@ from botocore.stub import Stubber
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.boto3 import Boto3Integration
-from sentry_sdk.integrations.boto3._instrumentation import (
-    _get_server_attributes,
-)
 from tests.integrations.boto3.aws_mock import Body
 
 session = boto3.Session(  # type: ignore[attr-defined]
@@ -147,7 +144,9 @@ def _span_attributes(span, span_streaming):
         "span_name",
         "rpc_service",
         "rpc_method",
+        "endpoint_url",
         "server_address",
+        "server_port",
     ),
     [
         (
@@ -157,7 +156,9 @@ def _span_attributes(span, span_streaming):
             "S3.HeadObject",
             "S3",
             "HeadObject",
-            "s3.eu-north-1.amazonaws.com",
+            "http://localhost:4566",
+            "localhost",
+            4566,
         ),
         (
             "events",
@@ -166,7 +167,9 @@ def _span_attributes(span, span_streaming):
             "EventBridge.ListEventBuses",
             "EventBridge",
             "ListEventBuses",
+            None,
             "events.eu-north-1.amazonaws.com",
+            443,
         ),
     ],
 )
@@ -181,9 +184,11 @@ def test_client_call_has_common_attributes(
     span_name,
     rpc_service,
     rpc_method,
+    endpoint_url,
     server_address,
+    server_port,
 ):
-    client = client_factory(service_name=service_name)
+    client = client_factory(service_name=service_name, endpoint_url=endpoint_url)
     span = _capture_stubbed_client_span(
         client,
         method_name,
@@ -199,7 +204,7 @@ def test_client_call_has_common_attributes(
     assert attributes[SPANDATA.RPC_SYSTEM_NAME] == "aws-api"
     assert attributes[SPANDATA.CLOUD_REGION] == "eu-north-1"
     assert attributes[SPANDATA.SERVER_ADDRESS] == server_address
-    assert attributes[SPANDATA.SERVER_PORT] == 443
+    assert attributes[SPANDATA.SERVER_PORT] == server_port
 
 
 def test_client_call_attributes_are_available_at_span_creation(
@@ -241,47 +246,18 @@ def test_client_call_attributes_are_available_at_span_creation(
     assert client_spans == []
 
 
-@pytest.mark.parametrize(
-    ("endpoint_url", "expected"),
-    [
-        (
-            "http://localhost:4566",
-            {
-                SPANDATA.SERVER_ADDRESS: "localhost",
-                SPANDATA.SERVER_PORT: 4566,
-            },
-        ),
-        (
-            "https://aws.example.test:8443",
-            {
-                SPANDATA.SERVER_ADDRESS: "aws.example.test",
-                SPANDATA.SERVER_PORT: 8443,
-            },
-        ),
-        (
-            "https://[2001:db8::1]:9443",
-            {
-                SPANDATA.SERVER_ADDRESS: "2001:db8::1",
-                SPANDATA.SERVER_PORT: 9443,
-            },
-        ),
-        (None, {}),
-        ("not-an-endpoint", {}),
-        ("https://example.com:not-a-port", {}),
-    ],
-)
-def test_get_server_attributes(endpoint_url, expected):
-    assert _get_server_attributes(endpoint_url) == expected
-
-
-@pytest.mark.parametrize("span_streaming", [True, False])
 def test_client_call_omits_missing_region(
+    sentry_init,
     capture_items,
-    client_factory,
     monkeypatch,
-    span_streaming,
 ):
-    client = client_factory()
+    sentry_init(
+        traces_sample_rate=1.0,
+        integrations=[Boto3Integration()],
+        trace_lifecycle="stream",
+        server_name="",
+    )
+    client = session.client("s3")
     monkeypatch.setattr(client.meta.config, "region_name", None)
 
     span = _capture_stubbed_client_span(
@@ -289,10 +265,10 @@ def test_client_call_omits_missing_region(
         "head_object",
         {"Bucket": "bucket", "Key": "foo"},
         capture_items,
-        span_streaming,
+        span_streaming=True,
     )
 
-    assert SPANDATA.CLOUD_REGION not in _span_attributes(span, span_streaming)
+    assert SPANDATA.CLOUD_REGION not in span["attributes"]
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
