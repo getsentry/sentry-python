@@ -61,7 +61,7 @@ def test_get_span_from_scope_regardless_of_sampling_decision(
                 else:
                     # noop spans are not set on the scope unless they're segments
                     assert scope.streamed_span.name == "/"
-                assert scope.transaction.name == "/"
+                assert scope._transaction == "/"
 
 
 @pytest.mark.parametrize(
