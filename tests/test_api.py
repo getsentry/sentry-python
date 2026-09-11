@@ -21,10 +21,10 @@ from tests.conftest import TestTransportWithOptions
 
 def test_get_current_span():
     fake_scope = mock.MagicMock()
-    fake_scope.streamed_span = mock.MagicMock()
-    assert get_current_span(fake_scope) == fake_scope.streamed_span
+    fake_scope.span = mock.MagicMock()
+    assert get_current_span(fake_scope) == fake_scope.span
 
-    fake_scope.streamed_span = None
+    fake_scope.span = None
     assert get_current_span(fake_scope) is None
 
 
