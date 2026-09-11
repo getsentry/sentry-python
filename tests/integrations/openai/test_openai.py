@@ -315,7 +315,7 @@ def test_nonstreaming_chat_completion_no_prompts(
     sentry_sdk.flush()
     span = next(item.payload for item in items)
     assert span["attributes"]["sentry.op"] == "gen_ai.chat"
-    assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "openai"
     assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
 
     assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "some-model"
@@ -325,7 +325,7 @@ def test_nonstreaming_chat_completion_no_prompts(
     assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
     assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
 
-    assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["attributes"]
+    assert SPANDATA.GEN_AI_PROVIDER_NAME_INSTRUCTIONS not in span["attributes"]
     assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
     assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
 
@@ -461,7 +461,7 @@ def test_nonstreaming_chat_completion(
     sentry_sdk.flush()
     span = next(item.payload for item in items)
     assert span["attributes"]["sentry.op"] == "gen_ai.chat"
-    assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "openai"
     assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
 
     assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "some-model"
@@ -472,7 +472,7 @@ def test_nonstreaming_chat_completion(
     assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
 
     assert (
-        json.loads(span["attributes"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS])
+        json.loads(span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME_INSTRUCTIONS])
         == expected_system_instructions
     )
 
@@ -498,7 +498,7 @@ def test_nonstreaming_chat_completion(
         pytest.param(
             {"gen_ai": {"inputs": True}},
             {
-                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS: json.dumps(
+                SPANDATA.GEN_AI_PROVIDER_NAME_INSTRUCTIONS: json.dumps(
                     [{"type": "text", "content": "You are a helpful assistant."}]
                 ),
                 SPANDATA.GEN_AI_REQUEST_MESSAGES: safe_serialize(
@@ -513,7 +513,7 @@ def test_nonstreaming_chat_completion(
             {"gen_ai": {"inputs": False}},
             {},
             [
-                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+                SPANDATA.GEN_AI_PROVIDER_NAME_INSTRUCTIONS,
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
                 SPANDATA.GEN_AI_TOOL_DEFINITIONS,
             ],
@@ -522,7 +522,7 @@ def test_nonstreaming_chat_completion(
         pytest.param(
             {},
             {
-                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS: json.dumps(
+                SPANDATA.GEN_AI_PROVIDER_NAME_INSTRUCTIONS: json.dumps(
                     [{"type": "text", "content": "You are a helpful assistant."}]
                 ),
                 SPANDATA.GEN_AI_REQUEST_MESSAGES: safe_serialize(
@@ -594,7 +594,7 @@ def test_completions_api_data_collection(
     assert span_data[SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
     assert span_data[SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
     assert span_data[SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
-    assert span_data[SPANDATA.GEN_AI_SYSTEM] == "openai"
+    assert span_data[SPANDATA.GEN_AI_PROVIDER_NAME] == "openai"
 
     for key, value in expected_present.items():
         assert span_data[key] == value
@@ -1064,7 +1064,7 @@ async def test_nonstreaming_chat_completion_async_no_prompts(
     sentry_sdk.flush()
     span = next(item.payload for item in items)
     assert span["attributes"]["sentry.op"] == "gen_ai.chat"
-    assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "openai"
     assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
 
     assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "some-model"
@@ -1074,7 +1074,7 @@ async def test_nonstreaming_chat_completion_async_no_prompts(
     assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
     assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
 
-    assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["attributes"]
+    assert SPANDATA.GEN_AI_PROVIDER_NAME_INSTRUCTIONS not in span["attributes"]
     assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
     assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
 
@@ -1208,7 +1208,7 @@ async def test_nonstreaming_chat_completion_async(
     sentry_sdk.flush()
     span = next(item.payload for item in items)
     assert span["attributes"]["sentry.op"] == "gen_ai.chat"
-    assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "openai"
     assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
 
     assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "some-model"
@@ -1219,7 +1219,7 @@ async def test_nonstreaming_chat_completion_async(
     assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
 
     assert (
-        json.loads(span["attributes"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS])
+        json.loads(span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME_INSTRUCTIONS])
         == expected_system_instructions
     )
 
@@ -1349,7 +1349,7 @@ def test_streaming_chat_completion_no_prompts(
     sentry_sdk.flush()
     span = next(item.payload for item in items)
     assert span["attributes"]["sentry.op"] == "gen_ai.chat"
-    assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "openai"
     assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
 
     assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "some-model"
@@ -1361,7 +1361,7 @@ def test_streaming_chat_completion_no_prompts(
 
     assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "model-id"
 
-    assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["attributes"]
+    assert SPANDATA.GEN_AI_PROVIDER_NAME_INSTRUCTIONS not in span["attributes"]
     assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
     assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
 
@@ -1852,7 +1852,7 @@ def test_streaming_chat_completion(
     sentry_sdk.flush()
     span = next(item.payload for item in items)
     assert span["attributes"]["sentry.op"] == "gen_ai.chat"
-    assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "openai"
     assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
 
     assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "some-model"
@@ -1863,7 +1863,7 @@ def test_streaming_chat_completion(
     assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
 
     assert (
-        json.loads(span["attributes"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS])
+        json.loads(span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME_INSTRUCTIONS])
         == expected_system_instructions
     )
 
@@ -2002,7 +2002,7 @@ async def test_streaming_chat_completion_async_no_prompts(
     sentry_sdk.flush()
     span = next(item.payload for item in items)
     assert span["attributes"]["sentry.op"] == "gen_ai.chat"
-    assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "openai"
     assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
 
     assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "some-model"
@@ -2014,7 +2014,7 @@ async def test_streaming_chat_completion_async_no_prompts(
 
     assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "model-id"
 
-    assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["attributes"]
+    assert SPANDATA.GEN_AI_PROVIDER_NAME_INSTRUCTIONS not in span["attributes"]
     assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
     assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
 
@@ -2215,7 +2215,7 @@ async def test_streaming_chat_completion_async(
     sentry_sdk.flush()
     span = next(item.payload for item in items)
     assert span["attributes"]["sentry.op"] == "gen_ai.chat"
-    assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "openai"
     assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
 
     assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "some-model"
@@ -2228,7 +2228,7 @@ async def test_streaming_chat_completion_async(
     assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "model-id"
 
     assert (
-        json.loads(span["attributes"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS])
+        json.loads(span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME_INSTRUCTIONS])
         == expected_system_instructions
     )
 
@@ -2388,7 +2388,7 @@ def test_embeddings_create_no_pii(
     sentry_sdk.flush()
     span = next(item.payload for item in items)
     assert span["attributes"]["sentry.op"] == "gen_ai.embeddings"
-    assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "openai"
     assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "text-embedding-3-large"
 
     assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT not in span["attributes"]
@@ -2504,7 +2504,7 @@ def test_embeddings_create(
     sentry_sdk.flush()
     span = next(item.payload for item in items)
     assert span["attributes"]["sentry.op"] == "gen_ai.embeddings"
-    assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "openai"
     assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "text-embedding-3-large"
 
     assert (
@@ -2604,7 +2604,7 @@ def test_embeddings_create_data_collection(
         lambda: client.embeddings.create(input="hello", model="text-embedding-3-large"),
     )
 
-    assert span_data[SPANDATA.GEN_AI_SYSTEM] == "openai"
+    assert span_data[SPANDATA.GEN_AI_PROVIDER_NAME] == "openai"
     assert span_data[SPANDATA.GEN_AI_OPERATION_NAME] == "embeddings"
     assert span_data[SPANDATA.GEN_AI_REQUEST_MODEL] == "text-embedding-3-large"
 
@@ -2715,7 +2715,7 @@ async def test_embeddings_create_async_no_pii(
     sentry_sdk.flush()
     span = next(item.payload for item in items)
     assert span["attributes"]["sentry.op"] == "gen_ai.embeddings"
-    assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "openai"
     assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "text-embedding-3-large"
 
     assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT not in span["attributes"]
@@ -2832,7 +2832,7 @@ async def test_embeddings_create_async(
     sentry_sdk.flush()
     span = next(item.payload for item in items)
     assert span["attributes"]["sentry.op"] == "gen_ai.embeddings"
-    assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "openai"
     assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "text-embedding-3-large"
 
     assert (
@@ -2921,7 +2921,7 @@ async def test_embeddings_create_async_data_collection(
     assert span["attributes"]["sentry.op"] == "gen_ai.embeddings"
     span_data = span["attributes"]
 
-    assert span_data[SPANDATA.GEN_AI_SYSTEM] == "openai"
+    assert span_data[SPANDATA.GEN_AI_PROVIDER_NAME] == "openai"
     assert span_data[SPANDATA.GEN_AI_OPERATION_NAME] == "embeddings"
     assert span_data[SPANDATA.GEN_AI_REQUEST_MODEL] == "text-embedding-3-large"
 
@@ -3680,7 +3680,7 @@ def test_ai_client_span_responses_api_no_pii(
         "gen_ai.request.model": "gpt-4o",
         "gen_ai.response.model": "response-model-id",
         "gen_ai.response.streaming": False,
-        "gen_ai.system": "openai",
+        SPANDATA.GEN_AI_PROVIDER_NAME: "openai",
         "gen_ai.usage.input_tokens": 20,
         "gen_ai.usage.input_tokens.cached": 5,
         "gen_ai.usage.output_tokens": 10,
@@ -3951,7 +3951,7 @@ def test_ai_client_span_responses_api(
         "gen_ai.request.temperature": 0.7,
         "gen_ai.request.top_p": 0.9,
         "gen_ai.request.reasoning.level": "high",
-        "gen_ai.system": "openai",
+        SPANDATA.GEN_AI_PROVIDER_NAME: "openai",
         "gen_ai.response.model": "response-model-id",
         "gen_ai.response.streaming": False,
         "gen_ai.usage.input_tokens": 20,
@@ -3989,7 +3989,7 @@ def test_ai_client_span_responses_api(
                 SPANDATA.GEN_AI_REQUEST_MESSAGES: safe_serialize(
                     ["How do I check if a Python object is an instance of a class?"]
                 ),
-                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS: safe_serialize(
+                SPANDATA.GEN_AI_PROVIDER_NAME_INSTRUCTIONS: safe_serialize(
                     [
                         {
                             "type": "text",
@@ -4009,7 +4009,7 @@ def test_ai_client_span_responses_api(
                 "instructions": "You are a coding assistant that talks like a pirate.",
             },
             {
-                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS: safe_serialize(
+                SPANDATA.GEN_AI_PROVIDER_NAME_INSTRUCTIONS: safe_serialize(
                     [
                         {
                             "type": "text",
@@ -4035,7 +4035,7 @@ def test_ai_client_span_responses_api(
                 ],
             },
             {
-                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS: safe_serialize(
+                SPANDATA.GEN_AI_PROVIDER_NAME_INSTRUCTIONS: safe_serialize(
                     [
                         {
                             "type": "text",
@@ -4062,7 +4062,7 @@ def test_ai_client_span_responses_api(
             {},
             [
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+                SPANDATA.GEN_AI_PROVIDER_NAME_INSTRUCTIONS,
                 SPANDATA.GEN_AI_TOOL_DEFINITIONS,
             ],
             True,
@@ -4080,7 +4080,7 @@ def test_ai_client_span_responses_api(
                 ),
                 SPANDATA.GEN_AI_TOOL_DEFINITIONS: safe_serialize(EXAMPLE_TOOLS),
             },
-            [SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS],
+            [SPANDATA.GEN_AI_PROVIDER_NAME_INSTRUCTIONS],
             True,
             id="gen-ai-omitted-defaults-to-enabled",
         ),
@@ -4090,7 +4090,7 @@ def test_ai_client_span_responses_api(
             {},
             [
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+                SPANDATA.GEN_AI_PROVIDER_NAME_INSTRUCTIONS,
                 SPANDATA.GEN_AI_TOOL_DEFINITIONS,
             ],
             True,
@@ -4144,7 +4144,7 @@ def test_responses_api_data_collection(
     assert span_data["gen_ai.request.temperature"] == 0.7
     assert span_data["gen_ai.request.top_p"] == 0.9
     assert span_data["gen_ai.request.reasoning.level"] == "high"
-    assert span_data["gen_ai.system"] == "openai"
+    assert span_data[SPANDATA.GEN_AI_PROVIDER_NAME] == "openai"
 
     for key, value in expected_present.items():
         assert span_data[key] == value
@@ -4763,7 +4763,7 @@ async def test_ai_client_span_responses_async_api(
         "gen_ai.request.model": "gpt-4o",
         "gen_ai.response.model": "response-model-id",
         "gen_ai.response.streaming": False,
-        "gen_ai.system": "openai",
+        SPANDATA.GEN_AI_PROVIDER_NAME: "openai",
         "gen_ai.usage.input_tokens": 20,
         "gen_ai.usage.input_tokens.cached": 5,
         "gen_ai.usage.output_tokens": 10,
@@ -4990,7 +4990,7 @@ async def test_ai_client_span_streaming_responses_async_api(
         "gen_ai.request.reasoning.level": "high",
         "gen_ai.response.model": "response-model-id",
         "gen_ai.response.streaming": True,
-        "gen_ai.system": "openai",
+        SPANDATA.GEN_AI_PROVIDER_NAME: "openai",
         "gen_ai.response.time_to_first_token": mock.ANY,
         "gen_ai.usage.input_tokens": 20,
         "gen_ai.usage.input_tokens.cached": 5,
@@ -5185,7 +5185,7 @@ def test_streaming_responses_api(
     sentry_sdk.flush()
     (span,) = (item.payload for item in items)
     assert span["attributes"]["sentry.op"] == "gen_ai.responses"
-    assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "openai"
     assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
     assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
     assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
@@ -5263,7 +5263,7 @@ async def test_streaming_responses_api_async(
     sentry_sdk.flush()
     (span,) = (item.payload for item in items)
     assert span["attributes"]["sentry.op"] == "gen_ai.responses"
-    assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "openai"
     assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
     assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
     assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9

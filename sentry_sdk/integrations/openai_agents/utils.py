@@ -48,7 +48,7 @@ def _capture_exception(exc: "Any") -> None:
 
 def _set_agent_data(span: "StreamedSpan", agent: "agents.Agent") -> None:
     span.set_attribute(
-        SPANDATA.GEN_AI_SYSTEM, "openai"
+        SPANDATA.GEN_AI_PROVIDER_NAME, "openai"
     )  # See footnote for  https://opentelemetry.io/docs/specs/semconv/registry/attributes/gen-ai/#gen-ai-system for explanation why.
 
     span.set_attribute(SPANDATA.GEN_AI_AGENT_NAME, agent.name)
@@ -134,7 +134,7 @@ def _set_input_data(
 
     if len(instructions_text_parts) > 0:
         span.set_attribute(
-            SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+            SPANDATA.GEN_AI_PROVIDER_NAME_INSTRUCTIONS,
             json.dumps(instructions_text_parts),
         )
 

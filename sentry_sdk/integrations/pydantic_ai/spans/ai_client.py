@@ -111,7 +111,7 @@ def _set_input_messages(span: "StreamedSpan", messages: "list[ModelMessage]") ->
     permanent_instructions, current_instructions = _get_system_instructions(messages)
     if len(permanent_instructions) > 0 or len(current_instructions) > 0:
         span.set_attribute(
-            SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+            SPANDATA.GEN_AI_PROVIDER_NAME_INSTRUCTIONS,
             json.dumps(
                 _transform_system_instructions(
                     permanent_instructions, current_instructions

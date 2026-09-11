@@ -455,7 +455,7 @@ def _set_common_input_data(
     """
     Set input data for the span based on the provided keyword arguments for the anthropic message creation.
     """
-    span.set_attribute(SPANDATA.GEN_AI_SYSTEM, "anthropic")
+    span.set_attribute(SPANDATA.GEN_AI_PROVIDER_NAME, "anthropic")
     span.set_attribute(SPANDATA.GEN_AI_OPERATION_NAME, "chat")
 
     if max_tokens is not None and _is_given(max_tokens):
@@ -498,7 +498,7 @@ def _set_common_input_data(
     if record_inputs:
         if isinstance(system, str) or isinstance(system, Iterable):
             span.set_attribute(
-                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+                SPANDATA.GEN_AI_PROVIDER_NAME_INSTRUCTIONS,
                 json.dumps(_transform_system_instructions(system)),
             )
 

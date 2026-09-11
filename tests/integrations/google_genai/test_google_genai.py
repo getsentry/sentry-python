@@ -165,7 +165,7 @@ def test_nonstreaming_generate_content(
     assert chat_span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
     assert chat_span["name"] == "chat gemini-1.5-flash"
     assert chat_span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-    assert chat_span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "gcp.gemini"
+    assert chat_span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "gcp.gemini"
     assert chat_span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "gemini-1.5-flash"
 
     if send_default_pii and include_prompts:
@@ -272,12 +272,14 @@ def test_generate_content_with_system_instruction(
     invoke_span = next(item.payload for item in items)
 
     if expected_texts is None:
-        assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in invoke_span["attributes"]
+        assert (
+            SPANDATA.GEN_AI_PROVIDER_NAME_INSTRUCTIONS not in invoke_span["attributes"]
+        )
         return
 
     # (PII is enabled and include_prompts is True in this test)
     system_instructions = json.loads(
-        invoke_span["attributes"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
+        invoke_span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME_INSTRUCTIONS]
     )
 
     assert system_instructions == [
@@ -1075,7 +1077,7 @@ def test_embed_content(
     assert embed_span["attributes"]["sentry.op"] == OP.GEN_AI_EMBEDDINGS
     assert embed_span["name"] == "embeddings text-embedding-004"
     assert embed_span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "embeddings"
-    assert embed_span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "gcp.gemini"
+    assert embed_span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "gcp.gemini"
     assert (
         embed_span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "text-embedding-004"
     )
@@ -1307,7 +1309,7 @@ async def test_async_embed_content(
     assert embed_span["attributes"]["sentry.op"] == OP.GEN_AI_EMBEDDINGS
     assert embed_span["name"] == "embeddings text-embedding-004"
     assert embed_span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "embeddings"
-    assert embed_span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "gcp.gemini"
+    assert embed_span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "gcp.gemini"
     assert (
         embed_span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "text-embedding-004"
     )
@@ -2333,7 +2335,7 @@ def test_extract_contents_messages_object_with_text_attribute():
 
 DATA_COLLECTION_CHAT_EXPECTED_VALUES = {
     SPANDATA.GEN_AI_REQUEST_MESSAGES: [{"role": "user", "content": "Tell me a joke"}],
-    SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS: [
+    SPANDATA.GEN_AI_PROVIDER_NAME_INSTRUCTIONS: [
         {"type": "text", "content": "You are a helpful assistant."}
     ],
     SPANDATA.GEN_AI_RESPONSE_TEXT: ["Hello! How can I help you today?"],
@@ -2356,7 +2358,7 @@ DATA_COLLECTION_EMBED_EXPECTED_VALUES = {
             False,
             [
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+                SPANDATA.GEN_AI_PROVIDER_NAME_INSTRUCTIONS,
                 SPANDATA.GEN_AI_RESPONSE_TEXT,
             ],
             [],
@@ -2369,7 +2371,7 @@ DATA_COLLECTION_EMBED_EXPECTED_VALUES = {
             [],
             [
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+                SPANDATA.GEN_AI_PROVIDER_NAME_INSTRUCTIONS,
                 SPANDATA.GEN_AI_RESPONSE_TEXT,
             ],
             id="gen-ai-inputs-and-outputs-disabled-override-legacy-on",
@@ -2380,7 +2382,7 @@ DATA_COLLECTION_EMBED_EXPECTED_VALUES = {
             False,
             [
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+                SPANDATA.GEN_AI_PROVIDER_NAME_INSTRUCTIONS,
             ],
             [
                 SPANDATA.GEN_AI_RESPONSE_TEXT,
@@ -2396,7 +2398,7 @@ DATA_COLLECTION_EMBED_EXPECTED_VALUES = {
             ],
             [
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+                SPANDATA.GEN_AI_PROVIDER_NAME_INSTRUCTIONS,
             ],
             id="gen-ai-outputs-enabled-inputs-disabled",
         ),
@@ -2406,7 +2408,7 @@ DATA_COLLECTION_EMBED_EXPECTED_VALUES = {
             False,
             [
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+                SPANDATA.GEN_AI_PROVIDER_NAME_INSTRUCTIONS,
                 SPANDATA.GEN_AI_RESPONSE_TEXT,
             ],
             [],
@@ -2418,7 +2420,7 @@ DATA_COLLECTION_EMBED_EXPECTED_VALUES = {
             True,
             [
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+                SPANDATA.GEN_AI_PROVIDER_NAME_INSTRUCTIONS,
                 SPANDATA.GEN_AI_RESPONSE_TEXT,
             ],
             [],
@@ -2431,7 +2433,7 @@ DATA_COLLECTION_EMBED_EXPECTED_VALUES = {
             [],
             [
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+                SPANDATA.GEN_AI_PROVIDER_NAME_INSTRUCTIONS,
                 SPANDATA.GEN_AI_RESPONSE_TEXT,
             ],
             id="no-gen-ai-config-legacy-pii-disabled",
@@ -2488,7 +2490,7 @@ def test_generate_content_data_collection(
         assert key not in span_data, f"{key} should not have been collected"
 
     # Data collection never gates non-PII attributes
-    assert span_data[SPANDATA.GEN_AI_SYSTEM] == "gcp.gemini"
+    assert span_data[SPANDATA.GEN_AI_PROVIDER_NAME] == "gcp.gemini"
     assert span_data[SPANDATA.GEN_AI_REQUEST_MODEL] == "gemini-1.5-flash"
     assert span_data[SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
     assert span_data[SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
@@ -2651,7 +2653,7 @@ def test_generate_content_data_collection_tools(
             False,
             [
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+                SPANDATA.GEN_AI_PROVIDER_NAME_INSTRUCTIONS,
                 SPANDATA.GEN_AI_RESPONSE_TEXT,
             ],
             [],
@@ -2664,7 +2666,7 @@ def test_generate_content_data_collection_tools(
             [],
             [
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+                SPANDATA.GEN_AI_PROVIDER_NAME_INSTRUCTIONS,
                 SPANDATA.GEN_AI_RESPONSE_TEXT,
             ],
             id="gen-ai-inputs-and-outputs-disabled-override-legacy-on",
@@ -2675,7 +2677,7 @@ def test_generate_content_data_collection_tools(
             False,
             [
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+                SPANDATA.GEN_AI_PROVIDER_NAME_INSTRUCTIONS,
             ],
             [
                 SPANDATA.GEN_AI_RESPONSE_TEXT,
@@ -2691,7 +2693,7 @@ def test_generate_content_data_collection_tools(
             ],
             [
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+                SPANDATA.GEN_AI_PROVIDER_NAME_INSTRUCTIONS,
             ],
             id="gen-ai-outputs-enabled-inputs-disabled",
         ),
@@ -2701,7 +2703,7 @@ def test_generate_content_data_collection_tools(
             False,
             [
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+                SPANDATA.GEN_AI_PROVIDER_NAME_INSTRUCTIONS,
                 SPANDATA.GEN_AI_RESPONSE_TEXT,
             ],
             [],
@@ -2713,7 +2715,7 @@ def test_generate_content_data_collection_tools(
             True,
             [
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+                SPANDATA.GEN_AI_PROVIDER_NAME_INSTRUCTIONS,
                 SPANDATA.GEN_AI_RESPONSE_TEXT,
             ],
             [],
@@ -2726,7 +2728,7 @@ def test_generate_content_data_collection_tools(
             [],
             [
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+                SPANDATA.GEN_AI_PROVIDER_NAME_INSTRUCTIONS,
                 SPANDATA.GEN_AI_RESPONSE_TEXT,
             ],
             id="no-gen-ai-config-legacy-pii-disabled",
@@ -3108,7 +3110,7 @@ def test_embed_content_data_collection(
             False,
             [
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+                SPANDATA.GEN_AI_PROVIDER_NAME_INSTRUCTIONS,
                 SPANDATA.GEN_AI_RESPONSE_TEXT,
             ],
             [],
@@ -3121,7 +3123,7 @@ def test_embed_content_data_collection(
             [],
             [
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+                SPANDATA.GEN_AI_PROVIDER_NAME_INSTRUCTIONS,
                 SPANDATA.GEN_AI_RESPONSE_TEXT,
             ],
             id="gen-ai-inputs-and-outputs-disabled-override-legacy-on",
@@ -3132,7 +3134,7 @@ def test_embed_content_data_collection(
             False,
             [
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+                SPANDATA.GEN_AI_PROVIDER_NAME_INSTRUCTIONS,
             ],
             [
                 SPANDATA.GEN_AI_RESPONSE_TEXT,
@@ -3148,7 +3150,7 @@ def test_embed_content_data_collection(
             ],
             [
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+                SPANDATA.GEN_AI_PROVIDER_NAME_INSTRUCTIONS,
             ],
             id="gen-ai-outputs-enabled-inputs-disabled",
         ),
@@ -3158,7 +3160,7 @@ def test_embed_content_data_collection(
             False,
             [
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+                SPANDATA.GEN_AI_PROVIDER_NAME_INSTRUCTIONS,
                 SPANDATA.GEN_AI_RESPONSE_TEXT,
             ],
             [],
@@ -3170,7 +3172,7 @@ def test_embed_content_data_collection(
             True,
             [
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+                SPANDATA.GEN_AI_PROVIDER_NAME_INSTRUCTIONS,
                 SPANDATA.GEN_AI_RESPONSE_TEXT,
             ],
             [],
@@ -3183,7 +3185,7 @@ def test_embed_content_data_collection(
             [],
             [
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+                SPANDATA.GEN_AI_PROVIDER_NAME_INSTRUCTIONS,
                 SPANDATA.GEN_AI_RESPONSE_TEXT,
             ],
             id="no-gen-ai-config-legacy-pii-disabled",

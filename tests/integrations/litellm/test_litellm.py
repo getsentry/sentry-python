@@ -212,7 +212,7 @@ def test_nonstreaming_chat_completion(
     assert span["name"] == "chat gpt-3.5-turbo"
     assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "gpt-3.5-turbo"
     assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "gpt-3.5-turbo"
-    assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "openai"
     assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
 
     if send_default_pii and include_prompts:
@@ -312,7 +312,7 @@ async def test_async_nonstreaming_chat_completion(
     assert span["name"] == "chat gpt-3.5-turbo"
     assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "gpt-3.5-turbo"
     assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "gpt-3.5-turbo"
-    assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "openai"
     assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
 
     if send_default_pii and include_prompts:
@@ -1094,7 +1094,7 @@ def test_multiple_providers(
     spans = [item.payload for item in items]
     for span in spans:
         # The provider should be detected by litellm.get_llm_provider
-        assert SPANDATA.GEN_AI_SYSTEM in span["attributes"]
+        assert SPANDATA.GEN_AI_PROVIDER_NAME in span["attributes"]
 
 
 @pytest.mark.asyncio(loop_scope="session")
@@ -1199,7 +1199,7 @@ async def test_async_multiple_providers(
     spans = [item.payload for item in items]
     for span in spans:
         # The provider should be detected by litellm.get_llm_provider
-        assert SPANDATA.GEN_AI_SYSTEM in span["attributes"]
+        assert SPANDATA.GEN_AI_PROVIDER_NAME in span["attributes"]
 
 
 def test_additional_parameters(
