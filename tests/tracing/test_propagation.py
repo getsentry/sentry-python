@@ -9,7 +9,7 @@ def test_standalone_span_iter_headers(sentry_init):
     with sentry_sdk.traces.start_span(name="test") as span:
         with pytest.raises(StopIteration):
             # We should not have any propagation headers
-            next(span.iter_headers())
+            next(span._iter_headers())
 
 
 def test_span_in_span_iter_headers(sentry_init):
@@ -19,7 +19,7 @@ def test_span_in_span_iter_headers(sentry_init):
         with sentry_sdk.traces.start_span(name="test2") as span_inner:
             with pytest.raises(StopIteration):
                 # We should not have any propagation headers
-                next(span_inner.iter_headers())
+                next(span_inner._iter_headers())
 
 
 def test_span_in_segment(sentry_init):
