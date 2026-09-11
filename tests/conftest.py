@@ -7,11 +7,9 @@ import socket
 import threading
 import warnings
 from collections import namedtuple
-from contextlib import contextmanager
 from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from threading import Thread
-from unittest import mock
 from urllib.parse import parse_qs, urlparse
 
 try:
@@ -85,7 +83,7 @@ from tests import _warning_recorder, _warning_recorder_mgr
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
-    from typing import Any, Callable, MutableMapping, Optional
+    from typing import Any, Callable, MutableMapping
 
 try:
     from httpx import (
@@ -501,7 +499,7 @@ def capture_events_forksafe(monkeypatch, capture_events, request):
         old_capture_envelope = test_client.transport.capture_envelope
 
         def append(envelope):
-            event = envelope.get_event() or envelope.get_transaction_event()
+            event = envelope.get_event()
             if event is not None:
                 events_w.write(json.dumps(event).encode("utf-8"))
                 events_w.write(b"\n")
@@ -1736,24 +1734,6 @@ def werkzeug_set_cookie(client, servername, key, value):
         client.set_cookie(servername, key, value)
     except TypeError:
         client.set_cookie(key, value)
-
-
-@contextmanager
-def patch_start_tracing_child(
-    fake_transaction_is_none: bool = False,
-) -> "Iterator[Optional[mock.MagicMock]]":
-    if not fake_transaction_is_none:
-        fake_transaction = mock.MagicMock()
-        fake_start_child = mock.MagicMock()
-        fake_transaction.start_child = fake_start_child
-    else:
-        fake_transaction = None
-        fake_start_child = None
-
-    with mock.patch(
-        "sentry_sdk.tracing_utils.get_current_span", return_value=fake_transaction
-    ):
-        yield fake_start_child
 
 
 class ApproxDict(dict):
