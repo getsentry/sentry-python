@@ -383,7 +383,6 @@ if TYPE_CHECKING:
     EventProcessor = Callable[[Event, Hint], Optional[Event]]
     ErrorProcessor = Callable[[Event, ExcInfo], Optional[Event]]
     BreadcrumbProcessor = Callable[[Breadcrumb, BreadcrumbHint], Optional[Breadcrumb]]
-    TransactionProcessor = Callable[[Event, Hint], Optional[Event]]
     LogProcessor = Callable[[Log, Hint], Optional[Log]]
 
     TracesSampler = Callable[[SamplingContext], Union[float, int, bool]]

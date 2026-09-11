@@ -55,7 +55,6 @@ if TYPE_CHECKING:
         Metric,
         SpanJSON,
         TracesSampler,
-        TransactionProcessor,
     )
 
     # Experiments are feature flags to enable and disable certain unstable SDK
@@ -1310,7 +1309,6 @@ class ClientConstructor:
         send_client_reports: bool = True,
         _experiments: "Experiments" = {},  # noqa: B006
         proxy_headers: "Optional[Dict[str, str]]" = None,
-        before_send_transaction: "Optional[TransactionProcessor]" = None,
         project_root: "Optional[str]" = None,
         include_local_variables: "Optional[bool]" = True,
         include_source_context: "Optional[bool]" = True,
@@ -1547,11 +1545,6 @@ class ClientConstructor:
 
             By the time `before_send` is executed, all scope data has already been applied to the event. Further
             modification of the scope won't have any effect.
-
-        :param before_send_transaction: This function is called with an SDK-specific transaction event object, and can
-            return a modified transaction event object, or `null` to skip reporting the event.
-
-            One way this might be used is for manual PII stripping before sending.
 
         :param before_breadcrumb: This function is called with an SDK-specific breadcrumb object before the breadcrumb
             is added to the scope.

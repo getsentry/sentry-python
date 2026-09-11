@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from enum import Enum
 from functools import wraps
 from itertools import chain
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk._types import AnnotatedValue
@@ -20,11 +20,6 @@ from sentry_sdk.consts import (
     SPANDATA,
 )
 from sentry_sdk.feature_flags import DEFAULT_FLAG_CAPACITY, FlagBuffer
-from sentry_sdk.profiler.continuous_profiler import (
-    get_profiler_id,
-    try_autostart_continuous_profiler,
-    try_profile_lifecycle_trace_start,
-)
 from sentry_sdk.session import Session
 from sentry_sdk.traces import (
     _DEFAULT_PARENT_SPAN,
@@ -34,15 +29,11 @@ from sentry_sdk.traces import (
 from sentry_sdk.tracing import (
     BAGGAGE_HEADER_NAME,
     SENTRY_TRACE_HEADER_NAME,
-    NoOpSpan,
-    Span,
-    Transaction,
 )
 from sentry_sdk.tracing_utils import (
     Baggage,
     PropagationContext,
     _make_sampling_decision,
-    has_span_streaming_enabled,
     has_tracing_enabled,
     is_ignored_span,
 )
@@ -75,8 +66,6 @@ if TYPE_CHECKING:
         Union,
     )
 
-    from typing_extensions import Unpack
-
     import sentry_sdk
     from sentry_sdk._types import (
         Attributes,
@@ -91,10 +80,8 @@ if TYPE_CHECKING:
         Log,
         LogLevelStr,
         Metric,
-        SamplingContext,
         Type,
     )
-    from sentry_sdk.tracing import TransactionKwargs
 
     P = ParamSpec("P")
     R = TypeVar("R")
@@ -585,12 +572,9 @@ class Scope:
         if not has_tracing_enabled(client.options):
             return self.get_active_propagation_context().to_traceparent()
 
-        span_streaming = has_span_streaming_enabled(client.options)
         # If we have an active span, return traceparent from there
-        if span_streaming and self.streamed_span is not None:
+        if self.streamed_span is not None:
             return self.streamed_span._to_traceparent()
-        elif not span_streaming and self.span is not None:
-            return self.span._to_traceparent()
 
         # else return traceparent from the propagation context
         return self.get_active_propagation_context().to_traceparent()
@@ -605,12 +589,9 @@ class Scope:
         if not has_tracing_enabled(client.options):
             return self.get_active_propagation_context().get_baggage()
 
-        span_streaming = has_span_streaming_enabled(client.options)
         # If we have an active span, return baggage from there
-        if span_streaming and self.streamed_span is not None:
+        if self.streamed_span is not None:
             return self.streamed_span._to_baggage()
-        elif not span_streaming and self.span is not None:
-            return self.span._to_baggage()
 
         # else return baggage from the propagation context
         return self.get_active_propagation_context().get_baggage()
@@ -619,11 +600,7 @@ class Scope:
         """
         Returns the Sentry "trace" context from the Propagation Context.
         """
-        if (
-            has_tracing_enabled(self.get_client().options)
-            and self._span is not None
-            and not isinstance(self._span, NoOpSpan)
-        ):
+        if has_tracing_enabled(self.get_client().options) and self._span is not None:
             return self._span._get_trace_context()
 
         # if we are tracing externally (otel), those values take precedence
@@ -664,16 +641,9 @@ class Scope:
         """
         client = self.get_client()
 
-        span = kwargs.pop("span", None)
-        if not span:
-            span_streaming = has_span_streaming_enabled(client.options)
-            span = self.streamed_span if span_streaming else self.span
+        span = kwargs.pop("span", None) or self.streamed_span
 
-        if (
-            has_tracing_enabled(client.options)
-            and span is not None
-            and not isinstance(span, NoOpSpan)
-        ):
+        if has_tracing_enabled(client.options) and span is not None:
             for header in span._iter_headers():
                 yield header
         elif has_external_propagation_context():
@@ -722,7 +692,7 @@ class Scope:
         self.clear_breadcrumbs()
         self._should_capture: bool = True
 
-        self._span: "Optional[Union[Span, StreamedSpan]]" = None
+        self._span: "Optional[StreamedSpan]" = None
         self._session: "Optional[Session]" = None
         self._force_auto_session_tracking: "Optional[bool]" = None
 
@@ -829,23 +799,6 @@ class Scope:
         session = self.get_isolation_scope()._session
         if session is not None:
             session.update(user=value)
-
-    @property
-    def span(self) -> "Optional[Span]":
-        """Get/set current tracing span or transaction."""
-        return self._span if isinstance(self._span, Span) else None
-
-    @span.setter
-    def span(self, span: "Optional[Span]") -> None:
-        self._span = span
-        # XXX: this differs from the implementation in JS, there Scope.setSpan
-        # does not set Scope._transactionName.
-        if isinstance(span, Transaction):
-            transaction = span
-            if transaction.name:
-                self._transaction = transaction.name
-                if transaction.source:
-                    self._transaction_info["source"] = transaction.source
 
     @property
     def streamed_span(self) -> "Optional[StreamedSpan]":
@@ -1041,160 +994,13 @@ class Scope:
             self._breadcrumbs.popleft()
             self._n_breadcrumbs_truncated += 1
 
-    def start_transaction(
-        self,
-        transaction: "Optional[Transaction]" = None,
-        custom_sampling_context: "Optional[SamplingContext]" = None,
-        **kwargs: "Unpack[TransactionKwargs]",
-    ) -> "Union[Transaction, NoOpSpan]":
-        """
-        Start and return a transaction.
-
-        Start an existing transaction if given, otherwise create and start a new
-        transaction with kwargs.
-
-        This is the entry point to manual tracing instrumentation.
-
-        A tree structure can be built by adding child spans to the transaction,
-        and child spans to other spans. To start a new child span within the
-        transaction or any span, call the respective `.start_child()` method.
-
-        Every child span must be finished before the transaction is finished,
-        otherwise the unfinished spans are discarded.
-
-        When used as context managers, spans and transactions are automatically
-        finished at the end of the `with` block. If not using context managers,
-        call the `.finish()` method.
-
-        When the transaction is finished, it will be sent to Sentry with all its
-        finished child spans.
-
-        :param transaction: The transaction to start. If omitted, we create and
-            start a new transaction.
-        :param custom_sampling_context: The transaction's custom sampling context.
-        :param kwargs: Optional keyword arguments to be passed to the Transaction
-            constructor. See :py:class:`sentry_sdk.tracing.Transaction` for
-            available arguments.
-        """
-        client = self.get_client()
-        if has_span_streaming_enabled(client.options):
-            deprecation_warning(
-                "Scope.start_transaction is not available in streaming mode.",
-            )
-            return NoOpSpan()
-
-        kwargs.setdefault("scope", self)
-
-        try_autostart_continuous_profiler()
-
-        custom_sampling_context = custom_sampling_context or {}
-
-        # kwargs at this point has type TransactionKwargs, since we have removed
-        # the client and custom_sampling_context from it.
-        transaction_kwargs: "TransactionKwargs" = kwargs
-
-        # if we haven't been given a transaction, make one
-        if transaction is None:
-            transaction = Transaction(**transaction_kwargs)
-
-        # use traces_sample_rate, traces_sampler, and/or inheritance to make a
-        # sampling decision
-        sampling_context = {
-            "transaction_context": transaction.to_json(),
-            "parent_sampled": transaction.parent_sampled,
-        }
-        sampling_context.update(custom_sampling_context)
-        transaction._set_initial_sampling_decision(sampling_context=sampling_context)
-
-        # update the sample rate in the dsc
-        if transaction.sample_rate is not None:
-            propagation_context = self.get_active_propagation_context()
-            baggage = propagation_context.baggage
-
-            if baggage is not None:
-                baggage.sentry_items["sample_rate"] = str(transaction.sample_rate)
-
-            if transaction._baggage:
-                transaction._baggage.sentry_items["sample_rate"] = str(
-                    transaction.sample_rate
-                )
-
-        if transaction.sampled:
-            transaction._continuous_profile = try_profile_lifecycle_trace_start()
-
-            # Typically, the profiler is set when the transaction is created. But when
-            # using the auto lifecycle, the profiler isn't running when the first
-            # transaction is started. So make sure we update the profiler id on it.
-            if transaction._continuous_profile is not None:
-                transaction.set_profiler_id(get_profiler_id())
-
-            # we don't bother to keep spans if we already know we're not going to
-            # send the transaction
-            max_spans = (client.options["_experiments"].get("max_spans")) or 1000
-            transaction.init_span_recorder(maxlen=max_spans)
-
-        return transaction
-
-    def start_span(self, **kwargs: "Any") -> "Span":
-        """
-        Start a span whose parent is the currently active span or transaction, if any.
-
-        The return value is a :py:class:`sentry_sdk.tracing.Span` instance,
-        typically used as a context manager to start and stop timing in a `with`
-        block.
-
-        Only spans contained in a transaction are sent to Sentry. Most
-        integrations start a transaction at the appropriate time, for example
-        for every incoming HTTP request. Use
-        :py:meth:`sentry_sdk.start_transaction` to start a new transaction when
-        one is not already in progress.
-
-        For supported `**kwargs` see :py:class:`sentry_sdk.tracing.Span`.
-        """
-        client = sentry_sdk.get_client()
-        if has_span_streaming_enabled(client.options):
-            deprecation_warning(
-                "Scope.start_span is not available in streaming mode.",
-            )
-            return NoOpSpan()
-
-        if kwargs.get("description") is not None:
-            deprecation_warning(
-                "The `description` parameter is deprecated. Please use `name` instead.",
-            )
-
-        with new_scope():
-            kwargs.setdefault("scope", self)
-
-            client = self.get_client()
-
-            # get current span or transaction
-            span = self.span or self.get_isolation_scope().span
-            if isinstance(span, StreamedSpan):
-                # make mypy happy
-                return NoOpSpan()
-
-            if span is None:
-                # New spans get the `trace_id` from the scope
-                if "trace_id" not in kwargs:
-                    propagation_context = self.get_active_propagation_context()
-                    kwargs["trace_id"] = propagation_context.trace_id
-
-                span = Span(**kwargs)
-            else:
-                # Children take `trace_id`` from the parent span.
-                span = span.start_child(**kwargs)
-
-            return span
-
-    def start_streamed_span(
+    def start_span(
         self,
         name: str,
         attributes: "Optional[Attributes]",
         parent_span: "Optional[StreamedSpan]",
         active: bool,
     ) -> "StreamedSpan":
-        # TODO: rename to start_span once we drop the old API
         if isinstance(parent_span, NoOpStreamedSpan):
             # parent_span is only set if the user explicitly set it
             logger.debug(
@@ -1308,39 +1114,6 @@ class Scope:
         if baggage is not None and baggage.sentry_items.get("sample_rate"):
             baggage.sentry_items["sample_rate"] = str(sample_rate)
 
-    def continue_trace(
-        self,
-        environ_or_headers: "Dict[str, Any]",
-        op: "Optional[str]" = None,
-        name: "Optional[str]" = None,
-        source: "Optional[str]" = None,
-        origin: str = "manual",
-    ) -> "Transaction":
-        """
-        Sets the propagation context from environment or headers and returns a transaction.
-        """
-        self.generate_propagation_context(environ_or_headers)
-
-        # generate_propagation_context ensures that the propagation_context is not None.
-        propagation_context = cast(PropagationContext, self._propagation_context)
-
-        optional_kwargs = {}
-        if name:
-            optional_kwargs["name"] = name
-        if source:
-            optional_kwargs["source"] = source
-
-        return Transaction(
-            op=op,
-            origin=origin,
-            baggage=propagation_context.baggage,
-            parent_sampled=propagation_context.parent_sampled,
-            trace_id=propagation_context.trace_id,
-            parent_span_id=propagation_context.parent_span_id,
-            same_process_as_parent=False,
-            **optional_kwargs,
-        )
-
     def capture_event(
         self,
         event: "Event",
@@ -1373,7 +1146,7 @@ class Scope:
 
         event_id = self.get_client().capture_event(event=event, hint=hint, scope=scope)
 
-        if event_id is not None and event.get("type") != "transaction":
+        if event_id is not None:
             self.get_isolation_scope()._last_event_id = event_id
 
         return event_id
@@ -1414,11 +1187,9 @@ class Scope:
         if span is None:
             return
 
-        client = self.get_client()
-        if not has_span_streaming_enabled(client.options):
-            return
-
         merged_scope = self._merge_scopes()
+
+        client = self.get_client()
         client._capture_span(span, scope=merged_scope)
 
     def capture_message(
@@ -1768,7 +1539,6 @@ class Scope:
     ) -> "Optional[Event]":
         """Applies the information contained on the scope to the given event."""
         ty = event.get("type")
-        is_transaction = ty == "transaction"
         is_check_in = ty == "check_in"
 
         # put all attachments into the hint. This lets callbacks play around
@@ -1776,8 +1546,7 @@ class Scope:
         # create the envelope.
         attachments_to_send = hint.get("attachments") or []
         for attachment in self._attachments:
-            if not is_transaction or attachment.add_to_transactions:
-                attachments_to_send.append(attachment)
+            attachments_to_send.append(attachment)
         hint["attachments"] = attachments_to_send
 
         self._apply_contexts_to_event(event, hint, options)
@@ -1796,8 +1565,6 @@ class Scope:
             self._apply_transaction_info_to_event(event, hint, options)
             self._apply_tags_to_event(event, hint, options)
             self._apply_extra_to_event(event, hint, options)
-
-        if not is_transaction and not is_check_in:
             self._apply_breadcrumbs_to_event(event, hint, options)
             self._apply_flags_to_event(event, hint, options)
 
@@ -1826,7 +1593,7 @@ class Scope:
             # isn't one
             if telemetry.get("span_id") is None:
                 if self._span is not None and not isinstance(
-                    self._span, (NoOpStreamedSpan, NoOpSpan)
+                    self._span, NoOpStreamedSpan
                 ):
                     telemetry["span_id"] = self._span.span_id
                 else:
