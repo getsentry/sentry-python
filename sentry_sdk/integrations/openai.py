@@ -798,7 +798,7 @@ def _new_sync_chat_completion(
         attributes={
             "sentry.op": consts.OP.GEN_AI_CHAT,
             "sentry.origin": OpenAIIntegration.origin,
-            SPANDATA.GEN_AI_SYSTEM: "openai",
+            SPANDATA.GEN_AI_PROVIDER_NAME: "openai",
             SPANDATA.GEN_AI_RESPONSE_STREAMING: is_streaming_response,
         },
     )
@@ -873,7 +873,7 @@ async def _new_async_chat_completion(
         attributes={
             "sentry.op": consts.OP.GEN_AI_CHAT,
             "sentry.origin": OpenAIIntegration.origin,
-            SPANDATA.GEN_AI_SYSTEM: "openai",
+            SPANDATA.GEN_AI_PROVIDER_NAME: "openai",
             SPANDATA.GEN_AI_RESPONSE_STREAMING: is_streaming_response,
         },
     )
@@ -1299,7 +1299,7 @@ def _new_sync_embeddings_create(f: "Any", *args: "Any", **kwargs: "Any") -> "Any
         attributes={
             "sentry.op": consts.OP.GEN_AI_EMBEDDINGS,
             "sentry.origin": OpenAIIntegration.origin,
-            SPANDATA.GEN_AI_SYSTEM: "openai",
+            SPANDATA.GEN_AI_PROVIDER_NAME: "openai",
         },
     ) as span:
         _set_embeddings_input_data(span, kwargs, integration)
@@ -1336,7 +1336,7 @@ async def _new_async_embeddings_create(
         attributes={
             "sentry.op": consts.OP.GEN_AI_EMBEDDINGS,
             "sentry.origin": OpenAIIntegration.origin,
-            SPANDATA.GEN_AI_SYSTEM: "openai",
+            SPANDATA.GEN_AI_PROVIDER_NAME: "openai",
         },
     ) as span:
         _set_embeddings_input_data(span, kwargs, integration)
@@ -1400,7 +1400,7 @@ def _new_sync_responses_create(
         attributes={
             "sentry.op": consts.OP.GEN_AI_RESPONSES,
             "sentry.origin": OpenAIIntegration.origin,
-            SPANDATA.GEN_AI_SYSTEM: "openai",
+            SPANDATA.GEN_AI_PROVIDER_NAME: "openai",
             SPANDATA.GEN_AI_RESPONSE_STREAMING: is_streaming_response,
         },
     )
@@ -1465,7 +1465,7 @@ async def _new_async_responses_create(
         attributes={
             "sentry.op": consts.OP.GEN_AI_RESPONSES,
             "sentry.origin": OpenAIIntegration.origin,
-            SPANDATA.GEN_AI_SYSTEM: "openai",
+            SPANDATA.GEN_AI_PROVIDER_NAME: "openai",
             SPANDATA.GEN_AI_RESPONSE_STREAMING: is_streaming_response,
         },
     )
