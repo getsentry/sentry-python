@@ -4,7 +4,6 @@ import os
 import subprocess
 import sys
 import time
-from collections import Counter, defaultdict
 from collections.abc import Mapping
 from textwrap import dedent
 from unittest import mock
@@ -1275,104 +1274,6 @@ def test_uwsgi_warnings(sentry_init, opt, missing_flags):
                     assert flag in message
             else:
                 mock_logger.warning.assert_not_called()
-
-
-class TestSpanClientReports:
-    """
-    Tests for client reports related to spans.
-    """
-
-    __test__ = False
-
-    @staticmethod
-    def span_dropper(spans_to_drop):
-        """
-        Returns a function that can be used to drop spans from an event.
-        """
-
-        def drop_spans(event, _):
-            event["spans"] = event["spans"][spans_to_drop:]
-            return event
-
-        return drop_spans
-
-    @staticmethod
-    def mock_transaction_event(span_count):
-        """
-        Returns a mock transaction event with the given number of spans.
-        """
-
-        return defaultdict(
-            mock.MagicMock,
-            type="transaction",
-            spans=[mock.MagicMock() for _ in range(span_count)],
-        )
-
-    def __init__(self, span_count):
-        """Configures a test case with the number of spans dropped and whether the transaction was dropped."""
-        self.span_count = span_count
-        self.expected_record_lost_event_calls = Counter()
-        self.before_send = lambda event, _: event
-        self.event_processor = lambda event, _: event
-
-    def _update_resulting_calls(self, reason, drops_transactions=0, drops_spans=0):
-        """
-        Updates the expected calls with the given resulting calls.
-        """
-        if drops_transactions > 0:
-            self.expected_record_lost_event_calls[
-                (reason, "transaction", None, drops_transactions)
-            ] += 1
-
-        if drops_spans > 0:
-            self.expected_record_lost_event_calls[
-                (reason, "span", None, drops_spans)
-            ] += 1
-
-    def with_before_send(
-        self,
-        before_send,
-        *,
-        drops_transactions=0,
-        drops_spans=0,
-    ):
-        self.before_send = before_send
-        self._update_resulting_calls(
-            "before_send",
-            drops_transactions,
-            drops_spans,
-        )
-
-        return self
-
-    def with_event_processor(
-        self,
-        event_processor,
-        *,
-        drops_transactions=0,
-        drops_spans=0,
-    ):
-        self.event_processor = event_processor
-        self._update_resulting_calls(
-            "event_processor",
-            drops_transactions,
-            drops_spans,
-        )
-
-        return self
-
-    def run(self, sentry_init, capture_record_lost_event_calls):
-        """Runs the test case with the configured parameters."""
-        sentry_init(before_send_transaction=self.before_send)
-        record_lost_event_calls = capture_record_lost_event_calls()
-
-        with sentry_sdk.isolation_scope() as scope:
-            scope.add_event_processor(self.event_processor)
-            event = self.mock_transaction_event(self.span_count)
-            sentry_sdk.get_client().capture_event(event, scope=scope)
-
-        # We use counters to ensure that the calls are made the expected number of times, disregarding order.
-        assert Counter(record_lost_event_calls) == self.expected_record_lost_event_calls
 
 
 def make_options_transport_cls():
