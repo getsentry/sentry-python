@@ -120,7 +120,7 @@ def _get_response_attributes(response: "Any") -> "Attributes":
         and not isinstance(retry_attempts, bool)
         and retry_attempts > 0
     ):
-        attributes["http.request.resend_count"] = retry_attempts
+        attributes[SPANDATA.HTTP_REQUEST_RESEND_COUNT] = retry_attempts
 
     headers = metadata.get("HTTPHeaders")
     if not isinstance(headers, dict):
