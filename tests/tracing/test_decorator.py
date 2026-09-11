@@ -1,12 +1,8 @@
 import inspect
-from unittest import mock
 
 import pytest
 
 import sentry_sdk
-from sentry_sdk.tracing_utils import create_span_decorator
-from sentry_sdk.utils import logger
-from tests.conftest import patch_start_tracing_child
 
 
 def my_example_function():
@@ -17,74 +13,7 @@ async def my_async_example_function():
     return "return_of_async_function"
 
 
-@pytest.mark.forked
-def test_trace_decorator():
-    with patch_start_tracing_child() as fake_start_child:
-        result = my_example_function()
-        fake_start_child.assert_not_called()
-        assert result == "return_of_sync_function"
-
-        start_child_span_decorator = create_span_decorator()
-        result2 = start_child_span_decorator(my_example_function)()
-        fake_start_child.assert_called_once_with(
-            op="function", name="test_decorator.my_example_function"
-        )
-        assert result2 == "return_of_sync_function"
-
-
-def test_trace_decorator_no_trx():
-    with patch_start_tracing_child(fake_transaction_is_none=True):
-        with mock.patch.object(logger, "debug", mock.Mock()) as fake_debug:
-            result = my_example_function()
-            fake_debug.assert_not_called()
-            assert result == "return_of_sync_function"
-
-            start_child_span_decorator = create_span_decorator()
-            result2 = start_child_span_decorator(my_example_function)()
-            fake_debug.assert_called_once_with(
-                "Cannot create a child span for %s. "
-                "Please start a Sentry transaction before calling this function.",
-                "test_decorator.my_example_function",
-            )
-            assert result2 == "return_of_sync_function"
-
-
-@pytest.mark.forked
-@pytest.mark.asyncio
-async def test_trace_decorator_async():
-    with patch_start_tracing_child() as fake_start_child:
-        result = await my_async_example_function()
-        fake_start_child.assert_not_called()
-        assert result == "return_of_async_function"
-
-        start_child_span_decorator = create_span_decorator()
-        result2 = await start_child_span_decorator(my_async_example_function)()
-        fake_start_child.assert_called_once_with(
-            op="function",
-            name="test_decorator.my_async_example_function",
-        )
-        assert result2 == "return_of_async_function"
-
-
-@pytest.mark.asyncio
-async def test_trace_decorator_async_no_trx():
-    with patch_start_tracing_child(fake_transaction_is_none=True):
-        with mock.patch.object(logger, "debug", mock.Mock()) as fake_debug:
-            result = await my_async_example_function()
-            fake_debug.assert_not_called()
-            assert result == "return_of_async_function"
-
-            start_child_span_decorator = create_span_decorator()
-            result2 = await start_child_span_decorator(my_async_example_function)()
-            fake_debug.assert_any_call(
-                "Cannot create a child span for %s. "
-                "Please start a Sentry transaction before calling this function.",
-                "test_decorator.my_async_example_function",
-            )
-            assert result2 == "return_of_async_function"
-
-
-def test_trace_decorator_span_streaming(sentry_init, capture_items):
+def test_trace_decorator(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
         trace_lifecycle="stream",
@@ -106,14 +35,13 @@ def test_trace_decorator_span_streaming(sentry_init, capture_items):
     (span,) = spans
 
     assert (
-        span["name"]
-        == "test_decorator.test_trace_decorator_span_streaming.<locals>.traced_function"
+        span["name"] == "test_decorator.test_trace_decorator.<locals>.traced_function"
     )
     assert span["attributes"]["sentry.op"] == "function"
     assert span["status"] == "ok"
 
 
-def test_trace_decorator_arguments_span_streaming(sentry_init, capture_items):
+def test_trace_decorator_arguments(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
         trace_lifecycle="stream",
@@ -140,7 +68,7 @@ def test_trace_decorator_arguments_span_streaming(sentry_init, capture_items):
     assert span["status"] == "ok"
 
 
-def test_trace_decorator_inactive_span_streaming(sentry_init, capture_items):
+def test_trace_decorator_inactive(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
         trace_lifecycle="stream",
@@ -169,7 +97,7 @@ def test_trace_decorator_inactive_span_streaming(sentry_init, capture_items):
 
 
 @pytest.mark.asyncio
-async def test_trace_decorator_async_span_streaming(sentry_init, capture_items):
+async def test_trace_decorator_async(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
         trace_lifecycle="stream",
@@ -192,16 +120,14 @@ async def test_trace_decorator_async_span_streaming(sentry_init, capture_items):
 
     assert (
         span["name"]
-        == "test_decorator.test_trace_decorator_async_span_streaming.<locals>.traced_function"
+        == "test_decorator.test_trace_decorator_async.<locals>.traced_function"
     )
     assert span["attributes"]["sentry.op"] == "function"
     assert span["status"] == "ok"
 
 
 @pytest.mark.asyncio
-async def test_trace_decorator_async_arguments_span_streaming(
-    sentry_init, capture_items
-):
+async def test_trace_decorator_async_arguments(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
         trace_lifecycle="stream",
@@ -229,9 +155,7 @@ async def test_trace_decorator_async_arguments_span_streaming(
 
 
 @pytest.mark.asyncio
-async def test_trace_decorator_async_inactive_span_streaming(
-    sentry_init, capture_items
-):
+async def test_trace_decorator_async_inactive(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
         trace_lifecycle="stream",
@@ -259,7 +183,7 @@ async def test_trace_decorator_async_inactive_span_streaming(
     assert span2["name"] == "outer"
 
 
-def test_trace_decorator_child_span_streaming(sentry_init, capture_items):
+def test_trace_decorator_child(sentry_init, capture_items):
     """Spans created with @trace show up as children if a span is active."""
     sentry_init(
         traces_sample_rate=1.0,
@@ -284,7 +208,7 @@ def test_trace_decorator_child_span_streaming(sentry_init, capture_items):
 
     assert (
         child_span["name"]
-        == "test_decorator.test_trace_decorator_child_span_streaming.<locals>._some_function_traced_stream"
+        == "test_decorator.test_trace_decorator_child.<locals>._some_function_traced_stream"
     )
     assert child_span["parent_span_id"] == segment.span_id
     assert segment_span["name"] == "segment"
@@ -292,7 +216,7 @@ def test_trace_decorator_child_span_streaming(sentry_init, capture_items):
 
 
 @pytest.mark.asyncio
-async def test_trace_decorator_async_child_span_streaming(sentry_init, capture_items):
+async def test_trace_decorator_async_child(sentry_init, capture_items):
     """Spans created with @trace show up as children if a span is active."""
     sentry_init(
         traces_sample_rate=1.0,
@@ -317,7 +241,7 @@ async def test_trace_decorator_async_child_span_streaming(sentry_init, capture_i
 
     assert (
         child_span["name"]
-        == "test_decorator.test_trace_decorator_async_child_span_streaming.<locals>._some_function_traced_stream"
+        == "test_decorator.test_trace_decorator_async_child.<locals>._some_function_traced_stream"
     )
     assert child_span["parent_span_id"] == segment.span_id
     assert segment_span["name"] == "segment"
