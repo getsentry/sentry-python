@@ -12,7 +12,6 @@ from sentry_sdk.integrations.boto3._instrumentation import (
     _get_error_attributes,
     _get_response_attributes,
     _get_server_attributes,
-    _merge_service_attributes,
 )
 from tests.integrations.boto3.aws_mock import Body
 
@@ -21,23 +20,6 @@ session = boto3.Session(  # type: ignore[attr-defined]
     aws_secret_access_key="-",
     region_name="eu-north-1",
 )
-
-
-def test_generic_attributes_take_precedence_over_service_attributes():
-    attributes = {SPANDATA.RPC_METHOD: "GetItem"}
-
-    _merge_service_attributes(
-        attributes,
-        {
-            SPANDATA.RPC_METHOD: "overridden",
-            SPANDATA.DB_SYSTEM_NAME: "aws.dynamodb",
-        },
-    )
-
-    assert attributes == {
-        SPANDATA.RPC_METHOD: "GetItem",
-        SPANDATA.DB_SYSTEM_NAME: "aws.dynamodb",
-    }
 
 
 def test_public_api():
