@@ -384,7 +384,7 @@ class SentryLangchainCallback(BaseCallbackHandler):
 
             ai_system = _get_ai_system(all_params)
             if ai_system:
-                span.set_attribute(SPANDATA.GEN_AI_PROVIDER_NAME, ai_system)
+                span.set_attribute(SPANDATA.GEN_AI_SYSTEM, ai_system)
 
             client = sentry_sdk.get_client()
 
@@ -466,7 +466,7 @@ class SentryLangchainCallback(BaseCallbackHandler):
 
             ai_system = _get_ai_system(all_params)
             if ai_system:
-                span.set_attribute(SPANDATA.GEN_AI_PROVIDER_NAME, ai_system)
+                span.set_attribute(SPANDATA.GEN_AI_SYSTEM, ai_system)
 
             agent_metadata = kwargs.get("metadata")
             if isinstance(agent_metadata, dict) and "lc_agent_name" in agent_metadata:
@@ -512,7 +512,7 @@ class SentryLangchainCallback(BaseCallbackHandler):
                 system_instructions = _get_system_instructions(messages)
                 if len(system_instructions) > 0:
                     span.set_attribute(
-                        SPANDATA.GEN_AI_PROVIDER_NAME_INSTRUCTIONS,
+                        SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
                         json.dumps(_transform_system_instructions(system_instructions)),
                     )
 

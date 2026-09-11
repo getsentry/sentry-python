@@ -115,7 +115,7 @@ def _set_model_data(
     if model_obj:
         # Set system from model
         if hasattr(model_obj, "system"):
-            span.set_attribute(SPANDATA.GEN_AI_PROVIDER_NAME, model_obj.system)
+            span.set_attribute(SPANDATA.GEN_AI_SYSTEM, model_obj.system)
 
         # Set model name
         model_name = _get_model_name(model_obj)

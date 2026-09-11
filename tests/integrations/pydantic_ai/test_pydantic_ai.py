@@ -692,7 +692,7 @@ async def test_system_prompt_attribute(
 
     if send_default_pii and include_prompts:
         system_instructions = chat_span["attributes"][
-            SPANDATA.GEN_AI_PROVIDER_NAME_INSTRUCTIONS
+            SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS
         ]
         assert json.loads(system_instructions) == [
             {
@@ -701,7 +701,7 @@ async def test_system_prompt_attribute(
             }
         ]
     else:
-        assert SPANDATA.GEN_AI_PROVIDER_NAME_INSTRUCTIONS not in chat_span["attributes"]
+        assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in chat_span["attributes"]
 
 
 @pytest.mark.asyncio
@@ -932,8 +932,8 @@ async def test_gen_ai_system(
 
     chat_span = chat_spans[0]
     # gen_ai.system should be set from the model (TestModel -> 'test')
-    assert SPANDATA.GEN_AI_PROVIDER_NAME in chat_span["attributes"]
-    assert chat_span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "test"
+    assert "gen_ai.system" in chat_span["attributes"]
+    assert chat_span["attributes"]["gen_ai.system"] == "test"
 
 
 @pytest.mark.asyncio
@@ -1328,7 +1328,7 @@ async def test_invoke_agent_with_instructions(
 
     if send_default_pii and include_prompts:
         system_instructions = chat_span["attributes"][
-            SPANDATA.GEN_AI_PROVIDER_NAME_INSTRUCTIONS
+            SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS
         ]
         assert json.loads(system_instructions) == [
             {"type": "text", "content": "System prompt"},
@@ -1338,7 +1338,7 @@ async def test_invoke_agent_with_instructions(
             },
         ]
     else:
-        assert SPANDATA.GEN_AI_PROVIDER_NAME_INSTRUCTIONS not in chat_span["attributes"]
+        assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in chat_span["attributes"]
 
 
 @pytest.mark.asyncio
@@ -3008,11 +3008,11 @@ async def test_data_collection_gen_ai_inputs_gates_request_messages_tool_inputs_
             assert SPANDATA.GEN_AI_REQUEST_MESSAGES in chat_span
             assert (
                 "helpful test assistant"
-                in chat_span[SPANDATA.GEN_AI_PROVIDER_NAME_INSTRUCTIONS]
+                in chat_span[SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
             )
         else:
             assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in chat_span
-            assert SPANDATA.GEN_AI_PROVIDER_NAME_INSTRUCTIONS not in chat_span
+            assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in chat_span
 
         # Non-PII data is unaffected by the gate
         assert SPANDATA.GEN_AI_REQUEST_MODEL in chat_span
