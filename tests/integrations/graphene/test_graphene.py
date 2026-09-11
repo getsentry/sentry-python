@@ -329,107 +329,6 @@ def test_no_event_if_no_errors_sync(sentry_init, capture_events):
     [True, False],
 )
 def test_graphql_span_holds_query_information(
-    sentry_init, capture_events, send_default_pii
-):
-    sentry_init(
-        integrations=[GrapheneIntegration(), FlaskIntegration()],
-        traces_sample_rate=1.0,
-        default_integrations=False,
-        send_default_pii=send_default_pii,
-    )
-    events = capture_events()
-
-    schema = Schema(query=Query)
-
-    sync_app = Flask(__name__)
-
-    @sync_app.route("/graphql", methods=["POST"])
-    def graphql_server_sync():
-        data = request.get_json()
-        result = schema.execute(data["query"], operation_name=data.get("operationName"))
-        return jsonify(result.data), 200
-
-    query = {
-        "query": "query GreetingQuery { hello }",
-        "operationName": "GreetingQuery",
-    }
-    client = sync_app.test_client()
-    client.post("/graphql", json=query)
-
-    assert len(events) == 1
-
-    (event,) = events
-    assert len(event["spans"]) == 1
-
-    (span,) = event["spans"]
-    assert span["op"] == OP.GRAPHQL_QUERY
-    assert span["description"] == query["operationName"]
-    assert span["data"]["graphql.operation.name"] == query["operationName"]
-    assert span["data"]["graphql.operation.type"] == "query"
-
-    if send_default_pii is True:
-        assert span["data"]["graphql.document"] == query["query"]
-    else:
-        assert "graphql.document" not in span["data"]
-
-
-@pytest.mark.parametrize(
-    "data_collection,send_default_pii,expect_document",
-    DATA_COLLECTION_GRAPHQL_DOCUMENTS_PARAMS,
-)
-def test_graphql_span_data_collection(
-    sentry_init, capture_events, data_collection, send_default_pii, expect_document
-):
-    init_kwargs = {
-        "integrations": [GrapheneIntegration(), FlaskIntegration()],
-        "traces_sample_rate": 1.0,
-        "default_integrations": False,
-        "_experiments": {"data_collection": data_collection},
-    }
-    if send_default_pii is not None:
-        init_kwargs["send_default_pii"] = send_default_pii
-    sentry_init(**init_kwargs)
-    events = capture_events()
-
-    schema = Schema(query=Query)
-
-    sync_app = Flask(__name__)
-
-    @sync_app.route("/graphql", methods=["POST"])
-    def graphql_server_sync():
-        data = request.get_json()
-        result = schema.execute(data["query"], operation_name=data.get("operationName"))
-        return jsonify(result.data), 200
-
-    query = {
-        "query": "query GreetingQuery { hello }",
-        "operationName": "GreetingQuery",
-    }
-    client = sync_app.test_client()
-    client.post("/graphql", json=query)
-
-    assert len(events) == 1
-
-    (event,) = events
-    assert len(event["spans"]) == 1
-
-    (span,) = event["spans"]
-    assert span["op"] == OP.GRAPHQL_QUERY
-    assert span["description"] == query["operationName"]
-    assert span["data"]["graphql.operation.name"] == query["operationName"]
-    assert span["data"]["graphql.operation.type"] == "query"
-
-    if expect_document:
-        assert span["data"]["graphql.document"] == query["query"]
-    else:
-        assert "graphql.document" not in span["data"]
-
-
-@pytest.mark.parametrize(
-    "send_default_pii",
-    [True, False],
-)
-def test_graphql_streamed_span_holds_query_information(
     sentry_init, capture_items, send_default_pii
 ):
     sentry_init(
@@ -486,7 +385,7 @@ def test_graphql_streamed_span_holds_query_information(
     "data_collection,send_default_pii,expect_document",
     DATA_COLLECTION_GRAPHQL_DOCUMENTS_PARAMS,
 )
-def test_graphql_streamed_span_data_collection(
+def test_graphql_span_data_collection(
     sentry_init, capture_items, data_collection, send_default_pii, expect_document
 ):
     init_kwargs = {
@@ -542,50 +441,7 @@ def test_graphql_streamed_span_data_collection(
     assert graphql_span["parent_span_id"] == flask_segment["span_id"]
 
 
-def test_breadcrumbs_hold_query_information_on_error(sentry_init, capture_events):
-    sentry_init(
-        integrations=[
-            GrapheneIntegration(),
-        ],
-        default_integrations=False,
-    )
-    events = capture_events()
-
-    schema = Schema(query=Query)
-
-    sync_app = Flask(__name__)
-
-    @sync_app.route("/graphql", methods=["POST"])
-    def graphql_server_sync():
-        data = request.get_json()
-        result = schema.execute(data["query"], operation_name=data.get("operationName"))
-        return jsonify(result.data), 200
-
-    query = {
-        "query": "query ErrorQuery { goodbye }",
-        "operationName": "ErrorQuery",
-    }
-    client = sync_app.test_client()
-    client.post("/graphql", json=query)
-
-    assert len(events) == 1
-
-    (event,) = events
-    assert len(event["breadcrumbs"]) == 1
-
-    breadcrumbs = event["breadcrumbs"]["values"]
-    assert len(breadcrumbs) == 1
-
-    (breadcrumb,) = breadcrumbs
-    assert breadcrumb["category"] == "graphql.operation"
-    assert breadcrumb["data"]["operation_name"] == query["operationName"]
-    assert breadcrumb["data"]["operation_type"] == "query"
-    assert breadcrumb["type"] == "default"
-
-
-def test_breadcrumbs_hold_query_information_on_error_with_span_streaming(
-    sentry_init, capture_items
-):
+def test_breadcrumbs_hold_query_information_on_error(sentry_init, capture_items):
     sentry_init(
         integrations=[
             GrapheneIntegration(),

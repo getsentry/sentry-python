@@ -29,7 +29,6 @@ skip_under_gevent = pytest.mark.skipif(
 import sentry_sdk
 from sentry_sdk import (
     Client,
-    Hub,
     add_breadcrumb,
     capture_message,
     get_isolation_scope,
@@ -38,11 +37,10 @@ from sentry_sdk import (
 from sentry_sdk._compat import PY37, PY38
 from sentry_sdk.envelope import Envelope, Item, PayloadRef, parse_json
 from sentry_sdk.integrations.asyncio import AsyncioIntegration
-from sentry_sdk.integrations.logging import LoggingIntegration, ignore_logger
+from sentry_sdk.integrations.logging import LoggingIntegration, ignore_logger_for_events
 from sentry_sdk.transport import (
     KEEP_ALIVE_SOCKET_OPTIONS,
     AsyncHttpTransport,
-    HttpTransport,
     _parse_rate_limits,
 )
 
@@ -404,15 +402,15 @@ def test_transport_infinite_loop(capturing_server, request, make_client):
     client = make_client(
         debug=True,
         # Make sure we cannot create events from our own logging
-        integrations=[LoggingIntegration(event_level=logging.DEBUG)],
+        integrations=[LoggingIntegration(event_level=logging.DEBUG, level=None)],
     )
 
     # I am not sure why, but "werkzeug" logger makes an INFO log on sending
-    # the message "hi" and does creates an infinite look.
+    # the message "hi" and does creates an infinite loop.
     # Ignoring this for breaking the infinite loop and still we can test
     # that our own log messages (sent from `_IGNORED_LOGGERS`) are not leading
     # to an infinite loop
-    ignore_logger("werkzeug")
+    ignore_logger_for_events("werkzeug")
 
     sentry_sdk.get_global_scope().set_client(client)
     with isolation_scope():
@@ -855,24 +853,6 @@ def test_log_item_limits(capturing_server, response_code, item, make_client):
         "reason": "ratelimit_backoff",
         "quantity": expected_lost_bytes,
     } in report["discarded_events"]
-
-
-def test_hub_cls_backwards_compat():
-    class TestCustomHubClass(Hub):
-        pass
-
-    transport = HttpTransport(
-        defaultdict(lambda: None, {"dsn": "https://123abc@example.com/123"})
-    )
-
-    with pytest.deprecated_call():
-        assert transport.hub_cls is Hub
-
-    with pytest.deprecated_call():
-        transport.hub_cls = TestCustomHubClass
-
-    with pytest.deprecated_call():
-        assert transport.hub_cls is TestCustomHubClass
 
 
 @pytest.mark.parametrize("quantity", (1, 2, 10))

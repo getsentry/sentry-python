@@ -59,12 +59,6 @@ class Envelope:
     ) -> None:
         self.add_item(Item(payload=PayloadRef(json=transaction), type="transaction"))
 
-    def add_profile(
-        self,
-        profile: "Any",
-    ) -> None:
-        self.add_item(Item(payload=PayloadRef(json=profile), type="profile"))
-
     def add_profile_chunk(
         self,
         profile_chunk: "Any",
@@ -259,8 +253,6 @@ class Item:
             return "trace_metric"
         elif ty == "client_report":
             return "internal"
-        elif ty == "profile":
-            return "profile"
         elif ty == "profile_chunk":
             return "profile_chunk"
         elif ty == "check_in":

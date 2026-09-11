@@ -2,7 +2,6 @@ import json
 import unittest.mock
 
 import pytest
-import trytond
 from trytond.exceptions import LoginException
 from trytond.exceptions import TrytonException as TrytondBaseException
 from trytond.exceptions import UserError as TrytondUserError
@@ -10,6 +9,7 @@ from trytond.exceptions import UserWarning as TrytondUserWarning
 from trytond.wsgi import app as trytond_app
 from werkzeug.test import Client
 
+import sentry_sdk
 from sentry_sdk.integrations.trytond import TrytondWSGIIntegration
 from tests.conftest import unpack_werkzeug_response
 
@@ -75,9 +75,6 @@ def test_trytonderrors_not_captured(
     assert not exceptions
 
 
-@pytest.mark.skipif(
-    trytond.__version__.split(".") < ["5", "4"], reason="At least Trytond-5.4 required"
-)
 def test_rpc_error_page(sentry_init, app, get_client):
     """Test that, after initializing the Trytond-SentrySDK integration
     a custom error handler can be registered to the Trytond WSGI app so as to
@@ -125,12 +122,13 @@ def test_rpc_error_page(sentry_init, app, get_client):
     assert data == dict(id=42, error=["UserError", ["Sentry error.", "foo", None]])
 
 
-def test_span_origin(sentry_init, app, capture_events, get_client):
+def test_span_origin(sentry_init, app, capture_items, get_client):
     sentry_init(
         integrations=[TrytondWSGIIntegration()],
         traces_sample_rate=1.0,
+        trace_lifecycle="stream",
     )
-    events = capture_events()
+    items = capture_items("span")
 
     @app.route("/something")
     def _(request):
@@ -139,6 +137,9 @@ def test_span_origin(sentry_init, app, capture_events, get_client):
     client = get_client()
     client.get("/something")
 
-    (event,) = events
+    sentry_sdk.flush()
 
-    assert event["contexts"]["trace"]["origin"] == "auto.http.trytond_wsgi"
+    (item,) = items
+    span = item.payload
+
+    assert span["attributes"]["sentry.origin"] == "auto.http.trytond_wsgi"

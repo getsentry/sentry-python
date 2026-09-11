@@ -23,6 +23,7 @@ sentry_sdk.init(
     dsn=os.environ["SENTRY_DSN"],
     integrations=[AwsLambdaIntegration(timeout_warning=True)],
     traces_sample_rate=float(os.environ["SENTRY_TRACES_SAMPLE_RATE"]),
+    trace_lifecycle="stream",
 )
 
 
@@ -49,8 +50,8 @@ class AWSLambdaModuleLoader:
             module_name = module_path.split(os.path.sep)[-1]
             module_file_path = module_path + ".py"
 
-            # Supported python versions are 3.6, 3.7, 3.8
-            if py_version >= (3, 6):
+            # Supported python versions are 3.7, 3.8
+            if py_version >= (3, 7):
                 import importlib.util
 
                 spec = importlib.util.spec_from_file_location(

@@ -827,36 +827,6 @@ def test_with_use_scope_data():
     }
 
 
-def test_nested_scopes_with_tags(sentry_init, capture_envelopes):
-    sentry_init(traces_sample_rate=1.0)
-    envelopes = capture_envelopes()
-
-    with sentry_sdk.isolation_scope() as scope1:
-        scope1.set_tag("isolation_scope1", 1)
-
-        with sentry_sdk.new_scope() as scope2:
-            scope2.set_tag("current_scope2", 1)
-
-            with sentry_sdk.start_transaction(name="trx") as trx:
-                trx.set_tag("trx", 1)
-
-                with sentry_sdk.start_span(op="span1") as span1:
-                    span1.set_tag("a", 1)
-
-                    with new_scope() as scope3:
-                        scope3.set_tag("current_scope3", 1)
-
-                        with sentry_sdk.start_span(op="span2") as span2:
-                            span2.set_tag("b", 1)
-
-    (envelope,) = envelopes
-    transaction = envelope.items[0].get_transaction_event()
-
-    assert transaction["tags"] == {"isolation_scope1": 1, "current_scope2": 1, "trx": 1}
-    assert transaction["spans"][0]["tags"] == {"a": 1}
-    assert transaction["spans"][1]["tags"] == {"b": 1}
-
-
 def test_should_send_default_pii_true(sentry_init):
     sentry_init(send_default_pii=True)
 
@@ -914,7 +884,7 @@ def test_set_tags():
 
 
 def test_last_event_id(sentry_init):
-    sentry_init(traces_sample_rate=1.0)
+    sentry_init(traces_sample_rate=1.0, trace_lifecycle="stream")
 
     assert Scope.last_event_id() is None
 
@@ -923,19 +893,8 @@ def test_last_event_id(sentry_init):
     assert Scope.last_event_id() is not None
 
 
-def test_last_event_id_transaction(sentry_init):
-    sentry_init(traces_sample_rate=1.0)
-
-    assert Scope.last_event_id() is None
-
-    with sentry_sdk.start_transaction(name="test"):
-        pass
-
-    assert Scope.last_event_id() is None, "Transaction should not set last_event_id"
-
-
 def test_last_event_id_cleared(sentry_init):
-    sentry_init(traces_sample_rate=1.0)
+    sentry_init(traces_sample_rate=1.0, trace_lifecycle="stream")
 
     # Make sure last_event_id is set
     sentry_sdk.capture_exception(Exception("test"))
@@ -1014,16 +973,16 @@ def test_handle_error_on_token_reset_isolation_scope(error_cls, scope_manager):
 
 
 def test_trace_context_tracing(sentry_init):
-    sentry_init(traces_sample_rate=1.0)
+    sentry_init(traces_sample_rate=1.0, trace_lifecycle="stream")
 
-    with sentry_sdk.start_transaction(name="trx") as transaction:
-        with sentry_sdk.start_span(op="span1"):
-            with sentry_sdk.start_span(op="span2") as span:
+    with sentry_sdk.traces.start_span(name="seg") as segment:
+        with sentry_sdk.traces.start_span(name="span1"):
+            with sentry_sdk.traces.start_span(name="span2") as span:
                 trace_context = sentry_sdk.get_current_scope().get_trace_context()
 
-    assert trace_context["trace_id"] == transaction.trace_id
+    assert trace_context["trace_id"] == segment.trace_id
     assert trace_context["span_id"] == span.span_id
-    assert trace_context["parent_span_id"] == span.parent_span_id
+    assert trace_context["parent_span_id"] == span._parent_span_id
     assert "dynamic_sampling_context" in trace_context
 
 

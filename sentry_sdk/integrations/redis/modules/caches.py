@@ -74,10 +74,6 @@ def _get_cache_span_description(
     integration: "RedisIntegration",
 ) -> str:
     description = _key_as_string(_get_safe_key(redis_command, args, kwargs))
-
-    if integration.max_data_size and len(description) > integration.max_data_size:
-        description = description[: integration.max_data_size - len("...")] + "..."
-
     return description
 
 

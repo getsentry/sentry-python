@@ -57,9 +57,7 @@ try:
 except ImportError:
     from anthropic.types.content_block import ContentBlock as TextBlock
 
-from sentry_sdk import start_span, start_transaction
-from sentry_sdk._types import BLOB_DATA_SUBSTITUTE
-from sentry_sdk.ai.utils import transform_content_part, transform_message_content
+from sentry_sdk.ai.utils import transform_content_part
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.anthropic import (
     AnthropicIntegration,
@@ -69,7 +67,6 @@ from sentry_sdk.integrations.anthropic import (
     _transform_anthropic_content_block,
 )
 from sentry_sdk.integrations.stdlib import StdlibIntegration
-from sentry_sdk.traces import SpanStatus
 from sentry_sdk.utils import package_version
 
 ANTHROPIC_VERSION = package_version("anthropic")
@@ -138,8 +135,6 @@ def data_collection_tool_use_message():
     )
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.parametrize(
     "send_default_pii, include_prompts",
     [
@@ -151,20 +146,16 @@ def data_collection_tool_use_message():
 )
 def test_nonstreaming_create_message(
     sentry_init,
-    capture_events,
     capture_items,
     send_default_pii,
     include_prompts,
-    stream_gen_ai_spans,
-    span_streaming,
 ):
     sentry_init(
         integrations=[AnthropicIntegration(include_prompts=include_prompts)],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        stream_gen_ai_spans=stream_gen_ai_spans,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
     client = Anthropic(api_key="z")
@@ -180,171 +171,55 @@ def test_nonstreaming_create_message(
             "content": "Hello, Claude",
         },
     ]
+    items = capture_items("span")
 
-    if span_streaming:
-        items = capture_items("transaction", "span")
+    response = client.messages.create(max_tokens=1024, messages=messages, model="model")
 
-        with sentry_sdk.traces.start_span(name="anthropic"):
-            response = client.messages.create(
-                max_tokens=1024, messages=messages, model="model"
-            )
+    assert response == EXAMPLE_MESSAGE
+    usage = response.usage
 
-        assert response == EXAMPLE_MESSAGE
-        usage = response.usage
+    assert usage.input_tokens == 10
+    assert usage.output_tokens == 20
 
-        assert usage.input_tokens == 10
-        assert usage.output_tokens == 20
+    sentry_sdk.flush()
+    spans = [item.payload for item in items]
+    assert len(spans) == 1
 
-        sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
-        assert len(spans) == 2
+    (span,) = spans
 
-        assert spans[1]["name"] == "anthropic"
-        (span, _) = spans
+    assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    assert span["name"] == "chat model"
+    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "anthropic"
+    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
-        assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-        assert span["name"] == "chat model"
-        assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
-
-        if send_default_pii and include_prompts:
-            assert json.loads(span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]) == [
-                {
-                    "role": "user",
-                    "content": "Message demonstrating the absence of truncation.",
-                },
-                {
-                    "role": "user",
-                    "content": "Hello, Claude",
-                },
-            ]
-            assert (
-                span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi, I'm Claude."
-            )
-        else:
-            assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
-
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
-        assert (
-            span["attributes"][SPANDATA.GEN_AI_RESPONSE_ID]
-            == "msg_01XFDUDYJgAACzvnptvVoYEL"
-        )
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == [
-            "end_turn"
+    if send_default_pii and include_prompts:
+        assert json.loads(span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]) == [
+            {
+                "role": "user",
+                "content": "Message demonstrating the absence of truncation.",
+            },
+            {
+                "role": "user",
+                "content": "Hello, Claude",
+            },
         ]
-    elif stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
-
-        with start_transaction(name="anthropic"):
-            response = client.messages.create(
-                max_tokens=1024, messages=messages, model="model"
-            )
-
-        assert response == EXAMPLE_MESSAGE
-        usage = response.usage
-
-        assert usage.input_tokens == 10
-        assert usage.output_tokens == 20
-
-        (event,) = (item.payload for item in items if item.type == "transaction")
-        assert event["transaction"] == "anthropic"
-
-        sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
-        assert len(spans) == 1
-        (span,) = spans
-
-        assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-        assert span["name"] == "chat model"
-        assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
-
-        if send_default_pii and include_prompts:
-            assert json.loads(span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]) == [
-                {
-                    "role": "user",
-                    "content": "Message demonstrating the absence of truncation.",
-                },
-                {
-                    "role": "user",
-                    "content": "Hello, Claude",
-                },
-            ]
-            assert (
-                span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi, I'm Claude."
-            )
-        else:
-            assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
-
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
-        assert (
-            span["attributes"][SPANDATA.GEN_AI_RESPONSE_ID]
-            == "msg_01XFDUDYJgAACzvnptvVoYEL"
-        )
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == [
-            "end_turn"
-        ]
+        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi, I'm Claude."
     else:
-        events = capture_events()
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
 
-        with start_transaction(name="anthropic"):
-            response = client.messages.create(
-                max_tokens=1024, messages=messages, model="model"
-            )
-
-        assert response == EXAMPLE_MESSAGE
-        usage = response.usage
-
-        assert usage.input_tokens == 10
-        assert usage.output_tokens == 20
-
-        assert len(events) == 1
-        (event,) = events
-
-        assert event["type"] == "transaction"
-        assert event["transaction"] == "anthropic"
-
-        assert len(event["spans"]) == 1
-        (span,) = event["spans"]
-
-        assert span["op"] == OP.GEN_AI_CHAT
-        assert span["description"] == "chat model"
-        assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-        assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
-
-        if send_default_pii and include_prompts:
-            assert (
-                span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-                == '[{"role": "user", "content": "Hello, Claude"}]'
-            )
-            assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi, I'm Claude."
-        else:
-            assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
-
-        assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-        assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
-        assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
-        assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
-        assert (
-            span["data"][SPANDATA.GEN_AI_RESPONSE_ID] == "msg_01XFDUDYJgAACzvnptvVoYEL"
-        )
-        assert span["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["end_turn"]
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
+    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
+    assert (
+        span["attributes"][SPANDATA.GEN_AI_RESPONSE_ID]
+        == "msg_01XFDUDYJgAACzvnptvVoYEL"
+    )
+    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["end_turn"]
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.parametrize(
     "data_collection,send_default_pii,include_prompts,expected_present,expected_absent",
     [
@@ -384,23 +259,19 @@ def test_nonstreaming_create_message(
 )
 def test_nonstreaming_create_message_data_collection(
     sentry_init,
-    capture_events,
     capture_items,
     data_collection,
     send_default_pii,
     include_prompts,
     expected_present,
     expected_absent,
-    stream_gen_ai_spans,
-    span_streaming,
 ):
     sentry_init_kwargs = dict(
         integrations=[AnthropicIntegration(include_prompts=include_prompts)],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        stream_gen_ai_spans=stream_gen_ai_spans,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
     if data_collection is not None:
         sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
@@ -415,28 +286,16 @@ def test_nonstreaming_create_message_data_collection(
         system="You are a helpful assistant.",
         messages=[{"role": "user", "content": "Hello, Claude"}],
     )
+    items = capture_items("span")
 
-    if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+    client.messages.create(**create_kwargs)
 
-        with start_transaction(name="anthropic"):
-            client.messages.create(**create_kwargs)
+    sentry_sdk.flush()
+    spans = [item.payload for item in items]
+    (span,) = [s for s in spans if s["attributes"]["sentry.op"] == OP.GEN_AI_CHAT]
+    span_data = span["attributes"]
 
-        sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
-        (span,) = [s for s in spans if s["attributes"]["sentry.op"] == OP.GEN_AI_CHAT]
-        span_data = span["attributes"]
-    else:
-        events = capture_events()
-
-        with start_transaction(name="anthropic"):
-            client.messages.create(**create_kwargs)
-
-        (event,) = events
-        (span,) = event["spans"]
-        span_data = span["data"]
-
-    assert span_data[SPANDATA.GEN_AI_SYSTEM] == "anthropic"
+    assert span_data[SPANDATA.GEN_AI_PROVIDER_NAME] == "anthropic"
     assert span_data[SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
     assert span_data[SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
     assert span_data[SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 1024
@@ -452,8 +311,6 @@ def test_nonstreaming_create_message_data_collection(
     ANTHROPIC_VERSION < (0, 27),
     reason="Tools are not supported in this version of the anthropic package",
 )
-@pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.parametrize(
     "data_collection,tools_collected",
     [
@@ -476,20 +333,16 @@ def test_nonstreaming_create_message_data_collection(
 )
 def test_nonstreaming_create_message_data_collection_tools(
     sentry_init,
-    capture_events,
     capture_items,
     data_collection,
     tools_collected,
-    stream_gen_ai_spans,
-    span_streaming,
 ):
     sentry_init_kwargs = dict(
         integrations=[AnthropicIntegration(include_prompts=False)],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=False,
-        stream_gen_ai_spans=stream_gen_ai_spans,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
     if data_collection is not None:
         sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
@@ -504,26 +357,14 @@ def test_nonstreaming_create_message_data_collection_tools(
         messages=[],
         tools=DATA_COLLECTION_EXAMPLE_TOOLS,
     )
+    items = capture_items("span")
 
-    if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+    client.messages.create(**create_kwargs)
 
-        with start_transaction(name="anthropic"):
-            client.messages.create(**create_kwargs)
-
-        sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
-        (span,) = [s for s in spans if s["attributes"]["sentry.op"] == OP.GEN_AI_CHAT]
-        span_data = span["attributes"]
-    else:
-        events = capture_events()
-
-        with start_transaction(name="anthropic"):
-            client.messages.create(**create_kwargs)
-
-        (event,) = events
-        (span,) = event["spans"]
-        span_data = span["data"]
+    sentry_sdk.flush()
+    spans = [item.payload for item in items]
+    (span,) = [s for s in spans if s["attributes"]["sentry.op"] == OP.GEN_AI_CHAT]
+    span_data = span["attributes"]
 
     if tools_collected:
         assert (
@@ -534,8 +375,6 @@ def test_nonstreaming_create_message_data_collection_tools(
         assert SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS not in span_data
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "data_collection,send_default_pii,include_prompts,expected_present,expected_absent",
@@ -568,23 +407,19 @@ def test_nonstreaming_create_message_data_collection_tools(
 )
 async def test_nonstreaming_create_message_data_collection_async(
     sentry_init,
-    capture_events,
     capture_items,
     data_collection,
     send_default_pii,
     include_prompts,
     expected_present,
     expected_absent,
-    stream_gen_ai_spans,
-    span_streaming,
 ):
     sentry_init_kwargs = dict(
         integrations=[AnthropicIntegration(include_prompts=include_prompts)],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        stream_gen_ai_spans=stream_gen_ai_spans,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
     if data_collection is not None:
         sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
@@ -599,28 +434,16 @@ async def test_nonstreaming_create_message_data_collection_async(
         system="You are a helpful assistant.",
         messages=[{"role": "user", "content": "Hello, Claude"}],
     )
+    items = capture_items("span")
 
-    if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+    await client.messages.create(**create_kwargs)
 
-        with start_transaction(name="anthropic"):
-            await client.messages.create(**create_kwargs)
+    sentry_sdk.flush()
+    spans = [item.payload for item in items]
+    (span,) = [s for s in spans if s["attributes"]["sentry.op"] == OP.GEN_AI_CHAT]
+    span_data = span["attributes"]
 
-        sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
-        (span,) = [s for s in spans if s["attributes"]["sentry.op"] == OP.GEN_AI_CHAT]
-        span_data = span["attributes"]
-    else:
-        events = capture_events()
-
-        with start_transaction(name="anthropic"):
-            await client.messages.create(**create_kwargs)
-
-        (event,) = events
-        (span,) = event["spans"]
-        span_data = span["data"]
-
-    assert span_data[SPANDATA.GEN_AI_SYSTEM] == "anthropic"
+    assert span_data[SPANDATA.GEN_AI_PROVIDER_NAME] == "anthropic"
     assert span_data[SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
     assert span_data[SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
     assert span_data[SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 1024
@@ -636,8 +459,6 @@ async def test_nonstreaming_create_message_data_collection_async(
     ANTHROPIC_VERSION < (0, 27),
     reason="anthropic.types.ToolUseBlock was added in 0.27.0. Before that, tool use was only available under the beta namespace and could not appear in a standard Message.",
 )
-@pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.parametrize(
     "data_collection,send_default_pii,include_prompts,outputs_collected",
     [
@@ -687,22 +508,18 @@ async def test_nonstreaming_create_message_data_collection_async(
 )
 def test_nonstreaming_create_message_data_collection_outputs(
     sentry_init,
-    capture_events,
     capture_items,
     data_collection,
     send_default_pii,
     include_prompts,
     outputs_collected,
-    stream_gen_ai_spans,
-    span_streaming,
 ):
     sentry_init_kwargs = dict(
         integrations=[AnthropicIntegration(include_prompts=include_prompts)],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        stream_gen_ai_spans=stream_gen_ai_spans,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
     if data_collection is not None:
         sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
@@ -717,26 +534,14 @@ def test_nonstreaming_create_message_data_collection_outputs(
         messages=[{"role": "user", "content": "What is the weather in San Francisco?"}],
         tools=DATA_COLLECTION_EXAMPLE_TOOLS,
     )
+    items = capture_items("span")
 
-    if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+    client.messages.create(**create_kwargs)
 
-        with start_transaction(name="anthropic"):
-            client.messages.create(**create_kwargs)
-
-        sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
-        (span,) = [s for s in spans if s["attributes"]["sentry.op"] == OP.GEN_AI_CHAT]
-        span_data = span["attributes"]
-    else:
-        events = capture_events()
-
-        with start_transaction(name="anthropic"):
-            client.messages.create(**create_kwargs)
-
-        (event,) = events
-        (span,) = event["spans"]
-        span_data = span["data"]
+    sentry_sdk.flush()
+    spans = [item.payload for item in items]
+    (span,) = [s for s in spans if s["attributes"]["sentry.op"] == OP.GEN_AI_CHAT]
+    span_data = span["attributes"]
 
     # Output data that is not gated on data collection
     assert span_data[SPANDATA.GEN_AI_RESPONSE_MODEL] == "model"
@@ -763,8 +568,6 @@ def test_nonstreaming_create_message_data_collection_outputs(
     ANTHROPIC_VERSION < (0, 27),
     reason="anthropic.types.ToolUseBlock was added in 0.27.0. Before that, tool use was only available under the beta namespace and could not appear in a standard Message.",
 )
-@pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "data_collection,send_default_pii,include_prompts,outputs_collected",
@@ -815,22 +618,18 @@ def test_nonstreaming_create_message_data_collection_outputs(
 )
 async def test_nonstreaming_create_message_data_collection_outputs_async(
     sentry_init,
-    capture_events,
     capture_items,
     data_collection,
     send_default_pii,
     include_prompts,
     outputs_collected,
-    stream_gen_ai_spans,
-    span_streaming,
 ):
     sentry_init_kwargs = dict(
         integrations=[AnthropicIntegration(include_prompts=include_prompts)],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        stream_gen_ai_spans=stream_gen_ai_spans,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
     if data_collection is not None:
         sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
@@ -845,26 +644,14 @@ async def test_nonstreaming_create_message_data_collection_outputs_async(
         messages=[{"role": "user", "content": "What is the weather in San Francisco?"}],
         tools=DATA_COLLECTION_EXAMPLE_TOOLS,
     )
+    items = capture_items("span")
 
-    if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+    await client.messages.create(**create_kwargs)
 
-        with start_transaction(name="anthropic"):
-            await client.messages.create(**create_kwargs)
-
-        sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
-        (span,) = [s for s in spans if s["attributes"]["sentry.op"] == OP.GEN_AI_CHAT]
-        span_data = span["attributes"]
-    else:
-        events = capture_events()
-
-        with start_transaction(name="anthropic"):
-            await client.messages.create(**create_kwargs)
-
-        (event,) = events
-        (span,) = event["spans"]
-        span_data = span["data"]
+    sentry_sdk.flush()
+    spans = [item.payload for item in items]
+    (span,) = [s for s in spans if s["attributes"]["sentry.op"] == OP.GEN_AI_CHAT]
+    span_data = span["attributes"]
 
     # Output data that is not gated on data collection
     assert span_data[SPANDATA.GEN_AI_RESPONSE_MODEL] == "model"
@@ -887,8 +674,6 @@ async def test_nonstreaming_create_message_data_collection_outputs_async(
         assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in span_data
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "send_default_pii, include_prompts",
@@ -901,20 +686,16 @@ async def test_nonstreaming_create_message_data_collection_outputs_async(
 )
 async def test_nonstreaming_create_message_async(
     sentry_init,
-    capture_events,
     capture_items,
     send_default_pii,
     include_prompts,
-    stream_gen_ai_spans,
-    span_streaming,
 ):
     sentry_init(
         integrations=[AnthropicIntegration(include_prompts=include_prompts)],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        stream_gen_ai_spans=stream_gen_ai_spans,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
     client = AsyncAnthropic(api_key="z")
@@ -930,165 +711,56 @@ async def test_nonstreaming_create_message_async(
             "content": "Hello, Claude",
         },
     ]
+    items = capture_items("span")
 
-    if span_streaming:
-        items = capture_items("transaction", "span")
+    response = await client.messages.create(
+        max_tokens=1024, messages=messages, model="model"
+    )
 
-        with sentry_sdk.traces.start_span(name="anthropic"):
-            response = await client.messages.create(
-                max_tokens=1024, messages=messages, model="model"
-            )
+    assert response == EXAMPLE_MESSAGE
+    usage = response.usage
 
-        assert response == EXAMPLE_MESSAGE
-        usage = response.usage
+    assert usage.input_tokens == 10
+    assert usage.output_tokens == 20
 
-        assert usage.input_tokens == 10
-        assert usage.output_tokens == 20
+    sentry_sdk.flush()
+    spans = [item.payload for item in items]
+    assert len(spans) == 1
 
-        sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
-        assert len(spans) == 2
+    (span,) = spans
 
-        assert spans[1]["name"] == "anthropic"
-        (span, _) = spans
+    assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    assert span["name"] == "chat model"
+    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "anthropic"
+    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
-        assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-        assert span["name"] == "chat model"
-        assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
-
-        if send_default_pii and include_prompts:
-            assert json.loads(span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]) == [
-                {
-                    "role": "user",
-                    "content": "Message demonstrating the absence of truncation.",
-                },
-                {
-                    "role": "user",
-                    "content": "Hello, Claude",
-                },
-            ]
-            assert (
-                span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi, I'm Claude."
-            )
-        else:
-            assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
-
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
-        assert (
-            span["attributes"][SPANDATA.GEN_AI_RESPONSE_ID]
-            == "msg_01XFDUDYJgAACzvnptvVoYEL"
-        )
-
-    elif stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
-
-        with start_transaction(name="anthropic"):
-            response = await client.messages.create(
-                max_tokens=1024, messages=messages, model="model"
-            )
-
-        assert response == EXAMPLE_MESSAGE
-        usage = response.usage
-
-        assert usage.input_tokens == 10
-        assert usage.output_tokens == 20
-
-        (event,) = (item.payload for item in items if item.type == "transaction")
-        assert event["transaction"] == "anthropic"
-
-        sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
-        assert len(spans) == 1
-        (span,) = spans
-
-        assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-        assert span["name"] == "chat model"
-        assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
-
-        if send_default_pii and include_prompts:
-            assert json.loads(span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]) == [
-                {
-                    "role": "user",
-                    "content": "Message demonstrating the absence of truncation.",
-                },
-                {
-                    "role": "user",
-                    "content": "Hello, Claude",
-                },
-            ]
-            assert (
-                span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi, I'm Claude."
-            )
-        else:
-            assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
-
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
-        assert (
-            span["attributes"][SPANDATA.GEN_AI_RESPONSE_ID]
-            == "msg_01XFDUDYJgAACzvnptvVoYEL"
-        )
+    if send_default_pii and include_prompts:
+        assert json.loads(span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]) == [
+            {
+                "role": "user",
+                "content": "Message demonstrating the absence of truncation.",
+            },
+            {
+                "role": "user",
+                "content": "Hello, Claude",
+            },
+        ]
+        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi, I'm Claude."
     else:
-        events = capture_events()
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
 
-        with start_transaction(name="anthropic"):
-            response = await client.messages.create(
-                max_tokens=1024, messages=messages, model="model"
-            )
-
-        assert response == EXAMPLE_MESSAGE
-        usage = response.usage
-
-        assert usage.input_tokens == 10
-        assert usage.output_tokens == 20
-
-        assert len(events) == 1
-        (event,) = events
-
-        assert event["type"] == "transaction"
-        assert event["transaction"] == "anthropic"
-
-        assert len(event["spans"]) == 1
-        (span,) = event["spans"]
-
-        assert span["op"] == OP.GEN_AI_CHAT
-        assert span["description"] == "chat model"
-        assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-        assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
-
-        if send_default_pii and include_prompts:
-            assert (
-                span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-                == '[{"role": "user", "content": "Hello, Claude"}]'
-            )
-            assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi, I'm Claude."
-        else:
-            assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
-
-        assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-        assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
-        assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
-        assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
-        assert (
-            span["data"][SPANDATA.GEN_AI_RESPONSE_ID] == "msg_01XFDUDYJgAACzvnptvVoYEL"
-        )
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
+    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
+    assert (
+        span["attributes"][SPANDATA.GEN_AI_RESPONSE_ID]
+        == "msg_01XFDUDYJgAACzvnptvVoYEL"
+    )
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.parametrize(
     "send_default_pii, include_prompts",
     [
@@ -1100,14 +772,11 @@ async def test_nonstreaming_create_message_async(
 )
 def test_streaming_create_message(
     sentry_init,
-    capture_events,
     capture_items,
     send_default_pii,
     include_prompts,
     get_model_response,
     server_side_event_chunks,
-    stream_gen_ai_spans,
-    span_streaming,
 ):
     client = Anthropic(api_key="z")
 
@@ -1153,8 +822,7 @@ def test_streaming_create_message(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        stream_gen_ai_spans=stream_gen_ai_spans,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
     messages = [
@@ -1167,177 +835,60 @@ def test_streaming_create_message(
             "content": "Hello, Claude",
         },
     ]
+    items = capture_items("span")
 
-    if span_streaming:
-        items = capture_items("transaction", "span")
-
-        with mock.patch.object(
-            client._client,
-            "send",
-            return_value=response,
-        ) as _, sentry_sdk.traces.start_span(name="anthropic"):
-            message = client.messages.create(
-                max_tokens=1024, messages=messages, model="model", stream=True
-            )
-
-            for _ in message:
-                pass
-
-        sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
-        assert spans[1]["name"] == "anthropic"
-        span = next(
-            span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    with mock.patch.object(
+        client._client,
+        "send",
+        return_value=response,
+    ):
+        message = client.messages.create(
+            max_tokens=1024, messages=messages, model="model", stream=True
         )
 
-        assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-        assert span["name"] == "chat model"
-        assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
+        for _ in message:
+            pass
 
-        if send_default_pii and include_prompts:
-            assert json.loads(span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]) == [
-                {
-                    "role": "user",
-                    "content": "Message demonstrating the absence of truncation.",
-                },
-                {
-                    "role": "user",
-                    "content": "Hello, Claude",
-                },
-            ]
-            assert (
-                span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi! I'm Claude!"
-            )
+    sentry_sdk.flush()
+    spans = [item.payload for item in items]
+    span = next(
+        span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    )
 
-        else:
-            assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
+    assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    assert span["name"] == "chat model"
+    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "anthropic"
+    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 20
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
-        assert (
-            span["attributes"][SPANDATA.GEN_AI_RESPONSE_ID]
-            == "msg_01XFDUDYJgAACzvnptvVoYEL"
-        )
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == [
-            "max_tokens"
+    if send_default_pii and include_prompts:
+        assert json.loads(span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]) == [
+            {
+                "role": "user",
+                "content": "Message demonstrating the absence of truncation.",
+            },
+            {
+                "role": "user",
+                "content": "Hello, Claude",
+            },
         ]
-    elif stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi! I'm Claude!"
 
-        with mock.patch.object(
-            client._client,
-            "send",
-            return_value=response,
-        ) as _, start_transaction(name="anthropic"):
-            message = client.messages.create(
-                max_tokens=1024, messages=messages, model="model", stream=True
-            )
-
-            for _ in message:
-                pass
-
-        (event,) = (item.payload for item in items if item.type == "transaction")
-        assert event["transaction"] == "anthropic"
-
-        sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
-        span = next(
-            span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-        )
-
-        assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-        assert span["name"] == "chat model"
-        assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
-
-        if send_default_pii and include_prompts:
-            assert json.loads(span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]) == [
-                {
-                    "role": "user",
-                    "content": "Message demonstrating the absence of truncation.",
-                },
-                {
-                    "role": "user",
-                    "content": "Hello, Claude",
-                },
-            ]
-            assert (
-                span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi! I'm Claude!"
-            )
-
-        else:
-            assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
-
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 20
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
-        assert (
-            span["attributes"][SPANDATA.GEN_AI_RESPONSE_ID]
-            == "msg_01XFDUDYJgAACzvnptvVoYEL"
-        )
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == [
-            "max_tokens"
-        ]
     else:
-        events = capture_events()
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
 
-        with mock.patch.object(
-            client._client,
-            "send",
-            return_value=response,
-        ) as _, start_transaction(name="anthropic"):
-            message = client.messages.create(
-                max_tokens=1024, messages=messages, model="model", stream=True
-            )
-
-            for _ in message:
-                pass
-
-        assert len(events) == 1
-        (event,) = events
-
-        assert event["type"] == "transaction"
-        assert event["transaction"] == "anthropic"
-
-        span = next(span for span in event["spans"] if span["op"] == OP.GEN_AI_CHAT)
-
-        assert span["op"] == OP.GEN_AI_CHAT
-        assert span["description"] == "chat model"
-        assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-        assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
-
-        if send_default_pii and include_prompts:
-            assert (
-                span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-                == '[{"role": "user", "content": "Hello, Claude"}]'
-            )
-            assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi! I'm Claude!"
-
-        else:
-            assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
-
-        assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-        assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
-        assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 20
-        assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
-        assert (
-            span["data"][SPANDATA.GEN_AI_RESPONSE_ID] == "msg_01XFDUDYJgAACzvnptvVoYEL"
-        )
-        assert span["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["max_tokens"]
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 20
+    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert (
+        span["attributes"][SPANDATA.GEN_AI_RESPONSE_ID]
+        == "msg_01XFDUDYJgAACzvnptvVoYEL"
+    )
+    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["max_tokens"]
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.parametrize(
     "data_collection,send_default_pii,include_prompts,expected_present,expected_absent",
     [
@@ -1369,7 +920,6 @@ def test_streaming_create_message(
 )
 def test_streaming_create_message_data_collection(
     sentry_init,
-    capture_events,
     capture_items,
     data_collection,
     send_default_pii,
@@ -1378,16 +928,13 @@ def test_streaming_create_message_data_collection(
     expected_absent,
     get_model_response,
     server_side_event_chunks,
-    stream_gen_ai_spans,
-    span_streaming,
 ):
     sentry_init_kwargs = dict(
         integrations=[AnthropicIntegration(include_prompts=include_prompts)],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        stream_gen_ai_spans=stream_gen_ai_spans,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
     if data_collection is not None:
         sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
@@ -1429,40 +976,23 @@ def test_streaming_create_message_data_collection(
         messages=[{"role": "user", "content": "Hello, Claude"}],
         stream=True,
     )
+    items = capture_items("span")
 
-    if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+    with mock.patch.object(
+        client._client,
+        "send",
+        return_value=response,
+    ):
+        message = client.messages.create(**create_kwargs)
+        for _ in message:
+            pass
 
-        with mock.patch.object(
-            client._client,
-            "send",
-            return_value=response,
-        ), start_transaction(name="anthropic"):
-            message = client.messages.create(**create_kwargs)
-            for _ in message:
-                pass
+    sentry_sdk.flush()
+    spans = [item.payload for item in items]
+    (span,) = [s for s in spans if s["attributes"]["sentry.op"] == OP.GEN_AI_CHAT]
+    span_data = span["attributes"]
 
-        sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
-        (span,) = [s for s in spans if s["attributes"]["sentry.op"] == OP.GEN_AI_CHAT]
-        span_data = span["attributes"]
-    else:
-        events = capture_events()
-
-        with mock.patch.object(
-            client._client,
-            "send",
-            return_value=response,
-        ), start_transaction(name="anthropic"):
-            message = client.messages.create(**create_kwargs)
-            for _ in message:
-                pass
-
-        (event,) = events
-        span = next(s for s in event["spans"] if s["op"] == OP.GEN_AI_CHAT)
-        span_data = span["data"]
-
-    assert span_data[SPANDATA.GEN_AI_SYSTEM] == "anthropic"
+    assert span_data[SPANDATA.GEN_AI_PROVIDER_NAME] == "anthropic"
     assert span_data[SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
     assert span_data[SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
     assert span_data[SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 1024
@@ -1475,8 +1005,6 @@ def test_streaming_create_message_data_collection(
         assert key not in span_data
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.parametrize(
     "data_collection,send_default_pii,include_prompts,outputs_collected",
     [
@@ -1519,7 +1047,6 @@ def test_streaming_create_message_data_collection(
 )
 def test_streaming_create_message_data_collection_outputs(
     sentry_init,
-    capture_events,
     capture_items,
     data_collection,
     send_default_pii,
@@ -1527,16 +1054,13 @@ def test_streaming_create_message_data_collection_outputs(
     outputs_collected,
     get_model_response,
     server_side_event_chunks,
-    stream_gen_ai_spans,
-    span_streaming,
 ):
     sentry_init_kwargs = dict(
         integrations=[AnthropicIntegration(include_prompts=include_prompts)],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        stream_gen_ai_spans=stream_gen_ai_spans,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
     if data_collection is not None:
         sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
@@ -1582,38 +1106,21 @@ def test_streaming_create_message_data_collection_outputs(
         messages=[{"role": "user", "content": "Hello, Claude"}],
         stream=True,
     )
+    items = capture_items("span")
 
-    if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+    with mock.patch.object(
+        client._client,
+        "send",
+        return_value=response,
+    ):
+        message = client.messages.create(**create_kwargs)
+        for _ in message:
+            pass
 
-        with mock.patch.object(
-            client._client,
-            "send",
-            return_value=response,
-        ), start_transaction(name="anthropic"):
-            message = client.messages.create(**create_kwargs)
-            for _ in message:
-                pass
-
-        sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
-        (span,) = [s for s in spans if s["attributes"]["sentry.op"] == OP.GEN_AI_CHAT]
-        span_data = span["attributes"]
-    else:
-        events = capture_events()
-
-        with mock.patch.object(
-            client._client,
-            "send",
-            return_value=response,
-        ), start_transaction(name="anthropic"):
-            message = client.messages.create(**create_kwargs)
-            for _ in message:
-                pass
-
-        (event,) = events
-        span = next(s for s in event["spans"] if s["op"] == OP.GEN_AI_CHAT)
-        span_data = span["data"]
+    sentry_sdk.flush()
+    spans = [item.payload for item in items]
+    (span,) = [s for s in spans if s["attributes"]["sentry.op"] == OP.GEN_AI_CHAT]
+    span_data = span["attributes"]
 
     # Output data that is not gated on data collection
     assert span_data[SPANDATA.GEN_AI_RESPONSE_MODEL] == "model"
@@ -1628,16 +1135,11 @@ def test_streaming_create_message_data_collection_outputs(
         assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span_data
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_streaming_create_message_close(
     sentry_init,
-    capture_events,
     capture_items,
     get_model_response,
     server_side_event_chunks,
-    stream_gen_ai_spans,
-    span_streaming,
 ):
     client = Anthropic(api_key="z")
 
@@ -1683,8 +1185,7 @@ def test_streaming_create_message_close(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        stream_gen_ai_spans=stream_gen_ai_spans,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
     messages = [
@@ -1693,157 +1194,59 @@ def test_streaming_create_message_close(
             "content": "Hello, Claude",
         }
     ]
+    items = capture_items("span")
 
-    if span_streaming:
-        items = capture_items("transaction", "span")
-
-        with mock.patch.object(
-            client._client,
-            "send",
-            return_value=response,
-        ) as _, sentry_sdk.traces.start_span(name="anthropic"):
-            messages = client.messages.create(
-                max_tokens=1024, messages=messages, model="model", stream=True
-            )
-
-            for _ in range(4):
-                next(messages)
-
-            messages.close()
-
-        sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
-        assert spans[1]["name"] == "anthropic"
-        span = next(
-            span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    with mock.patch.object(
+        client._client,
+        "send",
+        return_value=response,
+    ):
+        messages = client.messages.create(
+            max_tokens=1024, messages=messages, model="model", stream=True
         )
 
-        assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-        assert span["name"] == "chat model"
-        assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
+        for _ in range(4):
+            next(messages)
 
-        assert (
-            span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-            == '[{"role": "user", "content": "Hello, Claude"}]'
-        )
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi!"
+        messages.close()
 
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
-        assert (
-            span["attributes"][SPANDATA.GEN_AI_RESPONSE_ID]
-            == "msg_01XFDUDYJgAACzvnptvVoYEL"
-        )
-    elif stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+    sentry_sdk.flush()
+    spans = [item.payload for item in items]
+    span = next(
+        span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    )
 
-        with mock.patch.object(
-            client._client,
-            "send",
-            return_value=response,
-        ) as _, start_transaction(name="anthropic"):
-            messages = client.messages.create(
-                max_tokens=1024, messages=messages, model="model", stream=True
-            )
+    assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    assert span["name"] == "chat model"
+    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "anthropic"
+    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
-            for _ in range(4):
-                next(messages)
+    assert (
+        span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        == '[{"role": "user", "content": "Hello, Claude"}]'
+    )
+    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi!"
 
-            messages.close()
-
-        (event,) = (item.payload for item in items if item.type == "transaction")
-        assert event["transaction"] == "anthropic"
-
-        sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
-        span = next(
-            span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-        )
-
-        assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-        assert span["name"] == "chat model"
-        assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
-
-        assert (
-            span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-            == '[{"role": "user", "content": "Hello, Claude"}]'
-        )
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi!"
-
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
-        assert (
-            span["attributes"][SPANDATA.GEN_AI_RESPONSE_ID]
-            == "msg_01XFDUDYJgAACzvnptvVoYEL"
-        )
-    else:
-        events = capture_events()
-
-        with mock.patch.object(
-            client._client,
-            "send",
-            return_value=response,
-        ) as _, start_transaction(name="anthropic"):
-            messages = client.messages.create(
-                max_tokens=1024, messages=messages, model="model", stream=True
-            )
-
-            for _ in range(4):
-                next(messages)
-
-            messages.close()
-
-        assert len(events) == 1
-        (event,) = events
-
-        assert event["type"] == "transaction"
-        assert event["transaction"] == "anthropic"
-
-        span = next(span for span in event["spans"] if span["op"] == OP.GEN_AI_CHAT)
-
-        assert span["op"] == OP.GEN_AI_CHAT
-        assert span["description"] == "chat model"
-        assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-        assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
-
-        assert (
-            span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-            == '[{"role": "user", "content": "Hello, Claude"}]'
-        )
-        assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi!"
-
-        assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-        assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
-        assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
-        assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
-        assert (
-            span["data"][SPANDATA.GEN_AI_RESPONSE_ID] == "msg_01XFDUDYJgAACzvnptvVoYEL"
-        )
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
+    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert (
+        span["attributes"][SPANDATA.GEN_AI_RESPONSE_ID]
+        == "msg_01XFDUDYJgAACzvnptvVoYEL"
+    )
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.skipif(
     ANTHROPIC_VERSION < (0, 41),
     reason="Error classes moved in https://github.com/anthropics/anthropic-sdk-python/commit/4e0b15e22fe40e9aa513459564f641bf97c90954.",
 )
 def test_streaming_create_message_api_error(
     sentry_init,
-    capture_events,
     capture_items,
     get_model_response,
     server_side_event_chunks,
-    stream_gen_ai_spans,
-    span_streaming,
 ):
     client = Anthropic(api_key="z")
 
@@ -1884,8 +1287,7 @@ def test_streaming_create_message_api_error(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        stream_gen_ai_spans=stream_gen_ai_spans,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
     messages = [
@@ -1894,148 +1296,50 @@ def test_streaming_create_message_api_error(
             "content": "Hello, Claude",
         }
     ]
+    items = capture_items("span")
 
-    if span_streaming:
-        items = capture_items("transaction", "span")
-
-        with pytest.raises(APIStatusError), mock.patch.object(
-            client._client,
-            "send",
-            return_value=response,
-        ) as _, sentry_sdk.traces.start_span(name="anthropic"):
-            message = client.messages.create(
-                max_tokens=1024, messages=messages, model="model", stream=True
-            )
-
-            for _ in message:
-                pass
-
-        sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
-        assert spans[1]["name"] == "anthropic"
-        assert spans[1]["status"] == SpanStatus.ERROR
-        span = next(
-            span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    with pytest.raises(APIStatusError), mock.patch.object(
+        client._client,
+        "send",
+        return_value=response,
+    ):
+        message = client.messages.create(
+            max_tokens=1024, messages=messages, model="model", stream=True
         )
 
-        assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-        assert span["name"] == "chat model"
-        assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
+        for _ in message:
+            pass
 
-        assert (
-            span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-            == '[{"role": "user", "content": "Hello, Claude"}]'
-        )
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi!"
+    sentry_sdk.flush()
+    spans = [item.payload for item in items]
+    span = next(
+        span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    )
 
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
-        assert (
-            span["attributes"][SPANDATA.GEN_AI_RESPONSE_ID]
-            == "msg_01XFDUDYJgAACzvnptvVoYEL"
-        )
+    assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    assert span["name"] == "chat model"
+    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "anthropic"
+    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
-        assert span["status"] == "error"
-    elif stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+    assert (
+        span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        == '[{"role": "user", "content": "Hello, Claude"}]'
+    )
+    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi!"
 
-        with pytest.raises(APIStatusError), mock.patch.object(
-            client._client,
-            "send",
-            return_value=response,
-        ) as _, start_transaction(name="anthropic"):
-            message = client.messages.create(
-                max_tokens=1024, messages=messages, model="model", stream=True
-            )
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
+    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert (
+        span["attributes"][SPANDATA.GEN_AI_RESPONSE_ID]
+        == "msg_01XFDUDYJgAACzvnptvVoYEL"
+    )
 
-            for _ in message:
-                pass
-        (event,) = (item.payload for item in items if item.type == "transaction")
-        assert event["transaction"] == "anthropic"
-
-        sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
-        span = next(
-            span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-        )
-
-        assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-        assert span["name"] == "chat model"
-        assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
-
-        assert (
-            span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-            == '[{"role": "user", "content": "Hello, Claude"}]'
-        )
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi!"
-
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
-        assert (
-            span["attributes"][SPANDATA.GEN_AI_RESPONSE_ID]
-            == "msg_01XFDUDYJgAACzvnptvVoYEL"
-        )
-
-        assert span["status"] == "error"
-        assert event["contexts"]["trace"]["status"] == "internal_error"
-    else:
-        events = capture_events()
-
-        with pytest.raises(APIStatusError), mock.patch.object(
-            client._client,
-            "send",
-            return_value=response,
-        ) as _, start_transaction(name="anthropic"):
-            message = client.messages.create(
-                max_tokens=1024, messages=messages, model="model", stream=True
-            )
-
-            for _ in message:
-                pass
-
-        assert len(events) == 1
-        (event,) = events
-
-        assert event["type"] == "transaction"
-        assert event["transaction"] == "anthropic"
-
-        span = next(span for span in event["spans"] if span["op"] == OP.GEN_AI_CHAT)
-
-        assert span["op"] == OP.GEN_AI_CHAT
-        assert span["description"] == "chat model"
-        assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-        assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
-
-        assert (
-            span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-            == '[{"role": "user", "content": "Hello, Claude"}]'
-        )
-        assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi!"
-
-        assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-        assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
-        assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
-        assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
-        assert (
-            span["data"][SPANDATA.GEN_AI_RESPONSE_ID] == "msg_01XFDUDYJgAACzvnptvVoYEL"
-        )
-
-        assert span["status"] == "internal_error"
-        assert span["tags"]["status"] == "internal_error"
-        assert event["contexts"]["trace"]["status"] == "internal_error"
+    assert span["status"] == "error"
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.parametrize(
     "send_default_pii, include_prompts",
     [
@@ -2047,14 +1351,11 @@ def test_streaming_create_message_api_error(
 )
 def test_stream_messages(
     sentry_init,
-    capture_events,
     capture_items,
     send_default_pii,
     include_prompts,
     get_model_response,
     server_side_event_chunks,
-    stream_gen_ai_spans,
-    span_streaming,
 ):
     client = Anthropic(api_key="z")
 
@@ -2100,8 +1401,7 @@ def test_stream_messages(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        stream_gen_ai_spans=stream_gen_ai_spans,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
     messages = [
@@ -2114,176 +1414,60 @@ def test_stream_messages(
             "content": "Hello, Claude",
         },
     ]
+    items = capture_items("span")
 
-    if span_streaming:
-        items = capture_items("transaction", "span")
+    with mock.patch.object(
+        client._client,
+        "send",
+        return_value=response,
+    ), client.messages.stream(
+        max_tokens=1024,
+        messages=messages,
+        model="model",
+    ) as stream:
+        for event in stream:
+            pass
 
-        with mock.patch.object(
-            client._client,
-            "send",
-            return_value=response,
-        ) as _, sentry_sdk.traces.start_span(name="anthropic"), client.messages.stream(
-            max_tokens=1024,
-            messages=messages,
-            model="model",
-        ) as stream:
-            for event in stream:
-                pass
+    sentry_sdk.flush()
+    spans = [item.payload for item in items]
+    span = next(
+        span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    )
 
-        sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
-        assert spans[1]["name"] == "anthropic"
-        span = next(
-            span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-        )
+    assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    assert span["name"] == "chat model"
+    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "anthropic"
+    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
-        assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-        assert span["name"] == "chat model"
-        assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
-
-        if send_default_pii and include_prompts:
-            assert json.loads(span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]) == [
-                {
-                    "role": "user",
-                    "content": "Message demonstrating the absence of truncation.",
-                },
-                {
-                    "role": "user",
-                    "content": "Hello, Claude",
-                },
-            ]
-            assert (
-                span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi! I'm Claude!"
-            )
-
-        else:
-            assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
-
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 20
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
-        assert (
-            span["attributes"][SPANDATA.GEN_AI_RESPONSE_ID]
-            == "msg_01XFDUDYJgAACzvnptvVoYEL"
-        )
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == [
-            "max_tokens"
+    if send_default_pii and include_prompts:
+        assert json.loads(span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]) == [
+            {
+                "role": "user",
+                "content": "Message demonstrating the absence of truncation.",
+            },
+            {
+                "role": "user",
+                "content": "Hello, Claude",
+            },
         ]
-    elif stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi! I'm Claude!"
 
-        with mock.patch.object(
-            client._client,
-            "send",
-            return_value=response,
-        ) as _, start_transaction(name="anthropic"), client.messages.stream(
-            max_tokens=1024,
-            messages=messages,
-            model="model",
-        ) as stream:
-            for event in stream:
-                pass
-
-        (event,) = (item.payload for item in items if item.type == "transaction")
-        assert event["transaction"] == "anthropic"
-
-        sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
-        span = next(
-            span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-        )
-
-        assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-        assert span["name"] == "chat model"
-        assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
-
-        if send_default_pii and include_prompts:
-            assert json.loads(span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]) == [
-                {
-                    "role": "user",
-                    "content": "Message demonstrating the absence of truncation.",
-                },
-                {
-                    "role": "user",
-                    "content": "Hello, Claude",
-                },
-            ]
-            assert (
-                span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi! I'm Claude!"
-            )
-
-        else:
-            assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
-
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 20
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
-        assert (
-            span["attributes"][SPANDATA.GEN_AI_RESPONSE_ID]
-            == "msg_01XFDUDYJgAACzvnptvVoYEL"
-        )
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == [
-            "max_tokens"
-        ]
     else:
-        events = capture_events()
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
 
-        with mock.patch.object(
-            client._client,
-            "send",
-            return_value=response,
-        ) as _, start_transaction(name="anthropic"), client.messages.stream(
-            max_tokens=1024,
-            messages=messages,
-            model="model",
-        ) as stream:
-            for event in stream:
-                pass
-
-        assert len(events) == 1
-        (event,) = events
-
-        assert event["type"] == "transaction"
-        assert event["transaction"] == "anthropic"
-
-        span = next(span for span in event["spans"] if span["op"] == OP.GEN_AI_CHAT)
-
-        assert span["op"] == OP.GEN_AI_CHAT
-        assert span["description"] == "chat model"
-        assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-        assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
-
-        if send_default_pii and include_prompts:
-            assert (
-                span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-                == '[{"role": "user", "content": "Hello, Claude"}]'
-            )
-            assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi! I'm Claude!"
-        else:
-            assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
-
-        assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-        assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
-        assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 20
-        assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
-        assert (
-            span["data"][SPANDATA.GEN_AI_RESPONSE_ID] == "msg_01XFDUDYJgAACzvnptvVoYEL"
-        )
-        assert span["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["max_tokens"]
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 20
+    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert (
+        span["attributes"][SPANDATA.GEN_AI_RESPONSE_ID]
+        == "msg_01XFDUDYJgAACzvnptvVoYEL"
+    )
+    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["max_tokens"]
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.parametrize(
     "data_collection,send_default_pii,include_prompts,outputs_collected",
     [
@@ -2326,7 +1510,6 @@ def test_stream_messages(
 )
 def test_stream_messages_data_collection_outputs(
     sentry_init,
-    capture_events,
     capture_items,
     data_collection,
     send_default_pii,
@@ -2334,16 +1517,13 @@ def test_stream_messages_data_collection_outputs(
     outputs_collected,
     get_model_response,
     server_side_event_chunks,
-    stream_gen_ai_spans,
-    span_streaming,
 ):
     sentry_init_kwargs = dict(
         integrations=[AnthropicIntegration(include_prompts=include_prompts)],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        stream_gen_ai_spans=stream_gen_ai_spans,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
     if data_collection is not None:
         sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
@@ -2388,40 +1568,20 @@ def test_stream_messages_data_collection_outputs(
         model="model",
         messages=[{"role": "user", "content": "Hello, Claude"}],
     )
+    items = capture_items("span")
 
-    if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+    with mock.patch.object(
+        client._client,
+        "send",
+        return_value=response,
+    ), client.messages.stream(**stream_kwargs) as stream:
+        for _ in stream:
+            pass
 
-        with mock.patch.object(
-            client._client,
-            "send",
-            return_value=response,
-        ), start_transaction(name="anthropic"), client.messages.stream(
-            **stream_kwargs
-        ) as stream:
-            for _ in stream:
-                pass
-
-        sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
-        (span,) = [s for s in spans if s["attributes"]["sentry.op"] == OP.GEN_AI_CHAT]
-        span_data = span["attributes"]
-    else:
-        events = capture_events()
-
-        with mock.patch.object(
-            client._client,
-            "send",
-            return_value=response,
-        ), start_transaction(name="anthropic"), client.messages.stream(
-            **stream_kwargs
-        ) as stream:
-            for _ in stream:
-                pass
-
-        (event,) = events
-        span = next(s for s in event["spans"] if s["op"] == OP.GEN_AI_CHAT)
-        span_data = span["data"]
+    sentry_sdk.flush()
+    spans = [item.payload for item in items]
+    (span,) = [s for s in spans if s["attributes"]["sentry.op"] == OP.GEN_AI_CHAT]
+    span_data = span["attributes"]
 
     # Output data that is not gated on data collection
     assert span_data[SPANDATA.GEN_AI_RESPONSE_MODEL] == "model"
@@ -2436,16 +1596,11 @@ def test_stream_messages_data_collection_outputs(
         assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span_data
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_stream_messages_close(
     sentry_init,
-    capture_events,
     capture_items,
     get_model_response,
     server_side_event_chunks,
-    stream_gen_ai_spans,
-    span_streaming,
 ):
     client = Anthropic(api_key="z")
 
@@ -2491,8 +1646,7 @@ def test_stream_messages_close(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        stream_gen_ai_spans=stream_gen_ai_spans,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
     messages = [
@@ -2501,169 +1655,63 @@ def test_stream_messages_close(
             "content": "Hello, Claude",
         }
     ]
+    items = capture_items("span")
 
-    if span_streaming:
-        items = capture_items("transaction", "span")
+    with mock.patch.object(
+        client._client,
+        "send",
+        return_value=response,
+    ), client.messages.stream(
+        max_tokens=1024,
+        messages=messages,
+        model="model",
+    ) as stream:
+        for _ in range(4):
+            next(stream)
 
-        with mock.patch.object(
-            client._client,
-            "send",
-            return_value=response,
-        ) as _, sentry_sdk.traces.start_span(name="anthropic"), client.messages.stream(
-            max_tokens=1024,
-            messages=messages,
-            model="model",
-        ) as stream:
-            for _ in range(4):
-                next(stream)
+        # New versions add TextEvent, so consume one more event.
+        if TextEvent is not None and isinstance(next(stream), TextEvent):
+            next(stream)
 
-            # New versions add TextEvent, so consume one more event.
-            if TextEvent is not None and isinstance(next(stream), TextEvent):
-                next(stream)
+        stream.close()
 
-            stream.close()
+    sentry_sdk.flush()
+    spans = [item.payload for item in items]
+    span = next(
+        span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    )
 
-        sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
-        assert spans[1]["name"] == "anthropic"
-        span = next(
-            span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-        )
+    assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    assert span["name"] == "chat model"
+    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "anthropic"
+    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
-        assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-        assert span["name"] == "chat model"
-        assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
+    assert (
+        span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        == '[{"role": "user", "content": "Hello, Claude"}]'
+    )
+    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi!"
 
-        assert (
-            span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-            == '[{"role": "user", "content": "Hello, Claude"}]'
-        )
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi!"
-
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
-        assert (
-            span["attributes"][SPANDATA.GEN_AI_RESPONSE_ID]
-            == "msg_01XFDUDYJgAACzvnptvVoYEL"
-        )
-    elif stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
-
-        with mock.patch.object(
-            client._client,
-            "send",
-            return_value=response,
-        ) as _, start_transaction(name="anthropic"), client.messages.stream(
-            max_tokens=1024,
-            messages=messages,
-            model="model",
-        ) as stream:
-            for _ in range(4):
-                next(stream)
-
-            # New versions add TextEvent, so consume one more event.
-            if TextEvent is not None and isinstance(next(stream), TextEvent):
-                next(stream)
-
-            stream.close()
-
-        (event,) = (item.payload for item in items if item.type == "transaction")
-        assert event["transaction"] == "anthropic"
-
-        sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
-        span = next(
-            span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-        )
-
-        assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-        assert span["name"] == "chat model"
-        assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
-
-        assert (
-            span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-            == '[{"role": "user", "content": "Hello, Claude"}]'
-        )
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi!"
-
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
-        assert (
-            span["attributes"][SPANDATA.GEN_AI_RESPONSE_ID]
-            == "msg_01XFDUDYJgAACzvnptvVoYEL"
-        )
-    else:
-        events = capture_events()
-
-        with mock.patch.object(
-            client._client,
-            "send",
-            return_value=response,
-        ) as _, start_transaction(name="anthropic"), client.messages.stream(
-            max_tokens=1024,
-            messages=messages,
-            model="model",
-        ) as stream:
-            for _ in range(4):
-                next(stream)
-
-            # New versions add TextEvent, so consume one more event.
-            if TextEvent is not None and isinstance(next(stream), TextEvent):
-                next(stream)
-
-            stream.close()
-
-        assert len(events) == 1
-        (event,) = events
-
-        assert event["type"] == "transaction"
-        assert event["transaction"] == "anthropic"
-
-        span = next(span for span in event["spans"] if span["op"] == OP.GEN_AI_CHAT)
-
-        assert span["op"] == OP.GEN_AI_CHAT
-        assert span["description"] == "chat model"
-        assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-        assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
-
-        assert (
-            span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-            == '[{"role": "user", "content": "Hello, Claude"}]'
-        )
-        assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi!"
-
-        assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-        assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
-        assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
-        assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
-        assert (
-            span["data"][SPANDATA.GEN_AI_RESPONSE_ID] == "msg_01XFDUDYJgAACzvnptvVoYEL"
-        )
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
+    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert (
+        span["attributes"][SPANDATA.GEN_AI_RESPONSE_ID]
+        == "msg_01XFDUDYJgAACzvnptvVoYEL"
+    )
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.skipif(
     ANTHROPIC_VERSION < (0, 41),
     reason="Error classes moved in https://github.com/anthropics/anthropic-sdk-python/commit/4e0b15e22fe40e9aa513459564f641bf97c90954.",
 )
 def test_stream_messages_api_error(
     sentry_init,
-    capture_events,
     capture_items,
     get_model_response,
     server_side_event_chunks,
-    stream_gen_ai_spans,
-    span_streaming,
 ):
     client = Anthropic(api_key="z")
 
@@ -2704,8 +1752,7 @@ def test_stream_messages_api_error(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        stream_gen_ai_spans=stream_gen_ai_spans,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
     messages = [
@@ -2714,149 +1761,50 @@ def test_stream_messages_api_error(
             "content": "Hello, Claude",
         }
     ]
+    items = capture_items("span")
 
-    if span_streaming:
-        items = capture_items("transaction", "span")
+    with pytest.raises(APIStatusError), mock.patch.object(
+        client._client,
+        "send",
+        return_value=response,
+    ), client.messages.stream(
+        max_tokens=1024,
+        messages=messages,
+        model="model",
+    ) as stream:
+        for event in stream:
+            pass
 
-        with pytest.raises(APIStatusError), mock.patch.object(
-            client._client,
-            "send",
-            return_value=response,
-        ) as _, sentry_sdk.traces.start_span(name="anthropic"), client.messages.stream(
-            max_tokens=1024,
-            messages=messages,
-            model="model",
-        ) as stream:
-            for event in stream:
-                pass
+    sentry_sdk.flush()
+    spans = [item.payload for item in items]
+    span = next(
+        span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    )
 
-        sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
-        assert spans[1]["name"] == "anthropic"
-        assert spans[1]["status"] == SpanStatus.ERROR
-        span = next(
-            span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-        )
+    assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    assert span["name"] == "chat model"
+    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "anthropic"
+    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
-        assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-        assert span["name"] == "chat model"
-        assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
+    assert (
+        span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        == '[{"role": "user", "content": "Hello, Claude"}]'
+    )
+    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi!"
 
-        assert (
-            span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-            == '[{"role": "user", "content": "Hello, Claude"}]'
-        )
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi!"
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
+    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert (
+        span["attributes"][SPANDATA.GEN_AI_RESPONSE_ID]
+        == "msg_01XFDUDYJgAACzvnptvVoYEL"
+    )
 
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
-        assert (
-            span["attributes"][SPANDATA.GEN_AI_RESPONSE_ID]
-            == "msg_01XFDUDYJgAACzvnptvVoYEL"
-        )
-
-        assert span["status"] == "error"
-    elif stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
-
-        with pytest.raises(APIStatusError), mock.patch.object(
-            client._client,
-            "send",
-            return_value=response,
-        ) as _, start_transaction(name="anthropic"), client.messages.stream(
-            max_tokens=1024,
-            messages=messages,
-            model="model",
-        ) as stream:
-            for event in stream:
-                pass
-
-        (event,) = (item.payload for item in items if item.type == "transaction")
-        assert event["transaction"] == "anthropic"
-
-        sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
-        span = next(
-            span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-        )
-
-        assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-        assert span["name"] == "chat model"
-        assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
-
-        assert (
-            span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-            == '[{"role": "user", "content": "Hello, Claude"}]'
-        )
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi!"
-
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
-        assert (
-            span["attributes"][SPANDATA.GEN_AI_RESPONSE_ID]
-            == "msg_01XFDUDYJgAACzvnptvVoYEL"
-        )
-
-        assert span["status"] == "error"
-        assert event["contexts"]["trace"]["status"] == "internal_error"
-    else:
-        events = capture_events()
-
-        with pytest.raises(APIStatusError), mock.patch.object(
-            client._client,
-            "send",
-            return_value=response,
-        ) as _, start_transaction(name="anthropic"), client.messages.stream(
-            max_tokens=1024,
-            messages=messages,
-            model="model",
-        ) as stream:
-            for event in stream:
-                pass
-
-        assert len(events) == 1
-        (event,) = events
-
-        assert event["type"] == "transaction"
-        assert event["transaction"] == "anthropic"
-
-        span = next(span for span in event["spans"] if span["op"] == OP.GEN_AI_CHAT)
-
-        assert span["op"] == OP.GEN_AI_CHAT
-        assert span["description"] == "chat model"
-        assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-        assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
-
-        assert (
-            span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-            == '[{"role": "user", "content": "Hello, Claude"}]'
-        )
-        assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi!"
-
-        assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-        assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
-        assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
-        assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
-        assert (
-            span["data"][SPANDATA.GEN_AI_RESPONSE_ID] == "msg_01XFDUDYJgAACzvnptvVoYEL"
-        )
-
-        assert span["status"] == "internal_error"
-        assert span["tags"]["status"] == "internal_error"
-        assert event["contexts"]["trace"]["status"] == "internal_error"
+    assert span["status"] == "error"
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "send_default_pii, include_prompts",
@@ -2869,15 +1817,12 @@ def test_stream_messages_api_error(
 )
 async def test_streaming_create_message_async(
     sentry_init,
-    capture_events,
     capture_items,
     send_default_pii,
     include_prompts,
     get_model_response,
     async_iterator,
     server_side_event_chunks,
-    stream_gen_ai_spans,
-    span_streaming,
 ):
     client = AsyncAnthropic(api_key="z")
 
@@ -2926,8 +1871,7 @@ async def test_streaming_create_message_async(
         traces_sample_rate=1.0,
         default_integrations=False,
         send_default_pii=send_default_pii,
-        stream_gen_ai_spans=stream_gen_ai_spans,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
     messages = [
@@ -2940,177 +1884,60 @@ async def test_streaming_create_message_async(
             "content": "Hello, Claude",
         },
     ]
+    items = capture_items("span")
 
-    if span_streaming:
-        items = capture_items("transaction", "span")
-
-        with mock.patch.object(
-            client._client,
-            "send",
-            return_value=response,
-        ) as _, sentry_sdk.traces.start_span(name="anthropic"):
-            message = await client.messages.create(
-                max_tokens=1024, messages=messages, model="model", stream=True
-            )
-
-            async for _ in message:
-                pass
-
-        sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
-        assert len(spans) == 2
-
-        assert spans[1]["name"] == "anthropic"
-        (span, _) = spans
-
-        assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-        assert span["name"] == "chat model"
-        assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
-
-        if send_default_pii and include_prompts:
-            assert json.loads(span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]) == [
-                {
-                    "role": "user",
-                    "content": "Message demonstrating the absence of truncation.",
-                },
-                {
-                    "role": "user",
-                    "content": "Hello, Claude",
-                },
-            ]
-            assert (
-                span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi! I'm Claude!"
-            )
-
-        else:
-            assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
-
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 20
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
-        assert (
-            span["attributes"][SPANDATA.GEN_AI_RESPONSE_ID]
-            == "msg_01XFDUDYJgAACzvnptvVoYEL"
+    with mock.patch.object(
+        client._client,
+        "send",
+        return_value=response,
+    ):
+        message = await client.messages.create(
+            max_tokens=1024, messages=messages, model="model", stream=True
         )
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == [
-            "max_tokens"
+
+        async for _ in message:
+            pass
+
+    sentry_sdk.flush()
+    spans = [item.payload for item in items]
+    assert len(spans) == 1
+
+    (span,) = spans
+
+    assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    assert span["name"] == "chat model"
+    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "anthropic"
+    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
+
+    if send_default_pii and include_prompts:
+        assert json.loads(span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]) == [
+            {
+                "role": "user",
+                "content": "Message demonstrating the absence of truncation.",
+            },
+            {
+                "role": "user",
+                "content": "Hello, Claude",
+            },
         ]
-    elif stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi! I'm Claude!"
 
-        with mock.patch.object(
-            client._client,
-            "send",
-            return_value=response,
-        ) as _, start_transaction(name="anthropic"):
-            message = await client.messages.create(
-                max_tokens=1024, messages=messages, model="model", stream=True
-            )
-
-            async for _ in message:
-                pass
-
-        (event,) = (item.payload for item in items if item.type == "transaction")
-        assert event["transaction"] == "anthropic"
-
-        sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
-        assert len(spans) == 1
-        (span,) = spans
-
-        assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-        assert span["name"] == "chat model"
-        assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
-
-        if send_default_pii and include_prompts:
-            assert json.loads(span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]) == [
-                {
-                    "role": "user",
-                    "content": "Message demonstrating the absence of truncation.",
-                },
-                {
-                    "role": "user",
-                    "content": "Hello, Claude",
-                },
-            ]
-            assert (
-                span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi! I'm Claude!"
-            )
-
-        else:
-            assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
-
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 20
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
-        assert (
-            span["attributes"][SPANDATA.GEN_AI_RESPONSE_ID]
-            == "msg_01XFDUDYJgAACzvnptvVoYEL"
-        )
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == [
-            "max_tokens"
-        ]
     else:
-        events = capture_events()
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
 
-        with mock.patch.object(
-            client._client,
-            "send",
-            return_value=response,
-        ) as _, start_transaction(name="anthropic"):
-            message = await client.messages.create(
-                max_tokens=1024, messages=messages, model="model", stream=True
-            )
-
-            async for _ in message:
-                pass
-
-        assert len(events) == 1
-        (event,) = events
-
-        assert event["type"] == "transaction"
-        assert event["transaction"] == "anthropic"
-
-        assert len(event["spans"]) == 1
-        (span,) = event["spans"]
-
-        assert span["op"] == OP.GEN_AI_CHAT
-        assert span["description"] == "chat model"
-        assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-        assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
-
-        if send_default_pii and include_prompts:
-            assert (
-                span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-                == '[{"role": "user", "content": "Hello, Claude"}]'
-            )
-            assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi! I'm Claude!"
-
-        else:
-            assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
-
-        assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-        assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
-        assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 20
-        assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
-        assert (
-            span["data"][SPANDATA.GEN_AI_RESPONSE_ID] == "msg_01XFDUDYJgAACzvnptvVoYEL"
-        )
-        assert span["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["max_tokens"]
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 20
+    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert (
+        span["attributes"][SPANDATA.GEN_AI_RESPONSE_ID]
+        == "msg_01XFDUDYJgAACzvnptvVoYEL"
+    )
+    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["max_tokens"]
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "data_collection,send_default_pii,include_prompts,outputs_collected",
@@ -3154,7 +1981,6 @@ async def test_streaming_create_message_async(
 )
 async def test_streaming_create_message_data_collection_outputs_async(
     sentry_init,
-    capture_events,
     capture_items,
     data_collection,
     send_default_pii,
@@ -3163,16 +1989,13 @@ async def test_streaming_create_message_data_collection_outputs_async(
     get_model_response,
     async_iterator,
     server_side_event_chunks,
-    stream_gen_ai_spans,
-    span_streaming,
 ):
     sentry_init_kwargs = dict(
         integrations=[AnthropicIntegration(include_prompts=include_prompts)],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        stream_gen_ai_spans=stream_gen_ai_spans,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
     if data_collection is not None:
         sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
@@ -3220,38 +2043,21 @@ async def test_streaming_create_message_data_collection_outputs_async(
         messages=[{"role": "user", "content": "Hello, Claude"}],
         stream=True,
     )
+    items = capture_items("span")
 
-    if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+    with mock.patch.object(
+        client._client,
+        "send",
+        return_value=response,
+    ):
+        message = await client.messages.create(**create_kwargs)
+        async for _ in message:
+            pass
 
-        with mock.patch.object(
-            client._client,
-            "send",
-            return_value=response,
-        ), start_transaction(name="anthropic"):
-            message = await client.messages.create(**create_kwargs)
-            async for _ in message:
-                pass
-
-        sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
-        (span,) = [s for s in spans if s["attributes"]["sentry.op"] == OP.GEN_AI_CHAT]
-        span_data = span["attributes"]
-    else:
-        events = capture_events()
-
-        with mock.patch.object(
-            client._client,
-            "send",
-            return_value=response,
-        ), start_transaction(name="anthropic"):
-            message = await client.messages.create(**create_kwargs)
-            async for _ in message:
-                pass
-
-        (event,) = events
-        span = next(s for s in event["spans"] if s["op"] == OP.GEN_AI_CHAT)
-        span_data = span["data"]
+    sentry_sdk.flush()
+    spans = [item.payload for item in items]
+    (span,) = [s for s in spans if s["attributes"]["sentry.op"] == OP.GEN_AI_CHAT]
+    span_data = span["attributes"]
 
     # Output data that is not gated on data collection
     assert span_data[SPANDATA.GEN_AI_RESPONSE_MODEL] == "model"
@@ -3266,18 +2072,13 @@ async def test_streaming_create_message_data_collection_outputs_async(
         assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span_data
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 async def test_streaming_create_message_async_close(
     sentry_init,
-    capture_events,
     capture_items,
     get_model_response,
     async_iterator,
     server_side_event_chunks,
-    stream_gen_ai_spans,
-    span_streaming,
 ):
     client = AsyncAnthropic(api_key="z")
 
@@ -3325,8 +2126,7 @@ async def test_streaming_create_message_async_close(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        stream_gen_ai_spans=stream_gen_ai_spans,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
     messages = [
@@ -3335,142 +2135,49 @@ async def test_streaming_create_message_async_close(
             "content": "Hello, Claude",
         }
     ]
+    items = capture_items("span")
 
-    if span_streaming:
-        items = capture_items("transaction", "span")
-
-        with mock.patch.object(
-            client._client,
-            "send",
-            return_value=response,
-        ) as _, sentry_sdk.traces.start_span(name="anthropic"):
-            messages = await client.messages.create(
-                max_tokens=1024, messages=messages, model="model", stream=True
-            )
-
-            for _ in range(4):
-                await messages.__anext__()
-            await messages.close()
-
-        sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
-        assert spans[1]["name"] == "anthropic"
-        span = next(
-            span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    with mock.patch.object(
+        client._client,
+        "send",
+        return_value=response,
+    ):
+        messages = await client.messages.create(
+            max_tokens=1024, messages=messages, model="model", stream=True
         )
 
-        assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-        assert span["name"] == "chat model"
-        assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
+        for _ in range(4):
+            await messages.__anext__()
+        await messages.close()
 
-        assert (
-            span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-            == '[{"role": "user", "content": "Hello, Claude"}]'
-        )
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi!"
+    sentry_sdk.flush()
+    spans = [item.payload for item in items]
+    span = next(
+        span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    )
 
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
-        assert (
-            span["attributes"][SPANDATA.GEN_AI_RESPONSE_ID]
-            == "msg_01XFDUDYJgAACzvnptvVoYEL"
-        )
-    elif stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+    assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    assert span["name"] == "chat model"
+    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "anthropic"
+    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
-        with mock.patch.object(
-            client._client,
-            "send",
-            return_value=response,
-        ) as _, start_transaction(name="anthropic"):
-            messages = await client.messages.create(
-                max_tokens=1024, messages=messages, model="model", stream=True
-            )
+    assert (
+        span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        == '[{"role": "user", "content": "Hello, Claude"}]'
+    )
+    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi!"
 
-            for _ in range(4):
-                await messages.__anext__()
-            await messages.close()
-
-        (event,) = (item.payload for item in items if item.type == "transaction")
-        assert event["transaction"] == "anthropic"
-
-        sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
-        span = next(
-            span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-        )
-
-        assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-        assert span["name"] == "chat model"
-        assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
-
-        assert (
-            span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-            == '[{"role": "user", "content": "Hello, Claude"}]'
-        )
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi!"
-
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
-        assert (
-            span["attributes"][SPANDATA.GEN_AI_RESPONSE_ID]
-            == "msg_01XFDUDYJgAACzvnptvVoYEL"
-        )
-    else:
-        events = capture_events()
-
-        with mock.patch.object(
-            client._client,
-            "send",
-            return_value=response,
-        ) as _, start_transaction(name="anthropic"):
-            messages = await client.messages.create(
-                max_tokens=1024, messages=messages, model="model", stream=True
-            )
-
-            for _ in range(4):
-                await messages.__anext__()
-            await messages.close()
-
-        assert len(events) == 1
-        (event,) = events
-
-        assert event["type"] == "transaction"
-        assert event["transaction"] == "anthropic"
-
-        span = next(span for span in event["spans"] if span["op"] == OP.GEN_AI_CHAT)
-
-        assert span["op"] == OP.GEN_AI_CHAT
-        assert span["description"] == "chat model"
-        assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-        assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
-
-        assert (
-            span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-            == '[{"role": "user", "content": "Hello, Claude"}]'
-        )
-        assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi!"
-
-        assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-        assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
-        assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
-        assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
-        assert (
-            span["data"][SPANDATA.GEN_AI_RESPONSE_ID] == "msg_01XFDUDYJgAACzvnptvVoYEL"
-        )
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
+    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert (
+        span["attributes"][SPANDATA.GEN_AI_RESPONSE_ID]
+        == "msg_01XFDUDYJgAACzvnptvVoYEL"
+    )
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.skipif(
     ANTHROPIC_VERSION < (0, 41),
     reason="Error classes moved in https://github.com/anthropics/anthropic-sdk-python/commit/4e0b15e22fe40e9aa513459564f641bf97c90954.",
@@ -3478,13 +2185,10 @@ async def test_streaming_create_message_async_close(
 @pytest.mark.asyncio
 async def test_streaming_create_message_async_api_error(
     sentry_init,
-    capture_events,
     capture_items,
     get_model_response,
     async_iterator,
     server_side_event_chunks,
-    stream_gen_ai_spans,
-    span_streaming,
 ):
     client = AsyncAnthropic(api_key="z")
 
@@ -3527,8 +2231,7 @@ async def test_streaming_create_message_async_api_error(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        stream_gen_ai_spans=stream_gen_ai_spans,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
     messages = [
@@ -3537,149 +2240,50 @@ async def test_streaming_create_message_async_api_error(
             "content": "Hello, Claude",
         }
     ]
+    items = capture_items("span")
 
-    if span_streaming:
-        items = capture_items("transaction", "span")
-
-        with pytest.raises(APIStatusError), mock.patch.object(
-            client._client,
-            "send",
-            return_value=response,
-        ) as _, sentry_sdk.traces.start_span(name="anthropic"):
-            message = await client.messages.create(
-                max_tokens=1024, messages=messages, model="model", stream=True
-            )
-
-            async for _ in message:
-                pass
-
-        sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
-        assert spans[1]["name"] == "anthropic"
-        assert spans[1]["status"] == SpanStatus.ERROR
-        span = next(
-            span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    with pytest.raises(APIStatusError), mock.patch.object(
+        client._client,
+        "send",
+        return_value=response,
+    ):
+        message = await client.messages.create(
+            max_tokens=1024, messages=messages, model="model", stream=True
         )
 
-        assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-        assert span["name"] == "chat model"
-        assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
+        async for _ in message:
+            pass
 
-        assert (
-            span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-            == '[{"role": "user", "content": "Hello, Claude"}]'
-        )
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi!"
+    sentry_sdk.flush()
+    spans = [item.payload for item in items]
+    span = next(
+        span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    )
 
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
-        assert (
-            span["attributes"][SPANDATA.GEN_AI_RESPONSE_ID]
-            == "msg_01XFDUDYJgAACzvnptvVoYEL"
-        )
+    assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    assert span["name"] == "chat model"
+    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "anthropic"
+    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
-        assert span["status"] == "error"
-    elif stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+    assert (
+        span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        == '[{"role": "user", "content": "Hello, Claude"}]'
+    )
+    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi!"
 
-        with pytest.raises(APIStatusError), mock.patch.object(
-            client._client,
-            "send",
-            return_value=response,
-        ) as _, start_transaction(name="anthropic"):
-            message = await client.messages.create(
-                max_tokens=1024, messages=messages, model="model", stream=True
-            )
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
+    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert (
+        span["attributes"][SPANDATA.GEN_AI_RESPONSE_ID]
+        == "msg_01XFDUDYJgAACzvnptvVoYEL"
+    )
 
-            async for _ in message:
-                pass
-
-        (event,) = (item.payload for item in items if item.type == "transaction")
-        assert event["transaction"] == "anthropic"
-
-        sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
-        span = next(
-            span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-        )
-
-        assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-        assert span["name"] == "chat model"
-        assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
-
-        assert (
-            span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-            == '[{"role": "user", "content": "Hello, Claude"}]'
-        )
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi!"
-
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
-        assert (
-            span["attributes"][SPANDATA.GEN_AI_RESPONSE_ID]
-            == "msg_01XFDUDYJgAACzvnptvVoYEL"
-        )
-
-        assert span["status"] == "error"
-        assert event["contexts"]["trace"]["status"] == "internal_error"
-    else:
-        events = capture_events()
-
-        with pytest.raises(APIStatusError), mock.patch.object(
-            client._client,
-            "send",
-            return_value=response,
-        ) as _, start_transaction(name="anthropic"):
-            message = await client.messages.create(
-                max_tokens=1024, messages=messages, model="model", stream=True
-            )
-
-            async for _ in message:
-                pass
-
-        assert len(events) == 1
-        (event,) = events
-
-        assert event["type"] == "transaction"
-        assert event["transaction"] == "anthropic"
-
-        span = next(span for span in event["spans"] if span["op"] == OP.GEN_AI_CHAT)
-
-        assert span["op"] == OP.GEN_AI_CHAT
-        assert span["description"] == "chat model"
-        assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-        assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
-
-        assert (
-            span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-            == '[{"role": "user", "content": "Hello, Claude"}]'
-        )
-        assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi!"
-
-        assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-        assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
-        assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
-        assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
-        assert (
-            span["data"][SPANDATA.GEN_AI_RESPONSE_ID] == "msg_01XFDUDYJgAACzvnptvVoYEL"
-        )
-
-        assert span["status"] == "internal_error"
-        assert span["tags"]["status"] == "internal_error"
-        assert event["contexts"]["trace"]["status"] == "internal_error"
+    assert span["status"] == "error"
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "send_default_pii, include_prompts",
@@ -3692,15 +2296,12 @@ async def test_streaming_create_message_async_api_error(
 )
 async def test_stream_message_async(
     sentry_init,
-    capture_events,
     capture_items,
     send_default_pii,
     include_prompts,
     get_model_response,
     async_iterator,
     server_side_event_chunks,
-    stream_gen_ai_spans,
-    span_streaming,
 ):
     client = AsyncAnthropic(api_key="z")
 
@@ -3748,8 +2349,7 @@ async def test_stream_message_async(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        stream_gen_ai_spans=stream_gen_ai_spans,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
     messages = [
@@ -3762,172 +2362,60 @@ async def test_stream_message_async(
             "content": "Hello, Claude",
         },
     ]
+    items = capture_items("span")
 
-    if span_streaming:
-        items = capture_items("transaction", "span")
+    with mock.patch.object(
+        client._client,
+        "send",
+        return_value=response,
+    ):
+        async with client.messages.stream(
+            max_tokens=1024,
+            messages=messages,
+            model="model",
+        ) as stream:
+            async for event in stream:
+                pass
 
-        with mock.patch.object(
-            client._client,
-            "send",
-            return_value=response,
-        ) as _, sentry_sdk.traces.start_span(name="anthropic"):
-            async with client.messages.stream(
-                max_tokens=1024,
-                messages=messages,
-                model="model",
-            ) as stream:
-                async for event in stream:
-                    pass
+    sentry_sdk.flush()
+    spans = [item.payload for item in items]
+    assert len(spans) == 1
 
-        sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
-        assert len(spans) == 2
+    (span,) = spans
 
-        assert spans[1]["name"] == "anthropic"
-        (span, _) = spans
+    assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    assert span["name"] == "chat model"
+    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "anthropic"
+    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
-        assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-        assert span["name"] == "chat model"
-        assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
+    if send_default_pii and include_prompts:
+        assert json.loads(span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]) == [
+            {
+                "role": "user",
+                "content": "Message demonstrating the absence of truncation.",
+            },
+            {
+                "role": "user",
+                "content": "Hello, Claude",
+            },
+        ]
+        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi! I'm Claude!"
 
-        if send_default_pii and include_prompts:
-            assert json.loads(span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]) == [
-                {
-                    "role": "user",
-                    "content": "Message demonstrating the absence of truncation.",
-                },
-                {
-                    "role": "user",
-                    "content": "Hello, Claude",
-                },
-            ]
-            assert (
-                span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi! I'm Claude!"
-            )
-
-        else:
-            assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
-
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 20
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
-        assert (
-            span["attributes"][SPANDATA.GEN_AI_RESPONSE_ID]
-            == "msg_01XFDUDYJgAACzvnptvVoYEL"
-        )
-    elif stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
-
-        with mock.patch.object(
-            client._client,
-            "send",
-            return_value=response,
-        ) as _, start_transaction(name="anthropic"):
-            async with client.messages.stream(
-                max_tokens=1024,
-                messages=messages,
-                model="model",
-            ) as stream:
-                async for event in stream:
-                    pass
-
-        (event,) = (item.payload for item in items if item.type == "transaction")
-        assert event["transaction"] == "anthropic"
-
-        sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
-        assert len(spans) == 1
-        (span,) = spans
-
-        assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-        assert span["name"] == "chat model"
-        assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
-
-        if send_default_pii and include_prompts:
-            assert json.loads(span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]) == [
-                {
-                    "role": "user",
-                    "content": "Message demonstrating the absence of truncation.",
-                },
-                {
-                    "role": "user",
-                    "content": "Hello, Claude",
-                },
-            ]
-            assert (
-                span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi! I'm Claude!"
-            )
-
-        else:
-            assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
-
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 20
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
-        assert (
-            span["attributes"][SPANDATA.GEN_AI_RESPONSE_ID]
-            == "msg_01XFDUDYJgAACzvnptvVoYEL"
-        )
     else:
-        events = capture_events()
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
 
-        with mock.patch.object(
-            client._client,
-            "send",
-            return_value=response,
-        ) as _, start_transaction(name="anthropic"):
-            async with client.messages.stream(
-                max_tokens=1024,
-                messages=messages,
-                model="model",
-            ) as stream:
-                async for event in stream:
-                    pass
-        assert len(events) == 1
-        (event,) = events
-
-        assert event["type"] == "transaction"
-        assert event["transaction"] == "anthropic"
-
-        assert len(event["spans"]) == 1
-        (span,) = event["spans"]
-
-        assert span["op"] == OP.GEN_AI_CHAT
-        assert span["description"] == "chat model"
-        assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-        assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
-
-        if send_default_pii and include_prompts:
-            assert (
-                span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-                == '[{"role": "user", "content": "Hello, Claude"}]'
-            )
-            assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi! I'm Claude!"
-
-        else:
-            assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
-
-        assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-        assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
-        assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 20
-        assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
-        assert (
-            span["data"][SPANDATA.GEN_AI_RESPONSE_ID] == "msg_01XFDUDYJgAACzvnptvVoYEL"
-        )
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 20
+    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert (
+        span["attributes"][SPANDATA.GEN_AI_RESPONSE_ID]
+        == "msg_01XFDUDYJgAACzvnptvVoYEL"
+    )
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "data_collection,send_default_pii,include_prompts,outputs_collected",
@@ -3971,7 +2459,6 @@ async def test_stream_message_async(
 )
 async def test_stream_messages_data_collection_outputs_async(
     sentry_init,
-    capture_events,
     capture_items,
     data_collection,
     send_default_pii,
@@ -3980,16 +2467,13 @@ async def test_stream_messages_data_collection_outputs_async(
     get_model_response,
     async_iterator,
     server_side_event_chunks,
-    stream_gen_ai_spans,
-    span_streaming,
 ):
     sentry_init_kwargs = dict(
         integrations=[AnthropicIntegration(include_prompts=include_prompts)],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        stream_gen_ai_spans=stream_gen_ai_spans,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
     if data_collection is not None:
         sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
@@ -4036,38 +2520,21 @@ async def test_stream_messages_data_collection_outputs_async(
         model="model",
         messages=[{"role": "user", "content": "Hello, Claude"}],
     )
+    items = capture_items("span")
 
-    if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+    with mock.patch.object(
+        client._client,
+        "send",
+        return_value=response,
+    ):
+        async with client.messages.stream(**stream_kwargs) as stream:
+            async for _ in stream:
+                pass
 
-        with mock.patch.object(
-            client._client,
-            "send",
-            return_value=response,
-        ), start_transaction(name="anthropic"):
-            async with client.messages.stream(**stream_kwargs) as stream:
-                async for _ in stream:
-                    pass
-
-        sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
-        (span,) = [s for s in spans if s["attributes"]["sentry.op"] == OP.GEN_AI_CHAT]
-        span_data = span["attributes"]
-    else:
-        events = capture_events()
-
-        with mock.patch.object(
-            client._client,
-            "send",
-            return_value=response,
-        ), start_transaction(name="anthropic"):
-            async with client.messages.stream(**stream_kwargs) as stream:
-                async for _ in stream:
-                    pass
-
-        (event,) = events
-        span = next(s for s in event["spans"] if s["op"] == OP.GEN_AI_CHAT)
-        span_data = span["data"]
+    sentry_sdk.flush()
+    spans = [item.payload for item in items]
+    (span,) = [s for s in spans if s["attributes"]["sentry.op"] == OP.GEN_AI_CHAT]
+    span_data = span["attributes"]
 
     # Output data that is not gated on data collection
     assert span_data[SPANDATA.GEN_AI_RESPONSE_MODEL] == "model"
@@ -4082,8 +2549,6 @@ async def test_stream_messages_data_collection_outputs_async(
         assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span_data
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.skipif(
     ANTHROPIC_VERSION < (0, 41),
     reason="Error classes moved in https://github.com/anthropics/anthropic-sdk-python/commit/4e0b15e22fe40e9aa513459564f641bf97c90954.",
@@ -4091,13 +2556,10 @@ async def test_stream_messages_data_collection_outputs_async(
 @pytest.mark.asyncio
 async def test_stream_messages_async_api_error(
     sentry_init,
-    capture_events,
     capture_items,
     get_model_response,
     async_iterator,
     server_side_event_chunks,
-    stream_gen_ai_spans,
-    span_streaming,
 ):
     client = AsyncAnthropic(api_key="z")
 
@@ -4140,8 +2602,7 @@ async def test_stream_messages_async_api_error(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        stream_gen_ai_spans=stream_gen_ai_spans,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
     messages = [
@@ -4150,157 +2611,58 @@ async def test_stream_messages_async_api_error(
             "content": "Hello, Claude",
         }
     ]
+    items = capture_items("span")
 
-    if span_streaming:
-        items = capture_items("transaction", "span")
+    with pytest.raises(APIStatusError), mock.patch.object(
+        client._client,
+        "send",
+        return_value=response,
+    ):
+        async with client.messages.stream(
+            max_tokens=1024,
+            messages=messages,
+            model="model",
+        ) as stream:
+            async for event in stream:
+                pass
 
-        with pytest.raises(APIStatusError), mock.patch.object(
-            client._client,
-            "send",
-            return_value=response,
-        ) as _, sentry_sdk.traces.start_span(name="anthropic"):
-            async with client.messages.stream(
-                max_tokens=1024,
-                messages=messages,
-                model="model",
-            ) as stream:
-                async for event in stream:
-                    pass
+    sentry_sdk.flush()
+    spans = [item.payload for item in items]
+    span = next(
+        span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    )
 
-        sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
-        assert spans[1]["name"] == "anthropic"
-        span = next(
-            span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-        )
+    assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    assert span["name"] == "chat model"
+    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "anthropic"
+    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
-        assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-        assert span["name"] == "chat model"
-        assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
+    assert (
+        span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        == '[{"role": "user", "content": "Hello, Claude"}]'
+    )
+    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi!"
 
-        assert (
-            span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-            == '[{"role": "user", "content": "Hello, Claude"}]'
-        )
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi!"
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
+    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert (
+        span["attributes"][SPANDATA.GEN_AI_RESPONSE_ID]
+        == "msg_01XFDUDYJgAACzvnptvVoYEL"
+    )
 
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
-        assert (
-            span["attributes"][SPANDATA.GEN_AI_RESPONSE_ID]
-            == "msg_01XFDUDYJgAACzvnptvVoYEL"
-        )
-
-        assert span["status"] == "error"
-    elif stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
-
-        with pytest.raises(APIStatusError), mock.patch.object(
-            client._client,
-            "send",
-            return_value=response,
-        ) as _, start_transaction(name="anthropic"):
-            async with client.messages.stream(
-                max_tokens=1024,
-                messages=messages,
-                model="model",
-            ) as stream:
-                async for event in stream:
-                    pass
-
-        sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
-        span = next(
-            span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-        )
-
-        assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-        assert span["name"] == "chat model"
-        assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
-
-        assert (
-            span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-            == '[{"role": "user", "content": "Hello, Claude"}]'
-        )
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi!"
-
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
-        assert (
-            span["attributes"][SPANDATA.GEN_AI_RESPONSE_ID]
-            == "msg_01XFDUDYJgAACzvnptvVoYEL"
-        )
-
-        assert span["status"] == "error"
-    else:
-        events = capture_events()
-
-        with pytest.raises(APIStatusError), mock.patch.object(
-            client._client,
-            "send",
-            return_value=response,
-        ) as _, start_transaction(name="anthropic"):
-            async with client.messages.stream(
-                max_tokens=1024,
-                messages=messages,
-                model="model",
-            ) as stream:
-                async for event in stream:
-                    pass
-
-        assert len(events) == 1
-        (event,) = events
-
-        assert event["type"] == "transaction"
-        assert event["transaction"] == "anthropic"
-
-        span = next(span for span in event["spans"] if span["op"] == OP.GEN_AI_CHAT)
-
-        assert span["op"] == OP.GEN_AI_CHAT
-        assert span["description"] == "chat model"
-        assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-        assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
-
-        assert (
-            span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-            == '[{"role": "user", "content": "Hello, Claude"}]'
-        )
-        assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi!"
-
-        assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-        assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
-        assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
-        assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
-        assert (
-            span["data"][SPANDATA.GEN_AI_RESPONSE_ID] == "msg_01XFDUDYJgAACzvnptvVoYEL"
-        )
-
-        assert span["status"] == "internal_error"
-        assert span["tags"]["status"] == "internal_error"
-        assert event["contexts"]["trace"]["status"] == "internal_error"
+    assert span["status"] == "error"
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 async def test_stream_messages_async_close(
     sentry_init,
-    capture_events,
     capture_items,
     get_model_response,
     async_iterator,
     server_side_event_chunks,
-    stream_gen_ai_spans,
-    span_streaming,
 ):
     client = AsyncAnthropic(api_key="z")
 
@@ -4348,8 +2710,7 @@ async def test_stream_messages_async_close(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        stream_gen_ai_spans=stream_gen_ai_spans,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
     messages = [
@@ -4358,163 +2719,57 @@ async def test_stream_messages_async_close(
             "content": "Hello, Claude",
         }
     ]
+    items = capture_items("span")
 
-    if span_streaming:
-        items = capture_items("transaction", "span")
+    with mock.patch.object(
+        client._client,
+        "send",
+        return_value=response,
+    ):
+        async with client.messages.stream(
+            max_tokens=1024,
+            messages=messages,
+            model="model",
+        ) as stream:
+            for _ in range(4):
+                await stream.__anext__()
 
-        with mock.patch.object(
-            client._client,
-            "send",
-            return_value=response,
-        ) as _, sentry_sdk.traces.start_span(name="anthropic"):
-            async with client.messages.stream(
-                max_tokens=1024,
-                messages=messages,
-                model="model",
-            ) as stream:
-                for _ in range(4):
-                    await stream.__anext__()
+            # New versions add TextEvent, so consume one more event.
+            if TextEvent is not None and isinstance(
+                await stream.__anext__(), TextEvent
+            ):
+                await stream.__anext__()
 
-                # New versions add TextEvent, so consume one more event.
-                if TextEvent is not None and isinstance(
-                    await stream.__anext__(), TextEvent
-                ):
-                    await stream.__anext__()
+            await stream.close()
 
-                await stream.close()
+    sentry_sdk.flush()
+    spans = [item.payload for item in items]
+    span = next(
+        span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    )
 
-        sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
-        assert spans[1]["name"] == "anthropic"
-        span = next(
-            span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-        )
+    assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    assert span["name"] == "chat model"
+    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "anthropic"
+    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
-        assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-        assert span["name"] == "chat model"
-        assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
+    assert (
+        span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        == '[{"role": "user", "content": "Hello, Claude"}]'
+    )
+    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi!"
 
-        assert (
-            span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-            == '[{"role": "user", "content": "Hello, Claude"}]'
-        )
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi!"
-
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
-        assert (
-            span["attributes"][SPANDATA.GEN_AI_RESPONSE_ID]
-            == "msg_01XFDUDYJgAACzvnptvVoYEL"
-        )
-    elif stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
-
-        with mock.patch.object(
-            client._client,
-            "send",
-            return_value=response,
-        ) as _, start_transaction(name="anthropic"):
-            async with client.messages.stream(
-                max_tokens=1024,
-                messages=messages,
-                model="model",
-            ) as stream:
-                for _ in range(4):
-                    await stream.__anext__()
-
-                # New versions add TextEvent, so consume one more event.
-                if TextEvent is not None and isinstance(
-                    await stream.__anext__(), TextEvent
-                ):
-                    await stream.__anext__()
-
-                await stream.close()
-
-        sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
-        span = next(
-            span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-        )
-
-        assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-        assert span["name"] == "chat model"
-        assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
-
-        assert (
-            span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-            == '[{"role": "user", "content": "Hello, Claude"}]'
-        )
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi!"
-
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
-        assert (
-            span["attributes"][SPANDATA.GEN_AI_RESPONSE_ID]
-            == "msg_01XFDUDYJgAACzvnptvVoYEL"
-        )
-    else:
-        events = capture_events()
-
-        with mock.patch.object(
-            client._client,
-            "send",
-            return_value=response,
-        ) as _, start_transaction(name="anthropic"):
-            async with client.messages.stream(
-                max_tokens=1024,
-                messages=messages,
-                model="model",
-            ) as stream:
-                for _ in range(4):
-                    await stream.__anext__()
-
-                # New versions add TextEvent, so consume one more event.
-                if TextEvent is not None and isinstance(
-                    await stream.__anext__(), TextEvent
-                ):
-                    await stream.__anext__()
-
-                await stream.close()
-
-        assert len(events) == 1
-        (event,) = events
-
-        assert event["type"] == "transaction"
-        assert event["transaction"] == "anthropic"
-
-        span = next(span for span in event["spans"] if span["op"] == OP.GEN_AI_CHAT)
-
-        assert span["op"] == OP.GEN_AI_CHAT
-        assert span["description"] == "chat model"
-        assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-        assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
-
-        assert (
-            span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-            == '[{"role": "user", "content": "Hello, Claude"}]'
-        )
-        assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi!"
-
-        assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-        assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
-        assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
-        assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
-        assert (
-            span["data"][SPANDATA.GEN_AI_RESPONSE_ID] == "msg_01XFDUDYJgAACzvnptvVoYEL"
-        )
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
+    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert (
+        span["attributes"][SPANDATA.GEN_AI_RESPONSE_ID]
+        == "msg_01XFDUDYJgAACzvnptvVoYEL"
+    )
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.skipif(
     ANTHROPIC_VERSION < (0, 27),
     reason="Versions <0.27.0 do not include InputJSONDelta, which was introduced in >=0.27.0 along with a new message delta type for tool calling.",
@@ -4530,14 +2785,11 @@ async def test_stream_messages_async_close(
 )
 def test_streaming_create_message_with_input_json_delta(
     sentry_init,
-    capture_events,
     capture_items,
     send_default_pii,
     include_prompts,
     get_model_response,
     server_side_event_chunks,
-    stream_gen_ai_spans,
-    span_streaming,
 ):
     client = Anthropic(api_key="z")
 
@@ -4613,8 +2865,7 @@ def test_streaming_create_message_with_input_json_delta(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        stream_gen_ai_spans=stream_gen_ai_spans,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
     messages = [
@@ -4623,151 +2874,51 @@ def test_streaming_create_message_with_input_json_delta(
             "content": "What is the weather like in San Francisco?",
         }
     ]
+    items = capture_items("span")
 
-    if span_streaming:
-        items = capture_items("transaction", "span")
+    with mock.patch.object(
+        client._client,
+        "send",
+        return_value=response,
+    ):
+        message = client.messages.create(
+            max_tokens=1024, messages=messages, model="model", stream=True
+        )
 
-        with mock.patch.object(
-            client._client,
-            "send",
-            return_value=response,
-        ) as _, sentry_sdk.traces.start_span(name="anthropic"):
-            message = client.messages.create(
-                max_tokens=1024, messages=messages, model="model", stream=True
-            )
+        for _ in message:
+            pass
 
-            for _ in message:
-                pass
+    sentry_sdk.flush()
+    spans = [item.payload for item in items]
+    assert len(spans) == 1
 
-        sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
-        assert len(spans) == 2
+    (span,) = spans
 
-        assert spans[1]["name"] == "anthropic"
-        (span, _) = spans
+    assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    assert span["name"] == "chat model"
+    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "anthropic"
+    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
-        assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-        assert span["name"] == "chat model"
-        assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
-
-        if send_default_pii and include_prompts:
-            assert (
-                span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-                == '[{"role": "user", "content": "What is the weather like in San Francisco?"}]'
-            )
-            assert (
-                span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
-                == '{"location": "San Francisco, CA"}'
-            )
-        else:
-            assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
-
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 366
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 41
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 407
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
-
-    elif stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
-
-        with mock.patch.object(
-            client._client,
-            "send",
-            return_value=response,
-        ) as _, start_transaction(name="anthropic"):
-            message = client.messages.create(
-                max_tokens=1024, messages=messages, model="model", stream=True
-            )
-
-            for _ in message:
-                pass
-
-        (event,) = (item.payload for item in items if item.type == "transaction")
-        assert event["transaction"] == "anthropic"
-
-        sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
-        assert len(spans) == 1
-        (span,) = spans
-
-        assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-        assert span["name"] == "chat model"
-        assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
-
-        if send_default_pii and include_prompts:
-            assert (
-                span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-                == '[{"role": "user", "content": "What is the weather like in San Francisco?"}]'
-            )
-            assert (
-                span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
-                == '{"location": "San Francisco, CA"}'
-            )
-        else:
-            assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
-
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 366
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 41
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 407
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
-
+    if send_default_pii and include_prompts:
+        assert (
+            span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+            == '[{"role": "user", "content": "What is the weather like in San Francisco?"}]'
+        )
+        assert (
+            span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+            == '{"location": "San Francisco, CA"}'
+        )
     else:
-        events = capture_events()
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
 
-        with mock.patch.object(
-            client._client,
-            "send",
-            return_value=response,
-        ) as _, start_transaction(name="anthropic"):
-            message = client.messages.create(
-                max_tokens=1024, messages=messages, model="model", stream=True
-            )
-
-            for _ in message:
-                pass
-
-        assert len(events) == 1
-        (event,) = events
-
-        assert event["type"] == "transaction"
-        assert event["transaction"] == "anthropic"
-
-        assert len(event["spans"]) == 1
-        (span,) = event["spans"]
-
-        assert span["op"] == OP.GEN_AI_CHAT
-        assert span["description"] == "chat model"
-        assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-        assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
-
-        if send_default_pii and include_prompts:
-            assert (
-                span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-                == '[{"role": "user", "content": "What is the weather like in San Francisco?"}]'
-            )
-            assert (
-                span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
-                == '{"location": "San Francisco, CA"}'
-            )
-        else:
-            assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
-
-        assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 366
-        assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 41
-        assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 407
-        assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 366
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 41
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 407
+    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.skipif(
     ANTHROPIC_VERSION < (0, 27),
     reason="Versions <0.27.0 do not include InputJSONDelta, which was introduced in >=0.27.0 along with a new message delta type for tool calling.",
@@ -4783,14 +2934,11 @@ def test_streaming_create_message_with_input_json_delta(
 )
 def test_stream_messages_with_input_json_delta(
     sentry_init,
-    capture_events,
     capture_items,
     send_default_pii,
     include_prompts,
     get_model_response,
     server_side_event_chunks,
-    stream_gen_ai_spans,
-    span_streaming,
 ):
     client = Anthropic(api_key="z")
 
@@ -4866,8 +3014,7 @@ def test_stream_messages_with_input_json_delta(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        stream_gen_ai_spans=stream_gen_ai_spans,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
     messages = [
@@ -4876,150 +3023,51 @@ def test_stream_messages_with_input_json_delta(
             "content": "What is the weather like in San Francisco?",
         }
     ]
+    items = capture_items("span")
 
-    if span_streaming:
-        items = capture_items("transaction", "span")
+    with mock.patch.object(
+        client._client,
+        "send",
+        return_value=response,
+    ), client.messages.stream(
+        max_tokens=1024,
+        messages=messages,
+        model="model",
+    ) as stream:
+        for event in stream:
+            pass
 
-        with mock.patch.object(
-            client._client,
-            "send",
-            return_value=response,
-        ) as _, sentry_sdk.traces.start_span(name="anthropic"), client.messages.stream(
-            max_tokens=1024,
-            messages=messages,
-            model="model",
-        ) as stream:
-            for event in stream:
-                pass
+    sentry_sdk.flush()
+    spans = [item.payload for item in items]
+    assert len(spans) == 1
 
-        sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
-        assert len(spans) == 2
+    (span,) = spans
 
-        assert spans[1]["name"] == "anthropic"
-        (span, _) = spans
+    assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    assert span["name"] == "chat model"
+    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "anthropic"
+    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
-        assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-        assert span["name"] == "chat model"
-        assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
-
-        if send_default_pii and include_prompts:
-            assert (
-                span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-                == '[{"role": "user", "content": "What is the weather like in San Francisco?"}]'
-            )
-            assert (
-                span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
-                == '{"location": "San Francisco, CA"}'
-            )
-        else:
-            assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
-
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 366
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 41
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 407
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
-
-    elif stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
-
-        with mock.patch.object(
-            client._client,
-            "send",
-            return_value=response,
-        ) as _, start_transaction(name="anthropic"), client.messages.stream(
-            max_tokens=1024,
-            messages=messages,
-            model="model",
-        ) as stream:
-            for event in stream:
-                pass
-
-        (event,) = (item.payload for item in items if item.type == "transaction")
-        assert event["transaction"] == "anthropic"
-
-        sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
-        assert len(spans) == 1
-        (span,) = spans
-
-        assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-        assert span["name"] == "chat model"
-        assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
-
-        if send_default_pii and include_prompts:
-            assert (
-                span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-                == '[{"role": "user", "content": "What is the weather like in San Francisco?"}]'
-            )
-            assert (
-                span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
-                == '{"location": "San Francisco, CA"}'
-            )
-        else:
-            assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
-
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 366
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 41
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 407
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    if send_default_pii and include_prompts:
+        assert (
+            span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+            == '[{"role": "user", "content": "What is the weather like in San Francisco?"}]'
+        )
+        assert (
+            span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+            == '{"location": "San Francisco, CA"}'
+        )
     else:
-        events = capture_events()
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
 
-        with mock.patch.object(
-            client._client,
-            "send",
-            return_value=response,
-        ) as _, start_transaction(name="anthropic"), client.messages.stream(
-            max_tokens=1024,
-            messages=messages,
-            model="model",
-        ) as stream:
-            for event in stream:
-                pass
-
-        assert len(events) == 1
-        (event,) = events
-
-        assert event["type"] == "transaction"
-        assert event["transaction"] == "anthropic"
-
-        assert len(event["spans"]) == 1
-        (span,) = event["spans"]
-
-        assert span["op"] == OP.GEN_AI_CHAT
-        assert span["description"] == "chat model"
-        assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-        assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
-
-        if send_default_pii and include_prompts:
-            assert (
-                span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-                == '[{"role": "user", "content": "What is the weather like in San Francisco?"}]'
-            )
-            assert (
-                span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
-                == '{"location": "San Francisco, CA"}'
-            )
-        else:
-            assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
-
-        assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 366
-        assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 41
-        assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 407
-        assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 366
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 41
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 407
+    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 @pytest.mark.skipif(
     ANTHROPIC_VERSION < (0, 27),
@@ -5036,15 +3084,12 @@ def test_stream_messages_with_input_json_delta(
 )
 async def test_streaming_create_message_with_input_json_delta_async(
     sentry_init,
-    capture_events,
     capture_items,
     send_default_pii,
     include_prompts,
     get_model_response,
     async_iterator,
     server_side_event_chunks,
-    stream_gen_ai_spans,
-    span_streaming,
 ):
     client = AsyncAnthropic(api_key="z")
     response = get_model_response(
@@ -5125,8 +3170,7 @@ async def test_streaming_create_message_with_input_json_delta_async(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        stream_gen_ai_spans=stream_gen_ai_spans,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
     messages = [
@@ -5135,153 +3179,52 @@ async def test_streaming_create_message_with_input_json_delta_async(
             "content": "What is the weather like in San Francisco?",
         }
     ]
+    items = capture_items("span")
 
-    if span_streaming:
-        items = capture_items("transaction", "span")
+    with mock.patch.object(
+        client._client,
+        "send",
+        return_value=response,
+    ):
+        message = await client.messages.create(
+            max_tokens=1024, messages=messages, model="model", stream=True
+        )
 
-        with mock.patch.object(
-            client._client,
-            "send",
-            return_value=response,
-        ) as _, sentry_sdk.traces.start_span(name="anthropic"):
-            message = await client.messages.create(
-                max_tokens=1024, messages=messages, model="model", stream=True
-            )
+        async for _ in message:
+            pass
 
-            async for _ in message:
-                pass
+    sentry_sdk.flush()
+    spans = [item.payload for item in items]
+    assert len(spans) == 1
 
-        sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
-        assert len(spans) == 2
+    (span,) = spans
 
-        assert spans[1]["name"] == "anthropic"
-        (span, _) = spans
+    assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    assert span["name"] == "chat model"
+    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "anthropic"
+    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
-        assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-        assert span["name"] == "chat model"
-        assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
+    if send_default_pii and include_prompts:
+        assert (
+            span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+            == '[{"role": "user", "content": "What is the weather like in San Francisco?"}]'
+        )
+        assert (
+            span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+            == '{"location": "San Francisco, CA"}'
+        )
 
-        if send_default_pii and include_prompts:
-            assert (
-                span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-                == '[{"role": "user", "content": "What is the weather like in San Francisco?"}]'
-            )
-            assert (
-                span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
-                == '{"location": "San Francisco, CA"}'
-            )
-
-        else:
-            assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
-
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 366
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 41
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 407
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
-
-    elif stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
-
-        with mock.patch.object(
-            client._client,
-            "send",
-            return_value=response,
-        ) as _, start_transaction(name="anthropic"):
-            message = await client.messages.create(
-                max_tokens=1024, messages=messages, model="model", stream=True
-            )
-
-            async for _ in message:
-                pass
-
-        (event,) = (item.payload for item in items if item.type == "transaction")
-        assert event["transaction"] == "anthropic"
-
-        sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
-        assert len(spans) == 1
-        (span,) = spans
-
-        assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-        assert span["name"] == "chat model"
-        assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
-
-        if send_default_pii and include_prompts:
-            assert (
-                span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-                == '[{"role": "user", "content": "What is the weather like in San Francisco?"}]'
-            )
-            assert (
-                span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
-                == '{"location": "San Francisco, CA"}'
-            )
-
-        else:
-            assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
-
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 366
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 41
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 407
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
     else:
-        events = capture_events()
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
 
-        with mock.patch.object(
-            client._client,
-            "send",
-            return_value=response,
-        ) as _, start_transaction(name="anthropic"):
-            message = await client.messages.create(
-                max_tokens=1024, messages=messages, model="model", stream=True
-            )
-
-            async for _ in message:
-                pass
-
-        assert len(events) == 1
-        (event,) = events
-
-        assert event["type"] == "transaction"
-        assert event["transaction"] == "anthropic"
-
-        assert len(event["spans"]) == 1
-        (span,) = event["spans"]
-
-        assert span["op"] == OP.GEN_AI_CHAT
-        assert span["description"] == "chat model"
-        assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-        assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
-
-        if send_default_pii and include_prompts:
-            assert (
-                span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-                == '[{"role": "user", "content": "What is the weather like in San Francisco?"}]'
-            )
-            assert (
-                span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
-                == '{"location": "San Francisco, CA"}'
-            )
-
-        else:
-            assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
-
-        assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 366
-        assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 41
-        assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 407
-        assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 366
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 41
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 407
+    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 @pytest.mark.skipif(
     ANTHROPIC_VERSION < (0, 27),
@@ -5298,15 +3241,12 @@ async def test_streaming_create_message_with_input_json_delta_async(
 )
 async def test_stream_message_with_input_json_delta_async(
     sentry_init,
-    capture_events,
     capture_items,
     send_default_pii,
     include_prompts,
     get_model_response,
     async_iterator,
     server_side_event_chunks,
-    stream_gen_ai_spans,
-    span_streaming,
 ):
     client = AsyncAnthropic(api_key="z")
     response = get_model_response(
@@ -5387,8 +3327,7 @@ async def test_stream_message_with_input_json_delta_async(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        stream_gen_ai_spans=stream_gen_ai_spans,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
     messages = [
@@ -5397,481 +3336,185 @@ async def test_stream_message_with_input_json_delta_async(
             "content": "What is the weather like in San Francisco?",
         }
     ]
+    items = capture_items("span")
 
-    if span_streaming:
-        items = capture_items("transaction", "span")
+    with mock.patch.object(
+        client._client,
+        "send",
+        return_value=response,
+    ):
+        async with client.messages.stream(
+            max_tokens=1024,
+            messages=messages,
+            model="model",
+        ) as stream:
+            async for event in stream:
+                pass
 
-        with mock.patch.object(
-            client._client,
-            "send",
-            return_value=response,
-        ) as _, sentry_sdk.traces.start_span(name="anthropic"):
-            async with client.messages.stream(
-                max_tokens=1024,
-                messages=messages,
-                model="model",
-            ) as stream:
-                async for event in stream:
-                    pass
+    sentry_sdk.flush()
+    spans = [item.payload for item in items]
+    assert len(spans) == 1
 
-        sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
-        assert len(spans) == 2
+    (span,) = spans
 
-        assert spans[1]["name"] == "anthropic"
-        (span, _) = spans
+    assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    assert span["name"] == "chat model"
+    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "anthropic"
+    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
-        assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-        assert span["name"] == "chat model"
-        assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
-
-        if send_default_pii and include_prompts:
-            assert (
-                span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-                == '[{"role": "user", "content": "What is the weather like in San Francisco?"}]'
-            )
-            assert (
-                span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
-                == '{"location": "San Francisco, CA"}'
-            )
-        else:
-            assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
-
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 366
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 41
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 407
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
-
-    elif stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
-
-        with mock.patch.object(
-            client._client,
-            "send",
-            return_value=response,
-        ) as _, start_transaction(name="anthropic"):
-            async with client.messages.stream(
-                max_tokens=1024,
-                messages=messages,
-                model="model",
-            ) as stream:
-                async for event in stream:
-                    pass
-
-        (event,) = (item.payload for item in items if item.type == "transaction")
-        assert event["transaction"] == "anthropic"
-
-        sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
-        assert len(spans) == 1
-        (span,) = spans
-
-        assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-        assert span["name"] == "chat model"
-        assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
-
-        if send_default_pii and include_prompts:
-            assert (
-                span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-                == '[{"role": "user", "content": "What is the weather like in San Francisco?"}]'
-            )
-            assert (
-                span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
-                == '{"location": "San Francisco, CA"}'
-            )
-        else:
-            assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
-
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 366
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 41
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 407
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    if send_default_pii and include_prompts:
+        assert (
+            span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+            == '[{"role": "user", "content": "What is the weather like in San Francisco?"}]'
+        )
+        assert (
+            span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+            == '{"location": "San Francisco, CA"}'
+        )
     else:
-        events = capture_events()
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
 
-        with mock.patch.object(
-            client._client,
-            "send",
-            return_value=response,
-        ) as _, start_transaction(name="anthropic"):
-            async with client.messages.stream(
-                max_tokens=1024,
-                messages=messages,
-                model="model",
-            ) as stream:
-                async for event in stream:
-                    pass
-
-        assert len(events) == 1
-        (event,) = events
-
-        assert event["type"] == "transaction"
-        assert event["transaction"] == "anthropic"
-
-        assert len(event["spans"]) == 1
-        (span,) = event["spans"]
-
-        assert span["op"] == OP.GEN_AI_CHAT
-        assert span["description"] == "chat model"
-        assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-        assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
-
-        if send_default_pii and include_prompts:
-            assert (
-                span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-                == '[{"role": "user", "content": "What is the weather like in San Francisco?"}]'
-            )
-            assert (
-                span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
-                == '{"location": "San Francisco, CA"}'
-            )
-
-        else:
-            assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
-
-        assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 366
-        assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 41
-        assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 407
-        assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 366
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 41
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 407
+    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_exception_message_create(
     sentry_init,
-    capture_events,
     capture_items,
-    stream_gen_ai_spans,
-    span_streaming,
 ):
     sentry_init(
         integrations=[AnthropicIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        stream_gen_ai_spans=stream_gen_ai_spans,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
     client = Anthropic(api_key="z")
     client.messages._post = mock.Mock(
         side_effect=AnthropicError("API rate limit reached")
     )
+    items = capture_items("event")
 
-    if span_streaming:
-        items = capture_items("event")
+    with pytest.raises(AnthropicError):
+        client.messages.create(
+            model="some-model",
+            messages=[{"role": "system", "content": "I'm throwing an exception"}],
+            max_tokens=1024,
+        )
 
-        with pytest.raises(AnthropicError):
-            client.messages.create(
-                model="some-model",
-                messages=[{"role": "system", "content": "I'm throwing an exception"}],
-                max_tokens=1024,
-            )
-
-        (event,) = (item.payload for item in items)
-        assert event["level"] == "error"
-    elif stream_gen_ai_spans:
-        items = capture_items("event", "transaction")
-
-        with pytest.raises(AnthropicError):
-            client.messages.create(
-                model="some-model",
-                messages=[{"role": "system", "content": "I'm throwing an exception"}],
-                max_tokens=1024,
-            )
-
-        (event,) = (item.payload for item in items if item.type == "event")
-        assert event["level"] == "error"
-
-        (transaction,) = (item.payload for item in items if item.type == "transaction")
-        assert transaction["contexts"]["trace"]["status"] == "internal_error"
-    else:
-        events = capture_events()
-
-        with pytest.raises(AnthropicError):
-            client.messages.create(
-                model="some-model",
-                messages=[{"role": "system", "content": "I'm throwing an exception"}],
-                max_tokens=1024,
-            )
-
-        (event, transaction) = events
-        assert event["level"] == "error"
-        assert transaction["contexts"]["trace"]["status"] == "internal_error"
+    (event,) = (item.payload for item in items)
+    assert event["level"] == "error"
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_span_status_error(
     sentry_init,
-    capture_events,
     capture_items,
-    stream_gen_ai_spans,
-    span_streaming,
 ):
     sentry_init(
         integrations=[AnthropicIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        stream_gen_ai_spans=stream_gen_ai_spans,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
+    items = capture_items("event", "span")
 
-    if span_streaming:
-        items = capture_items("event", "span")
+    client = Anthropic(api_key="z")
+    client.messages._post = mock.Mock(
+        side_effect=AnthropicError("API rate limit reached")
+    )
+    with pytest.raises(AnthropicError):
+        client.messages.create(
+            model="some-model",
+            messages=[{"role": "system", "content": "I'm throwing an exception"}],
+            max_tokens=1024,
+        )
 
-        with sentry_sdk.traces.start_span(name="anthropic"):
-            client = Anthropic(api_key="z")
-            client.messages._post = mock.Mock(
-                side_effect=AnthropicError("API rate limit reached")
-            )
-            with pytest.raises(AnthropicError):
-                client.messages.create(
-                    model="some-model",
-                    messages=[
-                        {"role": "system", "content": "I'm throwing an exception"}
-                    ],
-                    max_tokens=1024,
-                )
+    (error,) = (item.payload for item in items if item.type == "event")
+    assert error["level"] == "error"
 
-        (error,) = (item.payload for item in items if item.type == "event")
-        assert error["level"] == "error"
-
-        sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
-        assert spans[0]["status"] == "error"
-        assert spans[0]["attributes"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert spans[0]["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-
-    elif stream_gen_ai_spans:
-        items = capture_items("event", "span")
-
-        with start_transaction(name="anthropic"):
-            client = Anthropic(api_key="z")
-            client.messages._post = mock.Mock(
-                side_effect=AnthropicError("API rate limit reached")
-            )
-            with pytest.raises(AnthropicError):
-                client.messages.create(
-                    model="some-model",
-                    messages=[
-                        {"role": "system", "content": "I'm throwing an exception"}
-                    ],
-                    max_tokens=1024,
-                )
-
-        (error,) = (item.payload for item in items if item.type == "event")
-        assert error["level"] == "error"
-
-        sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
-        assert spans[0]["status"] == "error"
-        assert spans[0]["attributes"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert spans[0]["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-    else:
-        events = capture_events()
-
-        with start_transaction(name="anthropic"):
-            client = Anthropic(api_key="z")
-            client.messages._post = mock.Mock(
-                side_effect=AnthropicError("API rate limit reached")
-            )
-            with pytest.raises(AnthropicError):
-                client.messages.create(
-                    model="some-model",
-                    messages=[
-                        {"role": "system", "content": "I'm throwing an exception"}
-                    ],
-                    max_tokens=1024,
-                )
-
-        (error, transaction) = events
-        assert error["level"] == "error"
-        assert transaction["spans"][0]["status"] == "internal_error"
-        assert transaction["spans"][0]["tags"]["status"] == "internal_error"
-        assert transaction["spans"][0]["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert transaction["spans"][0]["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+    sentry_sdk.flush()
+    spans = [item.payload for item in items if item.type == "span"]
+    assert spans[0]["status"] == "error"
+    assert spans[0]["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "anthropic"
+    assert spans[0]["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 async def test_span_status_error_async(
     sentry_init,
-    capture_events,
     capture_items,
-    stream_gen_ai_spans,
-    span_streaming,
 ):
     sentry_init(
         integrations=[AnthropicIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        stream_gen_ai_spans=stream_gen_ai_spans,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
-    if span_streaming:
-        items = capture_items("event", "span")
+    items = capture_items("event", "span")
 
-        with sentry_sdk.traces.start_span(name="anthropic"):
-            client = AsyncAnthropic(api_key="z")
-            client.messages._post = AsyncMock(
-                side_effect=AnthropicError("API rate limit reached")
-            )
-            with pytest.raises(AnthropicError):
-                await client.messages.create(
-                    model="some-model",
-                    messages=[
-                        {"role": "system", "content": "I'm throwing an exception"}
-                    ],
-                    max_tokens=1024,
-                )
+    client = AsyncAnthropic(api_key="z")
+    client.messages._post = AsyncMock(
+        side_effect=AnthropicError("API rate limit reached")
+    )
+    with pytest.raises(AnthropicError):
+        await client.messages.create(
+            model="some-model",
+            messages=[{"role": "system", "content": "I'm throwing an exception"}],
+            max_tokens=1024,
+        )
 
-        (error,) = (item.payload for item in items if item.type == "event")
-        assert error["level"] == "error"
+    (error,) = (item.payload for item in items if item.type == "event")
+    assert error["level"] == "error"
 
-        sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
-        assert spans[0]["status"] == "error"
-        assert spans[0]["attributes"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert spans[0]["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-    elif stream_gen_ai_spans:
-        items = capture_items("event", "span")
-
-        with start_transaction(name="anthropic"):
-            client = AsyncAnthropic(api_key="z")
-            client.messages._post = AsyncMock(
-                side_effect=AnthropicError("API rate limit reached")
-            )
-            with pytest.raises(AnthropicError):
-                await client.messages.create(
-                    model="some-model",
-                    messages=[
-                        {"role": "system", "content": "I'm throwing an exception"}
-                    ],
-                    max_tokens=1024,
-                )
-
-        (error,) = (item.payload for item in items if item.type == "event")
-        assert error["level"] == "error"
-
-        sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
-        assert spans[0]["status"] == "error"
-        assert spans[0]["attributes"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert spans[0]["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-    else:
-        events = capture_events()
-
-        with start_transaction(name="anthropic"):
-            client = AsyncAnthropic(api_key="z")
-            client.messages._post = AsyncMock(
-                side_effect=AnthropicError("API rate limit reached")
-            )
-            with pytest.raises(AnthropicError):
-                await client.messages.create(
-                    model="some-model",
-                    messages=[
-                        {"role": "system", "content": "I'm throwing an exception"}
-                    ],
-                    max_tokens=1024,
-                )
-
-        (error, transaction) = events
-        assert error["level"] == "error"
-        assert transaction["spans"][0]["status"] == "internal_error"
-        assert transaction["spans"][0]["tags"]["status"] == "internal_error"
-        assert transaction["spans"][0]["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert transaction["spans"][0]["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+    sentry_sdk.flush()
+    spans = [item.payload for item in items if item.type == "span"]
+    assert spans[0]["status"] == "error"
+    assert spans[0]["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "anthropic"
+    assert spans[0]["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 async def test_exception_message_create_async(
     sentry_init,
-    capture_events,
     capture_items,
-    stream_gen_ai_spans,
-    span_streaming,
 ):
     sentry_init(
         integrations=[AnthropicIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        stream_gen_ai_spans=stream_gen_ai_spans,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
     client = AsyncAnthropic(api_key="z")
     client.messages._post = AsyncMock(
         side_effect=AnthropicError("API rate limit reached")
     )
+    items = capture_items("event")
 
-    if span_streaming:
-        items = capture_items("event")
+    with pytest.raises(AnthropicError):
+        await client.messages.create(
+            model="some-model",
+            messages=[{"role": "system", "content": "I'm throwing an exception"}],
+            max_tokens=1024,
+        )
 
-        with pytest.raises(AnthropicError):
-            await client.messages.create(
-                model="some-model",
-                messages=[{"role": "system", "content": "I'm throwing an exception"}],
-                max_tokens=1024,
-            )
-
-        (event,) = (item.payload for item in items)
-        assert event["level"] == "error"
-    elif stream_gen_ai_spans:
-        items = capture_items("event", "transaction")
-
-        with pytest.raises(AnthropicError):
-            await client.messages.create(
-                model="some-model",
-                messages=[{"role": "system", "content": "I'm throwing an exception"}],
-                max_tokens=1024,
-            )
-
-        (event,) = (item.payload for item in items if item.type == "event")
-        assert event["level"] == "error"
-
-        (transaction,) = (item.payload for item in items if item.type == "transaction")
-        assert transaction["contexts"]["trace"]["status"] == "internal_error"
-    else:
-        events = capture_events()
-
-        with pytest.raises(AnthropicError):
-            await client.messages.create(
-                model="some-model",
-                messages=[{"role": "system", "content": "I'm throwing an exception"}],
-                max_tokens=1024,
-            )
-
-        (event, transaction) = events
-        assert event["level"] == "error"
-        assert transaction["contexts"]["trace"]["status"] == "internal_error"
+    (event,) = (item.payload for item in items)
+    assert event["level"] == "error"
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_span_origin(
     sentry_init,
-    capture_events,
     capture_items,
-    stream_gen_ai_spans,
-    span_streaming,
 ):
     sentry_init(
         integrations=[AnthropicIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        stream_gen_ai_spans=stream_gen_ai_spans,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
     client = Anthropic(api_key="z")
@@ -5883,63 +3526,27 @@ def test_span_origin(
             "content": "Hello, Claude",
         }
     ]
+    items = capture_items("span")
 
-    if span_streaming:
-        items = capture_items("transaction", "span")
+    client.messages.create(max_tokens=1024, messages=messages, model="model")
 
-        with sentry_sdk.traces.start_span(name="anthropic"):
-            client.messages.create(max_tokens=1024, messages=messages, model="model")
-
-        sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
-        assert spans[1]["attributes"]["sentry.origin"] == "manual"
-        assert spans[0]["attributes"]["sentry.origin"] == "auto.ai.anthropic"
-        assert spans[0]["attributes"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert spans[0]["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-
-    elif stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
-
-        with start_transaction(name="anthropic"):
-            client.messages.create(max_tokens=1024, messages=messages, model="model")
-
-        (event,) = (item.payload for item in items if item.type == "transaction")
-        assert event["contexts"]["trace"]["origin"] == "manual"
-
-        sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
-        assert spans[0]["attributes"]["sentry.origin"] == "auto.ai.anthropic"
-        assert spans[0]["attributes"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert spans[0]["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-    else:
-        events = capture_events()
-
-        with start_transaction(name="anthropic"):
-            client.messages.create(max_tokens=1024, messages=messages, model="model")
-
-        (event,) = events
-        assert event["contexts"]["trace"]["origin"] == "manual"
-        assert event["spans"][0]["origin"] == "auto.ai.anthropic"
-        assert event["spans"][0]["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert event["spans"][0]["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+    sentry_sdk.flush()
+    spans = [item.payload for item in items]
+    assert spans[0]["attributes"]["sentry.origin"] == "auto.ai.anthropic"
+    assert spans[0]["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "anthropic"
+    assert spans[0]["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 async def test_span_origin_async(
     sentry_init,
-    capture_events,
     capture_items,
-    stream_gen_ai_spans,
-    span_streaming,
 ):
     sentry_init(
         integrations=[AnthropicIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        stream_gen_ai_spans=stream_gen_ai_spans,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
     client = AsyncAnthropic(api_key="z")
@@ -5951,59 +3558,22 @@ async def test_span_origin_async(
             "content": "Hello, Claude",
         }
     ]
+    items = capture_items("span")
 
-    if span_streaming:
-        items = capture_items("transaction", "span")
+    await client.messages.create(max_tokens=1024, messages=messages, model="model")
 
-        with sentry_sdk.traces.start_span(name="anthropic"):
-            await client.messages.create(
-                max_tokens=1024, messages=messages, model="model"
-            )
-
-        sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
-        assert spans[1]["attributes"]["sentry.origin"] == "manual"
-        assert spans[0]["attributes"]["sentry.origin"] == "auto.ai.anthropic"
-        assert spans[0]["attributes"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert spans[0]["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-    elif stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
-
-        with start_transaction(name="anthropic"):
-            await client.messages.create(
-                max_tokens=1024, messages=messages, model="model"
-            )
-
-        (event,) = (item.payload for item in items if item.type == "transaction")
-        assert event["contexts"]["trace"]["origin"] == "manual"
-
-        sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
-        assert spans[0]["attributes"]["sentry.origin"] == "auto.ai.anthropic"
-        assert spans[0]["attributes"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert spans[0]["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-    else:
-        events = capture_events()
-
-        with start_transaction(name="anthropic"):
-            await client.messages.create(
-                max_tokens=1024, messages=messages, model="model"
-            )
-
-        (event,) = events
-
-        assert event["contexts"]["trace"]["origin"] == "manual"
-        assert event["spans"][0]["origin"] == "auto.ai.anthropic"
-        assert event["spans"][0]["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert event["spans"][0]["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+    sentry_sdk.flush()
+    spans = [item.payload for item in items]
+    assert spans[0]["attributes"]["sentry.origin"] == "auto.ai.anthropic"
+    assert spans[0]["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "anthropic"
+    assert spans[0]["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
 
 
 @pytest.mark.skipif(
     ANTHROPIC_VERSION < (0, 27),
     reason="Versions <0.27.0 do not include InputJSONDelta.",
 )
-@pytest.mark.parametrize("span_streaming", [True, False])
-def test_collect_ai_data_with_input_json_delta(span_streaming):
+def test_collect_ai_data_with_input_json_delta():
     event = ContentBlockDeltaEvent(
         delta=InputJSONDelta(partial_json="test", type="input_json_delta"),
         index=0,
@@ -6038,35 +3608,33 @@ def test_set_output_data_with_input_json_delta(sentry_init):
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        trace_lifecycle="stream",
     )
 
-    with start_transaction(name="test"):
-        span = start_span()
-        integration = AnthropicIntegration()
-        json_deltas = ["{'test': 'data',", "'more': 'json'}"]
-        _set_output_data(
-            span,
-            integration,
-            model="",
-            input_tokens=10,
-            output_tokens=20,
-            cache_read_input_tokens=0,
-            cache_write_input_tokens=0,
-            content_blocks=[{"text": "".join(json_deltas), "type": "text"}],
-        )
+    span = sentry_sdk.traces.start_span(name="test")
+    integration = AnthropicIntegration()
+    json_deltas = ["{'test': 'data',", "'more': 'json'}"]
+    _set_output_data(
+        span,
+        integration,
+        model="",
+        input_tokens=10,
+        output_tokens=20,
+        cache_read_input_tokens=0,
+        cache_write_input_tokens=0,
+        content_blocks=[{"text": "".join(json_deltas), "type": "text"}],
+    )
 
-        assert (
-            span._data.get(SPANDATA.GEN_AI_RESPONSE_TEXT)
-            == "{'test': 'data','more': 'json'}"
-        )
-        assert span._data.get(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS) == 10
-        assert span._data.get(SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS) == 20
-        assert span._data.get(SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS) == 30
+    assert (
+        span._attributes.get(SPANDATA.GEN_AI_RESPONSE_TEXT)
+        == "{'test': 'data','more': 'json'}"
+    )
+    assert span._attributes.get(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS) == 10
+    assert span._attributes.get(SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS) == 20
+    assert span._attributes.get(SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS) == 30
 
 
 # Test messages with mixed roles including "ai" that should be mapped to "assistant"
-@pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.parametrize(
     "test_message,expected_role",
     [
@@ -6084,12 +3652,9 @@ def test_set_output_data_with_input_json_delta(sentry_init):
 )
 def test_anthropic_message_role_mapping(
     sentry_init,
-    capture_events,
     capture_items,
     test_message,
     expected_role,
-    stream_gen_ai_spans,
-    span_streaming,
 ):
     """Test that Anthropic integration properly maps message roles like 'ai' to 'assistant'"""
     sentry_init(
@@ -6097,8 +3662,7 @@ def test_anthropic_message_role_mapping(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        stream_gen_ai_spans=stream_gen_ai_spans,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
     client = Anthropic(api_key="z")
@@ -6118,160 +3682,25 @@ def test_anthropic_message_role_mapping(
     client.messages._post = mock.Mock(return_value=mock_messages_create())
 
     test_messages = [test_message]
+    items = capture_items("span")
 
-    if span_streaming or stream_gen_ai_spans:
-        items = capture_items("span")
+    client.messages.create(model="claude-3-opus", max_tokens=10, messages=test_messages)
 
-        with start_transaction(name="anthropic tx"):
-            client.messages.create(
-                model="claude-3-opus", max_tokens=10, messages=test_messages
-            )
+    sentry_sdk.flush()
+    span = next(item.payload for item in items)
 
-        sentry_sdk.flush()
-        span = next(item.payload for item in items)
+    # Verify that the span was created correctly
+    assert span["attributes"]["sentry.op"] == "gen_ai.chat"
+    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "anthropic"
+    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+    assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["attributes"]
 
-        # Verify that the span was created correctly
-        assert span["attributes"]["sentry.op"] == "gen_ai.chat"
-        assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-        assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["attributes"]
-
-        # Parse the stored messages
-        stored_messages = json.loads(
-            span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-        )
-    else:
-        events = capture_events()
-
-        with start_transaction(name="anthropic tx"):
-            client.messages.create(
-                model="claude-3-opus", max_tokens=10, messages=test_messages
-            )
-
-        (event,) = events
-        span = event["spans"][0]
-
-        # Verify that the span was created correctly
-        assert span["op"] == "gen_ai.chat"
-        assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-        assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["data"]
-
-        # Parse the stored messages
-        stored_messages = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
+    # Parse the stored messages
+    stored_messages = json.loads(span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
 
     assert stored_messages[0]["role"] == expected_role
 
 
-def test_anthropic_message_truncation(sentry_init, capture_events):
-    """Test that large messages are truncated properly in Anthropic integration."""
-    sentry_init(
-        integrations=[AnthropicIntegration(include_prompts=True)],
-        disabled_integrations=[StdlibIntegration],
-        traces_sample_rate=1.0,
-        send_default_pii=True,
-        stream_gen_ai_spans=False,
-    )
-    events = capture_events()
-
-    client = Anthropic(api_key="z")
-    client.messages._post = mock.Mock(return_value=EXAMPLE_MESSAGE)
-
-    large_content = (
-        "This is a very long message that will exceed our size limits. " * 1000
-    )
-    messages = [
-        {"role": "user", "content": "small message 1"},
-        {"role": "assistant", "content": large_content},
-        {"role": "user", "content": large_content},
-        {"role": "assistant", "content": "small message 4"},
-        {"role": "user", "content": "small message 5"},
-    ]
-
-    with start_transaction():
-        client.messages.create(max_tokens=1024, messages=messages, model="model")
-
-    assert len(events) > 0
-    tx = events[0]
-    assert tx["type"] == "transaction"
-
-    chat_spans = [
-        span for span in tx.get("spans", []) if span.get("op") == OP.GEN_AI_CHAT
-    ]
-    assert len(chat_spans) > 0
-
-    chat_span = chat_spans[0]
-    assert chat_span["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-    assert chat_span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-    assert SPANDATA.GEN_AI_REQUEST_MESSAGES in chat_span["data"]
-
-    messages_data = chat_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-    assert isinstance(messages_data, str)
-
-    parsed_messages = json.loads(messages_data)
-    assert isinstance(parsed_messages, list)
-    assert len(parsed_messages) == 1
-    assert "small message 5" in str(parsed_messages[0])
-
-    assert tx["_meta"]["spans"]["0"]["data"]["gen_ai.request.messages"][""]["len"] == 5
-
-
-@pytest.mark.asyncio
-async def test_anthropic_message_truncation_async(sentry_init, capture_events):
-    """Test that large messages are truncated properly in Anthropic integration."""
-    sentry_init(
-        integrations=[AnthropicIntegration(include_prompts=True)],
-        disabled_integrations=[StdlibIntegration],
-        traces_sample_rate=1.0,
-        send_default_pii=True,
-        stream_gen_ai_spans=False,
-    )
-    events = capture_events()
-
-    client = AsyncAnthropic(api_key="z")
-    client.messages._post = mock.AsyncMock(return_value=EXAMPLE_MESSAGE)
-
-    large_content = (
-        "This is a very long message that will exceed our size limits. " * 1000
-    )
-    messages = [
-        {"role": "user", "content": "small message 1"},
-        {"role": "assistant", "content": large_content},
-        {"role": "user", "content": large_content},
-        {"role": "assistant", "content": "small message 4"},
-        {"role": "user", "content": "small message 5"},
-    ]
-
-    with start_transaction():
-        await client.messages.create(max_tokens=1024, messages=messages, model="model")
-
-    assert len(events) > 0
-    tx = events[0]
-    assert tx["type"] == "transaction"
-
-    chat_spans = [
-        span for span in tx.get("spans", []) if span.get("op") == OP.GEN_AI_CHAT
-    ]
-    assert len(chat_spans) > 0
-
-    chat_span = chat_spans[0]
-    assert chat_span["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-    assert chat_span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-    assert SPANDATA.GEN_AI_REQUEST_MESSAGES in chat_span["data"]
-
-    messages_data = chat_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-    assert isinstance(messages_data, str)
-
-    parsed_messages = json.loads(messages_data)
-    assert isinstance(parsed_messages, list)
-    assert len(parsed_messages) == 1
-    assert "small message 5" in str(parsed_messages[0])
-
-    assert tx["_meta"]["spans"]["0"]["data"]["gen_ai.request.messages"][""]["len"] == 5
-
-
-@pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.parametrize(
     "send_default_pii, include_prompts",
     [
@@ -6283,12 +3712,9 @@ async def test_anthropic_message_truncation_async(sentry_init, capture_events):
 )
 def test_nonstreaming_create_message_with_system_prompt(
     sentry_init,
-    capture_events,
     capture_items,
     send_default_pii,
     include_prompts,
-    stream_gen_ai_spans,
-    span_streaming,
 ):
     """Test that system prompts are properly captured in GEN_AI_REQUEST_MESSAGES."""
     sentry_init(
@@ -6296,8 +3722,7 @@ def test_nonstreaming_create_message_with_system_prompt(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        stream_gen_ai_spans=stream_gen_ai_spans,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
     client = Anthropic(api_key="z")
@@ -6309,191 +3734,62 @@ def test_nonstreaming_create_message_with_system_prompt(
             "content": "Hello, Claude",
         }
     ]
+    items = capture_items("span")
 
-    if span_streaming:
-        items = capture_items("transaction", "span")
+    response = client.messages.create(
+        max_tokens=1024,
+        messages=messages,
+        model="model",
+        system="You are a helpful assistant.",
+    )
 
-        with sentry_sdk.traces.start_span(name="anthropic"):
-            response = client.messages.create(
-                max_tokens=1024,
-                messages=messages,
-                model="model",
-                system="You are a helpful assistant.",
-            )
+    assert response == EXAMPLE_MESSAGE
+    usage = response.usage
 
-        assert response == EXAMPLE_MESSAGE
-        usage = response.usage
+    assert usage.input_tokens == 10
+    assert usage.output_tokens == 20
 
-        assert usage.input_tokens == 10
-        assert usage.output_tokens == 20
+    sentry_sdk.flush()
+    spans = [item.payload for item in items]
+    assert len(spans) == 1
 
-        sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
-        assert len(spans) == 2
+    (span,) = spans
 
-        assert spans[1]["name"] == "anthropic"
-        (span, _) = spans
+    assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    assert span["name"] == "chat model"
+    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "anthropic"
+    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
-        assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-        assert span["name"] == "chat model"
-        assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
-
-        if send_default_pii and include_prompts:
-            assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS in span["attributes"]
-            system_instructions = json.loads(
-                span["attributes"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
-            )
-            assert system_instructions == [
-                {"type": "text", "content": "You are a helpful assistant."}
-            ]
-
-            assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["attributes"]
-            stored_messages = json.loads(
-                span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-            )
-            assert len(stored_messages) == 1
-            assert stored_messages[0]["role"] == "user"
-            assert stored_messages[0]["content"] == "Hello, Claude"
-            assert (
-                span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi, I'm Claude."
-            )
-        else:
-            assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["attributes"]
-            assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
-
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == [
-            "end_turn"
+    if send_default_pii and include_prompts:
+        assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS in span["attributes"]
+        system_instructions = json.loads(
+            span["attributes"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
+        )
+        assert system_instructions == [
+            {"type": "text", "content": "You are a helpful assistant."}
         ]
-    elif stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
 
-        with start_transaction(name="anthropic"):
-            response = client.messages.create(
-                max_tokens=1024,
-                messages=messages,
-                model="model",
-                system="You are a helpful assistant.",
-            )
-
-        assert response == EXAMPLE_MESSAGE
-        usage = response.usage
-
-        assert usage.input_tokens == 10
-        assert usage.output_tokens == 20
-
-        (event,) = (item.payload for item in items if item.type == "transaction")
-        assert event["transaction"] == "anthropic"
-
-        sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
-        assert len(spans) == 1
-        (span,) = spans
-
-        assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-        assert span["name"] == "chat model"
-        assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
-
-        if send_default_pii and include_prompts:
-            assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS in span["attributes"]
-            system_instructions = json.loads(
-                span["attributes"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
-            )
-            assert system_instructions == [
-                {"type": "text", "content": "You are a helpful assistant."}
-            ]
-
-            assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["attributes"]
-            stored_messages = json.loads(
-                span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-            )
-            assert len(stored_messages) == 1
-            assert stored_messages[0]["role"] == "user"
-            assert stored_messages[0]["content"] == "Hello, Claude"
-            assert (
-                span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi, I'm Claude."
-            )
-        else:
-            assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["attributes"]
-            assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
-
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == [
-            "end_turn"
-        ]
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["attributes"]
+        stored_messages = json.loads(
+            span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        )
+        assert len(stored_messages) == 1
+        assert stored_messages[0]["role"] == "user"
+        assert stored_messages[0]["content"] == "Hello, Claude"
+        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi, I'm Claude."
     else:
-        events = capture_events()
+        assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["attributes"]
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
 
-        with start_transaction(name="anthropic"):
-            response = client.messages.create(
-                max_tokens=1024,
-                messages=messages,
-                model="model",
-                system="You are a helpful assistant.",
-            )
-
-        assert response == EXAMPLE_MESSAGE
-        usage = response.usage
-
-        assert usage.input_tokens == 10
-        assert usage.output_tokens == 20
-
-        assert len(events) == 1
-        (event,) = events
-
-        assert event["type"] == "transaction"
-        assert event["transaction"] == "anthropic"
-
-        assert len(event["spans"]) == 1
-        (span,) = event["spans"]
-
-        assert span["op"] == OP.GEN_AI_CHAT
-        assert span["description"] == "chat model"
-        assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-        assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
-
-        if send_default_pii and include_prompts:
-            assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS in span["data"]
-            system_instructions = json.loads(
-                span["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
-            )
-            assert system_instructions == [
-                {"type": "text", "content": "You are a helpful assistant."}
-            ]
-
-            assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["data"]
-            stored_messages = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
-            assert len(stored_messages) == 1
-            assert stored_messages[0]["role"] == "user"
-            assert stored_messages[0]["content"] == "Hello, Claude"
-            assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi, I'm Claude."
-        else:
-            assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["data"]
-            assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
-
-        assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-        assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
-        assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
-        assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
-        assert span["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["end_turn"]
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
+    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
+    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["end_turn"]
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "send_default_pii, include_prompts",
@@ -6506,12 +3802,9 @@ def test_nonstreaming_create_message_with_system_prompt(
 )
 async def test_nonstreaming_create_message_with_system_prompt_async(
     sentry_init,
-    capture_events,
     capture_items,
     send_default_pii,
     include_prompts,
-    stream_gen_ai_spans,
-    span_streaming,
 ):
     """Test that system prompts are properly captured in GEN_AI_REQUEST_MESSAGES (async)."""
     sentry_init(
@@ -6519,8 +3812,7 @@ async def test_nonstreaming_create_message_with_system_prompt_async(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        stream_gen_ai_spans=stream_gen_ai_spans,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
     client = AsyncAnthropic(api_key="z")
@@ -6532,191 +3824,62 @@ async def test_nonstreaming_create_message_with_system_prompt_async(
             "content": "Hello, Claude",
         }
     ]
+    items = capture_items("span")
 
-    if span_streaming:
-        items = capture_items("transaction", "span")
+    response = await client.messages.create(
+        max_tokens=1024,
+        messages=messages,
+        model="model",
+        system="You are a helpful assistant.",
+    )
 
-        with sentry_sdk.traces.start_span(name="anthropic"):
-            response = await client.messages.create(
-                max_tokens=1024,
-                messages=messages,
-                model="model",
-                system="You are a helpful assistant.",
-            )
+    assert response == EXAMPLE_MESSAGE
+    usage = response.usage
 
-        assert response == EXAMPLE_MESSAGE
-        usage = response.usage
+    assert usage.input_tokens == 10
+    assert usage.output_tokens == 20
 
-        assert usage.input_tokens == 10
-        assert usage.output_tokens == 20
+    sentry_sdk.flush()
+    spans = [item.payload for item in items]
+    assert len(spans) == 1
 
-        sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
-        assert len(spans) == 2
+    (span,) = spans
 
-        assert spans[1]["name"] == "anthropic"
-        (span, _) = spans
+    assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    assert span["name"] == "chat model"
+    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "anthropic"
+    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
-        assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-        assert span["name"] == "chat model"
-        assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
-
-        if send_default_pii and include_prompts:
-            assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS in span["attributes"]
-            system_instructions = json.loads(
-                span["attributes"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
-            )
-            assert system_instructions == [
-                {"type": "text", "content": "You are a helpful assistant."}
-            ]
-
-            assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["attributes"]
-            stored_messages = json.loads(
-                span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-            )
-            assert len(stored_messages) == 1
-            assert stored_messages[0]["role"] == "user"
-            assert stored_messages[0]["content"] == "Hello, Claude"
-            assert (
-                span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi, I'm Claude."
-            )
-        else:
-            assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["attributes"]
-            assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
-
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == [
-            "end_turn"
+    if send_default_pii and include_prompts:
+        assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS in span["attributes"]
+        system_instructions = json.loads(
+            span["attributes"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
+        )
+        assert system_instructions == [
+            {"type": "text", "content": "You are a helpful assistant."}
         ]
-    elif stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
 
-        with start_transaction(name="anthropic"):
-            response = await client.messages.create(
-                max_tokens=1024,
-                messages=messages,
-                model="model",
-                system="You are a helpful assistant.",
-            )
-
-        assert response == EXAMPLE_MESSAGE
-        usage = response.usage
-
-        assert usage.input_tokens == 10
-        assert usage.output_tokens == 20
-
-        (event,) = (item.payload for item in items if item.type == "transaction")
-        assert event["transaction"] == "anthropic"
-
-        sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
-        assert len(spans) == 1
-        (span,) = spans
-
-        assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-        assert span["name"] == "chat model"
-        assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
-
-        if send_default_pii and include_prompts:
-            assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS in span["attributes"]
-            system_instructions = json.loads(
-                span["attributes"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
-            )
-            assert system_instructions == [
-                {"type": "text", "content": "You are a helpful assistant."}
-            ]
-
-            assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["attributes"]
-            stored_messages = json.loads(
-                span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-            )
-            assert len(stored_messages) == 1
-            assert stored_messages[0]["role"] == "user"
-            assert stored_messages[0]["content"] == "Hello, Claude"
-            assert (
-                span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi, I'm Claude."
-            )
-        else:
-            assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["attributes"]
-            assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
-
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == [
-            "end_turn"
-        ]
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["attributes"]
+        stored_messages = json.loads(
+            span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        )
+        assert len(stored_messages) == 1
+        assert stored_messages[0]["role"] == "user"
+        assert stored_messages[0]["content"] == "Hello, Claude"
+        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi, I'm Claude."
     else:
-        events = capture_events()
+        assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["attributes"]
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
 
-        with start_transaction(name="anthropic"):
-            response = await client.messages.create(
-                max_tokens=1024,
-                messages=messages,
-                model="model",
-                system="You are a helpful assistant.",
-            )
-
-        assert response == EXAMPLE_MESSAGE
-        usage = response.usage
-
-        assert usage.input_tokens == 10
-        assert usage.output_tokens == 20
-
-        assert len(events) == 1
-        (event,) = events
-
-        assert event["type"] == "transaction"
-        assert event["transaction"] == "anthropic"
-
-        assert len(event["spans"]) == 1
-        (span,) = event["spans"]
-
-        assert span["op"] == OP.GEN_AI_CHAT
-        assert span["description"] == "chat model"
-        assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-        assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
-
-        if send_default_pii and include_prompts:
-            assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS in span["data"]
-            system_instructions = json.loads(
-                span["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
-            )
-            assert system_instructions == [
-                {"type": "text", "content": "You are a helpful assistant."}
-            ]
-
-            assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["data"]
-            stored_messages = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
-            assert len(stored_messages) == 1
-            assert stored_messages[0]["role"] == "user"
-            assert stored_messages[0]["content"] == "Hello, Claude"
-            assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi, I'm Claude."
-        else:
-            assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["data"]
-            assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
-
-        assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-        assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
-        assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
-        assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
-        assert span["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["end_turn"]
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
+    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
+    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["end_turn"]
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.parametrize(
     "send_default_pii, include_prompts",
     [
@@ -6728,14 +3891,11 @@ async def test_nonstreaming_create_message_with_system_prompt_async(
 )
 def test_streaming_create_message_with_system_prompt(
     sentry_init,
-    capture_events,
     capture_items,
     send_default_pii,
     include_prompts,
     get_model_response,
     server_side_event_chunks,
-    stream_gen_ai_spans,
-    span_streaming,
 ):
     """Test that system prompts are properly captured in streaming mode."""
     client = Anthropic(api_key="z")
@@ -6782,8 +3942,7 @@ def test_streaming_create_message_with_system_prompt(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        stream_gen_ai_spans=stream_gen_ai_spans,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
     messages = [
@@ -6792,195 +3951,65 @@ def test_streaming_create_message_with_system_prompt(
             "content": "Hello, Claude",
         }
     ]
+    items = capture_items("span")
 
-    if span_streaming:
-        items = capture_items("transaction", "span")
+    with mock.patch.object(
+        client._client,
+        "send",
+        return_value=response,
+    ):
+        message = client.messages.create(
+            max_tokens=1024,
+            messages=messages,
+            model="model",
+            stream=True,
+            system="You are a helpful assistant.",
+        )
 
-        with mock.patch.object(
-            client._client,
-            "send",
-            return_value=response,
-        ) as _, sentry_sdk.traces.start_span(name="anthropic"):
-            message = client.messages.create(
-                max_tokens=1024,
-                messages=messages,
-                model="model",
-                stream=True,
-                system="You are a helpful assistant.",
-            )
+        for _ in message:
+            pass
 
-            for _ in message:
-                pass
+    sentry_sdk.flush()
+    spans = [item.payload for item in items]
+    assert len(spans) == 1
 
-        sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
-        assert len(spans) == 2
+    (span,) = spans
 
-        assert spans[1]["name"] == "anthropic"
-        (span, _) = spans
+    assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    assert span["name"] == "chat model"
+    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "anthropic"
+    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
-        assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-        assert span["name"] == "chat model"
-        assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
+    if send_default_pii and include_prompts:
+        assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS in span["attributes"]
+        system_instructions = json.loads(
+            span["attributes"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
+        )
+        assert system_instructions == [
+            {"type": "text", "content": "You are a helpful assistant."}
+        ]
 
-        if send_default_pii and include_prompts:
-            assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS in span["attributes"]
-            system_instructions = json.loads(
-                span["attributes"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
-            )
-            assert system_instructions == [
-                {"type": "text", "content": "You are a helpful assistant."}
-            ]
-
-            assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["attributes"]
-            stored_messages = json.loads(
-                span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-            )
-            assert len(stored_messages) == 1
-            assert stored_messages[0]["role"] == "user"
-            assert stored_messages[0]["content"] == "Hello, Claude"
-            assert (
-                span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi! I'm Claude!"
-            )
-
-        else:
-            assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["attributes"]
-            assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
-
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 20
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
-
-    elif stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
-
-        with mock.patch.object(
-            client._client,
-            "send",
-            return_value=response,
-        ) as _, start_transaction(name="anthropic"):
-            message = client.messages.create(
-                max_tokens=1024,
-                messages=messages,
-                model="model",
-                stream=True,
-                system="You are a helpful assistant.",
-            )
-
-            for _ in message:
-                pass
-
-        (event,) = (item.payload for item in items if item.type == "transaction")
-        assert event["transaction"] == "anthropic"
-
-        sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
-        assert len(spans) == 1
-        (span,) = spans
-
-        assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-        assert span["name"] == "chat model"
-        assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
-
-        if send_default_pii and include_prompts:
-            assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS in span["attributes"]
-            system_instructions = json.loads(
-                span["attributes"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
-            )
-            assert system_instructions == [
-                {"type": "text", "content": "You are a helpful assistant."}
-            ]
-
-            assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["attributes"]
-            stored_messages = json.loads(
-                span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-            )
-            assert len(stored_messages) == 1
-            assert stored_messages[0]["role"] == "user"
-            assert stored_messages[0]["content"] == "Hello, Claude"
-            assert (
-                span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi! I'm Claude!"
-            )
-
-        else:
-            assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["attributes"]
-            assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
-
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 20
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["attributes"]
+        stored_messages = json.loads(
+            span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        )
+        assert len(stored_messages) == 1
+        assert stored_messages[0]["role"] == "user"
+        assert stored_messages[0]["content"] == "Hello, Claude"
+        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi! I'm Claude!"
 
     else:
-        events = capture_events()
+        assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["attributes"]
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
 
-        with mock.patch.object(
-            client._client,
-            "send",
-            return_value=response,
-        ) as _, start_transaction(name="anthropic"):
-            message = client.messages.create(
-                max_tokens=1024,
-                messages=messages,
-                model="model",
-                stream=True,
-                system="You are a helpful assistant.",
-            )
-
-            for _ in message:
-                pass
-
-        assert len(events) == 1
-        (event,) = events
-
-        assert event["type"] == "transaction"
-        assert event["transaction"] == "anthropic"
-
-        assert len(event["spans"]) == 1
-        (span,) = event["spans"]
-
-        assert span["op"] == OP.GEN_AI_CHAT
-        assert span["description"] == "chat model"
-        assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-        assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
-
-        if send_default_pii and include_prompts:
-            assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS in span["data"]
-            system_instructions = json.loads(
-                span["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
-            )
-            assert system_instructions == [
-                {"type": "text", "content": "You are a helpful assistant."}
-            ]
-
-            assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["data"]
-            stored_messages = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
-            assert len(stored_messages) == 1
-            assert stored_messages[0]["role"] == "user"
-            assert stored_messages[0]["content"] == "Hello, Claude"
-            assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi! I'm Claude!"
-
-        else:
-            assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["data"]
-            assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
-
-        assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-        assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
-        assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 20
-        assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 20
+    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.parametrize(
     "send_default_pii, include_prompts",
     [
@@ -6992,14 +4021,11 @@ def test_streaming_create_message_with_system_prompt(
 )
 def test_stream_messages_with_system_prompt(
     sentry_init,
-    capture_events,
     capture_items,
     send_default_pii,
     include_prompts,
     get_model_response,
     server_side_event_chunks,
-    stream_gen_ai_spans,
-    span_streaming,
 ):
     """Test that system prompts are properly captured in streaming mode."""
     client = Anthropic(api_key="z")
@@ -7046,8 +4072,7 @@ def test_stream_messages_with_system_prompt(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        stream_gen_ai_spans=stream_gen_ai_spans,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
     messages = [
@@ -7056,179 +4081,60 @@ def test_stream_messages_with_system_prompt(
             "content": "Hello, Claude",
         }
     ]
+    items = capture_items("span")
 
-    if span_streaming:
-        items = capture_items("transaction", "span")
+    with mock.patch.object(
+        client._client,
+        "send",
+        return_value=response,
+    ), client.messages.stream(
+        max_tokens=1024,
+        messages=messages,
+        model="model",
+        system="You are a helpful assistant.",
+    ) as stream:
+        for event in stream:
+            pass
 
-        with mock.patch.object(
-            client._client,
-            "send",
-            return_value=response,
-        ) as _, sentry_sdk.traces.start_span(name="anthropic"), client.messages.stream(
-            max_tokens=1024,
-            messages=messages,
-            model="model",
-            system="You are a helpful assistant.",
-        ) as stream:
-            for event in stream:
-                pass
+    sentry_sdk.flush()
+    spans = [item.payload for item in items]
+    assert len(spans) == 1
 
-        sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
-        assert len(spans) == 2
+    (span,) = spans
 
-        assert spans[1]["name"] == "anthropic"
-        (span, _) = spans
+    assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    assert span["name"] == "chat model"
+    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "anthropic"
+    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
-        assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-        assert span["name"] == "chat model"
-        assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
-
-        if send_default_pii and include_prompts:
-            assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS in span["attributes"]
-            system_instructions = json.loads(
-                span["attributes"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
-            )
-            assert system_instructions == [
-                {"type": "text", "content": "You are a helpful assistant."}
-            ]
-            assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["attributes"]
-            stored_messages = json.loads(
-                span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-            )
-            assert len(stored_messages) == 1
-            assert stored_messages[0]["role"] == "user"
-            assert stored_messages[0]["content"] == "Hello, Claude"
-            assert (
-                span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi! I'm Claude!"
-            )
-        else:
-            assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["attributes"]
-            assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
-
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 20
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
-
-    elif stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
-
-        with mock.patch.object(
-            client._client,
-            "send",
-            return_value=response,
-        ) as _, start_transaction(name="anthropic"), client.messages.stream(
-            max_tokens=1024,
-            messages=messages,
-            model="model",
-            system="You are a helpful assistant.",
-        ) as stream:
-            for event in stream:
-                pass
-
-        (event,) = (item.payload for item in items if item.type == "transaction")
-        assert event["transaction"] == "anthropic"
-
-        sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
-        assert len(spans) == 1
-        (span,) = spans
-
-        assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-        assert span["name"] == "chat model"
-        assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
-
-        if send_default_pii and include_prompts:
-            assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS in span["attributes"]
-            system_instructions = json.loads(
-                span["attributes"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
-            )
-            assert system_instructions == [
-                {"type": "text", "content": "You are a helpful assistant."}
-            ]
-            assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["attributes"]
-            stored_messages = json.loads(
-                span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-            )
-            assert len(stored_messages) == 1
-            assert stored_messages[0]["role"] == "user"
-            assert stored_messages[0]["content"] == "Hello, Claude"
-            assert (
-                span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi! I'm Claude!"
-            )
-        else:
-            assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["attributes"]
-            assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
-
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 20
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    if send_default_pii and include_prompts:
+        assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS in span["attributes"]
+        system_instructions = json.loads(
+            span["attributes"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
+        )
+        assert system_instructions == [
+            {"type": "text", "content": "You are a helpful assistant."}
+        ]
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["attributes"]
+        stored_messages = json.loads(
+            span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        )
+        assert len(stored_messages) == 1
+        assert stored_messages[0]["role"] == "user"
+        assert stored_messages[0]["content"] == "Hello, Claude"
+        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi! I'm Claude!"
     else:
-        events = capture_events()
+        assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["attributes"]
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
 
-        with mock.patch.object(
-            client._client,
-            "send",
-            return_value=response,
-        ) as _, start_transaction(name="anthropic"), client.messages.stream(
-            max_tokens=1024,
-            messages=messages,
-            model="model",
-            system="You are a helpful assistant.",
-        ) as stream:
-            for event in stream:
-                pass
-
-        assert len(events) == 1
-        (event,) = events
-
-        assert event["type"] == "transaction"
-        assert event["transaction"] == "anthropic"
-
-        assert len(event["spans"]) == 1
-        (span,) = event["spans"]
-
-        assert span["op"] == OP.GEN_AI_CHAT
-        assert span["description"] == "chat model"
-        assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-        assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
-
-        if send_default_pii and include_prompts:
-            assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS in span["data"]
-            system_instructions = json.loads(
-                span["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
-            )
-            assert system_instructions == [
-                {"type": "text", "content": "You are a helpful assistant."}
-            ]
-            assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["data"]
-            stored_messages = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
-            assert len(stored_messages) == 1
-            assert stored_messages[0]["role"] == "user"
-            assert stored_messages[0]["content"] == "Hello, Claude"
-            assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi! I'm Claude!"
-        else:
-            assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["data"]
-            assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
-
-        assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-        assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
-        assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 20
-        assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 20
+    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "send_default_pii, include_prompts",
@@ -7241,15 +4147,12 @@ def test_stream_messages_with_system_prompt(
 )
 async def test_stream_message_with_system_prompt_async(
     sentry_init,
-    capture_events,
     capture_items,
     send_default_pii,
     include_prompts,
     get_model_response,
     async_iterator,
     server_side_event_chunks,
-    stream_gen_ai_spans,
-    span_streaming,
 ):
     """Test that system prompts are properly captured in streaming mode (async)."""
     client = AsyncAnthropic(api_key="z")
@@ -7298,8 +4201,7 @@ async def test_stream_message_with_system_prompt_async(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        stream_gen_ai_spans=stream_gen_ai_spans,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
     messages = [
@@ -7308,186 +4210,62 @@ async def test_stream_message_with_system_prompt_async(
             "content": "Hello, Claude",
         }
     ]
+    items = capture_items("span")
 
-    if span_streaming:
-        items = capture_items("transaction", "span")
+    with mock.patch.object(
+        client._client,
+        "send",
+        return_value=response,
+    ):
+        async with client.messages.stream(
+            max_tokens=1024,
+            messages=messages,
+            model="model",
+            system="You are a helpful assistant.",
+        ) as stream:
+            async for event in stream:
+                pass
 
-        with mock.patch.object(
-            client._client,
-            "send",
-            return_value=response,
-        ) as _, sentry_sdk.traces.start_span(name="anthropic"):
-            async with client.messages.stream(
-                max_tokens=1024,
-                messages=messages,
-                model="model",
-                system="You are a helpful assistant.",
-            ) as stream:
-                async for event in stream:
-                    pass
+    sentry_sdk.flush()
+    spans = [item.payload for item in items]
+    assert len(spans) == 1
 
-        sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
-        assert len(spans) == 2
+    (span,) = spans
 
-        assert spans[1]["name"] == "anthropic"
-        (span, _) = spans
+    assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    assert span["name"] == "chat model"
+    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "anthropic"
+    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
-        assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-        assert span["name"] == "chat model"
-        assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
+    if send_default_pii and include_prompts:
+        assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS in span["attributes"]
+        system_instructions = json.loads(
+            span["attributes"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
+        )
+        assert system_instructions == [
+            {"type": "text", "content": "You are a helpful assistant."}
+        ]
 
-        if send_default_pii and include_prompts:
-            assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS in span["attributes"]
-            system_instructions = json.loads(
-                span["attributes"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
-            )
-            assert system_instructions == [
-                {"type": "text", "content": "You are a helpful assistant."}
-            ]
-
-            assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["attributes"]
-            stored_messages = json.loads(
-                span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-            )
-            assert len(stored_messages) == 1
-            assert stored_messages[0]["role"] == "user"
-            assert stored_messages[0]["content"] == "Hello, Claude"
-            assert (
-                span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi! I'm Claude!"
-            )
-        else:
-            assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["attributes"]
-            assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
-
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 20
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
-
-    elif stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
-
-        with mock.patch.object(
-            client._client,
-            "send",
-            return_value=response,
-        ) as _, start_transaction(name="anthropic"):
-            async with client.messages.stream(
-                max_tokens=1024,
-                messages=messages,
-                model="model",
-                system="You are a helpful assistant.",
-            ) as stream:
-                async for event in stream:
-                    pass
-
-        (event,) = (item.payload for item in items if item.type == "transaction")
-        assert event["transaction"] == "anthropic"
-
-        sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
-        assert len(spans) == 1
-        (span,) = spans
-
-        assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-        assert span["name"] == "chat model"
-        assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
-
-        if send_default_pii and include_prompts:
-            assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS in span["attributes"]
-            system_instructions = json.loads(
-                span["attributes"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
-            )
-            assert system_instructions == [
-                {"type": "text", "content": "You are a helpful assistant."}
-            ]
-
-            assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["attributes"]
-            stored_messages = json.loads(
-                span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-            )
-            assert len(stored_messages) == 1
-            assert stored_messages[0]["role"] == "user"
-            assert stored_messages[0]["content"] == "Hello, Claude"
-            assert (
-                span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi! I'm Claude!"
-            )
-        else:
-            assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["attributes"]
-            assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
-
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 20
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["attributes"]
+        stored_messages = json.loads(
+            span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        )
+        assert len(stored_messages) == 1
+        assert stored_messages[0]["role"] == "user"
+        assert stored_messages[0]["content"] == "Hello, Claude"
+        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi! I'm Claude!"
     else:
-        events = capture_events()
+        assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["attributes"]
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
 
-        with mock.patch.object(
-            client._client,
-            "send",
-            return_value=response,
-        ) as _, start_transaction(name="anthropic"):
-            async with client.messages.stream(
-                max_tokens=1024,
-                messages=messages,
-                model="model",
-                system="You are a helpful assistant.",
-            ) as stream:
-                async for event in stream:
-                    pass
-
-        assert len(events) == 1
-        (event,) = events
-
-        assert event["type"] == "transaction"
-        assert event["transaction"] == "anthropic"
-
-        assert len(event["spans"]) == 1
-        (span,) = event["spans"]
-
-        assert span["op"] == OP.GEN_AI_CHAT
-        assert span["description"] == "chat model"
-        assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-        assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
-
-        if send_default_pii and include_prompts:
-            assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS in span["data"]
-            system_instructions = json.loads(
-                span["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
-            )
-            assert system_instructions == [
-                {"type": "text", "content": "You are a helpful assistant."}
-            ]
-
-            assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["data"]
-            stored_messages = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
-            assert len(stored_messages) == 1
-            assert stored_messages[0]["role"] == "user"
-            assert stored_messages[0]["content"] == "Hello, Claude"
-            assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi! I'm Claude!"
-
-        else:
-            assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["data"]
-            assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
-
-        assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-        assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
-        assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 20
-        assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 20
+    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "send_default_pii, include_prompts",
@@ -7500,15 +4278,12 @@ async def test_stream_message_with_system_prompt_async(
 )
 async def test_streaming_create_message_with_system_prompt_async(
     sentry_init,
-    capture_events,
     capture_items,
     send_default_pii,
     include_prompts,
     get_model_response,
     async_iterator,
     server_side_event_chunks,
-    stream_gen_ai_spans,
-    span_streaming,
 ):
     """Test that system prompts are properly captured in streaming mode (async)."""
     client = AsyncAnthropic(api_key="z")
@@ -7557,8 +4332,7 @@ async def test_streaming_create_message_with_system_prompt_async(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        stream_gen_ai_spans=stream_gen_ai_spans,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
     messages = [
@@ -7567,201 +4341,69 @@ async def test_streaming_create_message_with_system_prompt_async(
             "content": "Hello, Claude",
         }
     ]
+    items = capture_items("span")
 
-    if span_streaming:
-        items = capture_items("transaction", "span")
+    with mock.patch.object(
+        client._client,
+        "send",
+        return_value=response,
+    ):
+        message = await client.messages.create(
+            max_tokens=1024,
+            messages=messages,
+            model="model",
+            stream=True,
+            system="You are a helpful assistant.",
+        )
 
-        with mock.patch.object(
-            client._client,
-            "send",
-            return_value=response,
-        ) as _, sentry_sdk.traces.start_span(name="anthropic"):
-            message = await client.messages.create(
-                max_tokens=1024,
-                messages=messages,
-                model="model",
-                stream=True,
-                system="You are a helpful assistant.",
-            )
+        async for _ in message:
+            pass
 
-            async for _ in message:
-                pass
+    sentry_sdk.flush()
+    spans = [item.payload for item in items]
 
-        sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+    assert len(spans) == 1
+    (span,) = spans
 
-        assert spans[1]["name"] == "anthropic"
-        assert len(spans) == 2
-        (span, _) = spans
+    assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    assert span["name"] == "chat model"
+    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "anthropic"
+    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
-        assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-        assert span["name"] == "chat model"
-        assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
+    if send_default_pii and include_prompts:
+        assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS in span["attributes"]
+        system_instructions = json.loads(
+            span["attributes"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
+        )
+        assert system_instructions == [
+            {"type": "text", "content": "You are a helpful assistant."}
+        ]
 
-        if send_default_pii and include_prompts:
-            assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS in span["attributes"]
-            system_instructions = json.loads(
-                span["attributes"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
-            )
-            assert system_instructions == [
-                {"type": "text", "content": "You are a helpful assistant."}
-            ]
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["attributes"]
+        stored_messages = json.loads(
+            span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        )
 
-            assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["attributes"]
-            stored_messages = json.loads(
-                span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-            )
+        assert len(stored_messages) == 1
+        assert stored_messages[0]["role"] == "user"
+        assert stored_messages[0]["content"] == "Hello, Claude"
+        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi! I'm Claude!"
 
-            assert len(stored_messages) == 1
-            assert stored_messages[0]["role"] == "user"
-            assert stored_messages[0]["content"] == "Hello, Claude"
-            assert (
-                span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi! I'm Claude!"
-            )
-
-        else:
-            assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["attributes"]
-            assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
-
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 20
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
-
-    elif stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
-
-        with mock.patch.object(
-            client._client,
-            "send",
-            return_value=response,
-        ) as _, start_transaction(name="anthropic"):
-            message = await client.messages.create(
-                max_tokens=1024,
-                messages=messages,
-                model="model",
-                stream=True,
-                system="You are a helpful assistant.",
-            )
-
-            async for _ in message:
-                pass
-
-        (event,) = (item.payload for item in items if item.type == "transaction")
-        assert event["transaction"] == "anthropic"
-
-        sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
-        assert len(spans) == 1
-        (span,) = spans
-
-        assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-        assert span["name"] == "chat model"
-        assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
-
-        if send_default_pii and include_prompts:
-            assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS in span["attributes"]
-            system_instructions = json.loads(
-                span["attributes"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
-            )
-            assert system_instructions == [
-                {"type": "text", "content": "You are a helpful assistant."}
-            ]
-
-            assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["attributes"]
-            stored_messages = json.loads(
-                span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-            )
-
-            assert len(stored_messages) == 1
-            assert stored_messages[0]["role"] == "user"
-            assert stored_messages[0]["content"] == "Hello, Claude"
-            assert (
-                span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi! I'm Claude!"
-            )
-
-        else:
-            assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["attributes"]
-            assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
-
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 20
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
     else:
-        events = capture_events()
+        assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["attributes"]
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
 
-        with mock.patch.object(
-            client._client,
-            "send",
-            return_value=response,
-        ) as _, start_transaction(name="anthropic"):
-            message = await client.messages.create(
-                max_tokens=1024,
-                messages=messages,
-                model="model",
-                stream=True,
-                system="You are a helpful assistant.",
-            )
-
-            async for _ in message:
-                pass
-
-        assert len(events) == 1
-        (event,) = events
-
-        assert event["type"] == "transaction"
-        assert event["transaction"] == "anthropic"
-
-        assert len(event["spans"]) == 1
-        (span,) = event["spans"]
-
-        assert span["op"] == OP.GEN_AI_CHAT
-        assert span["description"] == "chat model"
-        assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-        assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
-
-        if send_default_pii and include_prompts:
-            assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS in span["data"]
-            system_instructions = json.loads(
-                span["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
-            )
-            assert system_instructions == [
-                {"type": "text", "content": "You are a helpful assistant."}
-            ]
-            assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["data"]
-            stored_messages = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
-            assert len(stored_messages) == 1
-            assert stored_messages[0]["role"] == "user"
-            assert stored_messages[0]["content"] == "Hello, Claude"
-            assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi! I'm Claude!"
-
-        else:
-            assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["data"]
-            assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
-
-        assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-        assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
-        assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 20
-        assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 20
+    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_system_prompt_with_complex_structure(
     sentry_init,
-    capture_events,
     capture_items,
-    stream_gen_ai_spans,
-    span_streaming,
 ):
     """Test that complex system prompt structures (list of text blocks) are properly captured."""
     sentry_init(
@@ -7769,8 +4411,7 @@ def test_system_prompt_with_complex_structure(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        stream_gen_ai_spans=stream_gen_ai_spans,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
     client = Anthropic(api_key="z")
@@ -7788,111 +4429,36 @@ def test_system_prompt_with_complex_structure(
             "content": "Hello",
         }
     ]
+    items = capture_items("span")
 
-    if span_streaming:
-        items = capture_items("span")
+    response = client.messages.create(
+        max_tokens=1024, messages=messages, model="model", system=system_prompt
+    )
 
-        with sentry_sdk.traces.start_span(name="anthropic"):
-            response = client.messages.create(
-                max_tokens=1024, messages=messages, model="model", system=system_prompt
-            )
+    assert response == EXAMPLE_MESSAGE
 
-        assert response == EXAMPLE_MESSAGE
+    sentry_sdk.flush()
+    spans = [item.payload for item in items]
 
-        sentry_sdk.flush()
-        spans = [item.payload for item in items]
-        assert len(spans) == 2
+    (span,) = spans
 
-        assert spans[1]["name"] == "anthropic"
-        (span, _) = spans
+    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "anthropic"
+    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
 
-        assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+    assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS in span["attributes"]
+    system_instructions = json.loads(
+        span["attributes"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
+    )
 
-        assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS in span["attributes"]
-        system_instructions = json.loads(
-            span["attributes"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
-        )
+    # System content should be a list of text blocks
+    assert isinstance(system_instructions, list)
+    assert system_instructions == [
+        {"type": "text", "content": "You are a helpful assistant."},
+        {"type": "text", "content": "Be concise and clear."},
+    ]
 
-        # System content should be a list of text blocks
-        assert isinstance(system_instructions, list)
-        assert system_instructions == [
-            {"type": "text", "content": "You are a helpful assistant."},
-            {"type": "text", "content": "Be concise and clear."},
-        ]
-
-        assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["attributes"]
-        stored_messages = json.loads(
-            span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-        )
-
-    elif stream_gen_ai_spans:
-        items = capture_items("span")
-
-        with start_transaction(name="anthropic"):
-            response = client.messages.create(
-                max_tokens=1024, messages=messages, model="model", system=system_prompt
-            )
-
-        assert response == EXAMPLE_MESSAGE
-
-        sentry_sdk.flush()
-        spans = [item.payload for item in items]
-        assert len(spans) == 1
-        (span,) = spans
-
-        assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-
-        assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS in span["attributes"]
-        system_instructions = json.loads(
-            span["attributes"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
-        )
-
-        # System content should be a list of text blocks
-        assert isinstance(system_instructions, list)
-        assert system_instructions == [
-            {"type": "text", "content": "You are a helpful assistant."},
-            {"type": "text", "content": "Be concise and clear."},
-        ]
-
-        assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["attributes"]
-        stored_messages = json.loads(
-            span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-        )
-    else:
-        events = capture_events()
-
-        with start_transaction(name="anthropic"):
-            response = client.messages.create(
-                max_tokens=1024, messages=messages, model="model", system=system_prompt
-            )
-
-        assert response == EXAMPLE_MESSAGE
-
-        assert len(events) == 1
-        (event,) = events
-
-        assert len(event["spans"]) == 1
-        (span,) = event["spans"]
-
-        assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-
-        assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS in span["data"]
-        system_instructions = json.loads(
-            span["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
-        )
-
-        # System content should be a list of text blocks
-        assert isinstance(system_instructions, list)
-        assert system_instructions == [
-            {"type": "text", "content": "You are a helpful assistant."},
-            {"type": "text", "content": "Be concise and clear."},
-        ]
-
-        assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["data"]
-        stored_messages = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
+    assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["attributes"]
+    stored_messages = json.loads(span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
 
     assert len(stored_messages) == 1
     assert stored_messages[0]["role"] == "user"
@@ -8058,103 +4624,12 @@ def test_transform_content_part_text_block():
     assert result is None
 
 
-def test_transform_message_content_string():
-    """Test that string content is returned as-is."""
-    result = transform_message_content("Hello, world!")
-    assert result == "Hello, world!"
-
-
-def test_transform_message_content_list_anthropic():
-    """Test that list content with Anthropic format is transformed correctly."""
-    content = [
-        {"type": "text", "text": "Hello!"},
-        {
-            "type": "image",
-            "source": {
-                "type": "base64",
-                "media_type": "image/png",
-                "data": "base64data...",
-            },
-        },
-    ]
-
-    result = transform_message_content(content)
-
-    assert len(result) == 2
-    # Text block stays as-is (transform returns None, keeps original)
-    assert result[0] == {"type": "text", "text": "Hello!"}
-    assert result[1] == {
-        "type": "blob",
-        "modality": "image",
-        "mime_type": "image/png",
-        "content": "base64data...",
-    }
-
-
 # Integration tests for binary data in messages
 
 
-def test_message_with_base64_image(sentry_init, capture_events):
-    """Test that messages with base64 images are properly captured."""
-    sentry_init(
-        integrations=[AnthropicIntegration(include_prompts=True)],
-        disabled_integrations=[StdlibIntegration],
-        traces_sample_rate=1.0,
-        send_default_pii=True,
-        stream_gen_ai_spans=False,
-    )
-    events = capture_events()
-    client = Anthropic(api_key="z")
-    client.messages._post = mock.Mock(return_value=EXAMPLE_MESSAGE)
-
-    messages = [
-        {
-            "role": "user",
-            "content": [
-                {"type": "text", "text": "What's in this image?"},
-                {
-                    "type": "image",
-                    "source": {
-                        "type": "base64",
-                        "media_type": "image/jpeg",
-                        "data": "base64encodeddatahere...",
-                    },
-                },
-            ],
-        }
-    ]
-
-    with start_transaction(name="anthropic"):
-        client.messages.create(max_tokens=1024, messages=messages, model="model")
-
-    assert len(events) == 1
-    (event,) = events
-    (span,) = event["spans"]
-
-    assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["data"]
-    stored_messages = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
-
-    assert len(stored_messages) == 1
-    assert stored_messages[0]["role"] == "user"
-    content = stored_messages[0]["content"]
-    assert len(content) == 2
-    assert content[0] == {"type": "text", "text": "What's in this image?"}
-    assert content[1] == {
-        "type": "blob",
-        "modality": "image",
-        "mime_type": "image/jpeg",
-        "content": BLOB_DATA_SUBSTITUTE,
-    }
-
-
-@pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_message_with_url_image(
     sentry_init,
-    capture_events,
     capture_items,
-    stream_gen_ai_spans,
-    span_streaming,
 ):
     """Test that messages with URL-referenced images are properly captured."""
     sentry_init(
@@ -8162,8 +4637,7 @@ def test_message_with_url_image(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        stream_gen_ai_spans=stream_gen_ai_spans,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
     client = Anthropic(api_key="z")
@@ -8184,31 +4658,15 @@ def test_message_with_url_image(
             ],
         }
     ]
+    items = capture_items("span")
 
-    if span_streaming or stream_gen_ai_spans:
-        items = capture_items("span")
+    client.messages.create(max_tokens=1024, messages=messages, model="model")
 
-        with start_transaction(name="anthropic"):
-            client.messages.create(max_tokens=1024, messages=messages, model="model")
+    sentry_sdk.flush()
+    spans = [item.payload for item in items]
+    (span,) = spans
 
-        sentry_sdk.flush()
-        spans = [item.payload for item in items]
-        (span,) = spans
-
-        stored_messages = json.loads(
-            span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-        )
-    else:
-        events = capture_events()
-
-        with start_transaction(name="anthropic"):
-            client.messages.create(max_tokens=1024, messages=messages, model="model")
-
-        assert len(events) == 1
-        (event,) = events
-        (span,) = event["spans"]
-
-        stored_messages = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
+    stored_messages = json.loads(span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
 
     content = stored_messages[0]["content"]
     assert content[1] == {
@@ -8219,14 +4677,9 @@ def test_message_with_url_image(
     }
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_message_with_file_image(
     sentry_init,
-    capture_events,
     capture_items,
-    stream_gen_ai_spans,
-    span_streaming,
 ):
     """Test that messages with file_id-referenced images are properly captured."""
     sentry_init(
@@ -8234,8 +4687,7 @@ def test_message_with_file_image(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        stream_gen_ai_spans=stream_gen_ai_spans,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
     client = Anthropic(api_key="z")
@@ -8257,31 +4709,15 @@ def test_message_with_file_image(
             ],
         }
     ]
+    items = capture_items("span")
 
-    if span_streaming or stream_gen_ai_spans:
-        items = capture_items("span")
+    client.messages.create(max_tokens=1024, messages=messages, model="model")
 
-        with start_transaction(name="anthropic"):
-            client.messages.create(max_tokens=1024, messages=messages, model="model")
+    sentry_sdk.flush()
+    spans = [item.payload for item in items]
+    (span,) = spans
 
-        sentry_sdk.flush()
-        spans = [item.payload for item in items]
-        (span,) = spans
-
-        stored_messages = json.loads(
-            span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-        )
-    else:
-        events = capture_events()
-
-        with start_transaction(name="anthropic"):
-            client.messages.create(max_tokens=1024, messages=messages, model="model")
-
-        assert len(events) == 1
-        (event,) = events
-        (span,) = event["spans"]
-
-        stored_messages = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
+    stored_messages = json.loads(span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
 
     content = stored_messages[0]["content"]
     assert content[1] == {
@@ -8292,61 +4728,9 @@ def test_message_with_file_image(
     }
 
 
-def test_message_with_base64_pdf(sentry_init, capture_events):
-    """Test that messages with base64-encoded PDF documents are properly captured."""
-    sentry_init(
-        integrations=[AnthropicIntegration(include_prompts=True)],
-        disabled_integrations=[StdlibIntegration],
-        traces_sample_rate=1.0,
-        send_default_pii=True,
-        stream_gen_ai_spans=False,
-    )
-    events = capture_events()
-    client = Anthropic(api_key="z")
-    client.messages._post = mock.Mock(return_value=EXAMPLE_MESSAGE)
-
-    messages = [
-        {
-            "role": "user",
-            "content": [
-                {"type": "text", "text": "Summarize this document."},
-                {
-                    "type": "document",
-                    "source": {
-                        "type": "base64",
-                        "media_type": "application/pdf",
-                        "data": "JVBERi0xLjQKJeLj...base64pdfdata",
-                    },
-                },
-            ],
-        }
-    ]
-
-    with start_transaction(name="anthropic"):
-        client.messages.create(max_tokens=1024, messages=messages, model="model")
-
-    assert len(events) == 1
-    (event,) = events
-    (span,) = event["spans"]
-
-    stored_messages = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
-    content = stored_messages[0]["content"]
-    assert content[1] == {
-        "type": "blob",
-        "modality": "document",
-        "mime_type": "application/pdf",
-        "content": BLOB_DATA_SUBSTITUTE,
-    }
-
-
-@pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_message_with_url_pdf(
     sentry_init,
-    capture_events,
     capture_items,
-    stream_gen_ai_spans,
-    span_streaming,
 ):
     """Test that messages with URL-referenced PDF documents are properly captured."""
     sentry_init(
@@ -8354,8 +4738,7 @@ def test_message_with_url_pdf(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        stream_gen_ai_spans=stream_gen_ai_spans,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
     client = Anthropic(api_key="z")
@@ -8376,31 +4759,15 @@ def test_message_with_url_pdf(
             ],
         }
     ]
+    items = capture_items("span")
 
-    if span_streaming or stream_gen_ai_spans:
-        items = capture_items("span")
+    client.messages.create(max_tokens=1024, messages=messages, model="model")
 
-        with start_transaction(name="anthropic"):
-            client.messages.create(max_tokens=1024, messages=messages, model="model")
+    sentry_sdk.flush()
+    spans = [item.payload for item in items]
+    (span,) = spans
 
-        sentry_sdk.flush()
-        spans = [item.payload for item in items]
-        (span,) = spans
-
-        stored_messages = json.loads(
-            span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-        )
-    else:
-        events = capture_events()
-
-        with start_transaction(name="anthropic"):
-            client.messages.create(max_tokens=1024, messages=messages, model="model")
-
-        assert len(events) == 1
-        (event,) = events
-        (span,) = event["spans"]
-
-        stored_messages = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
+    stored_messages = json.loads(span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
 
     content = stored_messages[0]["content"]
     assert content[1] == {
@@ -8411,14 +4778,9 @@ def test_message_with_url_pdf(
     }
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_message_with_file_document(
     sentry_init,
-    capture_events,
     capture_items,
-    stream_gen_ai_spans,
-    span_streaming,
 ):
     """Test that messages with file_id-referenced documents are properly captured."""
     sentry_init(
@@ -8426,8 +4788,7 @@ def test_message_with_file_document(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        stream_gen_ai_spans=stream_gen_ai_spans,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
     client = Anthropic(api_key="z")
@@ -8449,31 +4810,15 @@ def test_message_with_file_document(
             ],
         }
     ]
+    items = capture_items("span")
 
-    if span_streaming or stream_gen_ai_spans:
-        items = capture_items("span")
+    client.messages.create(max_tokens=1024, messages=messages, model="model")
 
-        with start_transaction(name="anthropic"):
-            client.messages.create(max_tokens=1024, messages=messages, model="model")
+    sentry_sdk.flush()
+    spans = [item.payload for item in items]
+    (span,) = spans
 
-        sentry_sdk.flush()
-        spans = [item.payload for item in items]
-        (span,) = spans
-
-        stored_messages = json.loads(
-            span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-        )
-    else:
-        events = capture_events()
-
-        with start_transaction(name="anthropic"):
-            client.messages.create(max_tokens=1024, messages=messages, model="model")
-
-        assert len(events) == 1
-        (event,) = events
-        (span,) = event["spans"]
-
-        stored_messages = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
+    stored_messages = json.loads(span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
 
     content = stored_messages[0]["content"]
     assert content[1] == {
@@ -8484,176 +4829,9 @@ def test_message_with_file_document(
     }
 
 
-def test_message_with_mixed_content(sentry_init, capture_events):
-    """Test that messages with mixed content (text, images, documents) are properly captured."""
-    sentry_init(
-        integrations=[AnthropicIntegration(include_prompts=True)],
-        disabled_integrations=[StdlibIntegration],
-        traces_sample_rate=1.0,
-        send_default_pii=True,
-        stream_gen_ai_spans=False,
-    )
-    events = capture_events()
-    client = Anthropic(api_key="z")
-    client.messages._post = mock.Mock(return_value=EXAMPLE_MESSAGE)
-
-    messages = [
-        {
-            "role": "user",
-            "content": [
-                {"type": "text", "text": "Compare this image with the document."},
-                {
-                    "type": "image",
-                    "source": {
-                        "type": "base64",
-                        "media_type": "image/png",
-                        "data": "iVBORw0KGgo...base64imagedata",
-                    },
-                },
-                {
-                    "type": "image",
-                    "source": {
-                        "type": "url",
-                        "url": "https://example.com/comparison.jpg",
-                    },
-                },
-                {
-                    "type": "document",
-                    "source": {
-                        "type": "base64",
-                        "media_type": "application/pdf",
-                        "data": "JVBERi0xLjQK...base64pdfdata",
-                    },
-                },
-                {"type": "text", "text": "Please provide a detailed analysis."},
-            ],
-        }
-    ]
-
-    with start_transaction(name="anthropic"):
-        client.messages.create(max_tokens=1024, messages=messages, model="model")
-
-    assert len(events) == 1
-    (event,) = events
-    (span,) = event["spans"]
-
-    stored_messages = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
-    content = stored_messages[0]["content"]
-
-    assert len(content) == 5
-    assert content[0] == {
-        "type": "text",
-        "text": "Compare this image with the document.",
-    }
-    assert content[1] == {
-        "type": "blob",
-        "modality": "image",
-        "mime_type": "image/png",
-        "content": BLOB_DATA_SUBSTITUTE,
-    }
-    assert content[2] == {
-        "type": "uri",
-        "modality": "image",
-        "mime_type": "",
-        "uri": "https://example.com/comparison.jpg",
-    }
-    assert content[3] == {
-        "type": "blob",
-        "modality": "document",
-        "mime_type": "application/pdf",
-        "content": BLOB_DATA_SUBSTITUTE,
-    }
-    assert content[4] == {
-        "type": "text",
-        "text": "Please provide a detailed analysis.",
-    }
-
-
-def test_message_with_multiple_images_different_formats(sentry_init, capture_events):
-    """Test that messages with multiple images of different source types are handled."""
-    sentry_init(
-        integrations=[AnthropicIntegration(include_prompts=True)],
-        disabled_integrations=[StdlibIntegration],
-        traces_sample_rate=1.0,
-        send_default_pii=True,
-        stream_gen_ai_spans=False,
-    )
-    events = capture_events()
-    client = Anthropic(api_key="z")
-    client.messages._post = mock.Mock(return_value=EXAMPLE_MESSAGE)
-
-    messages = [
-        {
-            "role": "user",
-            "content": [
-                {
-                    "type": "image",
-                    "source": {
-                        "type": "base64",
-                        "media_type": "image/jpeg",
-                        "data": "base64data1...",
-                    },
-                },
-                {
-                    "type": "image",
-                    "source": {
-                        "type": "url",
-                        "url": "https://example.com/img2.gif",
-                    },
-                },
-                {
-                    "type": "image",
-                    "source": {
-                        "type": "file",
-                        "file_id": "file_img_789",
-                        "media_type": "image/webp",
-                    },
-                },
-                {"type": "text", "text": "Compare these three images."},
-            ],
-        }
-    ]
-
-    with start_transaction(name="anthropic"):
-        client.messages.create(max_tokens=1024, messages=messages, model="model")
-
-    assert len(events) == 1
-    (event,) = events
-    (span,) = event["spans"]
-
-    stored_messages = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
-    content = stored_messages[0]["content"]
-
-    assert len(content) == 4
-    assert content[0] == {
-        "type": "blob",
-        "modality": "image",
-        "mime_type": "image/jpeg",
-        "content": BLOB_DATA_SUBSTITUTE,
-    }
-    assert content[1] == {
-        "type": "uri",
-        "modality": "image",
-        "mime_type": "",
-        "uri": "https://example.com/img2.gif",
-    }
-    assert content[2] == {
-        "type": "file",
-        "modality": "image",
-        "mime_type": "image/webp",
-        "file_id": "file_img_789",
-    }
-    assert content[3] == {"type": "text", "text": "Compare these three images."}
-
-
-@pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_binary_content_not_stored_when_pii_disabled(
     sentry_init,
-    capture_events,
     capture_items,
-    stream_gen_ai_spans,
-    span_streaming,
 ):
     """Test that binary content is not stored when send_default_pii is False."""
     sentry_init(
@@ -8661,8 +4839,7 @@ def test_binary_content_not_stored_when_pii_disabled(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=False,
-        stream_gen_ai_spans=stream_gen_ai_spans,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
     client = Anthropic(api_key="z")
@@ -8684,41 +4861,21 @@ def test_binary_content_not_stored_when_pii_disabled(
             ],
         }
     ]
+    items = capture_items("span")
 
-    if span_streaming or stream_gen_ai_spans:
-        items = capture_items("span")
+    client.messages.create(max_tokens=1024, messages=messages, model="model")
 
-        with start_transaction(name="anthropic"):
-            client.messages.create(max_tokens=1024, messages=messages, model="model")
+    sentry_sdk.flush()
+    spans = [item.payload for item in items]
+    (span,) = spans
 
-        sentry_sdk.flush()
-        spans = [item.payload for item in items]
-        (span,) = spans
-
-        # Messages should not be stored
-        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
-    else:
-        events = capture_events()
-
-        with start_transaction(name="anthropic"):
-            client.messages.create(max_tokens=1024, messages=messages, model="model")
-
-        assert len(events) == 1
-        (event,) = events
-        (span,) = event["spans"]
-
-        # Messages should not be stored
-        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
+    # Messages should not be stored
+    assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_binary_content_not_stored_when_prompts_disabled(
     sentry_init,
-    capture_events,
     capture_items,
-    stream_gen_ai_spans,
-    span_streaming,
 ):
     """Test that binary content is not stored when include_prompts is False."""
     sentry_init(
@@ -8726,8 +4883,7 @@ def test_binary_content_not_stored_when_prompts_disabled(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        stream_gen_ai_spans=stream_gen_ai_spans,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
     client = Anthropic(api_key="z")
@@ -8749,49 +4905,28 @@ def test_binary_content_not_stored_when_prompts_disabled(
             ],
         }
     ]
+    items = capture_items("span")
 
-    if span_streaming or stream_gen_ai_spans:
-        items = capture_items("span")
+    client.messages.create(max_tokens=1024, messages=messages, model="model")
 
-        with start_transaction(name="anthropic"):
-            client.messages.create(max_tokens=1024, messages=messages, model="model")
+    sentry_sdk.flush()
+    spans = [item.payload for item in items]
+    (span,) = spans
 
-        sentry_sdk.flush()
-        spans = [item.payload for item in items]
-        (span,) = spans
-
-        # Messages should not be stored
-        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
-    else:
-        events = capture_events()
-
-        with start_transaction(name="anthropic"):
-            client.messages.create(max_tokens=1024, messages=messages, model="model")
-
-        assert len(events) == 1
-        (event,) = events
-        (span,) = event["spans"]
-
-        # Messages should not be stored
-        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
+    # Messages should not be stored
+    assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_cache_tokens_nonstreaming(
     sentry_init,
-    capture_events,
     capture_items,
-    stream_gen_ai_spans,
-    span_streaming,
 ):
     """Test cache read/write tokens are tracked for non-streaming responses."""
     sentry_init(
         integrations=[AnthropicIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        stream_gen_ai_spans=stream_gen_ai_spans,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
     client = Anthropic(api_key="z")
@@ -8811,52 +4946,27 @@ def test_cache_tokens_nonstreaming(
             ),
         )
     )
+    items = capture_items("span")
 
-    if span_streaming or stream_gen_ai_spans:
-        items = capture_items("span")
+    client.messages.create(
+        max_tokens=1024,
+        messages=[{"role": "user", "content": "Hello"}],
+        model="claude-3-5-sonnet-20241022",
+    )
 
-        with start_transaction(name="anthropic"):
-            client.messages.create(
-                max_tokens=1024,
-                messages=[{"role": "user", "content": "Hello"}],
-                model="claude-3-5-sonnet-20241022",
-            )
-
-        sentry_sdk.flush()
-        (span,) = (item.payload for item in items)
-        # input_tokens normalized: 100 + 80 (cache_read) + 20 (cache_write) = 200
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 200
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 50
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 250
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 80
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 20
-    else:
-        events = capture_events()
-
-        with start_transaction(name="anthropic"):
-            client.messages.create(
-                max_tokens=1024,
-                messages=[{"role": "user", "content": "Hello"}],
-                model="claude-3-5-sonnet-20241022",
-            )
-
-        (span,) = events[0]["spans"]
-        # input_tokens normalized: 100 + 80 (cache_read) + 20 (cache_write) = 200
-        assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 200
-        assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 50
-        assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 250
-        assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 80
-        assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 20
+    sentry_sdk.flush()
+    (span,) = (item.payload for item in items)
+    # input_tokens normalized: 100 + 80 (cache_read) + 20 (cache_write) = 200
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 200
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 50
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 250
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 80
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 20
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_input_tokens_include_cache_write_nonstreaming(
     sentry_init,
-    capture_events,
     capture_items,
-    stream_gen_ai_spans,
-    span_streaming,
 ):
     """
     Test that gen_ai.usage.input_tokens includes cache_write tokens (non-streaming).
@@ -8873,8 +4983,7 @@ def test_input_tokens_include_cache_write_nonstreaming(
         integrations=[AnthropicIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        stream_gen_ai_spans=stream_gen_ai_spans,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
     client = Anthropic(api_key="z")
@@ -8894,56 +5003,27 @@ def test_input_tokens_include_cache_write_nonstreaming(
             ),
         )
     )
+    items = capture_items("span")
 
-    if span_streaming or stream_gen_ai_spans:
-        items = capture_items("span")
+    client.messages.create(
+        max_tokens=1024,
+        messages=[{"role": "user", "content": "What is 3+3?"}],
+        model="claude-sonnet-4-20250514",
+    )
 
-        with start_transaction(name="anthropic"):
-            client.messages.create(
-                max_tokens=1024,
-                messages=[{"role": "user", "content": "What is 3+3?"}],
-                model="claude-sonnet-4-20250514",
-            )
+    sentry_sdk.flush()
+    (span,) = (item.payload for item in items)
 
-        sentry_sdk.flush()
-        (span,) = (item.payload for item in items)
-
-        # input_tokens should be total: 19 (non-cached) + 2846 (cache_write) = 2865
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 2865
-        assert (
-            span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 2879
-        )  # 2865 + 14
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 0
-        assert (
-            span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 2846
-        )
-    else:
-        events = capture_events()
-
-        with start_transaction(name="anthropic"):
-            client.messages.create(
-                max_tokens=1024,
-                messages=[{"role": "user", "content": "What is 3+3?"}],
-                model="claude-sonnet-4-20250514",
-            )
-
-        (span,) = events[0]["spans"]
-
-        # input_tokens should be total: 19 (non-cached) + 2846 (cache_write) = 2865
-        assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 2865
-        assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 2879  # 2865 + 14
-        assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 0
-        assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 2846
+    # input_tokens should be total: 19 (non-cached) + 2846 (cache_write) = 2865
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 2865
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 2879  # 2865 + 14
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 0
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 2846
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_input_tokens_include_cache_read_nonstreaming(
     sentry_init,
-    capture_events,
     capture_items,
-    stream_gen_ai_spans,
-    span_streaming,
 ):
     """
     Test that gen_ai.usage.input_tokens includes cache_read tokens (non-streaming).
@@ -8960,8 +5040,7 @@ def test_input_tokens_include_cache_read_nonstreaming(
         integrations=[AnthropicIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        stream_gen_ai_spans=stream_gen_ai_spans,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
     client = Anthropic(api_key="z")
@@ -8981,56 +5060,29 @@ def test_input_tokens_include_cache_read_nonstreaming(
             ),
         )
     )
+    items = capture_items("span")
 
-    if span_streaming or stream_gen_ai_spans:
-        items = capture_items("span")
+    client.messages.create(
+        max_tokens=1024,
+        messages=[{"role": "user", "content": "What is 5+5?"}],
+        model="claude-sonnet-4-20250514",
+    )
 
-        with start_transaction(name="anthropic"):
-            client.messages.create(
-                max_tokens=1024,
-                messages=[{"role": "user", "content": "What is 5+5?"}],
-                model="claude-sonnet-4-20250514",
-            )
+    sentry_sdk.flush()
+    (span,) = [item.payload for item in items]
 
-        sentry_sdk.flush()
-        (span,) = [item.payload for item in items]
-
-        # input_tokens should be total: 19 (non-cached) + 2846 (cache_read) = 2865
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 2865
-        assert (
-            span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 2879
-        )  # 2865 + 14
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 2846
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 0
-    else:
-        events = capture_events()
-
-        with start_transaction(name="anthropic"):
-            client.messages.create(
-                max_tokens=1024,
-                messages=[{"role": "user", "content": "What is 5+5?"}],
-                model="claude-sonnet-4-20250514",
-            )
-
-        (span,) = events[0]["spans"]
-
-        # input_tokens should be total: 19 (non-cached) + 2846 (cache_read) = 2865
-        assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 2865
-        assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 2879  # 2865 + 14
-        assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 2846
-        assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 0
+    # input_tokens should be total: 19 (non-cached) + 2846 (cache_read) = 2865
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 2865
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 2879  # 2865 + 14
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 2846
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 0
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_input_tokens_include_cache_read_streaming(
     sentry_init,
-    capture_events,
     capture_items,
     get_model_response,
     server_side_event_chunks,
-    stream_gen_ai_spans,
-    span_streaming,
 ):
     """
     Test that gen_ai.usage.input_tokens includes cache_read tokens (streaming).
@@ -9071,71 +5123,38 @@ def test_input_tokens_include_cache_read_streaming(
         integrations=[AnthropicIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        stream_gen_ai_spans=stream_gen_ai_spans,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
+    items = capture_items("span")
 
-    if span_streaming or stream_gen_ai_spans:
-        items = capture_items("span")
+    with mock.patch.object(
+        client._client,
+        "send",
+        return_value=response,
+    ):
+        for _ in client.messages.create(
+            max_tokens=1024,
+            messages=[{"role": "user", "content": "What is 5+5?"}],
+            model="claude-sonnet-4-20250514",
+            stream=True,
+        ):
+            pass
 
-        with mock.patch.object(
-            client._client,
-            "send",
-            return_value=response,
-        ) as _, start_transaction(name="anthropic"):
-            for _ in client.messages.create(
-                max_tokens=1024,
-                messages=[{"role": "user", "content": "What is 5+5?"}],
-                model="claude-sonnet-4-20250514",
-                stream=True,
-            ):
-                pass
+    sentry_sdk.flush()
+    (span,) = (item.payload for item in items)
 
-        sentry_sdk.flush()
-        (span,) = (item.payload for item in items)
-
-        # input_tokens should be total: 19 + 2846 = test_stream_messages_input_tokens_include_cache_read_streaming
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 2865
-        assert (
-            span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 2879
-        )  # 2865 + 14
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 2846
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 0
-    else:
-        events = capture_events()
-
-        with mock.patch.object(
-            client._client,
-            "send",
-            return_value=response,
-        ) as _, start_transaction(name="anthropic"):
-            for _ in client.messages.create(
-                max_tokens=1024,
-                messages=[{"role": "user", "content": "What is 5+5?"}],
-                model="claude-sonnet-4-20250514",
-                stream=True,
-            ):
-                pass
-
-        (span,) = events[0]["spans"]
-
-        # input_tokens should be total: 19 + 2846 = test_stream_messages_input_tokens_include_cache_read_streaming
-        assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 2865
-        assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 2879  # 2865 + 14
-        assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 2846
-        assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 0
+    # input_tokens should be total: 19 + 2846 = test_stream_messages_input_tokens_include_cache_read_streaming
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 2865
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 2879  # 2865 + 14
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 2846
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 0
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_stream_messages_input_tokens_include_cache_read_streaming(
     sentry_init,
-    capture_events,
     capture_items,
     get_model_response,
     server_side_event_chunks,
-    stream_gen_ai_spans,
-    span_streaming,
 ):
     """
     Test that gen_ai.usage.input_tokens includes cache_read tokens (streaming).
@@ -9175,67 +5194,35 @@ def test_stream_messages_input_tokens_include_cache_read_streaming(
         integrations=[AnthropicIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        stream_gen_ai_spans=stream_gen_ai_spans,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
+    items = capture_items("span")
 
-    if span_streaming or stream_gen_ai_spans:
-        items = capture_items("span")
+    with mock.patch.object(
+        client._client,
+        "send",
+        return_value=response,
+    ), client.messages.stream(
+        max_tokens=1024,
+        messages=[{"role": "user", "content": "What is 5+5?"}],
+        model="claude-sonnet-4-20250514",
+    ) as stream:
+        for event in stream:
+            pass
 
-        with mock.patch.object(
-            client._client,
-            "send",
-            return_value=response,
-        ) as _, start_transaction(name="anthropic"), client.messages.stream(
-            max_tokens=1024,
-            messages=[{"role": "user", "content": "What is 5+5?"}],
-            model="claude-sonnet-4-20250514",
-        ) as stream:
-            for event in stream:
-                pass
+    sentry_sdk.flush()
+    (span,) = (item.payload for item in items)
 
-        sentry_sdk.flush()
-        (span,) = (item.payload for item in items)
-
-        # input_tokens should be total: 19 + 2846 = 2865
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 2865
-        assert (
-            span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 2879
-        )  # 2865 + 14
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 2846
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 0
-    else:
-        events = capture_events()
-
-        with mock.patch.object(
-            client._client,
-            "send",
-            return_value=response,
-        ) as _, start_transaction(name="anthropic"), client.messages.stream(
-            max_tokens=1024,
-            messages=[{"role": "user", "content": "What is 5+5?"}],
-            model="claude-sonnet-4-20250514",
-        ) as stream:
-            for event in stream:
-                pass
-
-        (span,) = events[0]["spans"]
-
-        # input_tokens should be total: 19 + 2846 = 2865
-        assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 2865
-        assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 2879  # 2865 + 14
-        assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 2846
-        assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 0
+    # input_tokens should be total: 19 + 2846 = 2865
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 2865
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 2879  # 2865 + 14
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 2846
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 0
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_input_tokens_unchanged_without_caching(
     sentry_init,
-    capture_events,
     capture_items,
-    stream_gen_ai_spans,
-    span_streaming,
 ):
     """
     Test that input_tokens is unchanged when there are no cached tokens.
@@ -9247,8 +5234,7 @@ def test_input_tokens_unchanged_without_caching(
         integrations=[AnthropicIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        stream_gen_ai_spans=stream_gen_ai_spans,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
     client = Anthropic(api_key="z")
@@ -9266,48 +5252,26 @@ def test_input_tokens_unchanged_without_caching(
             ),
         )
     )
+    items = capture_items("span")
 
-    if span_streaming or stream_gen_ai_spans:
-        items = capture_items("span")
+    client.messages.create(
+        max_tokens=1024,
+        messages=[{"role": "user", "content": "What is 2+2?"}],
+        model="claude-sonnet-4-20250514",
+    )
 
-        with start_transaction(name="anthropic"):
-            client.messages.create(
-                max_tokens=1024,
-                messages=[{"role": "user", "content": "What is 2+2?"}],
-                model="claude-sonnet-4-20250514",
-            )
+    sentry_sdk.flush()
+    (span,) = (item.payload for item in items)
 
-        sentry_sdk.flush()
-        (span,) = (item.payload for item in items)
-
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 20
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 32  # 20 + 12
-    else:
-        events = capture_events()
-
-        with start_transaction(name="anthropic"):
-            client.messages.create(
-                max_tokens=1024,
-                messages=[{"role": "user", "content": "What is 2+2?"}],
-                model="claude-sonnet-4-20250514",
-            )
-
-        (span,) = events[0]["spans"]
-
-        assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 20
-        assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 32  # 20 + 12
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 20
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 32  # 20 + 12
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_cache_tokens_streaming(
     sentry_init,
-    capture_events,
     capture_items,
     get_model_response,
     server_side_event_chunks,
-    stream_gen_ai_spans,
-    span_streaming,
 ):
     """Test cache tokens are tracked for streaming responses."""
     client = Anthropic(api_key="z")
@@ -9344,69 +5308,38 @@ def test_cache_tokens_streaming(
         integrations=[AnthropicIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        stream_gen_ai_spans=stream_gen_ai_spans,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
+    items = capture_items("span")
 
-    if span_streaming or stream_gen_ai_spans:
-        items = capture_items("span")
+    with mock.patch.object(
+        client._client,
+        "send",
+        return_value=response,
+    ):
+        for _ in client.messages.create(
+            max_tokens=1024,
+            messages=[{"role": "user", "content": "Hello"}],
+            model="claude-3-5-sonnet-20241022",
+            stream=True,
+        ):
+            pass
 
-        with mock.patch.object(
-            client._client,
-            "send",
-            return_value=response,
-        ) as _, start_transaction(name="anthropic"):
-            for _ in client.messages.create(
-                max_tokens=1024,
-                messages=[{"role": "user", "content": "Hello"}],
-                model="claude-3-5-sonnet-20241022",
-                stream=True,
-            ):
-                pass
-
-        sentry_sdk.flush()
-        (span,) = (item.payload for item in items)
-        # input_tokens normalized: 100 + 80 (cache_read) + 20 (cache_write) = 200
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 200
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 210
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 80
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 20
-    else:
-        events = capture_events()
-
-        with mock.patch.object(
-            client._client,
-            "send",
-            return_value=response,
-        ) as _, start_transaction(name="anthropic"):
-            for _ in client.messages.create(
-                max_tokens=1024,
-                messages=[{"role": "user", "content": "Hello"}],
-                model="claude-3-5-sonnet-20241022",
-                stream=True,
-            ):
-                pass
-
-        (span,) = events[0]["spans"]
-        # input_tokens normalized: 100 + 80 (cache_read) + 20 (cache_write) = 200
-        assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 200
-        assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
-        assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 210
-        assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 80
-        assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 20
+    sentry_sdk.flush()
+    (span,) = (item.payload for item in items)
+    # input_tokens normalized: 100 + 80 (cache_read) + 20 (cache_write) = 200
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 200
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 210
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 80
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 20
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_stream_messages_cache_tokens(
     sentry_init,
-    capture_events,
     capture_items,
     get_model_response,
     server_side_event_chunks,
-    stream_gen_ai_spans,
-    span_streaming,
 ):
     """Test cache tokens are tracked for streaming responses."""
     client = Anthropic(api_key="z")
@@ -9443,52 +5376,27 @@ def test_stream_messages_cache_tokens(
         integrations=[AnthropicIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        stream_gen_ai_spans=stream_gen_ai_spans,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
+    items = capture_items("span")
 
-    if span_streaming or stream_gen_ai_spans:
-        items = capture_items("span")
+    with mock.patch.object(
+        client._client,
+        "send",
+        return_value=response,
+    ), client.messages.stream(
+        max_tokens=1024,
+        messages=[{"role": "user", "content": "Hello"}],
+        model="claude-3-5-sonnet-20241022",
+    ) as stream:
+        for event in stream:
+            pass
 
-        with mock.patch.object(
-            client._client,
-            "send",
-            return_value=response,
-        ) as _, start_transaction(name="anthropic"), client.messages.stream(
-            max_tokens=1024,
-            messages=[{"role": "user", "content": "Hello"}],
-            model="claude-3-5-sonnet-20241022",
-        ) as stream:
-            for event in stream:
-                pass
-
-        sentry_sdk.flush()
-        (span,) = (item.payload for item in items)
-        # input_tokens normalized: 100 + 80 (cache_read) + 20 (cache_write) = 200
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 200
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 210
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 80
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 20
-    else:
-        events = capture_events()
-
-        with mock.patch.object(
-            client._client,
-            "send",
-            return_value=response,
-        ) as _, start_transaction(name="anthropic"), client.messages.stream(
-            max_tokens=1024,
-            messages=[{"role": "user", "content": "Hello"}],
-            model="claude-3-5-sonnet-20241022",
-        ) as stream:
-            for event in stream:
-                pass
-
-        (span,) = events[0]["spans"]
-        # input_tokens normalized: 100 + 80 (cache_read) + 20 (cache_write) = 200
-        assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 200
-        assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
-        assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 210
-        assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 80
-        assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 20
+    sentry_sdk.flush()
+    (span,) = (item.payload for item in items)
+    # input_tokens normalized: 100 + 80 (cache_read) + 20 (cache_write) = 200
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 200
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 210
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 80
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 20

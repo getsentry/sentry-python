@@ -17,9 +17,8 @@ from sentry_sdk.utils import logger
 from ..spans import ai_client_span, update_ai_client_span
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Union
+    from typing import Any, Callable
 
-    from sentry_sdk.tracing import Span
 
 try:
     import agents
@@ -29,7 +28,7 @@ except ImportError:
 
 
 def _inject_trace_propagation_headers(
-    hosted_tool: "HostedMCPTool", span: "Union[Span, StreamedSpan]"
+    hosted_tool: "HostedMCPTool", span: "StreamedSpan"
 ) -> None:
     headers = hosted_tool.tool_config.get("headers")
     if headers is None:
@@ -141,12 +140,7 @@ def _get_model(
                 for hosted_tool in hosted_tools:
                     _inject_trace_propagation_headers(hosted_tool, span=span)
 
-                set_on_span = (
-                    span.set_attribute
-                    if isinstance(span, StreamedSpan)
-                    else span.set_data
-                )
-                set_on_span(SPANDATA.GEN_AI_RESPONSE_STREAMING, True)
+                span.set_attribute(SPANDATA.GEN_AI_RESPONSE_STREAMING, True)
 
                 streaming_response = None
                 ttft_recorded = False
@@ -157,7 +151,9 @@ def _get_model(
                     # Detect first content token (text delta event)
                     if not ttft_recorded and hasattr(event, "delta"):
                         ttft = time.perf_counter() - start_time
-                        set_on_span(SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN, ttft)
+                        span.set_attribute(
+                            SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN, ttft
+                        )
                         ttft_recorded = True
 
                     # Capture the full response from ResponseCompletedEvent

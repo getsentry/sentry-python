@@ -16,7 +16,10 @@ from opentelemetry.trace import (
 )
 from opentelemetry.util._once import Once
 
-from sentry_sdk.integrations.otlp import OTLPIntegration, SentryOTLPPropagator
+from sentry_sdk.integrations.otlp import (
+    OTLPIntegration,
+    SentryOTLPPropagator,
+)
 from sentry_sdk.scope import get_external_propagation_context
 
 original_propagator = get_global_textmap()

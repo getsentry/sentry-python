@@ -63,12 +63,9 @@ def get_sentry_task_factory(mock_get_running_loop):
 
 @minimum_python_38
 @pytest.mark.asyncio(loop_scope="module")
-@pytest.mark.parametrize("span_streaming", [True, False])
 async def test_create_task(
     sentry_init,
-    capture_events,
     capture_items,
-    span_streaming,
 ):
     sentry_init(
         traces_sample_rate=1.0,
@@ -76,92 +73,51 @@ async def test_create_task(
         integrations=[
             AsyncioIntegration(),
         ],
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
-    if span_streaming:
-        items = capture_items("span")
+    items = capture_items("span")
 
-        with sentry_sdk.traces.start_span(
-            name="not so important", attributes={"sentry.op": "root"}
-        ):
-            foo_task = asyncio.create_task(foo())
-            bar_task = asyncio.create_task(bar())
+    with sentry_sdk.traces.start_span(
+        name="not so important", attributes={"sentry.op": "root"}
+    ):
+        foo_task = asyncio.create_task(foo())
+        bar_task = asyncio.create_task(bar())
 
-            if hasattr(foo_task.get_coro(), "__name__"):
-                assert foo_task.get_coro().__name__ == "foo"
-            if hasattr(bar_task.get_coro(), "__name__"):
-                assert bar_task.get_coro().__name__ == "bar"
+        if hasattr(foo_task.get_coro(), "__name__"):
+            assert foo_task.get_coro().__name__ == "foo"
+        if hasattr(bar_task.get_coro(), "__name__"):
+            assert bar_task.get_coro().__name__ == "bar"
 
-            tasks = [foo_task, bar_task]
+        tasks = [foo_task, bar_task]
 
-            await asyncio.wait(tasks, return_when=asyncio.FIRST_EXCEPTION)
-
-    else:
-        events = capture_events()
-
-        with sentry_sdk.start_transaction(name="test_transaction_for_create_task"):
-            with sentry_sdk.start_span(op="root", name="not so important"):
-                foo_task = asyncio.create_task(foo())
-                bar_task = asyncio.create_task(bar())
-
-                if hasattr(foo_task.get_coro(), "__name__"):
-                    assert foo_task.get_coro().__name__ == "foo"
-                if hasattr(bar_task.get_coro(), "__name__"):
-                    assert bar_task.get_coro().__name__ == "bar"
-
-                tasks = [foo_task, bar_task]
-
-                await asyncio.wait(tasks, return_when=asyncio.FIRST_EXCEPTION)
+        await asyncio.wait(tasks, return_when=asyncio.FIRST_EXCEPTION)
 
     sentry_sdk.flush()
 
-    if span_streaming:
-        segment = items.pop().payload
+    segment = items.pop().payload
 
-        assert segment["is_segment"] is True
-        assert segment["name"] == "not so important"
-        assert segment["attributes"]["sentry.op"] == "root"
+    assert segment["is_segment"] is True
+    assert segment["name"] == "not so important"
+    assert segment["attributes"]["sentry.op"] == "root"
 
-        spans = [item.payload for item in items]
-        assert len(spans) == 2
+    spans = [item.payload for item in items]
+    assert len(spans) == 2
 
-        assert spans[0]["attributes"]["sentry.op"] == OP.FUNCTION
-        assert spans[0]["name"] == "foo"
-        assert spans[0]["parent_span_id"] == segment["span_id"]
+    assert spans[0]["attributes"]["sentry.op"] == OP.FUNCTION
+    assert spans[0]["name"] == "foo"
+    assert spans[0]["parent_span_id"] == segment["span_id"]
 
-        assert spans[1]["attributes"]["sentry.op"] == OP.FUNCTION
-        assert spans[1]["name"] == "bar"
-        assert spans[1]["parent_span_id"] == segment["span_id"]
-    else:
-        (transaction_event,) = events
-
-        assert transaction_event["spans"][0]["op"] == "root"
-        assert transaction_event["spans"][0]["description"] == "not so important"
-
-        assert transaction_event["spans"][1]["op"] == OP.FUNCTION
-        assert transaction_event["spans"][1]["description"] == "foo"
-        assert (
-            transaction_event["spans"][1]["parent_span_id"]
-            == transaction_event["spans"][0]["span_id"]
-        )
-
-        assert transaction_event["spans"][2]["op"] == OP.FUNCTION
-        assert transaction_event["spans"][2]["description"] == "bar"
-        assert (
-            transaction_event["spans"][2]["parent_span_id"]
-            == transaction_event["spans"][0]["span_id"]
-        )
+    assert spans[1]["attributes"]["sentry.op"] == OP.FUNCTION
+    assert spans[1]["name"] == "bar"
+    assert spans[1]["parent_span_id"] == segment["span_id"]
 
 
 @minimum_python_38
 @pytest.mark.asyncio(loop_scope="module")
-@pytest.mark.parametrize("span_streaming", [True, False])
 async def test_gather(
     sentry_init,
-    capture_events,
     capture_items,
-    span_streaming,
 ):
     sentry_init(
         traces_sample_rate=1.0,
@@ -169,61 +125,33 @@ async def test_gather(
         integrations=[
             AsyncioIntegration(),
         ],
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
-    if span_streaming:
-        items = capture_items("span")
+    items = capture_items("span")
 
-        with sentry_sdk.traces.start_span(
-            name="not so important", attributes={"sentry.op": "root"}
-        ):
-            await asyncio.gather(foo(), bar(), return_exceptions=True)
-
-    else:
-        events = capture_events()
-
-        with sentry_sdk.start_transaction(name="test_transaction_for_gather"):
-            with sentry_sdk.start_span(op="root", name="not so important"):
-                await asyncio.gather(foo(), bar(), return_exceptions=True)
+    with sentry_sdk.traces.start_span(
+        name="not so important", attributes={"sentry.op": "root"}
+    ):
+        await asyncio.gather(foo(), bar(), return_exceptions=True)
 
     sentry_sdk.flush()
 
-    if span_streaming:
-        segment = items.pop().payload
-        assert segment["is_segment"] is True
-        assert segment["name"] == "not so important"
-        assert segment["attributes"]["sentry.op"] == "root"
+    segment = items.pop().payload
+    assert segment["is_segment"] is True
+    assert segment["name"] == "not so important"
+    assert segment["attributes"]["sentry.op"] == "root"
 
-        spans = [item.payload for item in items]
-        assert len(spans) == 2
+    spans = [item.payload for item in items]
+    assert len(spans) == 2
 
-        assert spans[0]["attributes"]["sentry.op"] == OP.FUNCTION
-        assert spans[0]["name"] == "foo"
-        assert spans[0]["parent_span_id"] == segment["span_id"]
+    assert spans[0]["attributes"]["sentry.op"] == OP.FUNCTION
+    assert spans[0]["name"] == "foo"
+    assert spans[0]["parent_span_id"] == segment["span_id"]
 
-        assert spans[1]["attributes"]["sentry.op"] == OP.FUNCTION
-        assert spans[1]["name"] == "bar"
-        assert spans[1]["parent_span_id"] == segment["span_id"]
-    else:
-        (transaction_event,) = events
-
-        assert transaction_event["spans"][0]["op"] == "root"
-        assert transaction_event["spans"][0]["description"] == "not so important"
-
-        assert transaction_event["spans"][1]["op"] == OP.FUNCTION
-        assert transaction_event["spans"][1]["description"] == "foo"
-        assert (
-            transaction_event["spans"][1]["parent_span_id"]
-            == transaction_event["spans"][0]["span_id"]
-        )
-
-        assert transaction_event["spans"][2]["op"] == OP.FUNCTION
-        assert transaction_event["spans"][2]["description"] == "bar"
-        assert (
-            transaction_event["spans"][2]["parent_span_id"]
-            == transaction_event["spans"][0]["span_id"]
-        )
+    assert spans[1]["attributes"]["sentry.op"] == OP.FUNCTION
+    assert spans[1]["name"] == "bar"
+    assert spans[1]["parent_span_id"] == segment["span_id"]
 
 
 @minimum_python_38
@@ -238,18 +166,19 @@ async def test_exception(
         integrations=[
             AsyncioIntegration(),
         ],
+        trace_lifecycle="stream",
     )
 
     events = capture_events()
 
-    with sentry_sdk.start_transaction(name="test_exception"):
-        with sentry_sdk.start_span(op="root", name="not so important"):
+    with sentry_sdk.traces.start_span(name="test_exception", parent_span=None):
+        with sentry_sdk.traces.start_span(name="not so important"):
             tasks = [asyncio.create_task(boom()), asyncio.create_task(bar())]
             await asyncio.wait(tasks, return_when=asyncio.FIRST_EXCEPTION)
 
     sentry_sdk.flush()
 
-    (error_event, _) = events
+    (error_event,) = events
 
     assert error_event["transaction"] == "test_exception"
     assert error_event["contexts"]["trace"]["op"] == "function"
@@ -449,63 +378,41 @@ def test_sentry_task_factory_context_with_factory(mock_get_running_loop):
 
 @minimum_python_38
 @pytest.mark.asyncio(loop_scope="module")
-@pytest.mark.parametrize("span_streaming", [True, False])
 async def test_span_origin(
     sentry_init,
-    capture_events,
     capture_items,
-    span_streaming,
 ):
     sentry_init(
         integrations=[AsyncioIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
-    if span_streaming:
-        items = capture_items("span")
+    items = capture_items("span")
 
-        with sentry_sdk.traces.start_span(name="something"):
-            tasks = [
-                asyncio.create_task(foo()),
-            ]
-            await asyncio.wait(tasks, return_when=asyncio.FIRST_EXCEPTION)
-
-    else:
-        events = capture_events()
-
-        with sentry_sdk.start_transaction(name="something"):
-            tasks = [
-                asyncio.create_task(foo()),
-            ]
-            await asyncio.wait(tasks, return_when=asyncio.FIRST_EXCEPTION)
+    with sentry_sdk.traces.start_span(name="something"):
+        tasks = [
+            asyncio.create_task(foo()),
+        ]
+        await asyncio.wait(tasks, return_when=asyncio.FIRST_EXCEPTION)
 
     sentry_sdk.flush()
 
-    if span_streaming:
-        segment = items.pop().payload
-        assert segment["is_segment"] is True
-        assert segment["attributes"]["sentry.origin"] == "manual"
+    segment = items.pop().payload
+    assert segment["is_segment"] is True
+    assert segment["attributes"]["sentry.origin"] == "manual"
 
-        spans = [item.payload for item in items]
-        assert len(spans) == 1
-        assert spans[0]["attributes"]["sentry.origin"] == "auto.function.asyncio"
-    else:
-        (event,) = events
-
-        assert event["contexts"]["trace"]["origin"] == "manual"
-        assert event["spans"][0]["origin"] == "auto.function.asyncio"
+    spans = [item.payload for item in items]
+    assert len(spans) == 1
+    assert spans[0]["attributes"]["sentry.origin"] == "auto.function.asyncio"
 
 
 @minimum_python_38
 @pytest.mark.asyncio
-@pytest.mark.parametrize("span_streaming", [True, False])
 async def test_task_spans_false(
     sentry_init,
-    capture_events,
     capture_items,
     uninstall_integration,
-    span_streaming,
 ):
     uninstall_integration("asyncio")
 
@@ -514,43 +421,30 @@ async def test_task_spans_false(
         integrations=[
             AsyncioIntegration(task_spans=False),
         ],
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
-    if span_streaming:
-        items = capture_items("span")
+    items = capture_items("span")
 
-        with sentry_sdk.traces.start_span(name="test_no_spans"):
-            tasks = [asyncio.create_task(foo()), asyncio.create_task(bar())]
-            await asyncio.wait(tasks, return_when=asyncio.FIRST_EXCEPTION)
-
-    else:
-        events = capture_events()
-
-        with sentry_sdk.start_transaction(name="test_no_spans"):
-            tasks = [asyncio.create_task(foo()), asyncio.create_task(bar())]
-            await asyncio.wait(tasks, return_when=asyncio.FIRST_EXCEPTION)
+    with sentry_sdk.traces.start_span(name="test_no_spans"):
+        tasks = [asyncio.create_task(foo()), asyncio.create_task(bar())]
+        await asyncio.wait(tasks, return_when=asyncio.FIRST_EXCEPTION)
 
     sentry_sdk.flush()
 
-    if span_streaming:
-        segment = items.pop().payload
-        assert segment["is_segment"] is True
-        assert segment["name"] == "test_no_spans"
+    segment = items.pop().payload
+    assert segment["is_segment"] is True
+    assert segment["name"] == "test_no_spans"
 
-        spans = [item.payload for item in items]
-        assert len(spans) == 0
-    else:
-        (transaction_event,) = events
-
-        assert not transaction_event["spans"]
+    spans = [item.payload for item in items]
+    assert len(spans) == 0
 
 
 @minimum_python_38
 @pytest.mark.asyncio
 async def test_enable_asyncio_integration_with_task_spans_false(
     sentry_init,
-    capture_events,
+    capture_items,
     uninstall_integration,
 ):
     """
@@ -558,7 +452,7 @@ async def test_enable_asyncio_integration_with_task_spans_false(
     """
     uninstall_integration("asyncio")
 
-    sentry_init(traces_sample_rate=1.0)
+    sentry_init(traces_sample_rate=1.0, trace_lifecycle="stream")
 
     assert "asyncio" not in sentry_sdk.get_client().integrations
 
@@ -567,87 +461,68 @@ async def test_enable_asyncio_integration_with_task_spans_false(
     assert "asyncio" in sentry_sdk.get_client().integrations
     assert sentry_sdk.get_client().integrations["asyncio"].task_spans is False
 
-    events = capture_events()
+    items = capture_items("span")
 
-    with sentry_sdk.start_transaction(name="test"):
+    with sentry_sdk.traces.start_span(name="test"):
         await asyncio.create_task(foo())
 
     sentry_sdk.flush()
 
-    (transaction,) = events
-    assert not transaction["spans"]
+    segment = items.pop().payload
+    assert segment["is_segment"] is True
+
+    spans = [item.payload for item in items]
+    assert len(spans) == 0
 
 
 @minimum_python_38
 @pytest.mark.asyncio
-@pytest.mark.parametrize("span_streaming", [True, False])
 async def test_delayed_enable_integration(
-    sentry_init, capture_events, capture_items, span_streaming
+    sentry_init,
+    capture_items,
 ):
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
     assert "asyncio" not in sentry_sdk.get_client().integrations
 
-    if span_streaming:
-        items = capture_items("span")
+    items = capture_items("span")
 
-        with sentry_sdk.traces.start_span(name="test"):
-            await asyncio.create_task(foo())
+    with sentry_sdk.traces.start_span(name="test"):
+        await asyncio.create_task(foo())
 
-        sentry_sdk.flush()
+    sentry_sdk.flush()
 
-        assert len(items) == 1
-        assert items[0].payload.get("is_segment") is True
+    assert len(items) == 1
+    assert items[0].payload.get("is_segment") is True
 
-        items.clear()
-
-    else:
-        events = capture_events()
-
-        with sentry_sdk.start_transaction(name="test"):
-            await asyncio.create_task(foo())
-
-        assert len(events) == 1
-        (transaction,) = events
-        assert not transaction["spans"]
+    items.clear()
 
     enable_asyncio_integration()
 
     assert "asyncio" in sentry_sdk.get_client().integrations
 
-    if span_streaming:
-        items = capture_items("span")
+    items = capture_items("span")
 
-        with sentry_sdk.traces.start_span(name="test"):
-            await asyncio.create_task(foo())
+    with sentry_sdk.traces.start_span(name="test"):
+        await asyncio.create_task(foo())
 
-        sentry_sdk.flush()
+    sentry_sdk.flush()
 
-        segment = items.pop().payload
-        assert segment["is_segment"] is True
+    segment = items.pop().payload
+    assert segment["is_segment"] is True
 
-        spans = [item.payload for item in items]
-        assert len(spans) == 1
-        assert spans[0]["attributes"]["sentry.origin"] == "auto.function.asyncio"
-    else:
-        events = capture_events()
-
-        with sentry_sdk.start_transaction(name="test"):
-            await asyncio.create_task(foo())
-
-        assert len(events) == 1
-        (transaction,) = events
-        assert transaction["spans"]
-        assert transaction["spans"][0]["origin"] == "auto.function.asyncio"
+    spans = [item.payload for item in items]
+    assert len(spans) == 1
+    assert spans[0]["attributes"]["sentry.origin"] == "auto.function.asyncio"
 
 
 @minimum_python_38
 @pytest.mark.asyncio
 async def test_delayed_enable_integration_with_options(sentry_init, capture_events):
-    sentry_init(traces_sample_rate=1.0)
+    sentry_init(traces_sample_rate=1.0, trace_lifecycle="stream")
 
     assert "asyncio" not in sentry_sdk.get_client().integrations
 
@@ -674,7 +549,9 @@ async def test_delayed_enable_enabled_integration(sentry_init, uninstall_integra
     uninstall_integration("asyncio")
 
     integration = AsyncioIntegration()
-    sentry_init(integrations=[integration], traces_sample_rate=1.0)
+    sentry_init(
+        integrations=[integration], traces_sample_rate=1.0, trace_lifecycle="stream"
+    )
 
     assert "asyncio" in sentry_sdk.get_client().integrations
 
@@ -694,83 +571,61 @@ async def test_delayed_enable_enabled_integration(sentry_init, uninstall_integra
 
 @minimum_python_38
 @pytest.mark.asyncio
-@pytest.mark.parametrize("span_streaming", [True, False])
 async def test_delayed_enable_integration_after_disabling(
-    sentry_init, capture_events, capture_items, span_streaming
+    sentry_init,
+    capture_items,
 ):
     sentry_init(
         disabled_integrations=[AsyncioIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
     assert "asyncio" not in sentry_sdk.get_client().integrations
 
-    if span_streaming:
-        items = capture_items("span")
+    items = capture_items("span")
 
-        with sentry_sdk.traces.start_span(name="test"):
-            await asyncio.create_task(foo())
+    with sentry_sdk.traces.start_span(name="test"):
+        await asyncio.create_task(foo())
 
-        sentry_sdk.flush()
+    sentry_sdk.flush()
 
-        assert len(items) == 1
-        assert items[0].payload.get("is_segment") is True
+    assert len(items) == 1
+    assert items[0].payload.get("is_segment") is True
 
-        items.clear()
-
-    else:
-        events = capture_events()
-
-        with sentry_sdk.start_transaction(name="test"):
-            await asyncio.create_task(foo())
-
-        assert len(events) == 1
-        (transaction,) = events
-        assert not transaction["spans"]
+    items.clear()
 
     enable_asyncio_integration()
 
     assert "asyncio" in sentry_sdk.get_client().integrations
 
-    if span_streaming:
-        items = capture_items("span")
+    items = capture_items("span")
 
-        with sentry_sdk.traces.start_span(name="test"):
-            await asyncio.create_task(foo())
+    with sentry_sdk.traces.start_span(name="test"):
+        await asyncio.create_task(foo())
 
-        sentry_sdk.flush()
+    sentry_sdk.flush()
 
-        segment = items.pop().payload
-        assert segment["is_segment"] is True
+    segment = items.pop().payload
+    assert segment["is_segment"] is True
 
-        spans = [item.payload for item in items]
-        assert len(spans) == 1
-        assert spans[0]["attributes"]["sentry.origin"] == "auto.function.asyncio"
-    else:
-        events = capture_events()
-
-        with sentry_sdk.start_transaction(name="test"):
-            await asyncio.create_task(foo())
-
-        assert len(events) == 1
-        (transaction,) = events
-        assert transaction["spans"]
-        assert transaction["spans"][0]["origin"] == "auto.function.asyncio"
+    spans = [item.payload for item in items]
+    assert len(spans) == 1
+    assert spans[0]["attributes"]["sentry.origin"] == "auto.function.asyncio"
 
 
 @minimum_python_39
 @pytest.mark.asyncio(loop_scope="module")
-@pytest.mark.parametrize("span_streaming", [True, False])
 async def test_internal_tasks_not_wrapped(
-    sentry_init, capture_events, capture_items, span_streaming
+    sentry_init,
+    capture_items,
 ):
     from sentry_sdk.utils import mark_sentry_task_internal
 
     sentry_init(
         integrations=[AsyncioIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
     async def user_task():
@@ -781,64 +636,31 @@ async def test_internal_tasks_not_wrapped(
         await asyncio.sleep(0.01)
         return "internal_result"
 
-    if span_streaming:
-        items = capture_items("span")
+    items = capture_items("span")
 
-        with sentry_sdk.traces.start_span(name="test_streamed_span"):
-            user_task_obj = asyncio.create_task(user_task())
+    with sentry_sdk.traces.start_span(name="test_streamed_span"):
+        user_task_obj = asyncio.create_task(user_task())
 
-            with mark_sentry_task_internal():
-                internal_task_obj = asyncio.create_task(internal_task())
+        with mark_sentry_task_internal():
+            internal_task_obj = asyncio.create_task(internal_task())
 
-            user_result = await user_task_obj
-            internal_result = await internal_task_obj
-
-    else:
-        events = capture_events()
-
-        with sentry_sdk.start_transaction(name="test_transaction"):
-            user_task_obj = asyncio.create_task(user_task())
-
-            with mark_sentry_task_internal():
-                internal_task_obj = asyncio.create_task(internal_task())
-
-            user_result = await user_task_obj
-            internal_result = await internal_task_obj
+        user_result = await user_task_obj
+        internal_result = await internal_task_obj
 
     assert user_result == "user_result"
     assert internal_result == "internal_result"
 
     sentry_sdk.flush()
 
-    if span_streaming:
-        assert len(items) == 2
+    assert len(items) == 2
 
-        segment = items.pop().payload
-        assert segment["is_segment"] is True
-        assert segment["name"] == "test_streamed_span"
+    segment = items.pop().payload
+    assert segment["is_segment"] is True
+    assert segment["name"] == "test_streamed_span"
 
-        spans = [item.payload for item in items]
-        assert len(spans) == 1
-        assert spans[0]["name"].endswith("user_task")
-    else:
-        assert len(events) == 1
-        transaction = events[0]
-
-        user_spans = []
-        internal_spans = []
-
-        for span in transaction.get("spans", []):
-            if "user_task" in span.get("description", ""):
-                user_spans.append(span)
-            elif "internal_task" in span.get("description", ""):
-                internal_spans.append(span)
-
-        assert len(user_spans) > 0, (
-            f"User task should have been traced. All spans: {[s.get('description') for s in transaction.get('spans', [])]}"
-        )
-        assert len(internal_spans) == 0, (
-            f"Internal task should NOT have been traced. All spans: {[s.get('description') for s in transaction.get('spans', [])]}"
-        )
+    spans = [item.payload for item in items]
+    assert len(spans) == 1
+    assert spans[0]["name"].endswith("user_task")
 
 
 @minimum_python_38

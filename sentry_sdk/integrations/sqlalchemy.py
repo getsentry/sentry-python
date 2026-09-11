@@ -1,7 +1,6 @@
-from sentry_sdk.consts import SPANDATA, SPANSTATUS
+from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.traces import SpanStatus, StreamedSpan
-from sentry_sdk.tracing import Span
 from sentry_sdk.tracing_utils import (
     add_query_source,
     record_sql_queries,
@@ -17,12 +16,12 @@ try:
     from sqlalchemy.engine import Engine  # type: ignore
     from sqlalchemy.event import listen  # type: ignore
 except ImportError:
-    raise DidNotEnable("SQLAlchemy not installed.")
+    raise DidNotEnable("SQLAlchemy not installed or incompatible")
 
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any, ContextManager, Optional, Union
+    from typing import Any, ContextManager, Optional
 
 
 class SqlalchemyIntegration(Integration):
@@ -31,8 +30,7 @@ class SqlalchemyIntegration(Integration):
 
     @staticmethod
     def setup_once() -> None:
-        version = parse_version(SQLALCHEMY_VERSION)
-        _check_minimum_version(SqlalchemyIntegration, version)
+        _check_minimum_version(SqlalchemyIntegration, parse_version(SQLALCHEMY_VERSION))
 
         listen(Engine, "before_cursor_execute", _before_cursor_execute)
         listen(Engine, "after_cursor_execute", _after_cursor_execute)
@@ -80,10 +78,8 @@ def _after_cursor_execute(
     )
 
     # Record query source immediately before span is finished: accurate end timestamp and before the span is flushed.
-    span: "Optional[Union[Span, StreamedSpan]]" = getattr(
-        context, "_sentry_sql_span", None
-    )
-    if isinstance(span, StreamedSpan):
+    span: "Optional[StreamedSpan]" = getattr(context, "_sentry_sql_span", None)
+    if span is not None:
         with capture_internal_exceptions():
             add_query_source(span)
 
@@ -91,23 +87,18 @@ def _after_cursor_execute(
         context._sentry_sql_span_manager = None
         ctx_mgr.__exit__(None, None, None)
 
-    if isinstance(span, Span):
-        with capture_internal_exceptions():
-            add_query_source(span)
-
 
 def _handle_error(context: "Any", *args: "Any") -> None:
     execution_context = context.execution_context
     if execution_context is None:
         return
 
-    span: "Optional[Span]" = getattr(execution_context, "_sentry_sql_span", None)
+    span: "Optional[StreamedSpan]" = getattr(
+        execution_context, "_sentry_sql_span", None
+    )
 
     if span is not None:
-        if isinstance(span, StreamedSpan):
-            span.status = SpanStatus.ERROR
-        else:
-            span.set_status(SPANSTATUS.INTERNAL_ERROR)
+        span.status = SpanStatus.ERROR
 
     # _after_cursor_execute does not get called for crashing SQL stmts. Judging
     # from SQLAlchemy codebase it does seem like any error coming into this
@@ -155,25 +146,16 @@ def _get_db_system(name: str) -> "Optional[str]":
     return None
 
 
-def _set_db_data(span: "Union[Span, StreamedSpan]", conn: "Any") -> None:
+def _set_db_data(span: "StreamedSpan", conn: "Any") -> None:
     db_system = _get_db_system(conn.engine.name)
 
-    if isinstance(span, StreamedSpan):
-        if db_system is not None:
-            span.set_attribute(SPANDATA.DB_SYSTEM_NAME, db_system)
-    else:
-        if db_system is not None:
-            span.set_data(SPANDATA.DB_SYSTEM, db_system)
-
-    if isinstance(span, StreamedSpan):
-        set_on_span = span.set_attribute
-    else:
-        set_on_span = span.set_data
+    if db_system is not None:
+        span.set_attribute(SPANDATA.DB_SYSTEM_NAME, db_system)
 
     try:
         driver = conn.dialect.driver
         if driver:
-            set_on_span(SPANDATA.DB_DRIVER_NAME, driver)
+            span.set_attribute(SPANDATA.DB_DRIVER_NAME, driver)
     except Exception:
         pass
 
@@ -181,17 +163,13 @@ def _set_db_data(span: "Union[Span, StreamedSpan]", conn: "Any") -> None:
         return
 
     db_name = conn.engine.url.database
-    if isinstance(span, StreamedSpan):
-        if db_name is not None:
-            span.set_attribute(SPANDATA.DB_NAMESPACE, db_name)
-    else:
-        if db_name is not None:
-            span.set_data(SPANDATA.DB_NAME, db_name)
+    if db_name is not None:
+        span.set_attribute(SPANDATA.DB_NAMESPACE, db_name)
 
     server_address = conn.engine.url.host
     if server_address is not None:
-        set_on_span(SPANDATA.SERVER_ADDRESS, server_address)
+        span.set_attribute(SPANDATA.SERVER_ADDRESS, server_address)
 
     server_port = conn.engine.url.port
     if server_port is not None:
-        set_on_span(SPANDATA.SERVER_PORT, server_port)
+        span.set_attribute(SPANDATA.SERVER_PORT, server_port)

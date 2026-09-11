@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 try:
     from executing import Source
 except ImportError:
-    raise DidNotEnable("executing is not installed")
+    raise DidNotEnable("executing is not installed or incompatible")
 
 
 class ExecutingIntegration(Integration):

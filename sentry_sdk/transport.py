@@ -7,7 +7,6 @@ import os
 import socket
 import ssl
 import time
-import warnings
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
@@ -42,7 +41,6 @@ from typing import TYPE_CHECKING, Dict, List, cast
 import certifi
 import urllib3
 
-import sentry_sdk
 from sentry_sdk.consts import EndpointType
 from sentry_sdk.envelope import Envelope, Item, PayloadRef
 from sentry_sdk.utils import (
@@ -69,7 +67,7 @@ if TYPE_CHECKING:
 
     from urllib3.poolmanager import PoolManager, ProxyManager
 
-    from sentry_sdk._types import Event, EventDataCategory
+    from sentry_sdk._types import EventDataCategory
 
 KEEP_ALIVE_SOCKET_OPTIONS = []
 for option in [
@@ -113,24 +111,6 @@ class Transport(ABC):
             self.parsed_dsn = Dsn(options["dsn"], options.get("org_id"))
         else:
             self.parsed_dsn = None
-
-    def capture_event(self: "Self", event: "Event") -> None:
-        """
-        DEPRECATED: Please use capture_envelope instead.
-
-        This gets invoked with the event dictionary when an event should
-        be sent to sentry.
-        """
-
-        warnings.warn(
-            "capture_event is deprecated, please use capture_envelope instead!",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-
-        envelope = Envelope()
-        envelope.add_event(event)
-        self.capture_envelope(envelope)
 
     @abstractmethod
     def capture_envelope(self: "Self", envelope: "Envelope") -> None:
@@ -233,9 +213,6 @@ class HttpTransportCore(Transport):
         self._last_client_report_sent = time.time()
 
         self._pool = self._make_pool()
-
-        # Backwards compatibility for deprecated `self.hub_class` attribute
-        self._hub_cls = sentry_sdk.Hub
 
         experiments = options.get("_experiments", {})
         compression_level = experiments.get(
@@ -715,27 +692,6 @@ class BaseHttpTransport(HttpTransportCore):
             self._worker.submit(lambda: self._flush_client_reports(force=True))
             self._worker.flush(timeout, callback)
 
-    @staticmethod
-    def _warn_hub_cls() -> None:
-        """Convenience method to warn users about the deprecation of the `hub_cls` attribute."""
-        warnings.warn(
-            "The `hub_cls` attribute is deprecated and will be removed in a future release.",
-            DeprecationWarning,
-            stacklevel=3,
-        )
-
-    @property
-    def hub_cls(self: "Self") -> "type[sentry_sdk.Hub]":
-        """DEPRECATED: This attribute is deprecated and will be removed in a future release."""
-        HttpTransport._warn_hub_cls()
-        return self._hub_cls
-
-    @hub_cls.setter
-    def hub_cls(self: "Self", value: "type[sentry_sdk.Hub]") -> None:
-        """DEPRECATED: This attribute is deprecated and will be removed in a future release."""
-        HttpTransport._warn_hub_cls()
-        self._hub_cls = value
-
 
 class HttpTransport(BaseHttpTransport):
     if TYPE_CHECKING:
@@ -1161,35 +1117,6 @@ class _EnvelopePrinterTransport(Transport):
         return getattr(self._inner, name)
 
 
-class _FunctionTransport(Transport):
-    """
-    DEPRECATED: Users wishing to provide a custom transport should subclass
-    the Transport class, rather than providing a function.
-    """
-
-    def __init__(
-        self,
-        func: "Callable[[Event], None]",
-    ) -> None:
-        Transport.__init__(self)
-        self._func = func
-
-    def capture_event(
-        self,
-        event: "Event",
-    ) -> None:
-        self._func(event)
-        return None
-
-    def capture_envelope(self, envelope: "Envelope") -> None:
-        # Since function transports expect to be called with an event, we need
-        # to iterate over the envelope and call the function for each event, via
-        # the deprecated capture_event method.
-        event = envelope.get_event()
-        if event is not None:
-            self.capture_event(event)
-
-
 def make_transport(options: "Dict[str, Any]") -> "Optional[Transport]":
     ref_transport = options["transport"]
 
@@ -1233,14 +1160,6 @@ def make_transport(options: "Dict[str, Any]") -> "Optional[Transport]":
         transport = ref_transport
     elif isinstance(ref_transport, type) and issubclass(ref_transport, Transport):
         transport_cls = ref_transport
-    elif callable(ref_transport):
-        warnings.warn(
-            "Function transports are deprecated and will be removed in a future release."
-            "Please provide a Transport instance or subclass, instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        transport = _FunctionTransport(ref_transport)
 
     # if a transport class is given only instantiate it if the dsn is not
     # empty or None

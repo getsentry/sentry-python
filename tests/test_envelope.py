@@ -88,6 +88,7 @@ def test_envelope_headers(sentry_init, capture_envelopes, monkeypatch):
     sentry_init(
         dsn="https://dogsarebadatkeepingsecrets@squirrelchasers.ingest.sentry.io/12312012",
         traces_sample_rate=1.0,
+        trace_lifecycle="stream",
     )
     envelopes = capture_envelopes()
 
@@ -250,7 +251,6 @@ def test_envelope_item_data_category_mapping():
         ("session", "session"),
         ("attachment", "attachment"),
         ("client_report", "internal"),
-        ("profile", "profile"),
         ("profile_chunk", "profile_chunk"),
         ("check_in", "monitor"),
         ("unknown_type", "default"),

@@ -2,16 +2,14 @@ import sys
 from functools import wraps
 
 import sentry_sdk
-from sentry_sdk.integrations import DidNotEnable, Integration
+from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.integrations._wsgi_common import _filter_headers
 from sentry_sdk.integrations.aws_lambda import _make_request_event_processor
 from sentry_sdk.traces import (
+    SegmentNameSource,
     SpanStatus,
     StreamedSpan,
-    get_current_span,
 )
-from sentry_sdk.tracing import TransactionSource
-from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
@@ -21,13 +19,14 @@ from sentry_sdk.utils import (
 
 try:
     import chalice  # type: ignore
-    from chalice import Chalice, ChaliceViewError
+    from chalice import ChaliceViewError
     from chalice import __version__ as CHALICE_VERSION
     from chalice.app import (  # type: ignore
         EventSourceHandler as ChaliceEventSourceHandler,
     )
+    from chalice.app import RestAPIEventHandler
 except ImportError:
-    raise DidNotEnable("Chalice is not installed")
+    raise DidNotEnable("Chalice is not installed or incompatible")
 
 from typing import TYPE_CHECKING
 
@@ -78,73 +77,58 @@ def _get_view_function_response(
                     )
                 )
 
-            if has_span_streaming_enabled(client.options):
-                current_span = get_current_span()
-                segment = None
-                if type(current_span) is StreamedSpan:
-                    # A segment already exists (created by the AWS Lambda
-                    # integration), so decorate it with Chalice attributes
-                    # The AWS Lambda integration owns the span lifecycle
-                    # (end + flush), but Chalice converts unhandled view exceptions
-                    # into 500 responses, so the error must be captured here.
-                    request_dict = app.current_request.to_dict()
-                    headers = request_dict.get("headers", {})
+            scope.set_transaction_name(
+                app.lambda_context.function_name,
+                source=SegmentNameSource.COMPONENT,
+            )
 
-                    header_attrs: "Dict[str, Any]" = {}
-                    for header, value in _filter_headers(
-                        headers, use_annotated_value=False
-                    ).items():
-                        header_attrs[f"http.request.header.{header.lower()}"] = value
+            current_span = sentry_sdk.traces.get_current_span()
+            segment = None
+            if type(current_span) is StreamedSpan:
+                # A segment already exists (created by the AWS Lambda
+                # integration), so decorate it with Chalice attributes
+                # The AWS Lambda integration owns the span lifecycle
+                # (end + flush), but Chalice converts unhandled view exceptions
+                # into 500 responses, so the error must be captured here.
+                request_dict = app.current_request.to_dict()
+                headers = request_dict.get("headers", {})
 
-                    additional_attrs: "Dict[str, Any]" = {}
-                    if "method" in request_dict:
-                        additional_attrs["http.request.method"] = request_dict["method"]
+                header_attrs: "Dict[str, Any]" = {}
+                for header, value in _filter_headers(
+                    headers, use_annotated_value=False
+                ).items():
+                    header_attrs[f"http.request.header.{header.lower()}"] = value
 
-                    attributes = {
-                        "sentry.origin": ChaliceIntegration.origin,
-                        **header_attrs,
-                        **additional_attrs,
-                    }
+                additional_attrs: "Dict[str, Any]" = {}
+                if "method" in request_dict:
+                    additional_attrs["http.request.method"] = request_dict["method"]
 
-                    segment = current_span._segment
-                    segment.set_attributes(attributes)
+                attributes = {
+                    "sentry.origin": ChaliceIntegration.origin,
+                    **header_attrs,
+                    **additional_attrs,
+                }
 
-                try:
-                    return view_function(**function_args)
-                except Exception as exc:
-                    if isinstance(exc, ChaliceViewError):
-                        raise
-                    exc_info = sys.exc_info()
-                    if segment:
-                        segment.status = SpanStatus.ERROR.value
-                    sentry_event, hint = event_from_exception(
-                        exc_info,
-                        client_options=client.options,
-                        mechanism={"type": "chalice", "handled": False},
-                    )
-                    sentry_sdk.capture_event(sentry_event, hint=hint)
-                    if segment is None:
-                        client.flush()
+                segment = current_span._segment
+                segment.set_attributes(attributes)
+
+            try:
+                return view_function(**function_args)
+            except Exception as exc:
+                if isinstance(exc, ChaliceViewError):
                     raise
-            else:
-                scope.set_transaction_name(
-                    app.lambda_context.function_name,
-                    source=TransactionSource.COMPONENT,
+                exc_info = sys.exc_info()
+                if segment:
+                    segment.status = SpanStatus.ERROR.value
+                sentry_event, hint = event_from_exception(
+                    exc_info,
+                    client_options=client.options,
+                    mechanism={"type": "chalice", "handled": False},
                 )
-                try:
-                    return view_function(**function_args)
-                except Exception as exc:
-                    if isinstance(exc, ChaliceViewError):
-                        raise
-                    exc_info = sys.exc_info()
-                    sentry_event, hint = event_from_exception(
-                        exc_info,
-                        client_options=client.options,
-                        mechanism={"type": "chalice", "handled": False},
-                    )
-                    sentry_sdk.capture_event(sentry_event, hint=hint)
+                sentry_sdk.capture_event(sentry_event, hint=hint)
+                if segment is None:
                     client.flush()
-                    raise
+                raise
 
     return wrapped_view_function  # type: ignore
 
@@ -156,18 +140,11 @@ class ChaliceIntegration(Integration):
     @staticmethod
     def setup_once() -> None:
         version = parse_version(CHALICE_VERSION)
-
+        _check_minimum_version(ChaliceIntegration, version)
         if version is None:
-            raise DidNotEnable("Unparsable Chalice version: {}".format(CHALICE_VERSION))
+            return
 
-        if version < (1, 20):
-            old_get_view_function_response = Chalice._get_view_function_response
-        else:
-            from chalice.app import RestAPIEventHandler
-
-            old_get_view_function_response = (
-                RestAPIEventHandler._get_view_function_response
-            )
+        old_get_view_function_response = RestAPIEventHandler._get_view_function_response
 
         def sentry_event_response(
             app: "Any", view_function: "F", function_args: "Dict[str, Any]"
@@ -180,9 +157,7 @@ class ChaliceIntegration(Integration):
                 app, wrapped_view_function, function_args
             )
 
-        if version < (1, 20):
-            Chalice._get_view_function_response = sentry_event_response
-        else:
-            RestAPIEventHandler._get_view_function_response = sentry_event_response
+        RestAPIEventHandler._get_view_function_response = sentry_event_response
+
         # for everything else (like events)
         chalice.app.EventSourceHandler = EventSourceHandler

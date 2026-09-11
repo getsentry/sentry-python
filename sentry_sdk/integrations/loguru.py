@@ -2,31 +2,29 @@ import enum
 from typing import TYPE_CHECKING
 
 import sentry_sdk
-from sentry_sdk.integrations import DidNotEnable, Integration
+from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.integrations.logging import (
     BreadcrumbHandler,
     EventHandler,
     _BaseHandler,
 )
 from sentry_sdk.logger import _log_level_to_otel
-from sentry_sdk.utils import safe_repr
+from sentry_sdk.utils import parse_version, safe_repr
 
 if TYPE_CHECKING:
     from logging import LogRecord
-    from typing import Any, Optional, Union
+    from typing import Any, Optional
 
 try:
     import loguru
+    from loguru import __version__ as LOGURU_VERSION  # type: ignore
     from loguru import logger
     from loguru._defaults import LOGURU_FORMAT as DEFAULT_FORMAT
 
     if TYPE_CHECKING:
         from loguru import Message
 except ImportError:
-    raise DidNotEnable("LOGURU is not installed")
-
-
-_SENTINEL = object()
+    raise DidNotEnable("LOGURU is not installed or incompatible")
 
 
 class LoggingLevels(enum.IntEnum):
@@ -69,35 +67,34 @@ class LoguruIntegration(Integration):
     identifier = "loguru"
 
     level: "Optional[int]" = DEFAULT_LEVEL
-    event_level: "Optional[int]" = DEFAULT_EVENT_LEVEL
-    breadcrumb_format = DEFAULT_FORMAT
     event_format = DEFAULT_FORMAT
-    sentry_logs_level: "Optional[int]" = DEFAULT_LEVEL
-    capture_sentry_logs: "Optional[Union[bool, object]]" = _SENTINEL
+    event_level: "Optional[int]" = None
+    breadcrumb_level: "Optional[int]" = DEFAULT_LEVEL
+    breadcrumb_format = DEFAULT_FORMAT
 
     def __init__(
         self,
         level: "Optional[int]" = DEFAULT_LEVEL,
-        event_level: "Optional[int]" = DEFAULT_EVENT_LEVEL,
-        breadcrumb_format: "str | loguru.FormatFunction" = DEFAULT_FORMAT,
+        event_level: "Optional[int]" = None,
         event_format: "str | loguru.FormatFunction" = DEFAULT_FORMAT,
-        sentry_logs_level: "Optional[int]" = DEFAULT_LEVEL,
-        capture_sentry_logs: "Optional[Union[bool, object]]" = _SENTINEL,
+        breadcrumb_format: "str | loguru.FormatFunction" = DEFAULT_FORMAT,
+        breadcrumb_level: "Optional[int]" = DEFAULT_LEVEL,
     ) -> None:
         LoguruIntegration.level = level
         LoguruIntegration.event_level = event_level
-        LoguruIntegration.breadcrumb_format = breadcrumb_format
         LoguruIntegration.event_format = event_format
-        LoguruIntegration.sentry_logs_level = sentry_logs_level
-        LoguruIntegration.capture_sentry_logs = capture_sentry_logs
+        LoguruIntegration.breadcrumb_level = breadcrumb_level
+        LoguruIntegration.breadcrumb_format = breadcrumb_format
 
     @staticmethod
     def setup_once() -> None:
+        version = parse_version(LOGURU_VERSION)
+        _check_minimum_version(LoguruIntegration, version)
+
         if LoguruIntegration.level is not None:
             logger.add(
-                LoguruBreadcrumbHandler(level=LoguruIntegration.level),
+                loguru_handler,
                 level=LoguruIntegration.level,
-                format=LoguruIntegration.breadcrumb_format,
             )
 
         if LoguruIntegration.event_level is not None:
@@ -107,10 +104,11 @@ class LoguruIntegration(Integration):
                 format=LoguruIntegration.event_format,
             )
 
-        if LoguruIntegration.sentry_logs_level is not None:
+        if LoguruIntegration.breadcrumb_level is not None:
             logger.add(
-                loguru_sentry_logs_handler,
-                level=LoguruIntegration.sentry_logs_level,
+                LoguruBreadcrumbHandler(level=LoguruIntegration.breadcrumb_level),
+                level=LoguruIntegration.breadcrumb_level,
+                format=LoguruIntegration.breadcrumb_format,
             )
 
 
@@ -144,33 +142,16 @@ class LoguruBreadcrumbHandler(_LoguruBaseHandler, BreadcrumbHandler):
     pass
 
 
-def loguru_sentry_logs_handler(message: "Message") -> None:
+def loguru_handler(message: "Message") -> None:
     # This is intentionally a callable sink instead of a standard logging handler
     # since otherwise we wouldn't get direct access to message.record
     client = sentry_sdk.get_client()
     if not client.is_active():
         return
 
-    # TODO: remove this compat hack in the next major. Capture should
-    # only depend on capture_sentry_logs being True.
-    compat_logs_enabled = client.options.get("enable_logs", False) or client.options[
-        "_experiments"
-    ].get("enable_logs", False)
-    should_capture_logs = False
-    if LoguruIntegration.capture_sentry_logs is True:
-        should_capture_logs = True
-    elif LoguruIntegration.capture_sentry_logs is _SENTINEL and compat_logs_enabled:
-        should_capture_logs = True
-
-    if not should_capture_logs:
-        return
-
     record = message.record
 
-    if (
-        LoguruIntegration.sentry_logs_level is None
-        or record["level"].no < LoguruIntegration.sentry_logs_level
-    ):
+    if LoguruIntegration.level is None or record["level"].no < LoguruIntegration.level:
         return
 
     otel_severity_number, otel_severity_text = _log_level_to_otel(

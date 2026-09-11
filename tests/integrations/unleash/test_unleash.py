@@ -1,5 +1,4 @@
 import concurrent.futures as cf
-import sys
 from random import random
 from unittest import mock
 
@@ -7,9 +6,7 @@ import pytest
 from UnleashClient import UnleashClient
 
 import sentry_sdk
-from sentry_sdk import start_span, start_transaction
 from sentry_sdk.integrations.unleash import UnleashIntegration
-from tests.conftest import ApproxDict
 from tests.integrations.unleash.testutils import mock_unleash_client
 
 
@@ -85,7 +82,6 @@ def test_is_enabled_threaded(sentry_init, capture_events, uninstall_integration)
     }
 
 
-@pytest.mark.skipif(sys.version_info < (3, 7), reason="requires python3.7 or higher")
 def test_is_enabled_asyncio(sentry_init, capture_events, uninstall_integration):
     asyncio = pytest.importorskip("asyncio")
     uninstall_integration(UnleashIntegration.identifier)
@@ -168,12 +164,11 @@ def test_wrapper_attributes(sentry_init, uninstall_integration):
         assert client.is_enabled.__qualname__ == original_is_enabled.__qualname__
 
 
-@pytest.mark.parametrize(
-    "span_streaming",
-    [True, False],
-)
 def test_unleash_span_integration(
-    sentry_init, capture_events, capture_items, uninstall_integration, span_streaming
+    sentry_init,
+    capture_events,
+    capture_items,
+    uninstall_integration,
 ):
     uninstall_integration(UnleashIntegration.identifier)
 
@@ -181,32 +176,19 @@ def test_unleash_span_integration(
         sentry_init(
             traces_sample_rate=1.0,
             integrations=[UnleashIntegration()],
-            trace_lifecycle="stream" if span_streaming else "static",
+            trace_lifecycle="stream",
         )
 
         client = UnleashClient()  # type: ignore[arg-type]
 
-        if span_streaming:
-            items = capture_items("span")
-            with sentry_sdk.traces.start_span(name="bar"):
-                client.is_enabled("hello")
-                client.is_enabled("other")
+        items = capture_items("span")
+        with sentry_sdk.traces.start_span(name="bar"):
+            client.is_enabled("hello")
+            client.is_enabled("other")
 
-            sentry_sdk.flush()
+        sentry_sdk.flush()
 
-            assert len(items) == 1
-            span = items[0].payload
-            assert span["attributes"]["flag.evaluation.hello"] is True
-            assert span["attributes"]["flag.evaluation.other"] is False
-
-        else:
-            events = capture_events()
-            with start_transaction(name="hi"):
-                with start_span(op="foo", name="bar"):
-                    client.is_enabled("hello")
-                    client.is_enabled("other")
-
-            (event,) = events
-            assert event["spans"][0]["data"] == ApproxDict(
-                {"flag.evaluation.hello": True, "flag.evaluation.other": False}
-            )
+        assert len(items) == 1
+        span = items[0].payload
+        assert span["attributes"]["flag.evaluation.hello"] is True
+        assert span["attributes"]["flag.evaluation.other"] is False

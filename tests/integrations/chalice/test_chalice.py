@@ -41,7 +41,11 @@ def _generate_lambda_context(self):
 
 @pytest.fixture
 def app(sentry_init):
-    sentry_init(integrations=[ChaliceIntegration()])
+    sentry_init(
+        integrations=[ChaliceIntegration()],
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+    )
     app = Chalice(app_name="sentry_chalice")
 
     @app.route("/boom")
@@ -175,35 +179,9 @@ def test_transaction(
     assert event["transaction_info"] == {"source": expected_source}
 
 
-def _make_span_streaming_app(sentry_init):
-    sentry_init(
-        integrations=[ChaliceIntegration()],
-        traces_sample_rate=1.0,
-        trace_lifecycle="stream",
-    )
-    app = Chalice(app_name="sentry_chalice")
-
-    @app.route("/message")
-    def hi():
-        capture_message("hi")
-        return {"status": "ok"}
-
-    @app.route("/boom")
-    def boom():
-        raise Exception("boom goes the dynamite!")
-
-    LocalGateway._generate_lambda_context = _generate_lambda_context
-
-    return app
-
-
-def test_span_streaming_existing_span(
-    sentry_init,
-    capture_items,
-):
+def test_existing_span(sentry_init, capture_items, app):
     """When a segment already exists (e.g. created by the AWS Lambda
     integration), Chalice decorates it instead of creating a duplicate."""
-    app = _make_span_streaming_app(sentry_init)
     client = RequestHandler(app)
     items = capture_items("span")
 
@@ -232,11 +210,11 @@ def test_span_streaming_existing_span(
     assert span["status"] == "ok"
 
 
-def test_span_streaming_existing_span_error(
+def test_existing_span_error(
     sentry_init,
     capture_items,
+    app,
 ):
-    app = _make_span_streaming_app(sentry_init)
     client = RequestHandler(app)
     items = capture_items("event", "span")
 

@@ -45,25 +45,20 @@ def _request(server, headers, path="/"):
     connection.close()
 
 
-@pytest.mark.parametrize("span_streaming", [False, True])
 def test_aws_http_connection_adds_missing_unsigned_propagation_headers(
-    sentry_init, local_http_server, span_streaming
+    sentry_init,
+    local_http_server,
 ):
     """Add missing unsigned `sentry-trace` and `baggage`."""
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
         default_integrations=False,
         integrations=[StdlibIntegration()],
     )
     server, requests = local_http_server
-
-    if span_streaming:
-        with sentry_sdk.traces.start_span(name="test"):  # type: ignore[attr-defined]
-            _request(server, [])
-    else:
-        with sentry_sdk.start_transaction(name="test", sampled=True):
-            _request(server, [])
+    with sentry_sdk.traces.start_span(name="test"):  # type: ignore[attr-defined]
+        _request(server, [])
 
     headers: HTTPMessage = requests[0]
 
@@ -78,37 +73,26 @@ def test_aws_http_connection_adds_missing_unsigned_propagation_headers(
     assert len(sentry_trace_headers) == 1
 
 
-@pytest.mark.parametrize("span_streaming", [False, True])
 def test_aws_http_connection_appends_baggage_but_preserves_sentry_trace(
-    sentry_init, local_http_server, span_streaming
+    sentry_init,
+    local_http_server,
 ):
     """Append unsigned `baggage`; leave existing `sentry-trace` as-is."""
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
         default_integrations=False,
         integrations=[StdlibIntegration()],
     )
     server, requests = local_http_server
-
-    if span_streaming:
-        with sentry_sdk.traces.start_span(name="test"):  # type: ignore[attr-defined]
-            _request(
-                server,
-                [
-                    ("baggage", "vendor=value"),
-                    ("sentry-trace", "existing-trace"),
-                ],
-            )
-    else:
-        with sentry_sdk.start_transaction(name="test", sampled=True):
-            _request(
-                server,
-                [
-                    ("baggage", "vendor=value"),
-                    ("sentry-trace", "existing-trace"),
-                ],
-            )
+    with sentry_sdk.traces.start_span(name="test"):  # type: ignore[attr-defined]
+        _request(
+            server,
+            [
+                ("baggage", "vendor=value"),
+                ("sentry-trace", "existing-trace"),
+            ],
+        )
 
     headers: HTTPMessage = requests[0]
 
@@ -123,14 +107,14 @@ def test_aws_http_connection_appends_baggage_but_preserves_sentry_trace(
     assert headers.get_all("sentry-trace") == ["existing-trace"]
 
 
-@pytest.mark.parametrize("span_streaming", [False, True])
 def test_aws_http_connection_preserves_signed_propagation_headers(
-    sentry_init, local_http_server, span_streaming
+    sentry_init,
+    local_http_server,
 ):
     """Leave signed `sentry-trace` and `baggage` as-is."""
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
         default_integrations=False,
         integrations=[StdlibIntegration()],
     )
@@ -143,27 +127,15 @@ def test_aws_http_connection_preserves_signed_propagation_headers(
         "SignedHeaders=baggage;host;sentry-trace, "
         "Signature=sixtyseven"
     )
-
-    if span_streaming:
-        with sentry_sdk.traces.start_span(name="test"):  # type: ignore[attr-defined]
-            _request(
-                server,
-                [
-                    ("baggage", "vendor=value"),
-                    ("sentry-trace", "existing-trace"),
-                    ("Authorization", authorization),
-                ],
-            )
-    else:
-        with sentry_sdk.start_transaction(name="test", sampled=True):
-            _request(
-                server,
-                [
-                    ("baggage", "vendor=value"),
-                    ("sentry-trace", "existing-trace"),
-                    ("Authorization", authorization),
-                ],
-            )
+    with sentry_sdk.traces.start_span(name="test"):  # type: ignore[attr-defined]
+        _request(
+            server,
+            [
+                ("baggage", "vendor=value"),
+                ("sentry-trace", "existing-trace"),
+                ("Authorization", authorization),
+            ],
+        )
 
     headers: HTTPMessage = requests[0]
 
@@ -180,14 +152,14 @@ def test_aws_http_connection_preserves_signed_propagation_headers(
     }
 
 
-@pytest.mark.parametrize("span_streaming", [False, True])
 def test_aws_http_connection_preserves_query_signed_baggage(
-    sentry_init, local_http_server, span_streaming
+    sentry_init,
+    local_http_server,
 ):
     """Leave query-signed `baggage` as-is; add unsigned `sentry-trace`."""
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
         default_integrations=False,
         integrations=[StdlibIntegration()],
     )
@@ -202,21 +174,12 @@ def test_aws_http_connection_preserves_query_signed_baggage(
         "&X-Amz-SignedHeaders=baggage%3Bhost"
         "&X-Amz-Signature=sixtyseven"
     )
-
-    if span_streaming:
-        with sentry_sdk.traces.start_span(name="test"):  # type: ignore[attr-defined]
-            _request(
-                server,
-                [("baggage", "vendor=value")],
-                path=path,
-            )
-    else:
-        with sentry_sdk.start_transaction(name="test", sampled=True):
-            _request(
-                server,
-                [("baggage", "vendor=value")],
-                path=path,
-            )
+    with sentry_sdk.traces.start_span(name="test"):  # type: ignore[attr-defined]
+        _request(
+            server,
+            [("baggage", "vendor=value")],
+            path=path,
+        )
 
     headers: HTTPMessage = requests[0]
     # query-signed `baggage`: leave as-is.

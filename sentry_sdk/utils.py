@@ -5,14 +5,15 @@ import linecache
 import logging
 import math
 import os
-import random
 import re
 import subprocess
 import sys
 import threading
 import time
+import warnings
 from collections import namedtuple
 from contextlib import contextmanager
+from contextvars import ContextVar
 from datetime import datetime, timezone
 from decimal import Decimal
 from functools import partial, partialmethod, wraps
@@ -269,7 +270,8 @@ def datetime_from_isoformat(value: str) -> "datetime":
     try:
         result = datetime.fromisoformat(value)
     except (AttributeError, ValueError):
-        # py 3.6
+        # until 3.11, datetime.fromisoformat didn't support all possible formats,
+        # so we still need this manual fallback
         timestamp_format = (
             "%Y-%m-%dT%H:%M:%S.%f" if "." in value else "%Y-%m-%dT%H:%M:%S"
         )
@@ -1358,133 +1360,6 @@ def parse_version(version: str) -> "Optional[Tuple[int, ...]]":
     return release_tuple
 
 
-def _is_contextvars_broken() -> bool:
-    """
-    Returns whether gevent/eventlet have patched the stdlib in a way where thread locals are now more "correct" than contextvars.
-    """
-    try:
-        import gevent
-        from gevent.monkey import is_object_patched
-
-        # Get the MAJOR and MINOR version numbers of Gevent
-        version_tuple = tuple(
-            [int(part) for part in re.split(r"a|b|rc|\.", gevent.__version__)[:2]]
-        )
-        if is_object_patched("threading", "local"):
-            # Gevent 20.9.0 depends on Greenlet 0.4.17 which natively handles switching
-            # context vars when greenlets are switched, so, Gevent 20.9.0+ is all fine.
-            # Ref: https://github.com/gevent/gevent/blob/83c9e2ae5b0834b8f84233760aabe82c3ba065b4/src/gevent/monkey.py#L604-L609
-            # Gevent 20.5, that doesn't depend on Greenlet 0.4.17 with native support
-            # for contextvars, is able to patch both thread locals and contextvars, in
-            # that case, check if contextvars are effectively patched.
-            if (
-                # Gevent 20.9.0+
-                (sys.version_info >= (3, 7) and version_tuple >= (20, 9))
-                # Gevent 20.5.0+ or Python < 3.7
-                or (is_object_patched("contextvars", "ContextVar"))
-            ):
-                return False
-
-            return True
-    except ImportError:
-        pass
-
-    try:
-        import greenlet
-        from eventlet.patcher import is_monkey_patched  # type: ignore
-
-        greenlet_version = parse_version(greenlet.__version__)
-
-        if greenlet_version is None:
-            logger.error(
-                "Internal error in Sentry SDK: Could not parse Greenlet version from greenlet.__version__."
-            )
-            return False
-
-        if is_monkey_patched("thread") and greenlet_version < (0, 5):
-            return True
-    except ImportError:
-        pass
-
-    return False
-
-
-def _make_threadlocal_contextvars(local: type) -> type:
-    class ContextVar:
-        # Super-limited impl of ContextVar
-
-        def __init__(self, name: str, default: "Any" = None) -> None:
-            self._name = name
-            self._default = default
-            self._local = local()
-            self._original_local = local()
-
-        def get(self, default: "Any" = None) -> "Any":
-            return getattr(self._local, "value", default or self._default)
-
-        def set(self, value: "Any") -> "Any":
-            token = str(random.getrandbits(64))
-            original_value = self.get()
-            setattr(self._original_local, token, original_value)
-            self._local.value = value
-            return token
-
-        def reset(self, token: "Any") -> None:
-            self._local.value = getattr(self._original_local, token)
-            # delete the original value (this way it works in Python 3.6+)
-            del self._original_local.__dict__[token]
-
-    return ContextVar
-
-
-def _get_contextvars() -> "Tuple[bool, type]":
-    """
-    Figure out the "right" contextvars installation to use. Returns a
-    `contextvars.ContextVar`-like class with a limited API.
-
-    See https://docs.sentry.io/platforms/python/contextvars/ for more information.
-    """
-    if not _is_contextvars_broken():
-        # aiocontextvars is a PyPI package that ensures that the contextvars
-        # backport (also a PyPI package) works with asyncio under Python 3.6
-        #
-        # Import it if available.
-        if sys.version_info < (3, 7):
-            # `aiocontextvars` is absolutely required for functional
-            # contextvars on Python 3.6.
-            try:
-                from aiocontextvars import ContextVar
-
-                return True, ContextVar
-            except ImportError:
-                pass
-        else:
-            # On Python 3.7 contextvars are functional.
-            try:
-                from contextvars import ContextVar
-
-                return True, ContextVar
-            except ImportError:
-                pass
-
-    # Fall back to basic thread-local usage.
-
-    from threading import local
-
-    return False, _make_threadlocal_contextvars(local)
-
-
-HAS_REAL_CONTEXTVARS, ContextVar = _get_contextvars()
-
-CONTEXTVARS_ERROR_MESSAGE = """
-
-With asyncio/ASGI applications, the Sentry SDK requires a functional
-installation of `contextvars` to avoid leaking scope/context data across
-requests.
-
-Please refer to https://docs.sentry.io/platforms/python/contextvars/ for more information.
-"""
-
 _is_sentry_internal_task = ContextVar("is_sentry_internal_task", default=False)
 
 # These exceptions won't set the span status to error if they occur. Use
@@ -1542,7 +1417,7 @@ def transaction_from_function(func: "Callable[..., Any]") -> "Optional[str]":
     return qualname_from_function(func)
 
 
-disable_capture_event = ContextVar("disable_capture_event")
+disable_capture_event: "ContextVar[bool]" = ContextVar("disable_capture_event")
 
 
 class ServerlessTimeoutWarning(Exception):  # noqa: N818
@@ -1594,30 +1469,18 @@ class TimeoutThread(threading.Thread):
         if self._stop_event.is_set():
             return
 
-        integer_configured_timeout = int(self.configured_timeout)
-
-        # Setting up the exact integer value of configured time(in seconds)
-        if integer_configured_timeout < self.configured_timeout:
-            integer_configured_timeout = integer_configured_timeout + 1
-
         # Raising Exception after timeout duration is reached
         if self.isolation_scope is not None and self.current_scope is not None:
             with sentry_sdk.scope.use_isolation_scope(self.isolation_scope):
                 with sentry_sdk.scope.use_scope(self.current_scope):
                     try:
                         raise ServerlessTimeoutWarning(
-                            "WARNING : Function is expected to get timed out. Configured timeout duration = {} seconds.".format(
-                                integer_configured_timeout
-                            )
+                            "WARNING: Function is about to time out."
                         )
                     except Exception:
                         reraise(*self._capture_exception())
 
-        raise ServerlessTimeoutWarning(
-            "WARNING : Function is expected to get timed out. Configured timeout duration = {} seconds.".format(
-                integer_configured_timeout
-            )
-        )
+        raise ServerlessTimeoutWarning("WARNING: Function is about to time out.")
 
 
 def to_base64(original: str) -> "Optional[str]":
@@ -2158,9 +2021,7 @@ def get_before_send_log(
     if options is None:
         return None
 
-    return options.get("before_send_log") or options["_experiments"].get(
-        "before_send_log"
-    )
+    return options.get("before_send_log")
 
 
 def get_before_send_metric(
@@ -2169,9 +2030,7 @@ def get_before_send_metric(
     if options is None:
         return None
 
-    return options.get("before_send_metric") or options["_experiments"].get(
-        "before_send_metric"
-    )
+    return options.get("before_send_metric")
 
 
 def get_before_send_span(
@@ -2180,9 +2039,7 @@ def get_before_send_span(
     if options is None:
         return None
 
-    return options.get("before_send_span") or options["_experiments"].get(
-        "before_send_span"
-    )
+    return options.get("before_send_span")
 
 
 def format_attribute(val: "Any") -> "AttributeValue":
@@ -2238,7 +2095,10 @@ def serialize_attribute(val: "AttributeValue") -> "SerializedAttributeValue":
     return {"value": safe_repr(val), "type": "string"}
 
 
-# This noop context manager can be replaced with "from contextlib import nullcontext" when we drop Python 3.6 support
-@contextmanager
-def nullcontext() -> "Iterator[None]":
-    yield
+def deprecation_warning(msg: str) -> None:
+    """
+    Emit a warnings.warn about a deprecation.
+
+    For other types of warnings, use logger.warning().
+    """
+    warnings.warn(msg, stacklevel=3, category=DeprecationWarning)

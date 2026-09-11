@@ -1,5 +1,4 @@
 import sys
-import warnings
 from concurrent.futures import Future, ThreadPoolExecutor
 from functools import wraps
 from threading import Thread, current_thread
@@ -27,22 +26,8 @@ if TYPE_CHECKING:
 class ThreadingIntegration(Integration):
     identifier = "threading"
 
-    def __init__(
-        self, propagate_hub: "Optional[bool]" = None, propagate_scope: bool = True
-    ) -> None:
-        if propagate_hub is not None:
-            logger.warning(
-                "Deprecated: propagate_hub is deprecated. This will be removed in the future."
-            )
-
-        # Note: propagate_hub did not have any effect on propagation of scope data
-        # scope data was always propagated no matter what the value of propagate_hub was
-        # This is why the default for propagate_scope is True
-
+    def __init__(self, propagate_scope: bool = True) -> None:
         self.propagate_scope = propagate_scope
-
-        if propagate_hub is not None:
-            self.propagate_scope = propagate_hub
 
     @staticmethod
     def setup_once() -> None:
@@ -77,12 +62,11 @@ class ThreadingIntegration(Integration):
 
             if integration.propagate_scope:
                 if is_async_emulated_with_threads:
-                    warnings.warn(
+                    logger.warning(
                         "There is a known issue with Django channels 2.x and 3.x when using Python 3.8 or older. "
                         "(Async support is emulated using threads and some Sentry data may be leaked between those threads.) "
                         "Please either upgrade to Django channels 4.0+, use Django's async features "
                         "available in Django 3.1+ instead of Django channels, or upgrade to Python 3.9+.",
-                        stacklevel=2,
                     )
                     isolation_scope = sentry_sdk.get_isolation_scope()
                     current_scope = sentry_sdk.get_current_scope()

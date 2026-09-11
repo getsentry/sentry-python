@@ -231,73 +231,11 @@ def test_timeout_error(run_cloud_function):
     (exception,) = envelope_items[0]["exception"]["values"]
 
     assert exception["type"] == "ServerlessTimeoutWarning"
-    assert (
-        exception["value"]
-        == "WARNING : Function is expected to get timed out. Configured timeout duration = 3 seconds."
-    )
+    assert exception["value"] == "WARNING: Function is about to time out."
     assert exception["mechanism"]["type"] == "threading"
     assert not exception["mechanism"]["handled"]
 
     assert envelope_items[0]["tags"]["cloud_function"] == "true"
-
-
-def test_performance_no_error(run_cloud_function):
-    envelope_items, _, _ = run_cloud_function(
-        dedent(
-            """
-        functionhandler = None
-        event = {}
-        def cloud_function(functionhandler, event):
-            return "test_string"
-        """
-        )
-        + FUNCTIONS_PRELUDE
-        + dedent(
-            """
-        init_sdk(traces_sample_rate=1.0)
-        gcp_functions.worker_v1.FunctionHandler.invoke_user_function(functionhandler, event)
-        """
-        )
-    )
-
-    assert envelope_items[0]["type"] == "transaction"
-    assert envelope_items[0]["contexts"]["trace"]["op"] == "function.gcp"
-    assert envelope_items[0]["transaction"].startswith("Google Cloud function")
-    assert envelope_items[0]["transaction_info"] == {"source": "component"}
-    assert envelope_items[0]["transaction"] in envelope_items[0]["request"]["url"]
-
-
-def test_performance_error(run_cloud_function):
-    envelope_items, _, _ = run_cloud_function(
-        dedent(
-            """
-        functionhandler = None
-        event = {}
-        def cloud_function(functionhandler, event):
-            raise Exception("something went wrong")
-        """
-        )
-        + FUNCTIONS_PRELUDE
-        + dedent(
-            """
-        init_sdk(traces_sample_rate=1.0)
-        gcp_functions.worker_v1.FunctionHandler.invoke_user_function(functionhandler, event)
-        """
-        )
-    )
-
-    assert envelope_items[0]["level"] == "error"
-    (exception,) = envelope_items[0]["exception"]["values"]
-
-    assert exception["type"] == "Exception"
-    assert exception["value"] == "something went wrong"
-    assert exception["mechanism"]["type"] == "gcp"
-    assert not exception["mechanism"]["handled"]
-
-    assert envelope_items[1]["type"] == "transaction"
-    assert envelope_items[1]["contexts"]["trace"]["op"] == "function.gcp"
-    assert envelope_items[1]["transaction"].startswith("Google Cloud function")
-    assert envelope_items[1]["transaction"] in envelope_items[0]["request"]["url"]
 
 
 def test_traces_sampler_gets_correct_values_in_sampling_context(
@@ -370,6 +308,7 @@ def test_traces_sampler_gets_correct_values_in_sampling_context(
 
             init_sdk(
                 traces_sampler=traces_sampler,
+                trace_lifecycle="stream",
             )
 
             gcp_functions.worker_v1.FunctionHandler.invoke_user_function(functionhandler, event)
@@ -382,9 +321,9 @@ def test_traces_sampler_gets_correct_values_in_sampling_context(
 
 def test_error_has_new_trace_context_performance_enabled(run_cloud_function):
     """
-    Check if an 'trace' context is added to errros and transactions when performance monitoring is enabled.
+    Check if a 'trace' context is added to errors and spans when performance monitoring is enabled.
     """
-    envelope_items, _, _ = run_cloud_function(
+    envelope_items, _, span_items = run_cloud_function(
         dedent(
             """
         functionhandler = None
@@ -398,12 +337,12 @@ def test_error_has_new_trace_context_performance_enabled(run_cloud_function):
         + FUNCTIONS_PRELUDE
         + dedent(
             """
-        init_sdk(traces_sample_rate=1.0)
+        init_sdk(traces_sample_rate=1.0, trace_lifecycle="stream")
         gcp_functions.worker_v1.FunctionHandler.invoke_user_function(functionhandler, event)
         """
         )
     )
-    (msg_event, error_event, transaction_event) = envelope_items
+    (msg_event, error_event) = envelope_items
 
     assert "trace" in msg_event["contexts"]
     assert "trace_id" in msg_event["contexts"]["trace"]
@@ -411,13 +350,13 @@ def test_error_has_new_trace_context_performance_enabled(run_cloud_function):
     assert "trace" in error_event["contexts"]
     assert "trace_id" in error_event["contexts"]["trace"]
 
-    assert "trace" in transaction_event["contexts"]
-    assert "trace_id" in transaction_event["contexts"]["trace"]
+    assert len(span_items) == 1
+    segment_span = span_items[0]
 
     assert (
         msg_event["contexts"]["trace"]["trace_id"]
         == error_event["contexts"]["trace"]["trace_id"]
-        == transaction_event["contexts"]["trace"]["trace_id"]
+        == segment_span["trace_id"]
     )
 
 
@@ -456,59 +395,6 @@ def test_error_has_new_trace_context_performance_disabled(run_cloud_function):
     assert (
         msg_event["contexts"]["trace"]["trace_id"]
         == error_event["contexts"]["trace"]["trace_id"]
-    )
-
-
-def test_error_has_existing_trace_context_performance_enabled(run_cloud_function):
-    """
-    Check if an 'trace' context is added to errros and transactions
-    from the incoming 'sentry-trace' header when performance monitoring is enabled.
-    """
-    trace_id = "471a43a4192642f0b136d5159a501701"
-    parent_span_id = "6e8f22c393e68f19"
-    parent_sampled = 1
-    sentry_trace_header = "{}-{}-{}".format(trace_id, parent_span_id, parent_sampled)
-
-    envelope_items, _, _ = run_cloud_function(
-        dedent(
-            """
-        functionhandler = None
-
-        from collections import namedtuple
-        GCPEvent = namedtuple("GCPEvent", ["headers"])
-        event = GCPEvent(headers={"sentry-trace": "%s"})
-
-        def cloud_function(functionhandler, event):
-            sentry_sdk.capture_message("hi")
-            x = 3/0
-            return "3"
-        """
-            % sentry_trace_header
-        )
-        + FUNCTIONS_PRELUDE
-        + dedent(
-            """
-        init_sdk(traces_sample_rate=1.0)
-        gcp_functions.worker_v1.FunctionHandler.invoke_user_function(functionhandler, event)
-        """
-        )
-    )
-    (msg_event, error_event, transaction_event) = envelope_items
-
-    assert "trace" in msg_event["contexts"]
-    assert "trace_id" in msg_event["contexts"]["trace"]
-
-    assert "trace" in error_event["contexts"]
-    assert "trace_id" in error_event["contexts"]["trace"]
-
-    assert "trace" in transaction_event["contexts"]
-    assert "trace_id" in transaction_event["contexts"]["trace"]
-
-    assert (
-        msg_event["contexts"]["trace"]["trace_id"]
-        == error_event["contexts"]["trace"]["trace_id"]
-        == transaction_event["contexts"]["trace"]["trace_id"]
-        == "471a43a4192642f0b136d5159a501701"
     )
 
 
@@ -562,7 +448,7 @@ def test_error_has_existing_trace_context_performance_disabled(run_cloud_functio
 
 
 def test_span_origin(run_cloud_function):
-    events, _, _ = run_cloud_function(
+    _, _, span_items = run_cloud_function(
         dedent(
             """
         functionhandler = None
@@ -574,18 +460,17 @@ def test_span_origin(run_cloud_function):
         + FUNCTIONS_PRELUDE
         + dedent(
             """
-        init_sdk(traces_sample_rate=1.0)
+        init_sdk(traces_sample_rate=1.0, trace_lifecycle="stream")
         gcp_functions.worker_v1.FunctionHandler.invoke_user_function(functionhandler, event)
         """
         )
     )
 
-    (event,) = events
+    assert len(span_items) == 1
+    assert span_items[0]["attributes"]["sentry.origin"] == "auto.function.gcp"
 
-    assert event["contexts"]["trace"]["origin"] == "auto.function.gcp"
 
-
-def test_span_streaming_no_error(run_cloud_function):
+def test_performance_no_error(run_cloud_function):
     _, _, span_items = run_cloud_function(
         dedent(
             """
@@ -619,7 +504,7 @@ def test_span_streaming_no_error(run_cloud_function):
     assert segment_span["attributes"]["faas.entry_point"] == "cloud_function"
 
 
-def test_span_streaming_error(run_cloud_function):
+def test_performance_error(run_cloud_function):
     envelope_items, _, span_items = run_cloud_function(
         dedent(
             """
@@ -660,7 +545,7 @@ def test_span_streaming_error(run_cloud_function):
     assert segment_span["status"] == SpanStatus.ERROR
 
 
-def test_span_streaming_existing_trace_context(run_cloud_function):
+def test_existing_trace_context(run_cloud_function):
     trace_id = "471a43a4192642f0b136d5159a501701"
     parent_span_id = "6e8f22c393e68f19"
     parent_sampled = 1
@@ -708,7 +593,7 @@ def test_span_streaming_existing_trace_context(run_cloud_function):
     assert segment_span["attributes"]["faas.entry_point"] == "cloud_function"
 
 
-def test_span_streaming_request_attributes(run_cloud_function):
+def test_request_attributes(run_cloud_function):
     _, _, span_items = run_cloud_function(
         dedent(
             """
@@ -749,7 +634,7 @@ def test_span_streaming_request_attributes(run_cloud_function):
     assert attrs["faas.entry_point"] == "cloud_function"
 
 
-def test_span_streaming_no_query_string_without_pii(run_cloud_function):
+def test_no_query_string_without_pii(run_cloud_function):
     _, _, span_items = run_cloud_function(
         dedent(
             """
@@ -866,53 +751,7 @@ def _build_init_kwargs(send_default_pii, data_collection):
     "send_default_pii, data_collection, expected_event, expected_span",
     _QUERY_STRING_DATA_COLLECTION_CASES,
 )
-def test_query_string_data_collection_event_processor(
-    run_cloud_function,
-    send_default_pii,
-    data_collection,
-    expected_event,
-    expected_span,
-):
-    init_kwargs = _build_init_kwargs(send_default_pii, data_collection)
-    envelope_items, _, _ = run_cloud_function(
-        dedent(
-            """
-        functionhandler = None
-
-        from collections import namedtuple
-        GCPEvent = namedtuple("GCPEvent", ["headers", "method", "query_string"])
-        event = GCPEvent(
-            headers={},
-            method="GET",
-            query_string=b"toy=tennisball&color=red&auth=secret",
-        )
-
-        def cloud_function(functionhandler, event):
-            raise Exception("something went wrong")
-        """
-        )
-        + FUNCTIONS_PRELUDE
-        + dedent(
-            """
-        init_sdk(%s)
-        gcp_functions.worker_v1.FunctionHandler.invoke_user_function(functionhandler, event)
-        """
-            % init_kwargs
-        )
-    )
-
-    request = envelope_items[0]["request"]
-    if expected_event is None:
-        assert "query_string" not in request
-    else:
-        assert request["query_string"] == expected_event
-
-
-@pytest.mark.parametrize(
-    "send_default_pii, data_collection, expected_event, expected_span",
-    _QUERY_STRING_DATA_COLLECTION_CASES,
-)
-def test_query_string_data_collection_span_streaming(
+def test_query_string_data_collection(
     run_cloud_function,
     send_default_pii,
     data_collection,
