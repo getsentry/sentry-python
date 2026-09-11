@@ -6,11 +6,9 @@ try:
 except ImportError:
     raise DidNotEnable("botocore is not installed")
 
-_SPAN_ORIGIN = "auto.http.boto3"
-
-
 class Boto3Integration(Integration):
-    origin = _SPAN_ORIGIN
+    identifier = "boto3"
+    origin = f"auto.http.{identifier}"
 
     @staticmethod
     def setup_once() -> None:
