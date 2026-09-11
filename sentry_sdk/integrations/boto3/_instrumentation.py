@@ -27,7 +27,6 @@ if TYPE_CHECKING:
 
     from sentry_sdk._types import Attributes
     from sentry_sdk.integrations.boto3._context import AwsCallContext
-    from sentry_sdk.integrations.boto3._services.base import _ServiceExtension
 
 _AWS_RPC_SYSTEM_NAME = "aws-api"
 
@@ -90,20 +89,6 @@ def _get_client_attributes(
 
     attributes.update(_get_server_attributes(ctx.endpoint_url))
     return attributes
-
-
-def _merge_service_attributes(
-    attributes: "Attributes",
-    service_attributes: "Any",
-) -> None:
-    if not isinstance(service_attributes, dict):
-        return
-
-    for key, value in service_attributes.items():
-        # Generic attributes are added first and remain authoritative. A service
-        # extension may only fill attributes that generic instrumentation did
-        # not already produce.
-        attributes.setdefault(key, value)
 
 
 def _get_response_attributes(response: "Any") -> "Attributes":
@@ -201,7 +186,6 @@ def _get_error_attributes(exception: "BaseException") -> "Attributes":
 
 def _start_client_span(
     ctx: "AwsCallContext",
-    service_extension: "Optional[_ServiceExtension]" = None,
 ) -> "Optional[Union[Span, StreamedSpan]]":
     client = sentry_sdk.get_client()
     if client.get_integration(Boto3Integration) is None:
@@ -213,28 +197,6 @@ def _start_client_span(
     attributes = _get_client_attributes(ctx)
     span_op = OP.HTTP_CLIENT
     span_origin = Boto3Integration.origin
-
-    # enrich with service-specific attributes
-    if service_extension is not None:
-        service_span_config = None
-        with capture_internal_exceptions():
-            service_span_config = service_extension.get_span_config(ctx)
-
-        with capture_internal_exceptions():
-            if service_span_config is not None:
-                service_op, service_origin = service_span_config
-                if service_op and isinstance(service_op, str):
-                    span_op = service_op
-                if service_origin and isinstance(service_origin, str):
-                    span_origin = service_origin
-
-        # Request enrichment is independent from the span configuration. This
-        # lets HTTP-based services such as S3 return only their attribute delta.
-        with capture_internal_exceptions():
-            _merge_service_attributes(
-                attributes,
-                service_extension.get_request_attributes(ctx),
-            )
 
     if has_span_streaming_enabled(client.options):
         if sentry_sdk.traces.get_current_span() is None:
@@ -267,21 +229,12 @@ def _start_client_span(
 def _finish_client_span(
     span: "Union[Span, StreamedSpan]",
     parsed: "Dict[str, Any]",
-    ctx: "Optional[AwsCallContext]" = None,
-    service_extension: "Optional[_ServiceExtension]" = None,
 ) -> None:
     # response metadata is only available after the call. Keep enrichment
     # isolated so failure cannot prevent `__exit__()` below.
     attributes: "Attributes" = {}
     with capture_internal_exceptions():
         attributes = _get_response_attributes(parsed)
-
-    if ctx is not None and service_extension is not None:
-        with capture_internal_exceptions():
-            _merge_service_attributes(
-                attributes,
-                service_extension.get_response_attributes(ctx, parsed),
-            )
 
     with capture_internal_exceptions():
         _set_span_attributes(span, attributes)
@@ -351,27 +304,10 @@ def _finish_client_span(
 def _finish_client_span_with_error(
     span: "Union[Span, StreamedSpan]",
     exception: "BaseException",
-    ctx: "Optional[AwsCallContext]" = None,
-    service_extension: "Optional[_ServiceExtension]" = None,
 ) -> None:
     attributes: "Attributes" = {}
     with capture_internal_exceptions():
         attributes = _get_error_attributes(exception)
-
-    # ClientError.response is the parsed AWS error response, so the same response
-    # hook can enrich successful and failed service responses. A separate error
-    # hook is unnecessary until a service needs exception-only information.
-    # https://boto3.amazonaws.com/v1/documentation/api/latest/guide/error-handling.html#catching-botocore-exceptions
-    if (
-        ctx is not None
-        and service_extension is not None
-        and isinstance(exception, ClientError)
-    ):
-        with capture_internal_exceptions():
-            _merge_service_attributes(
-                attributes,
-                service_extension.get_response_attributes(ctx, exception.response),
-            )
 
     with capture_internal_exceptions():
         _set_span_attributes(span, attributes)
