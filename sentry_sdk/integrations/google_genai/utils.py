@@ -28,7 +28,6 @@ from sentry_sdk.ai.utils import (
 )
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
@@ -52,6 +51,7 @@ if TYPE_CHECKING:
     )
 
     from sentry_sdk._types import TextPart
+    from sentry_sdk.traces import StreamedSpan
 
 _is_PIL_available = False
 try:
@@ -708,22 +708,21 @@ def wrapped_tool(tool: "Tool | Callable[..., Any]") -> "Tool | Callable[..., Any
         @wraps(tool)
         async def async_wrapped(*args: "Any", **kwargs: "Any") -> "Any":
             with _create_tool_span(tool_name, tool_doc) as span:
-                set_on_span = (
-                    span.set_attribute
-                    if isinstance(span, StreamedSpan)
-                    else span.set_data
-                )
                 # Capture tool input
                 tool_input = _capture_tool_input(args, kwargs, tool)
                 with capture_internal_exceptions():
-                    set_on_span(SPANDATA.GEN_AI_TOOL_INPUT, safe_serialize(tool_input))
+                    span.set_attribute(
+                        SPANDATA.GEN_AI_TOOL_INPUT, safe_serialize(tool_input)
+                    )
 
                 try:
                     result = await tool(*args, **kwargs)
 
                     # Capture tool output
                     with capture_internal_exceptions():
-                        set_on_span(SPANDATA.GEN_AI_TOOL_OUTPUT, safe_serialize(result))
+                        span.set_attribute(
+                            SPANDATA.GEN_AI_TOOL_OUTPUT, safe_serialize(result)
+                        )
 
                     return result
                 except Exception as exc:
@@ -736,22 +735,21 @@ def wrapped_tool(tool: "Tool | Callable[..., Any]") -> "Tool | Callable[..., Any
         @wraps(tool)
         def sync_wrapped(*args: "Any", **kwargs: "Any") -> "Any":
             with _create_tool_span(tool_name, tool_doc) as span:
-                set_on_span = (
-                    span.set_attribute
-                    if isinstance(span, StreamedSpan)
-                    else span.set_data
-                )
                 # Capture tool input
                 tool_input = _capture_tool_input(args, kwargs, tool)
                 with capture_internal_exceptions():
-                    set_on_span(SPANDATA.GEN_AI_TOOL_INPUT, safe_serialize(tool_input))
+                    span.set_attribute(
+                        SPANDATA.GEN_AI_TOOL_INPUT, safe_serialize(tool_input)
+                    )
 
                 try:
                     result = tool(*args, **kwargs)
 
                     # Capture tool output
                     with capture_internal_exceptions():
-                        set_on_span(SPANDATA.GEN_AI_TOOL_OUTPUT, safe_serialize(result))
+                        span.set_attribute(
+                            SPANDATA.GEN_AI_TOOL_OUTPUT, safe_serialize(result)
+                        )
 
                     return result
                 except Exception as exc:

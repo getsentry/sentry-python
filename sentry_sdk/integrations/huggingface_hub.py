@@ -5,10 +5,7 @@ from typing import TYPE_CHECKING, cast
 
 import sentry_sdk
 from sentry_sdk.ai.monitoring import record_token_usage
-from sentry_sdk.ai.utils import (
-    _set_span_data_attribute,
-    set_data_normalized,
-)
+from sentry_sdk.ai.utils import set_data_normalized
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.scope import should_send_default_pii
@@ -106,10 +103,10 @@ def _wrap_huggingface_task(f: "Callable[..., Any]", op: str) -> "Callable[..., A
             },
         )
 
-        _set_span_data_attribute(span, SPANDATA.GEN_AI_OPERATION_NAME, operation_name)
+        span.set_attribute(SPANDATA.GEN_AI_OPERATION_NAME, operation_name)
 
         if model:
-            _set_span_data_attribute(span, SPANDATA.GEN_AI_REQUEST_MODEL, model)
+            span.set_attribute(SPANDATA.GEN_AI_REQUEST_MODEL, model)
 
         attribute_mapping = {
             "frequency_penalty": SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY,
@@ -143,7 +140,7 @@ def _wrap_huggingface_task(f: "Callable[..., Any]", op: str) -> "Callable[..., A
             value = kwargs.get(attribute, None)
             if value is not None:
                 if isinstance(value, (int, float, bool, str)):
-                    _set_span_data_attribute(span, span_attribute, value)
+                    span.set_attribute(span_attribute, value)
                 else:
                     set_data_normalized(span, span_attribute, value, unpack=False)
 
@@ -204,9 +201,7 @@ def _wrap_huggingface_task(f: "Callable[..., Any]", op: str) -> "Callable[..., A
                         response_text_buffer.append(choice.message.content)
 
             if response_model is not None:
-                _set_span_data_attribute(
-                    span, SPANDATA.GEN_AI_RESPONSE_MODEL, response_model
-                )
+                span.set_attribute(SPANDATA.GEN_AI_RESPONSE_MODEL, response_model)
 
             if finish_reason is not None:
                 set_data_normalized(
@@ -380,8 +375,8 @@ def _wrap_huggingface_task(f: "Callable[..., Any]", op: str) -> "Callable[..., A
                             yield chunk
 
                         if response_model is not None:
-                            _set_span_data_attribute(
-                                span, SPANDATA.GEN_AI_RESPONSE_MODEL, response_model
+                            span.set_attribute(
+                                SPANDATA.GEN_AI_RESPONSE_MODEL, response_model
                             )
 
                         if finish_reason is not None:

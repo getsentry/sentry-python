@@ -14,11 +14,9 @@ from functools import wraps
 from typing import TYPE_CHECKING
 
 import sentry_sdk
-from sentry_sdk.ai.utils import _set_span_data_attribute
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
@@ -71,7 +69,6 @@ if TYPE_CHECKING:
     from starlette.types import Receive, Scope, Send
 
     from sentry_sdk.traces import StreamedSpan
-    from sentry_sdk.tracing import Span
 
 
 class MCPIntegration(Integration):
@@ -182,7 +179,7 @@ def _get_request_context_data(
 
 
 def _set_span_input_data(
-    span: "Union[StreamedSpan, Span]",
+    span: "StreamedSpan",
     handler_name: str,
     span_data_key: str,
     mcp_method_name: str,
@@ -194,28 +191,27 @@ def _set_span_input_data(
     """Set input span data for MCP handlers."""
 
     # Set handler identifier
-    _set_span_data_attribute(span, span_data_key, handler_name)
-    _set_span_data_attribute(span, SPANDATA.MCP_METHOD_NAME, mcp_method_name)
+    span.set_attribute(span_data_key, handler_name)
+    span.set_attribute(SPANDATA.MCP_METHOD_NAME, mcp_method_name)
 
     # Set transport/MCP transport type
-    _set_span_data_attribute(
-        span,
+    span.set_attribute(
         SPANDATA.NETWORK_TRANSPORT,
         "pipe" if mcp_transport == "stdio" else "tcp",
     )
-    _set_span_data_attribute(span, SPANDATA.MCP_TRANSPORT, mcp_transport)
+    span.set_attribute(SPANDATA.MCP_TRANSPORT, mcp_transport)
 
     # Set request_id if provided
     if request_id:
-        _set_span_data_attribute(span, SPANDATA.MCP_REQUEST_ID, request_id)
+        span.set_attribute(SPANDATA.MCP_REQUEST_ID, request_id)
 
     # Set session_id if provided
     if session_id:
-        _set_span_data_attribute(span, SPANDATA.MCP_SESSION_ID, session_id)
+        span.set_attribute(SPANDATA.MCP_SESSION_ID, session_id)
 
     # Set request arguments (excluding common request context objects)
     for k, v in arguments.items():
-        _set_span_data_attribute(span, f"mcp.request.argument.{k}", safe_serialize(v))
+        span.set_attribute(f"mcp.request.argument.{k}", safe_serialize(v))
 
 
 def _extract_tool_result_content(result: "Any") -> "Any":
@@ -369,13 +365,13 @@ async def _tool_handler_wrapper(
 
         extracted = _extract_tool_result_content(result)
         if extracted is not None and should_include_data:
-            _set_span_data_attribute(
-                span, SPANDATA.MCP_TOOL_RESULT_CONTENT, safe_serialize(extracted)
+            span.set_attribute(
+                SPANDATA.MCP_TOOL_RESULT_CONTENT, safe_serialize(extracted)
             )
             # Set content count if result is a dict
             if isinstance(extracted, dict):
-                _set_span_data_attribute(
-                    span, SPANDATA.MCP_TOOL_RESULT_CONTENT_COUNT, len(extracted)
+                span.set_attribute(
+                    SPANDATA.MCP_TOOL_RESULT_CONTENT_COUNT, len(extracted)
                 )
 
     return result
@@ -457,15 +453,13 @@ async def _instrument_v2_tool_call(
             result_content = _extract_text_from_content_blocks(result["content"])
 
         if result_content is not None and should_include_result_data:
-            _set_span_data_attribute(
-                span,
+            span.set_attribute(
                 SPANDATA.MCP_TOOL_RESULT_CONTENT,
                 safe_serialize(result_content),
             )
             # Set content count if result is a dict
             if isinstance(result_content, dict):
-                _set_span_data_attribute(
-                    span,
+                span.set_attribute(
                     SPANDATA.MCP_TOOL_RESULT_CONTENT_COUNT,
                     len(result_content),
                 )
@@ -586,8 +580,8 @@ async def _prompt_handler_wrapper(
 
             # Always set message count if we found messages
             if message_count > 0:
-                _set_span_data_attribute(
-                    span, SPANDATA.MCP_PROMPT_RESULT_MESSAGE_COUNT, message_count
+                span.set_attribute(
+                    SPANDATA.MCP_PROMPT_RESULT_MESSAGE_COUNT, message_count
                 )
 
             # Only set role and content for single-message prompts if PII is allowed
@@ -601,9 +595,7 @@ async def _prompt_handler_wrapper(
                     role = first_message["role"]
 
                 if role:
-                    _set_span_data_attribute(
-                        span, SPANDATA.MCP_PROMPT_RESULT_MESSAGE_ROLE, role
-                    )
+                    span.set_attribute(SPANDATA.MCP_PROMPT_RESULT_MESSAGE_ROLE, role)
 
                 # Extract content text
                 content_text = None
@@ -624,8 +616,7 @@ async def _prompt_handler_wrapper(
                         content_text = msg_content
 
                 if content_text:
-                    _set_span_data_attribute(
-                        span,
+                    span.set_attribute(
                         SPANDATA.MCP_PROMPT_RESULT_MESSAGE_CONTENT,
                         content_text,
                     )
@@ -718,8 +709,8 @@ async def _instrument_v2_prompt_get(
 
             # Always set message count if we found messages
             if message_count > 0:
-                _set_span_data_attribute(
-                    span, SPANDATA.MCP_PROMPT_RESULT_MESSAGE_COUNT, message_count
+                span.set_attribute(
+                    SPANDATA.MCP_PROMPT_RESULT_MESSAGE_COUNT, message_count
                 )
 
             # Only set role and content for single-message prompts if PII is allowed
@@ -731,9 +722,7 @@ async def _instrument_v2_prompt_get(
                     role = first_message["role"]
 
                 if role:
-                    _set_span_data_attribute(
-                        span, SPANDATA.MCP_PROMPT_RESULT_MESSAGE_ROLE, role
-                    )
+                    span.set_attribute(SPANDATA.MCP_PROMPT_RESULT_MESSAGE_ROLE, role)
 
                 content_text = None
                 if "content" in first_message:
@@ -742,8 +731,7 @@ async def _instrument_v2_prompt_get(
                         content_text = msg_content["text"]
 
                 if content_text:
-                    _set_span_data_attribute(
-                        span,
+                    span.set_attribute(
                         SPANDATA.MCP_PROMPT_RESULT_MESSAGE_CONTENT,
                         content_text,
                     )
@@ -821,7 +809,7 @@ async def _resource_handler_wrapper(
         elif handler_name and "://" in handler_name:
             protocol = handler_name.split("://")[0]
         if protocol:
-            _set_span_data_attribute(span, SPANDATA.MCP_RESOURCE_PROTOCOL, protocol)
+            span.set_attribute(SPANDATA.MCP_RESOURCE_PROTOCOL, protocol)
 
         try:
             # Execute the async handler
@@ -880,7 +868,7 @@ async def _instrument_v2_resource_read(
         if handler_name and "://" in handler_name:
             protocol = handler_name.split("://")[0]
         if protocol:
-            _set_span_data_attribute(span, SPANDATA.MCP_RESOURCE_PROTOCOL, protocol)
+            span.set_attribute(SPANDATA.MCP_RESOURCE_PROTOCOL, protocol)
 
         try:
             result = await call_next(ctx)
