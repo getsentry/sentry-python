@@ -828,10 +828,10 @@ def trace(
             pass
     """
     from sentry_sdk.tracing_utils import (
-        create_streaming_span_decorator,
+        create_span_decorator,
     )
 
-    decorator = create_streaming_span_decorator(
+    decorator = create_span_decorator(
         name=name,
         attributes=attributes,
         active=active,
