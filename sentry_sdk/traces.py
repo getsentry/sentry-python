@@ -1,10 +1,17 @@
 """
-EXPERIMENTAL. Do not use in production.
+The API in this file is only meant to be used in span streaming mode. It should
+not be mixed with the legacy tracing API (sentry_sdk.start_transaction,
+sentry_sdk.start_span, etc.).
 
-The API in this file is only meant to be used in span streaming mode.
+You can enable span streaming mode via:
 
-You can enable span streaming mode via
-sentry_sdk.init(trace_lifecycle="stream").
+```
+import sentry_sdk
+
+sentry_sdk.init(
+    trace_lifecycle="stream",
+)
+```
 """
 
 import sys
@@ -110,10 +117,7 @@ def start_span(
     active: bool = True,
 ) -> "StreamedSpan":
     """
-    Start a span.
-
-    EXPERIMENTAL. Use sentry_sdk.start_transaction() and sentry_sdk.start_span()
-    instead.
+    Start a span in streaming mode.
 
     The span's parent, unless provided explicitly via the `parent_span` argument,
     will be the current active span, if any. If there is none, this span will
@@ -185,9 +189,7 @@ def start_span(
 
 def continue_trace(incoming: "dict[str, Any]") -> None:
     """
-    Continue a trace from headers or environment variables.
-
-    EXPERIMENTAL. Use sentry_sdk.continue_trace() instead.
+    Continue a trace from headers or environment variables in streaming mode.
 
     This function sets the propagation context on the scope. Any span started
     in the updated scope will belong under the trace extracted from the
@@ -211,9 +213,7 @@ def continue_trace(incoming: "dict[str, Any]") -> None:
 
 def new_trace() -> None:
     """
-    Resets the propagation context, forcing a new trace.
-
-    EXPERIMENTAL.
+    Resets the propagation context, forcing a new trace, in streaming mode.
 
     This function sets the propagation context on the scope. Any span started
     in the updated scope will start its own trace.
@@ -811,9 +811,7 @@ def trace(
     active: bool = True,
 ) -> "Union[Callable[P, R], Callable[[Callable[P, R]], Callable[P, R]]]":
     """
-    Decorator to start a span around a function call.
-
-    EXPERIMENTAL. Use @sentry_sdk.trace instead.
+    Decorator to start a span around a function call in streaming mode.
 
     This decorator automatically creates a new span when the decorated function
     is called, and finishes the span when the function returns or raises an exception.
