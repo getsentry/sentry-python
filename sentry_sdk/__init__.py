@@ -46,6 +46,7 @@ __all__ = [  # noqa
     "set_tags",
     "set_user",
     "start_span",
+    "trace",
     "monitor",
     "logger",
     "metrics",

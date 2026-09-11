@@ -5,6 +5,7 @@ from sentry_sdk import Client, traces
 from sentry_sdk._init_implementation import init
 from sentry_sdk.crons import monitor
 from sentry_sdk.scope import Scope, isolation_scope, new_scope
+from sentry_sdk.traces import trace
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -70,6 +71,7 @@ __all__ = [
     "set_tags",
     "set_user",
     "start_span",
+    "trace",
     "monitor",
     "start_session",
     "end_session",
