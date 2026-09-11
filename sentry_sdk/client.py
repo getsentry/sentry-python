@@ -700,7 +700,6 @@ class _Client(BaseClient):
         hint: "Hint",
         scope: "Optional[Scope]",
     ) -> "Optional[Event]":
-        previous_total_spans: "Optional[int]" = None
         previous_total_breadcrumbs: "Optional[int]" = None
 
         if event.get("timestamp") is None:
@@ -719,6 +718,17 @@ class _Client(BaseClient):
                 return None
 
             event = event_
+
+            if scope._n_breadcrumbs_truncated > 0:
+                breadcrumbs = event.get("breadcrumbs", {})
+                values = (
+                    breadcrumbs.get("values", [])
+                    if not isinstance(breadcrumbs, AnnotatedValue)
+                    else []
+                )
+                previous_total_breadcrumbs = (
+                    len(values) + scope._n_breadcrumbs_truncated
+                )
 
         if (
             self.options["attach_stacktrace"]
@@ -782,10 +792,7 @@ class _Client(BaseClient):
                             span_data[SPANDATA.GEN_AI_REQUEST_MESSAGES],
                             {"len": scope._gen_ai_original_message_count[span_id]},
                         )
-        if previous_total_spans is not None:
-            event["spans"] = AnnotatedValue(
-                event.get("spans", []), {"len": previous_total_spans}
-            )
+
         if previous_total_breadcrumbs is not None:
             event["breadcrumbs"] = AnnotatedValue(
                 event.get("breadcrumbs", {"values": []}),
