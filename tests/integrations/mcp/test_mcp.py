@@ -227,8 +227,9 @@ async def test_tool_handler_constructor_registration(
 
 @pytest.mark.asyncio
 @pytest.mark.skipif(not IS_MCP_V2, reason="MCPServer is MCP v2 only")
+@pytest.mark.parametrize("span_streaming", [True, False])
 async def test_mcpserver_high_level_tool_instrumented(
-    sentry_init, capture_events, stdio
+    sentry_init, capture_events, capture_items, span_streaming, stdio
 ):
     """The in-tree high-level MCPServer wires its handlers through the lowlevel
     Server(...) constructor, so its tool calls are instrumented too."""
@@ -237,6 +238,7 @@ async def test_mcpserver_high_level_tool_instrumented(
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     mcp_server = MCPServer("test-server")
@@ -245,21 +247,38 @@ async def test_mcpserver_high_level_tool_instrumented(
     def add(a: int, b: int) -> int:
         return a + b
 
-    events = capture_events()
-    with start_transaction(name="mcp tx"):
-        await stdio(
-            mcp_server._lowlevel_server,
-            method="tools/call",
-            params={"name": "add", "arguments": {"a": 2, "b": 3}},
-            request_id="req-mcpserver",
-        )
+    if span_streaming:
+        items = capture_items("span")
+        with sentry_sdk.traces.start_span(name="mcp tx"):
+            await stdio(
+                mcp_server._lowlevel_server,
+                method="tools/call",
+                params={"name": "add", "arguments": {"a": 2, "b": 3}},
+                request_id="req-mcpserver",
+            )
 
-    (tx,) = events
-    assert len(tx["spans"]) == 1
-    span = tx["spans"][0]
-    assert span["op"] == OP.MCP_SERVER
-    assert span["description"] == "tools/call add"
-    assert span["data"][SPANDATA.MCP_METHOD_NAME] == "tools/call"
+        sentry_sdk.flush()
+        span = _find_mcp_span(items, method_name="tools/call")
+        assert span is not None
+        assert span["attributes"]["sentry.op"] == OP.MCP_SERVER
+        assert span["name"] == "tools/call add"
+        assert span["attributes"][SPANDATA.MCP_METHOD_NAME] == "tools/call"
+    else:
+        events = capture_events()
+        with start_transaction(name="mcp tx"):
+            await stdio(
+                mcp_server._lowlevel_server,
+                method="tools/call",
+                params={"name": "add", "arguments": {"a": 2, "b": 3}},
+                request_id="req-mcpserver",
+            )
+
+        (tx,) = events
+        assert len(tx["spans"]) == 1
+        span = tx["spans"][0]
+        assert span["op"] == OP.MCP_SERVER
+        assert span["description"] == "tools/call add"
+        assert span["data"][SPANDATA.MCP_METHOD_NAME] == "tools/call"
 
 
 @pytest.mark.asyncio
@@ -578,10 +597,13 @@ async def test_tool_handler_streamable_http(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("span_streaming", [True, False])
 async def test_tool_handler_stateless_streamable_http(
     sentry_init,
     capture_events,
+    capture_items,
     select_transactions_with_mcp_spans,
+    span_streaming,
 ):
     """A stateless StreamableHTTP server is still reported as the http transport.
 
@@ -591,6 +613,7 @@ async def test_tool_handler_stateless_streamable_http(
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     server = Server("test-server")
@@ -607,30 +630,59 @@ async def test_tool_handler_stateless_streamable_http(
         async def test_tool_async(tool_name, arguments):
             return [TextContent(type="text", text="ok")]
 
-    events = capture_events()
+    if span_streaming:
+        items = capture_items("span")
 
-    # A stateless server accepts each request on its own, so there is no
-    # handshake to replay and no session id to echo back.
-    with TestClient(_streamable_http_app(server, stateless=True)) as client:
-        response = client.post(
-            "/mcp/",
-            headers={
-                "Accept": "application/json, text/event-stream",
-                "Content-Type": "application/json",
-            },
-            json={
-                "jsonrpc": "2.0",
-                "method": "tools/call",
-                "params": {"name": "process", "arguments": {}},
-                "id": "req-789",
-            },
+        # A stateless server accepts each request on its own, so there is no
+        # handshake to replay and no session id to echo back.
+        with TestClient(_streamable_http_app(server, stateless=True)) as client:
+            response = client.post(
+                "/mcp/",
+                headers={
+                    "Accept": "application/json, text/event-stream",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "jsonrpc": "2.0",
+                    "method": "tools/call",
+                    "params": {"name": "process", "arguments": {}},
+                    "id": "req-789",
+                },
+            )
+
+        assert "mcp-session-id" not in response.headers
+
+        sentry_sdk.flush()
+        span = _find_mcp_span(items, method_name="tools/call")
+        assert span is not None
+        data = span["attributes"]
+    else:
+        events = capture_events()
+
+        # A stateless server accepts each request on its own, so there is no
+        # handshake to replay and no session id to echo back.
+        with TestClient(_streamable_http_app(server, stateless=True)) as client:
+            response = client.post(
+                "/mcp/",
+                headers={
+                    "Accept": "application/json, text/event-stream",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "jsonrpc": "2.0",
+                    "method": "tools/call",
+                    "params": {"name": "process", "arguments": {}},
+                    "id": "req-789",
+                },
+            )
+
+        assert "mcp-session-id" not in response.headers
+
+        transactions = select_transactions_with_mcp_spans(
+            events, method_name="tools/call"
         )
-
-    assert "mcp-session-id" not in response.headers
-
-    transactions = select_transactions_with_mcp_spans(events, method_name="tools/call")
-    assert len(transactions) == 1
-    data = transactions[0]["spans"][0]["data"]
+        assert len(transactions) == 1
+        data = transactions[0]["spans"][0]["data"]
 
     assert data[SPANDATA.MCP_TRANSPORT] == "http"
     assert data[SPANDATA.NETWORK_TRANSPORT] == "tcp"
@@ -693,6 +745,8 @@ async def test_tool_handler_with_error(
         assert (
             error_payload["exception"]["values"][0]["value"] == "Tool execution failed"
         )
+        assert error_payload["exception"]["values"][0]["mechanism"]["type"] == "mcp"
+        assert not error_payload["exception"]["values"][0]["mechanism"]["handled"]
 
         assert span["status"] == "error"
     else:
@@ -722,6 +776,8 @@ async def test_tool_handler_with_error(
         assert error_event["level"] == "error"
         assert error_event["exception"]["values"][0]["type"] == "ValueError"
         assert error_event["exception"]["values"][0]["value"] == "Tool execution failed"
+        assert error_event["exception"]["values"][0]["mechanism"]["type"] == "mcp"
+        assert not error_event["exception"]["values"][0]["mechanism"]["handled"]
 
         # Check transaction and span
         assert tx["type"] == "transaction"
@@ -1019,6 +1075,8 @@ async def test_prompt_handler_with_error(
 
         assert error_payload["level"] == "error"
         assert error_payload["exception"]["values"][0]["type"] == "RuntimeError"
+        assert error_payload["exception"]["values"][0]["mechanism"]["type"] == "mcp"
+        assert not error_payload["exception"]["values"][0]["mechanism"]["handled"]
         assert span["status"] == "error"
     else:
         events = capture_events()
@@ -1041,6 +1099,8 @@ async def test_prompt_handler_with_error(
 
         assert error_event["level"] == "error"
         assert error_event["exception"]["values"][0]["type"] == "RuntimeError"
+        assert error_event["exception"]["values"][0]["mechanism"]["type"] == "mcp"
+        assert not error_event["exception"]["values"][0]["mechanism"]["handled"]
 
         # Check transaction and span
         assert tx["type"] == "transaction"
@@ -1304,6 +1364,8 @@ async def test_resource_handler_with_error(
 
         assert error_payload["level"] == "error"
         assert error_payload["exception"]["values"][0]["type"] == "FileNotFoundError"
+        assert error_payload["exception"]["values"][0]["mechanism"]["type"] == "mcp"
+        assert not error_payload["exception"]["values"][0]["mechanism"]["handled"]
         assert span["status"] == "error"
     else:
         events = capture_events()
@@ -1323,6 +1385,8 @@ async def test_resource_handler_with_error(
 
         assert error_event["level"] == "error"
         assert error_event["exception"]["values"][0]["type"] == "FileNotFoundError"
+        assert error_event["exception"]["values"][0]["mechanism"]["type"] == "mcp"
+        assert not error_event["exception"]["values"][0]["mechanism"]["handled"]
 
         # Check transaction and span
         assert tx["type"] == "transaction"
@@ -2020,7 +2084,10 @@ async def test_sse_transport_detection_v2(
 
 
 @pytest.mark.asyncio
-async def test_streamable_http_scope_propagation(sentry_init, capture_events, json_rpc):
+@pytest.mark.parametrize("span_streaming", [True, False])
+async def test_streamable_http_scope_propagation(
+    sentry_init, capture_events, capture_items, span_streaming, json_rpc
+):
     """Errors raised inside an HTTP handler attach to the MCP transaction's trace.
 
     StreamableHTTPServerTransport.handle_request stashes the active isolation and
@@ -2031,6 +2098,7 @@ async def test_streamable_http_scope_propagation(sentry_init, capture_events, js
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     server = Server("test-server")
@@ -2059,37 +2127,64 @@ async def test_streamable_http_scope_propagation(sentry_init, capture_events, js
         lifespan=lambda app: session_manager.run(),
     )
 
-    events = capture_events()
-    json_rpc(
-        app,
-        method="tools/call",
-        params={"name": "bad_tool", "arguments": {}},
-        request_id="req-scope",
-    )
+    if span_streaming:
+        items = capture_items("event", "span")
 
-    error_events = [e for e in events if e.get("type") != "transaction"]
-    mcp_transactions = [
-        e
-        for e in events
-        if e.get("type") == "transaction"
-        and any(
-            span["data"].get(SPANDATA.MCP_METHOD_NAME) == "tools/call"
-            for span in e.get("spans", [])
+        json_rpc(
+            app,
+            method="tools/call",
+            params={"name": "bad_tool", "arguments": {}},
+            request_id="req-scope",
         )
-    ]
 
-    assert len(error_events) == 1
-    assert len(mcp_transactions) == 1
+        (error_event,) = (item.payload for item in items if item.type == "event")
+        assert error_event["exception"]["values"][0]["type"] == "ValueError"
+        assert error_event["exception"]["values"][0]["mechanism"]["type"] == "mcp"
+        assert not error_event["exception"]["values"][0]["mechanism"]["handled"]
 
-    error_event = error_events[0]
-    assert error_event["exception"]["values"][0]["type"] == "ValueError"
+        sentry_sdk.flush()
 
-    # The captured error shares the trace of the MCP transaction, proving the
-    # handler executed under the propagated request scope.
-    assert (
-        error_event["contexts"]["trace"]["trace_id"]
-        == mcp_transactions[0]["contexts"]["trace"]["trace_id"]
-    )
+        span = _find_mcp_span(items, method_name="tools/call")
+        assert span is not None
+
+        # The captured error shares the trace of the MCP span, proving the
+        # handler executed under the propagated request scope.
+        assert error_event["contexts"]["trace"]["trace_id"] == span["trace_id"]
+    else:
+        events = capture_events()
+
+        json_rpc(
+            app,
+            method="tools/call",
+            params={"name": "bad_tool", "arguments": {}},
+            request_id="req-scope",
+        )
+
+        error_events = [e for e in events if e.get("type") != "transaction"]
+        mcp_transactions = [
+            e
+            for e in events
+            if e.get("type") == "transaction"
+            and any(
+                span["data"].get(SPANDATA.MCP_METHOD_NAME) == "tools/call"
+                for span in e.get("spans", [])
+            )
+        ]
+
+        assert len(error_events) == 1
+        assert len(mcp_transactions) == 1
+
+        error_event = error_events[0]
+        assert error_event["exception"]["values"][0]["type"] == "ValueError"
+        assert error_event["exception"]["values"][0]["mechanism"]["type"] == "mcp"
+        assert not error_event["exception"]["values"][0]["mechanism"]["handled"]
+
+        # The captured error shares the trace of the MCP transaction, proving the
+        # handler executed under the propagated request scope.
+        assert (
+            error_event["contexts"]["trace"]["trace_id"]
+            == mcp_transactions[0]["contexts"]["trace"]["trace_id"]
+        )
 
 
 @pytest.mark.asyncio

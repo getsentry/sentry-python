@@ -451,7 +451,10 @@ def _patch_django_asgi_handler() -> None:
 
 
 def _set_transaction_name_and_source(
-    scope: "sentry_sdk.Scope", transaction_style: str, request: "WSGIRequest"
+    scope: "sentry_sdk.Scope",
+    transaction_style: str,
+    request: "WSGIRequest",
+    route_path: "Optional[str]",
 ) -> None:
     try:
         transaction_name = None
@@ -459,13 +462,8 @@ def _set_transaction_name_and_source(
             fn = resolve(request.path).func
             transaction_name = transaction_from_function(getattr(fn, "view_class", fn))
 
-        elif transaction_style == "url":
-            if hasattr(request, "urlconf"):
-                transaction_name = LEGACY_RESOLVER.resolve(
-                    request.path_info, urlconf=request.urlconf
-                )
-            else:
-                transaction_name = LEGACY_RESOLVER.resolve(request.path_info)
+        elif transaction_style == "url" and route_path is not None:
+            transaction_name = route_path
 
         if transaction_name is None:
             transaction_name = request.path_info
@@ -477,6 +475,11 @@ def _set_transaction_name_and_source(
             transaction_name,
             source=source,
         )
+
+        if transaction_style == "url" and route_path is not None:
+            server_span = scope._server_segment_span
+            if server_span is not None:
+                server_span.set_attribute(SPANDATA.HTTP_ROUTE, route_path)
     except Resolver404:
         urlconf = import_module(settings.ROOT_URLCONF)
         # This exception only gets thrown when transaction_style is `function_name`
@@ -501,8 +504,29 @@ def _before_get_response(request: "WSGIRequest") -> None:
     _patch_drf()
 
     scope = sentry_sdk.get_current_scope()
+
+    route_path = None
+    if hasattr(request, "urlconf"):
+        try:
+            route_path = LEGACY_RESOLVER.resolve(
+                request.path_info, urlconf=request.urlconf
+            )
+        except Exception:
+            pass
+    else:
+        try:
+            route_path = LEGACY_RESOLVER.resolve(request.path_info)
+        except Exception:
+            pass
+
+    server_span = sentry_sdk.get_current_scope()._server_segment_span
+    if server_span is not None and route_path is not None:
+        server_span.set_attribute(SPANDATA.HTTP_ROUTE, route_path)
+
     # Rely on WSGI middleware to start a trace
-    _set_transaction_name_and_source(scope, integration.transaction_style, request)
+    _set_transaction_name_and_source(
+        scope, integration.transaction_style, request, route_path=route_path
+    )
 
     scope.add_event_processor(
         _make_wsgi_request_event_processor(weakref.ref(request), integration)
@@ -520,7 +544,27 @@ def _attempt_resolve_again(
     if not hasattr(request, "urlconf"):
         return
 
-    _set_transaction_name_and_source(scope, transaction_style, request)
+    route_path = None
+    if hasattr(request, "urlconf"):
+        try:
+            route_path = LEGACY_RESOLVER.resolve(
+                request.path_info, urlconf=request.urlconf
+            )
+        except Exception:
+            pass
+    else:
+        try:
+            route_path = LEGACY_RESOLVER.resolve(request.path_info)
+        except Exception:
+            pass
+
+    server_span = sentry_sdk.get_current_scope()._server_segment_span
+    if server_span is not None and route_path is not None:
+        server_span.set_attribute(SPANDATA.HTTP_ROUTE, route_path)
+
+    _set_transaction_name_and_source(
+        scope, transaction_style, request, route_path=route_path
+    )
 
 
 def _get_user_from_request_and_set_on_scope(request: "WSGIRequest") -> None:

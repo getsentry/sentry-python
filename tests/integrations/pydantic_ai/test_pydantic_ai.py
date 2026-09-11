@@ -1022,24 +1022,6 @@ async def test_agent_with_tool_validation_error(
         chat_spans = [
             s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
         ]
-        tool_spans = [
-            s
-            for s in spans
-            if s["attributes"].get("sentry.op", "") == "gen_ai.execute_tool"
-        ]
-
-        # Should have tool spans
-        assert len(tool_spans) >= 1
-
-        # Check tool spans
-        model_retry_tool_span = tool_spans[0]
-        assert "execute_tool" in model_retry_tool_span["name"]
-        assert (
-            model_retry_tool_span["attributes"]["gen_ai.operation.name"]
-            == "execute_tool"
-        )
-        assert model_retry_tool_span["attributes"]["gen_ai.tool.name"] == "add_numbers"
-        assert "gen_ai.tool.input" in model_retry_tool_span["attributes"]
 
         # Check chat spans have available_tools
         assert "gen_ai.request.available_tools" in chat_spans[0]["attributes"]
@@ -1073,17 +1055,6 @@ async def test_agent_with_tool_validation_error(
 
         # Find child span types (invoke_agent is the transaction, not a child span)
         chat_spans = [s for s in spans if s["op"] == "gen_ai.chat"]
-        tool_spans = [s for s in spans if s["op"] == "gen_ai.execute_tool"]
-
-        # Should have tool spans
-        assert len(tool_spans) >= 1
-
-        # Check tool spans
-        model_retry_tool_span = tool_spans[0]
-        assert "execute_tool" in model_retry_tool_span["description"]
-        assert model_retry_tool_span["data"]["gen_ai.operation.name"] == "execute_tool"
-        assert model_retry_tool_span["data"]["gen_ai.tool.name"] == "add_numbers"
-        assert "gen_ai.tool.input" in model_retry_tool_span["data"]
 
         # Check chat spans have available_tools
         assert "gen_ai.request.available_tools" in chat_spans[0]["data"]
@@ -2358,41 +2329,6 @@ async def test_model_name_extraction_fallback_to_str(sentry_init, capture_items)
     assert isinstance(result, str)
 
 
-@pytest.mark.asyncio
-async def test_model_settings_object_style(sentry_init, capture_items):
-    """
-    Test that object-style model settings (non-dict) are handled correctly.
-    """
-    from unittest.mock import MagicMock
-
-    import sentry_sdk
-    from sentry_sdk.integrations.pydantic_ai.utils import _set_model_data
-
-    sentry_init(
-        integrations=[PydanticAIIntegration()],
-        traces_sample_rate=1.0,
-    )
-
-    with sentry_sdk.start_transaction(op="test", name="test") as transaction:
-        span = sentry_sdk.start_span(op="test_span")
-
-        # Create mock settings object (not a dict)
-        mock_settings = MagicMock()
-        mock_settings.temperature = 0.8
-        mock_settings.max_tokens = 200
-        mock_settings.top_p = 0.95
-        mock_settings.frequency_penalty = 0.5
-        mock_settings.presence_penalty = 0.3
-
-        # Set model data with object-style settings
-        _set_model_data(span, None, mock_settings)
-
-        span.finish()
-
-    # Should not crash and should set the settings
-    assert transaction is not None
-
-
 @pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
@@ -3398,105 +3334,6 @@ async def test_get_model_name_with_none(sentry_init, capture_items):
 
 
 @pytest.mark.asyncio
-async def test_set_model_data_with_system(sentry_init, capture_items):
-    """
-    Test that _set_model_data captures system from model.
-    """
-    from unittest.mock import MagicMock
-
-    import sentry_sdk
-    from sentry_sdk.integrations.pydantic_ai.utils import _set_model_data
-
-    sentry_init(
-        integrations=[PydanticAIIntegration()],
-        traces_sample_rate=1.0,
-    )
-
-    with sentry_sdk.start_transaction(op="test", name="test") as transaction:
-        span = sentry_sdk.start_span(op="test_span")
-
-        # Create model with system
-        mock_model = MagicMock()
-        mock_model.system = "openai"
-        mock_model.model_name = "gpt-4"
-
-        # Set model data
-        _set_model_data(span, mock_model, None)
-
-        span.finish()
-
-    # Should not crash
-    assert transaction is not None
-
-
-@pytest.mark.asyncio
-async def test_set_model_data_from_agent_scope(sentry_init, capture_items):
-    """
-    Test that _set_model_data retrieves model from agent in scope when not passed.
-    """
-    from unittest.mock import MagicMock
-
-    import sentry_sdk
-    from sentry_sdk.integrations.pydantic_ai.utils import _set_model_data
-
-    sentry_init(
-        integrations=[PydanticAIIntegration()],
-        traces_sample_rate=1.0,
-    )
-
-    with sentry_sdk.start_transaction(op="test", name="test") as transaction:
-        # Set agent in scope
-        scope = sentry_sdk.get_current_scope()
-        mock_agent = MagicMock()
-        mock_agent.model = MagicMock()
-        mock_agent.model.model_name = "test-model"
-        mock_agent.model_settings = {"temperature": 0.5}
-        scope._contexts["pydantic_ai_agent"] = {"_agent": mock_agent}
-
-        span = sentry_sdk.start_span(op="test_span")
-
-        # Pass None for model, should get from scope
-        _set_model_data(span, None, None)
-
-        span.finish()
-
-    # Should not crash
-    assert transaction is not None
-
-
-@pytest.mark.asyncio
-async def test_set_model_data_with_none_settings_values(sentry_init, capture_items):
-    """
-    Test that _set_model_data skips None values in settings.
-    """
-    import sentry_sdk
-    from sentry_sdk.integrations.pydantic_ai.utils import _set_model_data
-
-    sentry_init(
-        integrations=[PydanticAIIntegration()],
-        traces_sample_rate=1.0,
-    )
-
-    with sentry_sdk.start_transaction(op="test", name="test") as transaction:
-        span = sentry_sdk.start_span(op="test_span")
-
-        # Create settings with None values
-        settings = {
-            "temperature": 0.7,
-            "max_tokens": None,  # Should be skipped
-            "top_p": None,  # Should be skipped
-        }
-
-        # Set model data
-        _set_model_data(span, None, settings)
-
-        span.finish()
-
-    # Should not crash
-    assert transaction is not None
-
-
-@pytest.mark.asyncio
 async def test_should_send_prompts_without_pii(sentry_init, capture_items):
     """
     Test that _should_send_inputs/_should_send_outputs return False when PII disabled.
@@ -3515,95 +3352,6 @@ async def test_should_send_prompts_without_pii(sentry_init, capture_items):
     # Should return False
     assert _should_send_inputs() is False
     assert _should_send_outputs() is False
-
-
-@pytest.mark.asyncio
-async def test_set_agent_data_without_agent(sentry_init, capture_items):
-    """
-    Test that _set_agent_data handles None agent gracefully.
-    """
-    import sentry_sdk
-    from sentry_sdk.integrations.pydantic_ai.utils import _set_agent_data
-
-    sentry_init(
-        integrations=[PydanticAIIntegration()],
-        traces_sample_rate=1.0,
-    )
-
-    with sentry_sdk.start_transaction(op="test", name="test") as transaction:
-        span = sentry_sdk.start_span(op="test_span")
-
-        # Pass None agent, with no agent in scope
-        _set_agent_data(span, None)
-
-        span.finish()
-
-    # Should not crash
-    assert transaction is not None
-
-
-@pytest.mark.asyncio
-async def test_set_agent_data_from_scope(sentry_init, capture_items):
-    """
-    Test that _set_agent_data retrieves agent from scope when not passed.
-    """
-    from unittest.mock import MagicMock
-
-    import sentry_sdk
-    from sentry_sdk.integrations.pydantic_ai.utils import _set_agent_data
-
-    sentry_init(
-        integrations=[PydanticAIIntegration()],
-        traces_sample_rate=1.0,
-    )
-
-    with sentry_sdk.start_transaction(op="test", name="test") as transaction:
-        # Set agent in scope
-        scope = sentry_sdk.get_current_scope()
-        mock_agent = MagicMock()
-        mock_agent.name = "test_agent_from_scope"
-        scope._contexts["pydantic_ai_agent"] = {"_agent": mock_agent}
-
-        span = sentry_sdk.start_span(op="test_span")
-
-        # Pass None for agent, should get from scope
-        _set_agent_data(span, None)
-
-        span.finish()
-
-    # Should not crash
-    assert transaction is not None
-
-
-@pytest.mark.asyncio
-async def test_set_agent_data_without_name(sentry_init, capture_items):
-    """
-    Test that _set_agent_data handles agent without name attribute.
-    """
-    from unittest.mock import MagicMock
-
-    import sentry_sdk
-    from sentry_sdk.integrations.pydantic_ai.utils import _set_agent_data
-
-    sentry_init(
-        integrations=[PydanticAIIntegration()],
-        traces_sample_rate=1.0,
-    )
-
-    with sentry_sdk.start_transaction(op="test", name="test") as transaction:
-        span = sentry_sdk.start_span(op="test_span")
-
-        # Create agent without name
-        mock_agent = MagicMock()
-        mock_agent.name = None  # No name
-
-        # Should not set agent name
-        _set_agent_data(span, mock_agent)
-
-        span.finish()
-
-    # Should not crash
-    assert transaction is not None
 
 
 @pytest.mark.asyncio

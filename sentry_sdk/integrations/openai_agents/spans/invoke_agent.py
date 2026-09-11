@@ -20,7 +20,7 @@ from ..consts import SPAN_ORIGIN
 from ..utils import _set_agent_data, _set_usage_data
 
 if TYPE_CHECKING:
-    from typing import Any, Union
+    from typing import Any, Optional, Union
 
     import agents
 
@@ -110,12 +110,12 @@ def invoke_agent_span(
 
 def update_invoke_agent_span(
     span: "Union[sentry_sdk.tracing.Span, StreamedSpan]",
-    context: "agents.RunContextWrapper",
-    agent: "agents.Agent",
+    context: "Optional[agents.RunContextWrapper]",
+    agent: "Optional[agents.Agent]",
     output: "Any" = None,
 ) -> None:
     # Add aggregated usage data from context_wrapper
-    if hasattr(context, "usage"):
+    if context and hasattr(context, "usage"):
         _set_usage_data(span, context.usage)
 
     client = sentry_sdk.get_client()

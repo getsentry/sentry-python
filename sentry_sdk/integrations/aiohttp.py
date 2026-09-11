@@ -4,7 +4,7 @@ from functools import wraps
 
 import sentry_sdk
 from sentry_sdk.api import continue_trace
-from sentry_sdk.consts import OP, SPANDATA, SPANSTATUS
+from sentry_sdk.consts import _SENTRY_HEADER_NAMES, OP, SPANDATA, SPANSTATUS
 from sentry_sdk.data_collection import (
     _apply_data_collection_filtering_to_query_string,
 )
@@ -29,6 +29,7 @@ from sentry_sdk.traces import (
 )
 from sentry_sdk.tracing import (
     BAGGAGE_HEADER_NAME,
+    SENTRY_TRACE_HEADER_NAME,
     SOURCE_FOR_STYLE,
     TransactionSource,
 )
@@ -43,6 +44,8 @@ from sentry_sdk.utils import (
     HAS_REAL_CONTEXTVARS,
     SENSITIVE_DATA_SUBSTITUTE,
     AnnotatedValue,
+    _get_aws_sigv4_signed_headers_from_authorization_header,
+    _get_aws_sigv4_signed_headers_from_url_query_string,
     _register_control_flow_exception,
     capture_internal_exceptions,
     ensure_integration_enabled,
@@ -310,7 +313,7 @@ class AioHttpIntegration(Integration):
 
                         return response
 
-        Application._handle = sentry_app_handle
+        Application._handle = sentry_app_handle  # type: ignore[method-assign]
 
         old_urldispatcher_resolve = UrlDispatcher.resolve
 
@@ -350,7 +353,7 @@ class AioHttpIntegration(Integration):
 
             return rv
 
-        UrlDispatcher.resolve = sentry_urldispatcher_resolve
+        UrlDispatcher.resolve = sentry_urldispatcher_resolve  # type: ignore[method-assign]
 
         old_client_session_init = ClientSession.__init__
 
@@ -363,7 +366,7 @@ class AioHttpIntegration(Integration):
             kwargs["trace_configs"] = client_trace_configs
             return old_client_session_init(*args, **kwargs)
 
-        ClientSession.__init__ = init
+        ClientSession.__init__ = init  # type: ignore[method-assign]
 
 
 def create_trace_config() -> "TraceConfig":
@@ -464,12 +467,50 @@ def create_trace_config() -> "TraceConfig":
             span = legacy_span
 
         if should_propagate_trace(client, str(params.url)):
+            # existing `sentry-trace`: skip so it is not duplicated.
+            headers_to_skip: "set[str]" = set()
+            if SENTRY_TRACE_HEADER_NAME in params.headers:
+                headers_to_skip.add(SENTRY_TRACE_HEADER_NAME)
+
+            with capture_internal_exceptions():
+                authorization = params.headers.get("Authorization")
+                if authorization:
+                    if isinstance(authorization, bytes):
+                        authorization = authorization.decode("latin-1")
+                    # `SignedHeaders` lists fields covered by SigV4.
+                    signed_headers = (
+                        _get_aws_sigv4_signed_headers_from_authorization_header(
+                            authorization
+                        )
+                    )
+                    # skip signed `sentry-trace` and `baggage`.
+                    headers_to_skip.update(
+                        _SENTRY_HEADER_NAMES.intersection(signed_headers)
+                    )
+
+                # presigned URLs list signed names in the query string.
+                query_signed_headers = (
+                    _get_aws_sigv4_signed_headers_from_url_query_string(str(params.url))
+                )
+                headers_to_skip.update(
+                    _SENTRY_HEADER_NAMES.intersection(query_signed_headers)
+                )
+
             for (
                 key,
                 value,
             ) in sentry_sdk.get_current_scope().iter_trace_propagation_headers(
                 span=span
             ):
+                # skip signed headers and an existing `sentry-trace`.
+                if key.lower() in headers_to_skip:
+                    logger.debug(
+                        "[Tracing] Not adding `{key}` header to outgoing request "
+                        "to {url}: it already exists or is covered by the AWS "
+                        "SigV4 signature.".format(key=key, url=params.url)
+                    )
+                    continue
+
                 logger.debug(
                     "[Tracing] Adding `{key}` header {value} to outgoing request to {url}.".format(
                         key=key, value=value, url=params.url

@@ -69,6 +69,8 @@ def _patch_error_tracing() -> None:
         # Call the original function
         return original_attach_error(error, *args, **kwargs)
 
-    error_tracing_module.attach_error_to_current_span = (
-        sentry_attach_error_to_current_span
+    setattr(
+        error_tracing_module,
+        "attach_error_to_current_span",
+        sentry_attach_error_to_current_span,
     )

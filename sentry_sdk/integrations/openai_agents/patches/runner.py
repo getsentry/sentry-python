@@ -37,7 +37,7 @@ if TYPE_CHECKING:
 TContext = TypeVar("TContext")
 
 
-class _SentryRunHooks(RunHooks[TContext]):  # type: ignore[misc]
+class _SentryRunHooks(RunHooks[TContext]):
     """
     Responsible for creating and managing Execute Tool spans. These spans are
     stored on the ToolContext reference that is shared between `on_tool_start()`
@@ -120,9 +120,9 @@ def _patch_run_hooks(hooks: "RunHooks[TContext]") -> None:
             await sentry_hooks.on_tool_end(context, agent, tool, result)
         await original_on_tool_end(context, agent, tool, result)
 
-    hooks._sentry_is_patched = True
-    hooks.on_tool_start = on_tool_start
-    hooks.on_tool_end = on_tool_end
+    hooks._sentry_is_patched = True  # type: ignore[attr-defined]
+    hooks.on_tool_start = on_tool_start  # type: ignore[method-assign]
+    hooks.on_tool_end = on_tool_end  # type: ignore[method-assign]
 
 
 def _create_run_wrapper(
