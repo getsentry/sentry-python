@@ -12,6 +12,10 @@ sentry_sdk.init(
     trace_lifecycle="stream",
 )
 ```
+
+See
+https://docs.sentry.io/platforms/python/tracing/streamed-spans/migration-guide/
+for how to migrate to span streaming.
 """
 
 import sys
