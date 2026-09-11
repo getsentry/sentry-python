@@ -4,7 +4,6 @@ import os
 import pickle
 import socket
 import sys
-from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from unittest import mock
 
@@ -92,19 +91,6 @@ def make_client(request, capturing_server):
         )
 
     return inner
-
-
-def mock_transaction_envelope(span_count: int) -> "Envelope":
-    event = defaultdict(
-        mock.MagicMock,
-        type="transaction",
-        spans=[mock.MagicMock() for _ in range(span_count)],
-    )
-
-    envelope = Envelope()
-    envelope.add_transaction(event)
-
-    return envelope
 
 
 # The compression-relevant dimensions (level x algo x http2) are fully
