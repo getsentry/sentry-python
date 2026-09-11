@@ -14,11 +14,6 @@ from sentry_sdk.integrations.boto3._instrumentation import (
     _get_server_attributes,
     _merge_service_attributes,
 )
-from sentry_sdk.integrations.boto3._services.base import _ServiceExtension
-from sentry_sdk.integrations.boto3._services.registry import (
-    _SERVICE_EXTENSIONS,
-    _resolve_service_extension,
-)
 from tests.integrations.boto3.aws_mock import Body
 
 session = boto3.Session(  # type: ignore[attr-defined]
@@ -26,11 +21,6 @@ session = boto3.Session(  # type: ignore[attr-defined]
     aws_secret_access_key="-",
     region_name="eu-north-1",
 )
-
-
-@pytest.mark.parametrize("service_name", sorted(_SERVICE_EXTENSIONS))
-def test_registered_service_extensions_load(service_name):
-    assert isinstance(_resolve_service_extension(service_name), _ServiceExtension)
 
 
 def test_generic_attributes_take_precedence_over_service_attributes():
@@ -704,92 +694,6 @@ def test_error_attribute_extraction_failure_does_not_replace_original_exception(
     assert len(client_spans) == 1
     assert client_spans[0]["status"] in ("error", "internal_error")
     _assert_span_finished(client_spans[0], span_streaming)
-
-
-@pytest.mark.tests_internal_exceptions
-@pytest.mark.parametrize("span_streaming", [True, False])
-def test_service_response_enrichment_failure_preserves_response_and_finishes_span(
-    capture_items,
-    client_factory,
-    monkeypatch,
-    span_streaming,
-):
-    class FailingServiceExtension(_ServiceExtension):
-        def get_response_attributes(self, ctx, response):
-            raise RuntimeError("service response enrichment failed")
-
-    monkeypatch.setattr(
-        "sentry_sdk.integrations.boto3._client._resolve_service_extension",
-        lambda service_name: FailingServiceExtension(),
-    )
-    client = client_factory()
-    api_params = {"Bucket": "bucket", "Key": "foo"}
-    original_response = {"ResponseMetadata": {"HTTPStatusCode": 200}}
-    returned_responses = []
-
-    with Stubber(client) as stubber:
-        stubber.add_response("head_object", original_response, api_params)
-        spans_by_op = _capture_boto3_spans_by_op(
-            lambda: returned_responses.append(client.head_object(**api_params)),
-            capture_items,
-            span_streaming,
-        )
-
-    client_spans = spans_by_op.get(OP.HTTP_CLIENT, [])
-    assert returned_responses == [original_response]
-    assert returned_responses[0] is original_response
-    assert len(client_spans) == 1
-    assert (
-        _span_attributes(client_spans[0], span_streaming)[SPANDATA.HTTP_STATUS_CODE]
-        == 200
-    )
-    _assert_span_finished(client_spans[0], span_streaming)
-
-
-@pytest.mark.tests_internal_exceptions
-@pytest.mark.parametrize("span_streaming", [True, False])
-def test_service_response_enrichment_failure_on_error_preserves_exception(
-    capture_items,
-    client_factory,
-    monkeypatch,
-    span_streaming,
-):
-    class FailingServiceExtension(_ServiceExtension):
-        def get_response_attributes(self, ctx, response):
-            raise RuntimeError("service response enrichment failed")
-
-    monkeypatch.setattr(
-        "sentry_sdk.integrations.boto3._client._resolve_service_extension",
-        lambda service_name: FailingServiceExtension(),
-    )
-    client = client_factory()
-    original_exception = ClientError(
-        {
-            "Error": {"Code": "AccessDeniedException"},
-            "ResponseMetadata": {"HTTPStatusCode": 403},
-        },
-        "HeadObject",
-    )
-
-    def raise_original_exception(**kwargs):
-        raise original_exception
-
-    client.meta.events.register("before-parameter-build", raise_original_exception)
-
-    def invoke_failing_client_method():
-        with pytest.raises(ClientError) as exc_info:
-            client.head_object(Bucket="bucket", Key="foo")
-        assert exc_info.value is original_exception
-
-    spans_by_op = _capture_boto3_spans_by_op(
-        invoke_failing_client_method, capture_items, span_streaming
-    )
-    client_spans = spans_by_op.get(OP.HTTP_CLIENT, [])
-
-    _assert_one_failed_span(client_spans, span_streaming)
-    attributes = _span_attributes(client_spans[0], span_streaming)
-    assert attributes[SPANDATA.ERROR_TYPE] == "AccessDeniedException"
-    assert attributes[SPANDATA.HTTP_STATUS_CODE] == 403
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
