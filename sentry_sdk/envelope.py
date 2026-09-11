@@ -23,7 +23,7 @@ class Envelope:
     """
     Represents a Sentry Envelope. The calling code is responsible for adhering to the constraints
     documented in the Sentry docs: https://develop.sentry.dev/sdk/envelopes/#data-model. In particular,
-    each envelope may have at most one Item with type "event" or "transaction" (but not both).
+    each envelope may have at most one Item with type "event".
     """
 
     def __init__(
@@ -52,12 +52,6 @@ class Envelope:
         event: "Event",
     ) -> None:
         self.add_item(Item(payload=PayloadRef(json=event), type="event"))
-
-    def add_transaction(
-        self,
-        transaction: "Event",
-    ) -> None:
-        self.add_item(Item(payload=PayloadRef(json=transaction), type="transaction"))
 
     def add_profile_chunk(
         self,
@@ -241,8 +235,6 @@ class Item:
             return "session"
         elif ty == "attachment":
             return "attachment"
-        elif ty == "transaction":
-            return "transaction"
         elif ty == "span":
             return "span"
         elif ty == "event":
@@ -268,11 +260,6 @@ class Item:
         Returns an error event if there is one.
         """
         if self.type == "event" and self.payload.json is not None:
-            return self.payload.json
-        return None
-
-    def get_transaction_event(self) -> "Optional[Event]":
-        if self.type == "transaction" and self.payload.json is not None:
             return self.payload.json
         return None
 
@@ -310,7 +297,7 @@ class Item:
             # if no length was specified we need to read up to the end of line
             # and remove it (if it is present, i.e. not the very last char in an eof terminated envelope)
             payload = f.readline().rstrip(b"\n")
-        if headers.get("type") in ("event", "transaction"):
+        if headers.get("type") == "event":
             rv = cls(headers=headers, payload=PayloadRef(json=parse_json(payload)))
         else:
             rv = cls(headers=headers, payload=payload)

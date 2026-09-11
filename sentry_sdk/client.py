@@ -27,7 +27,7 @@ from sentry_sdk.data_collection import (
     _map_from_send_default_pii,
     _resolve_data_collection,
 )
-from sentry_sdk.envelope import Envelope, Item, PayloadRef
+from sentry_sdk.envelope import Envelope, Item
 from sentry_sdk.integrations import setup_integrations
 from sentry_sdk.integrations.dedupe import DedupeIntegration
 from sentry_sdk.monitor import Monitor
@@ -706,10 +706,7 @@ class _Client(BaseClient):
         if event.get("timestamp") is None:
             event["timestamp"] = datetime.now(timezone.utc)
 
-        is_transaction = event.get("type") == "transaction"
-
         if scope is not None:
-            spans_before = len(cast(List[Dict[str, object]], event.get("spans", [])))
             event_ = scope.apply_to_event(event, hint, self.options)
 
             # one of the event/error processors returned None
@@ -717,51 +714,14 @@ class _Client(BaseClient):
                 if self.transport:
                     self.transport.record_lost_event(
                         "event_processor",
-                        data_category=("transaction" if is_transaction else "error"),
+                        data_category="error",
                     )
-                    if is_transaction:
-                        self.transport.record_lost_event(
-                            "event_processor",
-                            data_category="span",
-                            quantity=spans_before + 1,  # +1 for the transaction itself
-                        )
                 return None
 
             event = event_
-            spans_delta = spans_before - len(
-                cast(List[Dict[str, object]], event.get("spans", []))
-            )
-            span_recorder_dropped_spans: int = event.pop("_dropped_spans", 0)
-
-            if is_transaction and self.transport is not None:
-                if spans_delta > 0:
-                    self.transport.record_lost_event(
-                        "event_processor", data_category="span", quantity=spans_delta
-                    )
-                if span_recorder_dropped_spans > 0:
-                    self.transport.record_lost_event(
-                        "buffer_overflow",
-                        data_category="span",
-                        quantity=span_recorder_dropped_spans,
-                    )
-
-            dropped_spans: int = span_recorder_dropped_spans + spans_delta
-            if dropped_spans > 0:
-                previous_total_spans = spans_before + dropped_spans
-            if scope._n_breadcrumbs_truncated > 0:
-                breadcrumbs = event.get("breadcrumbs", {})
-                values = (
-                    breadcrumbs.get("values", [])
-                    if not isinstance(breadcrumbs, AnnotatedValue)
-                    else []
-                )
-                previous_total_breadcrumbs = (
-                    len(values) + scope._n_breadcrumbs_truncated
-                )
 
         if (
-            not is_transaction
-            and self.options["attach_stacktrace"]
+            self.options["attach_stacktrace"]
             and "exception" not in event
             and "stacktrace" not in event
             and "threads" not in event
@@ -846,11 +806,7 @@ class _Client(BaseClient):
             )
 
         before_send = self.options["before_send"]
-        if (
-            before_send is not None
-            and event is not None
-            and event.get("type") != "transaction"
-        ):
+        if before_send is not None and event is not None:
             new_event = None
             with capture_internal_exceptions():
                 new_event = before_send(event, hint or {})
@@ -867,36 +823,6 @@ class _Client(BaseClient):
                 # in before_send, it'd get dropped by DedupeIntegration.
                 if event.get("exception"):
                     DedupeIntegration.reset_last_seen()
-
-            event = new_event
-
-        before_send_transaction = self.options["before_send_transaction"]
-        if (
-            before_send_transaction is not None
-            and event is not None
-            and event.get("type") == "transaction"
-        ):
-            new_event = None
-            spans_before = len(cast(List[Dict[str, object]], event.get("spans", [])))
-            with capture_internal_exceptions():
-                new_event = before_send_transaction(event, hint or {})
-            if new_event is None:
-                logger.info("before send transaction dropped event")
-                if self.transport:
-                    self.transport.record_lost_event(
-                        reason="before_send", data_category="transaction"
-                    )
-                    self.transport.record_lost_event(
-                        reason="before_send",
-                        data_category="span",
-                        quantity=spans_before + 1,  # +1 for the transaction itself
-                    )
-            else:
-                spans_delta = spans_before - len(new_event.get("spans", []))
-                if spans_delta > 0 and self.transport is not None:
-                    self.transport.record_lost_event(
-                        reason="before_send", data_category="span", quantity=spans_delta
-                    )
 
             event = new_event
 
@@ -929,11 +855,6 @@ class _Client(BaseClient):
         hint: "Hint",
         scope: "Optional[Scope]" = None,
     ) -> bool:
-        # Transactions are sampled independent of error events.
-        is_transaction = event.get("type") == "transaction"
-        if is_transaction:
-            return True
-
         ignoring_prevents_recursion = scope is not None and not scope._should_capture
         if ignoring_prevents_recursion:
             return False
@@ -1053,7 +974,6 @@ class _Client(BaseClient):
         if event_id is None:
             event["event_id"] = event_id = uuid.uuid4().hex
 
-        span_recorder_has_gen_ai_span = event.pop("_has_gen_ai_span", False)
         event_opt = self._prepare_event(event, hint, scope)
         if event_opt is None:
             return None
@@ -1064,14 +984,9 @@ class _Client(BaseClient):
         if session:
             self._update_session_from_event(session, event)
 
-        is_transaction = event_opt.get("type") == "transaction"
         is_checkin = event_opt.get("type") == "check_in"
 
-        if (
-            not is_transaction
-            and not is_checkin
-            and not self._should_sample_error(event, hint)
-        ):
+        if not is_checkin and not self._should_sample_error(event, hint):
             return None
 
         attachments = hint.get("attachments")
@@ -1089,41 +1004,7 @@ class _Client(BaseClient):
 
         envelope = Envelope(headers=headers)
 
-        if is_transaction and not span_recorder_has_gen_ai_span:
-            envelope.add_transaction(event_opt)
-        elif is_transaction:
-            split_spans = _split_gen_ai_spans(event_opt)
-            if split_spans is None or not split_spans[1]:
-                envelope.add_transaction(event_opt)
-            else:
-                non_gen_ai_spans, gen_ai_spans = split_spans
-
-                event_opt["spans"] = non_gen_ai_spans
-                envelope.add_transaction(event_opt)
-
-                converted_gen_ai_spans = [
-                    _serialized_v1_span_to_serialized_v2_span(span, event_opt)
-                    for span in gen_ai_spans
-                    if isinstance(span, dict)
-                ]
-
-                envelope.add_item(
-                    Item(
-                        type=SpanBatcher.TYPE,
-                        content_type=SpanBatcher.CONTENT_TYPE,
-                        headers={
-                            "item_count": len(converted_gen_ai_spans),
-                        },
-                        payload=PayloadRef(
-                            json={
-                                "version": 2,
-                                "items": converted_gen_ai_spans,
-                            },
-                        ),
-                    )
-                )
-
-        elif is_checkin:
+        if is_checkin:
             envelope.add_checkin(event_opt)
         else:
             envelope.add_event(event_opt)

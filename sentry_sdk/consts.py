@@ -1546,11 +1546,6 @@ class ClientConstructor:
             By the time `before_send` is executed, all scope data has already been applied to the event. Further
             modification of the scope won't have any effect.
 
-        :param before_send_transaction: This function is called with an SDK-specific transaction event object, and can
-            return a modified transaction event object, or `null` to skip reporting the event.
-
-            One way this might be used is for manual PII stripping before sending.
-
         :param before_breadcrumb: This function is called with an SDK-specific breadcrumb object before the breadcrumb
             is added to the scope.
 

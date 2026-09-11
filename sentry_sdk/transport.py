@@ -159,13 +159,6 @@ class Transport(ABC):
         If an item is provided, the data category and quantity are
         extracted from the item, and the values passed for
         data_category and quantity are ignored.
-
-        When recording a lost transaction via data_category="transaction",
-        the calling code should also record the lost spans via this method.
-        When recording lost spans, `quantity` should be set to the number
-        of contained spans, plus one for the transaction itself. When
-        passing an Item containing a transaction via the `item` parameter,
-        this method automatically records the lost spans.
         """
         return None
 
@@ -453,7 +446,7 @@ class HttpTransportCore(Transport):
         new_items = []
         for item in envelope.items:
             if self._check_disabled(item.data_category):
-                if item.data_category in ("transaction", "error", "default", "statsd"):
+                if item.data_category in ("error", "default", "statsd"):
                     self.on_dropped_event("self_rate_limits")
                 self.record_lost_event("ratelimit_backoff", item=item)
             else:

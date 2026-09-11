@@ -1146,7 +1146,7 @@ class Scope:
 
         event_id = self.get_client().capture_event(event=event, hint=hint, scope=scope)
 
-        if event_id is not None and event.get("type") != "transaction":
+        if event_id is not None:
             self.get_isolation_scope()._last_event_id = event_id
 
         return event_id
@@ -1539,7 +1539,6 @@ class Scope:
     ) -> "Optional[Event]":
         """Applies the information contained on the scope to the given event."""
         ty = event.get("type")
-        is_transaction = ty == "transaction"
         is_check_in = ty == "check_in"
 
         # put all attachments into the hint. This lets callbacks play around
@@ -1547,7 +1546,7 @@ class Scope:
         # create the envelope.
         attachments_to_send = hint.get("attachments") or []
         for attachment in self._attachments:
-            if not is_transaction or attachment.add_to_transactions:
+            if attachment.add_to_transactions:
                 attachments_to_send.append(attachment)
         hint["attachments"] = attachments_to_send
 
@@ -1567,8 +1566,6 @@ class Scope:
             self._apply_transaction_info_to_event(event, hint, options)
             self._apply_tags_to_event(event, hint, options)
             self._apply_extra_to_event(event, hint, options)
-
-        if not is_transaction and not is_check_in:
             self._apply_breadcrumbs_to_event(event, hint, options)
             self._apply_flags_to_event(event, hint, options)
 
