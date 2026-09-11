@@ -93,12 +93,12 @@ def _set_agent_data(span: "StreamedSpan", agent: "agents.Agent") -> None:
 def _set_usage_data(span: "StreamedSpan", usage: "Usage") -> None:
     span.set_attribute(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, usage.input_tokens)
     span.set_attribute(
-        SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED,
+        SPANDATA.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
         usage.input_tokens_details.cached_tokens,
     )
     span.set_attribute(SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS, usage.output_tokens)
     span.set_attribute(
-        SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS_REASONING,
+        SPANDATA.GEN_AI_USAGE_REASONING_OUTPUT_TOKENS,
         usage.output_tokens_details.reasoning_tokens,
     )
     span.set_attribute(SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, usage.total_tokens)

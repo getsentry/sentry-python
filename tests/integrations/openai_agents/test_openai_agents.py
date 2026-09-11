@@ -2069,9 +2069,15 @@ async def test_tool_execution_span(
     assert ai_client_span1["attributes"]["gen_ai.request.temperature"] == 0.7
     assert ai_client_span1["attributes"]["gen_ai.request.top_p"] == 1.0
     assert ai_client_span1["attributes"]["gen_ai.usage.input_tokens"] == 10
-    assert ai_client_span1["attributes"]["gen_ai.usage.input_tokens.cached"] == 0
+    assert (
+        ai_client_span1["attributes"][SPANDATA.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]
+        == 0
+    )
     assert ai_client_span1["attributes"]["gen_ai.usage.output_tokens"] == 5
-    assert ai_client_span1["attributes"]["gen_ai.usage.output_tokens.reasoning"] == 0
+    assert (
+        ai_client_span1["attributes"][SPANDATA.GEN_AI_USAGE_REASONING_OUTPUT_TOKENS]
+        == 0
+    )
     assert ai_client_span1["attributes"]["gen_ai.usage.total_tokens"] == 15
 
     tool_call = {
@@ -2158,9 +2164,15 @@ async def test_tool_execution_span(
         == "Task completed using the tool"
     )
     assert ai_client_span2["attributes"]["gen_ai.system"] == "openai"
-    assert ai_client_span2["attributes"]["gen_ai.usage.input_tokens.cached"] == 0
+    assert (
+        ai_client_span2["attributes"][SPANDATA.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]
+        == 0
+    )
     assert ai_client_span2["attributes"]["gen_ai.usage.input_tokens"] == 15
-    assert ai_client_span2["attributes"]["gen_ai.usage.output_tokens.reasoning"] == 0
+    assert (
+        ai_client_span2["attributes"][SPANDATA.GEN_AI_USAGE_REASONING_OUTPUT_TOKENS]
+        == 0
+    )
     assert ai_client_span2["attributes"]["gen_ai.usage.output_tokens"] == 10
     assert ai_client_span2["attributes"]["gen_ai.usage.total_tokens"] == 25
 
@@ -3400,8 +3412,14 @@ async def test_invoke_agent_span_includes_usage_data(
     assert invoke_agent_span["attributes"]["gen_ai.usage.input_tokens"] == 10
     assert invoke_agent_span["attributes"]["gen_ai.usage.output_tokens"] == 20
     assert invoke_agent_span["attributes"]["gen_ai.usage.total_tokens"] == 30
-    assert invoke_agent_span["attributes"]["gen_ai.usage.input_tokens.cached"] == 0
-    assert invoke_agent_span["attributes"]["gen_ai.usage.output_tokens.reasoning"] == 5
+    assert (
+        invoke_agent_span["attributes"][SPANDATA.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]
+        == 0
+    )
+    assert (
+        invoke_agent_span["attributes"][SPANDATA.GEN_AI_USAGE_REASONING_OUTPUT_TOKENS]
+        == 5
+    )
 
 
 @pytest.mark.asyncio
@@ -3711,9 +3729,15 @@ async def test_multiple_llm_calls_aggregate_usage(
     assert invoke_agent_span["attributes"]["gen_ai.usage.output_tokens"] == 20
     assert invoke_agent_span["attributes"]["gen_ai.usage.total_tokens"] == 50
     # Cached tokens should be aggregated: 0 + 5 = 5
-    assert invoke_agent_span["attributes"]["gen_ai.usage.input_tokens.cached"] == 5
+    assert (
+        invoke_agent_span["attributes"][SPANDATA.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]
+        == 5
+    )
     # Reasoning tokens should be aggregated: 0 + 3 = 3
-    assert invoke_agent_span["attributes"]["gen_ai.usage.output_tokens.reasoning"] == 3
+    assert (
+        invoke_agent_span["attributes"][SPANDATA.GEN_AI_USAGE_REASONING_OUTPUT_TOKENS]
+        == 3
+    )
 
 
 @pytest.mark.asyncio

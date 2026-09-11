@@ -1023,7 +1023,7 @@ def set_span_data_for_response(
 
     if usage_data["input_tokens_cached"]:
         span.set_attribute(
-            SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED,
+            SPANDATA.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
             usage_data["input_tokens_cached"],
         )
 
@@ -1034,7 +1034,7 @@ def set_span_data_for_response(
 
     if usage_data["output_tokens_reasoning"]:
         span.set_attribute(
-            SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS_REASONING,
+            SPANDATA.GEN_AI_USAGE_REASONING_OUTPUT_TOKENS,
             usage_data["output_tokens_reasoning"],
         )
 

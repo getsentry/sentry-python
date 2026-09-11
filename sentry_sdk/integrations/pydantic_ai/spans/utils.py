@@ -71,12 +71,14 @@ def _set_usage_data(
 
     # Pydantic AI uses cache_read_tokens (not input_tokens_cached)
     if hasattr(usage, "cache_read_tokens") and usage.cache_read_tokens is not None:
-        set_on_span(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED, usage.cache_read_tokens)
+        set_on_span(
+            SPANDATA.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS, usage.cache_read_tokens
+        )
 
     # Pydantic AI uses cache_write_tokens (not input_tokens_cache_write)
     if hasattr(usage, "cache_write_tokens") and usage.cache_write_tokens is not None:
         set_on_span(
-            SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE,
+            SPANDATA.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS,
             usage.cache_write_tokens,
         )
 
