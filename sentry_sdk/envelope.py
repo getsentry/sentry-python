@@ -98,13 +98,6 @@ class Envelope:
                 return event
         return None
 
-    def get_transaction_event(self) -> "Optional[Event]":
-        for item in self.items:
-            event = item.get_transaction_event()
-            if event is not None:
-                return event
-        return None
-
     def __iter__(self) -> "Iterator[Item]":
         return iter(self.items)
 

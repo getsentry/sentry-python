@@ -36,7 +36,7 @@ try:
 except ImportError:
     ASYNC_TRANSPORT_AVAILABLE = False
 
-from typing import TYPE_CHECKING, Dict, List, cast
+from typing import TYPE_CHECKING, Dict, List
 
 import certifi
 import urllib3
@@ -264,17 +264,7 @@ class HttpTransportCore(Transport):
             data_category = item.data_category
             quantity = 1  # If an item is provided, we always count it as 1 (except for attachments, handled below).
 
-            if data_category == "transaction":
-                # Also record the lost spans
-                event = item.get_transaction_event() or {}
-
-                # +1 for the transaction itself
-                span_count = (
-                    len(cast(List[Dict[str, object]], event.get("spans") or [])) + 1
-                )
-                self.record_lost_event(reason, "span", quantity=span_count)
-
-            elif data_category == "log_item" and item:
+            if data_category == "log_item" and item:
                 # Also record size of lost logs in bytes
                 bytes_size = len(item.get_bytes())
                 self.record_lost_event(reason, "log_byte", quantity=bytes_size)
