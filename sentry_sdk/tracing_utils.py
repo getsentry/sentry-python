@@ -273,7 +273,7 @@ def _should_be_included(
 
 
 def add_source(
-    span: "Union[sentry_sdk.tracing.Span, sentry_sdk.traces.StreamedSpan]",
+    span: "sentry_sdk.traces.StreamedSpan",
     project_root: "Optional[str]",
     in_app_include: "Optional[list[str]]",
     in_app_exclude: "Optional[list[str]]",
@@ -317,20 +317,14 @@ def add_source(
         except Exception:
             lineno = None
         if lineno is not None:
-            if isinstance(span, Span):
-                span.set_data(SPANDATA.CODE_LINENO, lineno)
-            else:
-                span.set_attribute("code.line.number", lineno)
+            span.set_attribute("code.line.number", lineno)
 
         try:
             namespace = frame.f_globals.get("__name__")
         except Exception:
             namespace = None
         if namespace is not None:
-            if isinstance(span, Span):
-                span.set_data(SPANDATA.CODE_NAMESPACE, namespace)
-            else:
-                span.set_attribute(SPANDATA.CODE_NAMESPACE, namespace)
+            span.set_attribute(SPANDATA.CODE_NAMESPACE, namespace)
 
         filepath = _get_frame_module_abs_path(frame)
         if filepath is not None:
@@ -341,11 +335,8 @@ def add_source(
             else:
                 in_app_path = filepath
 
-            if isinstance(span, Span):
-                span.set_data(SPANDATA.CODE_FILEPATH, in_app_path)
-            else:
-                if in_app_path is not None:
-                    span.set_attribute("code.file.path", in_app_path)
+            if in_app_path is not None:
+                span.set_attribute("code.file.path", in_app_path)
 
         try:
             code_function = frame.f_code.co_name
@@ -353,10 +344,7 @@ def add_source(
             code_function = None
 
         if code_function is not None:
-            if isinstance(span, Span):
-                span.set_data(SPANDATA.CODE_FUNCTION, frame.f_code.co_name)
-            else:
-                span.set_attribute(SPANDATA.CODE_FUNCTION, frame.f_code.co_name)
+            span.set_attribute(SPANDATA.CODE_FUNCTION, frame.f_code.co_name)
 
 
 def add_query_source(
@@ -394,7 +382,7 @@ def add_query_source(
 
 
 def add_http_request_source(
-    span: "Union[sentry_sdk.tracing.Span, sentry_sdk.traces.StreamedSpan]",
+    span: "sentry_sdk.traces.StreamedSpan",
 ) -> None:
     """
     Adds OTel compatible source code information to a span for an outgoing HTTP request
@@ -403,13 +391,6 @@ def add_http_request_source(
     if not client.is_active():
         return
 
-    if isinstance(span, Span):
-        # In the StreamedSpan case, we need to add the extra span information before
-        # the span finishes, so it's expected that this will be None. In the Span case,
-        # it should already be finished.
-        if span.timestamp is None:
-            return
-
     if span.start_timestamp is None:
         return
 
@@ -417,12 +398,7 @@ def add_http_request_source(
     if not should_add_request_source:
         return
 
-    if isinstance(span, StreamedSpan):
-        end_timestamp = span.end_timestamp
-    else:
-        end_timestamp = span.timestamp
-
-    end_timestamp = end_timestamp or datetime.now(timezone.utc)
+    end_timestamp = span.end_timestamp or datetime.now(timezone.utc)
 
     duration = end_timestamp - span.start_timestamp
     threshold = client.options.get("http_request_source_threshold_ms", 0)
@@ -1525,7 +1501,6 @@ from sentry_sdk.tracing import (
     BAGGAGE_HEADER_NAME,
     LOW_QUALITY_TRANSACTION_SOURCES,
     SENTRY_TRACE_HEADER_NAME,
-    Span,
 )
 
 if TYPE_CHECKING:
