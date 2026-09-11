@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from enum import Enum
 from functools import wraps
 from itertools import chain
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk._types import AnnotatedValue
@@ -29,15 +29,11 @@ from sentry_sdk.traces import (
 from sentry_sdk.tracing import (
     BAGGAGE_HEADER_NAME,
     SENTRY_TRACE_HEADER_NAME,
-    NoOpSpan,
-    Span,
-    Transaction,
 )
 from sentry_sdk.tracing_utils import (
     Baggage,
     PropagationContext,
     _make_sampling_decision,
-    has_span_streaming_enabled,
     has_tracing_enabled,
     is_ignored_span,
 )
@@ -576,12 +572,9 @@ class Scope:
         if not has_tracing_enabled(client.options):
             return self.get_active_propagation_context().to_traceparent()
 
-        span_streaming = has_span_streaming_enabled(client.options)
         # If we have an active span, return traceparent from there
-        if span_streaming and self.streamed_span is not None:
+        if self.streamed_span is not None:
             return self.streamed_span._to_traceparent()
-        elif not span_streaming and self.span is not None:
-            return self.span._to_traceparent()
 
         # else return traceparent from the propagation context
         return self.get_active_propagation_context().to_traceparent()
@@ -596,12 +589,9 @@ class Scope:
         if not has_tracing_enabled(client.options):
             return self.get_active_propagation_context().get_baggage()
 
-        span_streaming = has_span_streaming_enabled(client.options)
         # If we have an active span, return baggage from there
-        if span_streaming and self.streamed_span is not None:
+        if self.streamed_span is not None:
             return self.streamed_span._to_baggage()
-        elif not span_streaming and self.span is not None:
-            return self.span._to_baggage()
 
         # else return baggage from the propagation context
         return self.get_active_propagation_context().get_baggage()
@@ -610,11 +600,7 @@ class Scope:
         """
         Returns the Sentry "trace" context from the Propagation Context.
         """
-        if (
-            has_tracing_enabled(self.get_client().options)
-            and self._span is not None
-            and not isinstance(self._span, NoOpSpan)
-        ):
+        if has_tracing_enabled(self.get_client().options) and self._span is not None:
             return self._span._get_trace_context()
 
         # if we are tracing externally (otel), those values take precedence
@@ -655,16 +641,9 @@ class Scope:
         """
         client = self.get_client()
 
-        span = kwargs.pop("span", None)
-        if not span:
-            span_streaming = has_span_streaming_enabled(client.options)
-            span = self.streamed_span if span_streaming else self.span
+        span = kwargs.pop("span", None) or self.streamed_span
 
-        if (
-            has_tracing_enabled(client.options)
-            and span is not None
-            and not isinstance(span, NoOpSpan)
-        ):
+        if has_tracing_enabled(client.options) and span is not None:
             for header in span._iter_headers():
                 yield header
         elif has_external_propagation_context():
@@ -713,7 +692,7 @@ class Scope:
         self.clear_breadcrumbs()
         self._should_capture: bool = True
 
-        self._span: "Optional[Union[Span, StreamedSpan]]" = None
+        self._span: "Optional[StreamedSpan]" = None
         self._session: "Optional[Session]" = None
         self._force_auto_session_tracking: "Optional[bool]" = None
 
@@ -820,23 +799,6 @@ class Scope:
         session = self.get_isolation_scope()._session
         if session is not None:
             session.update(user=value)
-
-    @property
-    def span(self) -> "Optional[Span]":
-        """Get/set current tracing span or transaction."""
-        return self._span if isinstance(self._span, Span) else None
-
-    @span.setter
-    def span(self, span: "Optional[Span]") -> None:
-        self._span = span
-        # XXX: this differs from the implementation in JS, there Scope.setSpan
-        # does not set Scope._transactionName.
-        if isinstance(span, Transaction):
-            transaction = span
-            if transaction.name:
-                self._transaction = transaction.name
-                if transaction.source:
-                    self._transaction_info["source"] = transaction.source
 
     @property
     def streamed_span(self) -> "Optional[StreamedSpan]":
@@ -1152,39 +1114,6 @@ class Scope:
         if baggage is not None and baggage.sentry_items.get("sample_rate"):
             baggage.sentry_items["sample_rate"] = str(sample_rate)
 
-    def continue_trace(
-        self,
-        environ_or_headers: "Dict[str, Any]",
-        op: "Optional[str]" = None,
-        name: "Optional[str]" = None,
-        source: "Optional[str]" = None,
-        origin: str = "manual",
-    ) -> "Transaction":
-        """
-        Sets the propagation context from environment or headers and returns a transaction.
-        """
-        self.generate_propagation_context(environ_or_headers)
-
-        # generate_propagation_context ensures that the propagation_context is not None.
-        propagation_context = cast(PropagationContext, self._propagation_context)
-
-        optional_kwargs = {}
-        if name:
-            optional_kwargs["name"] = name
-        if source:
-            optional_kwargs["source"] = source
-
-        return Transaction(
-            op=op,
-            origin=origin,
-            baggage=propagation_context.baggage,
-            parent_sampled=propagation_context.parent_sampled,
-            trace_id=propagation_context.trace_id,
-            parent_span_id=propagation_context.parent_span_id,
-            same_process_as_parent=False,
-            **optional_kwargs,
-        )
-
     def capture_event(
         self,
         event: "Event",
@@ -1258,11 +1187,9 @@ class Scope:
         if span is None:
             return
 
-        client = self.get_client()
-        if not has_span_streaming_enabled(client.options):
-            return
-
         merged_scope = self._merge_scopes()
+
+        client = self.get_client()
         client._capture_span(span, scope=merged_scope)
 
     def capture_message(
@@ -1670,7 +1597,7 @@ class Scope:
             # isn't one
             if telemetry.get("span_id") is None:
                 if self._span is not None and not isinstance(
-                    self._span, (NoOpStreamedSpan, NoOpSpan)
+                    self._span, NoOpStreamedSpan
                 ):
                     telemetry["span_id"] = self._span.span_id
                 else:

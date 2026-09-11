@@ -35,10 +35,7 @@ from sentry_sdk.profiler.continuous_profiler import setup_continuous_profiler
 from sentry_sdk.scrubber import EventScrubber
 from sentry_sdk.serializer import serialize
 from sentry_sdk.sessions import SessionFlusher
-from sentry_sdk.traces import SpanStatus, StreamedSpan
-from sentry_sdk.traces import trace as streaming_trace
-from sentry_sdk.tracing import trace as legacy_trace
-from sentry_sdk.tracing_utils import has_span_streaming_enabled
+from sentry_sdk.traces import SpanStatus, StreamedSpan, trace
 from sentry_sdk.transport import (
     AsyncHttpTransport,
     HttpTransportCore,
@@ -364,16 +361,6 @@ def _get_options(*args: "Optional[str]", **kwargs: "Any") -> "Dict[str, Any]":
             env_to_bool(os.environ.get("SENTRY_KEEP_ALIVE"), strict=True) or False
         )
 
-    if rv["ignore_spans"] and not has_span_streaming_enabled(rv):
-        logger.warning(
-            "The `ignore_spans` parameter only works when `trace_lifecycle` is set to `stream`.",
-        )
-
-    if rv["before_send_span"] and not has_span_streaming_enabled(rv):
-        logger.warning(
-            "The `before_send_span` parameter only works when `trace_lifecycle` is set to `stream`.",
-        )
-
     return rv
 
 
@@ -507,12 +494,6 @@ class _Client(BaseClient):
         """
         Instruments the functions given in the list `functions_to_trace` with a trace decorator.
         """
-        trace = (
-            streaming_trace
-            if has_span_streaming_enabled(self.options)
-            else legacy_trace
-        )
-
         for function in functions_to_trace:
             class_name = None
             function_qualname = function["qualified_name"]
@@ -635,12 +616,10 @@ class _Client(BaseClient):
                 record_lost_func=_record_lost_event,
             )
 
-            self.span_batcher = None
-            if has_span_streaming_enabled(self.options):
-                self.span_batcher = SpanBatcher(
-                    capture_func=_capture_envelope,
-                    record_lost_func=_record_lost_event,
-                )
+            self.span_batcher = SpanBatcher(
+                capture_func=_capture_envelope,
+                record_lost_func=_record_lost_event,
+            )
 
             max_request_body_size = ("always", "never", "small", "medium")
             if self.options["max_request_body_size"] not in max_request_body_size:
