@@ -2707,7 +2707,9 @@ async def test_set_usage_data_with_cache_tokens(
     spans = [item.payload for item in items]
 
     assert spans[0]["attributes"][SPANDATA.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS] == 80
-    assert spans[0]["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 20
+    assert (
+        spans[0]["attributes"][SPANDATA.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS] == 20
+    )
 
 
 @pytest.mark.parametrize(

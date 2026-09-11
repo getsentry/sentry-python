@@ -4961,7 +4961,7 @@ def test_cache_tokens_nonstreaming(
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 50
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 250
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS] == 80
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 20
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS] == 20
 
 
 def test_input_tokens_include_cache_write_nonstreaming(
@@ -5018,7 +5018,7 @@ def test_input_tokens_include_cache_write_nonstreaming(
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 2865
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 2879  # 2865 + 14
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS] == 0
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 2846
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS] == 2846
 
 
 def test_input_tokens_include_cache_read_nonstreaming(
@@ -5075,7 +5075,7 @@ def test_input_tokens_include_cache_read_nonstreaming(
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 2865
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 2879  # 2865 + 14
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS] == 2846
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 0
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS] == 0
 
 
 def test_input_tokens_include_cache_read_streaming(
@@ -5147,7 +5147,7 @@ def test_input_tokens_include_cache_read_streaming(
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 2865
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 2879  # 2865 + 14
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS] == 2846
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 0
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS] == 0
 
 
 def test_stream_messages_input_tokens_include_cache_read_streaming(
@@ -5217,7 +5217,7 @@ def test_stream_messages_input_tokens_include_cache_read_streaming(
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 2865
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 2879  # 2865 + 14
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS] == 2846
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 0
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS] == 0
 
 
 def test_input_tokens_unchanged_without_caching(
@@ -5332,7 +5332,7 @@ def test_cache_tokens_streaming(
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 210
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS] == 80
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 20
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS] == 20
 
 
 def test_stream_messages_cache_tokens(
@@ -5399,4 +5399,4 @@ def test_stream_messages_cache_tokens(
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 210
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS] == 80
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 20
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS] == 20
