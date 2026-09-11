@@ -153,7 +153,7 @@ def start_span(
     :return: The span that has been started.
     :rtype: StreamedSpan
     """
-    return sentry_sdk.get_current_scope().start_streamed_span(
+    return sentry_sdk.get_current_scope().start_span(
         name, attributes, parent_span, active
     )
 
