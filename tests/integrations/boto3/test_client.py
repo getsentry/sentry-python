@@ -121,10 +121,9 @@ def _capture_stubbed_client_span(
     api_params,
     capture_items,
     span_streaming,
-    response=None,
 ):
     with Stubber(client) as stubber:
-        stubber.add_response(method_name, response or {}, api_params)
+        stubber.add_response(method_name, {}, api_params)
         spans_by_op = _capture_boto3_spans_by_op(
             lambda: getattr(client, method_name)(**api_params),
             capture_items,
