@@ -5,22 +5,8 @@ from unittest import mock
 import pytest
 
 import sentry_sdk
-from sentry_sdk import capture_exception, start_span, start_transaction
-from sentry_sdk.tracing_utils import Baggage
+from sentry_sdk import capture_exception
 from sentry_sdk.utils import logger
-
-
-def test_sampling_decided_only_for_transactions(sentry_init, capture_events):
-    sentry_init(traces_sample_rate=0.5)
-
-    with start_transaction(name="hi") as transaction:
-        assert transaction.sampled is not None
-
-        with start_span() as span:
-            assert span.sampled == transaction.sampled
-
-    with start_span() as span:
-        assert span.sampled is None
 
 
 def test_sampling_decided_only_for_segments(sentry_init, capture_events):
@@ -36,32 +22,7 @@ def test_sampling_decided_only_for_segments(sentry_init, capture_events):
             assert span.sampled == segment.sampled
 
 
-@pytest.mark.parametrize("sampled", [True, False])
-def test_nested_transaction_sampling_override(sentry_init, sampled):
-    sentry_init(traces_sample_rate=1.0)
-
-    with start_transaction(name="outer", sampled=sampled) as outer_transaction:
-        assert outer_transaction.sampled is sampled
-        with start_transaction(
-            name="inner", sampled=(not sampled)
-        ) as inner_transaction:
-            assert inner_transaction.sampled is not sampled
-        assert outer_transaction.sampled is sampled
-
-
-def test_no_double_sampling(sentry_init, capture_events):
-    # Transactions should not be subject to the global/error sample rate.
-    # Only the traces_sample_rate should apply.
-    sentry_init(traces_sample_rate=1.0, sample_rate=0.0)
-    events = capture_events()
-
-    with start_transaction(name="/"):
-        pass
-
-    assert len(events) == 1
-
-
-def test_no_double_sampling_span_streaming(sentry_init, capture_items):
+def test_no_double_sampling(sentry_init, capture_items):
     # Segments should not be subject to the global/error sample rate.
     # Only the traces_sample_rate should apply.
     sentry_init(
@@ -80,16 +41,26 @@ def test_no_double_sampling_span_streaming(sentry_init, capture_items):
 
 
 @pytest.mark.parametrize("sampling_decision", [True, False])
-def test_get_transaction_and_span_from_scope_regardless_of_sampling_decision(
+def test_get_span_from_scope_regardless_of_sampling_decision(
     sentry_init, sampling_decision
 ):
-    sentry_init(traces_sample_rate=1.0)
+    sentry_init(traces_sample_rate=1.0, trace_lifecycle="stream")
 
-    with start_transaction(name="/", sampled=sampling_decision):
-        with start_span(op="child-span"):
-            with start_span(op="child-child-span"):
+    sentry_sdk.traces.continue_trace(
+        {
+            "sentry-trace": f"0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-{int(sampling_decision)}"
+        }
+    )
+
+    with sentry_sdk.traces.start_span(name="/"):
+        with sentry_sdk.traces.start_span(name="child-span"):
+            with sentry_sdk.traces.start_span(name="child-child-span"):
                 scope = sentry_sdk.get_current_scope()
-                assert scope.span.op == "child-child-span"
+                if sampling_decision is True:
+                    assert scope.streamed_span.name == "child-child-span"
+                else:
+                    # noop spans are not set on the scope unless they're segments
+                    assert scope.streamed_span.name == "/"
                 assert scope.transaction.name == "/"
 
 
@@ -98,22 +69,6 @@ def test_get_transaction_and_span_from_scope_regardless_of_sampling_decision(
     [(0.0, False), (0.25, False), (0.75, True), (1.00, True)],
 )
 def test_uses_traces_sample_rate_correctly(
-    sentry_init,
-    traces_sample_rate,
-    expected_decision,
-):
-    sentry_init(traces_sample_rate=traces_sample_rate)
-
-    baggage = Baggage(sentry_items={"sample_rand": "0.500000"})
-    transaction = start_transaction(name="dogpark", baggage=baggage)
-    assert transaction.sampled is expected_decision
-
-
-@pytest.mark.parametrize(
-    "traces_sample_rate,expected_decision",
-    [(0.0, False), (0.25, False), (0.75, True), (1.00, True)],
-)
-def test_uses_traces_sample_rate_correctly_span_streaming(
     sentry_init,
     traces_sample_rate,
     expected_decision,
@@ -143,22 +98,6 @@ def test_uses_traces_sampler_return_value_correctly(
     traces_sampler_return_value,
     expected_decision,
 ):
-    sentry_init(traces_sampler=mock.Mock(return_value=traces_sampler_return_value))
-
-    baggage = Baggage(sentry_items={"sample_rand": "0.500000"})
-    transaction = start_transaction(name="dogpark", baggage=baggage)
-    assert transaction.sampled is expected_decision
-
-
-@pytest.mark.parametrize(
-    "traces_sampler_return_value,expected_decision",
-    [(0.0, False), (0.25, False), (0.75, True), (1.00, True)],
-)
-def test_uses_traces_sampler_return_value_correctly_span_streaming(
-    sentry_init,
-    traces_sampler_return_value,
-    expected_decision,
-):
     sentry_init(
         traces_sampler=mock.Mock(return_value=traces_sampler_return_value),
         trace_lifecycle="stream",
@@ -179,16 +118,6 @@ def test_uses_traces_sampler_return_value_correctly_span_streaming(
 def test_tolerates_traces_sampler_returning_a_boolean(
     sentry_init, traces_sampler_return_value
 ):
-    sentry_init(traces_sampler=mock.Mock(return_value=traces_sampler_return_value))
-
-    transaction = start_transaction(name="dogpark")
-    assert transaction.sampled is traces_sampler_return_value
-
-
-@pytest.mark.parametrize("traces_sampler_return_value", [True, False])
-def test_tolerates_traces_sampler_returning_a_boolean_span_streaming(
-    sentry_init, traces_sampler_return_value
-):
     sentry_init(
         traces_sampler=mock.Mock(return_value=traces_sampler_return_value),
         trace_lifecycle="stream",
@@ -196,25 +125,6 @@ def test_tolerates_traces_sampler_returning_a_boolean_span_streaming(
 
     with sentry_sdk.traces.start_span(name="dogpark") as span:
         assert span.sampled is traces_sampler_return_value
-
-
-@pytest.mark.parametrize(
-    "traces_sample_rate,expected_decision",
-    [(0.0, False), (0.25, False), (0.75, True), (1.00, True)],
-)
-def test_traces_sampler_raising_falls_back_to_traces_sample_rate(
-    sentry_init,
-    traces_sample_rate,
-    expected_decision,
-):
-    sentry_init(
-        traces_sampler=mock.Mock(side_effect=ValueError("boom")),
-        traces_sample_rate=traces_sample_rate,
-    )
-
-    baggage = Baggage(sentry_items={"sample_rand": "0.500000"})
-    transaction = start_transaction(name="dogpark", baggage=baggage)
-    assert transaction.sampled is expected_decision
 
 
 @pytest.mark.parametrize("parent_sampling_decision", [True, False])
@@ -226,20 +136,24 @@ def test_traces_sampler_raising_falls_back_to_parent_sampling_decision(
     sentry_init(
         traces_sampler=mock.Mock(side_effect=ValueError("boom")),
         traces_sample_rate=0.0 if parent_sampling_decision else 1.0,
+        trace_lifecycle="stream",
     )
 
-    baggage = Baggage(sentry_items={"sample_rand": "0.500000"})
-    transaction = start_transaction(
-        name="dogpark", baggage=baggage, parent_sampled=parent_sampling_decision
+    sentry_sdk.traces.continue_trace(
+        {
+            "sentry-trace": f"0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-{int(parent_sampling_decision)}"
+        }
     )
-    assert transaction.sampled is parent_sampling_decision
+
+    with sentry_sdk.traces.start_span(name="dogpark") as span:
+        assert span.sampled is parent_sampling_decision
 
 
 @pytest.mark.parametrize(
     "traces_sample_rate,expected_decision",
     [(0.0, False), (0.25, False), (0.75, True), (1.00, True)],
 )
-def test_traces_sampler_raising_falls_back_to_traces_sample_rate_span_streaming(
+def test_traces_sampler_raising_falls_back_to_traces_sample_rate(
     sentry_init,
     traces_sample_rate,
     expected_decision,
@@ -265,7 +179,7 @@ def test_traces_sampler_raising_falls_back_to_traces_sample_rate_span_streaming(
     "traces_sample_rate,expected_decision",
     [(0.0, False), (0.25, False), (0.75, True), (1.00, True)],
 )
-def test_traces_sampler_raising_no_incoming_trace_falls_back_to_traces_sample_rate_span_streaming(
+def test_traces_sampler_raising_no_incoming_trace_falls_back_to_traces_sample_rate(
     sentry_init,
     traces_sample_rate,
     expected_decision,
@@ -291,17 +205,6 @@ def test_traces_sampler_raising_no_incoming_trace_and_no_traces_sample_rate(
 ):
     sentry_init(
         traces_sampler=mock.Mock(side_effect=ValueError("boom")),
-    )
-
-    transaction = start_transaction(name="dogpark")
-    assert transaction.sampled is False
-
-
-def test_traces_sampler_raising_no_incoming_trace_and_no_traces_sample_rate_span_streaming(
-    sentry_init,
-):
-    sentry_init(
-        traces_sampler=mock.Mock(side_effect=ValueError("boom")),
         trace_lifecycle="stream",
     )
 
@@ -310,20 +213,7 @@ def test_traces_sampler_raising_no_incoming_trace_and_no_traces_sample_rate_span
 
 
 @pytest.mark.parametrize("sampling_decision", [True, False])
-def test_only_captures_transaction_when_sampled_is_true(
-    sentry_init, sampling_decision, capture_events
-):
-    sentry_init(traces_sampler=mock.Mock(return_value=sampling_decision))
-    events = capture_events()
-
-    transaction = start_transaction(name="dogpark")
-    transaction.finish()
-
-    assert len(events) == (1 if sampling_decision else 0)
-
-
-@pytest.mark.parametrize("sampling_decision", [True, False])
-def test_only_captures_segment_when_sampled_is_true_span_streaming(
+def test_only_captures_segment_when_sampled_is_true(
     sentry_init, sampling_decision, capture_items
 ):
     sentry_init(
@@ -356,27 +246,6 @@ def test_prefers_traces_sampler_to_traces_sample_rate(
     sentry_init(
         traces_sample_rate=traces_sample_rate,
         traces_sampler=traces_sampler,
-    )
-
-    transaction = start_transaction(name="dogpark")
-    assert traces_sampler.called is True
-    assert transaction.sampled is traces_sampler_return_value
-
-
-@pytest.mark.parametrize(
-    "traces_sample_rate,traces_sampler_return_value", [(0, True), (1, False)]
-)
-def test_prefers_traces_sampler_to_traces_sample_rate_span_streaming(
-    sentry_init,
-    traces_sample_rate,
-    traces_sampler_return_value,
-):
-    # make traces_sample_rate imply the opposite of traces_sampler, to prove
-    # that traces_sampler takes precedence
-    traces_sampler = mock.Mock(return_value=traces_sampler_return_value)
-    sentry_init(
-        traces_sample_rate=traces_sample_rate,
-        traces_sampler=traces_sampler,
         trace_lifecycle="stream",
     )
 
@@ -385,23 +254,8 @@ def test_prefers_traces_sampler_to_traces_sample_rate_span_streaming(
     assert span.sampled is traces_sampler_return_value
 
 
-@pytest.mark.parametrize("parent_sampling_decision", [True, False])
-def test_ignores_inherited_sample_decision_when_traces_sampler_defined(
-    sentry_init, parent_sampling_decision
-):
-    # make traces_sampler pick the opposite of the inherited decision, to prove
-    # that traces_sampler takes precedence
-    traces_sampler = mock.Mock(return_value=not parent_sampling_decision)
-    sentry_init(traces_sampler=traces_sampler)
-
-    transaction = start_transaction(
-        name="dogpark", parent_sampled=parent_sampling_decision
-    )
-    assert transaction.sampled is not parent_sampling_decision
-
-
 @pytest.mark.parametrize("parent_sampling_decision", ["1", "0"])
-def test_ignores_inherited_sample_decision_when_traces_sampler_defined_span_streaming(
+def test_ignores_inherited_sample_decision_when_traces_sampler_defined(
     sentry_init, parent_sampling_decision
 ):
     # make traces_sampler pick the opposite of the inherited decision, to prove
@@ -421,38 +275,8 @@ def test_ignores_inherited_sample_decision_when_traces_sampler_defined_span_stre
     assert span.sampled is not bool(int(parent_sampling_decision))
 
 
-@pytest.mark.parametrize("explicit_decision", [True, False])
-def test_traces_sampler_doesnt_overwrite_explicitly_passed_sampling_decision(
-    sentry_init, explicit_decision
-):
-    # make traces_sampler pick the opposite of the explicit decision, to prove
-    # that the explicit decision takes precedence
-    traces_sampler = mock.Mock(return_value=not explicit_decision)
-    sentry_init(traces_sampler=traces_sampler)
-
-    transaction = start_transaction(name="dogpark", sampled=explicit_decision)
-    assert transaction.sampled is explicit_decision
-
-
-@pytest.mark.parametrize("parent_sampling_decision", [True, False])
-def test_inherits_parent_sampling_decision_when_traces_sampler_undefined(
-    sentry_init, parent_sampling_decision
-):
-    # make sure the parent sampling decision is the opposite of what
-    # traces_sample_rate would produce, to prove the inheritance takes
-    # precedence
-    sentry_init(traces_sample_rate=0.5)
-    mock_random_value = 0.25 if parent_sampling_decision is False else 0.75
-
-    with mock.patch.object(random, "random", return_value=mock_random_value):
-        transaction = start_transaction(
-            name="dogpark", parent_sampled=parent_sampling_decision
-        )
-        assert transaction.sampled is parent_sampling_decision
-
-
 @pytest.mark.parametrize("parent_sampling_decision", ["1", "0"])
-def test_inherits_parent_sampling_decision_when_traces_sampler_undefined_span_streaming(
+def test_inherits_parent_sampling_decision_when_traces_sampler_undefined(
     sentry_init, parent_sampling_decision
 ):
     sentry_init(
@@ -473,48 +297,6 @@ def test_inherits_parent_sampling_decision_when_traces_sampler_undefined_span_st
     with mock.patch.object(random, "random", return_value=mock_random_value):
         span = sentry_sdk.traces.start_span(name="dogpark")
         assert span.sampled is bool(int(parent_sampling_decision))
-
-
-@pytest.mark.parametrize("parent_sampling_decision", [True, False])
-def test_passes_parent_sampling_decision_in_sampling_context(
-    sentry_init, parent_sampling_decision
-):
-    sentry_init(traces_sample_rate=1.0)
-
-    sentry_trace_header = (
-        "12312012123120121231201212312012-1121201211212012-{sampled}".format(
-            sampled=int(parent_sampling_decision)
-        )
-    )
-
-    transaction = sentry_sdk.continue_trace(
-        {"sentry-trace": sentry_trace_header},
-        name="dogpark",
-    )
-
-    def mock_set_initial_sampling_decision(_, sampling_context):
-        assert "parent_sampled" in sampling_context
-        assert sampling_context["parent_sampled"] is parent_sampling_decision
-
-    with mock.patch(
-        "sentry_sdk.tracing.Transaction._set_initial_sampling_decision",
-        mock_set_initial_sampling_decision,
-    ):
-        start_transaction(transaction=transaction)
-
-
-def test_passes_custom_sampling_context_from_start_transaction_to_traces_sampler(
-    sentry_init,
-    DictionaryContaining,  # noqa: N803
-):
-    traces_sampler = mock.Mock()
-    sentry_init(traces_sampler=traces_sampler)
-
-    start_transaction(custom_sampling_context={"dogs": "yes", "cats": "maybe"})
-
-    traces_sampler.assert_any_call(
-        DictionaryContaining({"dogs": "yes", "cats": "maybe"})
-    )
 
 
 def test_custom_sampling_context(sentry_init):
@@ -600,29 +382,6 @@ def test_warns_and_sets_sampled_to_false_on_invalid_traces_sampler_return_value(
     traces_sampler_return_value,
     StringContaining,  # noqa: N803
 ):
-    sentry_init(traces_sampler=mock.Mock(return_value=traces_sampler_return_value))
-
-    with mock.patch.object(logger, "warning", mock.Mock()):
-        transaction = start_transaction(name="dogpark")
-        logger.warning.assert_any_call(StringContaining("Given sample rate is invalid"))
-        assert transaction.sampled is False
-
-
-@pytest.mark.parametrize(
-    "traces_sampler_return_value",
-    [
-        "dogs are great",  # wrong type
-        None,  # wrong type
-        float("NaN"),  # wrong type (edge: float, but not a valid rate)
-        -1.121,  # wrong value
-        1.231,  # wrong value
-    ],
-)
-def test_warns_and_sets_sampled_to_false_on_invalid_traces_sampler_return_value_span_streaming(
-    sentry_init,
-    traces_sampler_return_value,
-    StringContaining,  # noqa: N803
-):
     sentry_init(
         traces_sampler=mock.Mock(return_value=traces_sampler_return_value),
         trace_lifecycle="stream",
@@ -637,11 +396,11 @@ def test_warns_and_sets_sampled_to_false_on_invalid_traces_sampler_return_value_
 @pytest.mark.parametrize(
     "traces_sample_rate,sampled_output,expected_record_lost_event_calls",
     [
-        (None, False, []),
+        (None, None, []),
         (
             0.0,
             False,
-            [("sample_rate", "transaction", None, 1), ("sample_rate", "span", None, 1)],
+            [("sample_rate", "span", None, 1)],
         ),
         (1.0, True, []),
     ],
@@ -653,12 +412,12 @@ def test_records_lost_event_only_if_traces_sample_rate_enabled(
     sampled_output,
     expected_record_lost_event_calls,
 ):
-    sentry_init(traces_sample_rate=traces_sample_rate)
+    sentry_init(traces_sample_rate=traces_sample_rate, trace_lifecycle="stream")
     record_lost_event_calls = capture_record_lost_event_calls()
 
-    transaction = start_transaction(name="dogpark")
-    assert transaction.sampled is sampled_output
-    transaction.finish()
+    span = sentry_sdk.traces.start_span(name="dogpark")
+    assert span.sampled is sampled_output
+    span.end()
 
     # Use Counter because order of calls does not matter
     assert Counter(record_lost_event_calls) == Counter(expected_record_lost_event_calls)
@@ -667,11 +426,11 @@ def test_records_lost_event_only_if_traces_sample_rate_enabled(
 @pytest.mark.parametrize(
     "traces_sampler,sampled_output,expected_record_lost_event_calls",
     [
-        (None, False, []),
+        (None, None, []),
         (
             lambda _x: 0.0,
             False,
-            [("sample_rate", "transaction", None, 1), ("sample_rate", "span", None, 1)],
+            [("sample_rate", "span", None, 1)],
         ),
         (lambda _x: 1.0, True, []),
     ],
@@ -683,12 +442,12 @@ def test_records_lost_event_only_if_traces_sampler_enabled(
     sampled_output,
     expected_record_lost_event_calls,
 ):
-    sentry_init(traces_sampler=traces_sampler)
+    sentry_init(traces_sampler=traces_sampler, trace_lifecycle="stream")
     record_lost_event_calls = capture_record_lost_event_calls()
 
-    transaction = start_transaction(name="dogpark")
-    assert transaction.sampled is sampled_output
-    transaction.finish()
+    segment = sentry_sdk.traces.start_span(name="dogpark")
+    assert segment.sampled is sampled_output
+    segment.end()
 
     # Use Counter because order of calls does not matter
     assert Counter(record_lost_event_calls) == Counter(expected_record_lost_event_calls)

@@ -117,7 +117,7 @@ def test_should_propagate_trace_to_sentry(
     assert should_propagate_trace(client, url) == expected_propagation_decision
 
 
-def test_start_transaction_updates_scope_name(sentry_init):
+def test_start_span_segment_updates_scope_name(sentry_init):
     sentry_init(traces_sample_rate=1.0, trace_lifecycle="stream")
 
     scope = sentry_sdk.get_current_scope()
