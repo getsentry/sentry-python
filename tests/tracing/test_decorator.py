@@ -327,6 +327,7 @@ async def test_trace_decorator_async_child_span_streaming(sentry_init, capture_i
 def test_functions_to_trace_signature_unchanged_sync(sentry_init):
     sentry_init(
         traces_sample_rate=1.0,
+        trace_lifecycle="stream",
     )
 
     def _some_function(a, b, c):

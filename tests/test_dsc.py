@@ -449,6 +449,7 @@ def test_dsc_issue_twp(sentry_init, capture_envelopes, traces_sample_rate):
         environment="canary",
         traces_sample_rate=traces_sample_rate,
         transport=TestTransportWithOptions,
+        trace_lifecycle="stream",
     )
     envelopes = capture_envelopes()
 

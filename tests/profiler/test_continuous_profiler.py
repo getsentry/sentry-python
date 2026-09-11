@@ -564,6 +564,7 @@ def test_continuous_profiler_manual_start_and_stop_noop_when_using_trace_lifecyl
     )
     sentry_init(
         traces_sample_rate=1.0,
+        trace_lifecycle="stream",
         **options,
     )
 
