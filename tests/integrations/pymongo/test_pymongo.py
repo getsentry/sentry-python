@@ -11,7 +11,7 @@ from sentry_sdk.integrations.pymongo import PyMongoIntegration, _strip_pii
 @pytest.fixture(scope="session")
 def mongo_server():
     server = MockupDB(verbose=True)
-    server.autoresponds("ismaster", maxWireVersion=8)
+    server.autoresponds("ismaster", maxWireVersion=9)
     server.run()
     server.autoresponds(
         {"find": "test_collection"}, cursor={"id": 123, "firstBatch": []}
