@@ -868,7 +868,6 @@ class Scope:
         filename: "Optional[str]" = None,
         path: "Optional[str]" = None,
         content_type: "Optional[str]" = None,
-        add_to_transactions: bool = False,
     ) -> None:
         """Adds an attachment to future events sent from this scope.
 
@@ -880,7 +879,6 @@ class Scope:
                 path=path,
                 filename=filename,
                 content_type=content_type,
-                add_to_transactions=add_to_transactions,
             )
         )
 
