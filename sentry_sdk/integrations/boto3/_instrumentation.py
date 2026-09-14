@@ -33,7 +33,6 @@ _AWS_RPC_SYSTEM_NAME = "aws-api"
 def _set_span_attributes(
     span: "Union[Span, StreamedSpan]", attributes: "Attributes"
 ) -> None:
-    # streamed and legacy spans expose different attribute APIs.
     if isinstance(span, StreamedSpan):
         span.set_attributes(attributes)
         return
@@ -56,8 +55,8 @@ def _get_server_attributes(endpoint_url: "Optional[str]") -> "Attributes":
         if parsed_url.scheme not in default_ports or not parsed_url.hostname:
             return {}
 
-        # `server.port` is only defined together with `server.address`. Infer the
-        # effective port when the configured HTTP(S) endpoint omits it.
+        # `server.port` is only defined together with `server.address`.
+        # Infer the effective port when the configured HTTP(S) endpoint omits it.
         # https://opentelemetry.io/docs/specs/semconv/rpc/rpc-spans/
         return {
             SPANDATA.SERVER_ADDRESS: parsed_url.hostname,
@@ -72,13 +71,9 @@ def _get_server_attributes(endpoint_url: "Optional[str]") -> "Attributes":
 def _get_client_attributes(
     ctx: "AwsCallContext",
 ) -> "Attributes":
-    # The AWS SDK conventions define `rpc.service` as the modeled AWS service ID
-    # and `rpc.method` as the modeled operation name. Although the general RPC
-    # conventions now deprecate `rpc.service`, the AWS-specific convention still
-    # recommends both attributes and defines the span name as `Service.Operation`.
-    # https://opentelemetry.io/docs/specs/semconv/cloud-providers/aws-sdk/#aws-sdk-spans
     attributes: "Attributes" = {
         SPANDATA.RPC_METHOD: ctx.operation_name,
+        # `rpc.service` is deprecated in OTel, but js still uses it.
         SPANDATA.RPC_SERVICE: ctx.service_id,
         SPANDATA.RPC_SYSTEM_NAME: _AWS_RPC_SYSTEM_NAME,
     }
@@ -97,7 +92,7 @@ def _start_client_span(
     if client.get_integration(Boto3Integration) is None:
         return None
 
-    # AWS client spans use `Service.Operation`, e.g. `DynamoDB.GetItem`.
+    # OTel define `rpc.service` as `Service.Operation`, e.g. `DynamoDB.GetItem`.
     # https://opentelemetry.io/docs/specs/semconv/cloud-providers/aws-sdk/#aws-sdk-spans
     span_name = "%s.%s" % (ctx.service_id, ctx.operation_name)
     attributes = _get_client_attributes(ctx)
