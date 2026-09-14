@@ -258,7 +258,7 @@ def test_client_call_omits_missing_region(
         server_name="",
     )
     client = session.client("s3")
-    monkeypatch.setattr(client.meta.config, "region_name", None)
+    monkeypatch.setattr(type(client.meta), "region_name", property(lambda _: None))
 
     span = _capture_stubbed_client_span(
         client,
