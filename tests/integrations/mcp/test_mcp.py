@@ -383,12 +383,7 @@ async def test_tool_handler_stdio(
     [(True, True), (True, False), (False, True), (False, False)],
 )
 async def test_tool_handler_streamable_http(
-    sentry_init,
-    capture_items,
-    send_default_pii,
-    include_prompts,
-    json_rpc,
-    select_transactions_with_mcp_spans,
+    sentry_init, capture_items, send_default_pii, include_prompts, json_rpc
 ):
     """Test that async tool handlers create proper spans"""
     sentry_init(
@@ -688,12 +683,7 @@ async def test_prompt_handler_stdio(
     [(True, True), (True, False), (False, True), (False, False)],
 )
 async def test_prompt_handler_streamable_http(
-    sentry_init,
-    capture_items,
-    send_default_pii,
-    include_prompts,
-    json_rpc,
-    select_transactions_with_mcp_spans,
+    sentry_init, capture_items, send_default_pii, include_prompts, json_rpc
 ):
     """Test that async prompt handlers create proper spans"""
     sentry_init(
@@ -890,12 +880,7 @@ async def test_resource_handler_stdio(sentry_init, capture_items, stdio):
 
 
 @pytest.mark.asyncio
-async def test_resource_handler_streamable_http(
-    sentry_init,
-    capture_items,
-    json_rpc,
-    select_transactions_with_mcp_spans,
-):
+async def test_resource_handler_streamable_http(sentry_init, capture_items, json_rpc):
     """Test that async resource handlers create proper spans"""
     sentry_init(
         integrations=[MCPIntegration()],

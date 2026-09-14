@@ -347,13 +347,7 @@ async def test_fastmcp_tool_sync(
     [(True, True), (True, False), (False, True), (False, False)],
 )
 async def test_fastmcp_tool_async(
-    sentry_init,
-    capture_items,
-    FastMCP,
-    send_default_pii,
-    include_prompts,
-    json_rpc,
-    select_transactions_with_mcp_spans,
+    sentry_init, capture_items, FastMCP, send_default_pii, include_prompts, json_rpc
 ):
     """Test that FastMCP async tool handlers create proper spans"""
     sentry_init(
@@ -674,13 +668,7 @@ async def test_fastmcp_resource_sync(
 )
 @pytest.mark.parametrize("FastMCP", fastmcp_implementations, ids=fastmcp_ids)
 @pytest.mark.asyncio
-async def test_fastmcp_resource_async(
-    sentry_init,
-    capture_items,
-    FastMCP,
-    json_rpc,
-    select_transactions_with_mcp_spans,
-):
+async def test_fastmcp_resource_async(sentry_init, capture_items, FastMCP, json_rpc):
     """Test that FastMCP async resource handlers create proper spans"""
     sentry_init(
         integrations=[MCPIntegration()],
@@ -882,13 +870,7 @@ async def test_fastmcp_sse_transport(
 
 
 @pytest.mark.parametrize("FastMCP", fastmcp_implementations, ids=fastmcp_ids)
-def test_fastmcp_http_transport(
-    sentry_init,
-    capture_items,
-    FastMCP,
-    json_rpc,
-    select_transactions_with_mcp_spans,
-):
+def test_fastmcp_http_transport(sentry_init, capture_items, FastMCP, json_rpc):
     """Test that FastMCP correctly detects HTTP transport"""
     sentry_init(
         integrations=[MCPIntegration()],

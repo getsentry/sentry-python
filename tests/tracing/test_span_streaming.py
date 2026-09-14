@@ -12,7 +12,6 @@ from sentry_sdk.traces import (
     SpanStatus,
     StreamedSpan,
 )
-from sentry_sdk.tracing_utils import has_span_streaming_enabled
 
 minimum_python_38 = pytest.mark.skipif(
     sys.version_info < (3, 8), reason="Asyncio tests need Python >= 3.8"
@@ -381,25 +380,6 @@ def test_before_send_span_raises_does_not_crash_application(sentry_init, capture
     assert span["name"] == "span"
     assert span["attributes"]["original"] == "value"
     assert "mutated" not in span["attributes"]
-
-
-def test_before_send_span_warns_without_span_streaming(sentry_init):
-    from unittest import mock
-
-    def before_send_span(span, hint):
-        return span
-
-    with mock.patch("sentry_sdk.client.logger") as mock_logger:
-        sentry_init(
-            traces_sample_rate=1.0,
-            before_send_span=before_send_span,
-        )
-
-    warnings = [
-        c for c in mock_logger.warning.call_args_list if "before_send_span" in str(c)
-    ]
-    assert len(warnings) == 1
-    assert "trace_lifecycle" in str(warnings[0])
 
 
 def test_span_attributes(sentry_init, capture_items):
@@ -1774,52 +1754,6 @@ def test_default_attributes(sentry_init, capture_envelopes):
 
 
 @pytest.mark.parametrize(
-    ("options", "expected"),
-    [
-        ({"trace_lifecycle": "stream"}, True),
-        ({"_experiments": {"trace_lifecycle": "stream"}}, True),
-        (
-            {
-                "trace_lifecycle": "stream",
-                "_experiments": {"trace_lifecycle": "static"},
-            },
-            True,
-        ),
-        (
-            {
-                "trace_lifecycle": "static",
-                "_experiments": {"trace_lifecycle": "stream"},
-            },
-            False,
-        ),
-        ({"trace_lifecycle": "static"}, False),
-        ({"_experiments": {"trace_lifecycle": "static"}}, False),
-        ({}, False),
-        ({"_experiments": {}}, False),
-        ({"_experiments": None}, False),
-        (None, False),
-    ],
-)
-def test_has_span_streaming_enabled(options, expected):
-    assert has_span_streaming_enabled(options) is expected
-
-
-def test_trace_lifecycle_top_level_enables_streaming(sentry_init, capture_items):
-    sentry_init(traces_sample_rate=1.0, trace_lifecycle="stream")
-
-    items = capture_items("span")
-
-    with sentry_sdk.traces.start_span(name="segment") as segment:
-        assert isinstance(segment, StreamedSpan)
-
-    sentry_sdk.get_client().flush()
-    spans = [item.payload for item in items]
-
-    assert len(spans) == 1
-    assert spans[0]["name"] == "segment"
-
-
-@pytest.mark.parametrize(
     ("ignore_spans", "name", "attributes", "ignored"), IGNORE_SPANS_CASES
 )
 def test_ignore_spans_top_level(
@@ -1850,71 +1784,3 @@ def test_ignore_spans_top_level(
         assert len(spans) == 1
         (span,) = spans
         assert span["name"] == name
-
-
-def test_ignore_spans_top_level_with_trace_lifecycle_in_experiments(
-    sentry_init, capture_items
-):
-    sentry_init(
-        traces_sample_rate=1.0,
-        ignore_spans=["ignored"],
-        _experiments={"trace_lifecycle": "stream"},
-    )
-
-    items = capture_items("span")
-
-    with sentry_sdk.traces.start_span(name="ignored") as ignored_span:
-        assert ignored_span.sampled is False
-        assert isinstance(ignored_span, NoOpStreamedSpan)
-
-    with sentry_sdk.traces.start_span(name="not ignored") as span:
-        assert span.sampled is True
-
-    sentry_sdk.get_client().flush()
-    spans = [item.payload for item in items]
-
-    assert len(spans) == 1
-    (span,) = spans
-    assert span["name"] == "not ignored"
-
-
-@pytest.mark.parametrize(
-    ("options", "streaming_enabled"),
-    [
-        (
-            {
-                "trace_lifecycle": "stream",
-                "_experiments": {"trace_lifecycle": "static"},
-            },
-            True,
-        ),
-        (
-            {
-                "trace_lifecycle": "static",
-                "_experiments": {"trace_lifecycle": "stream"},
-            },
-            False,
-        ),
-    ],
-)
-def test_top_level_trace_lifecycle_takes_precedence_over_experiments(
-    sentry_init, capture_items, options, streaming_enabled
-):
-    sentry_init(traces_sample_rate=1.0, **options)
-
-    items = capture_items("span")
-
-    with sentry_sdk.traces.start_span(name="segment") as segment:
-        if streaming_enabled:
-            assert isinstance(segment, StreamedSpan)
-        else:
-            assert isinstance(segment, NoOpStreamedSpan)
-
-    sentry_sdk.get_client().flush()
-    spans = [item.payload for item in items]
-
-    if streaming_enabled:
-        assert len(spans) == 1
-        assert spans[0]["name"] == "segment"
-    else:
-        assert len(spans) == 0
