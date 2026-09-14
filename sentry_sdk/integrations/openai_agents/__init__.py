@@ -21,7 +21,6 @@ try:
     # not installed. That's why we're adding the second, more specific import
     # after it, even if we don't use it.
     import agents
-    from agents.run import AgentRunner
     from agents.version import __version__ as OPENAI_AGENTS_VERSION
 
 except ImportError:
@@ -95,9 +94,7 @@ class OpenAIAgentsIntegration(Integration):
             async def new_wrapped_run_single_turn(
                 *args: "Any", **kwargs: "Any"
             ) -> "SingleStepResult":
-                return await _run_single_turn(
-                    run_loop.run_single_turn, *args, **kwargs
-                )
+                return await _run_single_turn(run_loop.run_single_turn, *args, **kwargs)
 
             agents.run.run_single_turn = new_wrapped_run_single_turn
 
