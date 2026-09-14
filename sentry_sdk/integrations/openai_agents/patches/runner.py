@@ -122,7 +122,7 @@ def _patch_run_hooks(hooks: "RunHooks[TContext]") -> None:
 
 
 def _create_run_wrapper(
-    original_func: "Callable[..., Any]", use_run_hooks: "bool"
+    original_func: "Callable[..., Any]",
 ) -> "Callable[..., Any]":
     """
     Wraps the agents.Runner.run methods to
@@ -135,12 +135,11 @@ def _create_run_wrapper(
 
     @wraps(original_func)
     async def wrapper(*args: "Any", **kwargs: "Any") -> "Any":
-        if use_run_hooks:
-            hooks = kwargs.get("hooks")
-            if hooks is not None:
-                _patch_run_hooks(hooks=hooks)
-            else:
-                kwargs["hooks"] = _SentryRunHooks()
+        hooks = kwargs.get("hooks")
+        if hooks is not None:
+            _patch_run_hooks(hooks=hooks)
+        else:
+            kwargs["hooks"] = _SentryRunHooks()
 
         # Isolate each workflow so that when agents are run in asyncio tasks they
         # don't touch each other's scopes
@@ -221,7 +220,7 @@ def _create_run_wrapper(
 
 
 def _create_run_streamed_wrapper(
-    original_func: "Callable[..., Any]", use_run_hooks: "bool"
+    original_func: "Callable[..., Any]",
 ) -> "Callable[..., Any]":
     """
     Wraps the agents.Runner.run_streamed method to
@@ -268,13 +267,12 @@ def _create_run_streamed_wrapper(
         else:
             args = (agent, *args[1:])
 
-        if use_run_hooks:
-            sentry_hooks = _SentryRunHooks()  # type: ignore[var-annotated]
-            hooks = kwargs.get("hooks")
-            if hooks is not None:
-                _patch_run_hooks(hooks=hooks)
-            else:
-                kwargs["hooks"] = sentry_hooks
+        sentry_hooks = _SentryRunHooks()  # type: ignore[var-annotated]
+        hooks = kwargs.get("hooks")
+        if hooks is not None:
+            _patch_run_hooks(hooks=hooks)
+        else:
+            kwargs["hooks"] = sentry_hooks
 
         try:
             # Call original function to get RunResultStreaming

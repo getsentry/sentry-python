@@ -8,7 +8,6 @@ from .patches import (
     _create_run_wrapper,
     _execute_final_output,
     _execute_handoffs,
-    _get_all_tools,
     _get_model,
     _patch_error_tracing,
     _run_single_turn,
@@ -22,7 +21,6 @@ try:
     # not installed. That's why we're adding the second, more specific import
     # after it, even if we don't use it.
     import agents
-    from agents.run import AgentRunner
     from agents.version import __version__ as OPENAI_AGENTS_VERSION
 
 except ImportError:
@@ -46,47 +44,37 @@ if TYPE_CHECKING:
     from agents.run_internal.run_steps import SingleStepResult
 
 
-def _patch_runner(use_run_hooks: "bool") -> None:
+def _patch_runner() -> None:
     # Create the root span for one full agent run (including eventual handoffs)
     # Note agents.run.DEFAULT_AGENT_RUNNER.run_sync is a wrapper around
     # agents.run.DEFAULT_AGENT_RUNNER.run. It does not need to be wrapped separately.
     agents.run.DEFAULT_AGENT_RUNNER.run = _create_run_wrapper(  # type: ignore[method-assign]
         agents.run.DEFAULT_AGENT_RUNNER.run,
-        use_run_hooks=use_run_hooks,
     )
 
     # Patch streaming runner
     agents.run.DEFAULT_AGENT_RUNNER.run_streamed = _create_run_streamed_wrapper(  # type: ignore[method-assign]
         agents.run.DEFAULT_AGENT_RUNNER.run_streamed,
-        use_run_hooks=use_run_hooks,
     )
 
 
 class OpenAIAgentsIntegration(Integration):
     """
-    NOTE: With version 0.8.0, the class methods below have been refactored to functions.
-    - `AgentRunner._get_model()` -> `agents.run_internal.turn_preparation.get_model()`
-    - `AgentRunner._get_all_tools()` -> `agents.run_internal.turn_preparation.get_all_tools()`
-    - `AgentRunner._run_single_turn()` -> `agents.run_internal.run_loop.run_single_turn()`
-    - `RunImpl.execute_handoffs()` -> `agents.run_internal.turn_resolution.execute_handoffs()`
-    - `RunImpl.execute_final_output()` -> `agents.run_internal.turn_resolution.execute_final_output()`
-
     Typical interaction with the library:
     1. The user creates an Agent instance with configuration, including system instructions sent to every Responses API call.
     2. The user passes the agent instance to a Runner with `run()` and `run_streamed()` methods. The latter can be used to incrementally receive progress.
         - `Runner.run()` and `Runner.run_streamed()` are thin wrappers for `DEFAULT_AGENT_RUNNER.run()` and `DEFAULT_AGENT_RUNNER.run_streamed()`.
         - `DEFAULT_AGENT_RUNNER.run()` and `DEFAULT_AGENT_RUNNER.run_streamed()` are patched in `_patch_runner()` with `_create_run_wrapper()` and `_create_run_streamed_wrapper()`, respectively.
     3. In a loop, the agent repeatedly calls the Responses API, maintaining a conversation history that includes previous messages and tool results, which is passed to each call.
-        - A Model instance is created at the start of the loop by calling the `Runner._get_model()`. We patch the Model instance using `patches._get_model()`.
-        - Available tools are also deteremined at the start of the loop, with `Runner._get_all_tools()`. We patch Tool instances by iterating through the returned tools in `patches._get_all_tools()`.
-        - In each loop iteration, `run_single_turn()` or `run_single_turn_streamed()` is responsible for calling the Responses API, patched with `patches._run_single_turn()` and `patches._run_single_turn_streamed()`.
-    4. On loop termination, `RunImpl.execute_final_output()` is called. The function is patched with `patches._execute_final_output()`.
+        - A Model instance is created at the start of the loop by calling the `run_internal.turn_preparation.get_model()`. We patch the Model instance using `patches._get_model()`.
+        - In each loop iteration, `run_single_turn()` or `run_single_turn_streamed()` is responsible for calling the Responses API, patched with `run_internal.run_loop.run_single_turn()` and `patches._run_single_turn_streamed()`.
+    4. On loop termination, `run_internal.turn_resolution.execute_final_output()` is called. The function is patched with `patches._execute_final_output()`.
 
     Local tools are run based on the return value from the Responses API as a post-API call step in the above loop.
     Hosted MCP Tools are run as part of the Responses API call, and involve OpenAI reaching out to an external MCP server.
     An agent can handoff to another agent, also directed by the return value of the Responses API and run post-API call in the loop.
     Handoffs are a way to switch agent-wide configuration.
-    - Handoffs are executed by calling `RunImpl.execute_handoffs()`. The method is patched with `patches._execute_handoffs()`
+    - Handoffs are executed by calling `run_internal.turn_resolution.execute_handoffs()`. The method is patched with `patches._execute_handoffs()`
     """
 
     identifier = "openai_agents"
@@ -97,160 +85,69 @@ class OpenAIAgentsIntegration(Integration):
         _check_minimum_version(OpenAIAgentsIntegration, library_version)
 
         _patch_error_tracing()
+        _patch_runner()
 
-        # ToolContext.tool_arguments added in https://github.com/openai/openai-agents-python/commit/5e1db14da542c77f8fdd5e2e26017977ae415813
-        use_run_hooks = library_version is not None and library_version >= (0, 3, 2)
+        if run_loop is not None:
 
-        _patch_runner(use_run_hooks=use_run_hooks)
+            @wraps(run_loop.run_single_turn)
+            async def new_wrapped_run_single_turn(
+                *args: "Any", **kwargs: "Any"
+            ) -> "SingleStepResult":
+                return await _run_single_turn(run_loop.run_single_turn, *args, **kwargs)
 
-        if library_version is not None and library_version >= (
-            0,
-            8,
-        ):
-            if run_loop is not None:
+            agents.run.run_single_turn = new_wrapped_run_single_turn
 
-                @wraps(run_loop.run_single_turn)
-                async def new_wrapped_run_single_turn(
-                    *args: "Any", **kwargs: "Any"
-                ) -> "SingleStepResult":
-                    return await _run_single_turn(
-                        run_loop.run_single_turn, *args, **kwargs
-                    )
+            original_run_single_turn_streamed = run_loop.run_single_turn_streamed
 
-                agents.run.run_single_turn = new_wrapped_run_single_turn
-
-                original_run_single_turn_streamed = run_loop.run_single_turn_streamed
-
-                @wraps(original_run_single_turn_streamed)
-                async def new_wrapped_run_single_turn_streamed(
-                    *args: "Any", **kwargs: "Any"
-                ) -> "SingleStepResult":
-                    return await _run_single_turn_streamed(
-                        original_run_single_turn_streamed,
-                        *args,
-                        **kwargs,
-                    )
-
-                agents.run_internal.run_loop.run_single_turn_streamed = (
-                    new_wrapped_run_single_turn_streamed
+            @wraps(original_run_single_turn_streamed)
+            async def new_wrapped_run_single_turn_streamed(
+                *args: "Any", **kwargs: "Any"
+            ) -> "SingleStepResult":
+                return await _run_single_turn_streamed(
+                    original_run_single_turn_streamed,
+                    *args,
+                    **kwargs,
                 )
 
-            if turn_preparation is not None:
-
-                @wraps(turn_preparation.get_model)
-                def new_wrapped_get_model(
-                    agent: "agents.Agent", run_config: "agents.RunConfig"
-                ) -> "agents.Model":
-                    return _get_model(turn_preparation.get_model, agent, run_config)
-
-                agents.run_internal.run_loop.get_model = new_wrapped_get_model
-
-            if turn_resolution is not None:
-                original_execute_handoffs = turn_resolution.execute_handoffs
-
-                @wraps(original_execute_handoffs)
-                async def new_wrapped_execute_handoffs(
-                    *args: "Any", **kwargs: "Any"
-                ) -> "SingleStepResult":
-                    return await _execute_handoffs(
-                        original_execute_handoffs, *args, **kwargs
-                    )
-
-                agents.run_internal.turn_resolution.execute_handoffs = (
-                    new_wrapped_execute_handoffs
-                )
-
-                original_execute_final_output = turn_resolution.execute_final_output
-
-                @wraps(turn_resolution.execute_final_output)
-                async def new_wrapped_final_output(
-                    *args: "Any", **kwargs: "Any"
-                ) -> "SingleStepResult":
-                    return await _execute_final_output(
-                        original_execute_final_output, *args, **kwargs
-                    )
-
-                agents.run_internal.turn_resolution.execute_final_output = (
-                    new_wrapped_final_output
-                )
-
-            return
-
-        if not use_run_hooks:
-            original_get_all_tools = AgentRunner._get_all_tools  # type: ignore[attr-defined]
-
-            @wraps(AgentRunner._get_all_tools.__func__)  # type: ignore[attr-defined]
-            async def old_wrapped_get_all_tools(
-                cls: "agents.Runner",
-                agent: "agents.Agent",
-                context_wrapper: "agents.RunContextWrapper",
-            ) -> "list[agents.Tool]":
-                return await _get_all_tools(
-                    original_get_all_tools, agent, context_wrapper
-                )
-
-            agents.run.AgentRunner._get_all_tools = classmethod(  # type: ignore[attr-defined]
-                old_wrapped_get_all_tools  # type: ignore[arg-type]
+            agents.run_internal.run_loop.run_single_turn_streamed = (
+                new_wrapped_run_single_turn_streamed
             )
 
-        original_get_model = AgentRunner._get_model  # type: ignore[attr-defined]
+        if turn_preparation is not None:
 
-        @wraps(AgentRunner._get_model.__func__)  # type: ignore[attr-defined]
-        def old_wrapped_get_model(
-            cls: "agents.Runner", agent: "agents.Agent", run_config: "agents.RunConfig"
-        ) -> "agents.Model":
-            return _get_model(original_get_model, agent, run_config)
+            @wraps(turn_preparation.get_model)
+            def new_wrapped_get_model(
+                agent: "agents.Agent", run_config: "agents.RunConfig"
+            ) -> "agents.Model":
+                return _get_model(turn_preparation.get_model, agent, run_config)
 
-        agents.run.AgentRunner._get_model = classmethod(old_wrapped_get_model)  # type: ignore[arg-type,attr-defined]
+            agents.run_internal.run_loop.get_model = new_wrapped_get_model
 
-        original_run_single_turn = AgentRunner._run_single_turn  # type: ignore[attr-defined]
+        if turn_resolution is not None:
+            original_execute_handoffs = turn_resolution.execute_handoffs
 
-        @wraps(AgentRunner._run_single_turn.__func__)  # type: ignore[attr-defined]
-        async def old_wrapped_run_single_turn(
-            cls: "agents.Runner", *args: "Any", **kwargs: "Any"
-        ) -> "SingleStepResult":
-            return await _run_single_turn(original_run_single_turn, *args, **kwargs)
+            @wraps(original_execute_handoffs)
+            async def new_wrapped_execute_handoffs(
+                *args: "Any", **kwargs: "Any"
+            ) -> "SingleStepResult":
+                return await _execute_handoffs(
+                    original_execute_handoffs, *args, **kwargs
+                )
 
-        agents.run.AgentRunner._run_single_turn = classmethod(  # type: ignore[attr-defined]
-            old_wrapped_run_single_turn  # type: ignore[arg-type]
-        )
-
-        original_run_single_turn_streamed = AgentRunner._run_single_turn_streamed  # type: ignore[attr-defined]
-
-        @wraps(AgentRunner._run_single_turn_streamed.__func__)  # type: ignore[attr-defined]
-        async def old_wrapped_run_single_turn_streamed(
-            cls: "agents.Runner", *args: "Any", **kwargs: "Any"
-        ) -> "SingleStepResult":
-            return await _run_single_turn_streamed(
-                original_run_single_turn_streamed, *args, **kwargs
+            agents.run_internal.turn_resolution.execute_handoffs = (
+                new_wrapped_execute_handoffs
             )
 
-        agents.run.AgentRunner._run_single_turn_streamed = classmethod(  # type: ignore[attr-defined]
-            old_wrapped_run_single_turn_streamed  # type: ignore[arg-type]
-        )
+            original_execute_final_output = turn_resolution.execute_final_output
 
-        original_execute_handoffs = agents._run_impl.RunImpl.execute_handoffs
+            @wraps(turn_resolution.execute_final_output)
+            async def new_wrapped_final_output(
+                *args: "Any", **kwargs: "Any"
+            ) -> "SingleStepResult":
+                return await _execute_final_output(
+                    original_execute_final_output, *args, **kwargs
+                )
 
-        @wraps(agents._run_impl.RunImpl.execute_handoffs.__func__)
-        async def old_wrapped_execute_handoffs(
-            cls: "agents.Runner", *args: "Any", **kwargs: "Any"
-        ) -> "SingleStepResult":
-            return await _execute_handoffs(original_execute_handoffs, *args, **kwargs)
-
-        agents._run_impl.RunImpl.execute_handoffs = classmethod(
-            old_wrapped_execute_handoffs  # type: ignore[arg-type]
-        )
-
-        original_execute_final_output = agents._run_impl.RunImpl.execute_final_output
-
-        @wraps(agents._run_impl.RunImpl.execute_final_output.__func__)
-        async def old_wrapped_final_output(
-            cls: "agents.Runner", *args: "Any", **kwargs: "Any"
-        ) -> "SingleStepResult":
-            return await _execute_final_output(
-                original_execute_final_output, *args, **kwargs
+            agents.run_internal.turn_resolution.execute_final_output = (
+                new_wrapped_final_output
             )
-
-        agents._run_impl.RunImpl.execute_final_output = classmethod(
-            old_wrapped_final_output  # type: ignore[arg-type]
-        )

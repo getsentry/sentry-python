@@ -348,7 +348,7 @@ def test_langchain_text_completion(
 
     llm_span = llm_spans[0]
     assert llm_span["name"] == "text_completion gpt-3.5-turbo"
-    assert llm_span["attributes"]["gen_ai.system"] == "openai"
+    assert llm_span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "openai"
     assert llm_span["attributes"]["gen_ai.function_id"] == "my-snazzy-pipeline"
     assert llm_span["attributes"]["gen_ai.request.model"] == "gpt-3.5-turbo"
     assert (
@@ -626,7 +626,7 @@ def test_langchain_create_agent(
     assert len(chat_spans) == 1
     assert chat_spans[0]["attributes"]["sentry.origin"] == "auto.ai.langchain"
 
-    assert chat_spans[0]["attributes"]["gen_ai.system"] == "openai-chat"
+    assert chat_spans[0]["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "openai-chat"
     assert chat_spans[0]["attributes"]["gen_ai.agent.name"] == "word_length_agent"
 
     assert chat_spans[0]["attributes"]["gen_ai.usage.input_tokens"] == 10
@@ -823,7 +823,7 @@ def test_tool_execution_span(
     assert (
         chat_spans[0]["attributes"][SPANDATA.GEN_AI_USAGE_REASONING_OUTPUT_TOKENS] == 10
     )
-    assert chat_spans[0]["attributes"]["gen_ai.system"] == "openai-chat"
+    assert chat_spans[0]["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "openai-chat"
 
     assert chat_spans[1]["attributes"]["gen_ai.usage.input_tokens"] == 89
     assert chat_spans[1]["attributes"]["gen_ai.usage.output_tokens"] == 28
@@ -838,7 +838,7 @@ def test_tool_execution_span(
     assert (
         chat_spans[1]["attributes"][SPANDATA.GEN_AI_USAGE_REASONING_OUTPUT_TOKENS] == 11
     )
-    assert chat_spans[1]["attributes"]["gen_ai.system"] == "openai-chat"
+    assert chat_spans[1]["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "openai-chat"
 
     if LANGCHAIN_OPENAI_VERSION >= (0, 3, 13):
         assert (
@@ -3237,9 +3237,9 @@ def test_langchain_ai_system_detection(
     llm_span = llm_spans[0]
 
     if expected_system is not None:
-        assert llm_span["attributes"][SPANDATA.GEN_AI_SYSTEM] == expected_system
+        assert llm_span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == expected_system
     else:
-        assert SPANDATA.GEN_AI_SYSTEM not in llm_span.get("attributes", {})
+        assert SPANDATA.GEN_AI_PROVIDER_NAME not in llm_span.get("attributes", {})
 
 
 class TestTransformLangchainMessageContent:
@@ -3543,7 +3543,7 @@ def test_langchain_chat_data_collection(
 
     # Data collection never gates non-PII attributes
     assert span_data[SPANDATA.GEN_AI_REQUEST_MODEL] == "gpt-3.5-turbo"
-    assert span_data[SPANDATA.GEN_AI_SYSTEM] == "openai-chat"
+    assert span_data[SPANDATA.GEN_AI_PROVIDER_NAME] == "openai-chat"
     assert span_data[SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
 
 
@@ -3737,7 +3737,7 @@ def test_langchain_text_completion_data_collection(
 
     # Data collection never gates non-PII attributes
     assert span_data[SPANDATA.GEN_AI_REQUEST_MODEL] == "gpt-3.5-turbo"
-    assert span_data[SPANDATA.GEN_AI_SYSTEM] == "openai"
+    assert span_data[SPANDATA.GEN_AI_PROVIDER_NAME] == "openai"
     assert span_data[SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
     assert span_data[SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 25
 

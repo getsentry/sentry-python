@@ -1,5 +1,5 @@
 from functools import wraps
-from typing import Any, Callable, List, Optional
+from typing import TYPE_CHECKING, Any, Callable, List, Optional
 
 import sentry_sdk
 from sentry_sdk.ai.utils import (
@@ -12,12 +12,14 @@ from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_ve
 # This is fine because langgraph depends on langchain-base, and LangchainIntegration only imports from langchain-base.
 from sentry_sdk.integrations.langchain import LangchainIntegration
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.utils import (
     has_data_collection_enabled,
     package_version,
     safe_serialize,
 )
+
+if TYPE_CHECKING:
+    from sentry_sdk.traces import StreamedSpan
 
 try:
     from langgraph.errors import GraphBubbleUp
@@ -266,7 +268,7 @@ def _extract_tool_calls(messages: "Optional[List[Any]]") -> "Optional[List[Any]]
     return tool_calls if tool_calls else None
 
 
-def _set_usage_data(span: "sentry_sdk.tracing.Span", messages: "Any") -> None:
+def _set_usage_data(span: "StreamedSpan", messages: "Any") -> None:
     input_tokens = 0
     output_tokens = 0
     total_tokens = 0
@@ -284,24 +286,20 @@ def _set_usage_data(span: "sentry_sdk.tracing.Span", messages: "Any") -> None:
         output_tokens += int(token_usage.get("completion_tokens", 0))
         total_tokens += int(token_usage.get("total_tokens", 0))
 
-    set_on_span = (
-        span.set_attribute if isinstance(span, StreamedSpan) else span.set_data
-    )
-
     if input_tokens > 0:
-        set_on_span(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, input_tokens)
+        span.set_attribute(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, input_tokens)
 
     if output_tokens > 0:
-        set_on_span(SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS, output_tokens)
+        span.set_attribute(SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS, output_tokens)
 
     if total_tokens > 0:
-        set_on_span(
+        span.set_attribute(
             SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS,
             total_tokens,
         )
 
 
-def _set_response_model_name(span: "sentry_sdk.tracing.Span", messages: "Any") -> None:
+def _set_response_model_name(span: "StreamedSpan", messages: "Any") -> None:
     if len(messages) == 0:
         return
 

@@ -165,7 +165,7 @@ def test_nonstreaming_generate_content(
     assert chat_span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
     assert chat_span["name"] == "chat gemini-1.5-flash"
     assert chat_span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-    assert chat_span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "gcp.gemini"
+    assert chat_span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "gcp.gemini"
     assert chat_span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "gemini-1.5-flash"
 
     if send_default_pii and include_prompts:
@@ -1075,7 +1075,7 @@ def test_embed_content(
     assert embed_span["attributes"]["sentry.op"] == OP.GEN_AI_EMBEDDINGS
     assert embed_span["name"] == "embeddings text-embedding-004"
     assert embed_span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "embeddings"
-    assert embed_span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "gcp.gemini"
+    assert embed_span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "gcp.gemini"
     assert (
         embed_span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "text-embedding-004"
     )
@@ -1307,7 +1307,7 @@ async def test_async_embed_content(
     assert embed_span["attributes"]["sentry.op"] == OP.GEN_AI_EMBEDDINGS
     assert embed_span["name"] == "embeddings text-embedding-004"
     assert embed_span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "embeddings"
-    assert embed_span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "gcp.gemini"
+    assert embed_span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "gcp.gemini"
     assert (
         embed_span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "text-embedding-004"
     )
@@ -2488,7 +2488,7 @@ def test_generate_content_data_collection(
         assert key not in span_data, f"{key} should not have been collected"
 
     # Data collection never gates non-PII attributes
-    assert span_data[SPANDATA.GEN_AI_SYSTEM] == "gcp.gemini"
+    assert span_data[SPANDATA.GEN_AI_PROVIDER_NAME] == "gcp.gemini"
     assert span_data[SPANDATA.GEN_AI_REQUEST_MODEL] == "gemini-1.5-flash"
     assert span_data[SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
     assert span_data[SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
