@@ -5,7 +5,7 @@ from botocore.awsrequest import AWSRequest
 from botocore.response import StreamingBody
 
 import sentry_sdk
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.consts import OP, SPANDATA, SPANSTATUS
 from sentry_sdk.integrations.boto3 import Boto3Integration
 from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing import BAGGAGE_HEADER_NAME, Span
@@ -147,6 +147,7 @@ def _finish_client_span(
         streaming_span = sentry_sdk.traces.start_span(
             name=span.name,
             parent_span=span,
+            active=False,
             attributes={
                 SPANDATA.SENTRY_OP: OP.HTTP_CLIENT_STREAM,
                 SPANDATA.SENTRY_ORIGIN: Boto3Integration.origin,
@@ -173,11 +174,11 @@ def _finish_client_span(
             else:
                 streaming_span.finish()
             return ret
-        except Exception:
+        except Exception as exc:
             if isinstance(streaming_span, StreamedSpan):
-                streaming_span.end()
+                streaming_span.__exit__(type(exc), exc, exc.__traceback__)
             else:
-                streaming_span.finish()
+                streaming_span.set_status(SPANSTATUS.INTERNAL_ERROR)
             raise
 
     body.read = sentry_streaming_body_read  # type: ignore
