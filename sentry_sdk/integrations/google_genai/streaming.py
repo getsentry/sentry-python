@@ -131,7 +131,7 @@ def set_span_data_for_streaming_response(
 
     if accumulated_response["usage_metadata"]["input_tokens_cached"]:
         span.set_attribute(
-            SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED,
+            SPANDATA.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
             accumulated_response["usage_metadata"]["input_tokens_cached"],
         )
 
@@ -143,7 +143,7 @@ def set_span_data_for_streaming_response(
 
     if accumulated_response["usage_metadata"]["output_tokens_reasoning"]:
         span.set_attribute(
-            SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS_REASONING,
+            SPANDATA.GEN_AI_USAGE_REASONING_OUTPUT_TOKENS,
             accumulated_response["usage_metadata"]["output_tokens_reasoning"],
         )
 
