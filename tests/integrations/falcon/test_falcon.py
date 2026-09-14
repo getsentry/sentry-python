@@ -68,7 +68,6 @@ def test_has_context(
 ):
     sentry_init(
         integrations=[FalconIntegration()],
-        trace_lifecycle="stream",
     )
 
     client = make_client()
@@ -106,7 +105,6 @@ def test_transaction_style(
     sentry_init(
         integrations=[integration],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     client = make_client()
@@ -136,7 +134,6 @@ def test_http_route(
     sentry_init(
         integrations=[FalconIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     client = make_client()
@@ -156,7 +153,6 @@ def test_unhandled_errors(
 ):
     sentry_init(
         integrations=[FalconIntegration()],
-        trace_lifecycle="stream",
     )
 
     class Resource:
@@ -192,7 +188,6 @@ def test_raised_5xx_errors(
 ):
     sentry_init(
         integrations=[FalconIntegration()],
-        trace_lifecycle="stream",
     )
 
     class Resource:
@@ -225,7 +220,6 @@ def test_raised_4xx_errors(
 ):
     sentry_init(
         integrations=[FalconIntegration()],
-        trace_lifecycle="stream",
     )
 
     class Resource:
@@ -256,7 +250,6 @@ def test_http_status(
     """
     sentry_init(
         integrations=[FalconIntegration()],
-        trace_lifecycle="stream",
     )
 
     class Resource:
@@ -287,7 +280,6 @@ def test_falcon_large_json_request(
         integrations=[FalconIntegration()],
         max_request_body_size="always",
         max_value_length=max_value_length,
-        trace_lifecycle="stream",
     )
 
     data = {"foo": {"bar": "a" * (1034)}}
@@ -329,7 +321,6 @@ def test_falcon_empty_json_request(
 ):
     sentry_init(
         integrations=[FalconIntegration()],
-        trace_lifecycle="stream",
     )
 
     class Resource:
@@ -358,7 +349,6 @@ def test_falcon_raw_data_request(
 ):
     sentry_init(
         integrations=[FalconIntegration()],
-        trace_lifecycle="stream",
     )
 
     class Resource:
@@ -387,7 +377,6 @@ def test_logging(
 ):
     sentry_init(
         integrations=[FalconIntegration(), LoggingIntegration(event_level="ERROR")],
-        trace_lifecycle="stream",
     )
 
     logger = logging.getLogger()
@@ -440,7 +429,6 @@ def test_error_in_errorhandler(
 ):
     sentry_init(
         integrations=[FalconIntegration()],
-        trace_lifecycle="stream",
     )
 
     app = falcon.API()
@@ -475,7 +463,6 @@ def test_bad_request_not_captured(
 ):
     sentry_init(
         integrations=[FalconIntegration()],
-        trace_lifecycle="stream",
     )
 
     app = falcon.API()
@@ -501,7 +488,6 @@ def test_does_not_leak_scope(
 ):
     sentry_init(
         integrations=[FalconIntegration()],
-        trace_lifecycle="stream",
     )
 
     app = falcon.API()
@@ -544,7 +530,6 @@ def test_falcon_not_breaking_asgi(sentry_init):
     """
     sentry_init(
         integrations=[FalconIntegration()],
-        trace_lifecycle="stream",
     )
 
     asgi_app = falcon.asgi.App()
@@ -566,7 +551,6 @@ def test_falcon_custom_error_handler(
     """
     sentry_init(
         integrations=[FalconIntegration()],
-        trace_lifecycle="stream",
     )
 
     app = make_app()
@@ -587,7 +571,6 @@ def test_span_origin(
     sentry_init(
         integrations=[FalconIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     client = make_client()
@@ -630,7 +613,6 @@ def test_falcon_request_media(sentry_init):
 
     sentry_init(
         integrations=[FalconIntegration()],
-        trace_lifecycle="stream",
     )
 
     try:

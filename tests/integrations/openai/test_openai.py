@@ -176,7 +176,6 @@ def test_chat_completion_tool_definitions(
         integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     client = OpenAI(api_key="z")
@@ -275,7 +274,6 @@ def test_nonstreaming_chat_completion_no_prompts(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
 
     client = OpenAI(api_key="z")
@@ -424,7 +422,6 @@ def test_nonstreaming_chat_completion(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
 
     client = OpenAI(api_key="z")
@@ -548,7 +545,6 @@ def test_completions_api_data_collection(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         _experiments={"data_collection": data_collection},
-        trace_lifecycle="stream",
     )
 
     client = OpenAI(api_key="z")
@@ -657,7 +653,6 @@ def test_completions_api_data_collection_outputs(
         "disabled_integrations": [StdlibIntegration],
         "traces_sample_rate": 1.0,
         "send_default_pii": send_default_pii,
-        "trace_lifecycle": "stream",
     }
     if data_collection is not None:
         init_kwargs["_experiments"] = {"data_collection": data_collection}
@@ -752,7 +747,6 @@ async def test_completions_api_data_collection_outputs_async(
         "disabled_integrations": [StdlibIntegration],
         "traces_sample_rate": 1.0,
         "send_default_pii": send_default_pii,
-        "trace_lifecycle": "stream",
     }
     if data_collection is not None:
         init_kwargs["_experiments"] = {"data_collection": data_collection}
@@ -801,7 +795,6 @@ def test_completions_api_data_collection_outputs_empty_choices(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         _experiments={"data_collection": {"gen_ai": {"outputs": True}}},
-        trace_lifecycle="stream",
     )
 
     client = OpenAI(api_key="z")
@@ -868,7 +861,6 @@ def test_streaming_chat_completion_data_collection_outputs(
         traces_sample_rate=1.0,
         send_default_pii=False,
         _experiments={"data_collection": data_collection},
-        trace_lifecycle="stream",
     )
 
     client = OpenAI(api_key="z")
@@ -953,7 +945,6 @@ async def test_streaming_chat_completion_data_collection_outputs_async(
         traces_sample_rate=1.0,
         send_default_pii=False,
         _experiments={"data_collection": data_collection},
-        trace_lifecycle="stream",
     )
 
     client = AsyncOpenAI(api_key="z")
@@ -1027,7 +1018,6 @@ async def test_nonstreaming_chat_completion_async_no_prompts(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
 
     client = AsyncOpenAI(api_key="z")
@@ -1174,7 +1164,6 @@ async def test_nonstreaming_chat_completion_async(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
 
     client = AsyncOpenAI(api_key="z")
@@ -1271,7 +1260,6 @@ def test_streaming_chat_completion_no_prompts(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
 
     client = OpenAI(api_key="z")
@@ -1391,7 +1379,6 @@ def test_streaming_chat_completion_with_usage_in_stream(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=False,
-        trace_lifecycle="stream",
     )
 
     client = OpenAI(api_key="z")
@@ -1473,7 +1460,6 @@ def test_streaming_chat_completion_empty_content_preserves_token_usage(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=False,
-        trace_lifecycle="stream",
     )
 
     client = OpenAI(api_key="z")
@@ -1538,7 +1524,6 @@ async def test_streaming_chat_completion_empty_content_preserves_token_usage_asy
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=False,
-        trace_lifecycle="stream",
     )
 
     client = AsyncOpenAI(api_key="z")
@@ -1605,7 +1590,6 @@ async def test_streaming_chat_completion_async_with_usage_in_stream(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=False,
-        trace_lifecycle="stream",
     )
 
     client = AsyncOpenAI(api_key="z")
@@ -1778,7 +1762,6 @@ def test_streaming_chat_completion(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
 
     client = OpenAI(api_key="z")
@@ -1921,7 +1904,6 @@ async def test_streaming_chat_completion_async_no_prompts(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
 
     client = AsyncOpenAI(api_key="z")
@@ -2136,7 +2118,6 @@ async def test_streaming_chat_completion_async(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
 
     client = AsyncOpenAI(api_key="z")
@@ -2263,7 +2244,6 @@ def test_bad_chat_completion(
         integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     items = capture_items("event", "span")
 
@@ -2292,7 +2272,6 @@ def test_span_status_error(
         integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     items = capture_items("event", "span")
 
@@ -2323,7 +2302,6 @@ async def test_bad_chat_completion_async(
         integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     client = AsyncOpenAI(api_key="z")
@@ -2363,7 +2341,6 @@ def test_embeddings_create_no_pii(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
 
     client = OpenAI(api_key="z")
@@ -2477,7 +2454,6 @@ def test_embeddings_create(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
 
     client = OpenAI(api_key="z")
@@ -2576,7 +2552,6 @@ def test_embeddings_create_data_collection(
         "disabled_integrations": [StdlibIntegration],
         "traces_sample_rate": 1.0,
         "send_default_pii": send_default_pii,
-        "trace_lifecycle": "stream",
     }
 
     sentry_init_kwargs = dict(init_kwargs)
@@ -2638,7 +2613,6 @@ def test_embeddings_create_data_collection_inputs_disabled_input_shapes(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        trace_lifecycle="stream",
         _experiments={"data_collection": {"gen_ai": {"inputs": False}}},
     )
 
@@ -2688,7 +2662,6 @@ async def test_embeddings_create_async_no_pii(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
 
     client = AsyncOpenAI(api_key="z")
@@ -2805,7 +2778,6 @@ async def test_embeddings_create_async(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
 
     client = AsyncOpenAI(api_key="z")
@@ -2886,7 +2858,6 @@ async def test_embeddings_create_async_data_collection(
         "disabled_integrations": [StdlibIntegration],
         "traces_sample_rate": 1.0,
         "send_default_pii": send_default_pii,
-        "trace_lifecycle": "stream",
     }
 
     sentry_init_kwargs = dict(init_kwargs)
@@ -2949,7 +2920,6 @@ def test_embeddings_create_raises_error(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
 
     client = OpenAI(api_key="z")
@@ -2985,7 +2955,6 @@ async def test_embeddings_create_raises_error_async(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
 
     client = AsyncOpenAI(api_key="z")
@@ -3013,7 +2982,6 @@ def test_span_origin_nonstreaming_chat(
     sentry_init(
         integrations=[OpenAIIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     client = OpenAI(api_key="z")
@@ -3051,7 +3019,6 @@ async def test_span_origin_nonstreaming_chat_async(
         integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     client = AsyncOpenAI(api_key="z")
@@ -3087,7 +3054,6 @@ def test_span_origin_streaming_chat(
         integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     client = OpenAI(api_key="z")
@@ -3151,7 +3117,6 @@ async def test_span_origin_streaming_chat_async(
         integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     client = AsyncOpenAI(api_key="z")
@@ -3220,7 +3185,6 @@ def test_span_origin_embeddings(
         integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     client = OpenAI(api_key="z")
@@ -3254,7 +3218,6 @@ async def test_span_origin_embeddings_async(
         integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     client = AsyncOpenAI(api_key="z")
@@ -3650,7 +3613,6 @@ def test_ai_client_span_responses_api_no_pii(
         integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     client = OpenAI(api_key="z")
@@ -3707,7 +3669,6 @@ def test_ai_client_span_responses_tool_definitions(
         integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     client = OpenAI(api_key="z")
@@ -3923,7 +3884,6 @@ def test_ai_client_span_responses_api(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
 
     client = OpenAI(api_key="z")
@@ -4113,7 +4073,6 @@ def test_responses_api_data_collection(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         _experiments={"data_collection": data_collection},
-        trace_lifecycle="stream",
     )
 
     client = OpenAI(api_key="z")
@@ -4256,7 +4215,6 @@ def test_responses_api_data_collection_outputs(
         "disabled_integrations": [StdlibIntegration],
         "traces_sample_rate": 1.0,
         "send_default_pii": send_default_pii,
-        "trace_lifecycle": "stream",
     }
     if data_collection is not None:
         init_kwargs["_experiments"] = {"data_collection": data_collection}
@@ -4351,7 +4309,6 @@ def test_responses_api_data_collection_outputs_shapes(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         _experiments={"data_collection": {"gen_ai": {"outputs": True}}},
-        trace_lifecycle="stream",
     )
 
     client = OpenAI(api_key="z")
@@ -4410,7 +4367,6 @@ def test_streaming_responses_api_data_collection_outputs(
         traces_sample_rate=1.0,
         send_default_pii=False,
         _experiments={"data_collection": data_collection},
-        trace_lifecycle="stream",
     )
 
     client = OpenAI(api_key="z")
@@ -4467,7 +4423,6 @@ def test_responses_api_conversation_id(
         integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     client = OpenAI(api_key="z")
@@ -4509,7 +4464,6 @@ def test_responses_api_reasoning_level(
         integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     client = OpenAI(api_key="z")
@@ -4544,7 +4498,6 @@ def test_error_in_responses_api(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
 
     client = OpenAI(api_key="z")
@@ -4731,7 +4684,6 @@ async def test_ai_client_span_responses_async_api(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
 
     client = AsyncOpenAI(api_key="z")
@@ -4944,7 +4896,6 @@ async def test_ai_client_span_streaming_responses_async_api(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
 
     client = AsyncOpenAI(api_key="z")
@@ -5024,7 +4975,6 @@ async def test_error_in_responses_async_api(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
 
     client = AsyncOpenAI(api_key="z")
@@ -5149,7 +5099,6 @@ def test_streaming_responses_api(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
 
     client = OpenAI(api_key="z")
@@ -5229,7 +5178,6 @@ async def test_streaming_responses_api_async(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
 
     client = AsyncOpenAI(api_key="z")
@@ -5308,7 +5256,6 @@ def test_chat_completion_reasoning_level(
         integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     client = OpenAI(api_key="z")
@@ -5374,7 +5321,6 @@ def test_openai_message_role_mapping(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
 
     client = OpenAI(api_key="z")
@@ -5423,7 +5369,6 @@ def test_streaming_chat_completion_ttft(
         integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     client = OpenAI(api_key="z")
@@ -5504,7 +5449,6 @@ async def test_streaming_chat_completion_ttft_async(
         integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     client = AsyncOpenAI(api_key="z")
@@ -5586,7 +5530,6 @@ def test_streaming_responses_api_ttft(
         integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     client = OpenAI(api_key="z")
@@ -5638,7 +5581,6 @@ async def test_streaming_responses_api_ttft_async(
         integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     client = AsyncOpenAI(api_key="z")

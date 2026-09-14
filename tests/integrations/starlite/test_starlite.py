@@ -146,7 +146,6 @@ def test_transaction_name_and_source(
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[StarliteIntegration()],
-        trace_lifecycle="stream",
     )
     starlite_app = starlite_app_factory()
     client = TestClient(starlite_app)
@@ -169,7 +168,6 @@ def test_middleware_spans(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[StarliteIntegration()],
-        trace_lifecycle="stream",
     )
 
     logging_config = LoggingMiddlewareConfig()
@@ -224,7 +222,6 @@ def test_middleware_callback_spans(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[StarliteIntegration()],
-        trace_lifecycle="stream",
     )
     starlite_app = starlite_app_factory(middleware=[SampleMiddleware])
 
@@ -285,7 +282,6 @@ def test_middleware_receive_send(sentry_init, capture_events):
 
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         integrations=[StarliteIntegration()],
     )
     starlite_app = starlite_app_factory(middleware=[SampleReceiveSendMiddleware])
@@ -319,7 +315,6 @@ def test_middleware_partial_receive_send(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[StarliteIntegration()],
-        trace_lifecycle="stream",
     )
     starlite_app = starlite_app_factory(middleware=[SamplePartialReceiveSendMiddleware])
 
@@ -370,7 +365,6 @@ def test_span_origin(sentry_init, capture_items):
     sentry_init(
         integrations=[StarliteIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     logging_config = LoggingMiddlewareConfig()
@@ -468,7 +462,6 @@ def test_request_body_data_collection(
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[StarliteIntegration()],
-        trace_lifecycle="stream",
         _experiments=(
             {} if data_collection is None else {"data_collection": data_collection}
         ),
@@ -496,7 +489,6 @@ def test_request_body_data_collection_wins_over_send_default_pii(
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[StarliteIntegration()],
-        trace_lifecycle="stream",
         send_default_pii=True,
         _experiments={"data_collection": {"http_bodies": []}},
     )
@@ -619,7 +611,6 @@ def test_cookie_data_collection(
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[StarliteIntegration()],
-        trace_lifecycle="stream",
         **init_kwargs,
     )
 

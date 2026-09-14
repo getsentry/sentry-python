@@ -630,7 +630,7 @@ def test_dedupe_doesnt_take_into_account_dropped_exception(sentry_init, capture_
 def test_event_processor_drop_records_client_report(
     sentry_init, capture_events, capture_record_lost_event_calls
 ):
-    sentry_init(traces_sample_rate=1.0, trace_lifecycle="stream")
+    sentry_init(traces_sample_rate=1.0)
     events = capture_events()
     record_lost_event_calls = capture_record_lost_event_calls()
 
@@ -750,7 +750,6 @@ def test_functions_to_trace(sentry_init, capture_items):
         sentry_init(
             traces_sample_rate=1.0,
             functions_to_trace=functions_to_trace,
-            trace_lifecycle="stream",
         )
 
         items = capture_items("span")
@@ -794,7 +793,6 @@ def test_functions_to_trace_with_class(sentry_init, capture_items):
         sentry_init(
             traces_sample_rate=1.0,
             functions_to_trace=functions_to_trace,
-            trace_lifecycle="stream",
         )
 
         items = capture_items("span")
@@ -843,7 +841,6 @@ def test_staticmethod_class_tracing(sentry_init, capture_items):
         functions_to_trace=[
             {"qualified_name": "tests.test_basics.TracingTestClass.static"}
         ],
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -869,7 +866,6 @@ def test_staticmethod_instance_tracing(sentry_init, capture_items):
         functions_to_trace=[
             {"qualified_name": "tests.test_basics.TracingTestClass.static"}
         ],
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -894,7 +890,6 @@ def test_classmethod_class_tracing(sentry_init, capture_items):
         functions_to_trace=[
             {"qualified_name": "tests.test_basics.TracingTestClass.class_"}
         ],
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -919,7 +914,6 @@ def test_classmethod_instance_tracing(sentry_init, capture_items):
         functions_to_trace=[
             {"qualified_name": "tests.test_basics.TracingTestClass.class_"}
         ],
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -940,12 +934,11 @@ def test_functions_to_trace_no_dot_does_not_crash(sentry_init):
     sentry_init(
         traces_sample_rate=1.0,
         functions_to_trace=[{"qualified_name": "my_function"}],
-        trace_lifecycle="stream",
     )
 
 
 def test_last_event_id(sentry_init):
-    sentry_init(traces_sample_rate=1.0, trace_lifecycle="stream")
+    sentry_init(traces_sample_rate=1.0)
 
     assert last_event_id() is None
 
@@ -955,7 +948,7 @@ def test_last_event_id(sentry_init):
 
 
 def test_last_event_id_scope(sentry_init):
-    sentry_init(traces_sample_rate=1.0, trace_lifecycle="stream")
+    sentry_init(traces_sample_rate=1.0)
 
     # Should not crash
     with isolation_scope() as scope:

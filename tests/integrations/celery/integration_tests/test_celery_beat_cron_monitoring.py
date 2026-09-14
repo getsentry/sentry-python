@@ -42,7 +42,6 @@ def celery_init(sentry_init, celery_config):
                     monitor_beat_tasks=monitor_beat_tasks,
                 )
             ],
-            trace_lifecycle="stream",
             **kwargs,
         )
         app = Celery("tasks")

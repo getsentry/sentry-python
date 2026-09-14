@@ -64,7 +64,6 @@ def init_arq(sentry_init):
             "integrations": [ArqIntegration()],
             "traces_sample_rate": 1.0,
             "send_default_pii": True,
-            "trace_lifecycle": "stream",
         }
         sentry_init_kwargs.update(init_kwargs or {})
         sentry_init(**sentry_init_kwargs)
@@ -113,7 +112,6 @@ def init_arq_with_dict_settings(sentry_init):
             "integrations": [ArqIntegration()],
             "traces_sample_rate": 1.0,
             "send_default_pii": True,
-            "trace_lifecycle": "stream",
         }
         sentry_init_kwargs.update(init_kwargs or {})
         sentry_init(**sentry_init_kwargs)
@@ -165,7 +163,6 @@ def init_arq_with_kwarg_settings(sentry_init):
             "integrations": [ArqIntegration()],
             "traces_sample_rate": 1.0,
             "send_default_pii": True,
-            "trace_lifecycle": "stream",
         }
         sentry_init_kwargs.update(init_kwargs or {})
         sentry_init(**sentry_init_kwargs)

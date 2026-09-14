@@ -61,7 +61,6 @@ def test_redis_pipeline(
         integrations=[RedisIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
 
     connection = FakeRedis()
@@ -112,7 +111,6 @@ def test_redis_pipeline_data_collection(
     sentry_init(
         integrations=[RedisIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         _experiments={"data_collection": data_collection},
     )
 
@@ -151,7 +149,6 @@ def test_sensitive_data(
             integrations=[RedisIntegration()],
             traces_sample_rate=1.0,
             send_default_pii=True,
-            trace_lifecycle="stream",
         )
 
         connection = FakeRedis()
@@ -178,7 +175,6 @@ def test_pii_data_redacted(
     sentry_init(
         integrations=[RedisIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     connection = FakeRedis()
@@ -229,7 +225,6 @@ def test_data_collection_database_query_data(
     sentry_init(
         integrations=[RedisIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         _experiments={"data_collection": data_collection},
     )
 
@@ -275,7 +270,6 @@ def test_database_query_data_takes_precedence_over_send_default_pii(
         integrations=[RedisIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
         _experiments={"data_collection": data_collection},
     )
 
@@ -302,7 +296,6 @@ def test_pii_data_sent(sentry_init, capture_items):
         integrations=[RedisIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
 
     connection = FakeRedis()
@@ -341,7 +334,6 @@ def test_no_data_truncation_by_default(sentry_init, capture_items):
         integrations=[RedisIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
 
     connection = FakeRedis()
@@ -420,7 +412,6 @@ def test_db_connection_attributes_client(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[RedisIntegration()],
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -450,7 +441,6 @@ def test_db_connection_attributes_pipeline(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[RedisIntegration()],
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -483,7 +473,6 @@ def test_span_origin(sentry_init, capture_items):
     sentry_init(
         integrations=[RedisIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     connection = FakeRedis()

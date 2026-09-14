@@ -80,7 +80,6 @@ async def test_async_basic(
         integrations=[RedisIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
 
     connection = cluster.RedisCluster(host="localhost", port=6379)
@@ -125,7 +124,6 @@ async def test_async_redis_pipeline(
         integrations=[RedisIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
 
     connection = cluster.RedisCluster(host="localhost", port=6379)
@@ -159,7 +157,6 @@ async def test_async_span_origin(sentry_init, capture_items):
     sentry_init(
         integrations=[RedisIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     connection = cluster.RedisCluster(host="localhost", port=6379)

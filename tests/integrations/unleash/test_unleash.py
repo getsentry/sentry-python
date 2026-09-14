@@ -176,7 +176,6 @@ def test_unleash_span_integration(
         sentry_init(
             traces_sample_rate=1.0,
             integrations=[UnleashIntegration()],
-            trace_lifecycle="stream",
         )
 
         client = UnleashClient()  # type: ignore[arg-type]

@@ -126,7 +126,6 @@ def test_span_origin(sentry_init, app, capture_items, get_client):
     sentry_init(
         integrations=[TrytondWSGIIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     items = capture_items("span")
 

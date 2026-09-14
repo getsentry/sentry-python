@@ -302,7 +302,6 @@ async def test_tracing_unparseable_url(sentry_init, aiohttp_client, capture_item
     sentry_init(
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     async def hello(request):
@@ -341,7 +340,6 @@ async def test_traces_sampler_gets_request_object_in_sampling_context(
     traces_sampler = mock.Mock()
     sentry_init(
         integrations=[AioHttpIntegration()],
-        trace_lifecycle="stream",
         traces_sampler=traces_sampler,
     )
 
@@ -372,7 +370,6 @@ async def test_has_trace_if_performance_enabled(
     sentry_init(
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     async def hello(request):
@@ -423,7 +420,7 @@ async def test_has_trace_if_performance_enabled(
 async def test_has_trace_if_performance_disabled(
     sentry_init, aiohttp_client, capture_events
 ):
-    sentry_init(integrations=[AioHttpIntegration()], trace_lifecycle="stream")
+    sentry_init(integrations=[AioHttpIntegration()])
 
     async def hello(request):
         capture_message("It's a good day to try dividing by 0")
@@ -459,7 +456,6 @@ async def test_trace_from_headers_if_performance_enabled(
     sentry_init(
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     async def hello(request):
@@ -592,7 +588,6 @@ async def test_crumb_capture(
     sentry_init(
         integrations=[AioHttpIntegration()],
         before_breadcrumb=before_breadcrumb,
-        trace_lifecycle="stream",
         **pii_options,
     )
 
@@ -686,9 +681,7 @@ async def test_crumb_capture_client_error(
     url_expected,
     query_expected,
 ):
-    sentry_init(
-        integrations=[AioHttpIntegration()], trace_lifecycle="stream", **pii_options
-    )
+    sentry_init(integrations=[AioHttpIntegration()], **pii_options)
 
     async def handler(request):
         return web.Response(status=status_code)
@@ -738,7 +731,6 @@ async def test_outgoing_trace_headers_adds_missing_unsigned_propagation_headers(
     sentry_init(
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     async def handler(request):
@@ -780,7 +772,6 @@ async def test_outgoing_trace_headers_appends_baggage_but_preserves_sentry_trace
     sentry_init(
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         release="d08ebdb9309e1b004c6f52202de58a09c2268e42",
     )
 
@@ -815,7 +806,6 @@ async def test_outgoing_trace_headers_preserves_signed_propagation_headers(
     sentry_init(
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     async def handler(request):
@@ -855,7 +845,6 @@ async def test_outgoing_trace_headers_preserves_query_signed_baggage(
     sentry_init(
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     async def handler(request):
@@ -894,7 +883,6 @@ async def test_request_source_disabled(
     sentry_init(
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         enable_http_request_source=False,
         http_request_source_threshold_ms=0,
     )
@@ -946,7 +934,6 @@ async def test_request_source_enabled(
     sentry_init(
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         http_request_source_threshold_ms=0,
         **extra_options,
     )
@@ -989,7 +976,6 @@ async def test_request_source(
     sentry_init(
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         enable_http_request_source=True,
         http_request_source_threshold_ms=0,
     )
@@ -1050,7 +1036,6 @@ async def test_request_source_with_module_in_search_path(
     sentry_init(
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         enable_http_request_source=True,
         http_request_source_threshold_ms=0,
     )
@@ -1105,7 +1090,6 @@ async def test_no_request_source_if_duration_too_short(
     sentry_init(
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         enable_http_request_source=True,
         http_request_source_threshold_ms=10**10,
     )
@@ -1151,7 +1135,6 @@ async def test_request_source_if_duration_over_threshold(
     sentry_init(
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         enable_http_request_source=True,
         http_request_source_threshold_ms=0,
     )
@@ -1211,7 +1194,6 @@ async def test_span_origin(
 ):
     sentry_init(
         integrations=[AioHttpIntegration()],
-        trace_lifecycle="stream",
         traces_sample_rate=1.0,
     )
 
@@ -1363,7 +1345,6 @@ async def test_tracing(sentry_init, aiohttp_client, capture_items, send_pii):
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=send_pii,
-        trace_lifecycle="stream",
     )
 
     async def hello(request):
@@ -1434,7 +1415,6 @@ async def test_user_address_with_data_collection(
     sentry_init(
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         **init_kwargs,
     )
 
@@ -1468,7 +1448,6 @@ async def test_sensitive_header_scrubbing(sentry_init, aiohttp_client, capture_i
     sentry_init(
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     async def hello(request):
@@ -1628,7 +1607,6 @@ async def test_sensitive_header_passthrough_with_pii(
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=options["send_default_pii"],
-        trace_lifecycle="stream",
         _experiments={
             "data_collection": options["data_collection"],
         },
@@ -1682,7 +1660,6 @@ async def test_sensitive_header_passthrough_with_pii_without_data_collection(
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
 
     async def hello(request):
@@ -1720,7 +1697,6 @@ async def test_url_query_attribute(
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=send_pii,
-        trace_lifecycle="stream",
     )
 
     async def hello(request):
@@ -1777,7 +1753,6 @@ async def test_transaction_style(
     sentry_init(
         integrations=[AioHttpIntegration(transaction_style=transaction_style)],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     async def hello(request):
@@ -1819,7 +1794,6 @@ async def test_http_route(
     sentry_init(
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     async def hello(request):
@@ -1843,7 +1817,6 @@ async def test_server_error(sentry_init, aiohttp_client, capture_items):
     sentry_init(
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     async def hello(request):
@@ -1882,7 +1855,6 @@ async def test_http_exception(sentry_init, aiohttp_client, capture_items):
     sentry_init(
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     async def hello(request):
@@ -1914,7 +1886,6 @@ async def test_http_exception_ok_status_not_overridden(
     sentry_init(
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     async def hello(request):
@@ -1948,7 +1919,6 @@ async def test_outgoing_client_span(
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=send_pii,
-        trace_lifecycle="stream",
     )
 
     async def handler(request):
@@ -2007,7 +1977,6 @@ async def test_outgoing_trace_headers(
     sentry_init(
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     async def handler(request):
@@ -2041,7 +2010,6 @@ async def test_user_ip_address_on_all_spans(
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
 
     async def hello(request):
@@ -2153,7 +2121,6 @@ async def test_server_url_query_data_collection(
     sentry_init(
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         **init_kwargs,
     )
 
@@ -2195,7 +2162,6 @@ async def test_client_url_query_data_collection(
     sentry_init(
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         **init_kwargs,
     )
 

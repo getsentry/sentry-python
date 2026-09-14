@@ -11,7 +11,6 @@ from sentry_sdk.tracing_utils import extract_sentrytrace_data
 def test_to_traceparent(sentry_init, traces_sample_rate):
     sentry_init(
         traces_sample_rate=traces_sample_rate,
-        trace_lifecycle="stream",
     )
 
     with sentry_sdk.traces.start_span(name="/interactions/other-dogs/new-dog") as span:
@@ -70,7 +69,6 @@ def test_sentrytrace_extraction_leading_empty_fragment():
 def test_iter_headers(sentry_init, monkeypatch):
     sentry_init(
         traces_sample_rate=0.0,
-        trace_lifecycle="stream",
     )
     monkeypatch.setattr(
         StreamedSpan,

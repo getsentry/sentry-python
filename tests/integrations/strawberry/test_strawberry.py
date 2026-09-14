@@ -559,7 +559,6 @@ def test_capture_segment_on_error(
         ]
         + framework_integrations,
         traces_sample_rate=1,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("event", "span")
@@ -630,7 +629,6 @@ def test_capture_segment_on_success(
         + framework_integrations,
         traces_sample_rate=1,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -698,7 +696,6 @@ def test_segment_no_operation_name(
         + framework_integrations,
         traces_sample_rate=1,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -768,7 +765,6 @@ def test_segment_mutation(
         + framework_integrations,
         traces_sample_rate=1,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -860,7 +856,6 @@ def test_graphql_span_data_collection(
         "integrations": [StrawberryIntegration(async_execution=async_execution)]
         + framework_integrations,
         "traces_sample_rate": 1,
-        "trace_lifecycle": "stream",
         "_experiments": {"data_collection": data_collection},
     }
     if send_default_pii is not None:
@@ -970,7 +965,6 @@ def test_span_origin(
         ]
         + framework_integrations,
         traces_sample_rate=1,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -1020,7 +1014,6 @@ def test_span_origin2(
         ]
         + framework_integrations,
         traces_sample_rate=1,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -1070,7 +1063,6 @@ def test_span_origin3(
         ]
         + framework_integrations,
         traces_sample_rate=1,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")

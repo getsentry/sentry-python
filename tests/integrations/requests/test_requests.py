@@ -16,7 +16,6 @@ def test_crumb_capture(sentry_init, capture_events, send_default_pii):
     sentry_init(
         integrations=[StdlibIntegration()],
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
     events = capture_events()
 
@@ -63,7 +62,6 @@ def test_crumb_capture_client_error(
     sentry_init(
         integrations=[StdlibIntegration()],
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
 
     events = capture_events()
@@ -106,7 +104,6 @@ def test_crumb_capture_client_error(
 def test_omit_url_data_if_parsing_fails(sentry_init, capture_events):
     sentry_init(
         integrations=[StdlibIntegration()],
-        trace_lifecycle="stream",
         send_default_pii=True,
     )
 

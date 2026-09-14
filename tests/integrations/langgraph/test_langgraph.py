@@ -170,7 +170,6 @@ def test_pregel_invoke(
         integrations=[LanggraphIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
 
     test_state = {
@@ -277,7 +276,6 @@ def test_pregel_ainvoke(
         integrations=[LanggraphIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
 
     test_state = {"messages": [MockMessage("What's the weather like?", name="user")]}
@@ -362,7 +360,6 @@ def test_pregel_invoke_error(
         integrations=[LanggraphIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
 
     test_state = {"messages": [MockMessage("This will fail")]}
@@ -399,7 +396,6 @@ def test_pregel_ainvoke_error(
         integrations=[LanggraphIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
 
     test_state = {"messages": [MockMessage("This will fail async")]}
@@ -441,7 +437,6 @@ def test_pregel_invoke_with_different_graph_names(
         integrations=[LanggraphIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
 
     pregel = MockPregelInstance(graph_name) if graph_name else MockPregelInstance()
@@ -489,7 +484,6 @@ def test_pregel_invoke_span_includes_usage_data(
     sentry_init(
         integrations=[LanggraphIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     test_state = {
@@ -570,7 +564,6 @@ def test_pregel_ainvoke_span_includes_usage_data(
     sentry_init(
         integrations=[LanggraphIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     test_state = {
@@ -654,7 +647,6 @@ def test_pregel_invoke_multiple_llm_calls_aggregate_usage(
     sentry_init(
         integrations=[LanggraphIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     test_state = {
@@ -740,7 +732,6 @@ def test_pregel_ainvoke_multiple_llm_calls_aggregate_usage(
     sentry_init(
         integrations=[LanggraphIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     test_state = {
@@ -829,7 +820,6 @@ def test_pregel_invoke_span_includes_response_model(
     sentry_init(
         integrations=[LanggraphIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     test_state = {
@@ -906,7 +896,6 @@ def test_pregel_ainvoke_span_includes_response_model(
     sentry_init(
         integrations=[LanggraphIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     test_state = {
@@ -986,7 +975,6 @@ def test_pregel_invoke_span_uses_last_response_model(
     sentry_init(
         integrations=[LanggraphIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     test_state = {
@@ -1075,7 +1063,6 @@ def test_pregel_ainvoke_span_uses_last_response_model(
     sentry_init(
         integrations=[LanggraphIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     test_state = {
@@ -1212,7 +1199,6 @@ def test_extraction_functions_complex_scenario(
         integrations=[LanggraphIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
 
     pregel = MockPregelInstance("complex_graph")
@@ -1292,7 +1278,6 @@ def test_langgraph_message_role_mapping(
         integrations=[LanggraphIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
 
     # Mock a langgraph message with mixed roles
@@ -1433,7 +1418,6 @@ def test_pregel_invoke_gates_request_messages_on_inputs_setting(
         "integrations": [LanggraphIntegration()],
         "traces_sample_rate": 1.0,
         "send_default_pii": send_default_pii,
-        "trace_lifecycle": "stream",
     }
     if data_collection is not None:
         init_kwargs["_experiments"] = {"data_collection": data_collection}
@@ -1519,7 +1503,6 @@ def test_pregel_invoke_gates_response_text_and_tool_calls_on_outputs_setting(
         "integrations": [LanggraphIntegration()],
         "traces_sample_rate": 1.0,
         "send_default_pii": send_default_pii,
-        "trace_lifecycle": "stream",
     }
     if data_collection is not None:
         init_kwargs["_experiments"] = {"data_collection": data_collection}
@@ -1611,7 +1594,6 @@ def test_pregel_ainvoke_gates_inputs_and_outputs_independently(
         "integrations": [LanggraphIntegration()],
         "traces_sample_rate": 1.0,
         "send_default_pii": send_default_pii,
-        "trace_lifecycle": "stream",
     }
     if data_collection is not None:
         init_kwargs["_experiments"] = {"data_collection": data_collection}
@@ -1673,7 +1655,6 @@ def test_pregel_invoke_message_delta_ignores_gen_ai_inputs_setting(
     sentry_init(
         integrations=[LanggraphIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         _experiments={
             "data_collection": {"gen_ai": {"inputs": False, "outputs": True}}
         },
@@ -1742,7 +1723,6 @@ def test_pregel_ainvoke_message_delta_ignores_gen_ai_inputs_setting(
     sentry_init(
         integrations=[LanggraphIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         _experiments={
             "data_collection": {"gen_ai": {"inputs": False, "outputs": True}}
         },

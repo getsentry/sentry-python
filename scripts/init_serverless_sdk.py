@@ -23,7 +23,6 @@ sentry_sdk.init(
     dsn=os.environ["SENTRY_DSN"],
     integrations=[AwsLambdaIntegration(timeout_warning=True)],
     traces_sample_rate=float(os.environ["SENTRY_TRACES_SAMPLE_RATE"]),
-    trace_lifecycle="stream",
 )
 
 

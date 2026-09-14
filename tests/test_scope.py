@@ -87,7 +87,6 @@ def test_set_user_none_values_are_dropped_when_copying_to_attributes(
     sentry_init(
         traces_sample_rate=1.0,
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
     items = capture_items("span")
 
@@ -884,7 +883,7 @@ def test_set_tags():
 
 
 def test_last_event_id(sentry_init):
-    sentry_init(traces_sample_rate=1.0, trace_lifecycle="stream")
+    sentry_init(traces_sample_rate=1.0)
 
     assert Scope.last_event_id() is None
 
@@ -894,7 +893,7 @@ def test_last_event_id(sentry_init):
 
 
 def test_last_event_id_cleared(sentry_init):
-    sentry_init(traces_sample_rate=1.0, trace_lifecycle="stream")
+    sentry_init(traces_sample_rate=1.0)
 
     # Make sure last_event_id is set
     sentry_sdk.capture_exception(Exception("test"))
@@ -973,7 +972,7 @@ def test_handle_error_on_token_reset_isolation_scope(error_cls, scope_manager):
 
 
 def test_trace_context_tracing(sentry_init):
-    sentry_init(traces_sample_rate=1.0, trace_lifecycle="stream")
+    sentry_init(traces_sample_rate=1.0)
 
     with sentry_sdk.traces.start_span(name="seg") as segment:
         with sentry_sdk.traces.start_span(name="span1"):
