@@ -55,7 +55,6 @@ if TYPE_CHECKING:
         Metric,
         SpanJSON,
         TracesSampler,
-        TransactionProcessor,
     )
 
     # Experiments are feature flags to enable and disable certain unstable SDK
@@ -591,6 +590,12 @@ class SPANDATA:
     """
     The model's response messages. It has to be a stringified version of an array of message objects, which can include text responses and tool calls.
     Example: [{"role": "assistant", "parts": [{"type": "text", "content": "The weather in Paris is currently rainy with a temperature of 57°F."}], "finish_reason": "stop"}]
+    """
+
+    GEN_AI_RESPONSE_TIME_TO_FIRST_CHUNK = "gen_ai.response.time_to_first_chunk"
+    """
+    Time in seconds when the first response content chunk arrived in streaming responses.
+    Example: 0.6853435
     """
 
     GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN = "gen_ai.response.time_to_first_token"
@@ -1310,7 +1315,6 @@ class ClientConstructor:
         send_client_reports: bool = True,
         _experiments: "Experiments" = {},  # noqa: B006
         proxy_headers: "Optional[Dict[str, str]]" = None,
-        before_send_transaction: "Optional[TransactionProcessor]" = None,
         project_root: "Optional[str]" = None,
         include_local_variables: "Optional[bool]" = True,
         include_source_context: "Optional[bool]" = True,
@@ -1547,11 +1551,6 @@ class ClientConstructor:
 
             By the time `before_send` is executed, all scope data has already been applied to the event. Further
             modification of the scope won't have any effect.
-
-        :param before_send_transaction: This function is called with an SDK-specific transaction event object, and can
-            return a modified transaction event object, or `null` to skip reporting the event.
-
-            One way this might be used is for manual PII stripping before sending.
 
         :param before_breadcrumb: This function is called with an SDK-specific breadcrumb object before the breadcrumb
             is added to the scope.

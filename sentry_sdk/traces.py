@@ -1,23 +1,3 @@
-"""
-The API in this file is only meant to be used in span streaming mode. It should
-not be mixed with the legacy tracing API (sentry_sdk.start_transaction,
-sentry_sdk.start_span, etc.).
-
-You can enable span streaming mode via:
-
-```
-import sentry_sdk
-
-sentry_sdk.init(
-    trace_lifecycle="stream",
-)
-```
-
-See
-https://docs.sentry.io/platforms/python/tracing/streamed-spans/migration-guide/
-for how to migrate to span streaming.
-"""
-
 import sys
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -120,7 +100,7 @@ def start_span(
     active: bool = True,
 ) -> "StreamedSpan":
     """
-    Start a span in streaming mode.
+    Start a span.
 
     The span's parent, unless provided explicitly via the `parent_span` argument,
     will be the current active span, if any. If there is none, this span will
@@ -173,25 +153,14 @@ def start_span(
     :return: The span that has been started.
     :rtype: StreamedSpan
     """
-    from sentry_sdk.tracing_utils import has_span_streaming_enabled
-
-    client = sentry_sdk.get_client()
-    if client.is_active() and not has_span_streaming_enabled(client.options):
-        logger.warning(
-            "Using span streaming API in non-span-streaming mode. Use "
-            "sentry_sdk.start_transaction() and sentry_sdk.start_span() "
-            "instead.",
-        )
-        return NoOpStreamedSpan()
-
-    return sentry_sdk.get_current_scope().start_streamed_span(
+    return sentry_sdk.get_current_scope().start_span(
         name, attributes, parent_span, active
     )
 
 
 def continue_trace(incoming: "dict[str, Any]") -> None:
     """
-    Continue a trace from headers or environment variables in streaming mode.
+    Continue a trace from headers or environment variables.
 
     This function sets the propagation context on the scope. Any span started
     in the updated scope will belong under the trace extracted from the
@@ -215,7 +184,7 @@ def continue_trace(incoming: "dict[str, Any]") -> None:
 
 def new_trace() -> None:
     """
-    Resets the propagation context, forcing a new trace, in streaming mode.
+    Resets the propagation context, forcing a new trace.
 
     This function sets the propagation context on the scope. Any span started
     in the updated scope will start its own trace.
@@ -859,10 +828,10 @@ def trace(
             pass
     """
     from sentry_sdk.tracing_utils import (
-        create_streaming_span_decorator,
+        create_span_decorator,
     )
 
-    decorator = create_streaming_span_decorator(
+    decorator = create_span_decorator(
         name=name,
         attributes=attributes,
         active=active,
