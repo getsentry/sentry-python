@@ -67,7 +67,6 @@ class OpenAIAgentsIntegration(Integration):
         - `DEFAULT_AGENT_RUNNER.run()` and `DEFAULT_AGENT_RUNNER.run_streamed()` are patched in `_patch_runner()` with `_create_run_wrapper()` and `_create_run_streamed_wrapper()`, respectively.
     3. In a loop, the agent repeatedly calls the Responses API, maintaining a conversation history that includes previous messages and tool results, which is passed to each call.
         - A Model instance is created at the start of the loop by calling the `run_internal.turn_preparation.get_model()`. We patch the Model instance using `patches._get_model()`.
-        - Available tools are also deteremined at the start of the loop, with `run_internal.turn_preparation.get_all_tools()`. We patch Tool instances by iterating through the returned tools in `patches._get_all_tools()`.
         - In each loop iteration, `run_single_turn()` or `run_single_turn_streamed()` is responsible for calling the Responses API, patched with `run_internal.run_loop.run_single_turn()` and `patches._run_single_turn_streamed()`.
     4. On loop termination, `run_internal.turn_resolution.execute_final_output()` is called. The function is patched with `patches._execute_final_output()`.
 
