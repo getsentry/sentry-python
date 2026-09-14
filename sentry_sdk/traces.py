@@ -114,6 +114,14 @@ _DEFAULT_PARENT_SPAN = object()
 
 
 class _AgentFrameworkGenerationContext:
+    """
+    A context manager that wraps `start_span()`, and sets and cleans up the `_agent_framework_generation_entered`
+    scope member.
+
+    Agent framework integrations should use this class to create chat client spans. By using this context
+    manager, chat client spans in "lower-level" client libraries are suppressed.
+    """
+
     def __init__(
         self,
         name: str,

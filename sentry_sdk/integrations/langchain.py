@@ -408,14 +408,13 @@ class SentryLangchainCallback(BaseCallbackHandler):
                 or ""
             )
 
-            context = self._create_generation_span(
+            span = self._create_span(
                 run_id,
                 parent_run_id,
                 op=OP.GEN_AI_TEXT_COMPLETION,
                 name=f"text_completion {model}".strip(),
                 origin=LangchainIntegration.origin,
             )
-            span = context.span
 
             span.set_attribute(SPANDATA.GEN_AI_OPERATION_NAME, "text_completion")
 
