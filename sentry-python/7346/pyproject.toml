@@ -1,0 +1,11 @@
+[project]
+name = "repro-sentry-python-7346"
+version = "0.1.0"
+description = "Reproduction for getsentry/sentry-python#7346"
+requires-python = ">=3.9"
+dependencies = ["sentry-sdk"]
+
+[tool.uv.sources]
+# `data_collection` is an unreleased `_experiments` option, so the
+# reproduction runs against this checkout rather than a PyPI release.
+sentry-sdk = { path = "../..", editable = true }
