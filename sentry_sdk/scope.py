@@ -212,7 +212,6 @@ class Scope:
         "_extras",
         "_breadcrumbs",
         "_n_breadcrumbs_truncated",
-        "_gen_ai_original_message_count",
         "_gen_ai_conversation_id",
         "_event_processors",
         "_error_processors",
@@ -243,7 +242,6 @@ class Scope:
         self._name: "Optional[str]" = None
         self._propagation_context: "Optional[PropagationContext]" = None
         self._n_breadcrumbs_truncated: int = 0
-        self._gen_ai_original_message_count: "Dict[str, int]" = {}
 
         self._server_segment_span: "Optional[StreamedSpan]" = None
 
@@ -279,7 +277,6 @@ class Scope:
 
         rv._breadcrumbs = copy(self._breadcrumbs)
         rv._n_breadcrumbs_truncated = self._n_breadcrumbs_truncated
-        rv._gen_ai_original_message_count = self._gen_ai_original_message_count.copy()
         rv._event_processors = self._event_processors.copy()
         rv._error_processors = self._error_processors.copy()
         rv._propagation_context = self._propagation_context
@@ -1629,10 +1626,6 @@ class Scope:
         if scope._n_breadcrumbs_truncated:
             self._n_breadcrumbs_truncated = (
                 self._n_breadcrumbs_truncated + scope._n_breadcrumbs_truncated
-            )
-        if scope._gen_ai_original_message_count:
-            self._gen_ai_original_message_count.update(
-                scope._gen_ai_original_message_count
             )
         if scope._gen_ai_conversation_id:
             self._gen_ai_conversation_id = scope._gen_ai_conversation_id
