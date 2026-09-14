@@ -41,7 +41,6 @@ from sentry_sdk.utils import (
     capture_internal_exception,
     capture_internal_exceptions,
     datetime_from_isoformat,
-    deprecation_warning,
     disable_capture_event,
     event_from_exception,
     exc_info_from_error,
@@ -719,75 +718,15 @@ class Scope:
         """When set this overrides the default fingerprint."""
         self._fingerprint = value
 
-    @property
-    def transaction(self) -> "Any":
-        # would be type: () -> Optional[Transaction], see https://github.com/python/mypy/issues/3004
-        """Return the transaction (root span) in the scope, if any."""
-
-        # there is no span/transaction on the scope
-        if self._span is None:
-            return None
-
-        if isinstance(self._span, StreamedSpan):
-            deprecation_warning(
-                "Scope.transaction is not available in streaming mode.",
-            )
-            return None
-
-        # there is an orphan span on the scope
-        if self._span.containing_transaction is None:
-            return None
-
-        # there is either a transaction (which is its own containing
-        # transaction) or a non-orphan span on the scope
-        return self._span.containing_transaction
-
-    @transaction.setter
-    def transaction(self, value: "Any") -> None:
-        # would be type: (Optional[str]) -> None, see https://github.com/python/mypy/issues/3004
-        """When set this forces a specific transaction name to be set.
-
-        Deprecated: use set_transaction_name instead."""
-
-        # XXX: the docstring above is misleading. The implementation of
-        # apply_to_event prefers an existing value of event.transaction over
-        # anything set in the scope.
-        # XXX: note that with the introduction of the Scope.transaction getter,
-        # there is a semantic and type mismatch between getter and setter. The
-        # getter returns a Transaction, the setter sets a transaction name.
-        # Without breaking version compatibility, we could make the setter set a
-        # transaction name or transaction (self._span) depending on the type of
-        # the value argument.
-
-        logger.warning(
-            "Assigning to scope.transaction directly is deprecated: use scope.set_transaction_name() instead."
-        )
-        self._transaction = value
-        if self._span:
-            if isinstance(self._span, StreamedSpan):
-                deprecation_warning(
-                    "Scope.transaction is not available in streaming mode.",
-                )
-                return None
-
-            if self._span.containing_transaction:
-                self._span.containing_transaction.name = value
-
     def set_transaction_name(self, name: str, source: "Optional[str]" = None) -> None:
         """Set the transaction name and optionally the transaction source."""
         self._transaction = name
         if self._span:
-            if isinstance(self._span, StreamedSpan):
-                self._span._segment.name = name
-                if source:
-                    self._span._segment.set_attribute(
-                        "sentry.segment.name.source", getattr(source, "value", source)
-                    )
-
-            elif self._span.containing_transaction:
-                self._span.containing_transaction.name = name
-                if source:
-                    self._span.containing_transaction.source = source
+            self._span._segment.name = name
+            if source:
+                self._span._segment.set_attribute(
+                    "sentry.segment.name.source", getattr(source, "value", source)
+                )
 
         if source:
             self._transaction_info["source"] = source
