@@ -179,6 +179,7 @@ def _finish_client_span(
                 streaming_span.__exit__(type(exc), exc, exc.__traceback__)
             else:
                 streaming_span.set_status(SPANSTATUS.INTERNAL_ERROR)
+                streaming_span.finish()
             raise
 
     body.read = sentry_streaming_body_read  # type: ignore
