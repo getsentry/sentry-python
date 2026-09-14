@@ -21,6 +21,7 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
   )
   ```
 
+- The FastAPI and Starlette integrations no longer eagerly consume the request body. As a result, the body is only reported in events if your handler parsed it with `Request.json()` or `Request.form()` before the event is captured.
 - The UnraisableHookIntegration is now enabled by default.
 - We now don't suppress chained exceptions in the ASGI and asyncio integrations by default. The related `suppress_asgi_chained_exceptions` experimental option was removed.
 - In the AWS Lambda and GCP integrations, the message of the warning the SDK optionally emits if a function is about to time out has changed.

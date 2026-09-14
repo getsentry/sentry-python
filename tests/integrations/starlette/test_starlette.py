@@ -1478,6 +1478,7 @@ def test_original_request_not_scrubbed(sentry_init, capture_events):
     events = capture_events()
 
     async def _error(request):
+        await request.json()
         logging.critical("Oh no!")
         assert request.headers["Authorization"] == "Bearer ohno"
         assert request.headers["Proxy-Authorization"] == "Basic ohno"
