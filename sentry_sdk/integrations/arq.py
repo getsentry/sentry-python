@@ -1,7 +1,7 @@
 import sys
 
 import sentry_sdk
-from sentry_sdk.consts import OP, SPANDATA, SPANSTATUS
+from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.integrations.logging import ignore_logger_for_events
 from sentry_sdk.scope import should_send_default_pii
@@ -125,15 +125,6 @@ def patch_run_job() -> None:
 
 
 def _capture_exception(exc_info: "ExcInfo") -> None:
-    scope = sentry_sdk.get_current_scope()
-
-    if scope.transaction is not None:
-        if exc_info[0] in ARQ_CONTROL_FLOW_EXCEPTIONS:
-            scope.transaction.set_status(SPANSTATUS.ABORTED)
-            return
-
-        scope.transaction.set_status(SPANSTATUS.INTERNAL_ERROR)
-
     if exc_info[0] in ARQ_CONTROL_FLOW_EXCEPTIONS:
         return
 
@@ -150,11 +141,6 @@ def _make_event_processor(
 ) -> "EventProcessor":
     def event_processor(event: "Event", hint: "Hint") -> "Optional[Event]":
         with capture_internal_exceptions():
-            scope = sentry_sdk.get_current_scope()
-            if scope.transaction is not None:
-                scope.transaction.name = ctx["job_name"]
-                event["transaction"] = ctx["job_name"]
-
             tags = event.setdefault("tags", {})
             tags["arq_task_id"] = ctx["job_id"]
             tags["arq_task_retry"] = ctx["job_try"] > 1
