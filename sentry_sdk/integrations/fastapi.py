@@ -126,7 +126,7 @@ async def _wrap_async_handler(
     )
     sentry_scope = sentry_sdk.get_isolation_scope()
     extractor = StarletteRequestExtractor(request)
-    info = extractor.extract_request_info()
+    info = await extractor.extract_request_info()
 
     def _make_request_event_processor(
         req: "Any", integration: "Any"
