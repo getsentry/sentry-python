@@ -7,7 +7,7 @@ from botocore.response import StreamingBody
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA, SPANSTATUS
 from sentry_sdk.integrations.boto3 import Boto3Integration
-from sentry_sdk.traces import StreamedSpan
+from sentry_sdk.traces import NoOpStreamedSpan, StreamedSpan
 from sentry_sdk.tracing import BAGGAGE_HEADER_NAME, Span
 from sentry_sdk.tracing_utils import (
     add_http_breadcrumb,
@@ -132,6 +132,9 @@ def _finish_client_span(
     parsed: "Dict[str, Any]",
 ) -> None:
     span.__exit__(None, None, None)
+
+    if isinstance(span, NoOpStreamedSpan):
+        return
 
     body = parsed.get("Body")
     if not isinstance(body, StreamingBody):
@@ -271,6 +274,14 @@ def _sentry_request_created(
 
         if has_span_streaming_enabled(client.options):
             span = sentry_sdk.traces.get_current_span()
+            # an ignored `NoOpStreamedSpan` is not activated, so
+            # `get_current_span()` may return the parent; do not enrich it.
+            if (
+                span is None
+                or span.get_attributes().get(SPANDATA.SENTRY_ORIGIN)
+                != Boto3Integration.origin
+            ):
+                return
         else:
             span = sentry_sdk.get_current_span()
         if span is None:
