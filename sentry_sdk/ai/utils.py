@@ -3,12 +3,11 @@ import json
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, Optional, Tuple, Union
+    from typing import Any, Dict, Optional, Tuple
 
-    from sentry_sdk.tracing import Span
+    from sentry_sdk.traces import StreamedSpan
 
 import sentry_sdk
-from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.utils import logger
 
 
@@ -449,25 +448,16 @@ def _normalize_data(data: "Any", unpack: bool = True) -> "Any":
 
 
 def set_data_normalized(
-    span: "Union[Span, StreamedSpan]",
+    span: "StreamedSpan",
     key: str,
     value: "Any",
     unpack: bool = True,
 ) -> None:
     normalized = _normalize_data(value, unpack=unpack)
     if isinstance(normalized, (int, float, bool, str)):
-        _set_span_data_attribute(span, key, normalized)
+        span.set_attribute(key, normalized)
     else:
-        _set_span_data_attribute(span, key, json.dumps(normalized))
-
-
-def _set_span_data_attribute(
-    span: "Union[Span, StreamedSpan]", key: str, value: "Any"
-) -> None:
-    if isinstance(span, StreamedSpan):
-        span.set_attribute(key, value)
-    else:
-        span.set_data(key, value)
+        span.set_attribute(key, json.dumps(normalized))
 
 
 def normalize_message_role(role: str) -> str:

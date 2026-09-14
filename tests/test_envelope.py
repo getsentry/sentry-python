@@ -4,20 +4,14 @@ from sentry_sdk.envelope import Envelope, Item, PayloadRef
 from sentry_sdk.session import Session
 
 
-def generate_transaction_item():
+def generate_event_item():
     return {
         "event_id": "15210411201320122115110420122013",
-        "type": "transaction",
-        "transaction": "/interactions/other-dogs/new-dog",
-        "start_timestamp": 1353568872.11122131,
-        "timestamp": 1356942672.09040815,
+        "message": "hello",
         "contexts": {
             "trace": {
                 "trace_id": "12312012123120121231201212312012",
                 "span_id": "0415201309082013",
-                "parent_span_id": None,
-                "description": "<OrganizationContext>",
-                "op": "greeting.sniff",
                 "dynamic_sampling_context": {
                     "trace_id": "12312012123120121231201212312012",
                     "sample_rate": "1.0",
@@ -28,17 +22,6 @@ def generate_transaction_item():
                 },
             }
         },
-        "spans": [
-            {
-                "description": "<OrganizationContext>",
-                "op": "greeting.sniff",
-                "parent_span_id": None,
-                "span_id": "0415201309082013",
-                "start_timestamp": 1353568872.11122131,
-                "timestamp": 1356942672.09040815,
-                "trace_id": "12312012123120121231201212312012",
-            }
-        ],
     }
 
 
@@ -49,22 +32,6 @@ def test_add_and_get_basic_event():
     envelope.add_event(expected)
 
     assert envelope.get_event() == {"message": "Hello, World!"}
-
-
-def test_add_and_get_transaction_event():
-    envelope = Envelope()
-
-    transaction_item = generate_transaction_item()
-    transaction_item.update({"event_id": "a" * 32})
-    envelope.add_transaction(transaction_item)
-
-    # typically it should not be possible to be able to add a second transaction;
-    # but we do it anyways
-    another_transaction_item = generate_transaction_item()
-    envelope.add_transaction(another_transaction_item)
-
-    # should only fetch the first inserted transaction event
-    assert envelope.get_transaction_event() == transaction_item
 
 
 def test_add_and_get_session():
@@ -87,12 +54,11 @@ def test_envelope_headers(sentry_init, capture_envelopes, monkeypatch):
 
     sentry_init(
         dsn="https://dogsarebadatkeepingsecrets@squirrelchasers.ingest.sentry.io/12312012",
-        traces_sample_rate=1.0,
         trace_lifecycle="stream",
     )
     envelopes = capture_envelopes()
 
-    capture_event(generate_transaction_item())
+    capture_event(generate_event_item())
 
     assert len(envelopes) == 1
 
@@ -246,7 +212,6 @@ def test_envelope_item_data_category_mapping():
     """Test that envelope items map to correct data categories for rate limiting."""
     test_cases = [
         ("event", "error"),
-        ("transaction", "transaction"),
         ("log", "log_item"),
         ("session", "session"),
         ("attachment", "attachment"),

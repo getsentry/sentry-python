@@ -73,7 +73,6 @@ if TYPE_CHECKING:
     from aiohttp.web_urldispatcher import UrlMappingMatchInfo
 
     from sentry_sdk._types import Attributes, Event, EventProcessor
-    from sentry_sdk.tracing import Span
     from sentry_sdk.utils import ExcInfo
 
 
@@ -343,7 +342,7 @@ def create_trace_config() -> "TraceConfig":
             parsed_url.url if parsed_url else SENSITIVE_DATA_SUBSTITUTE,
         )
 
-        span: "Union[Span, StreamedSpan, None]" = None
+        span: "Optional[StreamedSpan]" = None
         attributes: "Attributes" = {
             "sentry.op": OP.HTTP_CLIENT,
             "sentry.origin": AioHttpIntegration.origin,

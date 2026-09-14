@@ -241,32 +241,21 @@ def _get_connect_data(conn: Any, *, use_streaming_keys: bool = False) -> dict[st
 
 def _set_db_data(span: Any, conn: Any) -> None:
     """Set database-related span data from connection object."""
-    if isinstance(span, StreamedSpan):
-        set_value = span.set_attribute
-        db_system = SPANDATA.DB_SYSTEM_NAME
-        db_name = SPANDATA.DB_NAMESPACE
-    else:
-        # Remove this else block once we've completely migrated to streamed spans
-        # The use of deprecated attributes here is to ensure backwards compatibility
-        set_value = span.set_data
-        db_system = SPANDATA.DB_SYSTEM
-        db_name = SPANDATA.DB_NAME
-
-    set_value(db_system, "mysql")
-    set_value(SPANDATA.DB_DRIVER_NAME, "aiomysql")
+    span.set_attribute(SPANDATA.DB_SYSTEM_NAME, "mysql")
+    span.set_attribute(SPANDATA.DB_DRIVER_NAME, "aiomysql")
 
     host = getattr(conn, "host", None)
     if host is not None:
-        set_value(SPANDATA.SERVER_ADDRESS, host)
+        span.set_attribute(SPANDATA.SERVER_ADDRESS, host)
 
     port = getattr(conn, "port", None)
     if port is not None:
-        set_value(SPANDATA.SERVER_PORT, port)
+        span.set_attribute(SPANDATA.SERVER_PORT, port)
 
     database = getattr(conn, "db", None)
     if database is not None:
-        set_value(db_name, database)
+        span.set_attribute(SPANDATA.DB_NAMESPACE, database)
 
     user = getattr(conn, "user", None)
     if user is not None:
-        set_value(SPANDATA.DB_USER, user)
+        span.set_attribute(SPANDATA.DB_USER, user)
