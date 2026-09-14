@@ -15,7 +15,7 @@ from sentry_sdk.ai.utils import (
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.traces import StreamedSpan
+from sentry_sdk.traces import StreamedSpan, _AgentFrameworkGenerationContext
 from sentry_sdk.tracing_utils import (
     _get_value,
 )
@@ -26,7 +26,6 @@ from sentry_sdk.utils import (
     logger,
     parse_version,
 )
-from sentry_sdk.traces import _AgentFrameworkGenerationContext
 
 if TYPE_CHECKING:
     from typing import (
@@ -285,7 +284,12 @@ class SentryLangchainCallback(BaseCallbackHandler):
             if is_ignored:
                 context.__exit__(None, None, None)
             else:
-                _capture_exception(error, context.span._scope if isinstance(context, _AgentFrameworkGenerationContext) else context._scope)
+                _capture_exception(
+                    error,
+                    context.span._scope
+                    if isinstance(context, _AgentFrameworkGenerationContext)
+                    else context._scope,
+                )
                 context.__exit__(type(error), error, error.__traceback__)
 
             del self.span_map[run_id]
@@ -307,10 +311,14 @@ class SentryLangchainCallback(BaseCallbackHandler):
     ) -> "StreamedSpan":
         span = None
         if parent_id:
-            parent: "Optional[Union[StreamedSpan, _AgentFrameworkGenerationContext]]" = self.span_map.get(parent_id)
+            parent: "Optional[Union[StreamedSpan, _AgentFrameworkGenerationContext]]" = self.span_map.get(
+                parent_id
+            )
             if parent:
                 span = sentry_sdk.traces.start_span(
-                    parent_span=parent.span if isinstance(parent, _AgentFrameworkGenerationContext) else parent,
+                    parent_span=parent.span
+                    if isinstance(parent, _AgentFrameworkGenerationContext)
+                    else parent,
                     name=name,
                     attributes={
                         "sentry.op": op,
@@ -340,10 +348,14 @@ class SentryLangchainCallback(BaseCallbackHandler):
     ) -> "_AgentFrameworkGenerationContext":
         context = None
         if parent_id:
-            parent: "Optional[Union[StreamedSpan, _AgentFrameworkGenerationContext]]" = self.span_map.get(parent_id)
+            parent: "Optional[Union[StreamedSpan, _AgentFrameworkGenerationContext]]" = self.span_map.get(
+                parent_id
+            )
             if parent:
                 context = _AgentFrameworkGenerationContext(
-                    parent_span=parent.span if isinstance(parent, _AgentFrameworkGenerationContext) else parent,
+                    parent_span=parent.span
+                    if isinstance(parent, _AgentFrameworkGenerationContext)
+                    else parent,
                     name=name,
                     attributes={
                         "sentry.op": op,
@@ -582,7 +594,11 @@ class SentryLangchainCallback(BaseCallbackHandler):
                 return
 
             context = self.span_map[run_id]
-            span = context.span if isinstance(context, _AgentFrameworkGenerationContext) else context
+            span = (
+                context.span
+                if isinstance(context, _AgentFrameworkGenerationContext)
+                else context
+            )
 
             client = sentry_sdk.get_client()
 
@@ -616,7 +632,11 @@ class SentryLangchainCallback(BaseCallbackHandler):
                 return
 
             context = self.span_map[run_id]
-            span = context.span if isinstance(context, _AgentFrameworkGenerationContext) else context
+            span = (
+                context.span
+                if isinstance(context, _AgentFrameworkGenerationContext)
+                else context
+            )
 
             client = sentry_sdk.get_client()
 
@@ -753,7 +773,11 @@ class SentryLangchainCallback(BaseCallbackHandler):
                 return
 
             context = self.span_map[run_id]
-            span = context.span if isinstance(context, _AgentFrameworkGenerationContext) else context
+            span = (
+                context.span
+                if isinstance(context, _AgentFrameworkGenerationContext)
+                else context
+            )
 
             client = sentry_sdk.get_client()
 

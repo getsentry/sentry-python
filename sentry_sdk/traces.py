@@ -139,7 +139,9 @@ class _AgentFrameworkGenerationContext:
     def __enter__(self) -> "_AgentFrameworkGenerationContext":
         return self
 
-    def __exit__(self, ty: "Optional[Any]", value: "Optional[Any]", tb: "Optional[Any]") -> None:
+    def __exit__(
+        self, ty: "Optional[Any]", value: "Optional[Any]", tb: "Optional[Any]"
+    ) -> None:
         if type(self._span) is not StreamedSpan:
             self._span.__exit__(ty, value, tb)
 
