@@ -37,13 +37,8 @@ def _patch_botocore_client() -> None:
     ) -> "Any":
         """
         Own the span lifecycle for one `_make_api_call()` invocation, including
-        all retries performed by botocore.
-
-        Botocore's ``after-call-error`` event only surrounds ``_make_request``.
-        Wrapping ``_make_api_call`` also closes the span when parameter building,
-        serialization, or endpoint resolution fails before the request starts:
+        all retries performed by botocore, serialization, or endpoint resolution.
         https://github.com/boto/botocore/blob/develop/botocore/client.py
-
         https://opentelemetry.io/docs/specs/semconv/rpc/rpc-spans/#rpc-client-span
         """
         client = sentry_sdk.get_client()
