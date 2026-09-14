@@ -44,7 +44,6 @@ def app(sentry_init):
     sentry_init(
         integrations=[ChaliceIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     app = Chalice(app_name="sentry_chalice")
 

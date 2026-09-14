@@ -27,7 +27,6 @@ def test_deterministic_sampled(sentry_init, capture_items, sample_rate, sample_r
     """
     sentry_init(
         traces_sample_rate=sample_rate,
-        trace_lifecycle="stream",
     )
     items = capture_items("span")
 
@@ -56,7 +55,6 @@ def test_segment_uses_incoming_sample_rand(
     """
     sentry_init(
         traces_sample_rate=sample_rate,
-        trace_lifecycle="stream",
     )
     items = capture_items("span")
 

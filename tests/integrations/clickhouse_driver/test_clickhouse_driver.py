@@ -23,7 +23,6 @@ if clickhouse_driver.VERSION < (0, 2, 6):
 def test_clickhouse_client_breadcrumbs(sentry_init, capture_events) -> None:
     sentry_init(
         integrations=[ClickhouseDriverIntegration()],
-        trace_lifecycle="stream",
         _experiments={"record_sql_params": True},
     )
     events = capture_events()
@@ -128,7 +127,6 @@ def test_clickhouse_client_breadcrumbs_with_pii(sentry_init, capture_events) -> 
     sentry_init(
         integrations=[ClickhouseDriverIntegration()],
         send_default_pii=True,
-        trace_lifecycle="stream",
         _experiments={"record_sql_params": True},
     )
     events = capture_events()
@@ -231,7 +229,6 @@ def test_clickhouse_client_breadcrumbs_with_data_collection(
 ) -> None:
     sentry_init(
         integrations=[ClickhouseDriverIntegration()],
-        trace_lifecycle="stream",
         _experiments={"data_collection": {"database_query_data": True}},
     )
     events = capture_events()
@@ -334,7 +331,6 @@ def test_clickhouse_client_breadcrumbs_with_data_collection_disabled(
 ) -> None:
     sentry_init(
         integrations=[ClickhouseDriverIntegration()],
-        trace_lifecycle="stream",
         _experiments={"data_collection": {"database_query_data": False}},
     )
     events = capture_events()
@@ -435,7 +431,6 @@ def test_clickhouse_client_breadcrumbs_data_collection_overrides_pii(
     sentry_init(
         integrations=[ClickhouseDriverIntegration()],
         send_default_pii=True,
-        trace_lifecycle="stream",
         _experiments={"data_collection": {"database_query_data": False}},
     )
     events = capture_events()
@@ -535,7 +530,6 @@ def test_clickhouse_client_breadcrumbs_with_data_collection_default(
 ) -> None:
     sentry_init(
         integrations=[ClickhouseDriverIntegration()],
-        trace_lifecycle="stream",
         _experiments={"data_collection": {}},
     )
     events = capture_events()
@@ -639,7 +633,6 @@ def test_clickhouse_client_with_data_collection(sentry_init, capture_items) -> N
     sentry_init(
         integrations=[ClickhouseDriverIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         _experiments={
             "data_collection": {"database_query_data": True},
         },
@@ -675,7 +668,6 @@ def test_clickhouse_client_spans(
 ):
     sentry_init(
         integrations=[ClickhouseDriverIntegration()],
-        trace_lifecycle="stream",
         _experiments={
             "record_sql_params": True,
         },
@@ -812,7 +804,6 @@ def test_clickhouse_client_spans_with_pii(
 ):
     sentry_init(
         integrations=[ClickhouseDriverIntegration()],
-        trace_lifecycle="stream",
         _experiments={
             "record_sql_params": True,
         },
@@ -937,7 +928,6 @@ def test_clickhouse_client_spans_with_pii(
 def test_clickhouse_dbapi_breadcrumbs(sentry_init, capture_events) -> None:
     sentry_init(
         integrations=[ClickhouseDriverIntegration()],
-        trace_lifecycle="stream",
     )
     events = capture_events()
 
@@ -1037,7 +1027,6 @@ def test_clickhouse_dbapi_breadcrumbs_with_pii(sentry_init, capture_events) -> N
     sentry_init(
         integrations=[ClickhouseDriverIntegration()],
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
     events = capture_events()
 
@@ -1143,7 +1132,6 @@ def test_clickhouse_dbapi_spans(
 ):
     sentry_init(
         integrations=[ClickhouseDriverIntegration()],
-        trace_lifecycle="stream",
         _experiments={
             "record_sql_params": True,
         },
@@ -1277,7 +1265,6 @@ def test_clickhouse_dbapi_spans_with_pii(
 ):
     sentry_init(
         integrations=[ClickhouseDriverIntegration()],
-        trace_lifecycle="stream",
         _experiments={
             "record_sql_params": True,
         },
@@ -1411,7 +1398,6 @@ def test_span_origin(
     sentry_init(
         integrations=[ClickhouseDriverIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     items = capture_items("span")
 

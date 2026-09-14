@@ -293,7 +293,6 @@ async def test_request_info_json_body(sentry_init, capture_items):
         traces_sample_rate=1.0,
         send_default_pii=True,
         integrations=[StarletteIntegration()],
-        trace_lifecycle="stream",
     )
 
     starlette_app = starlette_app_factory()
@@ -336,7 +335,6 @@ async def test_formdata_request_body(sentry_init, capture_items):
         send_default_pii=True,
         max_request_body_size="always",
         integrations=[StarletteIntegration()],
-        trace_lifecycle="stream",
     )
 
     starlette_app = starlette_app_factory()
@@ -381,7 +379,6 @@ async def test_request_body_too_big(sentry_init, capture_items):
         traces_sample_rate=1.0,
         send_default_pii=True,
         integrations=[StarletteIntegration()],
-        trace_lifecycle="stream",
     )
 
     starlette_app = starlette_app_factory()
@@ -427,7 +424,6 @@ async def test_formdata_request_body_data_collection_http_bodies_empty(
         traces_sample_rate=1.0,
         max_request_body_size="always",
         integrations=[StarletteIntegration()],
-        trace_lifecycle="stream",
         _experiments={"data_collection": {"http_bodies": []}},
     )
 
@@ -476,7 +472,6 @@ async def test_request_body_data_collection(
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[StarletteIntegration()],
-        trace_lifecycle="stream",
         _experiments=(
             {} if data_collection is None else {"data_collection": data_collection}
         ),
@@ -514,7 +509,6 @@ async def test_request_info_no_pii(sentry_init, capture_items):
         traces_sample_rate=1.0,
         send_default_pii=False,
         integrations=[StarletteIntegration()],
-        trace_lifecycle="stream",
     )
 
     starlette_app = starlette_app_factory()
@@ -653,7 +647,6 @@ async def test_cookie_data_collection(
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[StarletteIntegration()],
-        trace_lifecycle="stream",
         **init_kwargs,
     )
 
@@ -712,7 +705,6 @@ def test_query_string_data_collection(
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[StarletteIntegration()],
-        trace_lifecycle="stream",
         **init_kwargs,
     )
 
@@ -776,7 +768,6 @@ def test_span_http_query_data_collection(
         auto_enabling_integrations=False,
         integrations=[StarletteIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         **init_kwargs,
     )
 
@@ -856,7 +847,6 @@ def test_user_info_data_collection(
         auto_enabling_integrations=False,
         integrations=[StarletteIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         **kwargs,
     )
 
@@ -933,7 +923,6 @@ def test_host_route_path_has_url_source(sentry_init, capture_items):
     sentry_init(
         integrations=[StarletteIntegration(transaction_style="url")],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     async def hosted_endpoint(request):
@@ -1062,7 +1051,6 @@ def test_user_information(sentry_init, capture_events, init_kwargs, expect_user)
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[StarletteIntegration()],
-        trace_lifecycle="stream",
         **init_kwargs,
     )
     starlette_app = starlette_app_factory(
@@ -1095,7 +1083,6 @@ def test_user_information_does_not_clobber_app_set_user(sentry_init, capture_eve
         traces_sample_rate=1.0,
         send_default_pii=True,
         integrations=[StarletteIntegration()],
-        trace_lifecycle="stream",
     )
 
     async def _set_user(request):
@@ -1132,7 +1119,6 @@ def test_middleware_spans(sentry_init, capture_items):
         traces_sample_rate=1.0,
         integrations=[StarletteIntegration(middleware_spans=True)],
         auto_enabling_integrations=False,  # disable because httpx will enable otherwise, leading to the segment span being an `http.client` sentry.op (the TestClient initiating the request), rather than the more realistic `http.server`.
-        trace_lifecycle="stream",
     )
     starlette_app = starlette_app_factory(
         middleware=[Middleware(AuthenticationMiddleware, backend=BasicAuthBackend())]
@@ -1180,7 +1166,6 @@ def test_middleware_spans_disabled(sentry_init, capture_items):
         traces_sample_rate=1.0,
         integrations=[StarletteIntegration(middleware_spans=False)],
         auto_enabling_integrations=False,  # disable because httpx will enable otherwise, leading to the segment span being an `http.client` sentry.op (the TestClient initiating the request), rather than the more realistic `http.server`.
-        trace_lifecycle="stream",
     )
     starlette_app = starlette_app_factory(
         middleware=[Middleware(AuthenticationMiddleware, backend=BasicAuthBackend())]
@@ -1210,7 +1195,6 @@ def test_middleware_callback_spans(sentry_init, capture_items):
         traces_sample_rate=1.0,
         integrations=[StarletteIntegration(middleware_spans=True)],
         auto_enabling_integrations=False,  # disable because httpx will enable otherwise, leading to the segment span being an `http.client` sentry.op (the TestClient initiating the request), rather than the more realistic `http.server`.
-        trace_lifecycle="stream",
     )
     starlette_app = starlette_app_factory(middleware=[Middleware(SampleMiddleware)])
 
@@ -1294,7 +1278,6 @@ def test_middleware_receive_send(sentry_init, capture_events):
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[StarletteIntegration()],
-        trace_lifecycle="stream",
     )
     starlette_app = starlette_app_factory(
         middleware=[Middleware(SampleReceiveSendMiddleware)]
@@ -1313,7 +1296,6 @@ def test_middleware_partial_receive_send(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[StarletteIntegration()],
-        trace_lifecycle="stream",
     )
     starlette_app = starlette_app_factory(
         middleware=[Middleware(SamplePartialReceiveSendMiddleware)]
@@ -1386,7 +1368,6 @@ def test_middleware_positional_args(sentry_init):
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[StarletteIntegration()],
-        trace_lifecycle="stream",
     )
     _ = starlette_app_factory(middleware=[Middleware(SampleMiddlewareWithArgs, "bla")])
 
@@ -1421,7 +1402,6 @@ def test_active_thread_id(sentry_init, capture_items, endpoint):
         auto_enabling_integrations=False,  # avoid legacy spans from auto-enabled integrations leaking into streaming mode
         integrations=[StarletteIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     app = starlette_app_factory()
 
@@ -1446,7 +1426,6 @@ def test_http_route(sentry_init, capture_items, endpoint):
         auto_enabling_integrations=False,
         integrations=[StarletteIntegration(transaction_style="url")],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     app = starlette_app_factory()
 
@@ -1473,7 +1452,6 @@ def test_segment_name_is_route_resolved_name_static(
         auto_enabling_integrations=False,
         integrations=[StarletteIntegration(transaction_style="url")],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     items = capture_items("span")
 
@@ -1590,7 +1568,6 @@ def test_transaction_name(
         auto_enabling_integrations=False,  # Make sure that httpx integration is not added, because it adds tracing information to the starlette test clients request.
         integrations=[StarletteIntegration(transaction_style=transaction_style)],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -1653,7 +1630,6 @@ def test_transaction_name_in_traces_sampler(
         integrations=[StarletteIntegration(transaction_style=transaction_style)],
         traces_sampler=dummy_traces_sampler,
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     app = starlette_app_factory()
@@ -1699,7 +1675,6 @@ def test_transaction_name_in_middleware(
             ),
         ],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -1731,7 +1706,6 @@ def test_span_origin(sentry_init, capture_items):
         auto_enabling_integrations=False,  # avoid httpx auto-instrumentation leaking spans
         integrations=[StarletteIntegration(middleware_spans=True)],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     starlette_app = starlette_app_factory(
         middleware=[Middleware(AuthenticationMiddleware, backend=BasicAuthBackend())]
@@ -1766,7 +1740,6 @@ def test_segment_http_method_default(sentry_init, capture_items):
         integrations=[
             StarletteIntegration(),
         ],
-        trace_lifecycle="stream",
     )
     items = capture_items("span")
 
@@ -1791,7 +1764,6 @@ def test_request_url(sentry_init, capture_items):
         integrations=[
             StarletteIntegration(),
         ],
-        trace_lifecycle="stream",
     )
 
     starlette_app = starlette_app_factory()
@@ -1829,7 +1801,6 @@ def test_segment_http_method_custom(sentry_init, capture_items):
                 ),  # capitalization does not matter
             ),
         ],
-        trace_lifecycle="stream",
     )
     items = capture_items("span")
 
@@ -1890,7 +1861,6 @@ async def test_malformed_json_request_body(sentry_init, capture_events):
         traces_sample_rate=1.0,
         send_default_pii=True,
         integrations=[StarletteIntegration()],
-        trace_lifecycle="stream",
     )
 
     starlette_app = starlette_app_factory()

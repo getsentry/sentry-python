@@ -308,7 +308,6 @@ def test_traces_sampler_gets_correct_values_in_sampling_context(
 
             init_sdk(
                 traces_sampler=traces_sampler,
-                trace_lifecycle="stream",
             )
 
             gcp_functions.worker_v1.FunctionHandler.invoke_user_function(functionhandler, event)
@@ -337,7 +336,7 @@ def test_error_has_new_trace_context_performance_enabled(run_cloud_function):
         + FUNCTIONS_PRELUDE
         + dedent(
             """
-        init_sdk(traces_sample_rate=1.0, trace_lifecycle="stream")
+        init_sdk(traces_sample_rate=1.0)
         gcp_functions.worker_v1.FunctionHandler.invoke_user_function(functionhandler, event)
         """
         )
@@ -460,7 +459,7 @@ def test_span_origin(run_cloud_function):
         + FUNCTIONS_PRELUDE
         + dedent(
             """
-        init_sdk(traces_sample_rate=1.0, trace_lifecycle="stream")
+        init_sdk(traces_sample_rate=1.0)
         gcp_functions.worker_v1.FunctionHandler.invoke_user_function(functionhandler, event)
         """
         )
@@ -483,7 +482,7 @@ def test_performance_no_error(run_cloud_function):
         + FUNCTIONS_PRELUDE
         + dedent(
             """
-        init_sdk(traces_sample_rate=1.0, trace_lifecycle="stream")
+        init_sdk(traces_sample_rate=1.0)
         gcp_functions.worker_v1.FunctionHandler.invoke_user_function(functionhandler, event)
         """
         )
@@ -517,7 +516,7 @@ def test_performance_error(run_cloud_function):
         + FUNCTIONS_PRELUDE
         + dedent(
             """
-        init_sdk(traces_sample_rate=1.0, trace_lifecycle="stream")
+        init_sdk(traces_sample_rate=1.0)
         gcp_functions.worker_v1.FunctionHandler.invoke_user_function(functionhandler, event)
         """
         )
@@ -569,7 +568,7 @@ def test_existing_trace_context(run_cloud_function):
         + FUNCTIONS_PRELUDE
         + dedent(
             """
-        init_sdk(traces_sample_rate=1.0, trace_lifecycle="stream")
+        init_sdk(traces_sample_rate=1.0)
         gcp_functions.worker_v1.FunctionHandler.invoke_user_function(functionhandler, event)
         """
         )
@@ -614,7 +613,7 @@ def test_request_attributes(run_cloud_function):
         + FUNCTIONS_PRELUDE
         + dedent(
             """
-        init_sdk(traces_sample_rate=1.0, send_default_pii=True, trace_lifecycle="stream")
+        init_sdk(traces_sample_rate=1.0, send_default_pii=True)
         gcp_functions.worker_v1.FunctionHandler.invoke_user_function(functionhandler, event)
         """
         )
@@ -655,7 +654,7 @@ def test_no_query_string_without_pii(run_cloud_function):
         + FUNCTIONS_PRELUDE
         + dedent(
             """
-        init_sdk(traces_sample_rate=1.0, send_default_pii=False, trace_lifecycle="stream")
+        init_sdk(traces_sample_rate=1.0, send_default_pii=False)
         gcp_functions.worker_v1.FunctionHandler.invoke_user_function(functionhandler, event)
         """
         )
@@ -779,7 +778,7 @@ def test_query_string_data_collection(
         + FUNCTIONS_PRELUDE
         + dedent(
             """
-        init_sdk(traces_sample_rate=1.0, trace_lifecycle="stream", %s)
+        init_sdk(traces_sample_rate=1.0, %s)
         gcp_functions.worker_v1.FunctionHandler.invoke_user_function(functionhandler, event)
         """
             % init_kwargs

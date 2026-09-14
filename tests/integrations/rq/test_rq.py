@@ -56,7 +56,6 @@ def test_basic(
     sentry_init(
         integrations=[RqIntegration()],
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
 
     queue = rq.Queue(connection=FakeRedis())
@@ -103,7 +102,6 @@ def test_job_args_kwargs_data_collection(
 ):
     sentry_init(
         integrations=[RqIntegration()],
-        trace_lifecycle="stream",
         **init_kwargs,
     )
 
@@ -132,7 +130,6 @@ def test_transport_shutdown(
 ):
     sentry_init(
         integrations=[RqIntegration()],
-        trace_lifecycle="stream",
     )
 
     queue = rq.Queue(connection=FakeRedis())
@@ -160,7 +157,6 @@ def test_worker_span_with_error(
         integrations=[RqIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
 
     queue = rq.Queue(connection=FakeRedis())
@@ -205,7 +201,6 @@ def test_error_has_trace_context_if_tracing_disabled(
 ):
     sentry_init(
         integrations=[RqIntegration()],
-        trace_lifecycle="stream",
     )
 
     queue = rq.Queue(connection=FakeRedis())
@@ -227,7 +222,6 @@ def test_tracing_enabled(
     sentry_init(
         integrations=[RqIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     queue = rq.Queue(connection=FakeRedis())
@@ -268,7 +262,6 @@ def test_tracing_disabled(
 ):
     sentry_init(
         integrations=[RqIntegration()],
-        trace_lifecycle="stream",
     )
 
     queue = rq.Queue(connection=FakeRedis())
@@ -293,7 +286,6 @@ def test_worker_span_no_error(
         integrations=[RqIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
 
     queue = rq.Queue(connection=FakeRedis())
@@ -323,7 +315,6 @@ def test_traces_sampler_gets_correct_values_in_sampling_context(
     sentry_init(
         integrations=[RqIntegration()],
         traces_sampler=traces_sampler,
-        trace_lifecycle="stream",
     )
 
     queue = rq.Queue(connection=FakeRedis())
@@ -359,7 +350,6 @@ def test_job_with_retries(
 ):
     sentry_init(
         integrations=[RqIntegration()],
-        trace_lifecycle="stream",
     )
 
     queue = rq.Queue(connection=FakeRedis())
@@ -380,7 +370,6 @@ def test_span_origin(
     sentry_init(
         integrations=[RqIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     queue = rq.Queue(connection=FakeRedis())

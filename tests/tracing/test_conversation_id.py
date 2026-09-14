@@ -5,7 +5,7 @@ def test_conversation_id_propagates_to_span_with_gen_ai_operation_name(
     sentry_init, capture_items
 ):
     """Span with gen_ai.operation.name attribute should get conversation_id."""
-    sentry_init(traces_sample_rate=1.0, trace_lifecycle="stream")
+    sentry_init(traces_sample_rate=1.0)
     items = capture_items("span")
 
     scope = sentry_sdk.get_current_scope()
@@ -29,7 +29,7 @@ def test_conversation_id_propagates_to_span_with_gen_ai_operation_name(
 
 def test_conversation_id_propagates_to_span_with_ai_op(sentry_init, capture_items):
     """Span with ai.* op should get conversation_id."""
-    sentry_init(traces_sample_rate=1.0, trace_lifecycle="stream")
+    sentry_init(traces_sample_rate=1.0)
     items = capture_items("span")
 
     scope = sentry_sdk.get_current_scope()
@@ -58,7 +58,6 @@ def test_conversation_id_propagates_to_span_with_gen_ai_op(
     """Span with gen_ai.* op should get conversation_id."""
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -82,7 +81,7 @@ def test_conversation_id_propagates_to_span_with_gen_ai_op(
 
 def test_conversation_id_not_propagated_to_non_ai_span(sentry_init, capture_items):
     """Non-AI span should NOT get conversation_id."""
-    sentry_init(traces_sample_rate=1.0, trace_lifecycle="stream")
+    sentry_init(traces_sample_rate=1.0)
     items = capture_items("span")
 
     scope = sentry_sdk.get_current_scope()
@@ -106,7 +105,7 @@ def test_conversation_id_not_propagated_to_non_ai_span(sentry_init, capture_item
 
 def test_conversation_id_not_propagated_when_not_set(sentry_init, capture_items):
     """AI span should not have conversation_id if not set on scope."""
-    sentry_init(traces_sample_rate=1.0, trace_lifecycle="stream")
+    sentry_init(traces_sample_rate=1.0)
     items = capture_items("span")
 
     scope = sentry_sdk.get_current_scope()
@@ -130,7 +129,7 @@ def test_conversation_id_not_propagated_when_not_set(sentry_init, capture_items)
 
 def test_conversation_id_not_propagated_to_span_without_op(sentry_init, capture_items):
     """Span without op and without gen_ai.operation.name should NOT get conversation_id."""
-    sentry_init(traces_sample_rate=1.0, trace_lifecycle="stream")
+    sentry_init(traces_sample_rate=1.0)
     items = capture_items("span")
 
     scope = sentry_sdk.get_current_scope()
@@ -154,7 +153,7 @@ def test_conversation_id_propagates_with_gen_ai_operation_name_no_op(
     sentry_init, capture_items
 ):
     """Span with gen_ai.operation.name but no op should still get conversation_id."""
-    sentry_init(traces_sample_rate=1.0, trace_lifecycle="stream")
+    sentry_init(traces_sample_rate=1.0)
     items = capture_items("span")
 
     scope = sentry_sdk.get_current_scope()
@@ -178,7 +177,7 @@ def test_conversation_id_propagates_with_gen_ai_operation_name_no_op(
 
 def test_conversation_id_propagates_to_segment_with_ai_op(sentry_init, capture_items):
     """Segment with ai.* op should get conversation_id."""
-    sentry_init(traces_sample_rate=1.0, trace_lifecycle="stream")
+    sentry_init(traces_sample_rate=1.0)
     items = capture_items("span")
 
     scope = sentry_sdk.get_current_scope()
@@ -197,7 +196,7 @@ def test_conversation_id_propagates_to_segment_with_ai_op(sentry_init, capture_i
 
 def test_conversation_id_not_propagated_to_non_ai_segment(sentry_init, capture_items):
     """Non-AI segment should NOT get conversation_id."""
-    sentry_init(traces_sample_rate=1.0, trace_lifecycle="stream")
+    sentry_init(traces_sample_rate=1.0)
     items = capture_items("span")
 
     scope = sentry_sdk.get_current_scope()

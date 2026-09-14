@@ -2,7 +2,7 @@ import sentry_sdk
 
 
 def test_span_origin_manual(sentry_init, capture_items):
-    sentry_init(trace_lifecycle="stream", traces_sample_rate=1.0)
+    sentry_init(traces_sample_rate=1.0)
     items = capture_items("span")
 
     with sentry_sdk.traces.start_span(name="hi"):
@@ -17,7 +17,7 @@ def test_span_origin_manual(sentry_init, capture_items):
 
 
 def test_span_origin_custom(sentry_init, capture_items):
-    sentry_init(trace_lifecycle="stream", traces_sample_rate=1.0)
+    sentry_init(traces_sample_rate=1.0)
     items = capture_items("span")
 
     with sentry_sdk.traces.start_span(

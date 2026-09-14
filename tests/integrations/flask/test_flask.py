@@ -114,7 +114,6 @@ def test_transaction_or_segment_style(
             flask_sentry.FlaskIntegration(transaction_style=transaction_style)
         ],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -140,7 +139,6 @@ def test_http_route(
     sentry_init(
         integrations=[flask_sentry.FlaskIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     items = capture_items("span")
 
@@ -253,7 +251,6 @@ def test_flask_login_configured(
         integrations=[flask_sentry.FlaskIntegration()],
         send_default_pii=send_default_pii,
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     class User:
@@ -787,7 +784,6 @@ def test_tracing_success(
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[flask_sentry.FlaskIntegration()],
-        trace_lifecycle="stream",
     )
 
     @app.before_request
@@ -830,7 +826,6 @@ def test_tracing_error(sentry_init, capture_events, capture_items, app):
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[flask_sentry.FlaskIntegration()],
-        trace_lifecycle="stream",
     )
 
     items = capture_items("event", "span")
@@ -988,7 +983,6 @@ def test_span_origin(sentry_init, app, capture_events, capture_items):
     sentry_init(
         integrations=[flask_sentry.FlaskIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -1016,7 +1010,6 @@ def test_segment_http_method_default(
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[flask_sentry.FlaskIntegration()],
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -1058,7 +1051,6 @@ def test_segment_http_method_custom(
                 )  # capitalization does not matter
             )  # case does not matter
         ],
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -1204,7 +1196,6 @@ def test_span_http_query_data_collection(
     sentry_init(
         integrations=[flask_sentry.FlaskIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         **init_kwargs,
     )
     monkeypatch.setattr(flask_sentry, "flask_login", None)
@@ -1265,7 +1256,6 @@ def test_user_info_span_attributes_data_collection(
     sentry_init(
         integrations=[flask_sentry.FlaskIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         _experiments=experiments,
         **init_kwargs,
     )
@@ -1400,7 +1390,6 @@ def test_flask_login_user_identity_span_attributes_data_collection(
     sentry_init(
         integrations=[flask_sentry.FlaskIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         _experiments=experiments,
         **init_kwargs,
     )

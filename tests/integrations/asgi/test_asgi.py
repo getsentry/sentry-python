@@ -180,7 +180,6 @@ async def test_capture_transaction(
     sentry_init(
         send_default_pii=should_send_pii,
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     app = SentryAsgiMiddleware(asgi3_app)
 
@@ -222,7 +221,6 @@ async def test_capture_transaction_with_error(
     sentry_init(
         send_default_pii=True,
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     app = SentryAsgiMiddleware(asgi3_app_with_error)
@@ -266,7 +264,6 @@ async def test_has_trace_if_performance_enabled(
 ):
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     app = SentryAsgiMiddleware(asgi3_app_with_error_and_msg)
 
@@ -331,7 +328,6 @@ async def test_trace_from_headers_if_performance_enabled(
 ):
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     app = SentryAsgiMiddleware(asgi3_app_with_error_and_msg)
 
@@ -404,7 +400,6 @@ async def test_websocket(
     sentry_init(
         send_default_pii=True,
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     asgi3_ws_app = SentryAsgiMiddleware(asgi3_ws_app)
@@ -446,7 +441,6 @@ async def test_auto_session_tracking_with_aggregates(
     sentry_init(
         send_default_pii=True,
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     app = SentryAsgiMiddleware(asgi3_app)
 
@@ -514,7 +508,6 @@ async def test_transaction_style(
     sentry_init(
         send_default_pii=True,
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     app = SentryAsgiMiddleware(asgi3_app, transaction_style=transaction_style)
 
@@ -691,7 +684,6 @@ async def test_get_request_attributes_url_with_filtered_host(
     sentry_init(
         send_default_pii=True,
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         _experiments={
             "data_collection": {
                 "http_headers": {"request": {"mode": "allowlist", "terms": []}}
@@ -723,7 +715,6 @@ async def test_get_request_attributes_url_with_headers_off(
     sentry_init(
         send_default_pii=True,
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         _experiments={
             "data_collection": {"http_headers": {"request": {"mode": "off"}}},
         },
@@ -839,7 +830,6 @@ async def test_get_request_attributes_query_data_collection(
 ):
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         **init_kwargs,
     )
     app = SentryAsgiMiddleware(asgi3_app)
@@ -916,7 +906,6 @@ async def test_get_request_attributes_client_address_user_info(
 ):
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         **init_kwargs,
     )
     app = SentryAsgiMiddleware(asgi3_app)
@@ -972,7 +961,6 @@ async def test_transaction_name(
     """
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -1036,7 +1024,6 @@ async def test_transaction_name_in_traces_sampler(
     sentry_init(
         traces_sampler=dummy_traces_sampler,
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     app = SentryAsgiMiddleware(asgi3_app, transaction_style=transaction_style)
@@ -1053,7 +1040,6 @@ async def test_custom_transaction_name(
 ):
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     app = SentryAsgiMiddleware(asgi3_custom_transaction_app)
 
@@ -1132,7 +1118,6 @@ async def test_user_ip_address_on_all_spans(
 
     kwargs = dict(init_kwargs)
     sentry_init(
-        trace_lifecycle="stream",
         traces_sample_rate=1.0,
         **kwargs,
     )

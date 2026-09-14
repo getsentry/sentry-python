@@ -39,7 +39,6 @@ def test_botocore_merges_propagation_before_sigv4_signing(
 ):
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         default_integrations=False,
         integrations=[Boto3Integration(), StdlibIntegration()],
     )
@@ -125,7 +124,6 @@ def test_botocore_without_boto3_integration_preserves_signed_baggage(
     """Leave signed `baggage` as-is; add unsigned `sentry-trace`."""
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         default_integrations=False,
         integrations=[StdlibIntegration()],
     )
@@ -176,7 +174,6 @@ def test_presigned_urls_do_not_require_sentry_headers(sentry_init):
         traces_sample_rate=1.0,
         default_integrations=False,
         integrations=[Boto3Integration(), StdlibIntegration()],
-        trace_lifecycle="stream",
     )
     client = boto3.client(  # type: ignore[attr-defined]
         "s3",
