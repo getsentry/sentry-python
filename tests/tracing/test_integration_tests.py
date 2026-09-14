@@ -8,7 +8,6 @@ import pytest
 
 import sentry_sdk
 from sentry_sdk import capture_message
-from sentry_sdk.consts import SPANSTATUS
 from sentry_sdk.transport import Transport
 from tests.conftest import TestTransportWithOptions
 
@@ -368,8 +367,7 @@ def test_non_error_exceptions(
     sentry_init(traces_sample_rate=1.0, trace_lifecycle="stream")
     items = capture_items()
 
-    with sentry_sdk.traces.start_span(name="hi") as segment:
-        segment.status = SPANSTATUS.OK
+    with sentry_sdk.traces.start_span(name="hi"):
         with pytest.raises(exception_cls):
             with sentry_sdk.traces.start_span(name="foo"):
                 raise exception_cls(exception_value)

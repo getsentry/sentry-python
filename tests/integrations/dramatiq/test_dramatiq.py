@@ -6,7 +6,7 @@ from dramatiq.brokers.stub import StubBroker
 from dramatiq.middleware import Middleware, SkipMessage
 
 import sentry_sdk
-from sentry_sdk.consts import SPANDATA, SPANSTATUS
+from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.dramatiq import DramatiqIntegration
 from sentry_sdk.integrations.logging import ignore_logger_for_events
 
@@ -76,7 +76,7 @@ def test_that_a_single_error_is_captured(broker, worker, capture_events, fail_fa
                 "traces_sample_rate": 1.0,
                 "trace_lifecycle": "stream",
             },
-            SPANSTATUS.INTERNAL_ERROR,
+            "error",
             False,
         ),
         (
@@ -84,7 +84,7 @@ def test_that_a_single_error_is_captured(broker, worker, capture_events, fail_fa
                 "traces_sample_rate": 1.0,
                 "trace_lifecycle": "stream",
             },
-            SPANSTATUS.OK,
+            "ok",
             False,
         ),
         (
@@ -92,7 +92,7 @@ def test_that_a_single_error_is_captured(broker, worker, capture_events, fail_fa
                 "traces_sample_rate": 1.0,
                 "trace_lifecycle": "stream",
             },
-            SPANSTATUS.INTERNAL_ERROR,
+            "error",
             True,
         ),
         (
@@ -100,7 +100,7 @@ def test_that_a_single_error_is_captured(broker, worker, capture_events, fail_fa
                 "traces_sample_rate": 1.0,
                 "trace_lifecycle": "stream",
             },
-            SPANSTATUS.OK,
+            "ok",
             True,
         ),
     ],
@@ -120,7 +120,7 @@ def test_task_transaction(
     expected_span_status,
     fail_fast,
 ):
-    task_fails = expected_span_status == SPANSTATUS.INTERNAL_ERROR
+    task_fails = expected_span_status == "error"
 
     items = capture_items("event", "span")
 
@@ -130,7 +130,7 @@ def test_task_transaction(
 
     dummy_actor.send(1, int(not task_fails))
 
-    if expected_span_status == SPANSTATUS.INTERNAL_ERROR and fail_fast:
+    if expected_span_status == "error" and fail_fast:
         with pytest.raises(ZeroDivisionError):
             broker.join(dummy_actor.queue_name, fail_fast=fail_fast)
     else:
