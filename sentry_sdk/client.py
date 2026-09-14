@@ -705,6 +705,8 @@ class _Client(BaseClient):
         if event.get("timestamp") is None:
             event["timestamp"] = datetime.now(timezone.utc)
 
+        is_checkin = event.get("type") == "check_in"
+
         if scope is not None:
             event_ = scope.apply_to_event(event, hint, self.options)
 
@@ -731,7 +733,8 @@ class _Client(BaseClient):
                 )
 
         if (
-            self.options["attach_stacktrace"]
+            not is_checkin
+            and self.options["attach_stacktrace"]
             and "exception" not in event
             and "stacktrace" not in event
             and "threads" not in event
