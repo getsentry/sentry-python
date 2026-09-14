@@ -113,6 +113,42 @@ SOURCE_FOR_STYLE = {
 _DEFAULT_PARENT_SPAN = object()
 
 
+class _AgentFrameworkGenerationContext:
+    def __init__(
+        self,
+        name: str,
+        attributes: "Optional[Attributes]" = None,
+        parent_span: "Optional[StreamedSpan]" = _DEFAULT_PARENT_SPAN,  # type: ignore[assignment]
+        active: bool = True,
+    ):
+        self._span = start_span(
+            name=name,
+            attributes=attributes,
+            parent_span=parent_span,
+            active=active,
+        )
+        if type(self._span) is not StreamedSpan:
+            return
+
+        self.span._scope._agent_framework_generation_entered = True
+
+    @property
+    def span(self) -> "StreamedSpan":
+        return self._span
+
+    def __enter__(self) -> "_AgentFrameworkGenerationContext":
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        if type(self._span) is not StreamedSpan:
+            self._span.__exit__(exc_type, exc_val, exc_tb)
+
+        try:
+            self._span.__exit__(exc_type, exc_val, exc_tb)
+        finally:
+            self._span._scope._agent_framework_generation_entered = False
+
+
 def start_span(
     name: str,
     attributes: "Optional[Attributes]" = None,

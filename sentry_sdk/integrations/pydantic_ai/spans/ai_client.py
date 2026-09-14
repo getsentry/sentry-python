@@ -1,13 +1,12 @@
 import json
 from typing import TYPE_CHECKING
 
-import sentry_sdk
 from sentry_sdk.ai.utils import (
     normalize_message_roles,
     set_data_normalized,
 )
 from sentry_sdk.consts import OP, SPANDATA
-from sentry_sdk.traces import StreamedSpan
+from sentry_sdk.traces import StreamedSpan, _AgentFrameworkGenerationContext
 from sentry_sdk.utils import safe_serialize
 
 from ..consts import SPAN_ORIGIN
@@ -268,12 +267,12 @@ def _set_output_data(
         pass
 
 
-def ai_client_span(
+def ai_client_context(
     messages: "list[ModelMessage]",
     agent: "Optional[Agent[Any, Any]]",
     model: "Model",
     model_settings: "Optional[ModelSettings]",
-) -> "StreamedSpan":
+) -> "_AgentFrameworkGenerationContext":
     """Create a span for an AI client call (model request).
 
     Args:
@@ -284,7 +283,7 @@ def ai_client_span(
     """
     model_name = _get_model_name(model) or "unknown"
 
-    span = sentry_sdk.traces.start_span(
+    context = _AgentFrameworkGenerationContext(
         name=f"chat {model_name}",
         attributes={
             "sentry.op": OP.GEN_AI_CHAT,
@@ -293,15 +292,15 @@ def ai_client_span(
         },
     )
 
-    _set_agent_data(span, agent)
-    _set_model_data(span, agent, model, model_settings)
-    _set_available_tools(span, agent)
+    _set_agent_data(context.span, agent)
+    _set_model_data(context.span, agent, model, model_settings)
+    _set_available_tools(context.span, agent)
 
     # Set input messages (full conversation history)
     if messages:
-        _set_input_messages(span, messages)
+        _set_input_messages(context.span, messages)
 
-    return span
+    return context
 
 
 def update_ai_client_span(

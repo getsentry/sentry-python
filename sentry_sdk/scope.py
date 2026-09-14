@@ -232,6 +232,7 @@ class Scope:
         "_should_capture",
         "_span",
         "_server_segment_span",
+        "_agent_framework_generation_entered",
         "_session",
         "_attachments",
         "_force_auto_session_tracking",
@@ -259,6 +260,7 @@ class Scope:
         self._gen_ai_original_message_count: "Dict[str, int]" = {}
 
         self._server_segment_span: "Optional[StreamedSpan]" = None
+        self._agent_framework_generation_entered : "bool" = False
 
         self.client: "sentry_sdk.client.BaseClient" = NonRecordingClient()
 
@@ -300,6 +302,7 @@ class Scope:
         rv._should_capture = self._should_capture
         rv._span = self._span
         rv._server_segment_span = self._server_segment_span
+        rv._agent_framework_generation_entered  = self._agent_framework_generation_entered 
         rv._session = self._session
         rv._force_auto_session_tracking = self._force_auto_session_tracking
         rv._attachments = self._attachments.copy()

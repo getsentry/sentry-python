@@ -2491,7 +2491,7 @@ async def test_ai_client_span_with_streaming_flag(
     Test that ai_client_span reads streaming flag from scope.
     """
     import sentry_sdk
-    from sentry_sdk.integrations.pydantic_ai.spans.ai_client import ai_client_span
+    from sentry_sdk.integrations.pydantic_ai.spans.ai_client import ai_client_context
 
     sentry_init(
         integrations=[PydanticAIIntegration()],
@@ -2504,7 +2504,7 @@ async def test_ai_client_span_with_streaming_flag(
     scope._contexts["pydantic_ai_agent"] = {"_streaming": True}
 
     # Create ai_client span
-    span = ai_client_span([], None, None, None)
+    span = ai_client_context([], None, None, None).span
     span.end()
 
 
@@ -2518,7 +2518,7 @@ async def test_ai_client_span_gets_agent_from_scope(
     from unittest.mock import MagicMock
 
     import sentry_sdk
-    from sentry_sdk.integrations.pydantic_ai.spans.ai_client import ai_client_span
+    from sentry_sdk.integrations.pydantic_ai.spans.ai_client import ai_client_context
 
     sentry_init(
         integrations=[PydanticAIIntegration()],
@@ -2535,7 +2535,7 @@ async def test_ai_client_span_gets_agent_from_scope(
     scope._contexts["pydantic_ai_agent"] = {"_agent": mock_agent}
 
     # Create ai_client span without passing agent
-    span = ai_client_span([], None, None, None)
+    span = ai_client_context([], None, None, None).span
     span.end()
 
 
@@ -2758,7 +2758,7 @@ def test_image_url_base64_content_in_span(
     image_url_kwargs,
     expected_content,
 ):
-    from sentry_sdk.integrations.pydantic_ai.spans.ai_client import ai_client_span
+    from sentry_sdk.integrations.pydantic_ai.spans.ai_client import ai_client_context
 
     sentry_init(
         integrations=[PydanticAIIntegration()],
@@ -2776,7 +2776,7 @@ def test_image_url_base64_content_in_span(
     mock_msg.parts = [user_part]
     mock_msg.instructions = None
 
-    span = ai_client_span([mock_msg], None, None, None)
+    span = ai_client_context([mock_msg], None, None, None).span
     span.end()
 
     sentry_sdk.flush()

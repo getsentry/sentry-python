@@ -26,6 +26,7 @@ from sentry_sdk.utils import (
     logger,
     parse_version,
 )
+from sentry_sdk.traces import _AgentFrameworkGenerationContext
 
 if TYPE_CHECKING:
     from typing import (
@@ -269,7 +270,7 @@ class SentryLangchainCallback(BaseCallbackHandler):
     """Callback handler that creates Sentry spans."""
 
     def __init__(self, include_prompts: bool) -> None:
-        self.span_map: "OrderedDict[UUID, StreamedSpan]" = OrderedDict()
+        self.span_map: "OrderedDict[UUID, Union[StreamedSpan, _AgentFrameworkGenerationContext]]" = OrderedDict()
         self.include_prompts = include_prompts
 
     def _handle_error(self, run_id: "UUID", error: "Any") -> None:
@@ -279,13 +280,13 @@ class SentryLangchainCallback(BaseCallbackHandler):
             if not run_id or run_id not in self.span_map:
                 return
 
-            span = self.span_map[run_id]
+            context = self.span_map[run_id]
 
             if is_ignored:
-                span.__exit__(None, None, None)
+                context.__exit__(None, None, None)
             else:
-                _capture_exception(error, span._scope)
-                span.__exit__(type(error), error, error.__traceback__)
+                _capture_exception(error, context.span._scope if isinstance(context, _AgentFrameworkGenerationContext) else context._scope)
+                context.__exit__(type(error), error, error.__traceback__)
 
             del self.span_map[run_id]
 
@@ -306,10 +307,10 @@ class SentryLangchainCallback(BaseCallbackHandler):
     ) -> "StreamedSpan":
         span = None
         if parent_id:
-            parent_span: "Optional[StreamedSpan]" = self.span_map.get(parent_id)
-            if parent_span:
+            parent: "Optional[Union[StreamedSpan, _AgentFrameworkGenerationContext]]" = self.span_map.get(parent_id)
+            if parent:
                 span = sentry_sdk.traces.start_span(
-                    parent_span=parent_span,
+                    parent_span=parent.span if isinstance(parent, _AgentFrameworkGenerationContext) else parent,
                     name=name,
                     attributes={
                         "sentry.op": op,
@@ -328,6 +329,39 @@ class SentryLangchainCallback(BaseCallbackHandler):
 
         self.span_map[run_id] = span
         return span
+
+    def _create_generation_span(
+        self: "SentryLangchainCallback",
+        run_id: "UUID",
+        parent_id: "Optional[Any]",
+        op: str,
+        name: str,
+        origin: str,
+    ) -> "_AgentFrameworkGenerationContext":
+        context = None
+        if parent_id:
+            parent: "Optional[Union[StreamedSpan, _AgentFrameworkGenerationContext]]" = self.span_map.get(parent_id)
+            if parent:
+                context = _AgentFrameworkGenerationContext(
+                    parent_span=parent.span if isinstance(parent, _AgentFrameworkGenerationContext) else parent,
+                    name=name,
+                    attributes={
+                        "sentry.op": op,
+                        "sentry.origin": origin,
+                    },
+                )
+
+        if context is None:
+            context = _AgentFrameworkGenerationContext(
+                name=name,
+                attributes={
+                    "sentry.op": op,
+                    "sentry.origin": origin,
+                },
+            )
+
+        self.span_map[run_id] = context
+        return context
 
     def _exit_span(
         self: "SentryLangchainCallback",
@@ -362,13 +396,14 @@ class SentryLangchainCallback(BaseCallbackHandler):
                 or ""
             )
 
-            span = self._create_span(
+            context = self._create_generation_span(
                 run_id,
                 parent_run_id,
                 op=OP.GEN_AI_TEXT_COMPLETION,
                 name=f"text_completion {model}".strip(),
                 origin=LangchainIntegration.origin,
             )
+            span = context.span
 
             span.set_attribute(SPANDATA.GEN_AI_OPERATION_NAME, "text_completion")
 
@@ -452,13 +487,14 @@ class SentryLangchainCallback(BaseCallbackHandler):
                 or ""
             )
 
-            span = self._create_span(
+            context = self._create_generation_span(
                 run_id,
                 kwargs.get("parent_run_id"),
                 op=OP.GEN_AI_CHAT,
                 name=f"chat {model}".strip(),
                 origin=LangchainIntegration.origin,
             )
+            span = context.span
 
             span.set_attribute(SPANDATA.GEN_AI_OPERATION_NAME, "chat")
             if model:
@@ -545,7 +581,8 @@ class SentryLangchainCallback(BaseCallbackHandler):
             if not run_id or run_id not in self.span_map:
                 return
 
-            span = self.span_map[run_id]
+            context = self.span_map[run_id]
+            span = context.span if isinstance(context, _AgentFrameworkGenerationContext) else context
 
             client = sentry_sdk.get_client()
 
@@ -578,7 +615,8 @@ class SentryLangchainCallback(BaseCallbackHandler):
             if not run_id or run_id not in self.span_map:
                 return
 
-            span = self.span_map[run_id]
+            context = self.span_map[run_id]
+            span = context.span if isinstance(context, _AgentFrameworkGenerationContext) else context
 
             client = sentry_sdk.get_client()
 
@@ -714,7 +752,8 @@ class SentryLangchainCallback(BaseCallbackHandler):
             if not run_id or run_id not in self.span_map:
                 return
 
-            span = self.span_map[run_id]
+            context = self.span_map[run_id]
+            span = context.span if isinstance(context, _AgentFrameworkGenerationContext) else context
 
             client = sentry_sdk.get_client()
 
