@@ -541,14 +541,13 @@ def test_data_category_limits(
     client.transport.capture_envelope(session_envelope)
     client.flush()
 
-    # events go through but attachments are dropped
-    assert len(capturing_server.captured) == 2
+    assert not capturing_server.captured
 
-    client.capture_event({"type": "error"})
+    client.capture_event({"type": "event"})
     client.flush()
 
-    assert len(capturing_server.captured) == 3
-    assert capturing_server.captured[2].path == "/api/132/envelope/"
+    assert len(capturing_server.captured) == 1
+    assert capturing_server.captured[0].path == "/api/132/envelope/"
 
     assert captured_outcomes == [
         ("ratelimit_backoff", "session"),
