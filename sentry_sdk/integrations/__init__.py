@@ -155,7 +155,7 @@ _MIN_VERSIONS = {
     "loguru": (0, 7, 0),
     "mcp": (1, 15, 0),
     "openai": (1, 0, 0),
-    "openai_agents": (0, 0, 19),
+    "openai_agents": (0, 10, 3),
     "openfeature": (0, 7, 1),
     "pydantic_ai": (1, 76, 0),
     "pymongo": (3, 5, 0),

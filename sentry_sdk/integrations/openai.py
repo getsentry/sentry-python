@@ -984,7 +984,7 @@ def _wrap_synchronous_completions_chunk_iterator(
     with capture_internal_exceptions():
         if ttft is not None:
             set_data_normalized(
-                span, SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN, ttft
+                span, SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_CHUNK, ttft
             )
         all_responses = None
         if len(data_buf) > 0:
@@ -1052,7 +1052,7 @@ async def _wrap_asynchronous_completions_chunk_iterator(
     with capture_internal_exceptions():
         if ttft is not None:
             set_data_normalized(
-                span, SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN, ttft
+                span, SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_CHUNK, ttft
             )
         all_responses = None
         if len(data_buf) > 0:
@@ -1123,7 +1123,7 @@ def _wrap_synchronous_responses_event_iterator(
     with capture_internal_exceptions():
         if ttft is not None:
             set_data_normalized(
-                span, SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN, ttft
+                span, SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_CHUNK, ttft
             )
         if len(data_buf) > 0:
             all_responses = ["".join(chunk) for chunk in data_buf]
@@ -1193,7 +1193,7 @@ async def _wrap_asynchronous_responses_event_iterator(
     with capture_internal_exceptions():
         if ttft is not None:
             set_data_normalized(
-                span, SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN, ttft
+                span, SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_CHUNK, ttft
             )
         if len(data_buf) > 0:
             all_responses = ["".join(chunk) for chunk in data_buf]

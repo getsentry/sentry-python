@@ -151,8 +151,8 @@ def _get_model(
                     # Detect first content token (text delta event)
                     if not ttft_recorded and hasattr(event, "delta"):
                         ttft = time.perf_counter() - start_time
-                        context.span.set_attribute(
-                            SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN, ttft
+                        span.set_attribute(
+                            SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_CHUNK, ttft
                         )
                         ttft_recorded = True
 
