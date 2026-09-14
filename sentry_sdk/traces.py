@@ -139,12 +139,12 @@ class _AgentFrameworkGenerationContext:
     def __enter__(self) -> "_AgentFrameworkGenerationContext":
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+    def __exit__(self, ty: "Optional[Any]", value: "Optional[Any]", tb: "Optional[Any]") -> None:
         if type(self._span) is not StreamedSpan:
-            self._span.__exit__(exc_type, exc_val, exc_tb)
+            self._span.__exit__(ty, value, tb)
 
         try:
-            self._span.__exit__(exc_type, exc_val, exc_tb)
+            self._span.__exit__(ty, value, tb)
         finally:
             self._span._scope._agent_framework_generation_entered = False
 
