@@ -154,6 +154,7 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 - The `update_current_span` API was removed.
 - `SanicIntegration` no longer accepts `unsampled_statuses`.
 - The `trace_ignore_status_codes` option was removed.
+- `add_attachment` no longer accepts an `add_to_transactions` argument.
 
 
 ## Deprecated

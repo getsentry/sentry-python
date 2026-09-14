@@ -174,11 +174,8 @@ def add_attachment(
     filename: "Optional[str]" = None,
     path: "Optional[str]" = None,
     content_type: "Optional[str]" = None,
-    add_to_transactions: bool = False,
 ) -> None:
-    return get_isolation_scope().add_attachment(
-        bytes, filename, path, content_type, add_to_transactions
-    )
+    return get_isolation_scope().add_attachment(bytes, filename, path, content_type)
 
 
 @scopemethod
