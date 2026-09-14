@@ -23,10 +23,10 @@ API Docs
 .. autoclass:: sentry_sdk.HttpTransport
     :members:
 
-.. autoclass:: sentry_sdk.tracing.Transaction
+.. autoclass:: sentry_sdk.traces.StreamedSpan
    :members:
 
-.. autoclass:: sentry_sdk.tracing.Span
+.. autoclass:: sentry_sdk.traces.NoOpStreamedSpan
    :members:
 
 .. autoclass:: sentry_sdk.session.Session

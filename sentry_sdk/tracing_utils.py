@@ -22,7 +22,6 @@ from sentry_sdk.utils import (
     _is_in_project_root,
     _module_in_list,
     capture_internal_exceptions,
-    deprecation_warning,
     filename_for_module,
     has_data_collection_enabled,
     is_sentry_url,
@@ -112,20 +111,6 @@ def has_tracing_enabled(options: "Optional[Dict[str, Any]]") -> bool:
     )
 
 
-def has_span_streaming_enabled(options: "Optional[dict[str, Any]]") -> bool:
-    if options is None:
-        return False
-
-    is_enabled_in_experiment_config = (options.get("_experiments") or {}).get(
-        "trace_lifecycle"
-    ) == "stream"
-
-    if options.get("trace_lifecycle") is not None:
-        return options.get("trace_lifecycle") == "stream"
-
-    return is_enabled_in_experiment_config
-
-
 @contextlib.contextmanager
 def record_sql_queries(
     cursor: "Any",
@@ -180,7 +165,7 @@ def record_sql_queries(
     if query is not None:
         additional_attributes["db.query.text"] = query
 
-    with sentry_sdk.traces.start_span(
+    with sentry_sdk.start_span(
         name="<unknown SQL query>" if query is None else query,
         attributes={
             "sentry.origin": span_origin,
@@ -381,9 +366,7 @@ def add_query_source(
     )
 
 
-def add_http_request_source(
-    span: "sentry_sdk.traces.StreamedSpan",
-) -> None:
+def add_http_request_source(span: "sentry_sdk.traces.StreamedSpan") -> None:
     """
     Adds OTel compatible source code information to a span for an outgoing HTTP request
     """
@@ -777,56 +760,6 @@ class Baggage:
         return Baggage(sentry_items, third_party_items, mutable)
 
     @classmethod
-    def populate_from_transaction(
-        cls, transaction: "sentry_sdk.tracing.Transaction"
-    ) -> "Baggage":
-        """
-        Populate fresh baggage entry with sentry_items and make it immutable
-        if this is the head SDK which originates traces.
-        """
-        client = sentry_sdk.get_client()
-        sentry_items: "Dict[str, str]" = {}
-
-        if not client.is_active():
-            return Baggage(sentry_items)
-
-        options = client.options or {}
-
-        sentry_items["trace_id"] = transaction.trace_id
-        sentry_items["sample_rand"] = f"{transaction._sample_rand:.6f}"  # noqa: E231
-
-        if options.get("environment"):
-            sentry_items["environment"] = options["environment"]
-
-        if options.get("release"):
-            sentry_items["release"] = options["release"]
-
-        if client.parsed_dsn:
-            sentry_items["public_key"] = client.parsed_dsn.public_key
-            if client.parsed_dsn.org_id:
-                sentry_items["org_id"] = client.parsed_dsn.org_id
-
-        if (
-            transaction.name
-            and transaction.source not in LOW_QUALITY_TRANSACTION_SOURCES
-        ):
-            sentry_items["transaction"] = transaction.name
-
-        if transaction.sample_rate is not None:
-            sentry_items["sample_rate"] = str(transaction.sample_rate)
-
-        if transaction.sampled is not None:
-            sentry_items["sampled"] = "true" if transaction.sampled else "false"
-
-        # there's an existing baggage but it was mutable,
-        # which is why we are creating this new baggage.
-        # However, if by chance the user put some sentry items in there, give them precedence.
-        if transaction._baggage and transaction._baggage.sentry_items:
-            sentry_items.update(transaction._baggage.sentry_items)
-
-        return Baggage(sentry_items, mutable=False)
-
-    @classmethod
     def populate_from_segment(cls, segment: "StreamedSpan") -> "Baggage":
         """
         Populate fresh baggage entry with sentry_items and make it immutable
@@ -990,109 +923,6 @@ def normalize_incoming_data(incoming_data: "Dict[str, Any]") -> "Dict[str, Any]"
 
 
 def create_span_decorator(
-    op: "Optional[Union[str, OP]]" = None,
-    name: "Optional[str]" = None,
-    attributes: "Optional[dict[str, Any]]" = None,
-) -> "Any":
-    """
-    Create a span decorator that can wrap both sync and async functions.
-
-    :param op: The operation type for the span.
-    :type op: str or :py:class:`sentry_sdk.consts.OP` or None
-    :param name: The name of the span.
-    :type name: str or None
-    :param attributes: Additional attributes to set on the span.
-    :type attributes: dict or None
-    """
-
-    def span_decorator(f: "Any") -> "Any":
-        """
-        Decorator to create a span for the given function.
-        """
-
-        @functools.wraps(f)
-        async def async_wrapper(*args: "Any", **kwargs: "Any") -> "Any":
-            current_span = get_current_span()
-
-            if current_span is None:
-                logger.debug(
-                    "Cannot create a child span for %s. "
-                    "Please start a Sentry transaction before calling this function.",
-                    qualname_from_function(f),
-                )
-                return await f(*args, **kwargs)
-
-            if isinstance(current_span, StreamedSpan):
-                deprecation_warning(
-                    "Use the @sentry_sdk.traces.trace decorator in span streaming mode.",
-                )
-                return await f(*args, **kwargs)
-
-            span_op = op or OP.FUNCTION
-            function_name = name or qualname_from_function(f) or ""
-            span_name = function_name
-
-            with current_span.start_child(
-                op=span_op,
-                name=span_name,
-            ) as span:
-                span.update_data(attributes or {})
-
-                result = await f(*args, **kwargs)
-
-                return result
-
-        try:
-            async_wrapper.__signature__ = inspect.signature(f)  # type: ignore[attr-defined]
-        except Exception:
-            pass
-
-        @functools.wraps(f)
-        def sync_wrapper(*args: "Any", **kwargs: "Any") -> "Any":
-            current_span = get_current_span()
-
-            if current_span is None:
-                logger.debug(
-                    "Cannot create a child span for %s. "
-                    "Please start a Sentry transaction before calling this function.",
-                    qualname_from_function(f),
-                )
-                return f(*args, **kwargs)
-
-            if isinstance(current_span, StreamedSpan):
-                deprecation_warning(
-                    "Use the @sentry_sdk.traces.trace decorator in span streaming mode.",
-                )
-                return f(*args, **kwargs)
-
-            span_op = op or OP.FUNCTION
-            function_name = name or qualname_from_function(f) or ""
-            span_name = function_name
-
-            with current_span.start_child(
-                op=span_op,
-                name=span_name,
-            ) as span:
-                span.update_data(attributes or {})
-
-                result = f(*args, **kwargs)
-
-                return result
-
-        try:
-            sync_wrapper.__signature__ = inspect.signature(f)  # type: ignore[attr-defined]
-        except Exception:
-            pass
-
-        if inspect.iscoroutinefunction(f):
-            return async_wrapper
-        else:
-            return sync_wrapper
-
-    return span_decorator
-
-
-def create_streaming_span_decorator(
     name: "Optional[str]" = None,
     attributes: "Optional[dict[str, Any]]" = None,
     active: bool = True,
@@ -1111,16 +941,9 @@ def create_streaming_span_decorator(
 
         @functools.wraps(f)
         async def async_wrapper(*args: "Any", **kwargs: "Any") -> "Any":
-            client = sentry_sdk.get_client()
-            if client.is_active() and not has_span_streaming_enabled(client.options):
-                logger.warning(
-                    "Using span streaming API in non-span-streaming mode. Use "
-                    "@sentry_sdk.trace instead.",
-                )
-
             span_name = name or qualname_from_function(f) or ""
 
-            with start_streaming_span(
+            with sentry_sdk.start_span(
                 name=span_name, attributes=new_attributes, active=active
             ):
                 result = await f(*args, **kwargs)
@@ -1133,16 +956,9 @@ def create_streaming_span_decorator(
 
         @functools.wraps(f)
         def sync_wrapper(*args: "Any", **kwargs: "Any") -> "Any":
-            client = sentry_sdk.get_client()
-            if client.is_active() and not has_span_streaming_enabled(client.options):
-                logger.warning(
-                    "Using span streaming API in non-span-streaming mode. Use "
-                    "@sentry_sdk.trace instead.",
-                )
-
             span_name = name or qualname_from_function(f) or ""
 
-            with start_streaming_span(
+            with sentry_sdk.start_span(
                 name=span_name, attributes=new_attributes, active=active
             ):
                 return f(*args, **kwargs)
@@ -1158,17 +974,6 @@ def create_streaming_span_decorator(
             return sync_wrapper
 
     return span_decorator
-
-
-def get_current_span(
-    scope: "Optional[sentry_sdk.Scope]" = None,
-) -> "Optional[Span]":
-    """
-    Returns the currently active span if there is one running, otherwise `None`
-    """
-    scope = scope or sentry_sdk.get_current_scope()
-    current_span = scope.span
-    return current_span
 
 
 def _generate_sample_rand(
@@ -1494,14 +1299,7 @@ from sentry_sdk.traces import (
     LOW_QUALITY_SEGMENT_SOURCES,
     StreamedSpan,
 )
-from sentry_sdk.traces import (
-    start_span as start_streaming_span,
-)
 from sentry_sdk.tracing import (
     BAGGAGE_HEADER_NAME,
-    LOW_QUALITY_TRANSACTION_SOURCES,
     SENTRY_TRACE_HEADER_NAME,
 )
-
-if TYPE_CHECKING:
-    from sentry_sdk.tracing import Span
