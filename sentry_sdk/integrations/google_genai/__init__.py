@@ -282,9 +282,6 @@ def _wrap_embed_content(f: "Callable[..., Any]") -> "Callable[..., Any]":
         if integration is None:
             return f(self, *args, **kwargs)
 
-        if sentry_sdk.get_current_scope()._agent_framework_generation_entered:
-            return f(self, *args, **kwargs)
-
         model_name, contents = prepare_embed_content_args(args, kwargs)
 
         with sentry_sdk.traces.start_span(
@@ -322,9 +319,6 @@ def _wrap_async_embed_content(f: "Callable[..., Any]") -> "Callable[..., Any]":
         integration = client.get_integration(GoogleGenAIIntegration)
         if integration is None:
             return await f(self, *args, **kwargs)
-
-        if sentry_sdk.get_current_scope()._agent_framework_generation_entered:
-            return f(self, *args, **kwargs)
 
         model_name, contents = prepare_embed_content_args(args, kwargs)
 
