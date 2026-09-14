@@ -779,8 +779,7 @@ class StarletteRequestExtractor:
                 return request_info
 
             formdata_body = getattr(self.request, "_form", None)
-            raw_body = getattr(self.request, "_body", None)
-            if formdata_body is None and raw_body:
+            if formdata_body is None and hasattr(self.request, "_body"):
                 # Raw data, do not add body just an annotation
                 request_info["data"] = AnnotatedValue.removed_because_raw_data()
                 return request_info
