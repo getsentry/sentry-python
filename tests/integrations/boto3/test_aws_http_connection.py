@@ -52,7 +52,6 @@ def test_aws_http_connection_adds_missing_unsigned_propagation_headers(
     """Add missing unsigned `sentry-trace` and `baggage`."""
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         default_integrations=False,
         integrations=[StdlibIntegration()],
     )
@@ -80,7 +79,6 @@ def test_aws_http_connection_appends_baggage_but_preserves_sentry_trace(
     """Append unsigned `baggage`; leave existing `sentry-trace` as-is."""
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         default_integrations=False,
         integrations=[StdlibIntegration()],
     )
@@ -114,7 +112,6 @@ def test_aws_http_connection_preserves_signed_propagation_headers(
     """Leave signed `sentry-trace` and `baggage` as-is."""
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         default_integrations=False,
         integrations=[StdlibIntegration()],
     )
@@ -159,7 +156,6 @@ def test_aws_http_connection_preserves_query_signed_baggage(
     """Leave query-signed `baggage` as-is; add unsigned `sentry-trace`."""
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         default_integrations=False,
         integrations=[StdlibIntegration()],
     )

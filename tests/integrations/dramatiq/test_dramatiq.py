@@ -22,7 +22,6 @@ def broker(request, sentry_init):
         sentry_init(
             integrations=[DramatiqIntegration()],
             traces_sample_rate=param,
-            trace_lifecycle="stream",
         )
     broker = StubBroker()
     broker.emit_after("process_boot")
@@ -74,7 +73,6 @@ def test_that_a_single_error_is_captured(broker, worker, capture_events, fail_fa
         (
             {
                 "traces_sample_rate": 1.0,
-                "trace_lifecycle": "stream",
             },
             "error",
             False,
@@ -82,7 +80,6 @@ def test_that_a_single_error_is_captured(broker, worker, capture_events, fail_fa
         (
             {
                 "traces_sample_rate": 1.0,
-                "trace_lifecycle": "stream",
             },
             "ok",
             False,
@@ -90,7 +87,6 @@ def test_that_a_single_error_is_captured(broker, worker, capture_events, fail_fa
         (
             {
                 "traces_sample_rate": 1.0,
-                "trace_lifecycle": "stream",
             },
             "error",
             True,
@@ -98,7 +94,6 @@ def test_that_a_single_error_is_captured(broker, worker, capture_events, fail_fa
         (
             {
                 "traces_sample_rate": 1.0,
-                "trace_lifecycle": "stream",
             },
             "ok",
             True,
@@ -166,7 +161,6 @@ def test_task_transaction(
     [
         {
             "traces_sample_rate": 1.0,
-            "trace_lifecycle": "stream",
         },
     ],
     indirect=["broker"],
@@ -528,7 +522,6 @@ def test_that_retry_exceptions_are_not_captured(
     [
         {
             "traces_sample_rate": 1.0,
-            "trace_lifecycle": "stream",
         },
     ],
     indirect=["broker"],

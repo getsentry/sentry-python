@@ -277,7 +277,6 @@ def test_should_continue_trace(
         org_id=explicit_org_id,
         strict_trace_continuation=strict_trace_continuation,
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         transport=TestTransportWithOptions,
     )
 

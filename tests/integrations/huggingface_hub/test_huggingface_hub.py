@@ -481,7 +481,6 @@ def test_text_generation(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         integrations=[HuggingfaceHubIntegration(include_prompts=include_prompts)],
-        trace_lifecycle="stream",
     )
 
     client = InferenceClient(model="test-model")
@@ -551,7 +550,6 @@ def test_text_generation_streaming(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         integrations=[HuggingfaceHubIntegration(include_prompts=include_prompts)],
-        trace_lifecycle="stream",
     )
 
     client = InferenceClient(model="test-model")
@@ -623,7 +621,6 @@ def test_chat_completion(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         integrations=[HuggingfaceHubIntegration(include_prompts=include_prompts)],
-        trace_lifecycle="stream",
     )
 
     client = get_hf_provider_inference_client()
@@ -709,7 +706,6 @@ def test_chat_completion_streaming(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         integrations=[HuggingfaceHubIntegration(include_prompts=include_prompts)],
-        trace_lifecycle="stream",
     )
 
     client = get_hf_provider_inference_client()
@@ -791,7 +787,6 @@ def test_chat_completion_api_error(
 ) -> None:
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     client = get_hf_provider_inference_client()
@@ -849,7 +844,6 @@ def test_span_status_error(
 
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     items = capture_items("event", "span")
 
@@ -893,7 +887,6 @@ def test_chat_completion_with_tools(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         integrations=[HuggingfaceHubIntegration(include_prompts=include_prompts)],
-        trace_lifecycle="stream",
     )
 
     client = get_hf_provider_inference_client()
@@ -984,7 +977,6 @@ def test_chat_completion_streaming_with_tools(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         integrations=[HuggingfaceHubIntegration(include_prompts=include_prompts)],
-        trace_lifecycle="stream",
     )
 
     client = get_hf_provider_inference_client()
@@ -1183,7 +1175,6 @@ def test_text_generation_data_collection(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         integrations=[HuggingfaceHubIntegration(include_prompts=include_prompts)],
-        trace_lifecycle="stream",
     )
     if data_collection is not None:
         sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
@@ -1318,7 +1309,6 @@ def test_text_generation_streaming_data_collection(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         integrations=[HuggingfaceHubIntegration(include_prompts=include_prompts)],
-        trace_lifecycle="stream",
     )
     if data_collection is not None:
         sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
@@ -1463,7 +1453,6 @@ def test_chat_completion_data_collection_tools(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         integrations=[HuggingfaceHubIntegration(include_prompts=include_prompts)],
-        trace_lifecycle="stream",
     )
     if data_collection is not None:
         sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
@@ -1624,7 +1613,6 @@ def test_chat_completion_streaming_data_collection_tools(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         integrations=[HuggingfaceHubIntegration(include_prompts=include_prompts)],
-        trace_lifecycle="stream",
     )
     if data_collection is not None:
         sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}

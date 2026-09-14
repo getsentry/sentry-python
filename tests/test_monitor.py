@@ -63,7 +63,6 @@ def test_segment_uses_downsampled_rate(
 ):
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         transport=UnhealthyTestTransport(),
     )
 

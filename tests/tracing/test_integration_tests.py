@@ -14,7 +14,7 @@ from tests.conftest import TestTransportWithOptions
 
 @pytest.mark.parametrize("sample_rate", [0.0, 1.0])
 def test_basic(sentry_init, capture_items, sample_rate):
-    sentry_init(traces_sample_rate=sample_rate, trace_lifecycle="stream")
+    sentry_init(traces_sample_rate=sample_rate)
     items = capture_items()
 
     with sentry_sdk.traces.start_span(name="hi"):
@@ -48,7 +48,7 @@ def test_basic(sentry_init, capture_items, sample_rate):
 
 
 def test_error_event_linked_without_performance(sentry_init, capture_items):
-    sentry_init(traces_sample_rate=None, trace_lifecycle="stream")
+    sentry_init(traces_sample_rate=None)
     items = capture_items("event")
 
     with sentry_sdk.traces.start_span(
@@ -73,7 +73,6 @@ def test_continue_trace(sentry_init, capture_items, parent_sampled, sample_rate)
     """
     sentry_init(
         traces_sample_rate=sample_rate,
-        trace_lifecycle="stream",
     )
     items = capture_items()
 
@@ -194,7 +193,6 @@ def test_dynamic_sampling_head_sdk_creates_dsc(
     sentry_init(
         traces_sample_rate=sample_rate,
         release="foo",
-        trace_lifecycle="stream",
     )
     envelopes = capture_envelopes()
 
@@ -255,7 +253,7 @@ def test_dynamic_sampling_head_sdk_creates_dsc(
     [{"traces_sample_rate": 1.0}, {"traces_sample_rate": 0.0}],
 )
 def test_memory_usage(sentry_init, capture_events, args):
-    sentry_init(**args, trace_lifecycle="stream")
+    sentry_init(**args)
 
     references = weakref.WeakSet()
 
@@ -287,7 +285,6 @@ def test_segments_do_not_go_through_before_send(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
         before_send=before_send,
-        trace_lifecycle="stream",
     )
     items = capture_items()
 
@@ -314,7 +311,6 @@ def test_start_span_after_finish(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1,
         transport=CustomTransport(),
-        trace_lifecycle="stream",
     )
     items = capture_items()
 
@@ -330,7 +326,6 @@ def test_trace_propagation_meta_head_sdk(sentry_init):
     sentry_init(
         traces_sample_rate=1.0,
         release="foo",
-        trace_lifecycle="stream",
     )
 
     sentry_sdk.traces.new_trace()
@@ -364,7 +359,7 @@ def test_trace_propagation_meta_head_sdk(sentry_init):
 def test_non_error_exceptions(
     sentry_init, capture_items, exception_cls, exception_value
 ):
-    sentry_init(traces_sample_rate=1.0, trace_lifecycle="stream")
+    sentry_init(traces_sample_rate=1.0)
     items = capture_items()
 
     with sentry_sdk.traces.start_span(name="hi"):
@@ -383,7 +378,7 @@ def test_non_error_exceptions(
 
 @pytest.mark.parametrize("exception_value", [None, 0, False])
 def test_good_sysexit_doesnt_fail_segment(sentry_init, capture_items, exception_value):
-    sentry_init(traces_sample_rate=1.0, trace_lifecycle="stream")
+    sentry_init(traces_sample_rate=1.0)
     items = capture_items()
 
     with sentry_sdk.traces.start_span(name="hi"):
@@ -428,7 +423,6 @@ def test_continue_trace_strict_trace_continuation(
         strict_trace_continuation=strict_trace_continuation,
         traces_sample_rate=1.0,
         transport=TestTransportWithOptions,
-        trace_lifecycle="stream",
     )
 
     headers = {
@@ -465,7 +459,7 @@ def test_continue_trace_forces_new_traces_when_no_propagation(
 ):
     """This is to make sure we don't have a long running trace because of TWP logic for the no propagation case."""
 
-    sentry_init(traces_sample_rate=1.0, trace_lifecycle="stream")
+    sentry_init(traces_sample_rate=1.0)
 
     sentry_sdk.traces.continue_trace({})
     with sentry_sdk.traces.start_span(name="segment1") as segment1:
@@ -481,7 +475,7 @@ def test_continue_trace_forces_new_traces_when_no_propagation(
 def test_continue_trace_forces_new_traces_when_no_propagation_with_new_trace(
     sentry_init,
 ):
-    sentry_init(traces_sample_rate=1.0, trace_lifecycle="stream")
+    sentry_init(traces_sample_rate=1.0)
 
     sentry_sdk.traces.new_trace()
     with sentry_sdk.traces.start_span(name="segment1") as segment1:

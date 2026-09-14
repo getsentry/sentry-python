@@ -53,7 +53,6 @@ async def test_basic(
     sentry_init(
         integrations=[DjangoIntegration()],
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
 
     import channels  # type: ignore[import-not-found]
@@ -115,7 +114,6 @@ async def test_async_views(
     sentry_init(
         integrations=[DjangoIntegration()],
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
 
     comm = HttpCommunicator(application, "GET", "/async_message")
@@ -151,7 +149,6 @@ async def test_http_route(
     sentry_init(
         integrations=[DjangoIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -263,7 +260,6 @@ async def test_async_middleware_spans(
     sentry_init(
         integrations=[DjangoIntegration(middleware_spans=True)],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         _experiments={
             "record_sql_params": True,
         },
@@ -310,7 +306,6 @@ async def test_has_trace_if_performance_enabled(
     sentry_init(
         integrations=[DjangoIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     comm = HttpCommunicator(asgi_application, "GET", "/view-exc-with-msg")
@@ -347,7 +342,6 @@ async def test_has_trace_if_performance_disabled(
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
-        trace_lifecycle="stream",
     )
 
     comm = HttpCommunicator(asgi_application, "GET", "/view-exc-with-msg")
@@ -385,7 +379,6 @@ async def test_trace_from_headers_if_performance_enabled(
     sentry_init(
         integrations=[DjangoIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     trace_id = "582b43a4192642f0b136d5159a501701"
@@ -429,7 +422,6 @@ async def test_trace_from_headers_if_performance_disabled(
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
-        trace_lifecycle="stream",
     )
 
     trace_id = "582b43a4192642f0b136d5159a501701"
@@ -572,7 +564,6 @@ async def test_asgi_request_body_send_default_pii(
     sentry_init(
         integrations=[DjangoIntegration()],
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
 
     comm = HttpCommunicator(
@@ -806,7 +797,6 @@ async def test_async_view(
     sentry_init(
         integrations=[DjangoIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     comm = HttpCommunicator(application, "GET", "/simple_async_view")
@@ -836,7 +826,6 @@ async def test_transaction_http_method_default(
     sentry_init(
         integrations=[DjangoIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     items = capture_items("span")
 
@@ -877,7 +866,6 @@ async def test_transaction_http_method_custom(
             )
         ],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     items = capture_items("span")
 

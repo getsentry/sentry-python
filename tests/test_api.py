@@ -38,7 +38,7 @@ def test_get_current_span_via_traces():
 
 
 def test_get_current_span_current_scope_via_traces(sentry_init):
-    sentry_init(trace_lifecycle="stream")
+    sentry_init()
 
     assert sentry_sdk.traces.get_current_span() is None
 
@@ -50,7 +50,7 @@ def test_get_current_span_current_scope_via_traces(sentry_init):
 
 
 def test_get_current_span_with_segment(sentry_init):
-    sentry_init(trace_lifecycle="stream")
+    sentry_init()
 
     assert sentry_sdk.traces.get_current_span() is None
 
@@ -59,7 +59,7 @@ def test_get_current_span_with_segment(sentry_init):
 
 
 def test_traceparent_with_tracing_enabled(sentry_init):
-    sentry_init(traces_sample_rate=1.0, trace_lifecycle="stream")
+    sentry_init(traces_sample_rate=1.0)
 
     with sentry_sdk.traces.start_span(name="span") as segment:
         expected_traceparent = "%s-%s-1" % (
@@ -70,7 +70,7 @@ def test_traceparent_with_tracing_enabled(sentry_init):
 
 
 def test_traceparent_with_tracing_disabled(sentry_init):
-    sentry_init(trace_lifecycle="stream")
+    sentry_init()
 
     propagation_context = get_isolation_scope()._propagation_context
     expected_traceparent = "%s-%s" % (
@@ -81,7 +81,7 @@ def test_traceparent_with_tracing_disabled(sentry_init):
 
 
 def test_baggage_with_tracing_disabled(sentry_init):
-    sentry_init(release="1.0.0", environment="dev", trace_lifecycle="stream")
+    sentry_init(release="1.0.0", environment="dev")
     propagation_context = get_isolation_scope()._propagation_context
     expected_baggage = (
         "sentry-trace_id={},sentry-environment=dev,sentry-release=1.0.0".format(
@@ -94,7 +94,6 @@ def test_baggage_with_tracing_disabled(sentry_init):
 def test_baggage_with_tracing_enabled(sentry_init):
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         release="1.0.0",
         environment="dev",
     )
@@ -109,7 +108,6 @@ def test_baggage_with_dsn(sentry_init):
     sentry_init(
         dsn="http://97333d956c9e40989a0139756c121c34@sentry-x.sentry-y.s.c.local/976543210",
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         release="2.0.0",
         environment="dev",
         transport=TestTransportWithOptions,
@@ -122,7 +120,7 @@ def test_baggage_with_dsn(sentry_init):
 
 
 def test_continue_trace(sentry_init):
-    sentry_init(trace_lifecycle="stream")
+    sentry_init()
 
     trace_id = "471a43a4192642f0b136d5159a501701"
     parent_span_id = "6e8f22c393e68f19"

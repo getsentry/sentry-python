@@ -155,7 +155,6 @@ def test_nonstreaming_create_message(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
 
     client = Anthropic(api_key="z")
@@ -271,7 +270,6 @@ def test_nonstreaming_create_message_data_collection(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
     if data_collection is not None:
         sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
@@ -342,7 +340,6 @@ def test_nonstreaming_create_message_data_collection_tools(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=False,
-        trace_lifecycle="stream",
     )
     if data_collection is not None:
         sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
@@ -419,7 +416,6 @@ async def test_nonstreaming_create_message_data_collection_async(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
     if data_collection is not None:
         sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
@@ -519,7 +515,6 @@ def test_nonstreaming_create_message_data_collection_outputs(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
     if data_collection is not None:
         sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
@@ -629,7 +624,6 @@ async def test_nonstreaming_create_message_data_collection_outputs_async(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
     if data_collection is not None:
         sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
@@ -695,7 +689,6 @@ async def test_nonstreaming_create_message_async(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
 
     client = AsyncAnthropic(api_key="z")
@@ -822,7 +815,6 @@ def test_streaming_create_message(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
 
     messages = [
@@ -934,7 +926,6 @@ def test_streaming_create_message_data_collection(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
     if data_collection is not None:
         sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
@@ -1060,7 +1051,6 @@ def test_streaming_create_message_data_collection_outputs(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
     if data_collection is not None:
         sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
@@ -1185,7 +1175,6 @@ def test_streaming_create_message_close(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
 
     messages = [
@@ -1287,7 +1276,6 @@ def test_streaming_create_message_api_error(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
 
     messages = [
@@ -1401,7 +1389,6 @@ def test_stream_messages(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
 
     messages = [
@@ -1523,7 +1510,6 @@ def test_stream_messages_data_collection_outputs(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
     if data_collection is not None:
         sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
@@ -1646,7 +1632,6 @@ def test_stream_messages_close(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
 
     messages = [
@@ -1752,7 +1737,6 @@ def test_stream_messages_api_error(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
 
     messages = [
@@ -1871,7 +1855,6 @@ async def test_streaming_create_message_async(
         traces_sample_rate=1.0,
         default_integrations=False,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
 
     messages = [
@@ -1995,7 +1978,6 @@ async def test_streaming_create_message_data_collection_outputs_async(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
     if data_collection is not None:
         sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
@@ -2126,7 +2108,6 @@ async def test_streaming_create_message_async_close(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
 
     messages = [
@@ -2231,7 +2212,6 @@ async def test_streaming_create_message_async_api_error(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
 
     messages = [
@@ -2349,7 +2329,6 @@ async def test_stream_message_async(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
 
     messages = [
@@ -2473,7 +2452,6 @@ async def test_stream_messages_data_collection_outputs_async(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
     if data_collection is not None:
         sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
@@ -2602,7 +2580,6 @@ async def test_stream_messages_async_api_error(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
 
     messages = [
@@ -2710,7 +2687,6 @@ async def test_stream_messages_async_close(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
 
     messages = [
@@ -2865,7 +2841,6 @@ def test_streaming_create_message_with_input_json_delta(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
 
     messages = [
@@ -3014,7 +2989,6 @@ def test_stream_messages_with_input_json_delta(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
 
     messages = [
@@ -3170,7 +3144,6 @@ async def test_streaming_create_message_with_input_json_delta_async(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
 
     messages = [
@@ -3327,7 +3300,6 @@ async def test_stream_message_with_input_json_delta_async(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
 
     messages = [
@@ -3390,7 +3362,6 @@ def test_exception_message_create(
         integrations=[AnthropicIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     client = Anthropic(api_key="z")
@@ -3418,7 +3389,6 @@ def test_span_status_error(
         integrations=[AnthropicIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     items = capture_items("event", "span")
 
@@ -3452,7 +3422,6 @@ async def test_span_status_error_async(
         integrations=[AnthropicIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     items = capture_items("event", "span")
 
@@ -3486,7 +3455,6 @@ async def test_exception_message_create_async(
         integrations=[AnthropicIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     client = AsyncAnthropic(api_key="z")
@@ -3514,7 +3482,6 @@ def test_span_origin(
         integrations=[AnthropicIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     client = Anthropic(api_key="z")
@@ -3546,7 +3513,6 @@ async def test_span_origin_async(
         integrations=[AnthropicIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     client = AsyncAnthropic(api_key="z")
@@ -3608,7 +3574,6 @@ def test_set_output_data_with_input_json_delta(sentry_init):
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
 
     span = sentry_sdk.traces.start_span(name="test")
@@ -3662,7 +3627,6 @@ def test_anthropic_message_role_mapping(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
 
     client = Anthropic(api_key="z")
@@ -3722,7 +3686,6 @@ def test_nonstreaming_create_message_with_system_prompt(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
 
     client = Anthropic(api_key="z")
@@ -3812,7 +3775,6 @@ async def test_nonstreaming_create_message_with_system_prompt_async(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
 
     client = AsyncAnthropic(api_key="z")
@@ -3942,7 +3904,6 @@ def test_streaming_create_message_with_system_prompt(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
 
     messages = [
@@ -4072,7 +4033,6 @@ def test_stream_messages_with_system_prompt(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
 
     messages = [
@@ -4201,7 +4161,6 @@ async def test_stream_message_with_system_prompt_async(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
 
     messages = [
@@ -4332,7 +4291,6 @@ async def test_streaming_create_message_with_system_prompt_async(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
 
     messages = [
@@ -4411,7 +4369,6 @@ def test_system_prompt_with_complex_structure(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
 
     client = Anthropic(api_key="z")
@@ -4637,7 +4594,6 @@ def test_message_with_url_image(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
 
     client = Anthropic(api_key="z")
@@ -4687,7 +4643,6 @@ def test_message_with_file_image(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
 
     client = Anthropic(api_key="z")
@@ -4738,7 +4693,6 @@ def test_message_with_url_pdf(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
 
     client = Anthropic(api_key="z")
@@ -4788,7 +4742,6 @@ def test_message_with_file_document(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
 
     client = Anthropic(api_key="z")
@@ -4839,7 +4792,6 @@ def test_binary_content_not_stored_when_pii_disabled(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=False,
-        trace_lifecycle="stream",
     )
 
     client = Anthropic(api_key="z")
@@ -4883,7 +4835,6 @@ def test_binary_content_not_stored_when_prompts_disabled(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
 
     client = Anthropic(api_key="z")
@@ -4926,7 +4877,6 @@ def test_cache_tokens_nonstreaming(
         integrations=[AnthropicIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     client = Anthropic(api_key="z")
@@ -4983,7 +4933,6 @@ def test_input_tokens_include_cache_write_nonstreaming(
         integrations=[AnthropicIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     client = Anthropic(api_key="z")
@@ -5040,7 +4989,6 @@ def test_input_tokens_include_cache_read_nonstreaming(
         integrations=[AnthropicIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     client = Anthropic(api_key="z")
@@ -5123,7 +5071,6 @@ def test_input_tokens_include_cache_read_streaming(
         integrations=[AnthropicIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     items = capture_items("span")
 
@@ -5194,7 +5141,6 @@ def test_stream_messages_input_tokens_include_cache_read_streaming(
         integrations=[AnthropicIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     items = capture_items("span")
 
@@ -5234,7 +5180,6 @@ def test_input_tokens_unchanged_without_caching(
         integrations=[AnthropicIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     client = Anthropic(api_key="z")
@@ -5308,7 +5253,6 @@ def test_cache_tokens_streaming(
         integrations=[AnthropicIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     items = capture_items("span")
 
@@ -5376,7 +5320,6 @@ def test_stream_messages_cache_tokens(
         integrations=[AnthropicIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     items = capture_items("span")
 

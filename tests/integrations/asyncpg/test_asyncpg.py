@@ -102,7 +102,6 @@ async def test_connect(
 ) -> None:
     sentry_init(
         integrations=[AsyncPGIntegration()],
-        trace_lifecycle="stream",
         _experiments={
             "record_sql_params": True,
         },
@@ -132,7 +131,6 @@ async def test_execute(
 ) -> None:
     sentry_init(
         integrations=[AsyncPGIntegration()],
-        trace_lifecycle="stream",
         _experiments={
             "record_sql_params": True,
         },
@@ -205,7 +203,6 @@ async def test_execute_many(
 ) -> None:
     sentry_init(
         integrations=[AsyncPGIntegration()],
-        trace_lifecycle="stream",
         _experiments={
             "record_sql_params": True,
         },
@@ -248,7 +245,6 @@ async def test_record_params(sentry_init, capture_events) -> None:
     sentry_init(
         integrations=[AsyncPGIntegration(record_params=True)],
         _experiments={"record_sql_params": True},
-        trace_lifecycle="stream",
     )
     events = capture_events()
 
@@ -289,7 +285,6 @@ async def test_cursor(sentry_init, capture_events) -> None:
     sentry_init(
         integrations=[AsyncPGIntegration()],
         _experiments={"record_sql_params": True},
-        trace_lifecycle="stream",
     )
     events = capture_events()
 
@@ -344,7 +339,6 @@ async def test_cursor_manual(sentry_init, capture_events) -> None:
     sentry_init(
         integrations=[AsyncPGIntegration()],
         _experiments={"record_sql_params": True},
-        trace_lifecycle="stream",
     )
     events = capture_events()
 
@@ -407,7 +401,6 @@ async def test_prepared_stmt(sentry_init, capture_events) -> None:
     sentry_init(
         integrations=[AsyncPGIntegration()],
         _experiments={"record_sql_params": True},
-        trace_lifecycle="stream",
     )
     events = capture_events()
 
@@ -457,7 +450,6 @@ async def test_connection_pool(sentry_init, capture_events) -> None:
     sentry_init(
         integrations=[AsyncPGIntegration()],
         _experiments={"record_sql_params": True},
-        trace_lifecycle="stream",
     )
     events = capture_events()
 
@@ -528,7 +520,6 @@ async def test_query_source_disabled(
         traces_sample_rate=1.0,
         enable_db_query_source=False,
         db_query_source_threshold_ms=0,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -573,7 +564,6 @@ async def test_query_source_enabled(
         "integrations": [AsyncPGIntegration()],
         "traces_sample_rate": 1.0,
         "db_query_source_threshold_ms": 0,
-        "trace_lifecycle": "stream",
     }
     if enable_db_query_source is not None:
         sentry_options["enable_db_query_source"] = enable_db_query_source
@@ -614,7 +604,6 @@ async def test_query_source(sentry_init, capture_items):
         traces_sample_rate=1.0,
         enable_db_query_source=True,
         db_query_source_threshold_ms=0,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -651,7 +640,6 @@ async def test_query_source_with_module_in_search_path(
         traces_sample_rate=1.0,
         enable_db_query_source=True,
         db_query_source_threshold_ms=0,
-        trace_lifecycle="stream",
     )
 
     from asyncpg_helpers.helpers import execute_query_in_connection
@@ -707,7 +695,6 @@ async def test_no_query_source_if_duration_too_short(
         traces_sample_rate=1.0,
         enable_db_query_source=True,
         db_query_source_threshold_ms=100000,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -747,7 +734,6 @@ async def test_query_source_if_duration_over_threshold(sentry_init, capture_item
     sentry_init(
         integrations=[AsyncPGIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         enable_db_query_source=True,
         db_query_source_threshold_ms=100,
     )
@@ -797,7 +783,6 @@ async def test_span_origin(sentry_init, capture_items):
     sentry_init(
         integrations=[AsyncPGIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -837,7 +822,6 @@ async def test_multiline_query_description_normalized(
     sentry_init(
         integrations=[AsyncPGIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -899,7 +883,6 @@ async def test_query_source_execute(
         traces_sample_rate=1.0,
         enable_db_query_source=True,
         db_query_source_threshold_ms=0,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -939,7 +922,6 @@ async def test_query_source_executemany(
         traces_sample_rate=1.0,
         enable_db_query_source=True,
         db_query_source_threshold_ms=0,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -976,7 +958,6 @@ async def test_query_source_prepare(
         traces_sample_rate=1.0,
         enable_db_query_source=True,
         db_query_source_threshold_ms=0,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -1024,7 +1005,6 @@ async def test_cursor_iteration_creates_db_cursor_iter_spans(
     sentry_init(
         integrations=[AsyncPGIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -1067,7 +1047,6 @@ async def test_cursor_fetch_methods_create_spans(
         traces_sample_rate=1.0,
         enable_db_query_source=True,
         db_query_source_threshold_ms=0,
-        trace_lifecycle="stream",
     )
 
     items = capture_items()

@@ -32,7 +32,6 @@ def test_crumb_capture_and_hint_sync(
     sentry_init(
         integrations=[HttpxIntegration()],
         before_breadcrumb=before_breadcrumb,
-        trace_lifecycle="stream",
         send_default_pii=send_default_pii,
     )
 
@@ -89,7 +88,6 @@ async def test_crumb_capture_and_hint_async(
     sentry_init(
         integrations=[HttpxIntegration()],
         before_breadcrumb=before_breadcrumb,
-        trace_lifecycle="stream",
         send_default_pii=send_default_pii,
     )
 
@@ -136,7 +134,6 @@ def test_crumb_capture_without_span_sync(sentry_init, capture_events, httpx_mock
 
     sentry_init(
         integrations=[HttpxIntegration()],
-        trace_lifecycle="stream",
     )
 
     url = "http://example.com/"
@@ -172,7 +169,6 @@ async def test_crumb_capture_without_span_async(
 
     sentry_init(
         integrations=[HttpxIntegration()],
-        trace_lifecycle="stream",
     )
 
     url = "http://example.com/"
@@ -218,7 +214,6 @@ def test_crumb_capture_client_error_sync(
 
     sentry_init(
         integrations=[HttpxIntegration()],
-        trace_lifecycle="stream",
         send_default_pii=send_default_pii,
     )
 
@@ -281,7 +276,6 @@ async def test_crumb_capture_client_error_async(
 
     sentry_init(
         integrations=[HttpxIntegration()],
-        trace_lifecycle="stream",
         send_default_pii=send_default_pii,
     )
 
@@ -388,7 +382,6 @@ def test_option_trace_propagation_targets_sync(
         release="test",
         trace_propagation_targets=trace_propagation_targets,
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         integrations=[HttpxIntegration()],
     )
 
@@ -466,7 +459,6 @@ async def test_option_trace_propagation_targets_async(
         release="test",
         trace_propagation_targets=trace_propagation_targets,
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         integrations=[HttpxIntegration()],
     )
 
@@ -486,7 +478,6 @@ def test_outgoing_trace_headers_sync(sentry_init, capture_items, httpx_mock):
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[HttpxIntegration()],
-        trace_lifecycle="stream",
     )
 
     url = "http://example.com/"
@@ -516,7 +507,6 @@ async def test_outgoing_trace_headers_async(sentry_init, capture_items, httpx_mo
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[HttpxIntegration()],
-        trace_lifecycle="stream",
     )
 
     url = "http://example.com/"
@@ -550,7 +540,6 @@ def test_outgoing_trace_headers_append_to_baggage_sync(
         traces_sample_rate=1.0,
         integrations=[HttpxIntegration()],
         release="d08ebdb9309e1b004c6f52202de58a09c2268e42",
-        trace_lifecycle="stream",
     )
 
     url = "http://example.com/"
@@ -584,7 +573,6 @@ async def test_outgoing_trace_headers_append_to_baggage_async(
         traces_sample_rate=1.0,
         integrations=[HttpxIntegration()],
         release="d08ebdb9309e1b004c6f52202de58a09c2268e42",
-        trace_lifecycle="stream",
     )
 
     url = "http://example.com/"
@@ -625,7 +613,6 @@ def test_outgoing_trace_headers_no_current_span(sentry_init, httpx_mock):
         traces_sample_rate=1.0,
         trace_propagation_targets=[MATCH_ALL],
         integrations=[HttpxIntegration()],
-        trace_lifecycle="stream",
     )
 
     url = "http://example.com/"
@@ -662,7 +649,6 @@ async def test_outgoing_trace_headers_no_current_span_async(sentry_init, httpx_m
         traces_sample_rate=1.0,
         trace_propagation_targets=[MATCH_ALL],
         integrations=[HttpxIntegration()],
-        trace_lifecycle="stream",
     )
 
     url = "http://example.com/"
@@ -694,7 +680,6 @@ def test_request_source_disabled_sync(sentry_init, capture_items, httpx_mock):
         traces_sample_rate=1.0,
         enable_http_request_source=False,
         http_request_source_threshold_ms=0,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -723,7 +708,6 @@ async def test_request_source_disabled_async(sentry_init, capture_items, httpx_m
         traces_sample_rate=1.0,
         enable_http_request_source=False,
         http_request_source_threshold_ms=0,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -756,7 +740,6 @@ def test_request_source_enabled_sync(
         "integrations": [HttpxIntegration()],
         "traces_sample_rate": 1.0,
         "http_request_source_threshold_ms": 0,
-        "trace_lifecycle": "stream",
     }
     if enable_http_request_source is not None:
         sentry_options["enable_http_request_source"] = enable_http_request_source
@@ -794,7 +777,6 @@ async def test_request_source_enabled_async(
         "integrations": [HttpxIntegration()],
         "traces_sample_rate": 1.0,
         "http_request_source_threshold_ms": 0,
-        "trace_lifecycle": "stream",
     }
     if enable_http_request_source is not None:
         sentry_options["enable_http_request_source"] = enable_http_request_source
@@ -826,7 +808,6 @@ def test_request_source_sync(sentry_init, capture_items, httpx_mock):
         traces_sample_rate=1.0,
         enable_http_request_source=True,
         http_request_source_threshold_ms=0,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -870,7 +851,6 @@ async def test_request_source_async(sentry_init, capture_items, httpx_mock):
         traces_sample_rate=1.0,
         enable_http_request_source=True,
         http_request_source_threshold_ms=0,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -920,7 +900,6 @@ def test_request_source_with_module_in_search_path_sync(
         traces_sample_rate=1.0,
         enable_http_request_source=True,
         http_request_source_threshold_ms=0,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -966,7 +945,6 @@ async def test_request_source_with_module_in_search_path_async(
         traces_sample_rate=1.0,
         enable_http_request_source=True,
         http_request_source_threshold_ms=0,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -1012,7 +990,6 @@ def test_no_request_source_if_duration_too_short_sync(
         enable_http_request_source=True,
         # Threshold so high no real request will ever exceed it
         http_request_source_threshold_ms=9999999,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -1044,7 +1021,6 @@ async def test_no_request_source_if_duration_too_short_async(
         enable_http_request_source=True,
         # Threshold so high no real request will ever exceed it
         http_request_source_threshold_ms=9999999,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -1075,7 +1051,6 @@ def test_request_source_if_duration_over_threshold_sync(
         enable_http_request_source=True,
         # Threshold of 0 means any non-zero duration qualifies
         http_request_source_threshold_ms=0,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -1125,7 +1100,6 @@ async def test_request_source_if_duration_over_threshold_async(
         enable_http_request_source=True,
         # Threshold of 0 means any non-zero duration qualifies
         http_request_source_threshold_ms=0,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -1169,7 +1143,6 @@ def test_span_origin_sync(sentry_init, capture_items, httpx_mock):
     sentry_init(
         integrations=[HttpxIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -1193,7 +1166,6 @@ async def test_span_origin_async(sentry_init, capture_items, httpx_mock):
     sentry_init(
         integrations=[HttpxIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -1220,7 +1192,6 @@ def test_http_url_attributes_sync(
         integrations=[HttpxIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -1258,7 +1229,6 @@ async def test_http_url_attributes_async(
         integrations=[HttpxIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -1295,7 +1265,6 @@ def test_http_url_attributes_no_query_or_fragment_sync(
         integrations=[HttpxIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -1331,7 +1300,6 @@ async def test_http_url_attributes_no_query_or_fragment_async(
         integrations=[HttpxIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -1441,7 +1409,6 @@ def test_url_query_data_collection_sync(
     sentry_init(
         integrations=[HttpxIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         **init_kwargs,
     )
 
@@ -1548,7 +1515,6 @@ async def test_url_query_data_collection_async(
     sentry_init(
         integrations=[HttpxIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         **init_kwargs,
     )
 
@@ -1598,7 +1564,6 @@ def test_url_full_reassembly_sync(
     sentry_init(
         integrations=[HttpxIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         **init_kwargs,
     )
 
@@ -1646,7 +1611,6 @@ async def test_url_full_reassembly_async(
     sentry_init(
         integrations=[HttpxIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         **init_kwargs,
     )
 
@@ -1701,7 +1665,6 @@ def test_url_query_params_off_keeps_bare_url_sync(
     sentry_init(
         integrations=[HttpxIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         **init_kwargs,
     )
 
@@ -1764,7 +1727,6 @@ async def test_url_query_params_off_keeps_bare_url_async(
     sentry_init(
         integrations=[HttpxIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         **init_kwargs,
     )
 
@@ -1845,7 +1807,6 @@ def test_crumb_url_query_data_collection_sync(
 
     sentry_init(
         integrations=[HttpxIntegration()],
-        trace_lifecycle="stream",
         **init_kwargs,
     )
 
@@ -1928,7 +1889,6 @@ async def test_crumb_url_query_data_collection_async(
 
     sentry_init(
         integrations=[HttpxIntegration()],
-        trace_lifecycle="stream",
         **init_kwargs,
     )
 
@@ -1963,7 +1923,6 @@ def test_omit_url_data_if_parsing_fails(
     sentry_init(
         integrations=[HttpxIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         _experiments={"data_collection": {}},
     )
 

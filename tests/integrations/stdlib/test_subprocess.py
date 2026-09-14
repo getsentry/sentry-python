@@ -60,7 +60,6 @@ def test_subprocess_basic(
     sentry_init(
         integrations=[StdlibIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     items = capture_items("event", "span")
 
@@ -172,7 +171,6 @@ def test_subprocess_empty_env(
     sentry_init(
         integrations=[StdlibIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     with sentry_sdk.traces.start_span(name="custom parent"):
         args = [
@@ -190,7 +188,6 @@ def test_subprocess_invalid_args(
 ):
     sentry_init(
         integrations=[StdlibIntegration()],
-        trace_lifecycle="stream",
     )
 
     with pytest.raises(TypeError) as excinfo:
@@ -206,7 +203,6 @@ def test_subprocess_span_origin(
     sentry_init(
         integrations=[StdlibIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     items = capture_items("span")
 

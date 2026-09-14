@@ -203,7 +203,6 @@ def test_launchdarkly_span_integration(
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[LaunchDarklyIntegration()],
-        trace_lifecycle="stream",
     )
     client = ldclient.get()
 

@@ -54,7 +54,6 @@ async def test_async_redis_pipeline(
         integrations=[RedisIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
 
     connection = FakeRedis()
@@ -91,7 +90,6 @@ async def test_async_span_origin(sentry_init, capture_events, capture_items):
     sentry_init(
         integrations=[RedisIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     connection = FakeRedis()

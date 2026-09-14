@@ -29,7 +29,6 @@ async def test_no_cache_basic(sentry_init, capture_events, capture_items):
             RedisIntegration(),
         ],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     connection = FakeRedisAsync()
@@ -54,7 +53,6 @@ async def test_cache_basic(sentry_init, capture_events, capture_items):
             ),
         ],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     connection = FakeRedisAsync()
@@ -81,7 +79,6 @@ async def test_cache_keys(sentry_init, capture_events, capture_items):
             ),
         ],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     connection = FakeRedisAsync()
@@ -131,7 +128,6 @@ async def test_cache_data(sentry_init, capture_events, capture_items):
             ),
         ],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     # Use a unique host per parametrized run so fakeredis (which shares state

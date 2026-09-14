@@ -336,7 +336,6 @@ def test_graphql_span_holds_query_information(
         traces_sample_rate=1.0,
         default_integrations=False,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
     items = capture_items("span")
 
@@ -392,7 +391,6 @@ def test_graphql_span_data_collection(
         "integrations": [GrapheneIntegration(), FlaskIntegration()],
         "traces_sample_rate": 1.0,
         "default_integrations": False,
-        "trace_lifecycle": "stream",
         "_experiments": {"data_collection": data_collection},
     }
     if send_default_pii is not None:
@@ -447,7 +445,6 @@ def test_breadcrumbs_hold_query_information_on_error(sentry_init, capture_items)
             GrapheneIntegration(),
         ],
         default_integrations=False,
-        trace_lifecycle="stream",
     )
     items = capture_items("span", "event")
 

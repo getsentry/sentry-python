@@ -410,7 +410,6 @@ def test_span_origin(
     sentry_init(
         integrations=[BottleIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -429,7 +428,6 @@ def test_basic(sentry_init, capture_items):
     sentry_init(
         integrations=[BottleIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     items = capture_items("span")
 
@@ -480,7 +478,6 @@ def test_transaction_style(
     sentry_init(
         integrations=[BottleIntegration(transaction_style=transaction_style)],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     items = capture_items("span")
 
@@ -521,7 +518,6 @@ def test_http_route(
     sentry_init(
         integrations=[BottleIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     items = capture_items("span")
 
@@ -546,7 +542,6 @@ def test_errors(sentry_init, capture_items, debug, catchall):
     sentry_init(
         integrations=[BottleIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     app = Bottle()
@@ -610,7 +605,6 @@ def test_http_error_status(
     sentry_init(
         integrations=[BottleIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     items = capture_items("span")
 
@@ -658,7 +652,6 @@ def test_failed_request_status_codes(
     sentry_init(
         integrations=[BottleIntegration(**integration_kwargs)],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     items = capture_items("event", "span")
 

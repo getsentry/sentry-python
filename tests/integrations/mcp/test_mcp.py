@@ -151,7 +151,6 @@ def test_integration_patches_server(sentry_init):
         sentry_init(
             integrations=[MCPIntegration()],
             traces_sample_rate=1.0,
-            trace_lifecycle="stream",
         )
 
         assert Server.call_tool is not original_call_tool
@@ -172,7 +171,6 @@ async def test_tool_handler_constructor_registration(sentry_init, capture_items,
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     async def test_tool(ctx, params):
@@ -217,7 +215,6 @@ async def test_mcpserver_high_level_tool_instrumented(
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     mcp_server = MCPServer("test-server")
@@ -252,7 +249,6 @@ async def test_wrapping_handler_is_idempotent(sentry_init, capture_items, stdio)
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     async def test_tool(ctx, params):
@@ -299,7 +295,6 @@ async def test_tool_handler_stdio(
         integrations=[MCPIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
 
     server = Server("test-server")
@@ -390,7 +385,6 @@ async def test_tool_handler_streamable_http(
         integrations=[MCPIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
 
     server = Server("test-server")
@@ -485,7 +479,6 @@ async def test_tool_handler_stateless_streamable_http(
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     server = Server("test-server")
@@ -540,7 +533,6 @@ async def test_tool_handler_with_error(sentry_init, capture_items, stdio):
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     server = Server("test-server")
@@ -605,7 +597,6 @@ async def test_prompt_handler_stdio(
         integrations=[MCPIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
 
     server = Server("test-server")
@@ -690,7 +681,6 @@ async def test_prompt_handler_streamable_http(
         integrations=[MCPIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
 
     server = Server("test-server")
@@ -766,7 +756,6 @@ async def test_prompt_handler_with_error(sentry_init, capture_items, stdio):
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     server = Server("test-server")
@@ -816,7 +805,6 @@ async def test_resource_handler_stdio(sentry_init, capture_items, stdio):
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     server = Server("test-server")
@@ -885,7 +873,6 @@ async def test_resource_handler_streamable_http(sentry_init, capture_items, json
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     server = Server("test-server")
@@ -960,7 +947,6 @@ async def test_resource_handler_with_error(sentry_init, capture_items, stdio):
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     server = Server("test-server")
@@ -1018,7 +1004,6 @@ async def test_tool_result_extraction_tuple(
         integrations=[MCPIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
 
     server = Server("test-server")
@@ -1086,7 +1071,6 @@ async def test_tool_result_extraction_unstructured(
         integrations=[MCPIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
 
     server = Server("test-server")
@@ -1142,7 +1126,6 @@ async def test_multiple_handlers(sentry_init, capture_items, stdio):
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     server = Server("test-server")
@@ -1261,7 +1244,6 @@ async def test_prompt_with_dict_result(
         integrations=[MCPIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
 
     server = Server("test-server")
@@ -1325,7 +1307,6 @@ async def test_tool_with_complex_arguments(sentry_init, capture_items, stdio):
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     server = Server("test-server")
@@ -1380,7 +1361,6 @@ async def test_sse_transport_detection(sentry_init, capture_items, json_rpc_sse)
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     server = Server("test-server")
@@ -1471,7 +1451,6 @@ async def test_sse_transport_detection_v2(sentry_init, capture_items, json_rpc_s
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     server = Server("test-server")
@@ -1549,7 +1528,6 @@ async def test_streamable_http_scope_propagation(sentry_init, capture_items, jso
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     server = Server("test-server")
@@ -1655,7 +1633,6 @@ async def test_tool_data_collection_inputs(
         "integrations": [MCPIntegration()],
         "traces_sample_rate": 1.0,
         "send_default_pii": send_default_pii,
-        "trace_lifecycle": "stream",
     }
     if data_collection is not None:
         init_kwargs["_experiments"] = {"data_collection": data_collection}
@@ -1761,7 +1738,6 @@ async def test_tool_data_collection_outputs(
         "integrations": [MCPIntegration()],
         "traces_sample_rate": 1.0,
         "send_default_pii": send_default_pii,
-        "trace_lifecycle": "stream",
     }
     if data_collection is not None:
         init_kwargs["_experiments"] = {"data_collection": data_collection}
@@ -1870,7 +1846,6 @@ async def test_prompt_data_collection_inputs(
         "integrations": [MCPIntegration()],
         "traces_sample_rate": 1.0,
         "send_default_pii": send_default_pii,
-        "trace_lifecycle": "stream",
     }
     if data_collection is not None:
         init_kwargs["_experiments"] = {"data_collection": data_collection}
@@ -1942,7 +1917,6 @@ async def test_include_prompts_ignored_when_data_collection_set(
         integrations=[MCPIntegration(include_prompts=False)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        trace_lifecycle="stream",
         _experiments={"data_collection": {"gen_ai": {"outputs": True}}},
     )
 
