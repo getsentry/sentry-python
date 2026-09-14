@@ -24,7 +24,6 @@ from agents.items import (
 )
 from agents.models.openai_responses import OpenAIResponsesModel
 from agents.tool import HostedMCPTool
-from agents.version import __version__ as OPENAI_AGENTS_VERSION
 from openai import AsyncOpenAI, InternalServerError
 from openai.types.responses.tool_param import CodeInterpreter, ImageGeneration
 
@@ -73,7 +72,7 @@ from sentry_sdk.integrations.logging import LoggingIntegration
 from sentry_sdk.integrations.openai_agents import OpenAIAgentsIntegration
 from sentry_sdk.integrations.openai_agents.utils import _set_input_data, safe_serialize
 from sentry_sdk.integrations.stdlib import StdlibIntegration
-from sentry_sdk.utils import package_version, parse_version
+from sentry_sdk.utils import package_version
 
 OPENAI_VERSION = package_version("openai")
 
@@ -312,9 +311,7 @@ async def test_tool_definitions(
     ]
 
     expected_available_tools = [
-        {"type": "web_search", "name": "web_search_preview"}
-        if parse_version(OPENAI_AGENTS_VERSION) < (0, 3, 0)
-        else {"type": "web_search", "name": "web_search"},
+        {"type": "web_search", "name": "web_search"},
         {"type": "file_search", "name": "file_search"},
         {"type": "computer", "name": "computer_use_preview"},
         {"type": "mcp", "name": "hosted_mcp"},
@@ -2223,15 +2220,9 @@ async def test_run_streamed_tool_execution_span(
         ),
     )
 
-    request_headers = {}
-    # openai-agents calls with_streaming_response() if available starting with
-    # https://github.com/openai/openai-agents-python/commit/159beb56130f7d85192acfd593c9168757984dc0.
-    # When using with_streaming_response() the header set below changes the response type:
-    # https://github.com/openai/openai-python/blob/656e3cab4a18262a49b961d41293367e45ee71b9/src/openai/_response.py#L67.
-    if parse_version(OPENAI_AGENTS_VERSION) >= (0, 10, 3) and hasattr(
-        agent_with_tool.model._client.responses, "with_streaming_response"
-    ):
-        request_headers["X-Stainless-Raw-Response"] = "stream"
+    request_headers = {
+        "X-Stainless-Raw-Response": "stream",
+    }
 
     tool_response = get_model_response(
         async_iterator(server_side_event_chunks(next(responses))),
@@ -2527,10 +2518,6 @@ async def test_tool_execution_error_data_collection(
     assert SPANDATA.GEN_AI_TOOL_OUTPUT not in tool_span_data
 
 
-@pytest.mark.skipif(
-    parse_version(OPENAI_AGENTS_VERSION) < (0, 4, 0),
-    reason="conversation_id support requires openai-agents >= 0.4.0",
-)
 @pytest.mark.asyncio
 async def test_tool_execution_span_non_pii_data_always_set(
     run_tool_agent,
@@ -2589,15 +2576,7 @@ async def test_hosted_mcp_tool_propagation_header_streamed(
         trace_lifecycle="stream",
     )
 
-    request_headers = {}
-    # openai-agents calls with_streaming_response() if available starting with
-    # https://github.com/openai/openai-agents-python/commit/159beb56130f7d85192acfd593c9168757984dc0.
-    # When using with_streaming_response() the header set below changes the response type:
-    # https://github.com/openai/openai-python/blob/656e3cab4a18262a49b961d41293367e45ee71b9/src/openai/_response.py#L67.
-    if parse_version(OPENAI_AGENTS_VERSION) >= (0, 10, 3) and hasattr(
-        agent_with_tool.model._client.responses, "with_streaming_response"
-    ):
-        request_headers["X-Stainless-Raw-Response"] = "stream"
+    request_headers = {"X-Stainless-Raw-Response": "stream"}
 
     response = get_model_response(
         async_iterator(
@@ -4020,15 +3999,7 @@ async def test_streaming_ttft_on_chat_span(
         trace_lifecycle="stream",
     )
 
-    request_headers = {}
-    # openai-agents calls with_streaming_response() if available starting with
-    # https://github.com/openai/openai-agents-python/commit/159beb56130f7d85192acfd593c9168757984dc0.
-    # When using with_streaming_response() the header set below changes the response type:
-    # https://github.com/openai/openai-python/blob/656e3cab4a18262a49b961d41293367e45ee71b9/src/openai/_response.py#L67.
-    if parse_version(OPENAI_AGENTS_VERSION) >= (0, 10, 3) and hasattr(
-        agent_with_tool.model._client.responses, "with_streaming_response"
-    ):
-        request_headers["X-Stainless-Raw-Response"] = "stream"
+    request_headers = {"X-Stainless-Raw-Response": "stream"}
 
     response = get_model_response(
         async_iterator(
@@ -4140,10 +4111,6 @@ async def test_streaming_ttft_on_chat_span(
     assert chat_span["attributes"].get(SPANDATA.GEN_AI_RESPONSE_STREAMING) is True
 
 
-@pytest.mark.skipif(
-    parse_version(OPENAI_AGENTS_VERSION) < (0, 4, 0),
-    reason="conversation_id support requires openai-agents >= 0.4.0",
-)
 @pytest.mark.asyncio
 async def test_conversation_id_on_all_spans(
     sentry_init,
@@ -4206,10 +4173,6 @@ async def test_conversation_id_on_all_spans(
     assert ai_client_span["attributes"]["gen_ai.conversation.id"] == "conv_test_123"
 
 
-@pytest.mark.skipif(
-    parse_version(OPENAI_AGENTS_VERSION) < (0, 4, 0),
-    reason="conversation_id support requires openai-agents >= 0.4.0",
-)
 @pytest.mark.asyncio
 async def test_conversation_id_on_tool_span(
     sentry_init,
@@ -4345,10 +4308,6 @@ async def test_conversation_id_on_tool_span(
     assert workflow_span["attributes"]["gen_ai.conversation.id"] == "conv_tool_test_456"
 
 
-@pytest.mark.skipif(
-    parse_version(OPENAI_AGENTS_VERSION) < (0, 4, 0),
-    reason="conversation_id support requires openai-agents >= 0.4.0",
-)
 @pytest.mark.asyncio
 async def test_no_conversation_id_when_not_provided(
     sentry_init,
@@ -4474,11 +4433,7 @@ async def test_runner_run_streamed_with_starting_agent_kwarg(
     model = OpenAIResponsesModel(model="gpt-4", openai_client=client)
     agent = test_agent.clone(model=model)
 
-    request_headers = {}
-    if parse_version(OPENAI_AGENTS_VERSION) >= (0, 10, 3) and hasattr(
-        agent.model._client.responses, "with_streaming_response"
-    ):
-        request_headers["X-Stainless-Raw-Response"] = "stream"
+    request_headers = {"X-Stainless-Raw-Response": "stream"}
 
     response = get_model_response(
         async_iterator(
