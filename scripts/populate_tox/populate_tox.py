@@ -65,7 +65,6 @@ IGNORE = {
     "aws_lambda",
     "cloud_resource_context",
     "common",
-    "integration_deactivation",
     "shadowed_module",
     "gcp",
     "gevent",
