@@ -92,7 +92,9 @@ def _start_client_span(
     if client.get_integration(Boto3Integration) is None:
         return None
 
-    span_name = "aws.%s.%s" % (ctx.service_id_hyphenized, ctx.operation_name)
+    # OTel define `rpc.service` as `Service.Operation`, e.g. `DynamoDB.GetItem`.
+    # https://opentelemetry.io/docs/specs/semconv/cloud-providers/aws-sdk/#aws-sdk-spans
+    span_name = "%s.%s" % (ctx.service_id, ctx.operation_name)
     attributes = _get_client_attributes(ctx)
     span_op = OP.HTTP_CLIENT
     span_origin = Boto3Integration.origin
