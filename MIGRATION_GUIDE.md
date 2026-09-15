@@ -28,6 +28,7 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 - We changed the way we emit warnings. Deprecations will from now on be always emitted using `warnings.warn()`, while all other warnings will be emitted using `logger.warning()`.
 - `sentry_sdk.init()` can no longer be used as a context manager.
 - The `@trace` decorator doesn't accept a `template` parameter anymore.
+- The option `attach_stacktrace` is now `True` by default, meaning the SDK will attach stack traces to messages.
 
 ### Logging
 
