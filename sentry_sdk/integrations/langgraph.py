@@ -299,22 +299,6 @@ def _set_usage_data(span: "Span", messages: "Any") -> None:
         )
 
 
-def _set_response_model_name(span: "Span", messages: "Any") -> None:
-    if len(messages) == 0:
-        return
-
-    last_message = messages[-1]
-    response_metadata = last_message.get("response_metadata")
-    if response_metadata is None:
-        return
-
-    model_name = response_metadata.get("model_name")
-    if model_name is None:
-        return
-
-    set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_MODEL, model_name)
-
-
 def _set_response_attributes(
     span: "Any",
     input_messages: "Optional[List[Any]]",
@@ -328,7 +312,6 @@ def _set_response_attributes(
         return
 
     _set_usage_data(span, new_messages)
-    _set_response_model_name(span, new_messages)
 
     if _should_record_outputs(integration):
         llm_response_text = _extract_llm_response_text(new_messages)
