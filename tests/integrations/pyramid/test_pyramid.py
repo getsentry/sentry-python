@@ -137,7 +137,6 @@ def test_transaction_style(
     sentry_init(
         integrations=[PyramidIntegration(transaction_style=transaction_style)],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("event", "span")
@@ -162,7 +161,6 @@ def test_http_route(
     sentry_init(
         integrations=[PyramidIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -479,7 +477,6 @@ def test_tracing_error(
     sentry_init(
         integrations=[PyramidIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("event", "span")
@@ -519,7 +516,6 @@ def test_span_origin(
     sentry_init(
         integrations=[PyramidIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("event", "span")
@@ -547,7 +543,6 @@ def test_span_sets_user_id_on_segment(
     sentry_init(
         integrations=[PyramidIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         **init_kwargs,
     )
 

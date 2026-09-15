@@ -42,7 +42,6 @@ def test_query_source_disabled(
         "traces_sample_rate": 1.0,
         "enable_db_query_source": False,
         "db_query_source_threshold_ms": 0,
-        "trace_lifecycle": "stream",
     }
 
     sentry_init(**sentry_options)
@@ -90,7 +89,6 @@ def test_query_source_enabled(
         "send_default_pii": True,
         "traces_sample_rate": 1.0,
         "db_query_source_threshold_ms": 0,
-        "trace_lifecycle": "stream",
     }
 
     if enable_db_query_source is not None:
@@ -140,7 +138,6 @@ def test_query_source(
         traces_sample_rate=1.0,
         enable_db_query_source=True,
         db_query_source_threshold_ms=0,
-        trace_lifecycle="stream",
     )
 
     if "postgres" not in connections:
@@ -206,7 +203,6 @@ def test_query_source_with_module_in_search_path(
         traces_sample_rate=1.0,
         enable_db_query_source=True,
         db_query_source_threshold_ms=0,
-        trace_lifecycle="stream",
     )
 
     if "postgres" not in connections:
@@ -264,7 +260,6 @@ def test_query_source_with_in_app_exclude(
         enable_db_query_source=True,
         db_query_source_threshold_ms=0,
         in_app_exclude=["tests.integrations.django.myapp.views"],
-        trace_lifecycle="stream",
     )
 
     if "postgres" not in connections:
@@ -335,7 +330,6 @@ def test_query_source_with_in_app_include(
         enable_db_query_source=True,
         db_query_source_threshold_ms=0,
         in_app_include=["django"],
-        trace_lifecycle="stream",
     )
 
     if "postgres" not in connections:
@@ -392,7 +386,6 @@ def test_no_query_source_if_duration_too_short(
         traces_sample_rate=1.0,
         enable_db_query_source=True,
         db_query_source_threshold_ms=100,
-        trace_lifecycle="stream",
     )
 
     if "postgres" not in connections:
@@ -462,7 +455,6 @@ def test_query_source_if_duration_over_threshold(
         traces_sample_rate=1.0,
         enable_db_query_source=True,
         db_query_source_threshold_ms=100,
-        trace_lifecycle="stream",
     )
 
     if "postgres" not in connections:
@@ -545,7 +537,6 @@ def test_db_span_origin_execute(
     sentry_init(
         integrations=[DjangoIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     if "postgres" not in connections:
@@ -579,7 +570,6 @@ def test_db_span_origin_executemany(
     sentry_init(
         integrations=[DjangoIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     if "postgres" not in connections:

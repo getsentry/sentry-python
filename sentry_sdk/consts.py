@@ -73,7 +73,6 @@ if TYPE_CHECKING:
             "transport_num_pools": Optional[int],
             "transport_http2": Optional[bool],
             "transport_async": Optional[bool],
-            "trace_lifecycle": Optional[Literal["static", "stream"]],
             "data_collection": Optional[DataCollectionUserOptions],
         },
         total=False,
@@ -1304,7 +1303,6 @@ class ClientConstructor:
         attach_stacktrace: bool = False,
         ca_certs: "Optional[str]" = None,
         traces_sample_rate: "Optional[float]" = None,
-        trace_lifecycle: "Optional[Literal['static', 'stream']]" = None,
         traces_sampler: "Optional[TracesSampler]" = None,
         profiler_mode: "Optional[ContinuousProfilerMode]" = None,
         profile_lifecycle: 'Literal["manual", "trace"]' = "manual",
@@ -1727,17 +1725,12 @@ class ClientConstructor:
 
         :param before_send_span: An optional function to modify spans before they're sent to Sentry.
             Modifications to the span's attributes and name will be retained. Unlike ``before_send_log``
-            and ``before_send_metric``, spans cannot be dropped by returning None. Only works when
-            ``trace_lifecycle="stream"`` is enabled.
+            and ``before_send_metric``, spans cannot be dropped by returning None.
 
         :param stream_gen_ai_spans: When set, generative AI spans are sent in a new transport format to
             reduce downstream data loss.
 
-        :param trace_lifecycle: Controls how traces are sent. Set to `"stream"` to send spans as they
-            finish, or `"static"` to send a completed trace as a transaction event.
-
-        :param ignore_spans: A sequence of span-matching rules. Matching spans are ignored when
-            `trace_lifecycle="stream"` is enabled.
+        :param ignore_spans: A sequence of span-matching rules. Matching spans are ignored.
 
         :param _experiments: Dictionary of experimental, opt-in features that are not yet stable.
 

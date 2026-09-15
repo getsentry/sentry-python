@@ -296,7 +296,6 @@ def test_langchain_text_completion(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
 
     model_response = get_model_response(
@@ -375,7 +374,6 @@ def test_langchain_chat_with_run_name(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
 
     request_headers = {}
@@ -444,7 +442,6 @@ def test_langchain_multi_choice_response(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
 
     model_response = get_model_response(
@@ -495,7 +492,6 @@ def test_langchain_tool_call_with_run_name(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
     items = capture_items("span")
 
@@ -577,7 +573,6 @@ def test_langchain_create_agent(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
 
     model_response = get_model_response(
@@ -710,7 +705,6 @@ def test_tool_execution_span(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
 
     responses = nonstreaming_responses_tool_call_model_responses(
@@ -922,7 +916,6 @@ def test_langchain_openai_tools_agent_no_prompts(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
 
     prompt = ChatPromptTemplate.from_messages(
@@ -1128,7 +1121,6 @@ def test_langchain_openai_tools_agent(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
 
     prompt = ChatPromptTemplate.from_messages(
@@ -1297,7 +1289,6 @@ def test_langchain_openai_tools_agent_with_config(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
 
     prompt = ChatPromptTemplate.from_messages(
@@ -1384,7 +1375,6 @@ def test_langchain_openai_tools_agent_stream_no_prompts(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
 
     prompt = ChatPromptTemplate.from_messages(
@@ -1594,7 +1584,6 @@ def test_langchain_openai_tools_agent_stream(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
 
     prompt = ChatPromptTemplate.from_messages(
@@ -1766,7 +1755,6 @@ def test_langchain_openai_tools_agent_stream_with_config(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
 
     prompt = ChatPromptTemplate.from_messages(
@@ -1853,7 +1841,6 @@ def test_langchain_error(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
 
     prompt = ChatPromptTemplate.from_messages(
@@ -1910,7 +1897,6 @@ def test_span_status_error(
         integrations=[LangchainIntegration(include_prompts=True)],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     items = capture_items("event", "span")
 
@@ -1965,7 +1951,6 @@ def test_langchain_tool_error(
         integrations=[LangchainIntegration(include_prompts=True)],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     responses = nonstreaming_responses_tool_call_model_responses(
@@ -2109,7 +2094,6 @@ def test_langchain_callback_manager(sentry_init):
         integrations=[LangchainIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     local_manager = BaseCallbackManager(handlers=[])
 
@@ -2143,7 +2127,6 @@ def test_langchain_callback_manager_with_sentry_callback(sentry_init):
         integrations=[LangchainIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     sentry_callback = SentryLangchainCallback(False)
     local_manager = BaseCallbackManager(handlers=[sentry_callback])
@@ -2177,7 +2160,6 @@ def test_langchain_callback_list(sentry_init):
         integrations=[LangchainIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     local_callbacks = []
 
@@ -2211,7 +2193,6 @@ def test_langchain_callback_list_existing_callback(sentry_init):
         integrations=[LangchainIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     sentry_callback = SentryLangchainCallback(False)
     local_callbacks = [sentry_callback]
@@ -2277,7 +2258,6 @@ def test_langchain_message_role_mapping(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
 
     prompt = ChatPromptTemplate.from_messages(
@@ -2661,7 +2641,6 @@ def test_langchain_ai_system_detection(
         integrations=[LangchainIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     callback = SentryLangchainCallback(include_prompts=True)
@@ -2935,7 +2914,6 @@ def test_langchain_chat_data_collection(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
     if data_collection is not None:
         sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
@@ -3130,7 +3108,6 @@ def test_langchain_text_completion_data_collection(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
     if data_collection is not None:
         sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
@@ -3301,7 +3278,6 @@ def test_langchain_data_collection_tools(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
     if data_collection is not None:
         sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
@@ -3417,7 +3393,6 @@ def test_langchain_data_collection_request_tool_call_params(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
     if data_collection is not None:
         sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
@@ -3547,7 +3522,6 @@ def test_langchain_tool_execution_data_collection(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
     if data_collection is not None:
         sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
@@ -3710,7 +3684,6 @@ def test_langchain_agent_executor_data_collection(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
     if data_collection is not None:
         sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}

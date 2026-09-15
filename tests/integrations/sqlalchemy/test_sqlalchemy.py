@@ -21,7 +21,6 @@ def test_orm_queries(
 ):
     sentry_init(
         integrations=[SqlalchemyIntegration()],
-        trace_lifecycle="stream",
         _experiments={
             "record_sql_params": True,
         },
@@ -88,7 +87,6 @@ def test_transactions(
 ):
     sentry_init(
         integrations=[SqlalchemyIntegration()],
-        trace_lifecycle="stream",
         _experiments={
             "record_sql_params": True,
         },
@@ -172,7 +170,6 @@ def test_transactions_no_engine_url(
 ):
     sentry_init(
         integrations=[SqlalchemyIntegration()],
-        trace_lifecycle="stream",
         _experiments={
             "record_sql_params": True,
         },
@@ -239,7 +236,6 @@ def test_long_sql_query_preserved(
     sentry_init(
         traces_sample_rate=1,
         integrations=[SqlalchemyIntegration()],
-        trace_lifecycle="stream",
     )
 
     engine = create_engine(
@@ -262,7 +258,6 @@ def test_engine_name_not_string(
 ):
     sentry_init(
         integrations=[SqlalchemyIntegration()],
-        trace_lifecycle="stream",
     )
 
     engine = create_engine(
@@ -283,7 +278,6 @@ def test_query_source_disabled(
         "traces_sample_rate": 1.0,
         "enable_db_query_source": False,
         "db_query_source_threshold_ms": 0,
-        "trace_lifecycle": "stream",
     }
 
     sentry_init(**sentry_options)
@@ -338,7 +332,6 @@ def test_query_source_enabled(
         "integrations": [SqlalchemyIntegration()],
         "traces_sample_rate": 1.0,
         "db_query_source_threshold_ms": 0,
-        "trace_lifecycle": "stream",
     }
 
     if enable_db_query_source is not None:
@@ -395,7 +388,6 @@ def test_query_source(
         traces_sample_rate=1.0,
         enable_db_query_source=True,
         db_query_source_threshold_ms=0,
-        trace_lifecycle="stream",
     )
     items = capture_items("span")
 
@@ -464,7 +456,6 @@ def test_query_source_with_module_in_search_path(
         traces_sample_rate=1.0,
         enable_db_query_source=True,
         db_query_source_threshold_ms=0,
-        trace_lifecycle="stream",
     )
 
     from sqlalchemy_helpers.helpers import (
@@ -539,7 +530,6 @@ def test_no_query_source_if_duration_too_short(
         traces_sample_rate=1.0,
         enable_db_query_source=True,
         db_query_source_threshold_ms=100,
-        trace_lifecycle="stream",
     )
     items = capture_items("span")
 
@@ -608,7 +598,6 @@ def test_query_source_if_duration_over_threshold(
         traces_sample_rate=1.0,
         enable_db_query_source=True,
         db_query_source_threshold_ms=100,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -694,7 +683,6 @@ def test_span_origin(
     sentry_init(
         integrations=[SqlalchemyIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     engine = create_engine(

@@ -134,7 +134,6 @@ def test_nonstreaming_generate_content(
         integrations=[GoogleGenAIIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
 
     # Mock the HTTP response at the _api_client.request() level
@@ -245,7 +244,6 @@ def test_generate_content_with_system_instruction(
         integrations=[GoogleGenAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
 
     mock_http_response = create_mock_http_response(EXAMPLE_API_RESPONSE_JSON)
@@ -293,7 +291,6 @@ def test_generate_content_with_tools(
     sentry_init(
         integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     # Create a mock tool function
@@ -379,7 +376,6 @@ def test_tool_execution(
         integrations=[GoogleGenAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
 
     # Create a mock tool function
@@ -421,7 +417,6 @@ def test_error_handling(
     sentry_init(
         integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     items = capture_items("event")
 
@@ -453,7 +448,6 @@ def test_streaming_generate_content(
         integrations=[GoogleGenAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
 
     # Create streaming chunks - simulating a multi-chunk response
@@ -597,7 +591,6 @@ def test_span_origin(
     sentry_init(
         integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     mock_http_response = create_mock_http_response(EXAMPLE_API_RESPONSE_JSON)
@@ -626,7 +619,6 @@ def test_response_without_usage_metadata(
     sentry_init(
         integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     # Response without usage metadata
@@ -672,7 +664,6 @@ def test_multiple_candidates(
         integrations=[GoogleGenAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
 
     # Response with multiple candidates
@@ -742,7 +733,6 @@ def test_all_configuration_parameters(
     sentry_init(
         integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     mock_http_response = create_mock_http_response(EXAMPLE_API_RESPONSE_JSON)
@@ -786,7 +776,6 @@ def test_empty_response(
     sentry_init(
         integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     # Minimal response with empty candidates array
@@ -820,7 +809,6 @@ def test_response_with_different_id_fields(
     sentry_init(
         integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     # Response with response_id and model_version
@@ -863,7 +851,6 @@ def test_tool_with_async_function(sentry_init):
     sentry_init(
         integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     # Create an async tool function
@@ -890,7 +877,6 @@ def test_contents_as_none(
         integrations=[GoogleGenAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
 
     mock_http_response = create_mock_http_response(EXAMPLE_API_RESPONSE_JSON)
@@ -922,7 +908,6 @@ def test_tool_calls_extraction(
     sentry_init(
         integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     # Response with function calls
@@ -1045,7 +1030,6 @@ def test_embed_content(
         integrations=[GoogleGenAIIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
 
     # Mock the HTTP response at the _api_client.request() level
@@ -1108,7 +1092,6 @@ def test_embed_content_string_input(
         integrations=[GoogleGenAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
 
     # Mock response with single embedding
@@ -1160,7 +1143,6 @@ def test_embed_content_error_handling(
     sentry_init(
         integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     items = capture_items("event")
 
@@ -1192,7 +1174,6 @@ def test_embed_content_without_statistics(
     sentry_init(
         integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     # Response without statistics (typical for older google-genai versions)
@@ -1236,7 +1217,6 @@ def test_embed_content_span_origin(
     sentry_init(
         integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     mock_http_response = create_mock_http_response(EXAMPLE_EMBED_RESPONSE_JSON)
@@ -1277,7 +1257,6 @@ async def test_async_embed_content(
         integrations=[GoogleGenAIIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
 
     # Mock the async HTTP response
@@ -1341,7 +1320,6 @@ async def test_async_embed_content_string_input(
         integrations=[GoogleGenAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
 
     # Mock response with single embedding
@@ -1395,7 +1373,6 @@ async def test_async_embed_content_error_handling(
     sentry_init(
         integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     items = capture_items("event")
 
@@ -1428,7 +1405,6 @@ async def test_async_embed_content_without_statistics(
     sentry_init(
         integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     # Response without statistics (typical for older google-genai versions)
@@ -1475,7 +1451,6 @@ async def test_async_embed_content_span_origin(
     sentry_init(
         integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     mock_http_response = create_mock_http_response(EXAMPLE_EMBED_RESPONSE_JSON)
@@ -1508,7 +1483,6 @@ def test_generate_content_with_content_object(
         integrations=[GoogleGenAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
 
     mock_http_response = create_mock_http_response(EXAMPLE_API_RESPONSE_JSON)
@@ -1548,7 +1522,6 @@ def test_generate_content_with_dict_format(
         integrations=[GoogleGenAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
 
     mock_http_response = create_mock_http_response(EXAMPLE_API_RESPONSE_JSON)
@@ -1586,7 +1559,6 @@ def test_generate_content_with_file_data(
         integrations=[GoogleGenAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
 
     mock_http_response = create_mock_http_response(EXAMPLE_API_RESPONSE_JSON)
@@ -1639,7 +1611,6 @@ def test_generate_content_with_inline_data(
         integrations=[GoogleGenAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
 
     mock_http_response = create_mock_http_response(EXAMPLE_API_RESPONSE_JSON)
@@ -1686,7 +1657,6 @@ def test_generate_content_with_function_response(
         integrations=[GoogleGenAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
 
     mock_http_response = create_mock_http_response(EXAMPLE_API_RESPONSE_JSON)
@@ -1745,7 +1715,6 @@ def test_generate_content_with_mixed_string_and_content(
         integrations=[GoogleGenAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
 
     mock_http_response = create_mock_http_response(EXAMPLE_API_RESPONSE_JSON)
@@ -1793,7 +1762,6 @@ def test_generate_content_with_part_object_directly(
         integrations=[GoogleGenAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
 
     mock_http_response = create_mock_http_response(EXAMPLE_API_RESPONSE_JSON)
@@ -1833,7 +1801,6 @@ def test_generate_content_with_list_of_dicts(
         integrations=[GoogleGenAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
 
     mock_http_response = create_mock_http_response(EXAMPLE_API_RESPONSE_JSON)
@@ -1874,7 +1841,6 @@ def test_generate_content_with_dict_inline_data(
         integrations=[GoogleGenAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
 
     mock_http_response = create_mock_http_response(EXAMPLE_API_RESPONSE_JSON)
@@ -1922,7 +1888,6 @@ def test_generate_content_without_parts_property_inline_data(
         integrations=[GoogleGenAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
 
     mock_http_response = create_mock_http_response(EXAMPLE_API_RESPONSE_JSON)
@@ -1968,7 +1933,6 @@ def test_generate_content_without_parts_property_inline_data_and_binary_data_wit
         integrations=[GoogleGenAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
 
     mock_http_response = create_mock_http_response(EXAMPLE_API_RESPONSE_JSON)
@@ -2452,7 +2416,6 @@ def test_generate_content_data_collection(
         integrations=[GoogleGenAIIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
     if data_collection is not None:
         sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
@@ -2565,7 +2528,6 @@ def test_generate_content_data_collection_tools(
         integrations=[GoogleGenAIIntegration(include_prompts=False)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
     if data_collection is not None:
         sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
@@ -2747,7 +2709,6 @@ def test_streaming_generate_content_data_collection(
         integrations=[GoogleGenAIIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
     if data_collection is not None:
         sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
@@ -2891,7 +2852,6 @@ def test_streaming_generate_content_data_collection_tools(
         integrations=[GoogleGenAIIntegration(include_prompts=False)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
     if data_collection is not None:
         sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
@@ -3062,7 +3022,6 @@ def test_embed_content_data_collection(
         integrations=[GoogleGenAIIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
     if data_collection is not None:
         sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
@@ -3204,7 +3163,6 @@ async def test_async_generate_content_data_collection(
         integrations=[GoogleGenAIIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
     if data_collection is not None:
         sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
@@ -3331,7 +3289,6 @@ async def test_async_embed_content_data_collection(
         integrations=[GoogleGenAIIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
     if data_collection is not None:
         sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}

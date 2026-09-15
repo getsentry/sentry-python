@@ -230,7 +230,7 @@ def test_logs_tied_to_segments(sentry_init, capture_items):
     """
     Log messages are also tied to segments.
     """
-    sentry_init(traces_sample_rate=1.0, trace_lifecycle="stream")
+    sentry_init(traces_sample_rate=1.0)
     items = capture_items("log")
 
     with sentry_sdk.traces.start_span(name="test-segment") as sgmt:
@@ -264,7 +264,7 @@ def test_logs_tied_to_spans(sentry_init, capture_items):
     """
     Log messages are also tied to spans.
     """
-    sentry_init(traces_sample_rate=1.0, trace_lifecycle="stream")
+    sentry_init(traces_sample_rate=1.0)
     items = capture_items("log")
 
     with sentry_sdk.traces.start_span(name="test-segment"):

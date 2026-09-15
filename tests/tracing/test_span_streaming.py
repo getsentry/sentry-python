@@ -21,7 +21,6 @@ minimum_python_38 = pytest.mark.skipif(
 def test_start_span(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -61,7 +60,6 @@ def test_start_span(sentry_init, capture_items):
 def test_start_span_no_context_manager(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -109,7 +107,6 @@ def test_span_sampled_when_created(sentry_init, capture_items):
 
     sentry_init(
         traces_sampler=traces_sampler,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -131,7 +128,6 @@ def test_span_sampled_when_created(sentry_init, capture_items):
 def test_start_span_attributes(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -163,7 +159,6 @@ def test_start_span_attributes_in_traces_sampler(sentry_init, capture_items):
 
     sentry_init(
         traces_sampler=traces_sampler,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -204,7 +199,6 @@ def test_sampling_context(sentry_init, capture_items):
 
     sentry_init(
         traces_sampler=traces_sampler,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -233,7 +227,6 @@ def test_before_send_span_basic(sentry_init, capture_items):
 
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         before_send_span=before_send_span,
     )
 
@@ -274,7 +267,6 @@ def test_before_send_span_invalid_return_value(
 
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         before_send_span=before_send_span,
     )
 
@@ -301,7 +293,6 @@ def test_before_send_span_unsupported_edit(sentry_init, capture_items):
 
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         before_send_span=before_send_span,
     )
 
@@ -330,7 +321,6 @@ def test_before_send_span_doesnt_receive_ignored_spans(sentry_init, capture_item
 
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         before_send_span=before_send_span,
         ignore_spans=[
             "ignored",
@@ -360,7 +350,6 @@ def test_before_send_span_raises_does_not_crash_application(sentry_init, capture
 
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         before_send_span=before_send_span,
     )
 
@@ -385,7 +374,6 @@ def test_before_send_span_raises_does_not_crash_application(sentry_init, capture
 def test_span_attributes(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -419,7 +407,6 @@ def test_span_attributes(sentry_init, capture_items):
 def test_span_attributes_serialize_early(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -464,7 +451,6 @@ def test_traces_sampler_drops_span(sentry_init, capture_items):
 
     sentry_init(
         traces_sampler=traces_sampler,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -496,7 +482,6 @@ def test_traces_sampler_called_once_per_segment(sentry_init):
 
     sentry_init(
         traces_sampler=traces_sampler,
-        trace_lifecycle="stream",
     )
 
     with sentry_sdk.traces.start_span(name="segment") as segment:
@@ -513,7 +498,6 @@ def test_traces_sampler_called_once_per_segment(sentry_init):
 def test_start_inactive_span(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -550,7 +534,6 @@ def test_start_inactive_span(sentry_init, capture_items):
 def test_start_span_override_parent(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -589,7 +572,6 @@ def test_start_span_override_parent(sentry_init, capture_items):
 def test_sibling_segments(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -622,7 +604,6 @@ def test_sibling_segments(sentry_init, capture_items):
 def test_sibling_segments_new_trace(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -657,7 +638,6 @@ def test_continue_trace_sampled(sentry_init, capture_items):
     sentry_init(
         # parent sampling decision takes precedence over traces_sample_rate
         traces_sample_rate=0.0,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -697,7 +677,6 @@ def test_continue_trace_unsampled(sentry_init, capture_items):
     sentry_init(
         # parent sampling decision takes precedence over traces_sample_rate
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -749,7 +728,6 @@ def test_backpressure_outcome(
     sentry_init(
         traces_sample_rate=0.5,
         enable_backpressure_handling=True,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -795,7 +773,6 @@ def test_continue_trace_no_sample_rand(sentry_init, capture_items):
     sentry_init(
         # parent sampling decision takes precedence over traces_sample_rate
         traces_sample_rate=0.0,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -850,7 +827,6 @@ def test_outgoing_traceparent_and_baggage_head_sdk(sentry_init, traces_sample_ra
 
     sentry_init(
         traces_sample_rate=traces_sample_rate,
-        trace_lifecycle="stream",
     )
 
     sentry_sdk.traces.new_trace()
@@ -917,7 +893,6 @@ def test_outgoing_traceparent_and_baggage_incoming_trace(
     # test_outgoing_traceparent_and_baggage_incoming_trace_deferred
     sentry_init(
         traces_sample_rate=traces_sample_rate,
-        trace_lifecycle="stream",
     )
 
     trace_id = "0af7651916cd43dd8448eb211c80319c"
@@ -997,7 +972,6 @@ def test_outgoing_traceparent_and_baggage_inconsistent_incoming_trace(
     # sampling decision
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     trace_id = "0af7651916cd43dd8448eb211c80319c"
@@ -1055,7 +1029,6 @@ def test_outgoing_traceparent_and_baggage_incoming_trace_deferred(
     """The SDK handles a deferred incoming sampling decision correctly."""
     sentry_init(
         traces_sample_rate=traces_sample_rate,
-        trace_lifecycle="stream",
     )
 
     if traces_sample_rate == 0.0:
@@ -1111,7 +1084,6 @@ def test_outgoing_traceparent_and_baggage_incoming_trace_deferred(
 def test_outgoing_traceparent_and_baggage_ignored_segment(sentry_init):
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         ignore_spans=[
             "ignored",
         ],
@@ -1150,7 +1122,6 @@ def test_outgoing_traceparent_and_baggage_ignored_segment(sentry_init):
 def test_outgoing_traceparent_and_baggage_ignored_child_span(sentry_init):
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         ignore_spans=[
             "ignored",
         ],
@@ -1195,7 +1166,6 @@ def test_outgoing_traceparent_and_baggage_ignored_child_span(sentry_init):
 def test_set_span_status(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -1219,7 +1189,6 @@ def test_set_span_status(sentry_init, capture_items):
 def test_set_span_status_on_error(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -1240,7 +1209,6 @@ def test_set_span_status_on_error(sentry_init, capture_items):
 def test_set_span_status_on_ignored_span(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         ignore_spans=["ignored"],
     )
 
@@ -1338,7 +1306,6 @@ def test_ignore_spans_basic(
 ):
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         ignore_spans=["ignored"],
     )
 
@@ -1370,7 +1337,6 @@ def test_ignore_spans_ignored_segment_drops_whole_tree(
     # Ignored segments should drop the whole span tree.
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         ignore_spans=["ignored"],
     )
 
@@ -1405,7 +1371,6 @@ def test_ignore_spans_ignored_segment_drops_whole_tree_explicit_parent_span(
     # Ignored segments should drop the whole span tree.
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         ignore_spans=["ignored"],
     )
 
@@ -1445,7 +1410,6 @@ def test_ignore_spans_set_ignored_child_span_as_parent(
     # Ignored non-segment spans should NOT drop the whole subtree under them.
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         ignore_spans=["ignored"],
     )
 
@@ -1485,7 +1449,6 @@ def test_ignore_spans_set_ignored_child_span_as_parent_explicit_parent_span(
     # Ignored non-segment spans should NOT drop the whole subtree under them.
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         ignore_spans=["ignored"],
     )
 
@@ -1534,7 +1497,6 @@ def test_ignore_spans_set_ignored_child_span_as_parent_explicit_parent_span(
 def test_ignore_spans_reparenting(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         ignore_spans=["ignored"],
     )
 
@@ -1575,7 +1537,6 @@ def test_ignored_spans_produce_client_report(
 ):
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         ignore_spans=["ignored"],
     )
 
@@ -1610,7 +1571,6 @@ def test_segment_span_has_profiler_id(
         profile_lifecycle="trace",
         profiler_mode="thread",
         profile_session_sample_rate=1.0,
-        trace_lifecycle="stream",
         _experiments={
             "continuous_profiling_auto_start": True,
         },
@@ -1645,7 +1605,6 @@ def test_segment_span_no_profiler_id_when_unsampled(
         profile_lifecycle="trace",
         profiler_mode="thread",
         profile_session_sample_rate=0.0,
-        trace_lifecycle="stream",
         _experiments={
             "continuous_profiling_auto_start": True,
         },
@@ -1681,7 +1640,6 @@ def test_profile_stops_when_segment_ends(
         profile_lifecycle="trace",
         profiler_mode="thread",
         profile_session_sample_rate=1.0,
-        trace_lifecycle="stream",
         _experiments={
             "continuous_profiling_auto_start": True,
         },
@@ -1705,7 +1663,6 @@ def test_default_attributes(sentry_init, capture_envelopes):
         release="1.0.0",
         dist="1.0",
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     envelopes = capture_envelopes()
@@ -1761,7 +1718,6 @@ def test_ignore_spans_top_level(
 ):
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         ignore_spans=ignore_spans,
     )
 

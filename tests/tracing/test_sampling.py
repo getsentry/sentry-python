@@ -12,7 +12,6 @@ from sentry_sdk.utils import logger
 def test_sampling_decided_only_for_segments(sentry_init, capture_events):
     sentry_init(
         traces_sample_rate=0.5,
-        trace_lifecycle="stream",
     )
 
     with sentry_sdk.traces.start_span(name="hi") as segment:
@@ -28,7 +27,6 @@ def test_no_double_sampling(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
         sample_rate=0.0,
-        trace_lifecycle="stream",
     )
     items = capture_items()
 
@@ -44,7 +42,7 @@ def test_no_double_sampling(sentry_init, capture_items):
 def test_get_span_from_scope_regardless_of_sampling_decision(
     sentry_init, sampling_decision
 ):
-    sentry_init(traces_sample_rate=1.0, trace_lifecycle="stream")
+    sentry_init(traces_sample_rate=1.0)
 
     sentry_sdk.traces.continue_trace(
         {
@@ -75,7 +73,6 @@ def test_uses_traces_sample_rate_correctly(
 ):
     sentry_init(
         traces_sample_rate=traces_sample_rate,
-        trace_lifecycle="stream",
     )
 
     sentry_sdk.traces.continue_trace(
@@ -100,7 +97,6 @@ def test_uses_traces_sampler_return_value_correctly(
 ):
     sentry_init(
         traces_sampler=mock.Mock(return_value=traces_sampler_return_value),
-        trace_lifecycle="stream",
     )
 
     sentry_sdk.traces.continue_trace(
@@ -120,7 +116,6 @@ def test_tolerates_traces_sampler_returning_a_boolean(
 ):
     sentry_init(
         traces_sampler=mock.Mock(return_value=traces_sampler_return_value),
-        trace_lifecycle="stream",
     )
 
     with sentry_sdk.traces.start_span(name="dogpark") as span:
@@ -136,7 +131,6 @@ def test_traces_sampler_raising_falls_back_to_parent_sampling_decision(
     sentry_init(
         traces_sampler=mock.Mock(side_effect=ValueError("boom")),
         traces_sample_rate=0.0 if parent_sampling_decision else 1.0,
-        trace_lifecycle="stream",
     )
 
     sentry_sdk.traces.continue_trace(
@@ -161,7 +155,6 @@ def test_traces_sampler_raising_falls_back_to_traces_sample_rate(
     sentry_init(
         traces_sampler=mock.Mock(side_effect=ValueError("boom")),
         traces_sample_rate=traces_sample_rate,
-        trace_lifecycle="stream",
     )
 
     sentry_sdk.traces.continue_trace(
@@ -188,7 +181,6 @@ def test_traces_sampler_raising_no_incoming_trace_falls_back_to_traces_sample_ra
     sentry_init(
         traces_sampler=mock.Mock(side_effect=ValueError("boom")),
         traces_sample_rate=traces_sample_rate,
-        trace_lifecycle="stream",
     )
 
     # no continue_trace, so no propagated sample_rand; make it deterministic
@@ -205,7 +197,6 @@ def test_traces_sampler_raising_no_incoming_trace_and_no_traces_sample_rate(
 ):
     sentry_init(
         traces_sampler=mock.Mock(side_effect=ValueError("boom")),
-        trace_lifecycle="stream",
     )
 
     with sentry_sdk.traces.start_span(name="dogpark") as span:
@@ -220,7 +211,6 @@ def test_only_captures_segment_when_sampled_is_true(
         traces_sampler=mock.Mock(
             return_value=sampling_decision,
         ),
-        trace_lifecycle="stream",
     )
     items = capture_items()
 
@@ -246,7 +236,6 @@ def test_prefers_traces_sampler_to_traces_sample_rate(
     sentry_init(
         traces_sample_rate=traces_sample_rate,
         traces_sampler=traces_sampler,
-        trace_lifecycle="stream",
     )
 
     span = sentry_sdk.traces.start_span(name="dogpark")
@@ -263,7 +252,6 @@ def test_ignores_inherited_sample_decision_when_traces_sampler_defined(
     traces_sampler = mock.Mock(return_value=not bool(int(parent_sampling_decision)))
     sentry_init(
         traces_sampler=traces_sampler,
-        trace_lifecycle="stream",
     )
 
     sentry_sdk.traces.continue_trace(
@@ -281,7 +269,6 @@ def test_inherits_parent_sampling_decision_when_traces_sampler_undefined(
 ):
     sentry_init(
         traces_sample_rate=0.5,
-        trace_lifecycle="stream",
     )
 
     sentry_sdk.traces.continue_trace(
@@ -313,7 +300,6 @@ def test_custom_sampling_context(sentry_init):
 
     sentry_init(
         traces_sampler=traces_sampler,
-        trace_lifecycle="stream",
     )
 
     sentry_sdk.get_current_scope().set_custom_sampling_context(
@@ -337,7 +323,6 @@ def test_custom_sampling_context_update_to_context_value_persists(sentry_init):
 
     sentry_init(
         traces_sampler=traces_sampler,
-        trace_lifecycle="stream",
     )
 
     sentry_sdk.traces.new_trace()
@@ -384,7 +369,6 @@ def test_warns_and_sets_sampled_to_false_on_invalid_traces_sampler_return_value(
 ):
     sentry_init(
         traces_sampler=mock.Mock(return_value=traces_sampler_return_value),
-        trace_lifecycle="stream",
     )
 
     with mock.patch.object(logger, "warning", mock.Mock()):
@@ -412,7 +396,7 @@ def test_records_lost_event_only_if_traces_sample_rate_enabled(
     sampled_output,
     expected_record_lost_event_calls,
 ):
-    sentry_init(traces_sample_rate=traces_sample_rate, trace_lifecycle="stream")
+    sentry_init(traces_sample_rate=traces_sample_rate)
     record_lost_event_calls = capture_record_lost_event_calls()
 
     span = sentry_sdk.traces.start_span(name="dogpark")
@@ -442,7 +426,7 @@ def test_records_lost_event_only_if_traces_sampler_enabled(
     sampled_output,
     expected_record_lost_event_calls,
 ):
-    sentry_init(traces_sampler=traces_sampler, trace_lifecycle="stream")
+    sentry_init(traces_sampler=traces_sampler)
     record_lost_event_calls = capture_record_lost_event_calls()
 
     segment = sentry_sdk.traces.start_span(name="dogpark")
@@ -458,7 +442,6 @@ def test_unsampled_spans_produce_client_report_if_traces_sample_rate_defined(
 ):
     sentry_init(
         traces_sample_rate=0.0,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -487,7 +470,6 @@ def test_unsampled_spans_produce_client_report_if_traces_sampler_defined(
 ):
     sentry_init(
         traces_sampler=lambda _: 0.0,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -516,7 +498,6 @@ def test_no_client_reports_if_tracing_is_off(
 ):
     sentry_init(
         traces_sample_rate=None,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")

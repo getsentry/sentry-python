@@ -33,7 +33,6 @@ async def grpc_server_and_channel(sentry_init):
         sentry_init(
             traces_sample_rate=1.0,
             integrations=[GRPCIntegration()],
-            trace_lifecycle="stream",
         )
 
         # Create server
@@ -71,7 +70,6 @@ async def test_noop_for_unimplemented_method(
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[GRPCIntegration()],
-        trace_lifecycle="stream",
     )
 
     # Create empty server with no services

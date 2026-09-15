@@ -18,7 +18,6 @@ from sentry_sdk._span_batcher import SpanBatcher
 from sentry_sdk.consts import (
     DEFAULT_MAX_VALUE_LENGTH,
     DEFAULT_OPTIONS,
-    SPANDATA,
     SPANSTATUS,
     VERSION,
     ClientConstructor,
@@ -705,6 +704,8 @@ class _Client(BaseClient):
         if event.get("timestamp") is None:
             event["timestamp"] = datetime.now(timezone.utc)
 
+        is_checkin = event.get("type") == "check_in"
+
         if scope is not None:
             event_ = scope.apply_to_event(event, hint, self.options)
 
@@ -731,7 +732,8 @@ class _Client(BaseClient):
                 )
 
         if (
-            self.options["attach_stacktrace"]
+            not is_checkin
+            and self.options["attach_stacktrace"]
             and "exception" not in event
             and "stacktrace" not in event
             and "threads" not in event
@@ -776,22 +778,6 @@ class _Client(BaseClient):
             event_scrubber = self.options["event_scrubber"]
             if event_scrubber:
                 event_scrubber.scrub_event(event)
-
-        if scope is not None and scope._gen_ai_original_message_count:
-            spans: "List[Dict[str, Any]] | AnnotatedValue" = event.get("spans", [])
-            if isinstance(spans, list):
-                for span in spans:
-                    span_id = span.get("span_id", None)
-                    span_data = span.get("data", {})
-                    if (
-                        span_id
-                        and span_id in scope._gen_ai_original_message_count
-                        and SPANDATA.GEN_AI_REQUEST_MESSAGES in span_data
-                    ):
-                        span_data[SPANDATA.GEN_AI_REQUEST_MESSAGES] = AnnotatedValue(
-                            span_data[SPANDATA.GEN_AI_REQUEST_MESSAGES],
-                            {"len": scope._gen_ai_original_message_count[span_id]},
-                        )
 
         if previous_total_breadcrumbs is not None:
             event["breadcrumbs"] = AnnotatedValue(

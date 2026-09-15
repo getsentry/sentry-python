@@ -695,7 +695,6 @@ async def test_query_source_disabled(sentry_init, capture_items):
         traces_sample_rate=1.0,
         enable_db_query_source=False,
         db_query_source_threshold_ms=0,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -739,7 +738,6 @@ async def test_query_source_enabled(sentry_init, capture_items, enable_db_query_
         "integrations": [AioMySQLIntegration()],
         "traces_sample_rate": 1.0,
         "db_query_source_threshold_ms": 0,
-        "trace_lifecycle": "stream",
     }
     if enable_db_query_source is not None:
         sentry_options["enable_db_query_source"] = enable_db_query_source
@@ -787,7 +785,6 @@ async def test_query_source(sentry_init, capture_items):
         traces_sample_rate=1.0,
         enable_db_query_source=True,
         db_query_source_threshold_ms=0,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -843,7 +840,6 @@ async def test_no_query_source_if_duration_too_short(sentry_init, capture_items)
         traces_sample_rate=1.0,
         enable_db_query_source=True,
         db_query_source_threshold_ms=100,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -898,7 +894,6 @@ async def test_query_source_if_duration_over_threshold(sentry_init, capture_item
         traces_sample_rate=1.0,
         enable_db_query_source=True,
         db_query_source_threshold_ms=100,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -964,7 +959,6 @@ async def test_span_origin(sentry_init, capture_items):
     sentry_init(
         integrations=[AioMySQLIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -998,7 +992,6 @@ async def test_multiline_query_description_normalized(sentry_init, capture_items
     sentry_init(
         integrations=[AioMySQLIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -1038,7 +1031,6 @@ async def test_db_data_on_spans(sentry_init, capture_items):
     sentry_init(
         integrations=[AioMySQLIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")

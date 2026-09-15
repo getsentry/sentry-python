@@ -32,7 +32,6 @@ def test_featureflags_integration(sentry_init, capture_events, uninstall_integra
 async def test_featureflags_integration_spans_async(sentry_init, capture_events):
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     events = capture_events()
 
@@ -61,7 +60,6 @@ async def test_featureflags_integration_spans_async(sentry_init, capture_events)
 def test_featureflags_integration_spans_sync(sentry_init, capture_events):
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     events = capture_events()
 

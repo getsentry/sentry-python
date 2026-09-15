@@ -102,7 +102,7 @@ def test_metrics_no_user_if_pii_off(sentry_init, capture_items):
 
 
 def test_metrics_with_span(sentry_init, capture_items):
-    sentry_init(traces_sample_rate=1.0, trace_lifecycle="stream")
+    sentry_init(traces_sample_rate=1.0)
     items = capture_items("trace_metric")
 
     with sentry_sdk.traces.start_span(name="test-span") as segment:

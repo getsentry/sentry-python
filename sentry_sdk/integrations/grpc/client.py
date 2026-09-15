@@ -60,12 +60,12 @@ class ClientInterceptor(
     ) -> "Union[Iterator[Message], Call]":
         method = client_call_details.method
 
-        response: "UnaryStreamCall"
         if sentry_sdk.traces.get_current_span() is None:
             client_call_details = self._update_client_call_details_metadata_from_scope(
                 client_call_details
             )
             return continuation(client_call_details, request)
+
         with sentry_sdk.traces.start_span(
             name="unary stream call to %s" % method,
             attributes={
@@ -78,11 +78,7 @@ class ClientInterceptor(
                 client_call_details
             )
 
-            response = continuation(client_call_details, request)
-            # Setting code on unary-stream leads to execution getting stuck
-            # span.set_data("code", response.code().name)
-
-            return response
+            return continuation(client_call_details, request)
 
     @staticmethod
     def _update_client_call_details_metadata_from_scope(

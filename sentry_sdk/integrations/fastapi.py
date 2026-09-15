@@ -126,7 +126,6 @@ async def _wrap_async_handler(
     )
     sentry_scope = sentry_sdk.get_isolation_scope()
     extractor = StarletteRequestExtractor(request)
-    info = await extractor.extract_request_info()
 
     def _make_request_event_processor(
         req: "Any", integration: "Any"
@@ -134,6 +133,8 @@ async def _wrap_async_handler(
         def event_processor(event: "Event", hint: "Dict[str, Any]") -> "Event":
             # Extract information from request
             request_info = event.get("request", {})
+
+            info = extractor.extract_request_info()
             if info:
                 if "cookies" in info:
                     request_info["cookies"] = info["cookies"]

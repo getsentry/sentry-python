@@ -74,7 +74,6 @@ def test_rediscluster_basic(
         integrations=[RedisIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -124,7 +123,6 @@ def test_rediscluster_pipeline(
         integrations=[RedisIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
 
     rc = redis.RedisCluster(host="localhost", port=6379)
@@ -165,7 +163,6 @@ def test_rediscluster_span_origin(
     sentry_init(
         integrations=[RedisIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     rc = redis.RedisCluster(host="localhost", port=6379)

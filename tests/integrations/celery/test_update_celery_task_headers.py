@@ -70,7 +70,7 @@ def test_monitor_beat_tasks_with_headers(monitor_beat_tasks):
 
 
 def test_span_with_transaction(sentry_init):
-    sentry_init(traces_sample_rate=1.0, trace_lifecycle="stream")
+    sentry_init(traces_sample_rate=1.0)
     headers = {}
     monitor_beat_tasks = False
 
@@ -90,7 +90,7 @@ def test_span_with_transaction(sentry_init):
 
 
 def test_span_with_transaction_custom_headers(sentry_init):
-    sentry_init(traces_sample_rate=1.0, trace_lifecycle="stream")
+    sentry_init(traces_sample_rate=1.0)
     headers = {
         "baggage": BAGGAGE_VALUE,
         "sentry-trace": SENTRY_TRACE_VALUE,
@@ -169,7 +169,7 @@ def test_celery_trace_propagation_traces_sample_rate(
     The Celery integration has its own mechanism to propagate traces:
     https://docs.sentry.io/platforms/python/integrations/celery/#distributed-traces
     """
-    sentry_init(traces_sample_rate=traces_sample_rate, trace_lifecycle="stream")
+    sentry_init(traces_sample_rate=traces_sample_rate)
 
     headers = {}
     span = None

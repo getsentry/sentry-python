@@ -40,7 +40,6 @@ def init_celery(sentry_init, request):
                     monitor_beat_tasks=monitor_beat_tasks,
                 )
             ],
-            trace_lifecycle="stream",
             **kwargs,
         )
         celery = Celery(__name__)
@@ -808,7 +807,6 @@ def test_producer_span_data(system, monkeypatch, sentry_init, capture_items):
     sentry_init(
         integrations=[CeleryIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     celery = Celery(__name__, broker=f"{system}://example.com")  # noqa: E231
 
@@ -879,7 +877,6 @@ def tests_span_origin_producer(monkeypatch, sentry_init, capture_items):
     sentry_init(
         integrations=[CeleryIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     celery = Celery(__name__, broker="redis://example.com")  # noqa: E231
 
@@ -914,7 +911,6 @@ def test_send_task_wrapped(
     sentry_init(
         integrations=[CeleryIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     celery = Celery(__name__, broker="redis://example.com")  # noqa: E231
 

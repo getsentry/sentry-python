@@ -63,7 +63,6 @@ def test_task_span_is_created(
     sentry_init(
         integrations=[DjangoIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     items = capture_items("span")
 
@@ -95,7 +94,6 @@ def test_task_enqueue_returns_result(sentry_init, immediate_backend):
     sentry_init(
         integrations=[DjangoIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     result = add_numbers.enqueue(3, 5)
@@ -117,7 +115,6 @@ def test_task_enqueue_with_kwargs(
     sentry_init(
         integrations=[DjangoIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     items = capture_items("span")
 
@@ -154,7 +151,6 @@ def test_task_error_reporting(
             LoggingIntegration(event_level=logging.ERROR),
         ],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     items = capture_items("span")
 
@@ -193,7 +189,6 @@ def test_multiple_task_enqueues_create_multiple_spans(
     sentry_init(
         integrations=[DjangoIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     items = capture_items("span")
 

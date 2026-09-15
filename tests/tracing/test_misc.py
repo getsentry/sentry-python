@@ -12,7 +12,6 @@ from sentry_sdk.utils import Dsn
 def test_finds_segment_on_scope(sentry_init):
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     with sentry_sdk.traces.start_span(name="dogpark"):
@@ -29,7 +28,6 @@ def test_finds_segment_on_scope(sentry_init):
 def test_finds_span_on_scope(sentry_init):
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     segment = sentry_sdk.traces.start_span(name="dogpark")
@@ -109,7 +107,6 @@ def test_should_propagate_trace_to_sentry(
     sentry_init(
         dsn=dsn,
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     client = sentry_sdk.get_client()
@@ -119,7 +116,7 @@ def test_should_propagate_trace_to_sentry(
 
 
 def test_start_span_segment_updates_scope_name(sentry_init):
-    sentry_init(traces_sample_rate=1.0, trace_lifecycle="stream")
+    sentry_init(traces_sample_rate=1.0)
 
     scope = sentry_sdk.get_current_scope()
 
