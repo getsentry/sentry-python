@@ -152,13 +152,3 @@ def update_invoke_agent_span(
         set_data_normalized(
             span, SPANDATA.GEN_AI_RESPONSE_TEXT, str(output), unpack=False
         )
-
-    # Set model name from response if available
-    if hasattr(result, "response"):
-        try:
-            response = result.response
-            if hasattr(response, "model_name") and response.model_name:
-                span.set_attribute(SPANDATA.GEN_AI_RESPONSE_MODEL, response.model_name)
-        except Exception:
-            # If response access fails, continue without setting model name
-            pass

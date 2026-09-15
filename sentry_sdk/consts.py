@@ -1282,7 +1282,7 @@ class ClientConstructor:
         profile_lifecycle: 'Literal["manual", "trace"]' = "manual",
         profile_session_sample_rate: "Optional[float]" = None,
         auto_enabling_integrations: bool = True,
-        disabled_integrations: "Optional[Sequence[sentry_sdk.integrations.Integration]]" = None,
+        disabled_integrations: "Optional[Sequence[Union[sentry_sdk.integrations.Integration, type[sentry_sdk.integrations.Integration]]]]" = None,
         auto_session_tracking: bool = True,
         send_client_reports: bool = True,
         _experiments: "Experiments" = {},  # noqa: B006

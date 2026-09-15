@@ -73,6 +73,19 @@ class BottleIntegration(Integration):
         version = parse_version(BOTTLE_VERSION)
         _check_minimum_version(BottleIntegration, version)
 
+        # Bottle's Route.__repr__ might lead to a never-terminating while True
+        # loop when attach_stacktrace=True.
+        def _sentry_route_repr(self: "Route") -> str:
+            cb = self.callback
+            return "<%s %s -> %s:%s>" % (
+                self.method,
+                self.rule,
+                getattr(cb, "__module__", "?"),
+                getattr(cb, "__name__", "?"),
+            )
+
+        Route.__sentry_repr__ = _sentry_route_repr
+
         old_app = Bottle.__call__
 
         @ensure_integration_enabled(BottleIntegration, old_app)
