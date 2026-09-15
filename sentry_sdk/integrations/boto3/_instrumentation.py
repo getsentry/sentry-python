@@ -33,6 +33,7 @@ except ImportError:
 
 
 _AWS_RPC_SYSTEM_NAME = "aws-api"
+_STDLIB_HTTP_SPAN_ORIGIN = "auto.http.stdlib.httplib"
 
 
 def _set_span_attributes(
@@ -138,6 +139,30 @@ def _start_client_span(
             span.set_tag("aws.service_id", ctx.service_id_hyphenized)
         span.set_tag("aws.operation_name", ctx.operation_name)
     return span
+
+
+def _finish_active_http_child_span(
+    span: "Union[Span, StreamedSpan]",
+) -> None:
+    if not isinstance(span, StreamedSpan):
+        return
+
+    http_span = sentry_sdk.traces.get_current_span()
+    if (
+        http_span is None
+        or http_span is span
+        or http_span.get_attributes().get(SPANDATA.SENTRY_ORIGIN)
+        != _STDLIB_HTTP_SPAN_ORIGIN
+        or http_span._parent_span_id != span.span_id
+    ):
+        return
+
+    # Stdlib normally keeps its HTTP span open until the response body is read.
+    # Boto3 has a separate `http.client.stream` span for that work, so finish the
+    # HTTP span after the headers and preserve LIFO scope restoration. OTel permits
+    # HTTP client spans to end after response headers are read.
+    # https://opentelemetry.io/docs/specs/semconv/http/http-spans/#http-client-span-duration
+    http_span.end()
 
 
 def _finish_client_span(

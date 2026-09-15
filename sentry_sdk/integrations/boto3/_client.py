@@ -5,6 +5,7 @@ from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.integrations.boto3 import Boto3Integration
 from sentry_sdk.integrations.boto3._context import AwsCallContext
 from sentry_sdk.integrations.boto3._instrumentation import (
+    _finish_active_http_child_span,
     _finish_client_span,
     _sentry_before_sign,
     _sentry_request_created,
@@ -65,11 +66,13 @@ def _patch_botocore_client() -> None:
         except BaseException as exc:
             if span is not None:
                 with capture_internal_exceptions():
+                    _finish_active_http_child_span(span)
                     span.__exit__(type(exc), exc, exc.__traceback__)
             raise
 
         if span is not None:
             with capture_internal_exceptions():
+                _finish_active_http_child_span(span)
                 _finish_client_span(span, parsed)
         return parsed
 
