@@ -116,7 +116,8 @@ def test_streaming(
 
         expected_attrs = {
             "http.request.method": "GET",
-            "rpc.method": "S3/GetObject",
+            "rpc.method": "GetObject",
+            "rpc.service": "S3",
             "sentry.environment": "production",
             "sentry.op": "http.client",
             "sentry.origin": "auto.http.boto3",
@@ -253,7 +254,7 @@ def test_omit_url_data_if_parsing_fails(
         items = capture_items("span")
 
         with mock.patch(
-            "sentry_sdk.integrations.boto3.parse_url",
+            "sentry_sdk.integrations.boto3._instrumentation.parse_url",
             side_effect=ValueError,
         ):
             with sentry_sdk.traces.start_span(
@@ -272,7 +273,8 @@ def test_omit_url_data_if_parsing_fails(
                 assert spans[0]["attributes"] == ApproxDict(
                     {
                         "http.request.method": "GET",
-                        "rpc.method": "S3/ListObjects",
+                        "rpc.method": "ListObjects",
+                        "rpc.service": "S3",
                         "sentry.environment": "production",
                         "sentry.op": "http.client",
                         "sentry.origin": "auto.http.boto3",
@@ -294,7 +296,7 @@ def test_omit_url_data_if_parsing_fails(
         events = capture_events()
 
         with mock.patch(
-            "sentry_sdk.integrations.boto3.parse_url",
+            "sentry_sdk.integrations.boto3._instrumentation.parse_url",
             side_effect=ValueError,
         ):
             with sentry_sdk.start_transaction() as transaction, MockResponse(
