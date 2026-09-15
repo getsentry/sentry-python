@@ -504,6 +504,25 @@ def test_function_names(sentry_init, capture_events, integrations):
         assert functions == ["foo", "bar"]
 
 
+def test_attach_stacktrace_default(sentry_init, capture_events):
+    sentry_init()
+    events = capture_events()
+
+    def foo():
+        bar()
+
+    def bar():
+        capture_message("HI")
+
+    foo()
+
+    (event,) = events
+    (thread,) = event["threads"]["values"]
+    functions = [x["function"] for x in thread["stacktrace"]["frames"]]
+
+    assert functions[-2:] == ["foo", "bar"]
+
+
 def test_attach_stacktrace_enabled(sentry_init, capture_events):
     sentry_init(attach_stacktrace=True)
     events = capture_events()
