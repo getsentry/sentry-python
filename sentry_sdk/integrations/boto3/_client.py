@@ -6,9 +6,12 @@ from sentry_sdk.integrations.boto3 import Boto3Integration
 from sentry_sdk.integrations.boto3._context import AwsCallContext
 from sentry_sdk.integrations.boto3._instrumentation import (
     _finish_active_http_child_span,
+    _get_error_attributes,
+    _get_response_attributes,
     _instrument_streaming_body,
     _sentry_before_sign,
     _sentry_request_created,
+    _set_span_attributes,
     _start_client_span,
 )
 from sentry_sdk.utils import capture_internal_exceptions, nullcontext
@@ -63,6 +66,15 @@ def _patch_botocore_client() -> None:
         with span_ctx as span:
             try:
                 parsed = orig_make_api_call(self, operation_name, api_params)
+            except BaseException as exc:
+                if span is not None:
+                    with capture_internal_exceptions():
+                        _set_span_attributes(span, _get_error_attributes(exc))
+                raise
+            else:
+                if span is not None:
+                    with capture_internal_exceptions():
+                        _set_span_attributes(span, _get_response_attributes(parsed))
             finally:
                 # stdlib HTTP span must leave stack before boto3 parent ctx
                 # manager restores the previous span.
