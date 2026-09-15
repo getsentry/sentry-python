@@ -157,6 +157,7 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 - `SanicIntegration` no longer accepts `unsampled_statuses`.
 - The `trace_ignore_status_codes` option was removed.
 - `add_attachment` no longer accepts an `add_to_transactions` argument.
+- The `stream_gen_ai_spans` option was removed. All spans are streamed now.
 
 
 ## Deprecated
