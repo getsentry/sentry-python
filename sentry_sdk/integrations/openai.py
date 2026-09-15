@@ -778,7 +778,7 @@ def _new_sync_chat_completion(
     if integration is None:
         return f(*args, **kwargs)
 
-    if sentry_sdk.get_current_scope()._agent_framework_generation_entered:
+    if sentry_sdk.get_current_scope()._agent_framework_chat_generation_entered:
         return f(*args, **kwargs)
 
     if "messages" not in kwargs:
@@ -856,7 +856,7 @@ async def _new_async_chat_completion(
     if integration is None:
         return await f(*args, **kwargs)
 
-    if sentry_sdk.get_current_scope()._agent_framework_generation_entered:
+    if sentry_sdk.get_current_scope()._agent_framework_chat_generation_entered:
         return await f(*args, **kwargs)
 
     if "messages" not in kwargs:
@@ -1396,7 +1396,7 @@ def _new_sync_responses_create(
     if integration is None:
         return f(*args, **kwargs)
 
-    if sentry_sdk.get_current_scope()._agent_framework_generation_entered:
+    if sentry_sdk.get_current_scope()._agent_framework_chat_generation_entered:
         return f(*args, **kwargs)
 
     model = kwargs.get("model")
@@ -1464,7 +1464,7 @@ async def _new_async_responses_create(
     if integration is None:
         return await f(*args, **kwargs)
 
-    if sentry_sdk.get_current_scope()._agent_framework_generation_entered:
+    if sentry_sdk.get_current_scope()._agent_framework_chat_generation_entered:
         return await f(*args, **kwargs)
 
     model = kwargs.get("model")

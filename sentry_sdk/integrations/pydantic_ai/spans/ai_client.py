@@ -6,7 +6,7 @@ from sentry_sdk.ai.utils import (
     set_data_normalized,
 )
 from sentry_sdk.consts import OP, SPANDATA
-from sentry_sdk.traces import StreamedSpan, _AgentFrameworkGenerationContext
+from sentry_sdk.traces import StreamedSpan, _AgentFrameworkChatGenerationContext
 from sentry_sdk.utils import safe_serialize
 
 from ..consts import SPAN_ORIGIN
@@ -272,7 +272,7 @@ def ai_client_context(
     agent: "Optional[Agent[Any, Any]]",
     model: "Model",
     model_settings: "Optional[ModelSettings]",
-) -> "_AgentFrameworkGenerationContext":
+) -> "_AgentFrameworkChatGenerationContext":
     """Create a span for an AI client call (model request).
 
     Args:
@@ -283,7 +283,7 @@ def ai_client_context(
     """
     model_name = _get_model_name(model) or "unknown"
 
-    context = _AgentFrameworkGenerationContext(
+    context = _AgentFrameworkChatGenerationContext(
         name=f"chat {model_name}",
         attributes={
             "sentry.op": OP.GEN_AI_CHAT,

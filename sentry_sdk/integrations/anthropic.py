@@ -709,7 +709,7 @@ def _sentry_patched_create_sync(f: "Any", *args: "Any", **kwargs: "Any") -> "Any
     if integration is None:
         return f(*args, **kwargs)
 
-    if sentry_sdk.get_current_scope()._agent_framework_generation_entered:
+    if sentry_sdk.get_current_scope()._agent_framework_chat_generation_entered:
         return f(*args, **kwargs)
 
     if "messages" not in kwargs:
@@ -799,7 +799,7 @@ async def _sentry_patched_create_async(
     if integration is None:
         return await f(*args, **kwargs)
 
-    if sentry_sdk.get_current_scope()._agent_framework_generation_entered:
+    if sentry_sdk.get_current_scope()._agent_framework_chat_generation_entered:
         return await f(*args, **kwargs)
 
     if "messages" not in kwargs:
@@ -1008,7 +1008,7 @@ def _wrap_message_stream(f: "Any") -> "Any":
 
     @wraps(f)
     def _sentry_patched_stream(*args: "Any", **kwargs: "Any") -> "MessageStreamManager":
-        if sentry_sdk.get_current_scope()._agent_framework_generation_entered:
+        if sentry_sdk.get_current_scope()._agent_framework_chat_generation_entered:
             return f(*args, **kwargs)
 
         stream_manager = f(*args, **kwargs)
@@ -1110,7 +1110,7 @@ def _wrap_async_message_stream(f: "Any") -> "Any":
     def _sentry_patched_stream(
         *args: "Any", **kwargs: "Any"
     ) -> "AsyncMessageStreamManager":
-        if sentry_sdk.get_current_scope()._agent_framework_generation_entered:
+        if sentry_sdk.get_current_scope()._agent_framework_chat_generation_entered:
             return f(*args, **kwargs)
 
         stream_manager = f(*args, **kwargs)

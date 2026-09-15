@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable
-from sentry_sdk.traces import StreamedSpan, _AgentFrameworkGenerationContext
+from sentry_sdk.traces import StreamedSpan, _AgentFrameworkChatGenerationContext
 from sentry_sdk.utils import has_data_collection_enabled
 
 try:
@@ -198,7 +198,7 @@ def _transform_tool_definitions(tools: "list[Tool]") -> "list[ToolDefinition]":
 
 def ai_client_context(
     agent: "Agent", get_response_kwargs: "dict[str, Any]"
-) -> "_AgentFrameworkGenerationContext":
+) -> "_AgentFrameworkChatGenerationContext":
     # TODO-anton: implement other types of operations. Now "chat" is hardcoded.
     model_name = None
     if agent.model:
@@ -208,7 +208,7 @@ def ai_client_context(
 
     client_options = sentry_sdk.get_client().options
 
-    context = _AgentFrameworkGenerationContext(
+    context = _AgentFrameworkChatGenerationContext(
         name=f"chat {model_name}",
         attributes={
             "sentry.op": OP.GEN_AI_CHAT,
