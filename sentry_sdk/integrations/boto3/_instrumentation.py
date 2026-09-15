@@ -1,11 +1,9 @@
 from typing import TYPE_CHECKING
 from urllib.parse import urlsplit
 
-from botocore.awsrequest import AWSRequest
-from botocore.response import StreamingBody
-
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA, SPANSTATUS
+from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.integrations.boto3 import Boto3Integration
 from sentry_sdk.traces import NoOpStreamedSpan, StreamedSpan
 from sentry_sdk.tracing import BAGGAGE_HEADER_NAME, Span
@@ -26,6 +24,13 @@ if TYPE_CHECKING:
 
     from sentry_sdk._types import Attributes
     from sentry_sdk.integrations.boto3._context import AwsCallContext
+
+try:
+    from botocore.awsrequest import AWSRequest
+    from botocore.response import StreamingBody
+except ImportError:
+    raise DidNotEnable("botocore not installed")
+
 
 _AWS_RPC_SYSTEM_NAME = "aws-api"
 

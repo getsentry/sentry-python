@@ -1,8 +1,7 @@
 from typing import TYPE_CHECKING
 
-from botocore.client import BaseClient
-
 import sentry_sdk
+from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.integrations.boto3 import Boto3Integration
 from sentry_sdk.integrations.boto3._context import AwsCallContext
 from sentry_sdk.integrations.boto3._instrumentation import (
@@ -18,6 +17,11 @@ if TYPE_CHECKING:
 
     from sentry_sdk.traces import StreamedSpan
     from sentry_sdk.tracing import Span
+
+try:
+    from botocore.client import BaseClient
+except ImportError:
+    raise DidNotEnable("botocore not installed")
 
 
 def _patch_botocore_client() -> None:
