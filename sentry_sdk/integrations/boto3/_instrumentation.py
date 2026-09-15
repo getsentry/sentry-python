@@ -165,12 +165,10 @@ def _finish_active_http_child_span(
     http_span.end()
 
 
-def _finish_client_span(
+def _instrument_streaming_body(
     span: "Union[Span, StreamedSpan]",
     parsed: "Dict[str, Any]",
 ) -> None:
-    span.__exit__(None, None, None)
-
     if isinstance(span, NoOpStreamedSpan):
         return
 
