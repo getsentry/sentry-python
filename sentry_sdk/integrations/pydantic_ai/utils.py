@@ -151,9 +151,7 @@ def _set_model_data(
                         span.set_attribute(spandata_key, value)
 
 
-def _set_available_tools(
-    span: "Span", agent: "Optional[Agent[Any, Any]]"
-) -> None:
+def _set_available_tools(span: "Span", agent: "Optional[Agent[Any, Any]]") -> None:
     """Set available tools data on a span from an agent's function toolset.
 
     Args:

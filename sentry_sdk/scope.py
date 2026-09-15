@@ -947,9 +947,7 @@ class Scope:
                 "currently active span instead."
             )
 
-        if parent_span is _DEFAULT_PARENT_SPAN or isinstance(
-            parent_span, NoOpSpan
-        ):
+        if parent_span is _DEFAULT_PARENT_SPAN or isinstance(parent_span, NoOpSpan):
             parent_span = self.span
 
         # If no eligible parent_span was provided and there is no currently
@@ -1531,9 +1529,7 @@ class Scope:
             # use the trace_context here because it synthesizes a span_id if there
             # isn't one
             if telemetry.get("span_id") is None:
-                if self._span is not None and not isinstance(
-                    self._span, NoOpSpan
-                ):
+                if self._span is not None and not isinstance(self._span, NoOpSpan):
                     telemetry["span_id"] = self._span.span_id
                 else:
                     external_propagation_context = get_external_propagation_context()

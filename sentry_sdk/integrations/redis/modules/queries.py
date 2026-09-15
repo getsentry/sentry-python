@@ -41,9 +41,7 @@ def _get_db_span_description(
     return description
 
 
-def _set_db_data_on_span(
-    span: "Span", connection_params: "dict[str, Any]"
-) -> None:
+def _set_db_data_on_span(span: "Span", connection_params: "dict[str, Any]") -> None:
     db = connection_params.get("db")
     host = connection_params.get("host")
     port = connection_params.get("port")

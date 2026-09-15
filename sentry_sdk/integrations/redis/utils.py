@@ -108,9 +108,7 @@ def _parse_rediscluster_command(command: "Any") -> "Sequence[Any]":
     return command.args
 
 
-def _set_client_data(
-    span: "Span", is_cluster: bool, name: str, *args: "Any"
-) -> None:
+def _set_client_data(span: "Span", is_cluster: bool, name: str, *args: "Any") -> None:
     if name:
         span.set_attribute(SPANDATA.DB_OPERATION_NAME, name)
 

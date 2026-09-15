@@ -253,8 +253,8 @@ class SentryLangchainCallback(BaseCallbackHandler):
     ) -> "Span":
         span = None
         if parent_id:
-            parent: "Optional[Union[Span, _AgentFrameworkChatGenerationContext]]" = self.span_map.get(
-                parent_id
+            parent: "Optional[Union[Span, _AgentFrameworkChatGenerationContext]]" = (
+                self.span_map.get(parent_id)
             )
             if parent:
                 span = sentry_sdk.traces.start_span(
@@ -290,8 +290,8 @@ class SentryLangchainCallback(BaseCallbackHandler):
     ) -> "_AgentFrameworkChatGenerationContext":
         context = None
         if parent_id:
-            parent: "Optional[Union[Span, _AgentFrameworkChatGenerationContext]]" = self.span_map.get(
-                parent_id
+            parent: "Optional[Union[Span, _AgentFrameworkChatGenerationContext]]" = (
+                self.span_map.get(parent_id)
             )
             if parent:
                 context = _AgentFrameworkChatGenerationContext(

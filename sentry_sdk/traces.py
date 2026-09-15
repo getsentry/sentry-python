@@ -799,6 +799,7 @@ class NoOpSpan(Span):
             "dynamic_sampling_context": self._dynamic_sampling_context(),
         }
 
+
 # backwards compat
 StreamedSpan = Span
 NoOpStreamedSpan = NoOpSpan
