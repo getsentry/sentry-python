@@ -19,7 +19,7 @@ except ImportError:
 from importlib.metadata import PackageNotFoundError, version
 from typing import TYPE_CHECKING
 
-from .spans.ai_client import ai_client_span, update_ai_client_span
+from .spans.ai_client import ai_client_context, update_ai_client_span
 from .spans.invoke_agent import invoke_agent_span, update_invoke_agent_span
 
 if TYPE_CHECKING:
@@ -57,15 +57,15 @@ def register_hooks(hooks: "Hooks") -> None:
         request_context: "ModelRequestContext",
         handler: "WrapModelRequestHandler",
     ) -> "ModelResponse":
-        with ai_client_span(
+        with ai_client_context(
             messages=request_context.messages,
             agent=ctx.agent,
             model=request_context.model,
             model_settings=request_context.model_settings,
-        ) as span:
+        ) as context:
             response = await handler(request_context)
 
-            update_ai_client_span(span, response)
+            update_ai_client_span(context.span, response)
             return response
 
     @hooks.on.tool_validate_error

@@ -15,7 +15,7 @@ from sentry_sdk.ai.utils import (
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.traces import StreamedSpan
+from sentry_sdk.traces import StreamedSpan, _AgentFrameworkChatGenerationContext
 from sentry_sdk.tracing_utils import (
     _get_value,
 )
@@ -83,54 +83,6 @@ except ImportError:
     # Catch TypeError due to changes in type hint evaluation order: https://github.com/pydantic/pydantic/issues/13036
     except (ImportError, TypeError):
         AgentExecutor = None
-
-
-# Conditional imports for embeddings providers
-try:
-    from langchain_openai import OpenAIEmbeddings  # type: ignore[import-not-found]
-except ImportError:
-    OpenAIEmbeddings = None
-
-try:
-    from langchain_openai import AzureOpenAIEmbeddings
-except ImportError:
-    AzureOpenAIEmbeddings = None
-
-try:
-    from langchain_google_vertexai import (  # type: ignore[import-not-found]
-        VertexAIEmbeddings,
-    )
-except ImportError:
-    VertexAIEmbeddings = None
-
-try:
-    from langchain_aws import BedrockEmbeddings  # type: ignore[import-not-found]
-except ImportError:
-    BedrockEmbeddings = None
-
-try:
-    from langchain_cohere import CohereEmbeddings  # type: ignore[import-not-found]
-except ImportError:
-    CohereEmbeddings = None
-
-try:
-    from langchain_mistralai import (  # type: ignore[import-not-found]
-        MistralAIEmbeddings,
-    )
-except ImportError:
-    MistralAIEmbeddings = None
-
-try:
-    from langchain_huggingface import (  # type: ignore[import-not-found]
-        HuggingFaceEmbeddings,
-    )
-except ImportError:
-    HuggingFaceEmbeddings = None
-
-try:
-    from langchain_ollama import OllamaEmbeddings  # type: ignore[import-not-found]
-except ImportError:
-    OllamaEmbeddings = None
 
 
 def _get_ai_system(all_params: "Dict[str, Any]") -> "Optional[str]":
@@ -245,16 +197,6 @@ class LangchainIntegration(Integration):
             AgentExecutor.invoke = _wrap_agent_executor_invoke(AgentExecutor.invoke)
             AgentExecutor.stream = _wrap_agent_executor_stream(AgentExecutor.stream)
 
-        # Patch embeddings providers
-        _patch_embeddings_provider(OpenAIEmbeddings)
-        _patch_embeddings_provider(AzureOpenAIEmbeddings)
-        _patch_embeddings_provider(VertexAIEmbeddings)
-        _patch_embeddings_provider(BedrockEmbeddings)
-        _patch_embeddings_provider(CohereEmbeddings)
-        _patch_embeddings_provider(MistralAIEmbeddings)
-        _patch_embeddings_provider(HuggingFaceEmbeddings)
-        _patch_embeddings_provider(OllamaEmbeddings)
-
 
 def _capture_exception(exc: "Any", scope: "Optional[Any]" = None) -> None:
     event, hint = event_from_exception(
@@ -269,7 +211,7 @@ class SentryLangchainCallback(BaseCallbackHandler):
     """Callback handler that creates Sentry spans."""
 
     def __init__(self, include_prompts: bool) -> None:
-        self.span_map: "OrderedDict[UUID, StreamedSpan]" = OrderedDict()
+        self.span_map: "OrderedDict[UUID, Union[StreamedSpan, _AgentFrameworkChatGenerationContext]]" = OrderedDict()
         self.include_prompts = include_prompts
 
     def _handle_error(self, run_id: "UUID", error: "Any") -> None:
@@ -279,13 +221,18 @@ class SentryLangchainCallback(BaseCallbackHandler):
             if not run_id or run_id not in self.span_map:
                 return
 
-            span = self.span_map[run_id]
+            context = self.span_map[run_id]
 
             if is_ignored:
-                span.__exit__(None, None, None)
+                context.__exit__(None, None, None)
             else:
-                _capture_exception(error, span._scope)
-                span.__exit__(type(error), error, error.__traceback__)
+                _capture_exception(
+                    error,
+                    context.span._scope
+                    if isinstance(context, _AgentFrameworkChatGenerationContext)
+                    else context._scope,
+                )
+                context.__exit__(type(error), error, error.__traceback__)
 
             del self.span_map[run_id]
 
@@ -306,10 +253,14 @@ class SentryLangchainCallback(BaseCallbackHandler):
     ) -> "StreamedSpan":
         span = None
         if parent_id:
-            parent_span: "Optional[StreamedSpan]" = self.span_map.get(parent_id)
-            if parent_span:
+            parent: "Optional[Union[StreamedSpan, _AgentFrameworkChatGenerationContext]]" = self.span_map.get(
+                parent_id
+            )
+            if parent:
                 span = sentry_sdk.traces.start_span(
-                    parent_span=parent_span,
+                    parent_span=parent.span
+                    if isinstance(parent, _AgentFrameworkChatGenerationContext)
+                    else parent,
                     name=name,
                     attributes={
                         "sentry.op": op,
@@ -328,6 +279,43 @@ class SentryLangchainCallback(BaseCallbackHandler):
 
         self.span_map[run_id] = span
         return span
+
+    def _create_generation_span(
+        self: "SentryLangchainCallback",
+        run_id: "UUID",
+        parent_id: "Optional[Any]",
+        op: str,
+        name: str,
+        origin: str,
+    ) -> "_AgentFrameworkChatGenerationContext":
+        context = None
+        if parent_id:
+            parent: "Optional[Union[StreamedSpan, _AgentFrameworkChatGenerationContext]]" = self.span_map.get(
+                parent_id
+            )
+            if parent:
+                context = _AgentFrameworkChatGenerationContext(
+                    parent_span=parent.span
+                    if isinstance(parent, _AgentFrameworkChatGenerationContext)
+                    else parent,
+                    name=name,
+                    attributes={
+                        "sentry.op": op,
+                        "sentry.origin": origin,
+                    },
+                )
+
+        if context is None:
+            context = _AgentFrameworkChatGenerationContext(
+                name=name,
+                attributes={
+                    "sentry.op": op,
+                    "sentry.origin": origin,
+                },
+            )
+
+        self.span_map[run_id] = context
+        return context
 
     def _exit_span(
         self: "SentryLangchainCallback",
@@ -452,13 +440,14 @@ class SentryLangchainCallback(BaseCallbackHandler):
                 or ""
             )
 
-            span = self._create_span(
+            context = self._create_generation_span(
                 run_id,
                 kwargs.get("parent_run_id"),
                 op=OP.GEN_AI_CHAT,
                 name=f"chat {model}".strip(),
                 origin=LangchainIntegration.origin,
             )
+            span = context.span
 
             span.set_attribute(SPANDATA.GEN_AI_OPERATION_NAME, "chat")
             if model:
@@ -545,7 +534,12 @@ class SentryLangchainCallback(BaseCallbackHandler):
             if not run_id or run_id not in self.span_map:
                 return
 
-            span = self.span_map[run_id]
+            context = self.span_map[run_id]
+            span = (
+                context.span
+                if isinstance(context, _AgentFrameworkChatGenerationContext)
+                else context
+            )
 
             client = sentry_sdk.get_client()
 
@@ -578,7 +572,12 @@ class SentryLangchainCallback(BaseCallbackHandler):
             if not run_id or run_id not in self.span_map:
                 return
 
-            span = self.span_map[run_id]
+            context = self.span_map[run_id]
+            span = (
+                context.span
+                if isinstance(context, _AgentFrameworkChatGenerationContext)
+                else context
+            )
 
             client = sentry_sdk.get_client()
 
@@ -714,7 +713,12 @@ class SentryLangchainCallback(BaseCallbackHandler):
             if not run_id or run_id not in self.span_map:
                 return
 
-            span = self.span_map[run_id]
+            context = self.span_map[run_id]
+            span = (
+                context.span
+                if isinstance(context, _AgentFrameworkChatGenerationContext)
+                else context
+            )
 
             client = sentry_sdk.get_client()
 
@@ -1255,114 +1259,3 @@ def _wrap_agent_executor_stream(f: "Callable[..., Any]") -> "Callable[..., Any]"
         return result
 
     return new_stream
-
-
-def _patch_embeddings_provider(provider_class: "Any") -> None:
-    """Patch an embeddings provider class with monitoring wrappers."""
-    if provider_class is None:
-        return
-
-    if hasattr(provider_class, "embed_documents"):
-        provider_class.embed_documents = _wrap_embedding_method(
-            provider_class.embed_documents
-        )
-    if hasattr(provider_class, "embed_query"):
-        provider_class.embed_query = _wrap_embedding_method(provider_class.embed_query)
-    if hasattr(provider_class, "aembed_documents"):
-        provider_class.aembed_documents = _wrap_async_embedding_method(
-            provider_class.aembed_documents
-        )
-    if hasattr(provider_class, "aembed_query"):
-        provider_class.aembed_query = _wrap_async_embedding_method(
-            provider_class.aembed_query
-        )
-
-
-def _wrap_embedding_method(f: "Callable[..., Any]") -> "Callable[..., Any]":
-    """Wrap sync embedding methods (embed_documents and embed_query)."""
-
-    @wraps(f)
-    def new_embedding_method(self: "Any", *args: "Any", **kwargs: "Any") -> "Any":
-        client = sentry_sdk.get_client()
-        integration = client.get_integration(LangchainIntegration)
-        if integration is None:
-            return f(self, *args, **kwargs)
-
-        model_name = getattr(self, "model", None) or getattr(self, "model_name", None)
-
-        record_inputs = False
-        if has_data_collection_enabled(client.options):
-            record_inputs = client.options["data_collection"]["gen_ai"]["inputs"]
-        elif should_send_default_pii() and integration.include_prompts:
-            # TODO: Remove this branch once `send_default_pii` is deprecated
-            record_inputs = True
-
-        with sentry_sdk.traces.start_span(
-            name=f"embeddings {model_name}" if model_name else "embeddings",
-            attributes={
-                "sentry.op": OP.GEN_AI_EMBEDDINGS,
-                "sentry.origin": LangchainIntegration.origin,
-                SPANDATA.GEN_AI_OPERATION_NAME: "embeddings",
-            },
-        ) as span:
-            if model_name:
-                span.set_attribute(SPANDATA.GEN_AI_REQUEST_MODEL, model_name)
-
-            if record_inputs and len(args) > 0:
-                input_data = args[0]
-                # Normalize to list format
-                texts = input_data if isinstance(input_data, list) else [input_data]
-                set_data_normalized(
-                    span, SPANDATA.GEN_AI_EMBEDDINGS_INPUT, texts, unpack=False
-                )
-
-            result = f(self, *args, **kwargs)
-            return result
-
-    return new_embedding_method
-
-
-def _wrap_async_embedding_method(f: "Callable[..., Any]") -> "Callable[..., Any]":
-    """Wrap async embedding methods (aembed_documents and aembed_query)."""
-
-    @wraps(f)
-    async def new_async_embedding_method(
-        self: "Any", *args: "Any", **kwargs: "Any"
-    ) -> "Any":
-        client = sentry_sdk.get_client()
-        integration = client.get_integration(LangchainIntegration)
-        if integration is None:
-            return await f(self, *args, **kwargs)
-
-        model_name = getattr(self, "model", None) or getattr(self, "model_name", None)
-
-        record_inputs = False
-        if has_data_collection_enabled(client.options):
-            record_inputs = client.options["data_collection"]["gen_ai"]["inputs"]
-        elif should_send_default_pii() and integration.include_prompts:
-            # TODO: Remove this branch once `send_default_pii` is deprecated
-            record_inputs = True
-
-        with sentry_sdk.traces.start_span(
-            name=f"embeddings {model_name}" if model_name else "embeddings",
-            attributes={
-                "sentry.op": OP.GEN_AI_EMBEDDINGS,
-                "sentry.origin": LangchainIntegration.origin,
-                SPANDATA.GEN_AI_OPERATION_NAME: "embeddings",
-            },
-        ) as span:
-            if model_name:
-                span.set_attribute(SPANDATA.GEN_AI_REQUEST_MODEL, model_name)
-
-            if record_inputs and len(args) > 0:
-                input_data = args[0]
-                # Normalize to list format
-                texts = input_data if isinstance(input_data, list) else [input_data]
-                set_data_normalized(
-                    span, SPANDATA.GEN_AI_EMBEDDINGS_INPUT, texts, unpack=False
-                )
-
-            result = await f(self, *args, **kwargs)
-            return result
-
-    return new_async_embedding_method

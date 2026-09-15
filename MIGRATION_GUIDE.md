@@ -21,12 +21,14 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
   )
   ```
 
+- The FastAPI and Starlette integrations no longer eagerly consume the request body. As a result, the body is only reported in events if your handler parsed it with `Request.json()` or `Request.form()` before the event is captured.
 - The UnraisableHookIntegration is now enabled by default.
 - We now don't suppress chained exceptions in the ASGI and asyncio integrations by default. The related `suppress_asgi_chained_exceptions` experimental option was removed.
 - In the AWS Lambda and GCP integrations, the message of the warning the SDK optionally emits if a function is about to time out has changed.
 - We changed the way we emit warnings. Deprecations will from now on be always emitted using `warnings.warn()`, while all other warnings will be emitted using `logger.warning()`.
 - `sentry_sdk.init()` can no longer be used as a context manager.
 - The `@trace` decorator doesn't accept a `template` parameter anymore.
+- The option `attach_stacktrace` is now `True` by default, meaning the SDK will attach stack traces to messages.
 
 ### Logging
 

@@ -37,10 +37,6 @@ def test_logging_defaults(sentry_init, capture_events):
 
     sentry_sdk.flush()
 
-    for event in events:
-        print(event)
-        print()
-
     # Without adding the integration explicitly, only the message should be
     # captured (no logs), and it shouldn't have any breadcrumbs
     assert len(events) == 1
@@ -160,6 +156,7 @@ def test_event_logging_stack_trace(
         integrations=[
             LoggingIntegration(breadcrumb_level=logging.INFO, event_level=logging.ERROR)
         ],
+        attach_stacktrace=False,
     )
     events = capture_events()
 

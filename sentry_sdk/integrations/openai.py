@@ -778,6 +778,9 @@ def _new_sync_chat_completion(
     if integration is None:
         return f(*args, **kwargs)
 
+    if sentry_sdk.get_current_scope()._agent_framework_chat_generation_entered:
+        return f(*args, **kwargs)
+
     if "messages" not in kwargs:
         # invalid call (in all versions of openai), let it return error
         return f(*args, **kwargs)
@@ -851,6 +854,9 @@ async def _new_async_chat_completion(
     client = sentry_sdk.get_client()
     integration = client.get_integration(OpenAIIntegration)
     if integration is None:
+        return await f(*args, **kwargs)
+
+    if sentry_sdk.get_current_scope()._agent_framework_chat_generation_entered:
         return await f(*args, **kwargs)
 
     if "messages" not in kwargs:
@@ -1390,6 +1396,9 @@ def _new_sync_responses_create(
     if integration is None:
         return f(*args, **kwargs)
 
+    if sentry_sdk.get_current_scope()._agent_framework_chat_generation_entered:
+        return f(*args, **kwargs)
+
     model = kwargs.get("model")
 
     # Same bool handling as in https://github.com/openai/openai-python/blob/acd0c54d8a68efeedde0e5b4e6c310eef1ce7867/src/openai/resources/responses/responses.py#L940
@@ -1453,6 +1462,9 @@ async def _new_async_responses_create(
     client = sentry_sdk.get_client()
     integration = client.get_integration(OpenAIIntegration)
     if integration is None:
+        return await f(*args, **kwargs)
+
+    if sentry_sdk.get_current_scope()._agent_framework_chat_generation_entered:
         return await f(*args, **kwargs)
 
     model = kwargs.get("model")

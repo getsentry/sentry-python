@@ -166,7 +166,6 @@ GROUPS = {
         "pure_eval",
         "trytond_wsgi",
         "typer",
-        "integration_deactivation",
         "shadowed_module",
     ],
 }

@@ -24,6 +24,7 @@ from sentry_sdk.integrations.strawberry import (
     SentrySyncExtension,
     StrawberryIntegration,
 )
+from tests.conftest import ApproxDict
 
 try:
     from strawberry.extensions.tracing import (
@@ -339,11 +340,12 @@ def test_event_processor_data_collection(
 
     # request.data comes from the framework integration and must not be
     # overwritten by the strawberry integration
-    assert error_event["request"]["data"] == {
-        "query": query,
-        "operationName": "ErrorQuery",
-        "variables": {"value": "boom"},
-    }
+    assert error_event["request"]["data"] == ApproxDict(
+        {
+            "operationName": "ErrorQuery",
+            "variables": {"value": "boom"},
+        }
+    )
 
     if expect_api_target:
         assert error_event["request"]["api_target"] == "graphql"

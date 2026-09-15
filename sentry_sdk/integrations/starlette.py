@@ -531,14 +531,14 @@ async def _wrap_async_handler(
     sentry_scope = sentry_sdk.get_isolation_scope()
     extractor = StarletteRequestExtractor(request)
 
-    info = await extractor.extract_request_info()
-
     def _make_request_event_processor(
         req: "Any", integration: "Any"
     ) -> "Callable[[Event, dict[str, Any]], Event]":
         def event_processor(event: "Event", hint: "Dict[str, Any]") -> "Event":
             # Add info from request to event
             request_info = event.get("request", {})
+
+            info = extractor.extract_request_info()
             if info:
                 if "cookies" in info:
                     request_info["cookies"] = info["cookies"]
@@ -743,7 +743,7 @@ class StarletteRequestExtractor:
 
         return cookies
 
-    async def extract_request_info(
+    def extract_request_info(
         self: "StarletteRequestExtractor",
     ) -> "Optional[Dict[str, Any]]":
         client = sentry_sdk.get_client()
@@ -763,7 +763,7 @@ class StarletteRequestExtractor:
                 request_info["cookies"] = self.cookies()
 
             # If there is no body, just return the cookies
-            content_length = await self.content_length()
+            content_length = self.content_length()
             if not content_length:
                 return request_info
 
@@ -774,32 +774,30 @@ class StarletteRequestExtractor:
                 request_info["data"] = AnnotatedValue.removed_because_over_size_limit()
                 return request_info
 
-            # Add JSON body, if it is a JSON request
-            json = await self.json()
-            if json:
-                request_info["data"] = json
+            if hasattr(self.request, "_json"):
+                request_info["data"] = self.request._json
                 return request_info
 
-            # Add form as key/value pairs, if request has form data
-            form = await self.form()
-            if form:
-                form_data = {}
-                for key, val in form.items():
-                    is_file = isinstance(val, UploadFile)
-                    form_data[key] = (
-                        val
-                        if not is_file
-                        else AnnotatedValue.removed_because_raw_data()
-                    )
-
-                request_info["data"] = form_data
+            formdata_body = getattr(self.request, "_form", None)
+            if formdata_body is None and hasattr(self.request, "_body"):
+                # Raw data, do not add body just an annotation
+                request_info["data"] = AnnotatedValue.removed_because_raw_data()
                 return request_info
 
-            # Raw data, do not add body just an annotation
-            request_info["data"] = AnnotatedValue.removed_because_raw_data()
+            if formdata_body is None:
+                return request_info
+
+            form_data = {}
+            for key, val in formdata_body.items():
+                is_file = isinstance(val, UploadFile)
+                form_data[key] = (
+                    val if not is_file else AnnotatedValue.removed_because_raw_data()
+                )
+
+            request_info["data"] = form_data
             return request_info
 
-    async def content_length(self: "StarletteRequestExtractor") -> "Optional[int]":
+    def content_length(self: "StarletteRequestExtractor") -> "Optional[int]":
         if "content-length" in self.request.headers:
             return int(self.request.headers["content-length"])
 

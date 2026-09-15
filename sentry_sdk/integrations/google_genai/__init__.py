@@ -75,6 +75,9 @@ def _wrap_generate_content_stream(f: "Callable[..., Any]") -> "Callable[..., Any
         if integration is None:
             return f(self, *args, **kwargs)
 
+        if sentry_sdk.get_current_scope()._agent_framework_chat_generation_entered:
+            return f(self, *args, **kwargs)
+
         _model, contents, model_name = prepare_generate_content_args(args, kwargs)
 
         chat_span = sentry_sdk.traces.start_span(
@@ -136,6 +139,9 @@ def _wrap_async_generate_content_stream(
         if integration is None:
             return await f(self, *args, **kwargs)
 
+        if sentry_sdk.get_current_scope()._agent_framework_chat_generation_entered:
+            return f(self, *args, **kwargs)
+
         _model, contents, model_name = prepare_generate_content_args(args, kwargs)
 
         chat_span = sentry_sdk.traces.start_span(
@@ -193,6 +199,9 @@ def _wrap_generate_content(f: "Callable[..., Any]") -> "Callable[..., Any]":
         if integration is None:
             return f(self, *args, **kwargs)
 
+        if sentry_sdk.get_current_scope()._agent_framework_chat_generation_entered:
+            return f(self, *args, **kwargs)
+
         model, contents, model_name = prepare_generate_content_args(args, kwargs)
 
         with sentry_sdk.traces.start_span(
@@ -232,6 +241,9 @@ def _wrap_async_generate_content(f: "Callable[..., Any]") -> "Callable[..., Any]
         integration = client.get_integration(GoogleGenAIIntegration)
         if integration is None:
             return await f(self, *args, **kwargs)
+
+        if sentry_sdk.get_current_scope()._agent_framework_chat_generation_entered:
+            return f(self, *args, **kwargs)
 
         model, contents, model_name = prepare_generate_content_args(args, kwargs)
 

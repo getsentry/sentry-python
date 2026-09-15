@@ -1274,7 +1274,7 @@ class ClientConstructor:
         before_send: "Optional[EventProcessor]" = None,
         before_breadcrumb: "Optional[BreadcrumbProcessor]" = None,
         debug: "Optional[bool]" = None,
-        attach_stacktrace: bool = False,
+        attach_stacktrace: bool = True,
         ca_certs: "Optional[str]" = None,
         traces_sample_rate: "Optional[float]" = None,
         traces_sampler: "Optional[TracesSampler]" = None,
