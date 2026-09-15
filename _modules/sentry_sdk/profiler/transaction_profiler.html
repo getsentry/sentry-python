@@ -2,7 +2,7 @@
 <html lang="en" data-accent-color="violet" data-content_root="../../../">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>sentry_sdk.profiler.transaction_profiler - sentry-python 2.69.1 documentation</title><link rel="index" title="Index" href="../../../genindex.html" /><link rel="search" title="Search" href="../../../search.html" /><script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>sentry_sdk.profiler.transaction_profiler - sentry-python 2.69.2 documentation</title><link rel="index" title="Index" href="../../../genindex.html" /><link rel="search" title="Search" href="../../../search.html" /><script>
     function setColorMode(t){let e=document.documentElement;e.setAttribute("data-color-mode",t);let a=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches,s=t;"auto"===t&&(s=a?"dark":"light"),"light"===s?(e.classList.remove("dark"),e.classList.add("light")):(e.classList.remove("light"),e.classList.add("dark"))}
     setColorMode(localStorage._theme||"auto");
   </script><link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=e1a1ceaf" />
@@ -107,7 +107,7 @@ data-aria-dark="Switch to auto color mode">
       <div class="relative min-w-0 max-w-6xl px-6 pb-6 pt-8 xl:px-12">
   <article class="yue" role="main">
           <h1>Source code for sentry_sdk.profiler.transaction_profiler</h1><div class="highlight"><pre>
-<span></span><span data-line="1"><span class="sd">&quot;&quot;&quot;</span>
+<span></span><span data-line="1"><span class="sd">"""</span>
 </span><span data-line="2"><span class="sd">This file is originally based on code from https://github.com/nylas/nylas-perftools,</span>
 </span><span data-line="3"><span class="sd">which is published under the following license:</span>
 </span><span data-line="4">
@@ -116,7 +116,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="7"><span class="sd">Copyright (c) 2014 Nylas</span>
 </span><span data-line="8">
 </span><span data-line="9"><span class="sd">Permission is hereby granted, free of charge, to any person obtaining a copy</span>
-</span><span data-line="10"><span class="sd">of this software and associated documentation files (the &quot;Software&quot;), to deal</span>
+</span><span data-line="10"><span class="sd">of this software and associated documentation files (the "Software"), to deal</span>
 </span><span data-line="11"><span class="sd">in the Software without restriction, including without limitation the rights</span>
 </span><span data-line="12"><span class="sd">to use, copy, modify, merge, publish, distribute, sublicense, and/or sell</span>
 </span><span data-line="13"><span class="sd">copies of the Software, and to permit persons to whom the Software is</span>
@@ -125,14 +125,14 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="16"><span class="sd">The above copyright notice and this permission notice shall be included in all</span>
 </span><span data-line="17"><span class="sd">copies or substantial portions of the Software.</span>
 </span><span data-line="18">
-</span><span data-line="19"><span class="sd">THE SOFTWARE IS PROVIDED &quot;AS IS&quot;, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR</span>
+</span><span data-line="19"><span class="sd">THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR</span>
 </span><span data-line="20"><span class="sd">IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,</span>
 </span><span data-line="21"><span class="sd">FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE</span>
 </span><span data-line="22"><span class="sd">AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER</span>
 </span><span data-line="23"><span class="sd">LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,</span>
 </span><span data-line="24"><span class="sd">OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE</span>
 </span><span data-line="25"><span class="sd">SOFTWARE.</span>
-</span><span data-line="26"><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="26"><span class="sd">"""</span>
 </span><span data-line="27">
 </span><span data-line="28"><span class="kn">import</span><span class="w"> </span><span class="nn">atexit</span>
 </span><span data-line="29"><span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
@@ -181,21 +181,21 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="72">    <span class="p">)</span>
 </span><span data-line="73">
 </span><span data-line="74">    <span class="n">ProcessedSample</span> <span class="o">=</span> <span class="n">TypedDict</span><span class="p">(</span>
-</span><span data-line="75">        <span class="s2">&quot;ProcessedSample&quot;</span><span class="p">,</span>
+</span><span data-line="75">        <span class="s2">"ProcessedSample"</span><span class="p">,</span>
 </span><span data-line="76">        <span class="p">{</span>
-</span><span data-line="77">            <span class="s2">&quot;elapsed_since_start_ns&quot;</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
-</span><span data-line="78">            <span class="s2">&quot;thread_id&quot;</span><span class="p">:</span> <span class="n">ThreadId</span><span class="p">,</span>
-</span><span data-line="79">            <span class="s2">&quot;stack_id&quot;</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+</span><span data-line="77">            <span class="s2">"elapsed_since_start_ns"</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+</span><span data-line="78">            <span class="s2">"thread_id"</span><span class="p">:</span> <span class="n">ThreadId</span><span class="p">,</span>
+</span><span data-line="79">            <span class="s2">"stack_id"</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
 </span><span data-line="80">        <span class="p">},</span>
 </span><span data-line="81">    <span class="p">)</span>
 </span><span data-line="82">
 </span><span data-line="83">    <span class="n">ProcessedProfile</span> <span class="o">=</span> <span class="n">TypedDict</span><span class="p">(</span>
-</span><span data-line="84">        <span class="s2">&quot;ProcessedProfile&quot;</span><span class="p">,</span>
+</span><span data-line="84">        <span class="s2">"ProcessedProfile"</span><span class="p">,</span>
 </span><span data-line="85">        <span class="p">{</span>
-</span><span data-line="86">            <span class="s2">&quot;frames&quot;</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">ProcessedFrame</span><span class="p">],</span>
-</span><span data-line="87">            <span class="s2">&quot;stacks&quot;</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">ProcessedStack</span><span class="p">],</span>
-</span><span data-line="88">            <span class="s2">&quot;samples&quot;</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">ProcessedSample</span><span class="p">],</span>
-</span><span data-line="89">            <span class="s2">&quot;thread_metadata&quot;</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="n">ThreadId</span><span class="p">,</span> <span class="n">ProcessedThreadMetadata</span><span class="p">],</span>
+</span><span data-line="86">            <span class="s2">"frames"</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">ProcessedFrame</span><span class="p">],</span>
+</span><span data-line="87">            <span class="s2">"stacks"</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">ProcessedStack</span><span class="p">],</span>
+</span><span data-line="88">            <span class="s2">"samples"</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">ProcessedSample</span><span class="p">],</span>
+</span><span data-line="89">            <span class="s2">"thread_metadata"</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="n">ThreadId</span><span class="p">,</span> <span class="n">ProcessedThreadMetadata</span><span class="p">],</span>
 </span><span data-line="90">        <span class="p">},</span>
 </span><span data-line="91">    <span class="p">)</span>
 </span><span data-line="92">
@@ -204,15 +204,15 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="95">    <span class="kn">from</span><span class="w"> </span><span class="nn">gevent.monkey</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_original</span>
 </span><span data-line="96">    <span class="kn">from</span><span class="w"> </span><span class="nn">gevent.threadpool</span><span class="w"> </span><span class="kn">import</span> <span class="n">ThreadPool</span> <span class="k">as</span> <span class="n">_ThreadPool</span>
 </span><span data-line="97">
-</span><span data-line="98">    <span class="n">ThreadPool</span><span class="p">:</span> <span class="s2">&quot;Optional[Type[_ThreadPool]]&quot;</span> <span class="o">=</span> <span class="n">_ThreadPool</span>
-</span><span data-line="99">    <span class="n">thread_sleep</span> <span class="o">=</span> <span class="n">get_original</span><span class="p">(</span><span class="s2">&quot;time&quot;</span><span class="p">,</span> <span class="s2">&quot;sleep&quot;</span><span class="p">)</span>
+</span><span data-line="98">    <span class="n">ThreadPool</span><span class="p">:</span> <span class="s2">"Optional[Type[_ThreadPool]]"</span> <span class="o">=</span> <span class="n">_ThreadPool</span>
+</span><span data-line="99">    <span class="n">thread_sleep</span> <span class="o">=</span> <span class="n">get_original</span><span class="p">(</span><span class="s2">"time"</span><span class="p">,</span> <span class="s2">"sleep"</span><span class="p">)</span>
 </span><span data-line="100"><span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
 </span><span data-line="101">    <span class="n">thread_sleep</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">sleep</span>
 </span><span data-line="102">
 </span><span data-line="103">    <span class="n">ThreadPool</span> <span class="o">=</span> <span class="kc">None</span>
 </span><span data-line="104">
 </span><span data-line="105">
-</span><span data-line="106"><span class="n">_scheduler</span><span class="p">:</span> <span class="s2">&quot;Optional[Scheduler]&quot;</span> <span class="o">=</span> <span class="kc">None</span>
+</span><span data-line="106"><span class="n">_scheduler</span><span class="p">:</span> <span class="s2">"Optional[Scheduler]"</span> <span class="o">=</span> <span class="kc">None</span>
 </span><span data-line="107">
 </span><span data-line="108">
 </span><span data-line="109"><span class="c1"># The minimum number of unique samples that must exist in a profile to be</span>
@@ -220,21 +220,21 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="111"><span class="n">PROFILE_MINIMUM_SAMPLES</span> <span class="o">=</span> <span class="mi">2</span>
 </span><span data-line="112">
 </span><span data-line="113">
-</span><span data-line="114"><span class="k">def</span><span class="w"> </span><span class="nf">has_profiling_enabled</span><span class="p">(</span><span class="n">options</span><span class="p">:</span> <span class="s2">&quot;Dict[str, Any]&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
-</span><span data-line="115">    <span class="n">profiles_sampler</span> <span class="o">=</span> <span class="n">options</span><span class="p">[</span><span class="s2">&quot;profiles_sampler&quot;</span><span class="p">]</span>
+</span><span data-line="114"><span class="k">def</span><span class="w"> </span><span class="nf">has_profiling_enabled</span><span class="p">(</span><span class="n">options</span><span class="p">:</span> <span class="s2">"Dict[str, Any]"</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+</span><span data-line="115">    <span class="n">profiles_sampler</span> <span class="o">=</span> <span class="n">options</span><span class="p">[</span><span class="s2">"profiles_sampler"</span><span class="p">]</span>
 </span><span data-line="116">    <span class="k">if</span> <span class="n">profiles_sampler</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
 </span><span data-line="117">        <span class="k">return</span> <span class="kc">True</span>
 </span><span data-line="118">
-</span><span data-line="119">    <span class="n">profiles_sample_rate</span> <span class="o">=</span> <span class="n">options</span><span class="p">[</span><span class="s2">&quot;profiles_sample_rate&quot;</span><span class="p">]</span>
+</span><span data-line="119">    <span class="n">profiles_sample_rate</span> <span class="o">=</span> <span class="n">options</span><span class="p">[</span><span class="s2">"profiles_sample_rate"</span><span class="p">]</span>
 </span><span data-line="120">    <span class="k">if</span> <span class="n">profiles_sample_rate</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">profiles_sample_rate</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
 </span><span data-line="121">        <span class="k">return</span> <span class="kc">True</span>
 </span><span data-line="122">
-</span><span data-line="123">    <span class="n">profiles_sample_rate</span> <span class="o">=</span> <span class="n">options</span><span class="p">[</span><span class="s2">&quot;_experiments&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;profiles_sample_rate&quot;</span><span class="p">)</span>
+</span><span data-line="123">    <span class="n">profiles_sample_rate</span> <span class="o">=</span> <span class="n">options</span><span class="p">[</span><span class="s2">"_experiments"</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"profiles_sample_rate"</span><span class="p">)</span>
 </span><span data-line="124">    <span class="k">if</span> <span class="n">profiles_sample_rate</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
 </span><span data-line="125">        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
-</span><span data-line="126">            <span class="s2">&quot;_experiments[&#39;profiles_sample_rate&#39;] is deprecated. &quot;</span>
-</span><span data-line="127">            <span class="s2">&quot;Please use the non-experimental profiles_sample_rate option &quot;</span>
-</span><span data-line="128">            <span class="s2">&quot;directly.&quot;</span>
+</span><span data-line="126">            <span class="s2">"_experiments['profiles_sample_rate'] is deprecated. "</span>
+</span><span data-line="127">            <span class="s2">"Please use the non-experimental profiles_sample_rate option "</span>
+</span><span data-line="128">            <span class="s2">"directly."</span>
 </span><span data-line="129">        <span class="p">)</span>
 </span><span data-line="130">        <span class="k">if</span> <span class="n">profiles_sample_rate</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
 </span><span data-line="131">            <span class="k">return</span> <span class="kc">True</span>
@@ -242,11 +242,11 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="133">    <span class="k">return</span> <span class="kc">False</span>
 </span><span data-line="134">
 </span><span data-line="135">
-</span><span data-line="136"><span class="k">def</span><span class="w"> </span><span class="nf">setup_profiler</span><span class="p">(</span><span class="n">options</span><span class="p">:</span> <span class="s2">&quot;Dict[str, Any]&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+</span><span data-line="136"><span class="k">def</span><span class="w"> </span><span class="nf">setup_profiler</span><span class="p">(</span><span class="n">options</span><span class="p">:</span> <span class="s2">"Dict[str, Any]"</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
 </span><span data-line="137">    <span class="k">global</span> <span class="n">_scheduler</span>
 </span><span data-line="138">
 </span><span data-line="139">    <span class="k">if</span> <span class="n">_scheduler</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="140">        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;[Profiling] Profiler is already setup&quot;</span><span class="p">)</span>
+</span><span data-line="140">        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">"[Profiling] Profiler is already setup"</span><span class="p">)</span>
 </span><span data-line="141">        <span class="k">return</span> <span class="kc">False</span>
 </span><span data-line="142">
 </span><span data-line="143">    <span class="n">frequency</span> <span class="o">=</span> <span class="n">DEFAULT_SAMPLING_FREQUENCY</span>
@@ -260,30 +260,30 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="151">    <span class="k">else</span><span class="p">:</span>
 </span><span data-line="152">        <span class="n">default_profiler_mode</span> <span class="o">=</span> <span class="n">ThreadScheduler</span><span class="o">.</span><span class="n">mode</span>
 </span><span data-line="153">
-</span><span data-line="154">    <span class="k">if</span> <span class="n">options</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;profiler_mode&quot;</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="155">        <span class="n">profiler_mode</span> <span class="o">=</span> <span class="n">options</span><span class="p">[</span><span class="s2">&quot;profiler_mode&quot;</span><span class="p">]</span>
+</span><span data-line="154">    <span class="k">if</span> <span class="n">options</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"profiler_mode"</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="155">        <span class="n">profiler_mode</span> <span class="o">=</span> <span class="n">options</span><span class="p">[</span><span class="s2">"profiler_mode"</span><span class="p">]</span>
 </span><span data-line="156">    <span class="k">else</span><span class="p">:</span>
-</span><span data-line="157">        <span class="n">profiler_mode</span> <span class="o">=</span> <span class="n">options</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;_experiments&quot;</span><span class="p">,</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;profiler_mode&quot;</span><span class="p">)</span>
+</span><span data-line="157">        <span class="n">profiler_mode</span> <span class="o">=</span> <span class="n">options</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"_experiments"</span><span class="p">,</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"profiler_mode"</span><span class="p">)</span>
 </span><span data-line="158">        <span class="k">if</span> <span class="n">profiler_mode</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
 </span><span data-line="159">            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
-</span><span data-line="160">                <span class="s2">&quot;_experiments[&#39;profiler_mode&#39;] is deprecated. Please use the &quot;</span>
-</span><span data-line="161">                <span class="s2">&quot;non-experimental profiler_mode option directly.&quot;</span>
+</span><span data-line="160">                <span class="s2">"_experiments['profiler_mode'] is deprecated. Please use the "</span>
+</span><span data-line="161">                <span class="s2">"non-experimental profiler_mode option directly."</span>
 </span><span data-line="162">            <span class="p">)</span>
 </span><span data-line="163">        <span class="n">profiler_mode</span> <span class="o">=</span> <span class="n">profiler_mode</span> <span class="ow">or</span> <span class="n">default_profiler_mode</span>
 </span><span data-line="164">
 </span><span data-line="165">    <span class="k">if</span> <span class="p">(</span>
 </span><span data-line="166">        <span class="n">profiler_mode</span> <span class="o">==</span> <span class="n">ThreadScheduler</span><span class="o">.</span><span class="n">mode</span>
-</span><span data-line="167">        <span class="c1"># for legacy reasons, we&#39;ll keep supporting sleep mode for this scheduler</span>
-</span><span data-line="168">        <span class="ow">or</span> <span class="n">profiler_mode</span> <span class="o">==</span> <span class="s2">&quot;sleep&quot;</span>
+</span><span data-line="167">        <span class="c1"># for legacy reasons, we'll keep supporting sleep mode for this scheduler</span>
+</span><span data-line="168">        <span class="ow">or</span> <span class="n">profiler_mode</span> <span class="o">==</span> <span class="s2">"sleep"</span>
 </span><span data-line="169">    <span class="p">):</span>
 </span><span data-line="170">        <span class="n">_scheduler</span> <span class="o">=</span> <span class="n">ThreadScheduler</span><span class="p">(</span><span class="n">frequency</span><span class="o">=</span><span class="n">frequency</span><span class="p">)</span>
 </span><span data-line="171">    <span class="k">elif</span> <span class="n">profiler_mode</span> <span class="o">==</span> <span class="n">GeventScheduler</span><span class="o">.</span><span class="n">mode</span><span class="p">:</span>
 </span><span data-line="172">        <span class="n">_scheduler</span> <span class="o">=</span> <span class="n">GeventScheduler</span><span class="p">(</span><span class="n">frequency</span><span class="o">=</span><span class="n">frequency</span><span class="p">)</span>
 </span><span data-line="173">    <span class="k">else</span><span class="p">:</span>
-</span><span data-line="174">        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Unknown profiler mode: </span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">profiler_mode</span><span class="p">))</span>
+</span><span data-line="174">        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Unknown profiler mode: </span><span class="si">{}</span><span class="s2">"</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">profiler_mode</span><span class="p">))</span>
 </span><span data-line="175">
 </span><span data-line="176">    <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
-</span><span data-line="177">        <span class="s2">&quot;[Profiling] Setting up profiler in </span><span class="si">{mode}</span><span class="s2"> mode&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="n">_scheduler</span><span class="o">.</span><span class="n">mode</span><span class="p">)</span>
+</span><span data-line="177">        <span class="s2">"[Profiling] Setting up profiler in </span><span class="si">{mode}</span><span class="s2"> mode"</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="n">_scheduler</span><span class="o">.</span><span class="n">mode</span><span class="p">)</span>
 </span><span data-line="178">    <span class="p">)</span>
 </span><span data-line="179">    <span class="n">_scheduler</span><span class="o">.</span><span class="n">setup</span><span class="p">()</span>
 </span><span data-line="180">
@@ -309,21 +309,21 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="198"><span class="k">class</span><span class="w"> </span><span class="nc">Profile</span><span class="p">:</span>
 </span><span data-line="199">    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
 </span><span data-line="200">        <span class="bp">self</span><span class="p">,</span>
-</span><span data-line="201">        <span class="n">sampled</span><span class="p">:</span> <span class="s2">&quot;Optional[bool]&quot;</span><span class="p">,</span>
+</span><span data-line="201">        <span class="n">sampled</span><span class="p">:</span> <span class="s2">"Optional[bool]"</span><span class="p">,</span>
 </span><span data-line="202">        <span class="n">start_ns</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
-</span><span data-line="203">        <span class="n">hub</span><span class="p">:</span> <span class="s2">&quot;Optional[sentry_sdk.Hub]&quot;</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span data-line="204">        <span class="n">scheduler</span><span class="p">:</span> <span class="s2">&quot;Optional[Scheduler]&quot;</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span data-line="203">        <span class="n">hub</span><span class="p">:</span> <span class="s2">"Optional[sentry_sdk.Hub]"</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span data-line="204">        <span class="n">scheduler</span><span class="p">:</span> <span class="s2">"Optional[Scheduler]"</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 </span><span data-line="205">    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 </span><span data-line="206">        <span class="bp">self</span><span class="o">.</span><span class="n">scheduler</span> <span class="o">=</span> <span class="n">_scheduler</span> <span class="k">if</span> <span class="n">scheduler</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">scheduler</span>
 </span><span data-line="207">
 </span><span data-line="208">        <span class="bp">self</span><span class="o">.</span><span class="n">event_id</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">uuid</span><span class="o">.</span><span class="n">uuid4</span><span class="p">()</span><span class="o">.</span><span class="n">hex</span>
 </span><span data-line="209">
-</span><span data-line="210">        <span class="bp">self</span><span class="o">.</span><span class="n">sampled</span><span class="p">:</span> <span class="s2">&quot;Optional[bool]&quot;</span> <span class="o">=</span> <span class="n">sampled</span>
+</span><span data-line="210">        <span class="bp">self</span><span class="o">.</span><span class="n">sampled</span><span class="p">:</span> <span class="s2">"Optional[bool]"</span> <span class="o">=</span> <span class="n">sampled</span>
 </span><span data-line="211">
 </span><span data-line="212">        <span class="c1"># Various framework integrations are capable of overwriting the active thread id.</span>
 </span><span data-line="213">        <span class="c1"># If it is set to `None` at the end of the profile, we fall back to the default.</span>
 </span><span data-line="214">        <span class="bp">self</span><span class="o">.</span><span class="n">_default_active_thread_id</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">get_current_thread_meta</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">or</span> <span class="mi">0</span>
-</span><span data-line="215">        <span class="bp">self</span><span class="o">.</span><span class="n">active_thread_id</span><span class="p">:</span> <span class="s2">&quot;Optional[int]&quot;</span> <span class="o">=</span> <span class="kc">None</span>
+</span><span data-line="215">        <span class="bp">self</span><span class="o">.</span><span class="n">active_thread_id</span><span class="p">:</span> <span class="s2">"Optional[int]"</span> <span class="o">=</span> <span class="kc">None</span>
 </span><span data-line="216">
 </span><span data-line="217">        <span class="k">try</span><span class="p">:</span>
 </span><span data-line="218">            <span class="bp">self</span><span class="o">.</span><span class="n">start_ns</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">start_ns</span>
@@ -333,20 +333,20 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="222">        <span class="bp">self</span><span class="o">.</span><span class="n">stop_ns</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span>
 </span><span data-line="223">        <span class="bp">self</span><span class="o">.</span><span class="n">active</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
 </span><span data-line="224">
-</span><span data-line="225">        <span class="bp">self</span><span class="o">.</span><span class="n">indexed_frames</span><span class="p">:</span> <span class="s2">&quot;Dict[FrameId, int]&quot;</span> <span class="o">=</span> <span class="p">{}</span>
-</span><span data-line="226">        <span class="bp">self</span><span class="o">.</span><span class="n">indexed_stacks</span><span class="p">:</span> <span class="s2">&quot;Dict[StackId, int]&quot;</span> <span class="o">=</span> <span class="p">{}</span>
-</span><span data-line="227">        <span class="bp">self</span><span class="o">.</span><span class="n">frames</span><span class="p">:</span> <span class="s2">&quot;List[ProcessedFrame]&quot;</span> <span class="o">=</span> <span class="p">[]</span>
-</span><span data-line="228">        <span class="bp">self</span><span class="o">.</span><span class="n">stacks</span><span class="p">:</span> <span class="s2">&quot;List[ProcessedStack]&quot;</span> <span class="o">=</span> <span class="p">[]</span>
-</span><span data-line="229">        <span class="bp">self</span><span class="o">.</span><span class="n">samples</span><span class="p">:</span> <span class="s2">&quot;List[ProcessedSample]&quot;</span> <span class="o">=</span> <span class="p">[]</span>
+</span><span data-line="225">        <span class="bp">self</span><span class="o">.</span><span class="n">indexed_frames</span><span class="p">:</span> <span class="s2">"Dict[FrameId, int]"</span> <span class="o">=</span> <span class="p">{}</span>
+</span><span data-line="226">        <span class="bp">self</span><span class="o">.</span><span class="n">indexed_stacks</span><span class="p">:</span> <span class="s2">"Dict[StackId, int]"</span> <span class="o">=</span> <span class="p">{}</span>
+</span><span data-line="227">        <span class="bp">self</span><span class="o">.</span><span class="n">frames</span><span class="p">:</span> <span class="s2">"List[ProcessedFrame]"</span> <span class="o">=</span> <span class="p">[]</span>
+</span><span data-line="228">        <span class="bp">self</span><span class="o">.</span><span class="n">stacks</span><span class="p">:</span> <span class="s2">"List[ProcessedStack]"</span> <span class="o">=</span> <span class="p">[]</span>
+</span><span data-line="229">        <span class="bp">self</span><span class="o">.</span><span class="n">samples</span><span class="p">:</span> <span class="s2">"List[ProcessedSample]"</span> <span class="o">=</span> <span class="p">[]</span>
 </span><span data-line="230">
 </span><span data-line="231">        <span class="bp">self</span><span class="o">.</span><span class="n">unique_samples</span> <span class="o">=</span> <span class="mi">0</span>
 </span><span data-line="232">
 </span><span data-line="233">        <span class="c1"># Backwards compatibility with the old hub property</span>
-</span><span data-line="234">        <span class="bp">self</span><span class="o">.</span><span class="n">_hub</span><span class="p">:</span> <span class="s2">&quot;Optional[sentry_sdk.Hub]&quot;</span> <span class="o">=</span> <span class="kc">None</span>
+</span><span data-line="234">        <span class="bp">self</span><span class="o">.</span><span class="n">_hub</span><span class="p">:</span> <span class="s2">"Optional[sentry_sdk.Hub]"</span> <span class="o">=</span> <span class="kc">None</span>
 </span><span data-line="235">        <span class="k">if</span> <span class="n">hub</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
 </span><span data-line="236">            <span class="bp">self</span><span class="o">.</span><span class="n">_hub</span> <span class="o">=</span> <span class="n">hub</span>
 </span><span data-line="237">            <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
-</span><span data-line="238">                <span class="s2">&quot;The `hub` parameter is deprecated. Please do not use it.&quot;</span><span class="p">,</span>
+</span><span data-line="238">                <span class="s2">"The `hub` parameter is deprecated. Please do not use it."</span><span class="p">,</span>
 </span><span data-line="239">                <span class="ne">DeprecationWarning</span><span class="p">,</span>
 </span><span data-line="240">                <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
 </span><span data-line="241">            <span class="p">)</span>
@@ -354,37 +354,37 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="243">    <span class="k">def</span><span class="w"> </span><span class="nf">update_active_thread_id</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 </span><span data-line="244">        <span class="bp">self</span><span class="o">.</span><span class="n">active_thread_id</span> <span class="o">=</span> <span class="n">get_current_thread_meta</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span>
 </span><span data-line="245">        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
-</span><span data-line="246">            <span class="s2">&quot;[Profiling] updating active thread id to </span><span class="si">{tid}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+</span><span data-line="246">            <span class="s2">"[Profiling] updating active thread id to </span><span class="si">{tid}</span><span class="s2">"</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
 </span><span data-line="247">                <span class="n">tid</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">active_thread_id</span>
 </span><span data-line="248">            <span class="p">)</span>
 </span><span data-line="249">        <span class="p">)</span>
 </span><span data-line="250">
 </span><span data-line="251">    <span class="k">def</span><span class="w"> </span><span class="nf">_set_initial_sampling_decision</span><span class="p">(</span>
-</span><span data-line="252">        <span class="bp">self</span><span class="p">,</span> <span class="n">sampling_context</span><span class="p">:</span> <span class="s2">&quot;SamplingContext&quot;</span>
+</span><span data-line="252">        <span class="bp">self</span><span class="p">,</span> <span class="n">sampling_context</span><span class="p">:</span> <span class="s2">"SamplingContext"</span>
 </span><span data-line="253">    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="254"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="255"><span class="sd">        Sets the profile&#39;s sampling decision according to the following</span>
+</span><span data-line="254"><span class="w">        </span><span class="sd">"""</span>
+</span><span data-line="255"><span class="sd">        Sets the profile's sampling decision according to the following</span>
 </span><span data-line="256"><span class="sd">        precedence rules:</span>
 </span><span data-line="257">
 </span><span data-line="258"><span class="sd">        1. If the transaction to be profiled is not sampled, that decision</span>
 </span><span data-line="259"><span class="sd">        will be used, regardless of anything else.</span>
 </span><span data-line="260">
 </span><span data-line="261"><span class="sd">        2. Use `profiles_sample_rate` to decide.</span>
-</span><span data-line="262"><span class="sd">        &quot;&quot;&quot;</span>
+</span><span data-line="262"><span class="sd">        """</span>
 </span><span data-line="263">
 </span><span data-line="264">        <span class="c1"># The corresponding transaction was not sampled,</span>
-</span><span data-line="265">        <span class="c1"># so don&#39;t generate a profile for it.</span>
+</span><span data-line="265">        <span class="c1"># so don't generate a profile for it.</span>
 </span><span data-line="266">        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">sampled</span><span class="p">:</span>
 </span><span data-line="267">            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
-</span><span data-line="268">                <span class="s2">&quot;[Profiling] Discarding profile because transaction is discarded.&quot;</span>
+</span><span data-line="268">                <span class="s2">"[Profiling] Discarding profile because transaction is discarded."</span>
 </span><span data-line="269">            <span class="p">)</span>
 </span><span data-line="270">            <span class="bp">self</span><span class="o">.</span><span class="n">sampled</span> <span class="o">=</span> <span class="kc">False</span>
 </span><span data-line="271">            <span class="k">return</span>
 </span><span data-line="272">
-</span><span data-line="273">        <span class="c1"># The profiler hasn&#39;t been properly initialized.</span>
+</span><span data-line="273">        <span class="c1"># The profiler hasn't been properly initialized.</span>
 </span><span data-line="274">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">scheduler</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
 </span><span data-line="275">            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
-</span><span data-line="276">                <span class="s2">&quot;[Profiling] Discarding profile because profiler was not started.&quot;</span>
+</span><span data-line="276">                <span class="s2">"[Profiling] Discarding profile because profiler was not started."</span>
 </span><span data-line="277">            <span class="p">)</span>
 </span><span data-line="278">            <span class="bp">self</span><span class="o">.</span><span class="n">sampled</span> <span class="o">=</span> <span class="kc">False</span>
 </span><span data-line="279">            <span class="k">return</span>
@@ -396,25 +396,25 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="285">
 </span><span data-line="286">        <span class="n">options</span> <span class="o">=</span> <span class="n">client</span><span class="o">.</span><span class="n">options</span>
 </span><span data-line="287">
-</span><span data-line="288">        <span class="k">if</span> <span class="nb">callable</span><span class="p">(</span><span class="n">options</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;profiles_sampler&quot;</span><span class="p">)):</span>
-</span><span data-line="289">            <span class="n">sample_rate</span> <span class="o">=</span> <span class="n">options</span><span class="p">[</span><span class="s2">&quot;profiles_sampler&quot;</span><span class="p">](</span><span class="n">sampling_context</span><span class="p">)</span>
-</span><span data-line="290">        <span class="k">elif</span> <span class="n">options</span><span class="p">[</span><span class="s2">&quot;profiles_sample_rate&quot;</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="291">            <span class="n">sample_rate</span> <span class="o">=</span> <span class="n">options</span><span class="p">[</span><span class="s2">&quot;profiles_sample_rate&quot;</span><span class="p">]</span>
+</span><span data-line="288">        <span class="k">if</span> <span class="nb">callable</span><span class="p">(</span><span class="n">options</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"profiles_sampler"</span><span class="p">)):</span>
+</span><span data-line="289">            <span class="n">sample_rate</span> <span class="o">=</span> <span class="n">options</span><span class="p">[</span><span class="s2">"profiles_sampler"</span><span class="p">](</span><span class="n">sampling_context</span><span class="p">)</span>
+</span><span data-line="290">        <span class="k">elif</span> <span class="n">options</span><span class="p">[</span><span class="s2">"profiles_sample_rate"</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="291">            <span class="n">sample_rate</span> <span class="o">=</span> <span class="n">options</span><span class="p">[</span><span class="s2">"profiles_sample_rate"</span><span class="p">]</span>
 </span><span data-line="292">        <span class="k">else</span><span class="p">:</span>
-</span><span data-line="293">            <span class="n">sample_rate</span> <span class="o">=</span> <span class="n">options</span><span class="p">[</span><span class="s2">&quot;_experiments&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;profiles_sample_rate&quot;</span><span class="p">)</span>
+</span><span data-line="293">            <span class="n">sample_rate</span> <span class="o">=</span> <span class="n">options</span><span class="p">[</span><span class="s2">"_experiments"</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"profiles_sample_rate"</span><span class="p">)</span>
 </span><span data-line="294">
 </span><span data-line="295">        <span class="c1"># The profiles_sample_rate option was not set, so profiling</span>
 </span><span data-line="296">        <span class="c1"># was never enabled.</span>
 </span><span data-line="297">        <span class="k">if</span> <span class="n">sample_rate</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
 </span><span data-line="298">            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
-</span><span data-line="299">                <span class="s2">&quot;[Profiling] Discarding profile because profiling was not enabled.&quot;</span>
+</span><span data-line="299">                <span class="s2">"[Profiling] Discarding profile because profiling was not enabled."</span>
 </span><span data-line="300">            <span class="p">)</span>
 </span><span data-line="301">            <span class="bp">self</span><span class="o">.</span><span class="n">sampled</span> <span class="o">=</span> <span class="kc">False</span>
 </span><span data-line="302">            <span class="k">return</span>
 </span><span data-line="303">
-</span><span data-line="304">        <span class="k">if</span> <span class="ow">not</span> <span class="n">is_valid_sample_rate</span><span class="p">(</span><span class="n">sample_rate</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="s2">&quot;Profiling&quot;</span><span class="p">):</span>
+</span><span data-line="304">        <span class="k">if</span> <span class="ow">not</span> <span class="n">is_valid_sample_rate</span><span class="p">(</span><span class="n">sample_rate</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="s2">"Profiling"</span><span class="p">):</span>
 </span><span data-line="305">            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
-</span><span data-line="306">                <span class="s2">&quot;[Profiling] Discarding profile because of invalid sample rate.&quot;</span>
+</span><span data-line="306">                <span class="s2">"[Profiling] Discarding profile because of invalid sample rate."</span>
 </span><span data-line="307">            <span class="p">)</span>
 </span><span data-line="308">            <span class="bp">self</span><span class="o">.</span><span class="n">sampled</span> <span class="o">=</span> <span class="kc">False</span>
 </span><span data-line="309">            <span class="k">return</span>
@@ -425,10 +425,10 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="314">        <span class="bp">self</span><span class="o">.</span><span class="n">sampled</span> <span class="o">=</span> <span class="n">random</span><span class="o">.</span><span class="n">random</span><span class="p">()</span> <span class="o">&lt;</span> <span class="nb">float</span><span class="p">(</span><span class="n">sample_rate</span><span class="p">)</span>
 </span><span data-line="315">
 </span><span data-line="316">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">sampled</span><span class="p">:</span>
-</span><span data-line="317">            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;[Profiling] Initializing profile&quot;</span><span class="p">)</span>
+</span><span data-line="317">            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">"[Profiling] Initializing profile"</span><span class="p">)</span>
 </span><span data-line="318">        <span class="k">else</span><span class="p">:</span>
 </span><span data-line="319">            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
-</span><span data-line="320">                <span class="s2">&quot;[Profiling] Discarding profile because it&#39;s not included in the random sample (sample rate = </span><span class="si">{sample_rate}</span><span class="s2">)&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+</span><span data-line="320">                <span class="s2">"[Profiling] Discarding profile because it's not included in the random sample (sample rate = </span><span class="si">{sample_rate}</span><span class="s2">)"</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
 </span><span data-line="321">                    <span class="n">sample_rate</span><span class="o">=</span><span class="nb">float</span><span class="p">(</span><span class="n">sample_rate</span><span class="p">)</span>
 </span><span data-line="322">                <span class="p">)</span>
 </span><span data-line="323">            <span class="p">)</span>
@@ -437,8 +437,8 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="326">        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">sampled</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">active</span><span class="p">:</span>
 </span><span data-line="327">            <span class="k">return</span>
 </span><span data-line="328">
-</span><span data-line="329">        <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">scheduler</span><span class="p">,</span> <span class="s2">&quot;No scheduler specified&quot;</span>
-</span><span data-line="330">        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;[Profiling] Starting profile&quot;</span><span class="p">)</span>
+</span><span data-line="329">        <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">scheduler</span><span class="p">,</span> <span class="s2">"No scheduler specified"</span>
+</span><span data-line="330">        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">"[Profiling] Starting profile"</span><span class="p">)</span>
 </span><span data-line="331">        <span class="bp">self</span><span class="o">.</span><span class="n">active</span> <span class="o">=</span> <span class="kc">True</span>
 </span><span data-line="332">        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">start_ns</span><span class="p">:</span>
 </span><span data-line="333">            <span class="bp">self</span><span class="o">.</span><span class="n">start_ns</span> <span class="o">=</span> <span class="n">nanosecond_time</span><span class="p">()</span>
@@ -448,12 +448,12 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="337">        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">sampled</span> <span class="ow">or</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">active</span><span class="p">:</span>
 </span><span data-line="338">            <span class="k">return</span>
 </span><span data-line="339">
-</span><span data-line="340">        <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">scheduler</span><span class="p">,</span> <span class="s2">&quot;No scheduler specified&quot;</span>
-</span><span data-line="341">        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;[Profiling] Stopping profile&quot;</span><span class="p">)</span>
+</span><span data-line="340">        <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">scheduler</span><span class="p">,</span> <span class="s2">"No scheduler specified"</span>
+</span><span data-line="341">        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">"[Profiling] Stopping profile"</span><span class="p">)</span>
 </span><span data-line="342">        <span class="bp">self</span><span class="o">.</span><span class="n">active</span> <span class="o">=</span> <span class="kc">False</span>
 </span><span data-line="343">        <span class="bp">self</span><span class="o">.</span><span class="n">stop_ns</span> <span class="o">=</span> <span class="n">nanosecond_time</span><span class="p">()</span>
 </span><span data-line="344">
-</span><span data-line="345">    <span class="k">def</span><span class="w"> </span><span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;Profile&quot;</span><span class="p">:</span>
+</span><span data-line="345">    <span class="k">def</span><span class="w"> </span><span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"Profile"</span><span class="p">:</span>
 </span><span data-line="346">        <span class="n">scope</span> <span class="o">=</span> <span class="n">sentry_sdk</span><span class="o">.</span><span class="n">get_isolation_scope</span><span class="p">()</span>
 </span><span data-line="347">        <span class="n">old_profile</span> <span class="o">=</span> <span class="n">scope</span><span class="o">.</span><span class="n">profile</span>
 </span><span data-line="348">        <span class="n">scope</span><span class="o">.</span><span class="n">profile</span> <span class="o">=</span> <span class="bp">self</span>
@@ -465,7 +465,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="354">        <span class="k">return</span> <span class="bp">self</span>
 </span><span data-line="355">
 </span><span data-line="356">    <span class="k">def</span><span class="w"> </span><span class="fm">__exit__</span><span class="p">(</span>
-</span><span data-line="357">        <span class="bp">self</span><span class="p">,</span> <span class="n">ty</span><span class="p">:</span> <span class="s2">&quot;Optional[Any]&quot;</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="s2">&quot;Optional[Any]&quot;</span><span class="p">,</span> <span class="n">tb</span><span class="p">:</span> <span class="s2">&quot;Optional[Any]&quot;</span>
+</span><span data-line="357">        <span class="bp">self</span><span class="p">,</span> <span class="n">ty</span><span class="p">:</span> <span class="s2">"Optional[Any]"</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="s2">"Optional[Any]"</span><span class="p">,</span> <span class="n">tb</span><span class="p">:</span> <span class="s2">"Optional[Any]"</span>
 </span><span data-line="358">    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 </span><span data-line="359">        <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
 </span><span data-line="360">            <span class="bp">self</span><span class="o">.</span><span class="n">stop</span><span class="p">()</span>
@@ -475,7 +475,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="364">
 </span><span data-line="365">            <span class="n">scope</span><span class="o">.</span><span class="n">profile</span> <span class="o">=</span> <span class="n">old_profile</span>
 </span><span data-line="366">
-</span><span data-line="367">    <span class="k">def</span><span class="w"> </span><span class="nf">write</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ts</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">sample</span><span class="p">:</span> <span class="s2">&quot;ExtractedSample&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="367">    <span class="k">def</span><span class="w"> </span><span class="nf">write</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ts</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">sample</span><span class="p">:</span> <span class="s2">"ExtractedSample"</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 </span><span data-line="368">        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">active</span><span class="p">:</span>
 </span><span data-line="369">            <span class="k">return</span>
 </span><span data-line="370">
@@ -494,7 +494,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="383">        <span class="k">for</span> <span class="n">tid</span><span class="p">,</span> <span class="p">(</span><span class="n">stack_id</span><span class="p">,</span> <span class="n">frame_ids</span><span class="p">,</span> <span class="n">frames</span><span class="p">)</span> <span class="ow">in</span> <span class="n">sample</span><span class="p">:</span>
 </span><span data-line="384">            <span class="k">try</span><span class="p">:</span>
 </span><span data-line="385">                <span class="c1"># Check if the stack is indexed first, this lets us skip</span>
-</span><span data-line="386">                <span class="c1"># indexing frames if it&#39;s not necessary</span>
+</span><span data-line="386">                <span class="c1"># indexing frames if it's not necessary</span>
 </span><span data-line="387">                <span class="k">if</span> <span class="n">stack_id</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">indexed_stacks</span><span class="p">:</span>
 </span><span data-line="388">                    <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">frame_id</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">frame_ids</span><span class="p">):</span>
 </span><span data-line="389">                        <span class="k">if</span> <span class="n">frame_id</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">indexed_frames</span><span class="p">:</span>
@@ -508,78 +508,78 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="397">
 </span><span data-line="398">                <span class="bp">self</span><span class="o">.</span><span class="n">samples</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
 </span><span data-line="399">                    <span class="p">{</span>
-</span><span data-line="400">                        <span class="s2">&quot;elapsed_since_start_ns&quot;</span><span class="p">:</span> <span class="n">elapsed_since_start_ns</span><span class="p">,</span>
-</span><span data-line="401">                        <span class="s2">&quot;thread_id&quot;</span><span class="p">:</span> <span class="n">tid</span><span class="p">,</span>
-</span><span data-line="402">                        <span class="s2">&quot;stack_id&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">indexed_stacks</span><span class="p">[</span><span class="n">stack_id</span><span class="p">],</span>
+</span><span data-line="400">                        <span class="s2">"elapsed_since_start_ns"</span><span class="p">:</span> <span class="n">elapsed_since_start_ns</span><span class="p">,</span>
+</span><span data-line="401">                        <span class="s2">"thread_id"</span><span class="p">:</span> <span class="n">tid</span><span class="p">,</span>
+</span><span data-line="402">                        <span class="s2">"stack_id"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">indexed_stacks</span><span class="p">[</span><span class="n">stack_id</span><span class="p">],</span>
 </span><span data-line="403">                    <span class="p">}</span>
 </span><span data-line="404">                <span class="p">)</span>
 </span><span data-line="405">            <span class="k">except</span> <span class="ne">AttributeError</span><span class="p">:</span>
-</span><span data-line="406">                <span class="c1"># For some reason, the frame we get doesn&#39;t have certain attributes.</span>
-</span><span data-line="407">                <span class="c1"># When this happens, we abandon the current sample as it&#39;s bad.</span>
+</span><span data-line="406">                <span class="c1"># For some reason, the frame we get doesn't have certain attributes.</span>
+</span><span data-line="407">                <span class="c1"># When this happens, we abandon the current sample as it's bad.</span>
 </span><span data-line="408">                <span class="n">capture_internal_exception</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">exc_info</span><span class="p">())</span>
 </span><span data-line="409">
-</span><span data-line="410">    <span class="k">def</span><span class="w"> </span><span class="nf">process</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;ProcessedProfile&quot;</span><span class="p">:</span>
+</span><span data-line="410">    <span class="k">def</span><span class="w"> </span><span class="nf">process</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"ProcessedProfile"</span><span class="p">:</span>
 </span><span data-line="411">        <span class="c1"># This collects the thread metadata at the end of a profile. Doing it</span>
 </span><span data-line="412">        <span class="c1"># this way means that any threads that terminate before the profile ends</span>
 </span><span data-line="413">        <span class="c1"># will not have any metadata associated with it.</span>
-</span><span data-line="414">        <span class="n">thread_metadata</span><span class="p">:</span> <span class="s2">&quot;Dict[str, ProcessedThreadMetadata]&quot;</span> <span class="o">=</span> <span class="p">{</span>
+</span><span data-line="414">        <span class="n">thread_metadata</span><span class="p">:</span> <span class="s2">"Dict[str, ProcessedThreadMetadata]"</span> <span class="o">=</span> <span class="p">{</span>
 </span><span data-line="415">            <span class="nb">str</span><span class="p">(</span><span class="n">thread</span><span class="o">.</span><span class="n">ident</span><span class="p">):</span> <span class="p">{</span>
-</span><span data-line="416">                <span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">thread</span><span class="o">.</span><span class="n">name</span><span class="p">),</span>
+</span><span data-line="416">                <span class="s2">"name"</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">thread</span><span class="o">.</span><span class="n">name</span><span class="p">),</span>
 </span><span data-line="417">            <span class="p">}</span>
 </span><span data-line="418">            <span class="k">for</span> <span class="n">thread</span> <span class="ow">in</span> <span class="n">threading</span><span class="o">.</span><span class="n">enumerate</span><span class="p">()</span>
 </span><span data-line="419">        <span class="p">}</span>
 </span><span data-line="420">
 </span><span data-line="421">        <span class="k">return</span> <span class="p">{</span>
-</span><span data-line="422">            <span class="s2">&quot;frames&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">frames</span><span class="p">,</span>
-</span><span data-line="423">            <span class="s2">&quot;stacks&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">stacks</span><span class="p">,</span>
-</span><span data-line="424">            <span class="s2">&quot;samples&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">samples</span><span class="p">,</span>
-</span><span data-line="425">            <span class="s2">&quot;thread_metadata&quot;</span><span class="p">:</span> <span class="n">thread_metadata</span><span class="p">,</span>
+</span><span data-line="422">            <span class="s2">"frames"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">frames</span><span class="p">,</span>
+</span><span data-line="423">            <span class="s2">"stacks"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">stacks</span><span class="p">,</span>
+</span><span data-line="424">            <span class="s2">"samples"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">samples</span><span class="p">,</span>
+</span><span data-line="425">            <span class="s2">"thread_metadata"</span><span class="p">:</span> <span class="n">thread_metadata</span><span class="p">,</span>
 </span><span data-line="426">        <span class="p">}</span>
 </span><span data-line="427">
 </span><span data-line="428">    <span class="k">def</span><span class="w"> </span><span class="nf">to_json</span><span class="p">(</span>
-</span><span data-line="429">        <span class="bp">self</span><span class="p">,</span> <span class="n">event_opt</span><span class="p">:</span> <span class="s2">&quot;Event&quot;</span><span class="p">,</span> <span class="n">options</span><span class="p">:</span> <span class="s2">&quot;Dict[str, Any]&quot;</span>
-</span><span data-line="430">    <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;Dict[str, Any]&quot;</span><span class="p">:</span>
+</span><span data-line="429">        <span class="bp">self</span><span class="p">,</span> <span class="n">event_opt</span><span class="p">:</span> <span class="s2">"Event"</span><span class="p">,</span> <span class="n">options</span><span class="p">:</span> <span class="s2">"Dict[str, Any]"</span>
+</span><span data-line="430">    <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"Dict[str, Any]"</span><span class="p">:</span>
 </span><span data-line="431">        <span class="n">profile</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">process</span><span class="p">()</span>
 </span><span data-line="432">
 </span><span data-line="433">        <span class="n">set_in_app_in_frames</span><span class="p">(</span>
-</span><span data-line="434">            <span class="n">profile</span><span class="p">[</span><span class="s2">&quot;frames&quot;</span><span class="p">],</span>
-</span><span data-line="435">            <span class="n">options</span><span class="p">[</span><span class="s2">&quot;in_app_exclude&quot;</span><span class="p">],</span>
-</span><span data-line="436">            <span class="n">options</span><span class="p">[</span><span class="s2">&quot;in_app_include&quot;</span><span class="p">],</span>
-</span><span data-line="437">            <span class="n">options</span><span class="p">[</span><span class="s2">&quot;project_root&quot;</span><span class="p">],</span>
+</span><span data-line="434">            <span class="n">profile</span><span class="p">[</span><span class="s2">"frames"</span><span class="p">],</span>
+</span><span data-line="435">            <span class="n">options</span><span class="p">[</span><span class="s2">"in_app_exclude"</span><span class="p">],</span>
+</span><span data-line="436">            <span class="n">options</span><span class="p">[</span><span class="s2">"in_app_include"</span><span class="p">],</span>
+</span><span data-line="437">            <span class="n">options</span><span class="p">[</span><span class="s2">"project_root"</span><span class="p">],</span>
 </span><span data-line="438">        <span class="p">)</span>
 </span><span data-line="439">
 </span><span data-line="440">        <span class="k">return</span> <span class="p">{</span>
-</span><span data-line="441">            <span class="s2">&quot;environment&quot;</span><span class="p">:</span> <span class="n">event_opt</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;environment&quot;</span><span class="p">),</span>
-</span><span data-line="442">            <span class="s2">&quot;event_id&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">event_id</span><span class="p">,</span>
-</span><span data-line="443">            <span class="s2">&quot;platform&quot;</span><span class="p">:</span> <span class="s2">&quot;python&quot;</span><span class="p">,</span>
-</span><span data-line="444">            <span class="s2">&quot;profile&quot;</span><span class="p">:</span> <span class="n">profile</span><span class="p">,</span>
-</span><span data-line="445">            <span class="s2">&quot;release&quot;</span><span class="p">:</span> <span class="n">event_opt</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;release&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">),</span>
-</span><span data-line="446">            <span class="s2">&quot;timestamp&quot;</span><span class="p">:</span> <span class="n">event_opt</span><span class="p">[</span><span class="s2">&quot;start_timestamp&quot;</span><span class="p">],</span>
-</span><span data-line="447">            <span class="s2">&quot;version&quot;</span><span class="p">:</span> <span class="s2">&quot;1&quot;</span><span class="p">,</span>
-</span><span data-line="448">            <span class="s2">&quot;device&quot;</span><span class="p">:</span> <span class="p">{</span>
-</span><span data-line="449">                <span class="s2">&quot;architecture&quot;</span><span class="p">:</span> <span class="n">platform</span><span class="o">.</span><span class="n">machine</span><span class="p">(),</span>
+</span><span data-line="441">            <span class="s2">"environment"</span><span class="p">:</span> <span class="n">event_opt</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"environment"</span><span class="p">),</span>
+</span><span data-line="442">            <span class="s2">"event_id"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">event_id</span><span class="p">,</span>
+</span><span data-line="443">            <span class="s2">"platform"</span><span class="p">:</span> <span class="s2">"python"</span><span class="p">,</span>
+</span><span data-line="444">            <span class="s2">"profile"</span><span class="p">:</span> <span class="n">profile</span><span class="p">,</span>
+</span><span data-line="445">            <span class="s2">"release"</span><span class="p">:</span> <span class="n">event_opt</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"release"</span><span class="p">,</span> <span class="s2">""</span><span class="p">),</span>
+</span><span data-line="446">            <span class="s2">"timestamp"</span><span class="p">:</span> <span class="n">event_opt</span><span class="p">[</span><span class="s2">"start_timestamp"</span><span class="p">],</span>
+</span><span data-line="447">            <span class="s2">"version"</span><span class="p">:</span> <span class="s2">"1"</span><span class="p">,</span>
+</span><span data-line="448">            <span class="s2">"device"</span><span class="p">:</span> <span class="p">{</span>
+</span><span data-line="449">                <span class="s2">"architecture"</span><span class="p">:</span> <span class="n">platform</span><span class="o">.</span><span class="n">machine</span><span class="p">(),</span>
 </span><span data-line="450">            <span class="p">},</span>
-</span><span data-line="451">            <span class="s2">&quot;os&quot;</span><span class="p">:</span> <span class="p">{</span>
-</span><span data-line="452">                <span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="n">platform</span><span class="o">.</span><span class="n">system</span><span class="p">(),</span>
-</span><span data-line="453">                <span class="s2">&quot;version&quot;</span><span class="p">:</span> <span class="n">platform</span><span class="o">.</span><span class="n">release</span><span class="p">(),</span>
+</span><span data-line="451">            <span class="s2">"os"</span><span class="p">:</span> <span class="p">{</span>
+</span><span data-line="452">                <span class="s2">"name"</span><span class="p">:</span> <span class="n">platform</span><span class="o">.</span><span class="n">system</span><span class="p">(),</span>
+</span><span data-line="453">                <span class="s2">"version"</span><span class="p">:</span> <span class="n">platform</span><span class="o">.</span><span class="n">release</span><span class="p">(),</span>
 </span><span data-line="454">            <span class="p">},</span>
-</span><span data-line="455">            <span class="s2">&quot;runtime&quot;</span><span class="p">:</span> <span class="p">{</span>
-</span><span data-line="456">                <span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="n">platform</span><span class="o">.</span><span class="n">python_implementation</span><span class="p">(),</span>
-</span><span data-line="457">                <span class="s2">&quot;version&quot;</span><span class="p">:</span> <span class="n">platform</span><span class="o">.</span><span class="n">python_version</span><span class="p">(),</span>
+</span><span data-line="455">            <span class="s2">"runtime"</span><span class="p">:</span> <span class="p">{</span>
+</span><span data-line="456">                <span class="s2">"name"</span><span class="p">:</span> <span class="n">platform</span><span class="o">.</span><span class="n">python_implementation</span><span class="p">(),</span>
+</span><span data-line="457">                <span class="s2">"version"</span><span class="p">:</span> <span class="n">platform</span><span class="o">.</span><span class="n">python_version</span><span class="p">(),</span>
 </span><span data-line="458">            <span class="p">},</span>
-</span><span data-line="459">            <span class="s2">&quot;transactions&quot;</span><span class="p">:</span> <span class="p">[</span>
+</span><span data-line="459">            <span class="s2">"transactions"</span><span class="p">:</span> <span class="p">[</span>
 </span><span data-line="460">                <span class="p">{</span>
-</span><span data-line="461">                    <span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="n">event_opt</span><span class="p">[</span><span class="s2">&quot;event_id&quot;</span><span class="p">],</span>
-</span><span data-line="462">                    <span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="n">event_opt</span><span class="p">[</span><span class="s2">&quot;transaction&quot;</span><span class="p">],</span>
+</span><span data-line="461">                    <span class="s2">"id"</span><span class="p">:</span> <span class="n">event_opt</span><span class="p">[</span><span class="s2">"event_id"</span><span class="p">],</span>
+</span><span data-line="462">                    <span class="s2">"name"</span><span class="p">:</span> <span class="n">event_opt</span><span class="p">[</span><span class="s2">"transaction"</span><span class="p">],</span>
 </span><span data-line="463">                    <span class="c1"># we start the transaction before the profile and this is</span>
 </span><span data-line="464">                    <span class="c1"># the transaction start time relative to the profile, so we</span>
 </span><span data-line="465">                    <span class="c1"># hardcode it to 0 until we can start the profile before</span>
-</span><span data-line="466">                    <span class="s2">&quot;relative_start_ns&quot;</span><span class="p">:</span> <span class="s2">&quot;0&quot;</span><span class="p">,</span>
+</span><span data-line="466">                    <span class="s2">"relative_start_ns"</span><span class="p">:</span> <span class="s2">"0"</span><span class="p">,</span>
 </span><span data-line="467">                    <span class="c1"># use the duration of the profile instead of the transaction</span>
 </span><span data-line="468">                    <span class="c1"># because we end the transaction after the profile</span>
-</span><span data-line="469">                    <span class="s2">&quot;relative_end_ns&quot;</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">stop_ns</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">start_ns</span><span class="p">),</span>
-</span><span data-line="470">                    <span class="s2">&quot;trace_id&quot;</span><span class="p">:</span> <span class="n">event_opt</span><span class="p">[</span><span class="s2">&quot;contexts&quot;</span><span class="p">][</span><span class="s2">&quot;trace&quot;</span><span class="p">][</span><span class="s2">&quot;trace_id&quot;</span><span class="p">],</span>
-</span><span data-line="471">                    <span class="s2">&quot;active_thread_id&quot;</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span>
+</span><span data-line="469">                    <span class="s2">"relative_end_ns"</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">stop_ns</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">start_ns</span><span class="p">),</span>
+</span><span data-line="470">                    <span class="s2">"trace_id"</span><span class="p">:</span> <span class="n">event_opt</span><span class="p">[</span><span class="s2">"contexts"</span><span class="p">][</span><span class="s2">"trace"</span><span class="p">][</span><span class="s2">"trace_id"</span><span class="p">],</span>
+</span><span data-line="471">                    <span class="s2">"active_thread_id"</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span>
 </span><span data-line="472">                        <span class="bp">self</span><span class="o">.</span><span class="n">_default_active_thread_id</span>
 </span><span data-line="473">                        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">active_thread_id</span> <span class="ow">is</span> <span class="kc">None</span>
 </span><span data-line="474">                        <span class="k">else</span> <span class="bp">self</span><span class="o">.</span><span class="n">active_thread_id</span>
@@ -599,33 +599,33 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="488">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">sampled</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">sampled</span><span class="p">:</span>
 </span><span data-line="489">            <span class="k">if</span> <span class="n">client</span><span class="o">.</span><span class="n">transport</span><span class="p">:</span>
 </span><span data-line="490">                <span class="n">client</span><span class="o">.</span><span class="n">transport</span><span class="o">.</span><span class="n">record_lost_event</span><span class="p">(</span>
-</span><span data-line="491">                    <span class="s2">&quot;sample_rate&quot;</span><span class="p">,</span> <span class="n">data_category</span><span class="o">=</span><span class="s2">&quot;profile&quot;</span>
+</span><span data-line="491">                    <span class="s2">"sample_rate"</span><span class="p">,</span> <span class="n">data_category</span><span class="o">=</span><span class="s2">"profile"</span>
 </span><span data-line="492">                <span class="p">)</span>
 </span><span data-line="493">            <span class="k">return</span> <span class="kc">False</span>
 </span><span data-line="494">
 </span><span data-line="495">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">unique_samples</span> <span class="o">&lt;</span> <span class="n">PROFILE_MINIMUM_SAMPLES</span><span class="p">:</span>
 </span><span data-line="496">            <span class="k">if</span> <span class="n">client</span><span class="o">.</span><span class="n">transport</span><span class="p">:</span>
 </span><span data-line="497">                <span class="n">client</span><span class="o">.</span><span class="n">transport</span><span class="o">.</span><span class="n">record_lost_event</span><span class="p">(</span>
-</span><span data-line="498">                    <span class="s2">&quot;insufficient_data&quot;</span><span class="p">,</span> <span class="n">data_category</span><span class="o">=</span><span class="s2">&quot;profile&quot;</span>
+</span><span data-line="498">                    <span class="s2">"insufficient_data"</span><span class="p">,</span> <span class="n">data_category</span><span class="o">=</span><span class="s2">"profile"</span>
 </span><span data-line="499">                <span class="p">)</span>
-</span><span data-line="500">            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;[Profiling] Discarding profile because insufficient samples.&quot;</span><span class="p">)</span>
+</span><span data-line="500">            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">"[Profiling] Discarding profile because insufficient samples."</span><span class="p">)</span>
 </span><span data-line="501">            <span class="k">return</span> <span class="kc">False</span>
 </span><span data-line="502">
 </span><span data-line="503">        <span class="k">return</span> <span class="kc">True</span>
 </span><span data-line="504">
 </span><span data-line="505">    <span class="nd">@property</span>
-</span><span data-line="506">    <span class="k">def</span><span class="w"> </span><span class="nf">hub</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;Optional[sentry_sdk.Hub]&quot;</span><span class="p">:</span>
+</span><span data-line="506">    <span class="k">def</span><span class="w"> </span><span class="nf">hub</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"Optional[sentry_sdk.Hub]"</span><span class="p">:</span>
 </span><span data-line="507">        <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
-</span><span data-line="508">            <span class="s2">&quot;The `hub` attribute is deprecated. Please do not access it.&quot;</span><span class="p">,</span>
+</span><span data-line="508">            <span class="s2">"The `hub` attribute is deprecated. Please do not access it."</span><span class="p">,</span>
 </span><span data-line="509">            <span class="ne">DeprecationWarning</span><span class="p">,</span>
 </span><span data-line="510">            <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
 </span><span data-line="511">        <span class="p">)</span>
 </span><span data-line="512">        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_hub</span>
 </span><span data-line="513">
 </span><span data-line="514">    <span class="nd">@hub</span><span class="o">.</span><span class="n">setter</span>
-</span><span data-line="515">    <span class="k">def</span><span class="w"> </span><span class="nf">hub</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="s2">&quot;Optional[sentry_sdk.Hub]&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="515">    <span class="k">def</span><span class="w"> </span><span class="nf">hub</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="s2">"Optional[sentry_sdk.Hub]"</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 </span><span data-line="516">        <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
-</span><span data-line="517">            <span class="s2">&quot;The `hub` attribute is deprecated. Please do not set it.&quot;</span><span class="p">,</span>
+</span><span data-line="517">            <span class="s2">"The `hub` attribute is deprecated. Please do not set it."</span><span class="p">,</span>
 </span><span data-line="518">            <span class="ne">DeprecationWarning</span><span class="p">,</span>
 </span><span data-line="519">            <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
 </span><span data-line="520">        <span class="p">)</span>
@@ -634,7 +634,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="522">
 </span><span data-line="523">
 </span><span data-line="524"><span class="k">class</span><span class="w"> </span><span class="nc">Scheduler</span><span class="p">(</span><span class="n">ABC</span><span class="p">):</span>
-</span><span data-line="525">    <span class="n">mode</span><span class="p">:</span> <span class="s2">&quot;ProfilerMode&quot;</span> <span class="o">=</span> <span class="s2">&quot;unknown&quot;</span>
+</span><span data-line="525">    <span class="n">mode</span><span class="p">:</span> <span class="s2">"ProfilerMode"</span> <span class="o">=</span> <span class="s2">"unknown"</span>
 </span><span data-line="526">
 </span><span data-line="527">    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">frequency</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 </span><span data-line="528">        <span class="bp">self</span><span class="o">.</span><span class="n">interval</span> <span class="o">=</span> <span class="mf">1.0</span> <span class="o">/</span> <span class="n">frequency</span>
@@ -642,15 +642,15 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="530">        <span class="bp">self</span><span class="o">.</span><span class="n">sampler</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">make_sampler</span><span class="p">()</span>
 </span><span data-line="531">
 </span><span data-line="532">        <span class="c1"># cap the number of new profiles at any time so it does not grow infinitely</span>
-</span><span data-line="533">        <span class="bp">self</span><span class="o">.</span><span class="n">new_profiles</span><span class="p">:</span> <span class="s2">&quot;Deque[Profile]&quot;</span> <span class="o">=</span> <span class="n">deque</span><span class="p">(</span><span class="n">maxlen</span><span class="o">=</span><span class="mi">128</span><span class="p">)</span>
-</span><span data-line="534">        <span class="bp">self</span><span class="o">.</span><span class="n">active_profiles</span><span class="p">:</span> <span class="s2">&quot;Set[Profile]&quot;</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+</span><span data-line="533">        <span class="bp">self</span><span class="o">.</span><span class="n">new_profiles</span><span class="p">:</span> <span class="s2">"Deque[Profile]"</span> <span class="o">=</span> <span class="n">deque</span><span class="p">(</span><span class="n">maxlen</span><span class="o">=</span><span class="mi">128</span><span class="p">)</span>
+</span><span data-line="534">        <span class="bp">self</span><span class="o">.</span><span class="n">active_profiles</span><span class="p">:</span> <span class="s2">"Set[Profile]"</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
 </span><span data-line="535">
-</span><span data-line="536">    <span class="k">def</span><span class="w"> </span><span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;Scheduler&quot;</span><span class="p">:</span>
+</span><span data-line="536">    <span class="k">def</span><span class="w"> </span><span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"Scheduler"</span><span class="p">:</span>
 </span><span data-line="537">        <span class="bp">self</span><span class="o">.</span><span class="n">setup</span><span class="p">()</span>
 </span><span data-line="538">        <span class="k">return</span> <span class="bp">self</span>
 </span><span data-line="539">
 </span><span data-line="540">    <span class="k">def</span><span class="w"> </span><span class="fm">__exit__</span><span class="p">(</span>
-</span><span data-line="541">        <span class="bp">self</span><span class="p">,</span> <span class="n">ty</span><span class="p">:</span> <span class="s2">&quot;Optional[Any]&quot;</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="s2">&quot;Optional[Any]&quot;</span><span class="p">,</span> <span class="n">tb</span><span class="p">:</span> <span class="s2">&quot;Optional[Any]&quot;</span>
+</span><span data-line="541">        <span class="bp">self</span><span class="p">,</span> <span class="n">ty</span><span class="p">:</span> <span class="s2">"Optional[Any]"</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="s2">"Optional[Any]"</span><span class="p">,</span> <span class="n">tb</span><span class="p">:</span> <span class="s2">"Optional[Any]"</span>
 </span><span data-line="542">    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 </span><span data-line="543">        <span class="bp">self</span><span class="o">.</span><span class="n">teardown</span><span class="p">()</span>
 </span><span data-line="544">
@@ -663,35 +663,35 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="551">        <span class="k">pass</span>
 </span><span data-line="552">
 </span><span data-line="553">    <span class="k">def</span><span class="w"> </span><span class="nf">ensure_running</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="554"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="554"><span class="w">        </span><span class="sd">"""</span>
 </span><span data-line="555"><span class="sd">        Ensure the scheduler is running. By default, this method is a no-op.</span>
 </span><span data-line="556"><span class="sd">        The method should be overridden by any implementation for which it is</span>
 </span><span data-line="557"><span class="sd">        relevant.</span>
-</span><span data-line="558"><span class="sd">        &quot;&quot;&quot;</span>
+</span><span data-line="558"><span class="sd">        """</span>
 </span><span data-line="559">        <span class="k">return</span> <span class="kc">None</span>
 </span><span data-line="560">
-</span><span data-line="561">    <span class="k">def</span><span class="w"> </span><span class="nf">start_profiling</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">profile</span><span class="p">:</span> <span class="s2">&quot;Profile&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="561">    <span class="k">def</span><span class="w"> </span><span class="nf">start_profiling</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">profile</span><span class="p">:</span> <span class="s2">"Profile"</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 </span><span data-line="562">        <span class="bp">self</span><span class="o">.</span><span class="n">ensure_running</span><span class="p">()</span>
 </span><span data-line="563">        <span class="bp">self</span><span class="o">.</span><span class="n">new_profiles</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">profile</span><span class="p">)</span>
 </span><span data-line="564">
-</span><span data-line="565">    <span class="k">def</span><span class="w"> </span><span class="nf">make_sampler</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;Callable[..., None]&quot;</span><span class="p">:</span>
+</span><span data-line="565">    <span class="k">def</span><span class="w"> </span><span class="nf">make_sampler</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"Callable[..., None]"</span><span class="p">:</span>
 </span><span data-line="566">        <span class="n">cwd</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">getcwd</span><span class="p">()</span>
 </span><span data-line="567">
 </span><span data-line="568">        <span class="n">cache</span> <span class="o">=</span> <span class="n">LRUCache</span><span class="p">(</span><span class="n">max_size</span><span class="o">=</span><span class="mi">256</span><span class="p">)</span>
 </span><span data-line="569">
-</span><span data-line="570">        <span class="k">def</span><span class="w"> </span><span class="nf">_sample_stack</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">:</span> <span class="s2">&quot;Any&quot;</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="s2">&quot;Any&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="571"><span class="w">            </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="570">        <span class="k">def</span><span class="w"> </span><span class="nf">_sample_stack</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">:</span> <span class="s2">"Any"</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="s2">"Any"</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="571"><span class="w">            </span><span class="sd">"""</span>
 </span><span data-line="572"><span class="sd">            Take a sample of the stack on all the threads in the process.</span>
 </span><span data-line="573"><span class="sd">            This should be called at a regular interval to collect samples.</span>
-</span><span data-line="574"><span class="sd">            &quot;&quot;&quot;</span>
+</span><span data-line="574"><span class="sd">            """</span>
 </span><span data-line="575">            <span class="c1"># no profiles taking place, so we can stop early</span>
 </span><span data-line="576">            <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">new_profiles</span> <span class="ow">and</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">active_profiles</span><span class="p">:</span>
-</span><span data-line="577">                <span class="c1"># make sure to clear the cache if we&#39;re not profiling so we dont</span>
+</span><span data-line="577">                <span class="c1"># make sure to clear the cache if we're not profiling so we dont</span>
 </span><span data-line="578">                <span class="c1"># keep a reference to the last stack of frames around</span>
 </span><span data-line="579">                <span class="k">return</span>
 </span><span data-line="580">
 </span><span data-line="581">            <span class="c1"># This is the number of profiles we want to pop off.</span>
-</span><span data-line="582">            <span class="c1"># It&#39;s possible another thread adds a new profile to</span>
+</span><span data-line="582">            <span class="c1"># It's possible another thread adds a new profile to</span>
 </span><span data-line="583">            <span class="c1"># the list and we spend longer than we want inside</span>
 </span><span data-line="584">            <span class="c1"># the loop below.</span>
 </span><span data-line="585">            <span class="c1">#</span>
@@ -708,8 +708,8 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="596">                    <span class="k">for</span> <span class="n">tid</span><span class="p">,</span> <span class="n">frame</span> <span class="ow">in</span> <span class="n">sys</span><span class="o">.</span><span class="n">_current_frames</span><span class="p">()</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
 </span><span data-line="597">                <span class="p">]</span>
 </span><span data-line="598">            <span class="k">except</span> <span class="ne">AttributeError</span><span class="p">:</span>
-</span><span data-line="599">                <span class="c1"># For some reason, the frame we get doesn&#39;t have certain attributes.</span>
-</span><span data-line="600">                <span class="c1"># When this happens, we abandon the current sample as it&#39;s bad.</span>
+</span><span data-line="599">                <span class="c1"># For some reason, the frame we get doesn't have certain attributes.</span>
+</span><span data-line="600">                <span class="c1"># When this happens, we abandon the current sample as it's bad.</span>
 </span><span data-line="601">                <span class="n">capture_internal_exception</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">exc_info</span><span class="p">())</span>
 </span><span data-line="602">                <span class="k">return</span>
 </span><span data-line="603">
@@ -745,21 +745,21 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="633">
 </span><span data-line="634">
 </span><span data-line="635"><span class="k">class</span><span class="w"> </span><span class="nc">ThreadScheduler</span><span class="p">(</span><span class="n">Scheduler</span><span class="p">):</span>
-</span><span data-line="636"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="636"><span class="w">    </span><span class="sd">"""</span>
 </span><span data-line="637"><span class="sd">    This scheduler is based on running a daemon thread that will call</span>
 </span><span data-line="638"><span class="sd">    the sampler at a regular interval.</span>
-</span><span data-line="639"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="639"><span class="sd">    """</span>
 </span><span data-line="640">
-</span><span data-line="641">    <span class="n">mode</span><span class="p">:</span> <span class="s2">&quot;ProfilerMode&quot;</span> <span class="o">=</span> <span class="s2">&quot;thread&quot;</span>
-</span><span data-line="642">    <span class="n">name</span> <span class="o">=</span> <span class="s2">&quot;sentry.profiler.ThreadScheduler&quot;</span>
+</span><span data-line="641">    <span class="n">mode</span><span class="p">:</span> <span class="s2">"ProfilerMode"</span> <span class="o">=</span> <span class="s2">"thread"</span>
+</span><span data-line="642">    <span class="n">name</span> <span class="o">=</span> <span class="s2">"sentry.profiler.ThreadScheduler"</span>
 </span><span data-line="643">
 </span><span data-line="644">    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">frequency</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 </span><span data-line="645">        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">frequency</span><span class="o">=</span><span class="n">frequency</span><span class="p">)</span>
 </span><span data-line="646">
 </span><span data-line="647">        <span class="c1"># used to signal to the thread that it should stop</span>
 </span><span data-line="648">        <span class="bp">self</span><span class="o">.</span><span class="n">running</span> <span class="o">=</span> <span class="kc">False</span>
-</span><span data-line="649">        <span class="bp">self</span><span class="o">.</span><span class="n">thread</span><span class="p">:</span> <span class="s2">&quot;Optional[threading.Thread]&quot;</span> <span class="o">=</span> <span class="kc">None</span>
-</span><span data-line="650">        <span class="bp">self</span><span class="o">.</span><span class="n">pid</span><span class="p">:</span> <span class="s2">&quot;Optional[int]&quot;</span> <span class="o">=</span> <span class="kc">None</span>
+</span><span data-line="649">        <span class="bp">self</span><span class="o">.</span><span class="n">thread</span><span class="p">:</span> <span class="s2">"Optional[threading.Thread]"</span> <span class="o">=</span> <span class="kc">None</span>
+</span><span data-line="650">        <span class="bp">self</span><span class="o">.</span><span class="n">pid</span><span class="p">:</span> <span class="s2">"Optional[int]"</span> <span class="o">=</span> <span class="kc">None</span>
 </span><span data-line="651">        <span class="bp">self</span><span class="o">.</span><span class="n">lock</span> <span class="o">=</span> <span class="n">threading</span><span class="o">.</span><span class="n">Lock</span><span class="p">()</span>
 </span><span data-line="652">
 </span><span data-line="653">    <span class="k">def</span><span class="w"> </span><span class="nf">setup</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
@@ -772,14 +772,14 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="660">                <span class="bp">self</span><span class="o">.</span><span class="n">thread</span><span class="o">.</span><span class="n">join</span><span class="p">()</span>
 </span><span data-line="661">
 </span><span data-line="662">    <span class="k">def</span><span class="w"> </span><span class="nf">ensure_running</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="663"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="663"><span class="w">        </span><span class="sd">"""</span>
 </span><span data-line="664"><span class="sd">        Check that the profiler has an active thread to run in, and start one if</span>
-</span><span data-line="665"><span class="sd">        that&#39;s not the case.</span>
+</span><span data-line="665"><span class="sd">        that's not the case.</span>
 </span><span data-line="666">
-</span><span data-line="667"><span class="sd">        Note that this might fail (e.g. in Python 3.12 it&#39;s not possible to</span>
+</span><span data-line="667"><span class="sd">        Note that this might fail (e.g. in Python 3.12 it's not possible to</span>
 </span><span data-line="668"><span class="sd">        spawn new threads at interpreter shutdown). In that case self.running</span>
 </span><span data-line="669"><span class="sd">        will be False after running this function.</span>
-</span><span data-line="670"><span class="sd">        &quot;&quot;&quot;</span>
+</span><span data-line="670"><span class="sd">        """</span>
 </span><span data-line="671">        <span class="n">pid</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">getpid</span><span class="p">()</span>
 </span><span data-line="672">
 </span><span data-line="673">        <span class="c1"># is running on the right process</span>
@@ -828,7 +828,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="716">
 </span><span data-line="717">
 </span><span data-line="718"><span class="k">class</span><span class="w"> </span><span class="nc">GeventScheduler</span><span class="p">(</span><span class="n">Scheduler</span><span class="p">):</span>
-</span><span data-line="719"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="719"><span class="w">    </span><span class="sd">"""</span>
 </span><span data-line="720"><span class="sd">    This scheduler is based on the thread scheduler but adapted to work with</span>
 </span><span data-line="721"><span class="sd">    gevent. When using gevent, it may monkey patch the threading modules</span>
 </span><span data-line="722"><span class="sd">    (`threading` and `_thread`). This results in the use of greenlets instead</span>
@@ -838,22 +838,22 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="726"><span class="sd">    1. Other greenlets doing sync work will prevent the sampler from running</span>
 </span><span data-line="727"><span class="sd">    2. The greenlet runs in the same thread as other greenlets so when taking</span>
 </span><span data-line="728"><span class="sd">       a sample, other greenlets will have been evicted from the thread. This</span>
-</span><span data-line="729"><span class="sd">       results in a sample containing only the sampler&#39;s code.</span>
-</span><span data-line="730"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="729"><span class="sd">       results in a sample containing only the sampler's code.</span>
+</span><span data-line="730"><span class="sd">    """</span>
 </span><span data-line="731">
-</span><span data-line="732">    <span class="n">mode</span><span class="p">:</span> <span class="s2">&quot;ProfilerMode&quot;</span> <span class="o">=</span> <span class="s2">&quot;gevent&quot;</span>
-</span><span data-line="733">    <span class="n">name</span> <span class="o">=</span> <span class="s2">&quot;sentry.profiler.GeventScheduler&quot;</span>
+</span><span data-line="732">    <span class="n">mode</span><span class="p">:</span> <span class="s2">"ProfilerMode"</span> <span class="o">=</span> <span class="s2">"gevent"</span>
+</span><span data-line="733">    <span class="n">name</span> <span class="o">=</span> <span class="s2">"sentry.profiler.GeventScheduler"</span>
 </span><span data-line="734">
 </span><span data-line="735">    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">frequency</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 </span><span data-line="736">        <span class="k">if</span> <span class="n">ThreadPool</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="737">            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Profiler mode: </span><span class="si">{}</span><span class="s2"> is not available&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">mode</span><span class="p">))</span>
+</span><span data-line="737">            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Profiler mode: </span><span class="si">{}</span><span class="s2"> is not available"</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">mode</span><span class="p">))</span>
 </span><span data-line="738">
 </span><span data-line="739">        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">frequency</span><span class="o">=</span><span class="n">frequency</span><span class="p">)</span>
 </span><span data-line="740">
 </span><span data-line="741">        <span class="c1"># used to signal to the thread that it should stop</span>
 </span><span data-line="742">        <span class="bp">self</span><span class="o">.</span><span class="n">running</span> <span class="o">=</span> <span class="kc">False</span>
-</span><span data-line="743">        <span class="bp">self</span><span class="o">.</span><span class="n">thread</span><span class="p">:</span> <span class="s2">&quot;Optional[_ThreadPool]&quot;</span> <span class="o">=</span> <span class="kc">None</span>
-</span><span data-line="744">        <span class="bp">self</span><span class="o">.</span><span class="n">pid</span><span class="p">:</span> <span class="s2">&quot;Optional[int]&quot;</span> <span class="o">=</span> <span class="kc">None</span>
+</span><span data-line="743">        <span class="bp">self</span><span class="o">.</span><span class="n">thread</span><span class="p">:</span> <span class="s2">"Optional[_ThreadPool]"</span> <span class="o">=</span> <span class="kc">None</span>
+</span><span data-line="744">        <span class="bp">self</span><span class="o">.</span><span class="n">pid</span><span class="p">:</span> <span class="s2">"Optional[int]"</span> <span class="o">=</span> <span class="kc">None</span>
 </span><span data-line="745">
 </span><span data-line="746">        <span class="c1"># This intentionally uses the gevent patched threading.Lock.</span>
 </span><span data-line="747">        <span class="c1"># The lock will be required when first trying to start profiles</span>
@@ -942,7 +942,7 @@ data-aria-dark="Switch to auto color mode">
     </div>
   </div>
 </footer>
-      <script src="../../../_static/documentation_options.js?v=f6252e7a"></script>
+      <script src="../../../_static/documentation_options.js?v=c1dda410"></script>
       <script src="../../../_static/doctools.js?v=9bcbadda"></script>
       <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
       <script src="../../../_static/shibuya.js?v=50760d75"></script></body>

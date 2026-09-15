@@ -2,7 +2,7 @@
 <html lang="en" data-accent-color="violet" data-content_root="../../">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>sentry_sdk.hub - sentry-python 2.69.1 documentation</title><link rel="index" title="Index" href="../../genindex.html" /><link rel="search" title="Search" href="../../search.html" /><script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>sentry_sdk.hub - sentry-python 2.69.2 documentation</title><link rel="index" title="Index" href="../../genindex.html" /><link rel="search" title="Search" href="../../search.html" /><script>
     function setColorMode(t){let e=document.documentElement;e.setAttribute("data-color-mode",t);let a=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches,s=t;"auto"===t&&(s=a?"dark":"light"),"light"===s?(e.classList.remove("dark"),e.classList.add("light")):(e.classList.remove("light"),e.classList.add("dark"))}
     setColorMode(localStorage._theme||"auto");
   </script><link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=e1a1ceaf" />
@@ -163,24 +163,24 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="54">    <span class="kn">from</span><span class="w"> </span><span class="nn">sentry_sdk.scope</span><span class="w"> </span><span class="kn">import</span> <span class="n">Scope</span>
 </span><span data-line="55">    <span class="kn">from</span><span class="w"> </span><span class="nn">sentry_sdk.tracing</span><span class="w"> </span><span class="kn">import</span> <span class="n">TransactionKwargs</span>
 </span><span data-line="56">
-</span><span data-line="57">    <span class="n">T</span> <span class="o">=</span> <span class="n">TypeVar</span><span class="p">(</span><span class="s2">&quot;T&quot;</span><span class="p">)</span>
+</span><span data-line="57">    <span class="n">T</span> <span class="o">=</span> <span class="n">TypeVar</span><span class="p">(</span><span class="s2">"T"</span><span class="p">)</span>
 </span><span data-line="58">
 </span><span data-line="59"><span class="k">else</span><span class="p">:</span>
 </span><span data-line="60">
-</span><span data-line="61">    <span class="k">def</span><span class="w"> </span><span class="nf">overload</span><span class="p">(</span><span class="n">x</span><span class="p">:</span> <span class="s2">&quot;T&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;T&quot;</span><span class="p">:</span>
+</span><span data-line="61">    <span class="k">def</span><span class="w"> </span><span class="nf">overload</span><span class="p">(</span><span class="n">x</span><span class="p">:</span> <span class="s2">"T"</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"T"</span><span class="p">:</span>
 </span><span data-line="62">        <span class="k">return</span> <span class="n">x</span>
 </span><span data-line="63">
 </span><span data-line="64">
 </span><span data-line="65"><span class="k">class</span><span class="w"> </span><span class="nc">SentryHubDeprecationWarning</span><span class="p">(</span><span class="ne">DeprecationWarning</span><span class="p">):</span>
-</span><span data-line="66"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="66"><span class="w">    </span><span class="sd">"""</span>
 </span><span data-line="67"><span class="sd">    A custom deprecation warning to inform users that the Hub is deprecated.</span>
-</span><span data-line="68"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="68"><span class="sd">    """</span>
 </span><span data-line="69">
 </span><span data-line="70">    <span class="n">_MESSAGE</span> <span class="o">=</span> <span class="p">(</span>
-</span><span data-line="71">        <span class="s2">&quot;`sentry_sdk.Hub` is deprecated and will be removed in a future major release. &quot;</span>
-</span><span data-line="72">        <span class="s2">&quot;Please consult our 1.x to 2.x migration guide for details on how to migrate &quot;</span>
-</span><span data-line="73">        <span class="s2">&quot;`Hub` usage to the new API: &quot;</span>
-</span><span data-line="74">        <span class="s2">&quot;https://docs.sentry.io/platforms/python/migration/1.x-to-2.x&quot;</span>
+</span><span data-line="71">        <span class="s2">"`sentry_sdk.Hub` is deprecated and will be removed in a future major release. "</span>
+</span><span data-line="72">        <span class="s2">"Please consult our 1.x to 2.x migration guide for details on how to migrate "</span>
+</span><span data-line="73">        <span class="s2">"`Hub` usage to the new API: "</span>
+</span><span data-line="74">        <span class="s2">"https://docs.sentry.io/platforms/python/migration/1.x-to-2.x"</span>
 </span><span data-line="75">    <span class="p">)</span>
 </span><span data-line="76">
 </span><span data-line="77">    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">_</span><span class="p">:</span> <span class="nb">object</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
@@ -188,20 +188,20 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="79">
 </span><span data-line="80">
 </span><span data-line="81"><span class="nd">@contextmanager</span>
-</span><span data-line="82"><span class="k">def</span><span class="w"> </span><span class="nf">_suppress_hub_deprecation_warning</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="s2">&quot;Generator[None, None, None]&quot;</span><span class="p">:</span>
-</span><span data-line="83"><span class="w">    </span><span class="sd">&quot;&quot;&quot;Utility function to suppress deprecation warnings for the Hub.&quot;&quot;&quot;</span>
+</span><span data-line="82"><span class="k">def</span><span class="w"> </span><span class="nf">_suppress_hub_deprecation_warning</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="s2">"Generator[None, None, None]"</span><span class="p">:</span>
+</span><span data-line="83"><span class="w">    </span><span class="sd">"""Utility function to suppress deprecation warnings for the Hub."""</span>
 </span><span data-line="84">    <span class="k">with</span> <span class="n">warnings</span><span class="o">.</span><span class="n">catch_warnings</span><span class="p">():</span>
-</span><span data-line="85">        <span class="n">warnings</span><span class="o">.</span><span class="n">filterwarnings</span><span class="p">(</span><span class="s2">&quot;ignore&quot;</span><span class="p">,</span> <span class="n">category</span><span class="o">=</span><span class="n">SentryHubDeprecationWarning</span><span class="p">)</span>
+</span><span data-line="85">        <span class="n">warnings</span><span class="o">.</span><span class="n">filterwarnings</span><span class="p">(</span><span class="s2">"ignore"</span><span class="p">,</span> <span class="n">category</span><span class="o">=</span><span class="n">SentryHubDeprecationWarning</span><span class="p">)</span>
 </span><span data-line="86">        <span class="k">yield</span>
 </span><span data-line="87">
 </span><span data-line="88">
-</span><span data-line="89"><span class="n">_local</span> <span class="o">=</span> <span class="n">ContextVar</span><span class="p">(</span><span class="s2">&quot;sentry_current_hub&quot;</span><span class="p">)</span>
+</span><span data-line="89"><span class="n">_local</span> <span class="o">=</span> <span class="n">ContextVar</span><span class="p">(</span><span class="s2">"sentry_current_hub"</span><span class="p">)</span>
 </span><span data-line="90">
 </span><span data-line="91">
 </span><span data-line="92"><span class="k">class</span><span class="w"> </span><span class="nc">HubMeta</span><span class="p">(</span><span class="nb">type</span><span class="p">):</span>
 </span><span data-line="93">    <span class="nd">@property</span>
-</span><span data-line="94">    <span class="k">def</span><span class="w"> </span><span class="nf">current</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;Hub&quot;</span><span class="p">:</span>
-</span><span data-line="95"><span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the current instance of the hub.&quot;&quot;&quot;</span>
+</span><span data-line="94">    <span class="k">def</span><span class="w"> </span><span class="nf">current</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"Hub"</span><span class="p">:</span>
+</span><span data-line="95"><span class="w">        </span><span class="sd">"""Returns the current instance of the hub."""</span>
 </span><span data-line="96">        <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="n">SentryHubDeprecationWarning</span><span class="p">(),</span> <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
 </span><span data-line="97">        <span class="n">rv</span> <span class="o">=</span> <span class="n">_local</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="kc">None</span><span class="p">)</span>
 </span><span data-line="98">        <span class="k">if</span> <span class="n">rv</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
@@ -212,8 +212,8 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="103">        <span class="k">return</span> <span class="n">rv</span>
 </span><span data-line="104">
 </span><span data-line="105">    <span class="nd">@property</span>
-</span><span data-line="106">    <span class="k">def</span><span class="w"> </span><span class="nf">main</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;Hub&quot;</span><span class="p">:</span>
-</span><span data-line="107"><span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the main instance of the hub.&quot;&quot;&quot;</span>
+</span><span data-line="106">    <span class="k">def</span><span class="w"> </span><span class="nf">main</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"Hub"</span><span class="p">:</span>
+</span><span data-line="107"><span class="w">        </span><span class="sd">"""Returns the main instance of the hub."""</span>
 </span><span data-line="108">        <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="n">SentryHubDeprecationWarning</span><span class="p">(),</span> <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
 </span><span data-line="109">        <span class="k">return</span> <span class="n">GLOBAL_HUB</span>
 </span><span data-line="110">
@@ -221,7 +221,7 @@ data-aria-dark="Switch to auto color mode">
 <div class="viewcode-block" id="Hub">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk.Hub">[docs]</a>
 </span><span data-line="112"><span class="k">class</span><span class="w"> </span><span class="nc">Hub</span><span class="p">(</span><span class="n">with_metaclass</span><span class="p">(</span><span class="n">HubMeta</span><span class="p">)):</span>  <span class="c1"># type: ignore</span>
-</span><span data-line="113"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="113"><span class="w">    </span><span class="sd">"""</span>
 </span><span data-line="114"><span class="sd">    .. deprecated:: 2.0.0</span>
 </span><span data-line="115"><span class="sd">        The Hub is deprecated. Its functionality will be merged into :py:class:`sentry_sdk.scope.Scope`.</span>
 </span><span data-line="116">
@@ -229,22 +229,22 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="118"><span class="sd">    its own hub but the hub might transfer with the flow of execution if</span>
 </span><span data-line="119"><span class="sd">    context vars are available.</span>
 </span><span data-line="120">
-</span><span data-line="121"><span class="sd">    If the hub is used with a with statement it&#39;s temporarily activated.</span>
-</span><span data-line="122"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="121"><span class="sd">    If the hub is used with a with statement it's temporarily activated.</span>
+</span><span data-line="122"><span class="sd">    """</span>
 </span><span data-line="123">
-</span><span data-line="124">    <span class="n">_stack</span><span class="p">:</span> <span class="s2">&quot;List[Tuple[Optional[Client], Scope]]&quot;</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># type: ignore[assignment]</span>
-</span><span data-line="125">    <span class="n">_scope</span><span class="p">:</span> <span class="s2">&quot;Optional[Scope]&quot;</span> <span class="o">=</span> <span class="kc">None</span>
+</span><span data-line="124">    <span class="n">_stack</span><span class="p">:</span> <span class="s2">"List[Tuple[Optional[Client], Scope]]"</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># type: ignore[assignment]</span>
+</span><span data-line="125">    <span class="n">_scope</span><span class="p">:</span> <span class="s2">"Optional[Scope]"</span> <span class="o">=</span> <span class="kc">None</span>
 </span><span data-line="126">
-</span><span data-line="127">    <span class="c1"># Mypy doesn&#39;t pick up on the metaclass.</span>
+</span><span data-line="127">    <span class="c1"># Mypy doesn't pick up on the metaclass.</span>
 </span><span data-line="128">
 </span><span data-line="129">    <span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>
-</span><span data-line="130">        <span class="n">current</span><span class="p">:</span> <span class="s2">&quot;Hub&quot;</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># type: ignore[assignment]</span>
-</span><span data-line="131">        <span class="n">main</span><span class="p">:</span> <span class="s2">&quot;Optional[Hub]&quot;</span> <span class="o">=</span> <span class="kc">None</span>
+</span><span data-line="130">        <span class="n">current</span><span class="p">:</span> <span class="s2">"Hub"</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># type: ignore[assignment]</span>
+</span><span data-line="131">        <span class="n">main</span><span class="p">:</span> <span class="s2">"Optional[Hub]"</span> <span class="o">=</span> <span class="kc">None</span>
 </span><span data-line="132">
 </span><span data-line="133">    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
 </span><span data-line="134">        <span class="bp">self</span><span class="p">,</span>
-</span><span data-line="135">        <span class="n">client_or_hub</span><span class="p">:</span> <span class="s2">&quot;Optional[Union[Hub, Client]]&quot;</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span data-line="136">        <span class="n">scope</span><span class="p">:</span> <span class="s2">&quot;Optional[Any]&quot;</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span data-line="135">        <span class="n">client_or_hub</span><span class="p">:</span> <span class="s2">"Optional[Union[Hub, Client]]"</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span data-line="136">        <span class="n">scope</span><span class="p">:</span> <span class="s2">"Optional[Any]"</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 </span><span data-line="137">    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 </span><span data-line="138">        <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="n">SentryHubDeprecationWarning</span><span class="p">(),</span> <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
 </span><span data-line="139">
@@ -270,15 +270,15 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="159">            <span class="n">current_scope</span> <span class="o">=</span> <span class="n">get_current_scope</span><span class="p">()</span>
 </span><span data-line="160">
 </span><span data-line="161">        <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span> <span class="o">=</span> <span class="p">[(</span><span class="n">client</span><span class="p">,</span> <span class="n">scope</span><span class="p">)]</span>  <span class="c1"># type: ignore</span>
-</span><span data-line="162">        <span class="bp">self</span><span class="o">.</span><span class="n">_last_event_id</span><span class="p">:</span> <span class="s2">&quot;Optional[str]&quot;</span> <span class="o">=</span> <span class="kc">None</span>
-</span><span data-line="163">        <span class="bp">self</span><span class="o">.</span><span class="n">_old_hubs</span><span class="p">:</span> <span class="s2">&quot;List[Hub]&quot;</span> <span class="o">=</span> <span class="p">[]</span>
+</span><span data-line="162">        <span class="bp">self</span><span class="o">.</span><span class="n">_last_event_id</span><span class="p">:</span> <span class="s2">"Optional[str]"</span> <span class="o">=</span> <span class="kc">None</span>
+</span><span data-line="163">        <span class="bp">self</span><span class="o">.</span><span class="n">_old_hubs</span><span class="p">:</span> <span class="s2">"List[Hub]"</span> <span class="o">=</span> <span class="p">[]</span>
 </span><span data-line="164">
-</span><span data-line="165">        <span class="bp">self</span><span class="o">.</span><span class="n">_old_current_scopes</span><span class="p">:</span> <span class="s2">&quot;List[Scope]&quot;</span> <span class="o">=</span> <span class="p">[]</span>
-</span><span data-line="166">        <span class="bp">self</span><span class="o">.</span><span class="n">_old_isolation_scopes</span><span class="p">:</span> <span class="s2">&quot;List[Scope]&quot;</span> <span class="o">=</span> <span class="p">[]</span>
-</span><span data-line="167">        <span class="bp">self</span><span class="o">.</span><span class="n">_current_scope</span><span class="p">:</span> <span class="s2">&quot;Scope&quot;</span> <span class="o">=</span> <span class="n">current_scope</span>
-</span><span data-line="168">        <span class="bp">self</span><span class="o">.</span><span class="n">_scope</span><span class="p">:</span> <span class="s2">&quot;Scope&quot;</span> <span class="o">=</span> <span class="n">scope</span>
+</span><span data-line="165">        <span class="bp">self</span><span class="o">.</span><span class="n">_old_current_scopes</span><span class="p">:</span> <span class="s2">"List[Scope]"</span> <span class="o">=</span> <span class="p">[]</span>
+</span><span data-line="166">        <span class="bp">self</span><span class="o">.</span><span class="n">_old_isolation_scopes</span><span class="p">:</span> <span class="s2">"List[Scope]"</span> <span class="o">=</span> <span class="p">[]</span>
+</span><span data-line="167">        <span class="bp">self</span><span class="o">.</span><span class="n">_current_scope</span><span class="p">:</span> <span class="s2">"Scope"</span> <span class="o">=</span> <span class="n">current_scope</span>
+</span><span data-line="168">        <span class="bp">self</span><span class="o">.</span><span class="n">_scope</span><span class="p">:</span> <span class="s2">"Scope"</span> <span class="o">=</span> <span class="n">scope</span>
 </span><span data-line="169">
-</span><span data-line="170">    <span class="k">def</span><span class="w"> </span><span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;Hub&quot;</span><span class="p">:</span>
+</span><span data-line="170">    <span class="k">def</span><span class="w"> </span><span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"Hub"</span><span class="p">:</span>
 </span><span data-line="171">        <span class="bp">self</span><span class="o">.</span><span class="n">_old_hubs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="p">)</span>
 </span><span data-line="172">        <span class="n">_local</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
 </span><span data-line="173">
@@ -294,9 +294,9 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="183">
 </span><span data-line="184">    <span class="k">def</span><span class="w"> </span><span class="fm">__exit__</span><span class="p">(</span>
 </span><span data-line="185">        <span class="bp">self</span><span class="p">,</span>
-</span><span data-line="186">        <span class="n">exc_type</span><span class="p">:</span> <span class="s2">&quot;Optional[type]&quot;</span><span class="p">,</span>
-</span><span data-line="187">        <span class="n">exc_value</span><span class="p">:</span> <span class="s2">&quot;Optional[BaseException]&quot;</span><span class="p">,</span>
-</span><span data-line="188">        <span class="n">tb</span><span class="p">:</span> <span class="s2">&quot;Optional[Any]&quot;</span><span class="p">,</span>
+</span><span data-line="186">        <span class="n">exc_type</span><span class="p">:</span> <span class="s2">"Optional[type]"</span><span class="p">,</span>
+</span><span data-line="187">        <span class="n">exc_value</span><span class="p">:</span> <span class="s2">"Optional[BaseException]"</span><span class="p">,</span>
+</span><span data-line="188">        <span class="n">tb</span><span class="p">:</span> <span class="s2">"Optional[Any]"</span><span class="p">,</span>
 </span><span data-line="189">    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 </span><span data-line="190">        <span class="n">old</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_old_hubs</span><span class="o">.</span><span class="n">pop</span><span class="p">()</span>
 </span><span data-line="191">        <span class="n">_local</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">old</span><span class="p">)</span>
@@ -311,15 +311,15 @@ data-aria-dark="Switch to auto color mode">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk.Hub.run">[docs]</a>
 </span><span data-line="199">    <span class="k">def</span><span class="w"> </span><span class="nf">run</span><span class="p">(</span>
 </span><span data-line="200">        <span class="bp">self</span><span class="p">,</span>
-</span><span data-line="201">        <span class="n">callback</span><span class="p">:</span> <span class="s2">&quot;Callable[[], T]&quot;</span><span class="p">,</span>
-</span><span data-line="202">    <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;T&quot;</span><span class="p">:</span>
-</span><span data-line="203"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="201">        <span class="n">callback</span><span class="p">:</span> <span class="s2">"Callable[[], T]"</span><span class="p">,</span>
+</span><span data-line="202">    <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"T"</span><span class="p">:</span>
+</span><span data-line="203"><span class="w">        </span><span class="sd">"""</span>
 </span><span data-line="204"><span class="sd">        .. deprecated:: 2.0.0</span>
 </span><span data-line="205"><span class="sd">            This function is deprecated and will be removed in a future release.</span>
 </span><span data-line="206">
 </span><span data-line="207"><span class="sd">        Runs a callback in the context of the hub.  Alternatively the</span>
 </span><span data-line="208"><span class="sd">        with statement can be used on the hub directly.</span>
-</span><span data-line="209"><span class="sd">        &quot;&quot;&quot;</span>
+</span><span data-line="209"><span class="sd">        """</span>
 </span><span data-line="210">        <span class="k">with</span> <span class="bp">self</span><span class="p">:</span>
 </span><span data-line="211">            <span class="k">return</span> <span class="n">callback</span><span class="p">()</span></div>
 
@@ -328,9 +328,9 @@ data-aria-dark="Switch to auto color mode">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk.Hub.get_integration">[docs]</a>
 </span><span data-line="213">    <span class="k">def</span><span class="w"> </span><span class="nf">get_integration</span><span class="p">(</span>
 </span><span data-line="214">        <span class="bp">self</span><span class="p">,</span>
-</span><span data-line="215">        <span class="n">name_or_class</span><span class="p">:</span> <span class="s2">&quot;Union[str, Type[Integration]]&quot;</span><span class="p">,</span>
-</span><span data-line="216">    <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;Any&quot;</span><span class="p">:</span>
-</span><span data-line="217"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="215">        <span class="n">name_or_class</span><span class="p">:</span> <span class="s2">"Union[str, Type[Integration]]"</span><span class="p">,</span>
+</span><span data-line="216">    <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"Any"</span><span class="p">:</span>
+</span><span data-line="217"><span class="w">        </span><span class="sd">"""</span>
 </span><span data-line="218"><span class="sd">        .. deprecated:: 2.0.0</span>
 </span><span data-line="219"><span class="sd">            This function is deprecated and will be removed in a future release.</span>
 </span><span data-line="220"><span class="sd">            Please use :py:meth:`sentry_sdk.client._Client.get_integration` instead.</span>
@@ -341,19 +341,19 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="225">
 </span><span data-line="226"><span class="sd">        If the return value is not `None` the hub is guaranteed to have a</span>
 </span><span data-line="227"><span class="sd">        client attached.</span>
-</span><span data-line="228"><span class="sd">        &quot;&quot;&quot;</span>
+</span><span data-line="228"><span class="sd">        """</span>
 </span><span data-line="229">        <span class="k">return</span> <span class="n">get_client</span><span class="p">()</span><span class="o">.</span><span class="n">get_integration</span><span class="p">(</span><span class="n">name_or_class</span><span class="p">)</span></div>
 
 </span><span data-line="230">
 </span><span data-line="231">    <span class="nd">@property</span>
-</span><span data-line="232">    <span class="k">def</span><span class="w"> </span><span class="nf">client</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;Optional[BaseClient]&quot;</span><span class="p">:</span>
-</span><span data-line="233"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="232">    <span class="k">def</span><span class="w"> </span><span class="nf">client</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"Optional[BaseClient]"</span><span class="p">:</span>
+</span><span data-line="233"><span class="w">        </span><span class="sd">"""</span>
 </span><span data-line="234"><span class="sd">        .. deprecated:: 2.0.0</span>
 </span><span data-line="235"><span class="sd">            This property is deprecated and will be removed in a future release.</span>
 </span><span data-line="236"><span class="sd">            Please use :py:func:`sentry_sdk.api.get_client` instead.</span>
 </span><span data-line="237">
 </span><span data-line="238"><span class="sd">        Returns the current client on the hub.</span>
-</span><span data-line="239"><span class="sd">        &quot;&quot;&quot;</span>
+</span><span data-line="239"><span class="sd">        """</span>
 </span><span data-line="240">        <span class="n">client</span> <span class="o">=</span> <span class="n">get_client</span><span class="p">()</span>
 </span><span data-line="241">
 </span><span data-line="242">        <span class="k">if</span> <span class="ow">not</span> <span class="n">client</span><span class="o">.</span><span class="n">is_active</span><span class="p">():</span>
@@ -362,25 +362,25 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="245">        <span class="k">return</span> <span class="n">client</span>
 </span><span data-line="246">
 </span><span data-line="247">    <span class="nd">@property</span>
-</span><span data-line="248">    <span class="k">def</span><span class="w"> </span><span class="nf">scope</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;Scope&quot;</span><span class="p">:</span>
-</span><span data-line="249"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="248">    <span class="k">def</span><span class="w"> </span><span class="nf">scope</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"Scope"</span><span class="p">:</span>
+</span><span data-line="249"><span class="w">        </span><span class="sd">"""</span>
 </span><span data-line="250"><span class="sd">        .. deprecated:: 2.0.0</span>
 </span><span data-line="251"><span class="sd">            This property is deprecated and will be removed in a future release.</span>
 </span><span data-line="252"><span class="sd">            Returns the current scope on the hub.</span>
-</span><span data-line="253"><span class="sd">        &quot;&quot;&quot;</span>
+</span><span data-line="253"><span class="sd">        """</span>
 </span><span data-line="254">        <span class="k">return</span> <span class="n">get_isolation_scope</span><span class="p">()</span>
 </span><span data-line="255">
 <div class="viewcode-block" id="Hub.last_event_id">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk.Hub.last_event_id">[docs]</a>
-</span><span data-line="256">    <span class="k">def</span><span class="w"> </span><span class="nf">last_event_id</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;Optional[str]&quot;</span><span class="p">:</span>
-</span><span data-line="257"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="256">    <span class="k">def</span><span class="w"> </span><span class="nf">last_event_id</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"Optional[str]"</span><span class="p">:</span>
+</span><span data-line="257"><span class="w">        </span><span class="sd">"""</span>
 </span><span data-line="258"><span class="sd">        Returns the last event ID.</span>
 </span><span data-line="259">
 </span><span data-line="260"><span class="sd">        .. deprecated:: 1.40.5</span>
 </span><span data-line="261"><span class="sd">            This function is deprecated and will be removed in a future release. The functions `capture_event`, `capture_message`, and `capture_exception` return the event ID directly.</span>
-</span><span data-line="262"><span class="sd">        &quot;&quot;&quot;</span>
+</span><span data-line="262"><span class="sd">        """</span>
 </span><span data-line="263">        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
-</span><span data-line="264">            <span class="s2">&quot;Deprecated: last_event_id is deprecated. This will be removed in the future. The functions `capture_event`, `capture_message`, and `capture_exception` return the event ID directly.&quot;</span>
+</span><span data-line="264">            <span class="s2">"Deprecated: last_event_id is deprecated. This will be removed in the future. The functions `capture_event`, `capture_message`, and `capture_exception` return the event ID directly."</span>
 </span><span data-line="265">        <span class="p">)</span>
 </span><span data-line="266">        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_last_event_id</span></div>
 
@@ -389,15 +389,15 @@ data-aria-dark="Switch to auto color mode">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk.Hub.bind_client">[docs]</a>
 </span><span data-line="268">    <span class="k">def</span><span class="w"> </span><span class="nf">bind_client</span><span class="p">(</span>
 </span><span data-line="269">        <span class="bp">self</span><span class="p">,</span>
-</span><span data-line="270">        <span class="n">new</span><span class="p">:</span> <span class="s2">&quot;Optional[BaseClient]&quot;</span><span class="p">,</span>
+</span><span data-line="270">        <span class="n">new</span><span class="p">:</span> <span class="s2">"Optional[BaseClient]"</span><span class="p">,</span>
 </span><span data-line="271">    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="272"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="272"><span class="w">        </span><span class="sd">"""</span>
 </span><span data-line="273"><span class="sd">        .. deprecated:: 2.0.0</span>
 </span><span data-line="274"><span class="sd">            This function is deprecated and will be removed in a future release.</span>
 </span><span data-line="275"><span class="sd">            Please use :py:meth:`sentry_sdk.Scope.set_client` instead.</span>
 </span><span data-line="276">
 </span><span data-line="277"><span class="sd">        Binds a new client to the hub.</span>
-</span><span data-line="278"><span class="sd">        &quot;&quot;&quot;</span>
+</span><span data-line="278"><span class="sd">        """</span>
 </span><span data-line="279">        <span class="n">get_global_scope</span><span class="p">()</span><span class="o">.</span><span class="n">set_client</span><span class="p">(</span><span class="n">new</span><span class="p">)</span></div>
 
 </span><span data-line="280">
@@ -405,12 +405,12 @@ data-aria-dark="Switch to auto color mode">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk.Hub.capture_event">[docs]</a>
 </span><span data-line="281">    <span class="k">def</span><span class="w"> </span><span class="nf">capture_event</span><span class="p">(</span>
 </span><span data-line="282">        <span class="bp">self</span><span class="p">,</span>
-</span><span data-line="283">        <span class="n">event</span><span class="p">:</span> <span class="s2">&quot;Event&quot;</span><span class="p">,</span>
-</span><span data-line="284">        <span class="n">hint</span><span class="p">:</span> <span class="s2">&quot;Optional[Hint]&quot;</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span data-line="285">        <span class="n">scope</span><span class="p">:</span> <span class="s2">&quot;Optional[Scope]&quot;</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span data-line="286">        <span class="o">**</span><span class="n">scope_kwargs</span><span class="p">:</span> <span class="s2">&quot;Any&quot;</span><span class="p">,</span>
-</span><span data-line="287">    <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;Optional[str]&quot;</span><span class="p">:</span>
-</span><span data-line="288"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="283">        <span class="n">event</span><span class="p">:</span> <span class="s2">"Event"</span><span class="p">,</span>
+</span><span data-line="284">        <span class="n">hint</span><span class="p">:</span> <span class="s2">"Optional[Hint]"</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span data-line="285">        <span class="n">scope</span><span class="p">:</span> <span class="s2">"Optional[Scope]"</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span data-line="286">        <span class="o">**</span><span class="n">scope_kwargs</span><span class="p">:</span> <span class="s2">"Any"</span><span class="p">,</span>
+</span><span data-line="287">    <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"Optional[str]"</span><span class="p">:</span>
+</span><span data-line="288"><span class="w">        </span><span class="sd">"""</span>
 </span><span data-line="289"><span class="sd">        .. deprecated:: 2.0.0</span>
 </span><span data-line="290"><span class="sd">            This function is deprecated and will be removed in a future release.</span>
 </span><span data-line="291"><span class="sd">            Please use :py:meth:`sentry_sdk.Scope.capture_event` instead.</span>
@@ -429,12 +429,12 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="304"><span class="sd">        :param scope_kwargs: Optional data to apply to event.</span>
 </span><span data-line="305"><span class="sd">            For supported `**scope_kwargs` see :py:meth:`sentry_sdk.Scope.update_from_kwargs`.</span>
 </span><span data-line="306"><span class="sd">            The `scope` and `scope_kwargs` parameters are mutually exclusive.</span>
-</span><span data-line="307"><span class="sd">        &quot;&quot;&quot;</span>
+</span><span data-line="307"><span class="sd">        """</span>
 </span><span data-line="308">        <span class="n">last_event_id</span> <span class="o">=</span> <span class="n">get_current_scope</span><span class="p">()</span><span class="o">.</span><span class="n">capture_event</span><span class="p">(</span>
 </span><span data-line="309">            <span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">,</span> <span class="n">scope</span><span class="o">=</span><span class="n">scope</span><span class="p">,</span> <span class="o">**</span><span class="n">scope_kwargs</span>
 </span><span data-line="310">        <span class="p">)</span>
 </span><span data-line="311">
-</span><span data-line="312">        <span class="n">is_transaction</span> <span class="o">=</span> <span class="n">event</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;type&quot;</span><span class="p">)</span> <span class="o">==</span> <span class="s2">&quot;transaction&quot;</span>
+</span><span data-line="312">        <span class="n">is_transaction</span> <span class="o">=</span> <span class="n">event</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"type"</span><span class="p">)</span> <span class="o">==</span> <span class="s2">"transaction"</span>
 </span><span data-line="313">        <span class="k">if</span> <span class="n">last_event_id</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">is_transaction</span><span class="p">:</span>
 </span><span data-line="314">            <span class="bp">self</span><span class="o">.</span><span class="n">_last_event_id</span> <span class="o">=</span> <span class="n">last_event_id</span>
 </span><span data-line="315">
@@ -446,11 +446,11 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="318">    <span class="k">def</span><span class="w"> </span><span class="nf">capture_message</span><span class="p">(</span>
 </span><span data-line="319">        <span class="bp">self</span><span class="p">,</span>
 </span><span data-line="320">        <span class="n">message</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
-</span><span data-line="321">        <span class="n">level</span><span class="p">:</span> <span class="s2">&quot;Optional[LogLevelStr]&quot;</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span data-line="322">        <span class="n">scope</span><span class="p">:</span> <span class="s2">&quot;Optional[Scope]&quot;</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span data-line="323">        <span class="o">**</span><span class="n">scope_kwargs</span><span class="p">:</span> <span class="s2">&quot;Any&quot;</span><span class="p">,</span>
-</span><span data-line="324">    <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;Optional[str]&quot;</span><span class="p">:</span>
-</span><span data-line="325"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="321">        <span class="n">level</span><span class="p">:</span> <span class="s2">"Optional[LogLevelStr]"</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span data-line="322">        <span class="n">scope</span><span class="p">:</span> <span class="s2">"Optional[Scope]"</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span data-line="323">        <span class="o">**</span><span class="n">scope_kwargs</span><span class="p">:</span> <span class="s2">"Any"</span><span class="p">,</span>
+</span><span data-line="324">    <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"Optional[str]"</span><span class="p">:</span>
+</span><span data-line="325"><span class="w">        </span><span class="sd">"""</span>
 </span><span data-line="326"><span class="sd">        .. deprecated:: 2.0.0</span>
 </span><span data-line="327"><span class="sd">            This function is deprecated and will be removed in a future release.</span>
 </span><span data-line="328"><span class="sd">            Please use :py:meth:`sentry_sdk.Scope.capture_message` instead.</span>
@@ -471,7 +471,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="343"><span class="sd">            The `scope` and `scope_kwargs` parameters are mutually exclusive.</span>
 </span><span data-line="344">
 </span><span data-line="345"><span class="sd">        :returns: An `event_id` if the SDK decided to send the event (see :py:meth:`sentry_sdk.client._Client.capture_event`).</span>
-</span><span data-line="346"><span class="sd">        &quot;&quot;&quot;</span>
+</span><span data-line="346"><span class="sd">        """</span>
 </span><span data-line="347">        <span class="n">last_event_id</span> <span class="o">=</span> <span class="n">get_current_scope</span><span class="p">()</span><span class="o">.</span><span class="n">capture_message</span><span class="p">(</span>
 </span><span data-line="348">            <span class="n">message</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="n">level</span><span class="p">,</span> <span class="n">scope</span><span class="o">=</span><span class="n">scope</span><span class="p">,</span> <span class="o">**</span><span class="n">scope_kwargs</span>
 </span><span data-line="349">        <span class="p">)</span>
@@ -486,11 +486,11 @@ data-aria-dark="Switch to auto color mode">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk.Hub.capture_exception">[docs]</a>
 </span><span data-line="356">    <span class="k">def</span><span class="w"> </span><span class="nf">capture_exception</span><span class="p">(</span>
 </span><span data-line="357">        <span class="bp">self</span><span class="p">,</span>
-</span><span data-line="358">        <span class="n">error</span><span class="p">:</span> <span class="s2">&quot;Optional[Union[BaseException, ExcInfo]]&quot;</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span data-line="359">        <span class="n">scope</span><span class="p">:</span> <span class="s2">&quot;Optional[Scope]&quot;</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span data-line="360">        <span class="o">**</span><span class="n">scope_kwargs</span><span class="p">:</span> <span class="s2">&quot;Any&quot;</span><span class="p">,</span>
-</span><span data-line="361">    <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;Optional[str]&quot;</span><span class="p">:</span>
-</span><span data-line="362"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="358">        <span class="n">error</span><span class="p">:</span> <span class="s2">"Optional[Union[BaseException, ExcInfo]]"</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span data-line="359">        <span class="n">scope</span><span class="p">:</span> <span class="s2">"Optional[Scope]"</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span data-line="360">        <span class="o">**</span><span class="n">scope_kwargs</span><span class="p">:</span> <span class="s2">"Any"</span><span class="p">,</span>
+</span><span data-line="361">    <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"Optional[str]"</span><span class="p">:</span>
+</span><span data-line="362"><span class="w">        </span><span class="sd">"""</span>
 </span><span data-line="363"><span class="sd">        .. deprecated:: 2.0.0</span>
 </span><span data-line="364"><span class="sd">            This function is deprecated and will be removed in a future release.</span>
 </span><span data-line="365"><span class="sd">            Please use :py:meth:`sentry_sdk.Scope.capture_exception` instead.</span>
@@ -509,7 +509,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="378"><span class="sd">            The `scope` and `scope_kwargs` parameters are mutually exclusive.</span>
 </span><span data-line="379">
 </span><span data-line="380"><span class="sd">        :returns: An `event_id` if the SDK decided to send the event (see :py:meth:`sentry_sdk.client._Client.capture_event`).</span>
-</span><span data-line="381"><span class="sd">        &quot;&quot;&quot;</span>
+</span><span data-line="381"><span class="sd">        """</span>
 </span><span data-line="382">        <span class="n">last_event_id</span> <span class="o">=</span> <span class="n">get_current_scope</span><span class="p">()</span><span class="o">.</span><span class="n">capture_exception</span><span class="p">(</span>
 </span><span data-line="383">            <span class="n">error</span><span class="p">,</span> <span class="n">scope</span><span class="o">=</span><span class="n">scope</span><span class="p">,</span> <span class="o">**</span><span class="n">scope_kwargs</span>
 </span><span data-line="384">        <span class="p">)</span>
@@ -524,11 +524,11 @@ data-aria-dark="Switch to auto color mode">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk.Hub.add_breadcrumb">[docs]</a>
 </span><span data-line="391">    <span class="k">def</span><span class="w"> </span><span class="nf">add_breadcrumb</span><span class="p">(</span>
 </span><span data-line="392">        <span class="bp">self</span><span class="p">,</span>
-</span><span data-line="393">        <span class="n">crumb</span><span class="p">:</span> <span class="s2">&quot;Optional[Breadcrumb]&quot;</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span data-line="394">        <span class="n">hint</span><span class="p">:</span> <span class="s2">&quot;Optional[BreadcrumbHint]&quot;</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span data-line="395">        <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="s2">&quot;Any&quot;</span><span class="p">,</span>
+</span><span data-line="393">        <span class="n">crumb</span><span class="p">:</span> <span class="s2">"Optional[Breadcrumb]"</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span data-line="394">        <span class="n">hint</span><span class="p">:</span> <span class="s2">"Optional[BreadcrumbHint]"</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span data-line="395">        <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="s2">"Any"</span><span class="p">,</span>
 </span><span data-line="396">    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="397"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="397"><span class="w">        </span><span class="sd">"""</span>
 </span><span data-line="398"><span class="sd">        .. deprecated:: 2.0.0</span>
 </span><span data-line="399"><span class="sd">            This function is deprecated and will be removed in a future release.</span>
 </span><span data-line="400"><span class="sd">            Please use :py:meth:`sentry_sdk.Scope.add_breadcrumb` instead.</span>
@@ -539,16 +539,16 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="405">
 </span><span data-line="406"><span class="sd">        :param hint: An optional value that can be used by `before_breadcrumb`</span>
 </span><span data-line="407"><span class="sd">            to customize the breadcrumbs that are emitted.</span>
-</span><span data-line="408"><span class="sd">        &quot;&quot;&quot;</span>
+</span><span data-line="408"><span class="sd">        """</span>
 </span><span data-line="409">        <span class="n">get_isolation_scope</span><span class="p">()</span><span class="o">.</span><span class="n">add_breadcrumb</span><span class="p">(</span><span class="n">crumb</span><span class="p">,</span> <span class="n">hint</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></div>
 
 </span><span data-line="410">
 <div class="viewcode-block" id="Hub.start_span">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk.Hub.start_span">[docs]</a>
 </span><span data-line="411">    <span class="k">def</span><span class="w"> </span><span class="nf">start_span</span><span class="p">(</span>
-</span><span data-line="412">        <span class="bp">self</span><span class="p">,</span> <span class="n">instrumenter</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">INSTRUMENTER</span><span class="o">.</span><span class="n">SENTRY</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="s2">&quot;Any&quot;</span>
-</span><span data-line="413">    <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;Span&quot;</span><span class="p">:</span>
-</span><span data-line="414"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="412">        <span class="bp">self</span><span class="p">,</span> <span class="n">instrumenter</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">INSTRUMENTER</span><span class="o">.</span><span class="n">SENTRY</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="s2">"Any"</span>
+</span><span data-line="413">    <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"Span"</span><span class="p">:</span>
+</span><span data-line="414"><span class="w">        </span><span class="sd">"""</span>
 </span><span data-line="415"><span class="sd">        .. deprecated:: 2.0.0</span>
 </span><span data-line="416"><span class="sd">            This function is deprecated and will be removed in a future release.</span>
 </span><span data-line="417"><span class="sd">            Please use :py:meth:`sentry_sdk.Scope.start_span` instead.</span>
@@ -566,7 +566,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="429"><span class="sd">        one is not already in progress.</span>
 </span><span data-line="430">
 </span><span data-line="431"><span class="sd">        For supported `**kwargs` see :py:class:`sentry_sdk.tracing.Span`.</span>
-</span><span data-line="432"><span class="sd">        &quot;&quot;&quot;</span>
+</span><span data-line="432"><span class="sd">        """</span>
 </span><span data-line="433">        <span class="n">scope</span> <span class="o">=</span> <span class="n">get_current_scope</span><span class="p">()</span>
 </span><span data-line="434">        <span class="k">return</span> <span class="n">scope</span><span class="o">.</span><span class="n">start_span</span><span class="p">(</span><span class="n">instrumenter</span><span class="o">=</span><span class="n">instrumenter</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></div>
 
@@ -575,12 +575,12 @@ data-aria-dark="Switch to auto color mode">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk.Hub.start_transaction">[docs]</a>
 </span><span data-line="436">    <span class="k">def</span><span class="w"> </span><span class="nf">start_transaction</span><span class="p">(</span>
 </span><span data-line="437">        <span class="bp">self</span><span class="p">,</span>
-</span><span data-line="438">        <span class="n">transaction</span><span class="p">:</span> <span class="s2">&quot;Optional[Transaction]&quot;</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span data-line="438">        <span class="n">transaction</span><span class="p">:</span> <span class="s2">"Optional[Transaction]"</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 </span><span data-line="439">        <span class="n">instrumenter</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">INSTRUMENTER</span><span class="o">.</span><span class="n">SENTRY</span><span class="p">,</span>
-</span><span data-line="440">        <span class="n">custom_sampling_context</span><span class="p">:</span> <span class="s2">&quot;Optional[SamplingContext]&quot;</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span data-line="441">        <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="s2">&quot;Unpack[TransactionKwargs]&quot;</span><span class="p">,</span>
-</span><span data-line="442">    <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;Union[Transaction, NoOpSpan]&quot;</span><span class="p">:</span>
-</span><span data-line="443"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="440">        <span class="n">custom_sampling_context</span><span class="p">:</span> <span class="s2">"Optional[SamplingContext]"</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span data-line="441">        <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="s2">"Unpack[TransactionKwargs]"</span><span class="p">,</span>
+</span><span data-line="442">    <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"Union[Transaction, NoOpSpan]"</span><span class="p">:</span>
+</span><span data-line="443"><span class="w">        </span><span class="sd">"""</span>
 </span><span data-line="444"><span class="sd">        .. deprecated:: 2.0.0</span>
 </span><span data-line="445"><span class="sd">            This function is deprecated and will be removed in a future release.</span>
 </span><span data-line="446"><span class="sd">            Please use :py:meth:`sentry_sdk.Scope.start_transaction` instead.</span>
@@ -607,13 +607,13 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="467"><span class="sd">        finished child spans.</span>
 </span><span data-line="468">
 </span><span data-line="469"><span class="sd">        For supported `**kwargs` see :py:class:`sentry_sdk.tracing.Transaction`.</span>
-</span><span data-line="470"><span class="sd">        &quot;&quot;&quot;</span>
+</span><span data-line="470"><span class="sd">        """</span>
 </span><span data-line="471">        <span class="n">scope</span> <span class="o">=</span> <span class="n">get_current_scope</span><span class="p">()</span>
 </span><span data-line="472">
 </span><span data-line="473">        <span class="c1"># For backwards compatibility, we allow passing the scope as the hub.</span>
 </span><span data-line="474">        <span class="c1"># We need a major release to make this nice. (if someone searches the code: deprecated)</span>
 </span><span data-line="475">        <span class="c1"># Type checking disabled for this line because deprecated keys are not allowed in the type signature.</span>
-</span><span data-line="476">        <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;hub&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">scope</span>  <span class="c1"># type: ignore</span>
+</span><span data-line="476">        <span class="n">kwargs</span><span class="p">[</span><span class="s2">"hub"</span><span class="p">]</span> <span class="o">=</span> <span class="n">scope</span>  <span class="c1"># type: ignore</span>
 </span><span data-line="477">
 </span><span data-line="478">        <span class="k">return</span> <span class="n">scope</span><span class="o">.</span><span class="n">start_transaction</span><span class="p">(</span>
 </span><span data-line="479">            <span class="n">transaction</span><span class="p">,</span> <span class="n">instrumenter</span><span class="p">,</span> <span class="n">custom_sampling_context</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span>
@@ -624,18 +624,18 @@ data-aria-dark="Switch to auto color mode">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk.Hub.continue_trace">[docs]</a>
 </span><span data-line="482">    <span class="k">def</span><span class="w"> </span><span class="nf">continue_trace</span><span class="p">(</span>
 </span><span data-line="483">        <span class="bp">self</span><span class="p">,</span>
-</span><span data-line="484">        <span class="n">environ_or_headers</span><span class="p">:</span> <span class="s2">&quot;Dict[str, Any]&quot;</span><span class="p">,</span>
-</span><span data-line="485">        <span class="n">op</span><span class="p">:</span> <span class="s2">&quot;Optional[str]&quot;</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span data-line="486">        <span class="n">name</span><span class="p">:</span> <span class="s2">&quot;Optional[str]&quot;</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span data-line="487">        <span class="n">source</span><span class="p">:</span> <span class="s2">&quot;Optional[str]&quot;</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span data-line="488">    <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;Transaction&quot;</span><span class="p">:</span>
-</span><span data-line="489"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="484">        <span class="n">environ_or_headers</span><span class="p">:</span> <span class="s2">"Dict[str, Any]"</span><span class="p">,</span>
+</span><span data-line="485">        <span class="n">op</span><span class="p">:</span> <span class="s2">"Optional[str]"</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span data-line="486">        <span class="n">name</span><span class="p">:</span> <span class="s2">"Optional[str]"</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span data-line="487">        <span class="n">source</span><span class="p">:</span> <span class="s2">"Optional[str]"</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span data-line="488">    <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"Transaction"</span><span class="p">:</span>
+</span><span data-line="489"><span class="w">        </span><span class="sd">"""</span>
 </span><span data-line="490"><span class="sd">        .. deprecated:: 2.0.0</span>
 </span><span data-line="491"><span class="sd">            This function is deprecated and will be removed in a future release.</span>
 </span><span data-line="492"><span class="sd">            Please use :py:meth:`sentry_sdk.Scope.continue_trace` instead.</span>
 </span><span data-line="493">
 </span><span data-line="494"><span class="sd">        Sets the propagation context from environment or headers and returns a transaction.</span>
-</span><span data-line="495"><span class="sd">        &quot;&quot;&quot;</span>
+</span><span data-line="495"><span class="sd">        """</span>
 </span><span data-line="496">        <span class="k">return</span> <span class="n">get_isolation_scope</span><span class="p">()</span><span class="o">.</span><span class="n">continue_trace</span><span class="p">(</span>
 </span><span data-line="497">            <span class="n">environ_or_headers</span><span class="o">=</span><span class="n">environ_or_headers</span><span class="p">,</span> <span class="n">op</span><span class="o">=</span><span class="n">op</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="n">source</span>
 </span><span data-line="498">        <span class="p">)</span></div>
@@ -644,14 +644,14 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="500">    <span class="nd">@overload</span>
 </span><span data-line="501">    <span class="k">def</span><span class="w"> </span><span class="nf">push_scope</span><span class="p">(</span>
 </span><span data-line="502">        <span class="bp">self</span><span class="p">,</span>
-</span><span data-line="503">        <span class="n">callback</span><span class="p">:</span> <span class="s2">&quot;Optional[None]&quot;</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span data-line="504">    <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;ContextManager[Scope]&quot;</span><span class="p">:</span>
+</span><span data-line="503">        <span class="n">callback</span><span class="p">:</span> <span class="s2">"Optional[None]"</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span data-line="504">    <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"ContextManager[Scope]"</span><span class="p">:</span>
 </span><span data-line="505">        <span class="k">pass</span>
 </span><span data-line="506">
 </span><span data-line="507">    <span class="nd">@overload</span>
 </span><span data-line="508">    <span class="k">def</span><span class="w"> </span><span class="nf">push_scope</span><span class="p">(</span>  <span class="c1"># noqa: F811</span>
 </span><span data-line="509">        <span class="bp">self</span><span class="p">,</span>
-</span><span data-line="510">        <span class="n">callback</span><span class="p">:</span> <span class="s2">&quot;Callable[[Scope], None]&quot;</span><span class="p">,</span>
+</span><span data-line="510">        <span class="n">callback</span><span class="p">:</span> <span class="s2">"Callable[[Scope], None]"</span><span class="p">,</span>
 </span><span data-line="511">    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 </span><span data-line="512">        <span class="k">pass</span>
 </span><span data-line="513">
@@ -659,10 +659,10 @@ data-aria-dark="Switch to auto color mode">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk.Hub.push_scope">[docs]</a>
 </span><span data-line="514">    <span class="k">def</span><span class="w"> </span><span class="nf">push_scope</span><span class="p">(</span>  <span class="c1"># noqa</span>
 </span><span data-line="515">        <span class="bp">self</span><span class="p">,</span>
-</span><span data-line="516">        <span class="n">callback</span><span class="p">:</span> <span class="s2">&quot;Optional[Callable[[Scope], None]]&quot;</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span data-line="516">        <span class="n">callback</span><span class="p">:</span> <span class="s2">"Optional[Callable[[Scope], None]]"</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 </span><span data-line="517">        <span class="n">continue_trace</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
-</span><span data-line="518">    <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;Optional[ContextManager[Scope]]&quot;</span><span class="p">:</span>
-</span><span data-line="519"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="518">    <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"Optional[ContextManager[Scope]]"</span><span class="p">:</span>
+</span><span data-line="519"><span class="w">        </span><span class="sd">"""</span>
 </span><span data-line="520"><span class="sd">        .. deprecated:: 2.0.0</span>
 </span><span data-line="521"><span class="sd">            This function is deprecated and will be removed in a future release.</span>
 </span><span data-line="522">
@@ -673,7 +673,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="527">
 </span><span data-line="528"><span class="sd">        :returns: If no `callback` is provided, a context manager that should</span>
 </span><span data-line="529"><span class="sd">            be used to pop the scope again.</span>
-</span><span data-line="530"><span class="sd">        &quot;&quot;&quot;</span>
+</span><span data-line="530"><span class="sd">        """</span>
 </span><span data-line="531">        <span class="k">if</span> <span class="n">callback</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
 </span><span data-line="532">            <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">push_scope</span><span class="p">()</span> <span class="k">as</span> <span class="n">scope</span><span class="p">:</span>
 </span><span data-line="533">                <span class="n">callback</span><span class="p">(</span><span class="n">scope</span><span class="p">)</span>
@@ -684,31 +684,31 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="537">
 <div class="viewcode-block" id="Hub.pop_scope_unsafe">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk.Hub.pop_scope_unsafe">[docs]</a>
-</span><span data-line="538">    <span class="k">def</span><span class="w"> </span><span class="nf">pop_scope_unsafe</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;Tuple[Optional[Client], Scope]&quot;</span><span class="p">:</span>
-</span><span data-line="539"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="538">    <span class="k">def</span><span class="w"> </span><span class="nf">pop_scope_unsafe</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"Tuple[Optional[Client], Scope]"</span><span class="p">:</span>
+</span><span data-line="539"><span class="w">        </span><span class="sd">"""</span>
 </span><span data-line="540"><span class="sd">        .. deprecated:: 2.0.0</span>
 </span><span data-line="541"><span class="sd">            This function is deprecated and will be removed in a future release.</span>
 </span><span data-line="542">
 </span><span data-line="543"><span class="sd">        Pops a scope layer from the stack.</span>
 </span><span data-line="544">
 </span><span data-line="545"><span class="sd">        Try to use the context manager :py:meth:`push_scope` instead.</span>
-</span><span data-line="546"><span class="sd">        &quot;&quot;&quot;</span>
+</span><span data-line="546"><span class="sd">        """</span>
 </span><span data-line="547">        <span class="n">rv</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="o">.</span><span class="n">pop</span><span class="p">()</span>
-</span><span data-line="548">        <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">,</span> <span class="s2">&quot;stack must have at least one layer&quot;</span>
+</span><span data-line="548">        <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">,</span> <span class="s2">"stack must have at least one layer"</span>
 </span><span data-line="549">        <span class="k">return</span> <span class="n">rv</span></div>
 
 </span><span data-line="550">
 </span><span data-line="551">    <span class="nd">@overload</span>
 </span><span data-line="552">    <span class="k">def</span><span class="w"> </span><span class="nf">configure_scope</span><span class="p">(</span>
 </span><span data-line="553">        <span class="bp">self</span><span class="p">,</span>
-</span><span data-line="554">        <span class="n">callback</span><span class="p">:</span> <span class="s2">&quot;Optional[None]&quot;</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span data-line="555">    <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;ContextManager[Scope]&quot;</span><span class="p">:</span>
+</span><span data-line="554">        <span class="n">callback</span><span class="p">:</span> <span class="s2">"Optional[None]"</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span data-line="555">    <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"ContextManager[Scope]"</span><span class="p">:</span>
 </span><span data-line="556">        <span class="k">pass</span>
 </span><span data-line="557">
 </span><span data-line="558">    <span class="nd">@overload</span>
 </span><span data-line="559">    <span class="k">def</span><span class="w"> </span><span class="nf">configure_scope</span><span class="p">(</span>  <span class="c1"># noqa: F811</span>
 </span><span data-line="560">        <span class="bp">self</span><span class="p">,</span>
-</span><span data-line="561">        <span class="n">callback</span><span class="p">:</span> <span class="s2">&quot;Callable[[Scope], None]&quot;</span><span class="p">,</span>
+</span><span data-line="561">        <span class="n">callback</span><span class="p">:</span> <span class="s2">"Callable[[Scope], None]"</span><span class="p">,</span>
 </span><span data-line="562">    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 </span><span data-line="563">        <span class="k">pass</span>
 </span><span data-line="564">
@@ -716,10 +716,10 @@ data-aria-dark="Switch to auto color mode">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk.Hub.configure_scope">[docs]</a>
 </span><span data-line="565">    <span class="k">def</span><span class="w"> </span><span class="nf">configure_scope</span><span class="p">(</span>  <span class="c1"># noqa</span>
 </span><span data-line="566">        <span class="bp">self</span><span class="p">,</span>
-</span><span data-line="567">        <span class="n">callback</span><span class="p">:</span> <span class="s2">&quot;Optional[Callable[[Scope], None]]&quot;</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span data-line="567">        <span class="n">callback</span><span class="p">:</span> <span class="s2">"Optional[Callable[[Scope], None]]"</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 </span><span data-line="568">        <span class="n">continue_trace</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
-</span><span data-line="569">    <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;Optional[ContextManager[Scope]]&quot;</span><span class="p">:</span>
-</span><span data-line="570"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="569">    <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"Optional[ContextManager[Scope]]"</span><span class="p">:</span>
+</span><span data-line="570"><span class="w">        </span><span class="sd">"""</span>
 </span><span data-line="571"><span class="sd">        .. deprecated:: 2.0.0</span>
 </span><span data-line="572"><span class="sd">            This function is deprecated and will be removed in a future release.</span>
 </span><span data-line="573">
@@ -728,7 +728,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="576"><span class="sd">        :param callback: If provided, call the callback with the current scope.</span>
 </span><span data-line="577">
 </span><span data-line="578"><span class="sd">        :returns: If no callback is provided, returns a context manager that returns the scope.</span>
-</span><span data-line="579"><span class="sd">        &quot;&quot;&quot;</span>
+</span><span data-line="579"><span class="sd">        """</span>
 </span><span data-line="580">        <span class="n">scope</span> <span class="o">=</span> <span class="n">get_isolation_scope</span><span class="p">()</span>
 </span><span data-line="581">
 </span><span data-line="582">        <span class="k">if</span> <span class="n">continue_trace</span><span class="p">:</span>
@@ -741,7 +741,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="589">            <span class="k">return</span> <span class="kc">None</span>
 </span><span data-line="590">
 </span><span data-line="591">        <span class="nd">@contextmanager</span>
-</span><span data-line="592">        <span class="k">def</span><span class="w"> </span><span class="nf">inner</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="s2">&quot;Generator[Scope, None, None]&quot;</span><span class="p">:</span>
+</span><span data-line="592">        <span class="k">def</span><span class="w"> </span><span class="nf">inner</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="s2">"Generator[Scope, None, None]"</span><span class="p">:</span>
 </span><span data-line="593">            <span class="k">yield</span> <span class="n">scope</span>
 </span><span data-line="594">
 </span><span data-line="595">        <span class="k">return</span> <span class="n">inner</span><span class="p">()</span></div>
@@ -751,15 +751,15 @@ data-aria-dark="Switch to auto color mode">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk.Hub.start_session">[docs]</a>
 </span><span data-line="597">    <span class="k">def</span><span class="w"> </span><span class="nf">start_session</span><span class="p">(</span>
 </span><span data-line="598">        <span class="bp">self</span><span class="p">,</span>
-</span><span data-line="599">        <span class="n">session_mode</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;application&quot;</span><span class="p">,</span>
+</span><span data-line="599">        <span class="n">session_mode</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">"application"</span><span class="p">,</span>
 </span><span data-line="600">    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="601"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="601"><span class="w">        </span><span class="sd">"""</span>
 </span><span data-line="602"><span class="sd">        .. deprecated:: 2.0.0</span>
 </span><span data-line="603"><span class="sd">            This function is deprecated and will be removed in a future release.</span>
 </span><span data-line="604"><span class="sd">            Please use :py:meth:`sentry_sdk.Scope.start_session` instead.</span>
 </span><span data-line="605">
 </span><span data-line="606"><span class="sd">        Starts a new session.</span>
-</span><span data-line="607"><span class="sd">        &quot;&quot;&quot;</span>
+</span><span data-line="607"><span class="sd">        """</span>
 </span><span data-line="608">        <span class="n">get_isolation_scope</span><span class="p">()</span><span class="o">.</span><span class="n">start_session</span><span class="p">(</span>
 </span><span data-line="609">            <span class="n">session_mode</span><span class="o">=</span><span class="n">session_mode</span><span class="p">,</span>
 </span><span data-line="610">        <span class="p">)</span></div>
@@ -768,20 +768,20 @@ data-aria-dark="Switch to auto color mode">
 <div class="viewcode-block" id="Hub.end_session">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk.Hub.end_session">[docs]</a>
 </span><span data-line="612">    <span class="k">def</span><span class="w"> </span><span class="nf">end_session</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="613"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="613"><span class="w">        </span><span class="sd">"""</span>
 </span><span data-line="614"><span class="sd">        .. deprecated:: 2.0.0</span>
 </span><span data-line="615"><span class="sd">            This function is deprecated and will be removed in a future release.</span>
 </span><span data-line="616"><span class="sd">            Please use :py:meth:`sentry_sdk.Scope.end_session` instead.</span>
 </span><span data-line="617">
 </span><span data-line="618"><span class="sd">        Ends the current session if there is one.</span>
-</span><span data-line="619"><span class="sd">        &quot;&quot;&quot;</span>
+</span><span data-line="619"><span class="sd">        """</span>
 </span><span data-line="620">        <span class="n">get_isolation_scope</span><span class="p">()</span><span class="o">.</span><span class="n">end_session</span><span class="p">()</span></div>
 
 </span><span data-line="621">
 <div class="viewcode-block" id="Hub.stop_auto_session_tracking">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk.Hub.stop_auto_session_tracking">[docs]</a>
 </span><span data-line="622">    <span class="k">def</span><span class="w"> </span><span class="nf">stop_auto_session_tracking</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="623"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="623"><span class="w">        </span><span class="sd">"""</span>
 </span><span data-line="624"><span class="sd">        .. deprecated:: 2.0.0</span>
 </span><span data-line="625"><span class="sd">            This function is deprecated and will be removed in a future release.</span>
 </span><span data-line="626"><span class="sd">            Please use :py:meth:`sentry_sdk.Scope.stop_auto_session_tracking` instead.</span>
@@ -790,14 +790,14 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="629">
 </span><span data-line="630"><span class="sd">        This temporarily session tracking for the current scope when called.</span>
 </span><span data-line="631"><span class="sd">        To resume session tracking call `resume_auto_session_tracking`.</span>
-</span><span data-line="632"><span class="sd">        &quot;&quot;&quot;</span>
+</span><span data-line="632"><span class="sd">        """</span>
 </span><span data-line="633">        <span class="n">get_isolation_scope</span><span class="p">()</span><span class="o">.</span><span class="n">stop_auto_session_tracking</span><span class="p">()</span></div>
 
 </span><span data-line="634">
 <div class="viewcode-block" id="Hub.resume_auto_session_tracking">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk.Hub.resume_auto_session_tracking">[docs]</a>
 </span><span data-line="635">    <span class="k">def</span><span class="w"> </span><span class="nf">resume_auto_session_tracking</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="636"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="636"><span class="w">        </span><span class="sd">"""</span>
 </span><span data-line="637"><span class="sd">        .. deprecated:: 2.0.0</span>
 </span><span data-line="638"><span class="sd">            This function is deprecated and will be removed in a future release.</span>
 </span><span data-line="639"><span class="sd">            Please use :py:meth:`sentry_sdk.Scope.resume_auto_session_tracking` instead.</span>
@@ -805,7 +805,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="641"><span class="sd">        Resumes automatic session tracking for the current scope if</span>
 </span><span data-line="642"><span class="sd">        disabled earlier.  This requires that generally automatic session</span>
 </span><span data-line="643"><span class="sd">        tracking is enabled.</span>
-</span><span data-line="644"><span class="sd">        &quot;&quot;&quot;</span>
+</span><span data-line="644"><span class="sd">        """</span>
 </span><span data-line="645">        <span class="n">get_isolation_scope</span><span class="p">()</span><span class="o">.</span><span class="n">resume_auto_session_tracking</span><span class="p">()</span></div>
 
 </span><span data-line="646">
@@ -813,29 +813,29 @@ data-aria-dark="Switch to auto color mode">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk.Hub.flush">[docs]</a>
 </span><span data-line="647">    <span class="k">def</span><span class="w"> </span><span class="nf">flush</span><span class="p">(</span>
 </span><span data-line="648">        <span class="bp">self</span><span class="p">,</span>
-</span><span data-line="649">        <span class="n">timeout</span><span class="p">:</span> <span class="s2">&quot;Optional[float]&quot;</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span data-line="650">        <span class="n">callback</span><span class="p">:</span> <span class="s2">&quot;Optional[Callable[[int, float], None]]&quot;</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span data-line="649">        <span class="n">timeout</span><span class="p">:</span> <span class="s2">"Optional[float]"</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span data-line="650">        <span class="n">callback</span><span class="p">:</span> <span class="s2">"Optional[Callable[[int, float], None]]"</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 </span><span data-line="651">    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="652"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="652"><span class="w">        </span><span class="sd">"""</span>
 </span><span data-line="653"><span class="sd">        .. deprecated:: 2.0.0</span>
 </span><span data-line="654"><span class="sd">            This function is deprecated and will be removed in a future release.</span>
 </span><span data-line="655"><span class="sd">            Please use :py:meth:`sentry_sdk.client._Client.flush` instead.</span>
 </span><span data-line="656">
 </span><span data-line="657"><span class="sd">        Alias for :py:meth:`sentry_sdk.client._Client.flush`</span>
-</span><span data-line="658"><span class="sd">        &quot;&quot;&quot;</span>
+</span><span data-line="658"><span class="sd">        """</span>
 </span><span data-line="659">        <span class="k">return</span> <span class="n">get_client</span><span class="p">()</span><span class="o">.</span><span class="n">flush</span><span class="p">(</span><span class="n">timeout</span><span class="o">=</span><span class="n">timeout</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="n">callback</span><span class="p">)</span></div>
 
 </span><span data-line="660">
 <div class="viewcode-block" id="Hub.get_traceparent">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk.Hub.get_traceparent">[docs]</a>
-</span><span data-line="661">    <span class="k">def</span><span class="w"> </span><span class="nf">get_traceparent</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;Optional[str]&quot;</span><span class="p">:</span>
-</span><span data-line="662"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="661">    <span class="k">def</span><span class="w"> </span><span class="nf">get_traceparent</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"Optional[str]"</span><span class="p">:</span>
+</span><span data-line="662"><span class="w">        </span><span class="sd">"""</span>
 </span><span data-line="663"><span class="sd">        .. deprecated:: 2.0.0</span>
 </span><span data-line="664"><span class="sd">            This function is deprecated and will be removed in a future release.</span>
 </span><span data-line="665"><span class="sd">            Please use :py:meth:`sentry_sdk.Scope.get_traceparent` instead.</span>
 </span><span data-line="666">
 </span><span data-line="667"><span class="sd">        Returns the traceparent either from the active span or from the scope.</span>
-</span><span data-line="668"><span class="sd">        &quot;&quot;&quot;</span>
+</span><span data-line="668"><span class="sd">        """</span>
 </span><span data-line="669">        <span class="n">current_scope</span> <span class="o">=</span> <span class="n">get_current_scope</span><span class="p">()</span>
 </span><span data-line="670">        <span class="n">traceparent</span> <span class="o">=</span> <span class="n">current_scope</span><span class="o">.</span><span class="n">get_traceparent</span><span class="p">()</span>
 </span><span data-line="671">
@@ -848,14 +848,14 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="677">
 <div class="viewcode-block" id="Hub.get_baggage">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk.Hub.get_baggage">[docs]</a>
-</span><span data-line="678">    <span class="k">def</span><span class="w"> </span><span class="nf">get_baggage</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;Optional[str]&quot;</span><span class="p">:</span>
-</span><span data-line="679"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="678">    <span class="k">def</span><span class="w"> </span><span class="nf">get_baggage</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"Optional[str]"</span><span class="p">:</span>
+</span><span data-line="679"><span class="w">        </span><span class="sd">"""</span>
 </span><span data-line="680"><span class="sd">        .. deprecated:: 2.0.0</span>
 </span><span data-line="681"><span class="sd">            This function is deprecated and will be removed in a future release.</span>
 </span><span data-line="682"><span class="sd">            Please use :py:meth:`sentry_sdk.Scope.get_baggage` instead.</span>
 </span><span data-line="683">
 </span><span data-line="684"><span class="sd">        Returns Baggage either from the active span or from the scope.</span>
-</span><span data-line="685"><span class="sd">        &quot;&quot;&quot;</span>
+</span><span data-line="685"><span class="sd">        """</span>
 </span><span data-line="686">        <span class="n">current_scope</span> <span class="o">=</span> <span class="n">get_current_scope</span><span class="p">()</span>
 </span><span data-line="687">        <span class="n">baggage</span> <span class="o">=</span> <span class="n">current_scope</span><span class="o">.</span><span class="n">get_baggage</span><span class="p">()</span>
 </span><span data-line="688">
@@ -872,9 +872,9 @@ data-aria-dark="Switch to auto color mode">
 <div class="viewcode-block" id="Hub.iter_trace_propagation_headers">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk.Hub.iter_trace_propagation_headers">[docs]</a>
 </span><span data-line="698">    <span class="k">def</span><span class="w"> </span><span class="nf">iter_trace_propagation_headers</span><span class="p">(</span>
-</span><span data-line="699">        <span class="bp">self</span><span class="p">,</span> <span class="n">span</span><span class="p">:</span> <span class="s2">&quot;Optional[Span]&quot;</span> <span class="o">=</span> <span class="kc">None</span>
-</span><span data-line="700">    <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;Generator[Tuple[str, str], None, None]&quot;</span><span class="p">:</span>
-</span><span data-line="701"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="699">        <span class="bp">self</span><span class="p">,</span> <span class="n">span</span><span class="p">:</span> <span class="s2">"Optional[Span]"</span> <span class="o">=</span> <span class="kc">None</span>
+</span><span data-line="700">    <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"Generator[Tuple[str, str], None, None]"</span><span class="p">:</span>
+</span><span data-line="701"><span class="w">        </span><span class="sd">"""</span>
 </span><span data-line="702"><span class="sd">        .. deprecated:: 2.0.0</span>
 </span><span data-line="703"><span class="sd">            This function is deprecated and will be removed in a future release.</span>
 </span><span data-line="704"><span class="sd">            Please use :py:meth:`sentry_sdk.Scope.iter_trace_propagation_headers` instead.</span>
@@ -882,7 +882,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="706"><span class="sd">        Return HTTP headers which allow propagation of trace data. Data taken</span>
 </span><span data-line="707"><span class="sd">        from the span representing the request, if available, or the current</span>
 </span><span data-line="708"><span class="sd">        span on the scope if not.</span>
-</span><span data-line="709"><span class="sd">        &quot;&quot;&quot;</span>
+</span><span data-line="709"><span class="sd">        """</span>
 </span><span data-line="710">        <span class="k">return</span> <span class="n">get_current_scope</span><span class="p">()</span><span class="o">.</span><span class="n">iter_trace_propagation_headers</span><span class="p">(</span>
 </span><span data-line="711">            <span class="n">span</span><span class="o">=</span><span class="n">span</span><span class="p">,</span>
 </span><span data-line="712">        <span class="p">)</span></div>
@@ -890,18 +890,18 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="713">
 <div class="viewcode-block" id="Hub.trace_propagation_meta">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk.Hub.trace_propagation_meta">[docs]</a>
-</span><span data-line="714">    <span class="k">def</span><span class="w"> </span><span class="nf">trace_propagation_meta</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">span</span><span class="p">:</span> <span class="s2">&quot;Optional[Span]&quot;</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-</span><span data-line="715"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="714">    <span class="k">def</span><span class="w"> </span><span class="nf">trace_propagation_meta</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">span</span><span class="p">:</span> <span class="s2">"Optional[Span]"</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+</span><span data-line="715"><span class="w">        </span><span class="sd">"""</span>
 </span><span data-line="716"><span class="sd">        .. deprecated:: 2.0.0</span>
 </span><span data-line="717"><span class="sd">            This function is deprecated and will be removed in a future release.</span>
 </span><span data-line="718"><span class="sd">            Please use :py:meth:`sentry_sdk.Scope.trace_propagation_meta` instead.</span>
 </span><span data-line="719">
 </span><span data-line="720"><span class="sd">        Return meta tags which should be injected into HTML templates</span>
 </span><span data-line="721"><span class="sd">        to allow propagation of trace information.</span>
-</span><span data-line="722"><span class="sd">        &quot;&quot;&quot;</span>
+</span><span data-line="722"><span class="sd">        """</span>
 </span><span data-line="723">        <span class="k">if</span> <span class="n">span</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
 </span><span data-line="724">            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
-</span><span data-line="725">                <span class="s2">&quot;The parameter `span` in trace_propagation_meta() is deprecated and will be removed in the future.&quot;</span>
+</span><span data-line="725">                <span class="s2">"The parameter `span` in trace_propagation_meta() is deprecated and will be removed in the future."</span>
 </span><span data-line="726">            <span class="p">)</span>
 </span><span data-line="727">
 </span><span data-line="728">        <span class="k">return</span> <span class="n">get_current_scope</span><span class="p">()</span><span class="o">.</span><span class="n">trace_propagation_meta</span><span class="p">(</span>
@@ -950,7 +950,7 @@ data-aria-dark="Switch to auto color mode">
     </div>
   </div>
 </footer>
-      <script src="../../_static/documentation_options.js?v=f6252e7a"></script>
+      <script src="../../_static/documentation_options.js?v=c1dda410"></script>
       <script src="../../_static/doctools.js?v=9bcbadda"></script>
       <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
       <script src="../../_static/shibuya.js?v=50760d75"></script></body>
