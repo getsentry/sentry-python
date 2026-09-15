@@ -93,6 +93,53 @@ SOURCE_FOR_STYLE = {
 _DEFAULT_PARENT_SPAN = object()
 
 
+class _AgentFrameworkChatGenerationContext:
+    """
+    Starts a span for a chat generation and marks the current scope as being
+    inside a chat generation as viewed by an agent framework.
+
+    Agent framework integrations should use this class to create chat client spans. By using this context
+    manager, chat client spans in "lower-level" client libraries can be suppressed by checking the
+    `_agent_framework_chat_generation_entered` scope flag.
+    """
+
+    def __init__(
+        self,
+        name: str,
+        attributes: "Optional[Attributes]" = None,
+        parent_span: "Optional[StreamedSpan]" = _DEFAULT_PARENT_SPAN,  # type: ignore[assignment]
+        active: bool = True,
+    ):
+        self._span = start_span(
+            name=name,
+            attributes=attributes,
+            parent_span=parent_span,
+            active=active,
+        )
+        if type(self._span) is not StreamedSpan:
+            return
+
+        self.span._scope._agent_framework_chat_generation_entered = True
+
+    @property
+    def span(self) -> "StreamedSpan":
+        return self._span
+
+    def __enter__(self) -> "_AgentFrameworkChatGenerationContext":
+        return self
+
+    def __exit__(
+        self, ty: "Optional[Any]", value: "Optional[Any]", tb: "Optional[Any]"
+    ) -> None:
+        if type(self._span) is not StreamedSpan:
+            self._span.__exit__(ty, value, tb)
+
+        try:
+            self._span.__exit__(ty, value, tb)
+        finally:
+            self._span._scope._agent_framework_chat_generation_entered = False
+
+
 def start_span(
     name: str,
     attributes: "Optional[Attributes]" = None,
