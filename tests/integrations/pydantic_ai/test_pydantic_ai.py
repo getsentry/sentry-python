@@ -2980,10 +2980,7 @@ async def test_data_collection_gen_ai_inputs_gates_request_messages_tool_inputs_
         assert SPANDATA.GEN_AI_REQUEST_MODEL in chat_span
 
     # Both the chat and the invoke_agent spans list the agent's available tools
-    for op, span_data in spans:
-        if op not in ("gen_ai.chat", "gen_ai.invoke_agent"):
-            continue
-
+    for span_data in chat_spans:
         if expect_available_tools:
             assert "add_numbers" in span_data[SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS]
         else:
