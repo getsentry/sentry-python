@@ -190,13 +190,6 @@ def _finish_client_span(
     body.close = sentry_streaming_body_close  # type: ignore
 
 
-def _finish_client_span_with_error(
-    span: "Union[Span, StreamedSpan]",
-    exception: "BaseException",
-) -> None:
-    span.__exit__(type(exception), exception, exception.__traceback__)
-
-
 def _set_request_attributes(
     span: "Union[Span, StreamedSpan]",
     request: "AWSRequest",
