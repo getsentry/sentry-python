@@ -1135,8 +1135,6 @@ def _wrap_agent_executor_invoke(f: "Callable[..., Any]") -> "Callable[..., Any]"
             if run_name:
                 span.set_attribute(SPANDATA.GEN_AI_FUNCTION_ID, run_name)
 
-            _set_tools_on_span(span, tools)
-
             # Run the agent
             result = f(self, *args, **kwargs)
 
@@ -1191,8 +1189,6 @@ def _wrap_agent_executor_stream(f: "Callable[..., Any]") -> "Callable[..., Any]"
 
         if run_name:
             span.set_attribute(SPANDATA.GEN_AI_FUNCTION_ID, run_name)
-
-        _set_tools_on_span(span, tools)
 
         input = args[0].get("input") if len(args) >= 1 else None
         if input is not None and record_inputs:
