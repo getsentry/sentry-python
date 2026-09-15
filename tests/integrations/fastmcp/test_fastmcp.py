@@ -26,12 +26,10 @@ import json
 import logging
 from unittest import mock
 
-import anyio
 import pytest
 
 import sentry_sdk
 from sentry_sdk.integrations.logging import LoggingIntegration
-from sentry_sdk.utils import package_version, parse_version
 
 try:
     from unittest.mock import AsyncMock
@@ -42,7 +40,6 @@ except ImportError:
             return super(AsyncMock, self).__call__(*args, **kwargs)
 
 
-from mcp.server.sse import SseServerTransport
 from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
 
 from sentry_sdk.consts import OP, SPANDATA
@@ -55,8 +52,7 @@ except ImportError:
 
 
 from starlette.applications import Starlette
-from starlette.responses import Response
-from starlette.routing import Mount, Route
+from starlette.routing import Mount
 
 # Try to import both FastMCP implementations
 try:
@@ -89,15 +85,6 @@ except ImportError:
     CallToolRequest = None
     GetPromptRequest = None
     ReadResourceRequest = None
-
-MCP_PACKAGE_VERSION = package_version("mcp")
-
-try:
-    from fastmcp import __version__
-
-    FASTMCP_VERSION = parse_version(__version__)
-except ImportError:
-    FASTMCP_VERSION = None
 
 # Collect available FastMCP implementations for parametrization
 fastmcp_implementations = []
@@ -550,16 +537,15 @@ async def test_fastmcp_prompt_sync(
         @mcp.prompt()
         def code_help_prompt(language: str):
             """Get help for a programming language"""
-            message = {
-                "role": "user",
-                "content": {
-                    "type": "text",
-                    "text": f"Tell me about {language}",
-                },
-            }
-
-            if FASTMCP_VERSION is not None and FASTMCP_VERSION >= (3,):
-                message = Message(message)
+            message = Message(
+                {
+                    "role": "user",
+                    "content": {
+                        "type": "text",
+                        "text": f"Tell me about {language}",
+                    },
+                }
+            )
 
             return [message]
 
@@ -595,14 +581,10 @@ async def test_fastmcp_prompt_sync(
 
 
 # =============================================================================
-# Resource Handler Tests (if supported)
+# Resource Handler Tests
 # =============================================================================
 
 
-@pytest.mark.skipif(
-    HAS_STANDALONE_FASTMCP and (FASTMCP_VERSION is None or FASTMCP_VERSION < (0, 4, 1)),
-    reason="Resource URI templates not supported before fastmcp 0.4.1",
-)
 @pytest.mark.asyncio
 @pytest.mark.parametrize("FastMCP", fastmcp_implementations, ids=fastmcp_ids)
 async def test_fastmcp_resource_sync(
@@ -656,10 +638,6 @@ async def test_fastmcp_resource_sync(
         assert span["attributes"][SPANDATA.MCP_RESOURCE_PROTOCOL] == "file"
 
 
-@pytest.mark.skipif(
-    HAS_STANDALONE_FASTMCP and (FASTMCP_VERSION is None or FASTMCP_VERSION < (0, 4, 1)),
-    reason="Resource URI templates not supported before fastmcp 0.4.1",
-)
 @pytest.mark.parametrize("FastMCP", fastmcp_implementations, ids=fastmcp_ids)
 @pytest.mark.asyncio
 async def test_fastmcp_resource_async(sentry_init, capture_items, FastMCP, json_rpc):
@@ -773,91 +751,6 @@ async def test_fastmcp_span_origin(
 # =============================================================================
 # Transport Detection Tests
 # =============================================================================
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize("FastMCP", fastmcp_implementations, ids=fastmcp_ids)
-@pytest.mark.skipif(
-    StandaloneFastMCP and (FASTMCP_VERSION is not None and FASTMCP_VERSION >= (4,)),
-    reason="SSE tracing not (yet) supported in v4.",
-)
-async def test_fastmcp_sse_transport(
-    sentry_init,
-    capture_items,
-    FastMCP,
-    json_rpc_sse,
-):
-    """Test that FastMCP correctly detects SSE transport"""
-    sentry_init(
-        integrations=[MCPIntegration()],
-        traces_sample_rate=1.0,
-    )
-
-    mcp = FastMCP("Test Server")
-    sse = SseServerTransport("/messages/")
-
-    sse_connection_closed = asyncio.Event()
-
-    async def handle_sse(request):
-        async with sse.connect_sse(
-            request.scope, request.receive, request._send
-        ) as streams:
-            async with anyio.create_task_group() as tg:
-
-                async def run_server():
-                    await mcp._mcp_server.run(
-                        streams[0],
-                        streams[1],
-                        mcp._mcp_server.create_initialization_options(),
-                    )
-
-                tg.start_soon(run_server)
-
-        sse_connection_closed.set()
-        return Response()
-
-    app = Starlette(
-        routes=[
-            Route("/sse", endpoint=handle_sse, methods=["GET"]),
-            Mount("/messages/", app=sse.handle_post_message),
-        ],
-    )
-
-    @mcp.tool()
-    def sse_tool(value: str) -> dict:
-        """Tool for SSE transport test"""
-        return {"message": f"Received: {value}"}
-
-    keep_sse_alive = asyncio.Event()
-    items = capture_items("span")
-
-    app_task, _, result = await json_rpc_sse(
-        app,
-        method="tools/call",
-        params={
-            "name": "sse_tool",
-            "arguments": {"value": "hello"},
-        },
-        request_id="req-sse",
-        keep_sse_alive=keep_sse_alive,
-    )
-
-    await sse_connection_closed.wait()
-    await app_task
-
-    assert json.loads(result["result"]["content"][0]["text"]) == {
-        "message": "Received: hello"
-    }
-
-    sentry_sdk.flush()
-    # Find MCP spans
-    spans = [item.payload for item in items]
-    mcp_spans = [s for s in spans if s["attributes"].get("sentry.op") == OP.MCP_SERVER]
-
-    assert len(mcp_spans) >= 1
-    span = mcp_spans[0]
-    # Check that SSE transport is detected
-    assert span["attributes"].get(SPANDATA.MCP_TRANSPORT) == "sse"
 
 
 @pytest.mark.parametrize("FastMCP", fastmcp_implementations, ids=fastmcp_ids)

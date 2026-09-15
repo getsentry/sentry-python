@@ -35,38 +35,29 @@ except ImportError:
 
 
 from mcp.server.lowlevel import Server
-from mcp.server.lowlevel.helper_types import ReadResourceContents
 
 MCP_PACKAGE_VERSION = package_version("mcp")
-IS_MCP_V2 = MCP_PACKAGE_VERSION is not None and MCP_PACKAGE_VERSION >= (2, 0, 0)
 
 try:
-    if not IS_MCP_V2:
-        from mcp.server.lowlevel.server import (  # type: ignore[import-not-found]
-            request_ctx,
-        )
-    else:
-        request_ctx = None
+    from mcp.server.lowlevel.server import (  # type: ignore[import-not-found]
+        request_ctx,
+    )
 except ImportError:
     request_ctx = None
 
-if IS_MCP_V2:
-    from mcp_types import (
-        CallToolRequestParams,
-        CallToolResult,
-        GetPromptRequestParams,
-        GetPromptResult,
-        PromptMessage,
-        ReadResourceRequestParams,
-        ReadResourceResult,
-        TextContent,
-        TextResourceContents,
-    )
-else:
-    from mcp.types import GetPromptResult, PromptMessage, TextContent
-
 from mcp.server.sse import SseServerTransport
 from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
+from mcp_types import (
+    CallToolRequestParams,
+    CallToolResult,
+    GetPromptRequestParams,
+    GetPromptResult,
+    PromptMessage,
+    ReadResourceRequestParams,
+    ReadResourceResult,
+    TextContent,
+    TextResourceContents,
+)
 from starlette.applications import Starlette
 from starlette.responses import Response
 from starlette.routing import Mount, Route
@@ -141,27 +132,7 @@ class MockTextContent:
         self.text = text
 
 
-def test_integration_patches_server(sentry_init):
-    """Test that MCPIntegration patches the Server class"""
-    if not IS_MCP_V2:
-        original_call_tool = Server.call_tool
-        original_get_prompt = Server.get_prompt
-        original_read_resource = Server.read_resource
-
-        sentry_init(
-            integrations=[MCPIntegration()],
-            traces_sample_rate=1.0,
-        )
-
-        assert Server.call_tool is not original_call_tool
-        assert Server.get_prompt is not original_get_prompt
-        assert Server.read_resource is not original_read_resource
-
-
 @pytest.mark.asyncio
-@pytest.mark.skipif(
-    not IS_MCP_V2, reason="Constructor handler registration is MCP v2 only"
-)
 async def test_tool_handler_constructor_registration(sentry_init, capture_items, stdio):
     """v2 handlers registered via the Server(...) constructor are instrumented.
 
@@ -204,7 +175,6 @@ async def test_tool_handler_constructor_registration(sentry_init, capture_items,
 
 
 @pytest.mark.asyncio
-@pytest.mark.skipif(not IS_MCP_V2, reason="MCPServer is MCP v2 only")
 async def test_mcpserver_high_level_tool_instrumented(
     sentry_init, capture_items, stdio
 ):
@@ -240,9 +210,6 @@ async def test_mcpserver_high_level_tool_instrumented(
 
 
 @pytest.mark.asyncio
-@pytest.mark.skipif(
-    not IS_MCP_V2, reason="Constructor handler registration is MCP v2 only"
-)
 async def test_wrapping_handler_is_idempotent(sentry_init, capture_items, stdio):
     """Re-registering an already-wrapped handler via add_request_handler must
     not double-wrap — invoking it should produce exactly one MCP span."""
@@ -299,25 +266,18 @@ async def test_tool_handler_stdio(
 
     server = Server("test-server")
 
-    if IS_MCP_V2:
+    async def test_tool(ctx, params):
+        return CallToolResult(
+            content=[
+                TextContent(
+                    type="text",
+                    text=json.dumps({"result": "success", "value": 42}),
+                )
+            ],
+            structured_content={"result": "success", "value": 42},
+        )
 
-        async def test_tool(ctx, params):
-            return CallToolResult(
-                content=[
-                    TextContent(
-                        type="text",
-                        text=json.dumps({"result": "success", "value": 42}),
-                    )
-                ],
-                structured_content={"result": "success", "value": 42},
-            )
-
-        server.add_request_handler("tools/call", CallToolRequestParams, test_tool)
-    else:
-
-        @server.call_tool()
-        async def test_tool(tool_name, arguments):
-            return {"result": "success", "value": 42}
+    server.add_request_handler("tools/call", CallToolRequestParams, test_tool)
 
     items = capture_items("span")
     result = await stdio(
@@ -331,16 +291,11 @@ async def test_tool_handler_stdio(
     )
     sentry_sdk.flush()
 
-    if IS_MCP_V2:
-        assert _get_response(result).result["structuredContent"] == {
-            "result": "success",
-            "value": 42,
-        }
-    else:
-        assert _get_response(result).result["content"][0]["text"] == json.dumps(
-            {"result": "success", "value": 42},
-            indent=2,
-        )
+    assert _get_response(result).result["structuredContent"] == {
+        "result": "success",
+        "value": 42,
+    }
+
     span = _find_mcp_span(items, method_name="tools/call")
     assert span is not None
     assert span["name"] == "tools/call calculate"
@@ -389,29 +344,17 @@ async def test_tool_handler_streamable_http(
 
     server = Server("test-server")
 
-    if IS_MCP_V2:
-
-        async def test_tool_async(ctx, params):
-            return CallToolResult(
-                content=[
-                    TextContent(
-                        type="text",
-                        text=json.dumps({"status": "completed"}),
-                    )
-                ]
-            )
-
-        server.add_request_handler("tools/call", CallToolRequestParams, test_tool_async)
-    else:
-
-        @server.call_tool()
-        async def test_tool_async(tool_name, arguments):
-            return [
+    async def test_tool_async(ctx, params):
+        return CallToolResult(
+            content=[
                 TextContent(
                     type="text",
                     text=json.dumps({"status": "completed"}),
                 )
             ]
+        )
+
+    server.add_request_handler("tools/call", CallToolRequestParams, test_tool_async)
 
     session_manager = StreamableHTTPSessionManager(
         app=server,
@@ -483,17 +426,10 @@ async def test_tool_handler_stateless_streamable_http(
 
     server = Server("test-server")
 
-    if IS_MCP_V2:
+    async def test_tool_async(ctx, params):
+        return CallToolResult(content=[TextContent(type="text", text="ok")])
 
-        async def test_tool_async(ctx, params):
-            return CallToolResult(content=[TextContent(type="text", text="ok")])
-
-        server.add_request_handler("tools/call", CallToolRequestParams, test_tool_async)
-    else:
-
-        @server.call_tool()
-        async def test_tool_async(tool_name, arguments):
-            return [TextContent(type="text", text="ok")]
+    server.add_request_handler("tools/call", CallToolRequestParams, test_tool_async)
 
     items = capture_items("span")
 
@@ -537,17 +473,10 @@ async def test_tool_handler_with_error(sentry_init, capture_items, stdio):
 
     server = Server("test-server")
 
-    if IS_MCP_V2:
+    async def failing_tool(ctx, params):
+        raise ValueError("Tool execution failed")
 
-        async def failing_tool(ctx, params):
-            raise ValueError("Tool execution failed")
-
-        server.add_request_handler("tools/call", CallToolRequestParams, failing_tool)
-    else:
-
-        @server.call_tool()
-        def failing_tool(tool_name, arguments):
-            raise ValueError("Tool execution failed")
+    server.add_request_handler("tools/call", CallToolRequestParams, failing_tool)
 
     items = capture_items("event", "span")
     result = await stdio(
@@ -562,10 +491,8 @@ async def test_tool_handler_with_error(sentry_init, capture_items, stdio):
     sentry_sdk.flush()
 
     resp = _get_response(result)
-    if IS_MCP_V2:
-        assert "Tool execution failed" in resp.error.message
-    else:
-        assert resp.result["content"][0]["text"] == "Tool execution failed"
+
+    assert "Tool execution failed" in resp.error.message
 
     error_payload = next(item.payload for item in items if item.type == "event")
     span = _find_mcp_span(items, method_name="tools/call")
@@ -611,17 +538,10 @@ async def test_prompt_handler_stdio(
         ],
     )
 
-    if IS_MCP_V2:
+    async def test_prompt(ctx, params):
+        return prompt_result
 
-        async def test_prompt(ctx, params):
-            return prompt_result
-
-        server.add_request_handler("prompts/get", GetPromptRequestParams, test_prompt)
-    else:
-
-        @server.get_prompt()
-        async def test_prompt(name, arguments):
-            return prompt_result
+    server.add_request_handler("prompts/get", GetPromptRequestParams, test_prompt)
 
     items = capture_items("span")
     result = await stdio(
@@ -698,19 +618,10 @@ async def test_prompt_handler_streamable_http(
         ],
     )
 
-    if IS_MCP_V2:
+    async def test_prompt_async(ctx, params):
+        return prompt_result
 
-        async def test_prompt_async(ctx, params):
-            return prompt_result
-
-        server.add_request_handler(
-            "prompts/get", GetPromptRequestParams, test_prompt_async
-        )
-    else:
-
-        @server.get_prompt()
-        async def test_prompt_async(name, arguments):
-            return prompt_result
+    server.add_request_handler("prompts/get", GetPromptRequestParams, test_prompt_async)
 
     session_manager = StreamableHTTPSessionManager(
         app=server,
@@ -760,19 +671,10 @@ async def test_prompt_handler_with_error(sentry_init, capture_items, stdio):
 
     server = Server("test-server")
 
-    if IS_MCP_V2:
+    async def failing_prompt(ctx, params):
+        raise RuntimeError("Prompt not found")
 
-        async def failing_prompt(ctx, params):
-            raise RuntimeError("Prompt not found")
-
-        server.add_request_handler(
-            "prompts/get", GetPromptRequestParams, failing_prompt
-        )
-    else:
-
-        @server.get_prompt()
-        async def failing_prompt(name, arguments):
-            raise RuntimeError("Prompt not found")
+    server.add_request_handler("prompts/get", GetPromptRequestParams, failing_prompt)
 
     items = capture_items("event", "span")
     response = await stdio(
@@ -809,32 +711,20 @@ async def test_resource_handler_stdio(sentry_init, capture_items, stdio):
 
     server = Server("test-server")
 
-    if IS_MCP_V2:
-
-        async def test_resource(ctx, params):
-            return ReadResourceResult(
-                contents=[
-                    TextResourceContents(
-                        uri=str(params.uri),
-                        text=json.dumps({"content": "file contents"}),
-                        mime_type="text/plain",
-                    )
-                ]
-            )
-
-        server.add_request_handler(
-            "resources/read", ReadResourceRequestParams, test_resource
-        )
-    else:
-
-        @server.read_resource()
-        async def test_resource(uri):
-            return [
-                ReadResourceContents(
-                    content=json.dumps({"content": "file contents"}),
+    async def test_resource(ctx, params):
+        return ReadResourceResult(
+            contents=[
+                TextResourceContents(
+                    uri=str(params.uri),
+                    text=json.dumps({"content": "file contents"}),
                     mime_type="text/plain",
                 )
             ]
+        )
+
+    server.add_request_handler(
+        "resources/read", ReadResourceRequestParams, test_resource
+    )
 
     items = capture_items("span")
     result = await stdio(
@@ -877,32 +767,20 @@ async def test_resource_handler_streamable_http(sentry_init, capture_items, json
 
     server = Server("test-server")
 
-    if IS_MCP_V2:
-
-        async def test_resource_async(ctx, params):
-            return ReadResourceResult(
-                contents=[
-                    TextResourceContents(
-                        uri=str(params.uri),
-                        text=json.dumps({"data": "resource data"}),
-                        mime_type="text/plain",
-                    )
-                ]
-            )
-
-        server.add_request_handler(
-            "resources/read", ReadResourceRequestParams, test_resource_async
-        )
-    else:
-
-        @server.read_resource()
-        async def test_resource_async(uri):
-            return [
-                ReadResourceContents(
-                    content=json.dumps({"data": "resource data"}),
+    async def test_resource_async(ctx, params):
+        return ReadResourceResult(
+            contents=[
+                TextResourceContents(
+                    uri=str(params.uri),
+                    text=json.dumps({"data": "resource data"}),
                     mime_type="text/plain",
                 )
             ]
+        )
+
+    server.add_request_handler(
+        "resources/read", ReadResourceRequestParams, test_resource_async
+    )
 
     session_manager = StreamableHTTPSessionManager(
         app=server,
@@ -951,19 +829,12 @@ async def test_resource_handler_with_error(sentry_init, capture_items, stdio):
 
     server = Server("test-server")
 
-    if IS_MCP_V2:
+    async def failing_resource(ctx, params):
+        raise FileNotFoundError("Resource not found")
 
-        async def failing_resource(ctx, params):
-            raise FileNotFoundError("Resource not found")
-
-        server.add_request_handler(
-            "resources/read", ReadResourceRequestParams, failing_resource
-        )
-    else:
-
-        @server.read_resource()
-        def failing_resource(uri):
-            raise FileNotFoundError("Resource not found")
+    server.add_request_handler(
+        "resources/read", ReadResourceRequestParams, failing_resource
+    )
 
     items = capture_items("event", "span")
     await stdio(
@@ -1008,22 +879,13 @@ async def test_tool_result_extraction_tuple(
 
     server = Server("test-server")
 
-    if IS_MCP_V2:
+    async def test_tool_tuple(ctx, params):
+        return CallToolResult(
+            content=[TextContent(type="text", text="Result text")],
+            structured_content={"key": "value", "count": 5},
+        )
 
-        async def test_tool_tuple(ctx, params):
-            return CallToolResult(
-                content=[TextContent(type="text", text="Result text")],
-                structured_content={"key": "value", "count": 5},
-            )
-
-        server.add_request_handler("tools/call", CallToolRequestParams, test_tool_tuple)
-    else:
-
-        @server.call_tool()
-        def test_tool_tuple(tool_name, arguments):
-            unstructured = [MockTextContent("Result text")]
-            structured = {"key": "value", "count": 5}
-            return (unstructured, structured)
+    server.add_request_handler("tools/call", CallToolRequestParams, test_tool_tuple)
 
     items = capture_items("span")
     await stdio(
@@ -1075,27 +937,17 @@ async def test_tool_result_extraction_unstructured(
 
     server = Server("test-server")
 
-    if IS_MCP_V2:
-
-        async def test_tool_unstructured(ctx, params):
-            return CallToolResult(
-                content=[
-                    TextContent(type="text", text="First part"),
-                    TextContent(type="text", text="Second part"),
-                ]
-            )
-
-        server.add_request_handler(
-            "tools/call", CallToolRequestParams, test_tool_unstructured
-        )
-    else:
-
-        @server.call_tool()
-        def test_tool_unstructured(tool_name, arguments):
-            return [
-                MockTextContent("First part"),
-                MockTextContent("Second part"),
+    async def test_tool_unstructured(ctx, params):
+        return CallToolResult(
+            content=[
+                TextContent(type="text", text="First part"),
+                TextContent(type="text", text="Second part"),
             ]
+        )
+
+    server.add_request_handler(
+        "tools/call", CallToolRequestParams, test_tool_unstructured
+    )
 
     items = capture_items("span")
     await stdio(
@@ -1130,54 +982,29 @@ async def test_multiple_handlers(sentry_init, capture_items, stdio):
 
     server = Server("test-server")
 
-    if IS_MCP_V2:
-
-        async def tool_handler(ctx, params):
-            return CallToolResult(
-                content=[
-                    TextContent(
-                        type="text",
-                        text=json.dumps({"result": params.name}),
-                    )
-                ]
-            )
-
-        async def prompt_handler(ctx, params):
-            return GetPromptResult(
-                description="A test prompt",
-                messages=[
-                    PromptMessage(
-                        role="user",
-                        content=TextContent(type="text", text="Test prompt"),
-                    )
-                ],
-            )
-
-        server.add_request_handler("tools/call", CallToolRequestParams, tool_handler)
-        server.add_request_handler(
-            "prompts/get", GetPromptRequestParams, prompt_handler
+    async def tool_handler(ctx, params):
+        return CallToolResult(
+            content=[
+                TextContent(
+                    type="text",
+                    text=json.dumps({"result": params.name}),
+                )
+            ]
         )
-    else:
 
-        @server.call_tool()
-        def tool1(tool_name, arguments):
-            return {"result": "tool1"}
+    async def prompt_handler(ctx, params):
+        return GetPromptResult(
+            description="A test prompt",
+            messages=[
+                PromptMessage(
+                    role="user",
+                    content=TextContent(type="text", text="Test prompt"),
+                )
+            ],
+        )
 
-        @server.call_tool()
-        def tool2(tool_name, arguments):
-            return {"result": "tool2"}
-
-        @server.get_prompt()
-        def prompt1(name, arguments):
-            return GetPromptResult(
-                description="A test prompt",
-                messages=[
-                    PromptMessage(
-                        role="user",
-                        content=TextContent(type="text", text="Test prompt"),
-                    )
-                ],
-            )
+    server.add_request_handler("tools/call", CallToolRequestParams, tool_handler)
+    server.add_request_handler("prompts/get", GetPromptRequestParams, prompt_handler)
 
     items = capture_items("span")
     tx_ctx = sentry_sdk.traces.start_span(name="mcp tx")
@@ -1248,30 +1075,17 @@ async def test_prompt_with_dict_result(
 
     server = Server("test-server")
 
-    if IS_MCP_V2:
-
-        async def test_prompt_dict(ctx, params):
-            return GetPromptResult(
-                messages=[
-                    PromptMessage(
-                        role="user",
-                        content=TextContent(type="text", text="Hello from dict"),
-                    )
-                ]
-            )
-
-        server.add_request_handler(
-            "prompts/get", GetPromptRequestParams, test_prompt_dict
+    async def test_prompt_dict(ctx, params):
+        return GetPromptResult(
+            messages=[
+                PromptMessage(
+                    role="user",
+                    content=TextContent(type="text", text="Hello from dict"),
+                )
+            ]
         )
-    else:
 
-        @server.get_prompt()
-        def test_prompt_dict(name, arguments):
-            return {
-                "messages": [
-                    {"role": "user", "content": {"text": "Hello from dict"}},
-                ]
-            }
+    server.add_request_handler("prompts/get", GetPromptRequestParams, test_prompt_dict)
 
     items = capture_items("span")
     await stdio(
@@ -1311,19 +1125,10 @@ async def test_tool_with_complex_arguments(sentry_init, capture_items, stdio):
 
     server = Server("test-server")
 
-    if IS_MCP_V2:
+    async def test_tool_complex(ctx, params):
+        return CallToolResult(content=[TextContent(type="text", text="processed")])
 
-        async def test_tool_complex(ctx, params):
-            return CallToolResult(content=[TextContent(type="text", text="processed")])
-
-        server.add_request_handler(
-            "tools/call", CallToolRequestParams, test_tool_complex
-        )
-    else:
-
-        @server.call_tool()
-        def test_tool_complex(tool_name, arguments):
-            return {"processed": True}
+    server.add_request_handler("tools/call", CallToolRequestParams, test_tool_complex)
 
     complex_args = {
         "nested": {"key": "value", "list": [1, 2, 3]},
@@ -1355,88 +1160,6 @@ async def test_tool_with_complex_arguments(sentry_init, capture_items, stdio):
 
 
 @pytest.mark.asyncio
-@pytest.mark.skipif(IS_MCP_V2, reason="SSE scope propagation not supported in MCP v2")
-async def test_sse_transport_detection(sentry_init, capture_items, json_rpc_sse):
-    """Test that SSE transport is correctly detected via query parameter"""
-    sentry_init(
-        integrations=[MCPIntegration()],
-        traces_sample_rate=1.0,
-    )
-
-    server = Server("test-server")
-    sse = SseServerTransport("/messages/")
-
-    sse_connection_closed = asyncio.Event()
-
-    async def handle_sse(request):
-        async with sse.connect_sse(
-            request.scope, request.receive, request._send
-        ) as streams:
-            async with anyio.create_task_group() as tg:
-
-                async def run_server():
-                    await server.run(
-                        streams[0], streams[1], server.create_initialization_options()
-                    )
-
-                tg.start_soon(run_server)
-
-        sse_connection_closed.set()
-        return Response()
-
-    app = Starlette(
-        routes=[
-            Route("/sse", endpoint=handle_sse, methods=["GET"]),
-            Mount("/messages/", app=sse.handle_post_message),
-        ],
-    )
-
-    if IS_MCP_V2:
-
-        async def test_tool(ctx, params):
-            return CallToolResult(
-                content=[TextContent(type="text", text="success")],
-                structured_content={"result": "success"},
-            )
-
-        server.add_request_handler("tools/call", CallToolRequestParams, test_tool)
-    else:
-
-        @server.call_tool()
-        async def test_tool(tool_name, arguments):
-            return {"result": "success"}
-
-    items = capture_items("span")
-
-    keep_sse_alive = asyncio.Event()
-    app_task, session_id, result = await json_rpc_sse(
-        app,
-        method="tools/call",
-        params={
-            "name": "sse_tool",
-            "arguments": {},
-        },
-        request_id="req-sse",
-        keep_sse_alive=keep_sse_alive,
-    )
-
-    await sse_connection_closed.wait()
-    await app_task
-
-    assert result["result"]["structuredContent"] == {"result": "success"}
-    sentry_sdk.flush()
-    span = _find_mcp_span(items, method_name="tools/call")
-    assert span is not None
-    data = span["attributes"]
-
-    # Check that SSE transport is detected
-    assert data[SPANDATA.MCP_TRANSPORT] == "sse"
-    assert data[SPANDATA.NETWORK_TRANSPORT] == "tcp"
-    assert data[SPANDATA.MCP_SESSION_ID] == session_id
-
-
-@pytest.mark.asyncio
-@pytest.mark.skipif(not IS_MCP_V2, reason="MCP v2 SSE transport detection")
 async def test_sse_transport_detection_v2(sentry_init, capture_items, json_rpc_sse):
     """Test that SSE transport is detected on MCP v2.
 
@@ -1532,17 +1255,10 @@ async def test_streamable_http_scope_propagation(sentry_init, capture_items, jso
 
     server = Server("test-server")
 
-    if IS_MCP_V2:
+    async def failing_tool(ctx, params):
+        raise ValueError("Tool execution failed")
 
-        async def failing_tool(ctx, params):
-            raise ValueError("Tool execution failed")
-
-        server.add_request_handler("tools/call", CallToolRequestParams, failing_tool)
-    else:
-
-        @server.call_tool()
-        def failing_tool(tool_name, arguments):
-            raise ValueError("Tool execution failed")
+    server.add_request_handler("tools/call", CallToolRequestParams, failing_tool)
 
     session_manager = StreamableHTTPSessionManager(
         app=server,
@@ -1641,20 +1357,13 @@ async def test_tool_data_collection_inputs(
 
     server = Server("test-server")
 
-    if IS_MCP_V2:
+    async def test_tool(ctx, params):
+        return CallToolResult(
+            content=[TextContent(type="text", text="ok")],
+            structured_content={"result": "success"},
+        )
 
-        async def test_tool(ctx, params):
-            return CallToolResult(
-                content=[TextContent(type="text", text="ok")],
-                structured_content={"result": "success"},
-            )
-
-        server.add_request_handler("tools/call", CallToolRequestParams, test_tool)
-    else:
-
-        @server.call_tool()
-        async def test_tool(tool_name, arguments):
-            return {"result": "success"}
+    server.add_request_handler("tools/call", CallToolRequestParams, test_tool)
 
     params = {
         "name": "calculate",
@@ -1746,25 +1455,18 @@ async def test_tool_data_collection_outputs(
 
     server = Server("test-server")
 
-    if IS_MCP_V2:
+    async def test_tool(ctx, params):
+        return CallToolResult(
+            content=[
+                TextContent(
+                    type="text",
+                    text=json.dumps({"result": "success", "value": 42}),
+                )
+            ],
+            structured_content={"result": "success", "value": 42},
+        )
 
-        async def test_tool(ctx, params):
-            return CallToolResult(
-                content=[
-                    TextContent(
-                        type="text",
-                        text=json.dumps({"result": "success", "value": 42}),
-                    )
-                ],
-                structured_content={"result": "success", "value": 42},
-            )
-
-        server.add_request_handler("tools/call", CallToolRequestParams, test_tool)
-    else:
-
-        @server.call_tool()
-        async def test_tool(tool_name, arguments):
-            return {"result": "success", "value": 42}
+    server.add_request_handler("tools/call", CallToolRequestParams, test_tool)
 
     params = {
         "name": "calculate",
@@ -1864,17 +1566,10 @@ async def test_prompt_data_collection_inputs(
         ],
     )
 
-    if IS_MCP_V2:
+    async def test_prompt(ctx, params):
+        return prompt_result
 
-        async def test_prompt(ctx, params):
-            return prompt_result
-
-        server.add_request_handler("prompts/get", GetPromptRequestParams, test_prompt)
-    else:
-
-        @server.get_prompt()
-        async def test_prompt(name, arguments):
-            return prompt_result
+    server.add_request_handler("prompts/get", GetPromptRequestParams, test_prompt)
 
     params = {
         "name": "code_help",
@@ -1922,20 +1617,13 @@ async def test_include_prompts_ignored_when_data_collection_set(
 
     server = Server("test-server")
 
-    if IS_MCP_V2:
+    async def test_tool(ctx, params):
+        return CallToolResult(
+            content=[TextContent(type="text", text=json.dumps({"value": 42}))],
+            structured_content={"value": 42},
+        )
 
-        async def test_tool(ctx, params):
-            return CallToolResult(
-                content=[TextContent(type="text", text=json.dumps({"value": 42}))],
-                structured_content={"value": 42},
-            )
-
-        server.add_request_handler("tools/call", CallToolRequestParams, test_tool)
-    else:
-
-        @server.call_tool()
-        async def test_tool(tool_name, arguments):
-            return {"value": 42}
+    server.add_request_handler("tools/call", CallToolRequestParams, test_tool)
 
     params = {"name": "calculate", "arguments": {"x": 10}}
     items = capture_items("span")
