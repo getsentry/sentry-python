@@ -13,9 +13,6 @@ class Boto3Integration(Integration):
 
     @staticmethod
     def setup_once() -> None:
-        version = parse_version(BOTOCORE_VERSION)
-        _check_minimum_version(Boto3Integration, version, "botocore")
-
         # local import to avoid import cycle
         from sentry_sdk.integrations.boto3._client import _patch_botocore_client
 
