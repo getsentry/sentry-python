@@ -7,8 +7,8 @@ from sentry_sdk.integrations._wsgi_common import _filter_headers
 from sentry_sdk.integrations.aws_lambda import _make_request_event_processor
 from sentry_sdk.traces import (
     SegmentNameSource,
-    SpanStatus,
     Span,
+    SpanStatus,
 )
 from sentry_sdk.utils import (
     capture_internal_exceptions,

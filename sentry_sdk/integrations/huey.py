@@ -7,7 +7,7 @@ from sentry_sdk.api import get_baggage, get_traceparent
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.traces import SegmentNameSource, SpanStatus, Span
+from sentry_sdk.traces import SegmentNameSource, Span, SpanStatus
 from sentry_sdk.tracing import (
     BAGGAGE_HEADER_NAME,
     SENTRY_TRACE_HEADER_NAME,

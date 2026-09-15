@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.traces import SpanStatus, Span
+from sentry_sdk.traces import Span, SpanStatus
 from sentry_sdk.utils import has_data_collection_enabled
 
 from ..consts import SPAN_ORIGIN

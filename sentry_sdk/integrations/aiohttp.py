@@ -22,8 +22,8 @@ from sentry_sdk.scope import Scope, should_send_default_pii
 from sentry_sdk.sessions import track_session
 from sentry_sdk.traces import (
     SegmentNameSource,
-    SpanStatus,
     Span,
+    SpanStatus,
 )
 from sentry_sdk.tracing import (
     BAGGAGE_HEADER_NAME,

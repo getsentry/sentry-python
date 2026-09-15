@@ -9,8 +9,8 @@ import sentry_sdk
 from sentry_sdk.profiler.continuous_profiler import get_profiler_id
 from sentry_sdk.traces import (
     NoOpSpan,
-    SpanStatus,
     Span,
+    SpanStatus,
 )
 
 minimum_python_38 = pytest.mark.skipif(

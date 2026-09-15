@@ -1,6 +1,6 @@
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
-from sentry_sdk.traces import SpanStatus, Span
+from sentry_sdk.traces import Span, SpanStatus
 from sentry_sdk.tracing_utils import (
     add_query_source,
     record_sql_queries,
@@ -93,9 +93,7 @@ def _handle_error(context: "Any", *args: "Any") -> None:
     if execution_context is None:
         return
 
-    span: "Optional[Span]" = getattr(
-        execution_context, "_sentry_sql_span", None
-    )
+    span: "Optional[Span]" = getattr(execution_context, "_sentry_sql_span", None)
 
     if span is not None:
         span.status = SpanStatus.ERROR
