@@ -1170,32 +1170,6 @@ class SPANDATA:
     """
 
 
-class SPANSTATUS:
-    """
-    The status of a Sentry span.
-
-    See: https://develop.sentry.dev/sdk/event-payloads/contexts/#trace-context
-    """
-
-    ABORTED = "aborted"
-    ALREADY_EXISTS = "already_exists"
-    CANCELLED = "cancelled"
-    DATA_LOSS = "data_loss"
-    DEADLINE_EXCEEDED = "deadline_exceeded"
-    FAILED_PRECONDITION = "failed_precondition"
-    INTERNAL_ERROR = "internal_error"
-    INVALID_ARGUMENT = "invalid_argument"
-    NOT_FOUND = "not_found"
-    OK = "ok"
-    OUT_OF_RANGE = "out_of_range"
-    PERMISSION_DENIED = "permission_denied"
-    RESOURCE_EXHAUSTED = "resource_exhausted"
-    UNAUTHENTICATED = "unauthenticated"
-    UNAVAILABLE = "unavailable"
-    UNIMPLEMENTED = "unimplemented"
-    UNKNOWN_ERROR = "unknown_error"
-
-
 class OP:
     ANTHROPIC_MESSAGES_CREATE = "ai.messages.create.anthropic"
     CACHE_GET = "cache.get"
@@ -1613,28 +1587,28 @@ class ClientConstructor:
             If provided, the options will override the default `urllib3` `socket options
             <https://urllib3.readthedocs.io/en/stable/reference/urllib3.connection.html#urllib3.connection.HTTPConnection>`_.
 
-        :param traces_sample_rate: A number between `0` and `1`, controlling the percentage chance a given transaction
+        :param traces_sample_rate: A number between `0` and `1`, controlling the percentage chance a given service span
             will be sent to Sentry.
 
-            (`0` represents 0% while `1` represents 100%.) Applies equally to all transactions created in the app.
+            (`0` represents 0% while `1` represents 100%.) Applies equally to all service spans created in the app.
 
             Either this or `traces_sampler` must be defined to enable tracing.
 
             If `traces_sample_rate` is `0`, this means that no new traces will be created. However, if you have
             another service (for example a JS frontend) that makes requests to your service that include trace
-            information, those traces will be continued and thus transactions will be sent to Sentry.
+            information, those traces will be continued and thus spans will be sent to Sentry.
 
             If you want to disable all tracing you need to set `traces_sample_rate=None`. In this case, no new traces
             will be started and no incoming traces will be continued.
 
-        :param traces_sampler: A function responsible for determining the percentage chance a given transaction will be
+        :param traces_sampler: A function responsible for determining the percentage chance a given service span will be
             sent to Sentry.
 
-            It will automatically be passed information about the transaction and the context in which it's being
+            It will automatically be passed information about the service span and the context in which it's being
             created, and must return a number between `0` (0% chance of being sent) and `1` (100% chance of being
             sent).
 
-            Can also be used for filtering transactions, by returning `0` for those that are unwanted.
+            Can also be used for filtering service spans, by returning `0` for those that are unwanted.
 
             Either this or `traces_sample_rate` must be defined to enable tracing.
 
@@ -1726,9 +1700,6 @@ class ClientConstructor:
         :param before_send_span: An optional function to modify spans before they're sent to Sentry.
             Modifications to the span's attributes and name will be retained. Unlike ``before_send_log``
             and ``before_send_metric``, spans cannot be dropped by returning None.
-
-        :param stream_gen_ai_spans: When set, generative AI spans are sent in a new transport format to
-            reduce downstream data loss.
 
         :param ignore_spans: A sequence of span-matching rules. Matching spans are ignored.
 

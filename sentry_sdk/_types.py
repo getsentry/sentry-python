@@ -394,7 +394,6 @@ if TYPE_CHECKING:
         "default",
         "error",
         "crash",
-        "transaction",
         "security",
         "attachment",
         "session",
