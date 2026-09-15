@@ -591,7 +591,7 @@ def test_response_attribute_extraction_failure_does_not_change_response(
         raise RuntimeError("attribute extraction failed")
 
     monkeypatch.setattr(
-        "sentry_sdk.integrations.boto3._instrumentation._get_response_attributes",
+        "sentry_sdk.integrations.boto3._client._get_response_attributes",
         fail_attribute_extraction,
     )
 
@@ -630,7 +630,7 @@ def test_error_attribute_extraction_failure_does_not_replace_original_exception(
 
     client.meta.events.register("before-parameter-build", raise_original_exception)
     monkeypatch.setattr(
-        "sentry_sdk.integrations.boto3._instrumentation._get_error_attributes",
+        "sentry_sdk.integrations.boto3._client._get_error_attributes",
         fail_attribute_extraction,
     )
 
