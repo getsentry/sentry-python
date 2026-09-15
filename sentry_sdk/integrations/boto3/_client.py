@@ -44,17 +44,17 @@ def _patch_botocore_client() -> None:
         if client.get_integration(Boto3Integration) is None:
             return orig_make_api_call(self, operation_name, api_params)
 
-        ctx: "Optional[AwsCallContext]" = None
+        ctx = AwsCallContext(operation_name, api_params)
         span: "Optional[Union[Span, StreamedSpan]]" = None
 
+        # add optional metadata to context.
         with capture_internal_exceptions():
-            ctx = AwsCallContext(self, operation_name, api_params)
+            ctx.add_metadata(self)
 
-        if ctx is not None:
-            with capture_internal_exceptions():
-                span = _start_client_span(ctx)
-                if span is not None:
-                    span.__enter__()
+        with capture_internal_exceptions():
+            span = _start_client_span(ctx)
+            if span is not None:
+                span.__enter__()
 
         try:
             parsed = orig_make_api_call(self, operation_name, api_params)

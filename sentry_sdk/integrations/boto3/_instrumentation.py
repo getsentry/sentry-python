@@ -71,12 +71,11 @@ def _get_server_attributes(endpoint_url: "Optional[str]") -> "Attributes":
 def _get_client_attributes(
     ctx: "AwsCallContext",
 ) -> "Attributes":
-    attributes: "Attributes" = {
-        SPANDATA.RPC_METHOD: ctx.operation_name,
-        # `rpc.service` is deprecated in OTel, but js still uses it.
-        SPANDATA.RPC_SERVICE: ctx.service_id,
-        SPANDATA.RPC_SYSTEM_NAME: _AWS_RPC_SYSTEM_NAME,
-    }
+    attributes: "Attributes" = {}
+
+    # `rpc.service` is deprecated in OTel, but js still uses it.
+    if ctx.service_id:
+        attributes[SPANDATA.RPC_SERVICE] = ctx.service_id
 
     if ctx.region_name:
         attributes[SPANDATA.CLOUD_REGION] = ctx.region_name
@@ -92,8 +91,16 @@ def _start_client_span(
     if client.get_integration(Boto3Integration) is None:
         return None
 
-    span_name = "aws.%s.%s" % (ctx.service_id_hyphenized, ctx.operation_name)
-    attributes = _get_client_attributes(ctx)
+    # use unknown if `service_id_hyphenized` so span name can still be created.
+    # e.g. "aws.unkown.GetObject"
+    service_name = ctx.service_id_hyphenized or "unknown"
+    span_name = "aws.%s.%s" % (service_name, ctx.operation_name)
+    attributes: "Attributes" = {
+        SPANDATA.RPC_METHOD: ctx.operation_name,
+        SPANDATA.RPC_SYSTEM_NAME: _AWS_RPC_SYSTEM_NAME,
+    }
+    with capture_internal_exceptions():
+        attributes.update(_get_client_attributes(ctx))
     span_op = OP.HTTP_CLIENT
     span_origin = Boto3Integration.origin
 
@@ -119,9 +126,12 @@ def _start_client_span(
         op=span_op,
         origin=span_origin,
     )
-    _set_span_attributes(span, attributes)
-    span.set_tag("aws.service_id", ctx.service_id_hyphenized)
-    span.set_tag("aws.operation_name", ctx.operation_name)
+    with capture_internal_exceptions():
+        _set_span_attributes(span, attributes)
+    with capture_internal_exceptions():
+        if ctx.service_id_hyphenized:
+            span.set_tag("aws.service_id", ctx.service_id_hyphenized)
+        span.set_tag("aws.operation_name", ctx.operation_name)
     return span
 
 

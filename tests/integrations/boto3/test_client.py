@@ -8,6 +8,7 @@ from botocore.stub import Stubber
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.boto3 import Boto3Integration
+from sentry_sdk.integrations.boto3._context import AwsCallContext
 from tests.integrations.boto3.aws_mock import Body
 
 session = boto3.Session(  # type: ignore[attr-defined]
