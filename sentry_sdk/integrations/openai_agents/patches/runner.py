@@ -184,7 +184,6 @@ def _create_run_wrapper(
                             ):
                                 update_invoke_agent_span(
                                     span=invoke_agent_span,
-                                    context=context_wrapper,
                                     agent=agent,
                                 )
 
@@ -208,7 +207,6 @@ def _create_run_wrapper(
 
                 update_invoke_agent_span(
                     span=invoke_agent_span,
-                    context=run_result.context_wrapper,
                     agent=agent,
                 )
 

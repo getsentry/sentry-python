@@ -66,9 +66,7 @@ def _maybe_start_agent_span(
         if current_agent and current_agent != agent:
             span = getattr(context_wrapper, "_sentry_agent_span", None)
             if span:
-                update_invoke_agent_span(
-                    span=span, context=context_wrapper, agent=agent
-                )
+                update_invoke_agent_span(span=span, agent=agent)
                 span.__exit__(None, None, None)
                 delattr(context_wrapper, "_sentry_agent_span")
 
@@ -122,9 +120,7 @@ async def _run_single_turn(
         with capture_internal_exceptions():
             span = getattr(context_wrapper, "_sentry_agent_span", None)
             if span:
-                update_invoke_agent_span(
-                    span=span, context=context_wrapper, agent=agent
-                )
+                update_invoke_agent_span(span=span, agent=agent)
                 span.__exit__(*exc_info)
                 delattr(context_wrapper, "_sentry_agent_span")
         reraise(*exc_info)
@@ -202,9 +198,7 @@ async def _run_single_turn_streamed(
         with capture_internal_exceptions():
             span = getattr(context_wrapper, "_sentry_agent_span", None)
             if span:
-                update_invoke_agent_span(
-                    span=span, context=context_wrapper, agent=agent
-                )
+                update_invoke_agent_span(span=span, agent=agent)
                 span.__exit__(*exc_info)
                 delattr(context_wrapper, "_sentry_agent_span")
             _close_streaming_workflow_span(agent)
@@ -257,16 +251,14 @@ async def _execute_handoffs(
             _close_streaming_workflow_span(agent)
             span = getattr(context_wrapper, "_sentry_agent_span", None)
             if span:
-                update_invoke_agent_span(
-                    span=span, context=context_wrapper, agent=agent
-                )
+                update_invoke_agent_span(span=span, agent=agent)
                 span.__exit__(*exc_info)
                 delattr(context_wrapper, "_sentry_agent_span")
         reraise(*exc_info)
 
     span = getattr(context_wrapper, "_sentry_agent_span", None)
     if span:
-        update_invoke_agent_span(span=span, context=context_wrapper, agent=agent)
+        update_invoke_agent_span(span=span, agent=agent)
         span.__exit__(None, None, None)
         delattr(context_wrapper, "_sentry_agent_span")
 
@@ -306,18 +298,14 @@ async def _execute_final_output(
             _close_streaming_workflow_span(agent)
             span = getattr(context_wrapper, "_sentry_agent_span", None)
             if span:
-                update_invoke_agent_span(
-                    span=span, context=context_wrapper, agent=agent, output=final_output
-                )
+                update_invoke_agent_span(span=span, agent=agent, output=final_output)
                 span.__exit__(*exc_info)
                 delattr(context_wrapper, "_sentry_agent_span")
         reraise(*exc_info)
 
     span = getattr(context_wrapper, "_sentry_agent_span", None)
     if span:
-        update_invoke_agent_span(
-            span=span, context=context_wrapper, agent=agent, output=final_output
-        )
+        update_invoke_agent_span(span=span, agent=agent, output=final_output)
         span.__exit__(None, None, None)
         delattr(context_wrapper, "_sentry_agent_span")
 
