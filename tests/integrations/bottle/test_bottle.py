@@ -166,7 +166,7 @@ def test_large_json_request(
         assert len(event["request"]["data"]["foo"]["bar"]) == 1034
 
 
-def test_attach_stacktrace_works(sentry_init, capture_events, app, get_client):
+def test_attach_stacktrace_doesnt_hang(sentry_init, capture_events, app, get_client):
     sentry_init(
         integrations=[BottleIntegration()],
         max_request_body_size="always",
