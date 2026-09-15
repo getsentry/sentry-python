@@ -76,8 +76,7 @@ class BottleIntegration(Integration):
         _check_minimum_version(BottleIntegration, version)
 
         # Bottle's Route.__repr__ might lead to a never-terminating while True
-        # loop. This is triggered when attach_stacktrace=True serializes local
-        # variables.
+        # loop when attach_stacktrace=True.
         def _sentry_route_repr(self: "Route") -> str:
             cb = self.callback
             return "<%s %s -> %s:%s>" % (
