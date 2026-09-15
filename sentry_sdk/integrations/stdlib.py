@@ -9,7 +9,7 @@ import sentry_sdk
 from sentry_sdk.consts import _SENTRY_HEADER_NAMES, OP, SPANDATA
 from sentry_sdk.integrations import Integration
 from sentry_sdk.scope import add_global_event_processor
-from sentry_sdk.traces import StreamedSpan
+from sentry_sdk.traces import Span
 from sentry_sdk.tracing import SENTRY_TRACE_HEADER_NAME
 from sentry_sdk.tracing_utils import (
     EnvironHeaders,
@@ -69,7 +69,7 @@ class StdlibIntegration(Integration):
             return event
 
 
-def _complete_span(span: "StreamedSpan") -> None:
+def _complete_span(span: "Span") -> None:
     with capture_internal_exceptions():
         add_http_request_source(span)
     span.end()
@@ -272,7 +272,7 @@ def _install_httplib() -> None:
         with capture_internal_exceptions():
             parsed_url = parse_url(real_url, sanitize=False)
 
-        span: "Optional[StreamedSpan]" = None
+        span: "Optional[Span]" = None
         breadcrumb: "dict[str, Any]" = {}
 
         url_attributes = get_url_attributes(client, parsed_url)

@@ -68,7 +68,7 @@ if TYPE_CHECKING:
     )
     from starlette.types import Receive, Scope, Send
 
-    from sentry_sdk.traces import StreamedSpan
+    from sentry_sdk.traces import Span
 
 
 class MCPIntegration(Integration):
@@ -179,7 +179,7 @@ def _get_request_context_data(
 
 
 def _set_span_input_data(
-    span: "StreamedSpan",
+    span: "Span",
     handler_name: str,
     span_data_key: str,
     mcp_method_name: str,

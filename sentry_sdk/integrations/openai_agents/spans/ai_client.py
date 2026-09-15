@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable
-from sentry_sdk.traces import StreamedSpan, _AgentFrameworkChatGenerationContext
+from sentry_sdk.traces import Span, _AgentFrameworkChatGenerationContext
 from sentry_sdk.utils import has_data_collection_enabled
 
 try:
@@ -239,7 +239,7 @@ def ai_client_context(
 
 
 def update_ai_client_span(
-    span: "StreamedSpan",
+    span: "Span",
     response: "Any",
     response_model: "Optional[str]" = None,
     agent: "Optional[Agent]" = None,

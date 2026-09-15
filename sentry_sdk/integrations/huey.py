@@ -7,7 +7,7 @@ from sentry_sdk.api import get_baggage, get_traceparent
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.traces import SegmentNameSource, SpanStatus, StreamedSpan
+from sentry_sdk.traces import SegmentNameSource, SpanStatus, Span
 from sentry_sdk.tracing import (
     BAGGAGE_HEADER_NAME,
     SENTRY_TRACE_HEADER_NAME,
@@ -151,11 +151,11 @@ def _make_event_processor(task: "Any") -> "EventProcessor":
 def _capture_exception(exc_info: "ExcInfo") -> None:
     scope = sentry_sdk.get_current_scope()
     if exc_info[0] in HUEY_CONTROL_FLOW_EXCEPTIONS:
-        if type(scope._span) is StreamedSpan:
+        if type(scope._span) is Span:
             scope._span._segment.status = SpanStatus.OK
         return
 
-    if type(scope._span) is StreamedSpan:
+    if type(scope._span) is Span:
         scope._span._segment.status = SpanStatus.ERROR
 
     event, hint = event_from_exception(

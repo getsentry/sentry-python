@@ -138,7 +138,7 @@ class RqIntegration(Integration):
                 return old_enqueue_job(self, job, **kwargs)
 
             scope = sentry_sdk.get_current_scope()
-            if scope.streamed_span is not None:
+            if scope.span is not None:
                 job.meta["_sentry_trace_headers"] = dict(
                     scope.iter_trace_propagation_headers()
                 )

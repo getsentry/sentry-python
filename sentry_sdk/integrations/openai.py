@@ -42,7 +42,7 @@ from sentry_sdk.ai.utils import (
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.traces import StreamedSpan
+from sentry_sdk.traces import Span
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
@@ -174,7 +174,7 @@ def _has_attr_and_is_int(
 def _calculate_completions_token_usage(
     messages: "Optional[Union[Iterable[ChatCompletionMessageParam], list[str]]]",
     response: "Any",
-    span: "StreamedSpan",
+    span: "Span",
     streaming_message_responses: "Optional[List[str]]",
     streaming_message_total_token_usage: "Optional[CompletionUsage]",
     count_tokens: "Callable[..., Any]",
@@ -256,7 +256,7 @@ def _calculate_completions_token_usage(
 def _calculate_responses_token_usage(
     input: "Any",
     response: "Any",
-    span: "StreamedSpan",
+    span: "Span",
     streaming_message_responses: "Optional[List[str]]",
     count_tokens: "Callable[..., Any]",
 ) -> None:
@@ -332,7 +332,7 @@ def _calculate_responses_token_usage(
 
 
 def _set_responses_api_input_data(
-    span: "StreamedSpan",
+    span: "Span",
     kwargs: "dict[str, Any]",
     integration: "OpenAIIntegration",
 ) -> None:
@@ -465,7 +465,7 @@ def _set_responses_api_input_data(
 
 
 def _set_completions_api_input_data(
-    span: "StreamedSpan",
+    span: "Span",
     kwargs: "dict[str, Any]",
     integration: "OpenAIIntegration",
 ) -> None:
@@ -574,7 +574,7 @@ def _set_completions_api_input_data(
 
 
 def _set_embeddings_input_data(
-    span: "StreamedSpan",
+    span: "Span",
     kwargs: "dict[str, Any]",
     integration: "OpenAIIntegration",
 ) -> None:
@@ -630,7 +630,7 @@ def _set_embeddings_input_data(
 
 
 def _set_common_output_data(
-    span: "StreamedSpan",
+    span: "Span",
     response: "Union[ChatCompletion, Stream[ChatCompletionChunk], AsyncStream[ChatCompletionChunk], Response, Stream[ResponseStreamEvent], AsyncStream[ResponseStreamEvent], CreateEmbeddingResponse]",
     input: "Any",
     integration: "OpenAIIntegration",
@@ -922,7 +922,7 @@ async def _new_async_chat_completion(
 
 
 def _set_completions_api_output_data(
-    span: "StreamedSpan",
+    span: "Span",
     response: "Union[ChatCompletion, Stream[ChatCompletionChunk], AsyncStream[ChatCompletionChunk]]",
     kwargs: "dict[str, Any]",
     integration: "OpenAIIntegration",
@@ -943,7 +943,7 @@ def _set_completions_api_output_data(
 
 
 def _wrap_synchronous_completions_chunk_iterator(
-    span: "StreamedSpan",
+    span: "Span",
     integration: "OpenAIIntegration",
     start_time: "Optional[float]",
     messages: "Optional[Union[Iterable[ChatCompletionMessageParam], list[str]]]",
@@ -1011,7 +1011,7 @@ def _wrap_synchronous_completions_chunk_iterator(
 
 
 async def _wrap_asynchronous_completions_chunk_iterator(
-    span: "StreamedSpan",
+    span: "Span",
     integration: "OpenAIIntegration",
     start_time: "Optional[float]",
     messages: "Optional[Union[Iterable[ChatCompletionMessageParam], list[str]]]",
@@ -1079,7 +1079,7 @@ async def _wrap_asynchronous_completions_chunk_iterator(
 
 
 def _wrap_synchronous_responses_event_iterator(
-    span: "StreamedSpan",
+    span: "Span",
     integration: "OpenAIIntegration",
     start_time: "Optional[float]",
     input: "Optional[Union[str, list[str], ResponseInputParam]]",
@@ -1149,7 +1149,7 @@ def _wrap_synchronous_responses_event_iterator(
 
 
 async def _wrap_asynchronous_responses_event_iterator(
-    span: "StreamedSpan",
+    span: "Span",
     integration: "OpenAIIntegration",
     start_time: "Optional[float]",
     input: "Optional[Union[str, list[str], ResponseInputParam]]",
@@ -1219,7 +1219,7 @@ async def _wrap_asynchronous_responses_event_iterator(
 
 
 def _set_responses_api_output_data(
-    span: "StreamedSpan",
+    span: "Span",
     response: "Union[Response, Stream[ResponseStreamEvent], AsyncStream[ResponseStreamEvent]]",
     kwargs: "dict[str, Any]",
     integration: "OpenAIIntegration",
@@ -1240,7 +1240,7 @@ def _set_responses_api_output_data(
 
 
 def _set_embeddings_output_data(
-    span: "StreamedSpan",
+    span: "Span",
     response: "CreateEmbeddingResponse",
     kwargs: "dict[str, Any]",
     integration: "OpenAIIntegration",

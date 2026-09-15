@@ -3,7 +3,7 @@ from unittest import mock
 import pytest
 
 import sentry_sdk
-from sentry_sdk.traces import StreamedSpan
+from sentry_sdk.traces import Span
 from sentry_sdk.tracing_utils import extract_sentrytrace_data
 
 
@@ -71,7 +71,7 @@ def test_iter_headers(sentry_init, monkeypatch):
         traces_sample_rate=0.0,
     )
     monkeypatch.setattr(
-        StreamedSpan,
+        Span,
         "_to_traceparent",
         mock.Mock(return_value="12312012123120121231201212312012-0415201309082013-0"),
     )

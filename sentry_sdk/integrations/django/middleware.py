@@ -17,7 +17,7 @@ from sentry_sdk.utils import (
 if TYPE_CHECKING:
     from typing import Any, Callable, Optional, TypeVar
 
-    from sentry_sdk.traces import StreamedSpan
+    from sentry_sdk.traces import Span
 
     F = TypeVar("F", bound=Callable[..., Any])
 
@@ -66,7 +66,7 @@ def _wrap_middleware(middleware: "Any", middleware_name: str) -> "Any":
 
     def _check_middleware_span(
         old_method: "Callable[..., Any]",
-    ) -> "Optional[StreamedSpan]":
+    ) -> "Optional[Span]":
         integration = sentry_sdk.get_client().get_integration(DjangoIntegration)
         if integration is None or not integration.middleware_spans:
             return None

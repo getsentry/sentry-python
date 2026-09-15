@@ -17,7 +17,7 @@ import sentry_sdk
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.traces import StreamedSpan
+from sentry_sdk.traces import Span
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
@@ -175,7 +175,7 @@ def wrap_async_view(callback: "Any") -> "Any":
     ) -> "Any":
         client = sentry_sdk.get_client()
         current_span = sentry_sdk.traces.get_current_span()
-        if type(current_span) is StreamedSpan:
+        if type(current_span) is Span:
             segment = current_span._segment
             segment._update_active_thread()
 

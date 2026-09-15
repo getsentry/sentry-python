@@ -5,13 +5,13 @@ from sentry_sdk.consts import SPANDATA
 if TYPE_CHECKING:
     from typing import Any, Awaitable, Callable, Optional, TypeVar, Union
 
-    from sentry_sdk.traces import StreamedSpan
+    from sentry_sdk.traces import Span
 
     F = TypeVar("F", bound=Union[Callable[..., Any], Callable[..., Awaitable[Any]]])
 
 
 def record_token_usage(
-    span: "StreamedSpan",
+    span: "Span",
     input_tokens: "Optional[int]" = None,
     input_tokens_cached: "Optional[int]" = None,
     input_tokens_cache_write: "Optional[int]" = None,

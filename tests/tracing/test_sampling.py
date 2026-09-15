@@ -55,10 +55,10 @@ def test_get_span_from_scope_regardless_of_sampling_decision(
             with sentry_sdk.traces.start_span(name="child-child-span"):
                 scope = sentry_sdk.get_current_scope()
                 if sampling_decision is True:
-                    assert scope.streamed_span.name == "child-child-span"
+                    assert scope.span.name == "child-child-span"
                 else:
                     # noop spans are not set on the scope unless they're segments
-                    assert scope.streamed_span.name == "/"
+                    assert scope.span.name == "/"
                 assert scope._transaction == "/"
 
 

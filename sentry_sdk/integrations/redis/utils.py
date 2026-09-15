@@ -9,7 +9,7 @@ from sentry_sdk.integrations.redis.consts import (
     _SINGLE_KEY_COMMANDS,
 )
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.traces import StreamedSpan
+from sentry_sdk.traces import Span
 from sentry_sdk.utils import SENSITIVE_DATA_SUBSTITUTE, has_data_collection_enabled
 
 if TYPE_CHECKING:
@@ -109,7 +109,7 @@ def _parse_rediscluster_command(command: "Any") -> "Sequence[Any]":
 
 
 def _set_client_data(
-    span: "StreamedSpan", is_cluster: bool, name: str, *args: "Any"
+    span: "Span", is_cluster: bool, name: str, *args: "Any"
 ) -> None:
     if name:
         span.set_attribute(SPANDATA.DB_OPERATION_NAME, name)

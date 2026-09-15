@@ -33,7 +33,7 @@ from sentry_sdk.traces import (
 )
 from sentry_sdk.traces import (
     SegmentNameSource,
-    StreamedSpan,
+    Span,
 )
 from sentry_sdk.tracing import (
     SOURCE_FOR_STYLE,
@@ -218,7 +218,7 @@ class SentryAsgiMiddleware:
 
                     method = scope.get("method", "").upper()
 
-                    span: "Optional[ContextManager[Optional[StreamedSpan]]]" = None
+                    span: "Optional[ContextManager[Optional[Span]]]" = None
                     attributes: "Attributes" = {
                         "sentry.segment.name.source": getattr(
                             transaction_source, "value", transaction_source

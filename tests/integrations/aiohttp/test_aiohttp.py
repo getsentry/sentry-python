@@ -1843,7 +1843,7 @@ async def test_server_error(sentry_init, aiohttp_client, capture_items):
     server_span = items[1].payload
 
     # The integration's generic Exception path reraises without recording
-    # http.response.status_code on the server span. StreamedSpan.__exit__
+    # http.response.status_code on the server span. Span.__exit__
     # observes the propagating exception and sets status to "error".
     assert server_span["attributes"]["sentry.op"] == "http.server"
     assert "http.response.status_code" not in server_span["attributes"]

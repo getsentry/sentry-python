@@ -6,7 +6,7 @@ from sentry_sdk import consts
 from sentry_sdk.ai.monitoring import record_token_usage
 from sentry_sdk.ai.utils import set_data_normalized
 from sentry_sdk.consts import SPANDATA
-from sentry_sdk.traces import StreamedSpan
+from sentry_sdk.traces import Span
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Iterator
@@ -112,7 +112,7 @@ def _capture_exception(exc: "Any") -> None:
 
 def _wrap_chat(f: "Callable[..., Any]", streaming: bool) -> "Callable[..., Any]":
     def collect_chat_response_fields(
-        span: "StreamedSpan",
+        span: "Span",
         res: "NonStreamedChatResponse",
         include_pii: bool,
     ) -> None:

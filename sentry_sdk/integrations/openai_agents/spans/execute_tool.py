@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.traces import SpanStatus, StreamedSpan
+from sentry_sdk.traces import SpanStatus, Span
 from sentry_sdk.utils import has_data_collection_enabled
 
 from ..consts import SPAN_ORIGIN
@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 
 def execute_tool_span(
     tool: "agents.FunctionTool", *args: "Any", **kwargs: "Any"
-) -> "StreamedSpan":
+) -> "Span":
     return sentry_sdk.traces.start_span(
         name=f"execute_tool {tool.name}",
         attributes={
@@ -31,7 +31,7 @@ def execute_tool_span(
 
 
 def update_execute_tool_span(
-    span: "StreamedSpan",
+    span: "Span",
     agent: "agents.Agent",
     tool: "agents.Tool",
     result: "Any",

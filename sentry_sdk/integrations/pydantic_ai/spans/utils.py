@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 
     from pydantic_ai.usage import RequestUsage, RunUsage
 
-    from sentry_sdk.traces import StreamedSpan
+    from sentry_sdk.traces import Span
 
 
 def _serialize_image_url_item(item: "Any") -> "Dict[str, Any]":
@@ -47,7 +47,7 @@ def _serialize_binary_content_item(item: "Any") -> "Dict[str, Any]":
 
 
 def _set_usage_data(
-    span: "StreamedSpan",
+    span: "Span",
     usage: "Union[RequestUsage, RunUsage]",
 ) -> None:
     """Set token usage data on a span.

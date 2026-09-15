@@ -107,7 +107,7 @@ class _AgentFrameworkChatGenerationContext:
         self,
         name: str,
         attributes: "Optional[Attributes]" = None,
-        parent_span: "Optional[StreamedSpan]" = _DEFAULT_PARENT_SPAN,  # type: ignore[assignment]
+        parent_span: "Optional[Span]" = _DEFAULT_PARENT_SPAN,  # type: ignore[assignment]
         active: bool = True,
     ):
         self._span = start_span(
@@ -116,13 +116,13 @@ class _AgentFrameworkChatGenerationContext:
             parent_span=parent_span,
             active=active,
         )
-        if type(self._span) is not StreamedSpan:
+        if type(self._span) is not Span:
             return
 
         self.span._scope._agent_framework_chat_generation_entered = True
 
     @property
-    def span(self) -> "StreamedSpan":
+    def span(self) -> "Span":
         return self._span
 
     def __enter__(self) -> "_AgentFrameworkChatGenerationContext":
@@ -131,7 +131,7 @@ class _AgentFrameworkChatGenerationContext:
     def __exit__(
         self, ty: "Optional[Any]", value: "Optional[Any]", tb: "Optional[Any]"
     ) -> None:
-        if type(self._span) is not StreamedSpan:
+        if type(self._span) is not Span:
             self._span.__exit__(ty, value, tb)
 
         try:
@@ -143,9 +143,9 @@ class _AgentFrameworkChatGenerationContext:
 def start_span(
     name: str,
     attributes: "Optional[Attributes]" = None,
-    parent_span: "Optional[StreamedSpan]" = _DEFAULT_PARENT_SPAN,  # type: ignore[assignment]
+    parent_span: "Optional[Span]" = _DEFAULT_PARENT_SPAN,  # type: ignore[assignment]
     active: bool = True,
-) -> "StreamedSpan":
+) -> "Span":
     """
     Start a span.
 
@@ -189,7 +189,7 @@ def start_span(
         parent. If not provided, the parent will be set to the currently active
         span, if any. If set to `None`, this span will become a new root-level
         span.
-    :type parent_span: "Optional[StreamedSpan]"
+    :type parent_span: "Optional[Span]"
 
     :param active: Controls whether spans started while this span is running
         will automatically become its children. That's the default behavior. If
@@ -198,7 +198,7 @@ def start_span(
     :type active: bool
 
     :return: The span that has been started.
-    :rtype: StreamedSpan
+    :rtype: Span
     """
     return sentry_sdk.get_current_scope().start_span(
         name, attributes, parent_span, active
@@ -243,7 +243,7 @@ def new_trace() -> None:
     sentry_sdk.get_current_scope().set_new_propagation_context()
 
 
-class StreamedSpan:
+class Span:
     """
     A span holds timing information of a block of code.
 
@@ -281,7 +281,7 @@ class StreamedSpan:
         attributes: "Optional[Attributes]" = None,
         active: bool = True,
         scope: "sentry_sdk.Scope",
-        segment: "Optional[StreamedSpan]" = None,
+        segment: "Optional[Span]" = None,
         trace_id: "Optional[str]" = None,
         parent_span_id: "Optional[str]" = None,
         parent_sampled: "Optional[bool]" = None,
@@ -342,7 +342,7 @@ class StreamedSpan:
             f"active={self._active})>"
         )
 
-    def __enter__(self) -> "StreamedSpan":
+    def __enter__(self) -> "Span":
         return self
 
     def __exit__(
@@ -375,8 +375,8 @@ class StreamedSpan:
 
     def _start(self) -> None:
         if self._active:
-            old_span = self._scope.streamed_span
-            self._scope.streamed_span = self
+            old_span = self._scope.span
+            self._scope.span = self
             self._previous_span_on_scope = old_span
 
     def _end(self, end_timestamp: "Optional[Union[float, datetime]]" = None) -> None:
@@ -394,7 +394,7 @@ class StreamedSpan:
             with capture_internal_exceptions():
                 old_span = self._previous_span_on_scope
                 del self._previous_span_on_scope
-                self._scope.streamed_span = old_span
+                self._scope.span = old_span
 
         # Set attributes from the segment. These are set on span end on purpose
         # so that we have the best chance to capture the segment's final name
@@ -639,7 +639,7 @@ class StreamedSpan:
         return res
 
 
-class NoOpStreamedSpan(StreamedSpan):
+class NoOpSpan(Span):
     __slots__ = (
         "_sampled",
         "_finished",
@@ -650,7 +650,7 @@ class NoOpStreamedSpan(StreamedSpan):
         self,
         name: "Optional[str]" = None,
         attributes: "Optional[Attributes]" = None,
-        segment: "Optional[StreamedSpan]" = None,
+        segment: "Optional[Span]" = None,
         trace_id: "Optional[str]" = None,
         parent_span_id: "Optional[str]" = None,
         parent_sampled: "Optional[bool]" = None,
@@ -690,7 +690,7 @@ class NoOpStreamedSpan(StreamedSpan):
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__}(name={self.name}, sampled={self.sampled})>"
 
-    def __enter__(self) -> "NoOpStreamedSpan":
+    def __enter__(self) -> "NoOpSpan":
         return self
 
     def __exit__(
@@ -702,8 +702,8 @@ class NoOpStreamedSpan(StreamedSpan):
         if self._scope is None:
             return
 
-        old_span = self._scope.streamed_span
-        self._scope.streamed_span = self
+        old_span = self._scope.span
+        self._scope.span = self
         self._previous_span_on_scope = old_span
 
     def _end(self, end_timestamp: "Optional[Union[float, datetime]]" = None) -> None:
@@ -726,7 +726,7 @@ class NoOpStreamedSpan(StreamedSpan):
             with capture_internal_exceptions():
                 old_span = self._previous_span_on_scope
                 del self._previous_span_on_scope
-                self._scope.streamed_span = old_span
+                self._scope.span = old_span
 
         self._finished = True
 
@@ -799,6 +799,9 @@ class NoOpStreamedSpan(StreamedSpan):
             "dynamic_sampling_context": self._dynamic_sampling_context(),
         }
 
+# backwards compat
+StreamedSpan = Span
+NoOpStreamedSpan = NoOpSpan
 
 if TYPE_CHECKING:
 
@@ -892,12 +895,12 @@ def trace(
 
 def get_current_span(
     scope: "Optional[sentry_sdk.Scope]" = None,
-) -> "Optional[StreamedSpan]":
+) -> "Optional[Span]":
     """
-    Returns the currently active span on the scope if the span is a `StreamedSpan`, otherwise `None`.
+    Returns the currently active span on the scope if the span is a `Span`, otherwise `None`.
     """
     scope = scope or sentry_sdk.get_current_scope()
-    current_span = scope.streamed_span
+    current_span = scope.span
     return current_span
 
 

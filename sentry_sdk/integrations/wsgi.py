@@ -37,7 +37,7 @@ if TYPE_CHECKING:
     )
 
     from sentry_sdk._types import Event, EventProcessor
-    from sentry_sdk.traces import StreamedSpan
+    from sentry_sdk.traces import Span
     from sentry_sdk.utils import ExcInfo
 
     WsgiResponseIter = TypeVar("WsgiResponseIter")
@@ -127,7 +127,7 @@ class SentryWsgiMiddleware:
 
                     method = environ.get("REQUEST_METHOD", "").upper()
 
-                    span_ctx: "ContextManager[Union[StreamedSpan, None]]" = (
+                    span_ctx: "ContextManager[Union[Span, None]]" = (
                         nullcontext()
                     )
                     if method in self.http_methods_to_capture:
@@ -203,7 +203,7 @@ class SentryWsgiMiddleware:
 
 def _sentry_start_response(
     old_start_response: "StartResponse",
-    span: "Optional[Union[StreamedSpan]]",
+    span: "Optional[Union[Span]]",
     status: str,
     response_headers: "WsgiResponseHeaders",
     exc_info: "Optional[WsgiExcInfo]" = None,

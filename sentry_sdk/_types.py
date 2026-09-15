@@ -367,7 +367,7 @@ if TYPE_CHECKING:
             "start_timestamp": float,
             "end_timestamp": NotRequired[float],
             "attributes": NotRequired[Attributes],
-            "_segment_span": NotRequired["sentry_sdk.traces.StreamedSpan"],
+            "_segment_span": NotRequired["sentry_sdk.traces.Span"],
         },
     )
 

@@ -19,7 +19,7 @@ from sentry_sdk.utils import (
 )
 
 if TYPE_CHECKING:
-    from sentry_sdk.traces import StreamedSpan
+    from sentry_sdk.traces import Span
 
 try:
     from langgraph.errors import GraphBubbleUp
@@ -268,7 +268,7 @@ def _extract_tool_calls(messages: "Optional[List[Any]]") -> "Optional[List[Any]]
     return tool_calls if tool_calls else None
 
 
-def _set_usage_data(span: "StreamedSpan", messages: "Any") -> None:
+def _set_usage_data(span: "Span", messages: "Any") -> None:
     input_tokens = 0
     output_tokens = 0
     total_tokens = 0
@@ -299,7 +299,7 @@ def _set_usage_data(span: "StreamedSpan", messages: "Any") -> None:
         )
 
 
-def _set_response_model_name(span: "StreamedSpan", messages: "Any") -> None:
+def _set_response_model_name(span: "Span", messages: "Any") -> None:
     if len(messages) == 0:
         return
 

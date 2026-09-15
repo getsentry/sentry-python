@@ -51,7 +51,7 @@ if TYPE_CHECKING:
     )
 
     from sentry_sdk._types import TextPart
-    from sentry_sdk.traces import StreamedSpan
+    from sentry_sdk.traces import Span
 
 _is_PIL_available = False
 try:
@@ -679,7 +679,7 @@ def _capture_tool_input(
     return tool_input
 
 
-def _create_tool_span(tool_name: str, tool_doc: "Optional[str]") -> "StreamedSpan":
+def _create_tool_span(tool_name: str, tool_doc: "Optional[str]") -> "Span":
     """Create a span for tool execution."""
     span = sentry_sdk.traces.start_span(
         name=f"execute_tool {tool_name}",
@@ -897,7 +897,7 @@ def _transform_system_instructions(
 
 
 def set_span_data_for_request(
-    span: "StreamedSpan",
+    span: "Span",
     integration: "Any",
     model: str,
     contents: "ContentListUnion",
@@ -989,7 +989,7 @@ def set_span_data_for_request(
 
 
 def set_span_data_for_response(
-    span: "StreamedSpan",
+    span: "Span",
     integration: "Any",
     response: "GenerateContentResponse",
 ) -> None:
@@ -1103,7 +1103,7 @@ def prepare_embed_content_args(
 
 
 def set_span_data_for_embed_request(
-    span: "StreamedSpan",
+    span: "Span",
     integration: "Any",
     contents: "Any",
     kwargs: "dict[str, Any]",
@@ -1146,7 +1146,7 @@ def set_span_data_for_embed_request(
 
 
 def set_span_data_for_embed_response(
-    span: "StreamedSpan",
+    span: "Span",
     integration: "Any",
     response: "EmbedContentResponse",
 ) -> None:

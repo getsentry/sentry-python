@@ -4,7 +4,7 @@ import pytest
 
 import sentry_sdk
 from sentry_sdk.consts import MATCH_ALL
-from sentry_sdk.traces import StreamedSpan
+from sentry_sdk.traces import Span
 from sentry_sdk.tracing_utils import should_propagate_trace
 from sentry_sdk.utils import Dsn
 
@@ -16,12 +16,12 @@ def test_finds_segment_on_scope(sentry_init):
 
     with sentry_sdk.traces.start_span(name="dogpark"):
         scope = sentry_sdk.get_current_scope()
-        assert scope.streamed_span is not None
-        assert isinstance(scope.streamed_span, StreamedSpan)
-        assert scope.streamed_span.name == "dogpark"
+        assert scope.span is not None
+        assert isinstance(scope.span, Span)
+        assert scope.span.name == "dogpark"
 
         assert scope._span is not None
-        assert isinstance(scope._span, StreamedSpan)
+        assert isinstance(scope._span, Span)
         assert scope._span.name == "dogpark"
 
 
@@ -36,7 +36,7 @@ def test_finds_span_on_scope(sentry_init):
     scope = sentry_sdk.get_current_scope()
 
     assert scope._span is not None
-    assert isinstance(scope._span, StreamedSpan)
+    assert isinstance(scope._span, Span)
     assert scope._span.name == "sniffing"
 
 

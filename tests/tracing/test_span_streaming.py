@@ -8,9 +8,9 @@ import pytest
 import sentry_sdk
 from sentry_sdk.profiler.continuous_profiler import get_profiler_id
 from sentry_sdk.traces import (
-    NoOpStreamedSpan,
+    NoOpSpan,
     SpanStatus,
-    StreamedSpan,
+    Span,
 )
 
 minimum_python_38 = pytest.mark.skipif(
@@ -1345,15 +1345,15 @@ def test_ignore_spans_ignored_segment_drops_whole_tree(
 
     with sentry_sdk.traces.start_span(name="ignored") as ignored_span:
         assert ignored_span.sampled is False
-        assert isinstance(ignored_span, NoOpStreamedSpan)
+        assert isinstance(ignored_span, NoOpSpan)
 
         with sentry_sdk.traces.start_span(name="not ignored") as span1:
             assert span1.sampled is False
-            assert isinstance(span1, NoOpStreamedSpan)
+            assert isinstance(span1, NoOpSpan)
 
             with sentry_sdk.traces.start_span(name="not ignored") as span2:
                 assert span2.sampled is False
-                assert isinstance(span2, NoOpStreamedSpan)
+                assert isinstance(span2, NoOpSpan)
 
     sentry_sdk.get_client().flush()
     spans = [item.payload for item in items]
@@ -1378,15 +1378,15 @@ def test_ignore_spans_ignored_segment_drops_whole_tree_explicit_parent_span(
     lost_event_calls = capture_record_lost_event_calls()
 
     ignored_span = sentry_sdk.traces.start_span(name="ignored")
-    assert isinstance(ignored_span, NoOpStreamedSpan)
+    assert isinstance(ignored_span, NoOpSpan)
     assert ignored_span.sampled is False
 
     span1 = sentry_sdk.traces.start_span(name="not ignored 1", parent_span=ignored_span)
-    assert isinstance(span1, NoOpStreamedSpan)
+    assert isinstance(span1, NoOpSpan)
     assert span1.sampled is False
 
     span2 = sentry_sdk.traces.start_span(name="not ignored 2", parent_span=ignored_span)
-    assert isinstance(span2, NoOpStreamedSpan)
+    assert isinstance(span2, NoOpSpan)
     assert span2.sampled is False
 
     span1.end()
@@ -1456,22 +1456,22 @@ def test_ignore_spans_set_ignored_child_span_as_parent_explicit_parent_span(
     lost_event_calls = capture_record_lost_event_calls()
 
     segment = sentry_sdk.traces.start_span(name="segment")
-    assert not isinstance(segment, NoOpStreamedSpan)
+    assert not isinstance(segment, NoOpSpan)
     assert segment.sampled is True
     assert segment._parent_span_id is None
 
     ignored_span1 = sentry_sdk.traces.start_span(name="ignored", parent_span=segment)
-    assert isinstance(ignored_span1, NoOpStreamedSpan)
+    assert isinstance(ignored_span1, NoOpSpan)
     assert ignored_span1.sampled is False
 
     ignored_span2 = sentry_sdk.traces.start_span(
         name="ignored", parent_span=ignored_span1
     )
-    assert isinstance(ignored_span2, NoOpStreamedSpan)
+    assert isinstance(ignored_span2, NoOpSpan)
     assert ignored_span2.sampled is False
 
     span = sentry_sdk.traces.start_span(name="child", parent_span=ignored_span2)
-    assert not isinstance(span, NoOpStreamedSpan)
+    assert not isinstance(span, NoOpSpan)
     assert span.sampled is True
     assert span._parent_span_id == segment.span_id
     span.end()
@@ -1726,10 +1726,10 @@ def test_ignore_spans_top_level(
     with sentry_sdk.traces.start_span(name=name, attributes=attributes) as span:
         if ignored:
             assert span.sampled is False
-            assert isinstance(span, NoOpStreamedSpan)
+            assert isinstance(span, NoOpSpan)
         else:
             assert span.sampled is True
-            assert isinstance(span, StreamedSpan)
+            assert isinstance(span, Span)
 
     sentry_sdk.get_client().flush()
     spans = [item.payload for item in items]

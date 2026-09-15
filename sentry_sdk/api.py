@@ -28,7 +28,7 @@ if TYPE_CHECKING:
         LogLevelStr,
     )
     from sentry_sdk.client import BaseClient
-    from sentry_sdk.traces import StreamedSpan
+    from sentry_sdk.traces import Span
 
     T = TypeVar("T")
     F = TypeVar("F", bound=Callable[..., Any])
@@ -267,11 +267,11 @@ async def flush_async(
 
 
 @scopemethod
-def start_span(**kwargs: "Any") -> "StreamedSpan":
+def start_span(**kwargs: "Any") -> "Span":
     return traces.start_span(**kwargs)
 
 
-def get_current_span(scope: "Optional[Scope]" = None) -> "Optional[StreamedSpan]":
+def get_current_span(scope: "Optional[Scope]" = None) -> "Optional[Span]":
     """
     Returns the currently active span if there is one running, otherwise `None`
     """
