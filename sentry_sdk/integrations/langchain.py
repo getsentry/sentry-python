@@ -1135,8 +1135,6 @@ def _wrap_agent_executor_invoke(f: "Callable[..., Any]") -> "Callable[..., Any]"
             if run_name:
                 span.set_attribute(SPANDATA.GEN_AI_FUNCTION_ID, run_name)
 
-            _set_tools_on_span(span, tools)
-
             # Run the agent
             result = f(self, *args, **kwargs)
 
