@@ -6,8 +6,12 @@ from typing import TYPE_CHECKING
 import sentry_sdk
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable, _check_minimum_version
-from sentry_sdk.traces import Span, get_current_span
-from sentry_sdk.tracing import SOURCE_FOR_STYLE, TransactionSource
+from sentry_sdk.traces import (
+    SOURCE_FOR_STYLE,
+    SegmentNameSource,
+    Span,
+    get_current_span,
+)
 from sentry_sdk.utils import (
     has_data_collection_enabled,
     parse_version,
@@ -72,7 +76,7 @@ def _set_transaction_name_and_source(
 
     if not name:
         name = _DEFAULT_TRANSACTION_NAME
-        source = TransactionSource.ROUTE
+        source = SegmentNameSource.ROUTE
     else:
         source = SOURCE_FOR_STYLE[transaction_style]
 

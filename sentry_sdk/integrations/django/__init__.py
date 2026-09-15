@@ -21,7 +21,7 @@ from sentry_sdk.integrations.logging import ignore_logger_for_events
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
 from sentry_sdk.scope import add_global_event_processor, should_send_default_pii
 from sentry_sdk.serializer import add_global_repr_processor, add_repr_sequence_type
-from sentry_sdk.tracing import SOURCE_FOR_STYLE, TransactionSource
+from sentry_sdk.traces import SOURCE_FOR_STYLE, SegmentNameSource
 from sentry_sdk.tracing_utils import (
     add_query_source,
     record_sql_queries,
@@ -405,7 +405,7 @@ def _set_transaction_name_and_source(
 
         if transaction_name is None:
             transaction_name = request.path_info
-            source = TransactionSource.URL
+            source = SegmentNameSource.URL
         else:
             source = SOURCE_FOR_STYLE[transaction_style]
 

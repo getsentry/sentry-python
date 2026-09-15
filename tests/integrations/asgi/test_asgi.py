@@ -10,7 +10,7 @@ from sentry_sdk.integrations._asgi_common import (
     _get_ip,
 )
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware, _looks_like_asgi3
-from sentry_sdk.tracing import TransactionSource
+from sentry_sdk.traces import SegmentNameSource
 
 
 @pytest.fixture
@@ -134,7 +134,7 @@ def asgi3_ws_app():
 def asgi3_custom_transaction_app():
     async def app(scope, receive, send):
         sentry_sdk.get_current_scope().set_transaction_name(
-            "foobar", source=TransactionSource.CUSTOM
+            "foobar", source=SegmentNameSource.CUSTOM
         )
         await send(
             {

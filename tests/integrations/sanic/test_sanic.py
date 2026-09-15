@@ -14,7 +14,7 @@ from sanic.response import HTTPResponse
 import sentry_sdk
 from sentry_sdk import capture_message
 from sentry_sdk.integrations.sanic import SanicIntegration
-from sentry_sdk.tracing import TransactionSource
+from sentry_sdk.traces import SegmentNameSource
 from tests.conftest import get_free_port
 from tests.integrations.utils import (
     DATA_COLLECTION_REMOTE_ADDR_CASES,
@@ -377,28 +377,28 @@ class TransactionTestConfig:
             url="/message",
             expected_status=200,
             expected_transaction_name="hi",
-            expected_source=TransactionSource.COMPONENT,
+            expected_source=SegmentNameSource.COMPONENT,
         ),
         TransactionTestConfig(
             # Transaction for successful page load with query string
             url="/message?foo=bar",
             expected_status=200,
             expected_transaction_name="hi",
-            expected_source=TransactionSource.COMPONENT,
+            expected_source=SegmentNameSource.COMPONENT,
         ),
         TransactionTestConfig(
             # Transaction still recorded when we have an internal server error
             url="/500",
             expected_status=500,
             expected_transaction_name="fivehundred",
-            expected_source=TransactionSource.COMPONENT,
+            expected_source=SegmentNameSource.COMPONENT,
         ),
         TransactionTestConfig(
             # We should get transactions for 404 errors
             url="/404",
             expected_status=404,
             expected_transaction_name="/404",
-            expected_source=TransactionSource.URL,
+            expected_source=SegmentNameSource.URL,
         ),
     ],
 )

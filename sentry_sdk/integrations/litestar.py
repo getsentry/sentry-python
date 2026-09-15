@@ -13,7 +13,7 @@ from sentry_sdk.integrations import (
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 from sentry_sdk.integrations.logging import ignore_logger_for_events
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.tracing import SOURCE_FOR_STYLE, TransactionSource
+from sentry_sdk.traces import SOURCE_FOR_STYLE, SegmentNameSource
 from sentry_sdk.utils import (
     ensure_integration_enabled,
     event_from_exception,
@@ -272,7 +272,7 @@ def patch_http_route_handle() -> None:
 
         if not name:
             name = _DEFAULT_TRANSACTION_NAME
-            source = TransactionSource.ROUTE
+            source = SegmentNameSource.ROUTE
 
         sentry_sdk.set_transaction_name(name, source)
         sentry_scope.set_transaction_name(name, source)

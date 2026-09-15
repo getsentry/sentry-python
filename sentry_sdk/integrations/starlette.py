@@ -25,11 +25,7 @@ from sentry_sdk.integrations._wsgi_common import (
 )
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.traces import Span
-from sentry_sdk.tracing import (
-    SOURCE_FOR_STYLE,
-    TransactionSource,
-)
+from sentry_sdk.traces import SOURCE_FOR_STYLE, SegmentNameSource, Span
 from sentry_sdk.utils import (
     AnnotatedValue,
     capture_internal_exceptions,
@@ -162,7 +158,7 @@ def _enable_span_for_middleware(
         if (
             server_span is not None
             and route_path is not None
-            and name_source == TransactionSource.ROUTE
+            and name_source == SegmentNameSource.ROUTE
         ):
             server_span.set_attribute(SPANDATA.HTTP_ROUTE, route_path)
 
@@ -516,7 +512,7 @@ async def _wrap_async_handler(
     if (
         server_span is not None
         and route_path is not None
-        and name_source == TransactionSource.ROUTE
+        and name_source == SegmentNameSource.ROUTE
     ):
         server_span.set_attribute(SPANDATA.HTTP_ROUTE, route_path)
 
@@ -628,7 +624,7 @@ def patch_request_response() -> None:
                 if (
                     server_span is not None
                     and route_path is not None
-                    and name_source == TransactionSource.ROUTE
+                    and name_source == SegmentNameSource.ROUTE
                 ):
                     server_span.set_attribute(SPANDATA.HTTP_ROUTE, route_path)
 
@@ -832,22 +828,22 @@ class StarletteRequestExtractor:
 
 def _http_route_and_source_from_router(
     scope: "StarletteScope",
-) -> "Tuple[Optional[str], TransactionSource]":
+) -> "Tuple[Optional[str], SegmentNameSource]":
     router = scope.get("router")
     if not router:
-        return None, TransactionSource.ROUTE
+        return None, SegmentNameSource.ROUTE
 
     for route in router.routes:
         match = route.matches(scope)
         if match[0] == Match.FULL:
             try:
-                return route.path, TransactionSource.ROUTE
+                return route.path, SegmentNameSource.ROUTE
             except AttributeError:
                 # Host routes have no path template, so fall back to the
                 # concrete request path and classify it as a URL.
-                return scope.get("path"), TransactionSource.URL
+                return scope.get("path"), SegmentNameSource.URL
 
-    return None, TransactionSource.ROUTE
+    return None, SegmentNameSource.ROUTE
 
 
 def _set_transaction_name_and_source(
@@ -855,7 +851,7 @@ def _set_transaction_name_and_source(
     transaction_style: str,
     endpoint: "Optional[Callable[..., Any]]",
     route_path: "Optional[str]",
-    name_source: "TransactionSource",
+    name_source: "SegmentNameSource",
 ) -> None:
     name = None
     source = SOURCE_FOR_STYLE[transaction_style]
@@ -868,7 +864,7 @@ def _set_transaction_name_and_source(
 
     if name is None:
         name = _DEFAULT_TRANSACTION_NAME
-        source = TransactionSource.ROUTE
+        source = SegmentNameSource.ROUTE
 
     scope.set_transaction_name(name, source=source)
 
@@ -877,14 +873,14 @@ def _get_transaction_from_middleware(
     app: "Any",
     integration: "StarletteIntegration",
     route_path: "Optional[str]",
-    name_source: "TransactionSource",
+    name_source: "SegmentNameSource",
 ) -> "Tuple[Optional[str], Optional[str]]":
     name = None
     source = None
 
     if integration.transaction_style == "endpoint":
         name = transaction_from_function(app.__class__)
-        source = TransactionSource.COMPONENT
+        source = SegmentNameSource.COMPONENT
     elif integration.transaction_style == "url":
         name, source = route_path, name_source
 
