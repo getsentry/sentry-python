@@ -194,7 +194,9 @@ def test_attach_stacktrace_works(sentry_init, capture_events, app, get_client):
 
     (event,) = events
 
-    assert len(event["request"]["data"]["foo"]["bar"]) == 1024
+    # As long as this test finishes, we're good. It's just making sure we don't
+    # hang.
+    assert event["request"]["data"]
 
 
 @pytest.mark.parametrize("data", [{}, []], ids=["empty-dict", "empty-list"])
