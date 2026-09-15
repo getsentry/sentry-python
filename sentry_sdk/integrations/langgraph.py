@@ -19,7 +19,7 @@ from sentry_sdk.utils import (
 )
 
 if TYPE_CHECKING:
-    from sentry_sdk.traces import Span
+    pass
 
 try:
     from langgraph.errors import GraphBubbleUp
@@ -268,37 +268,6 @@ def _extract_tool_calls(messages: "Optional[List[Any]]") -> "Optional[List[Any]]
     return tool_calls if tool_calls else None
 
 
-def _set_usage_data(span: "Span", messages: "Any") -> None:
-    input_tokens = 0
-    output_tokens = 0
-    total_tokens = 0
-
-    for message in messages:
-        response_metadata = message.get("response_metadata")
-        if response_metadata is None:
-            continue
-
-        token_usage = response_metadata.get("token_usage")
-        if not token_usage:
-            continue
-
-        input_tokens += int(token_usage.get("prompt_tokens", 0))
-        output_tokens += int(token_usage.get("completion_tokens", 0))
-        total_tokens += int(token_usage.get("total_tokens", 0))
-
-    if input_tokens > 0:
-        span.set_attribute(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, input_tokens)
-
-    if output_tokens > 0:
-        span.set_attribute(SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS, output_tokens)
-
-    if total_tokens > 0:
-        span.set_attribute(
-            SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS,
-            total_tokens,
-        )
-
-
 def _set_response_attributes(
     span: "Any",
     input_messages: "Optional[List[Any]]",
@@ -310,8 +279,6 @@ def _set_response_attributes(
 
     if new_messages is None:
         return
-
-    _set_usage_data(span, new_messages)
 
     if _should_record_outputs(integration):
         llm_response_text = _extract_llm_response_text(new_messages)
