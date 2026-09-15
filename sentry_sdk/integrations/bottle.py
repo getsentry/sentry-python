@@ -75,6 +75,23 @@ class BottleIntegration(Integration):
         version = parse_version(BOTTLE_VERSION)
         _check_minimum_version(BottleIntegration, version)
 
+        # Bottle's Route.__repr__ calls get_undecorated_callback() which has
+        # a while-True loop that hangs when the callback is a closure whose
+        # cells don't contain any callable. This is triggered when
+        # attach_stacktrace=True serializes local variables including Route
+        # objects via safe_repr → repr(). Providing __sentry_repr__ makes the
+        # serializer use it instead of repr().
+        def _sentry_route_repr(self: "Route") -> str:
+            cb = self.callback
+            return "<%s %s -> %s:%s>" % (
+                self.method,
+                self.rule,
+                getattr(cb, "__module__", "?"),
+                getattr(cb, "__name__", "?"),
+            )
+
+        Route.__sentry_repr__ = _sentry_route_repr
+
         old_app = Bottle.__call__
 
         @ensure_integration_enabled(BottleIntegration, old_app)
