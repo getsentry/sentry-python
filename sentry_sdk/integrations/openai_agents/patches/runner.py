@@ -5,7 +5,6 @@ import sentry_sdk
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     has_data_collection_enabled,
@@ -64,10 +63,7 @@ class _SentryRunHooks(RunHooks[TContext]):
         elif not should_send_default_pii():
             return
 
-        if isinstance(span, StreamedSpan):
-            span.set_attribute(SPANDATA.GEN_AI_TOOL_INPUT, context.tool_arguments)
-        else:
-            span.set_data(SPANDATA.GEN_AI_TOOL_INPUT, context.tool_arguments)
+        span.set_attribute(SPANDATA.GEN_AI_TOOL_INPUT, context.tool_arguments)
 
     async def on_tool_end(
         self,
@@ -126,7 +122,7 @@ def _patch_run_hooks(hooks: "RunHooks[TContext]") -> None:
 
 
 def _create_run_wrapper(
-    original_func: "Callable[..., Any]", use_run_hooks: "bool"
+    original_func: "Callable[..., Any]",
 ) -> "Callable[..., Any]":
     """
     Wraps the agents.Runner.run methods to
@@ -139,12 +135,11 @@ def _create_run_wrapper(
 
     @wraps(original_func)
     async def wrapper(*args: "Any", **kwargs: "Any") -> "Any":
-        if use_run_hooks:
-            hooks = kwargs.get("hooks")
-            if hooks is not None:
-                _patch_run_hooks(hooks=hooks)
-            else:
-                kwargs["hooks"] = _SentryRunHooks()
+        hooks = kwargs.get("hooks")
+        if hooks is not None:
+            _patch_run_hooks(hooks=hooks)
+        else:
+            kwargs["hooks"] = _SentryRunHooks()
 
         # Isolate each workflow so that when agents are run in asyncio tasks they
         # don't touch each other's scopes
@@ -161,14 +156,9 @@ def _create_run_wrapper(
                 if conversation_id:
                     agent._sentry_conversation_id = conversation_id
 
-                    if isinstance(workflow_span, StreamedSpan):
-                        workflow_span.set_attribute(
-                            SPANDATA.GEN_AI_CONVERSATION_ID, conversation_id
-                        )
-                    else:
-                        workflow_span.set_data(
-                            SPANDATA.GEN_AI_CONVERSATION_ID, conversation_id
-                        )
+                    workflow_span.set_attribute(
+                        SPANDATA.GEN_AI_CONVERSATION_ID, conversation_id
+                    )
 
                 if "starting_agent" in kwargs:
                     kwargs["starting_agent"] = agent
@@ -188,19 +178,12 @@ def _create_run_wrapper(
                                 context_wrapper, "_sentry_agent_span", None
                             )
 
-                            if invoke_agent_span is not None and (
-                                (
-                                    isinstance(invoke_agent_span, StreamedSpan)
-                                    and invoke_agent_span.end_timestamp is None
-                                )
-                                or (
-                                    not isinstance(invoke_agent_span, StreamedSpan)
-                                    and invoke_agent_span.timestamp is None
-                                )
+                            if (
+                                invoke_agent_span is not None
+                                and invoke_agent_span.end_timestamp is None
                             ):
                                 update_invoke_agent_span(
                                     span=invoke_agent_span,
-                                    context=context_wrapper,
                                     agent=agent,
                                 )
 
@@ -224,7 +207,6 @@ def _create_run_wrapper(
 
                 update_invoke_agent_span(
                     span=invoke_agent_span,
-                    context=run_result.context_wrapper,
                     agent=agent,
                 )
 
@@ -236,7 +218,7 @@ def _create_run_wrapper(
 
 
 def _create_run_streamed_wrapper(
-    original_func: "Callable[..., Any]", use_run_hooks: "bool"
+    original_func: "Callable[..., Any]",
 ) -> "Callable[..., Any]":
     """
     Wraps the agents.Runner.run_streamed method to
@@ -271,12 +253,9 @@ def _create_run_streamed_wrapper(
 
         # Set conversation ID on workflow span early so it's captured even on errors
         if conversation_id:
-            if isinstance(workflow_span, StreamedSpan):
-                workflow_span.set_attribute(
-                    SPANDATA.GEN_AI_CONVERSATION_ID, conversation_id
-                )
-            else:
-                workflow_span.set_data(SPANDATA.GEN_AI_CONVERSATION_ID, conversation_id)
+            workflow_span.set_attribute(
+                SPANDATA.GEN_AI_CONVERSATION_ID, conversation_id
+            )
 
         # Store span on agent for cleanup
         agent._sentry_workflow_span = workflow_span
@@ -286,13 +265,12 @@ def _create_run_streamed_wrapper(
         else:
             args = (agent, *args[1:])
 
-        if use_run_hooks:
-            sentry_hooks = _SentryRunHooks()  # type: ignore[var-annotated]
-            hooks = kwargs.get("hooks")
-            if hooks is not None:
-                _patch_run_hooks(hooks=hooks)
-            else:
-                kwargs["hooks"] = sentry_hooks
+        sentry_hooks = _SentryRunHooks()  # type: ignore[var-annotated]
+        hooks = kwargs.get("hooks")
+        if hooks is not None:
+            _patch_run_hooks(hooks=hooks)
+        else:
+            kwargs["hooks"] = sentry_hooks
 
         try:
             # Call original function to get RunResultStreaming

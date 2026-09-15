@@ -1,24 +1,16 @@
 import functools
 from typing import TYPE_CHECKING
 
-from django import VERSION as DJANGO_VERSION
 from django.template import TemplateSyntaxError
+from django.template.base import Origin
 from django.utils.safestring import mark_safe
 
 import sentry_sdk
 from sentry_sdk.consts import OP
-from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import ensure_integration_enabled
 
 if TYPE_CHECKING:
     from typing import Any, Dict, Iterator, Optional, Tuple
-
-try:
-    # support Django 1.9
-    from django.template.base import Origin
-except ImportError:
-    # backward compatibility
-    from django.template.loader import LoaderOrigin as Origin
 
 
 def get_template_frame_from_exception(
@@ -62,31 +54,20 @@ def patch_templates() -> None:
     @property  # type: ignore
     @ensure_integration_enabled(DjangoIntegration, real_rendered_content.fget)
     def rendered_content(self: "SimpleTemplateResponse") -> str:
-        span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
-        if span_streaming:
-            if sentry_sdk.traces.get_current_span() is None:
-                return real_rendered_content.fget(self)
-            with sentry_sdk.traces.start_span(
-                name=_get_template_name_description(self.template_name),
-                attributes={
-                    "sentry.op": OP.TEMPLATE_RENDER,
-                    "sentry.origin": DjangoIntegration.origin,
-                },
-            ):
-                return real_rendered_content.fget(self)
-        else:
-            with sentry_sdk.start_span(
-                op=OP.TEMPLATE_RENDER,
-                name=_get_template_name_description(self.template_name),
-                origin=DjangoIntegration.origin,
-            ) as span:
-                span.set_data("context", self.context_data)
-                return real_rendered_content.fget(self)
+        if sentry_sdk.traces.get_current_span() is None:
+            return real_rendered_content.fget(self)
+
+        with sentry_sdk.traces.start_span(
+            name=_get_template_name_description(self.template_name),
+            attributes={
+                "sentry.op": OP.TEMPLATE_RENDER,
+                "sentry.origin": DjangoIntegration.origin,
+            },
+        ):
+            return real_rendered_content.fget(self)
 
     SimpleTemplateResponse.rendered_content = rendered_content
 
-    if DJANGO_VERSION < (1, 7):
-        return
     import django.shortcuts
 
     real_render = django.shortcuts.render
@@ -107,28 +88,17 @@ def patch_templates() -> None:
                 sentry_sdk.get_current_scope().trace_propagation_meta()
             )
 
-        client = sentry_sdk.get_client()
-        span_streaming = has_span_streaming_enabled(client.options)
+        if sentry_sdk.traces.get_current_span() is None:
+            return real_render(request, template_name, context, *args, **kwargs)
 
-        if span_streaming:
-            if sentry_sdk.traces.get_current_span() is None:
-                return real_render(request, template_name, context, *args, **kwargs)
-            with sentry_sdk.traces.start_span(
-                name=_get_template_name_description(template_name),
-                attributes={
-                    "sentry.op": OP.TEMPLATE_RENDER,
-                    "sentry.origin": DjangoIntegration.origin,
-                },
-            ):
-                return real_render(request, template_name, context, *args, **kwargs)
-        else:
-            with sentry_sdk.start_span(
-                op=OP.TEMPLATE_RENDER,
-                name=_get_template_name_description(template_name),
-                origin=DjangoIntegration.origin,
-            ) as span:
-                span.set_data("context", context)
-                return real_render(request, template_name, context, *args, **kwargs)
+        with sentry_sdk.traces.start_span(
+            name=_get_template_name_description(template_name),
+            attributes={
+                "sentry.op": OP.TEMPLATE_RENDER,
+                "sentry.origin": DjangoIntegration.origin,
+            },
+        ):
+            return real_render(request, template_name, context, *args, **kwargs)
 
     django.shortcuts.render = render
 
