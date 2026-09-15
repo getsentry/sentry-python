@@ -121,7 +121,7 @@ def record_sql_queries(
     record_cursor_repr: bool = False,
     span_origin: str = "manual",
     span_op_override_value: "Optional[str]" = None,
-) -> "Generator[sentry_sdk.traces.StreamedSpan, None, None]":
+) -> "Generator[sentry_sdk.traces.Span, None, None]":
     # TODO: Bring back capturing of params by default
     client = sentry_sdk.get_client()
     if has_data_collection_enabled(client.options):
@@ -258,7 +258,7 @@ def _should_be_included(
 
 
 def add_source(
-    span: "sentry_sdk.traces.StreamedSpan",
+    span: "sentry_sdk.traces.Span",
     project_root: "Optional[str]",
     in_app_include: "Optional[list[str]]",
     in_app_exclude: "Optional[list[str]]",
@@ -333,7 +333,7 @@ def add_source(
 
 
 def add_query_source(
-    span: "sentry_sdk.traces.StreamedSpan",
+    span: "sentry_sdk.traces.Span",
 ) -> None:
     """
     Adds OTel compatible source code information to a database query span
@@ -366,7 +366,7 @@ def add_query_source(
     )
 
 
-def add_http_request_source(span: "sentry_sdk.traces.StreamedSpan") -> None:
+def add_http_request_source(span: "sentry_sdk.traces.Span") -> None:
     """
     Adds OTel compatible source code information to a span for an outgoing HTTP request
     """
@@ -760,7 +760,7 @@ class Baggage:
         return Baggage(sentry_items, third_party_items, mutable)
 
     @classmethod
-    def populate_from_segment(cls, segment: "StreamedSpan") -> "Baggage":
+    def populate_from_segment(cls, segment: "Span") -> "Baggage":
         """
         Populate fresh baggage entry with sentry_items and make it immutable
         if this is the head SDK which originates traces.
@@ -1297,7 +1297,7 @@ def is_ignored_span(name: str, attributes: "Optional[Attributes]") -> bool:
 # Circular imports
 from sentry_sdk.traces import (
     LOW_QUALITY_SEGMENT_SOURCES,
-    StreamedSpan,
+    Span,
 )
 from sentry_sdk.tracing import (
     BAGGAGE_HEADER_NAME,

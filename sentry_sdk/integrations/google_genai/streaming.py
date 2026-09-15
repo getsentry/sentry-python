@@ -4,7 +4,7 @@ import sentry_sdk
 from sentry_sdk.ai.utils import set_data_normalized
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.traces import StreamedSpan
+from sentry_sdk.traces import Span
 from sentry_sdk.utils import (
     has_data_collection_enabled,
     safe_serialize,
@@ -98,7 +98,7 @@ def accumulate_streaming_response(
 
 
 def set_span_data_for_streaming_response(
-    span: "StreamedSpan",
+    span: "Span",
     integration: "Any",
     accumulated_response: "AccumulatedResponse",
 ) -> None:

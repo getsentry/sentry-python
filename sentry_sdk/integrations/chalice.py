@@ -7,8 +7,8 @@ from sentry_sdk.integrations._wsgi_common import _filter_headers
 from sentry_sdk.integrations.aws_lambda import _make_request_event_processor
 from sentry_sdk.traces import (
     SegmentNameSource,
+    Span,
     SpanStatus,
-    StreamedSpan,
 )
 from sentry_sdk.utils import (
     capture_internal_exceptions,
@@ -84,7 +84,7 @@ def _get_view_function_response(
 
             current_span = sentry_sdk.traces.get_current_span()
             segment = None
-            if type(current_span) is StreamedSpan:
+            if type(current_span) is Span:
                 # A segment already exists (created by the AWS Lambda
                 # integration), so decorate it with Chalice attributes
                 # The AWS Lambda integration owns the span lifecycle

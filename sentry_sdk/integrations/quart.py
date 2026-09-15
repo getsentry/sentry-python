@@ -12,7 +12,7 @@ from sentry_sdk.integrations._wsgi_common import _filter_headers
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import SOURCE_FOR_STYLE as SEGMENT_SOURCE_FOR_STYLE
-from sentry_sdk.traces import StreamedSpan, get_current_span
+from sentry_sdk.traces import Span, get_current_span
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
@@ -181,7 +181,7 @@ async def _request_websocket_started(app: "Quart", **kwargs: "Any") -> None:
     scope = sentry_sdk.get_isolation_scope()
 
     current_span = get_current_span()
-    if type(current_span) is StreamedSpan:
+    if type(current_span) is Span:
         segment = current_span._segment
 
         segment.set_attribute("http.request.method", request_websocket.method)

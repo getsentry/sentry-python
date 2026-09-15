@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from typing import Any, Dict, Optional, Tuple
 
-    from sentry_sdk.traces import StreamedSpan
+    from sentry_sdk.traces import Span
 
 import sentry_sdk
 from sentry_sdk.utils import logger
@@ -448,7 +448,7 @@ def _normalize_data(data: "Any", unpack: bool = True) -> "Any":
 
 
 def set_data_normalized(
-    span: "StreamedSpan",
+    span: "Span",
     key: str,
     value: "Any",
     unpack: bool = True,

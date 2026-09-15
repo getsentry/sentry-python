@@ -29,7 +29,7 @@ if TYPE_CHECKING:
         CommandSucceededEvent,
     )
 
-    from sentry_sdk.traces import StreamedSpan
+    from sentry_sdk.traces import Span
 
 
 SAFE_COMMAND_ATTRIBUTES = [
@@ -115,7 +115,7 @@ def _get_db_data(event: "Any") -> "Dict[str, Any]":
 
 class CommandTracer(monitoring.CommandListener):
     def __init__(self) -> None:
-        self._ongoing_operations: "dict[int, StreamedSpan]" = {}
+        self._ongoing_operations: "dict[int, Span]" = {}
 
     def _operation_key(
         self,

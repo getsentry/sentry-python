@@ -34,7 +34,7 @@ from sentry_sdk.integrations.django import (
 from sentry_sdk.integrations.django.signals_handlers import _get_receiver_name
 from sentry_sdk.integrations.executing import ExecutingIntegration
 from sentry_sdk.profiler.utils import get_frame_name
-from sentry_sdk.traces import StreamedSpan
+from sentry_sdk.traces import Span
 from tests.conftest import unpack_werkzeug_response
 from tests.integrations.django.myapp.signals import myapp_custom_signal_silenced
 from tests.integrations.django.myapp.wsgi import application
@@ -851,9 +851,7 @@ def test_set_db_data_custom_backend():
             return {}
 
     try:
-        _set_db_data(
-            StreamedSpan(name="name", scope=sentry_sdk.Scope()), DummyBackend()
-        )
+        _set_db_data(Span(name="name", scope=sentry_sdk.Scope()), DummyBackend())
     except TypeError:
         pytest.fail("A TypeError was raised")
 

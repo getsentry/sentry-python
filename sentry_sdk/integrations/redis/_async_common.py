@@ -24,14 +24,14 @@ if TYPE_CHECKING:
     from redis.asyncio.client import Pipeline, Redis
     from redis.asyncio.cluster import ClusterPipeline, RedisCluster
 
-    from sentry_sdk.traces import StreamedSpan
+    from sentry_sdk.traces import Span
 
 
 def patch_redis_async_pipeline(
     pipeline_cls: "Union[type[Pipeline[Any]], type[ClusterPipeline[Any]]]",
     is_cluster: bool,
     get_command_args_fn: "Any",
-    set_db_data_fn: "Callable[[StreamedSpan, Any], None]",
+    set_db_data_fn: "Callable[[Span, Any], None]",
 ) -> None:
     old_execute = pipeline_cls.execute
 
@@ -75,7 +75,7 @@ def patch_redis_async_pipeline(
 def patch_redis_async_client(
     cls: "Union[type[Redis[Any]], type[RedisCluster[Any]]]",
     is_cluster: bool,
-    set_db_data_fn: "Callable[[StreamedSpan, Any], None]",
+    set_db_data_fn: "Callable[[Span, Any], None]",
 ) -> None:
     old_execute_command = cls.execute_command
 
@@ -123,7 +123,7 @@ def patch_redis_async_client(
                 _get_safe_command(name, args)
             )
 
-        cache_span: "Optional[StreamedSpan]" = None
+        cache_span: "Optional[Span]" = None
         if cache_properties["is_cache_key"] and cache_properties["op"] is not None:
             cache_span = sentry_sdk.traces.start_span(
                 name=cache_properties["description"],

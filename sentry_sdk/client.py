@@ -30,7 +30,7 @@ from sentry_sdk.profiler.continuous_profiler import setup_continuous_profiler
 from sentry_sdk.scrubber import EventScrubber
 from sentry_sdk.serializer import serialize
 from sentry_sdk.sessions import SessionFlusher
-from sentry_sdk.traces import StreamedSpan, trace
+from sentry_sdk.traces import Span, trace
 from sentry_sdk.transport import (
     AsyncHttpTransport,
     HttpTransportCore,
@@ -70,7 +70,7 @@ if TYPE_CHECKING:
     from sentry_sdk.scope import Scope
     from sentry_sdk.session import Session
     from sentry_sdk.spotlight import SpotlightClient
-    from sentry_sdk.traces import StreamedSpan
+    from sentry_sdk.traces import Span
     from sentry_sdk.transport import Item, Transport
     from sentry_sdk.utils import Dsn
 
@@ -215,7 +215,7 @@ class BaseClient:
     def _capture_metric(self, metric: "Metric", scope: "Scope") -> None:
         pass
 
-    def _capture_span(self, span: "StreamedSpan", scope: "Scope") -> None:
+    def _capture_span(self, span: "Span", scope: "Scope") -> None:
         pass
 
     def capture_session(self, *args: "Any", **kwargs: "Any") -> None:
@@ -815,7 +815,7 @@ class _Client(BaseClient):
 
     def _capture_telemetry(
         self,
-        telemetry: "Optional[Union[Log, Metric, StreamedSpan]]",
+        telemetry: "Optional[Union[Log, Metric, Span]]",
         ty: str,
         scope: "Scope",
     ) -> None:
@@ -864,7 +864,7 @@ class _Client(BaseClient):
                 if serialized is None:
                     return
 
-            elif ty == "span" and isinstance(telemetry, StreamedSpan):
+            elif ty == "span" and isinstance(telemetry, Span):
                 # Reset the span to its original value before we attempted
                 # to call the `before_send_span` callback
                 if exception_raised_in_before_send_func:
@@ -908,7 +908,7 @@ class _Client(BaseClient):
     def _capture_metric(self, metric: "Optional[Metric]", scope: "Scope") -> None:
         self._capture_telemetry(metric, "metric", scope)
 
-    def _capture_span(self, span: "Optional[StreamedSpan]", scope: "Scope") -> None:
+    def _capture_span(self, span: "Optional[Span]", scope: "Scope") -> None:
         self._capture_telemetry(span, "span", scope)
 
     def capture_session(

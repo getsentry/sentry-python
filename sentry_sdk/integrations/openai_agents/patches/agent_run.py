@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING
 
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable
-from sentry_sdk.traces import StreamedSpan
+from sentry_sdk.traces import Span
 from sentry_sdk.utils import capture_internal_exceptions, reraise
 
 from ..spans import (
@@ -50,7 +50,7 @@ def _maybe_start_agent_span(
     should_run_agent_start_hooks: bool,
     span_kwargs: "dict[str, Any]",
     is_streaming: bool = False,
-) -> "Optional[StreamedSpan]":
+) -> "Optional[Span]":
     """
     Start an agent invocation span if conditions are met.
     Handles ending any existing span for a different agent.

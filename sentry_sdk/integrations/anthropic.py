@@ -15,7 +15,7 @@ from sentry_sdk.ai.utils import (
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.traces import StreamedSpan
+from sentry_sdk.traces import Span
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
@@ -83,7 +83,7 @@ if TYPE_CHECKING:
     from sentry_sdk._types import TextPart
 
     class _PatchedRawMessageStream(Stream[RawMessageStreamEvent]):
-        _span: StreamedSpan
+        _span: Span
         _integration: "AnthropicIntegration"
 
         _model: Optional[ModelParam]
@@ -93,7 +93,7 @@ if TYPE_CHECKING:
         _finish_reason: Optional[str]
 
     class _PatchedMessageStream(MessageStream):
-        _span: StreamedSpan
+        _span: Span
         _integration: "AnthropicIntegration"
 
         _model: Optional[ModelParam]
@@ -103,7 +103,7 @@ if TYPE_CHECKING:
         _finish_reason: Optional[str]
 
     class _PatchedRawAsyncMessageStream(AsyncStream[RawMessageStreamEvent]):
-        _span: StreamedSpan
+        _span: Span
         _integration: "AnthropicIntegration"
 
         _model: Optional[ModelParam]
@@ -113,7 +113,7 @@ if TYPE_CHECKING:
         _finish_reason: Optional[str]
 
     class _PatchedAsyncMessageStream(AsyncMessageStream):
-        _span: StreamedSpan
+        _span: Span
         _integration: "AnthropicIntegration"
 
         _model: Optional[ModelParam]
@@ -123,7 +123,7 @@ if TYPE_CHECKING:
         _finish_reason: Optional[str]
 
     class _PatchedMessageStreamManager(MessageStreamManager):
-        _span: StreamedSpan
+        _span: Span
         _integration: "AnthropicIntegration"
 
         _max_tokens: int
@@ -136,7 +136,7 @@ if TYPE_CHECKING:
         _tools: Optional[Iterable[ToolUnionParam]]
 
     class _PatchedAsyncMessageStreamManager(AsyncMessageStreamManager[Any]):
-        _span: StreamedSpan
+        _span: Span
         _integration: "AnthropicIntegration"
 
         _max_tokens: int
@@ -441,7 +441,7 @@ def _transform_system_instructions(
 
 
 def _set_common_input_data(
-    span: "StreamedSpan",
+    span: "Span",
     integration: "AnthropicIntegration",
     max_tokens: "int",
     messages: "Iterable[MessageParam]",
@@ -556,7 +556,7 @@ def _set_common_input_data(
 
 
 def _set_create_input_data(
-    span: "StreamedSpan",
+    span: "Span",
     kwargs: "dict[str, Any]",
     integration: "AnthropicIntegration",
 ) -> None:
@@ -640,7 +640,7 @@ async def _wrap_asynchronous_message_iterator(
 
 
 def _set_output_data(
-    span: "StreamedSpan",
+    span: "Span",
     integration: "AnthropicIntegration",
     model: "str | None",
     input_tokens: "int | None",
@@ -928,7 +928,7 @@ def _accumulate_event_data(
 
 
 def _set_streaming_output_data(
-    span: "StreamedSpan",
+    span: "Span",
     integration: "AnthropicIntegration",
     model: "Optional[str]",
     usage: "_RecordedUsage",

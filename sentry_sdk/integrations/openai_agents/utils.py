@@ -16,7 +16,7 @@ from sentry_sdk.ai.utils import (
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.traces import StreamedSpan
+from sentry_sdk.traces import Span
 from sentry_sdk.utils import (
     event_from_exception,
     has_data_collection_enabled,
@@ -46,7 +46,7 @@ def _capture_exception(exc: "Any") -> None:
     sentry_sdk.capture_event(event, hint=hint)
 
 
-def _set_agent_data(span: "StreamedSpan", agent: "agents.Agent") -> None:
+def _set_agent_data(span: "Span", agent: "agents.Agent") -> None:
     span.set_attribute(
         SPANDATA.GEN_AI_PROVIDER_NAME, "openai"
     )  # See footnote for  https://opentelemetry.io/docs/specs/semconv/registry/attributes/gen-ai/#gen-ai-system for explanation why.
@@ -90,7 +90,7 @@ def _set_agent_data(span: "StreamedSpan", agent: "agents.Agent") -> None:
         )
 
 
-def _set_usage_data(span: "StreamedSpan", usage: "Usage") -> None:
+def _set_usage_data(span: "Span", usage: "Usage") -> None:
     span.set_attribute(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, usage.input_tokens)
     span.set_attribute(
         SPANDATA.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
@@ -105,7 +105,7 @@ def _set_usage_data(span: "StreamedSpan", usage: "Usage") -> None:
 
 
 def _set_input_data(
-    span: "StreamedSpan",
+    span: "Span",
     get_response_kwargs: "dict[str, Any]",
 ) -> None:
     client = sentry_sdk.get_client()
@@ -182,7 +182,7 @@ def _set_input_data(
     )
 
 
-def _set_output_data(span: "StreamedSpan", result: "Any") -> None:
+def _set_output_data(span: "Span", result: "Any") -> None:
     client = sentry_sdk.get_client()
     record_outputs = False
     if has_data_collection_enabled(client.options):

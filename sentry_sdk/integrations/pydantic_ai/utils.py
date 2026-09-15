@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING
 import sentry_sdk
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.traces import StreamedSpan
+from sentry_sdk.traces import Span
 from sentry_sdk.utils import (
     event_from_exception,
     has_data_collection_enabled,
@@ -56,7 +56,7 @@ def _should_send_outputs() -> bool:
     return _should_send_prompts_legacy()
 
 
-def _set_agent_data(span: "StreamedSpan", agent: "Optional[Agent]") -> None:
+def _set_agent_data(span: "Span", agent: "Optional[Agent]") -> None:
     """Set agent-related data on a span.
 
     Args:
@@ -95,7 +95,7 @@ def _get_model_name(
 
 
 def _set_model_data(
-    span: "StreamedSpan",
+    span: "Span",
     agent: "Optional[Agent]",
     model: "Union[Model, AbstractModel]",
     model_settings: "Optional[Union[ModelSettings, RealtimeModelSettings]]",
@@ -151,9 +151,7 @@ def _set_model_data(
                         span.set_attribute(spandata_key, value)
 
 
-def _set_available_tools(
-    span: "StreamedSpan", agent: "Optional[Agent[Any, Any]]"
-) -> None:
+def _set_available_tools(span: "Span", agent: "Optional[Agent[Any, Any]]") -> None:
     """Set available tools data on a span from an agent's function toolset.
 
     Args:

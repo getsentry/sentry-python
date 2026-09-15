@@ -15,7 +15,7 @@ from sentry_sdk.ai.utils import (
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.traces import StreamedSpan, _AgentFrameworkChatGenerationContext
+from sentry_sdk.traces import Span, _AgentFrameworkChatGenerationContext
 from sentry_sdk.tracing_utils import (
     _get_value,
 )
@@ -211,7 +211,7 @@ class SentryLangchainCallback(BaseCallbackHandler):
     """Callback handler that creates Sentry spans."""
 
     def __init__(self, include_prompts: bool) -> None:
-        self.span_map: "OrderedDict[UUID, Union[StreamedSpan, _AgentFrameworkChatGenerationContext]]" = OrderedDict()
+        self.span_map: "OrderedDict[UUID, Union[Span, _AgentFrameworkChatGenerationContext]]" = OrderedDict()
         self.include_prompts = include_prompts
 
     def _handle_error(self, run_id: "UUID", error: "Any") -> None:
@@ -250,11 +250,11 @@ class SentryLangchainCallback(BaseCallbackHandler):
         op: str,
         name: str,
         origin: str,
-    ) -> "StreamedSpan":
+    ) -> "Span":
         span = None
         if parent_id:
-            parent: "Optional[Union[StreamedSpan, _AgentFrameworkChatGenerationContext]]" = self.span_map.get(
-                parent_id
+            parent: "Optional[Union[Span, _AgentFrameworkChatGenerationContext]]" = (
+                self.span_map.get(parent_id)
             )
             if parent:
                 span = sentry_sdk.traces.start_span(
@@ -290,8 +290,8 @@ class SentryLangchainCallback(BaseCallbackHandler):
     ) -> "_AgentFrameworkChatGenerationContext":
         context = None
         if parent_id:
-            parent: "Optional[Union[StreamedSpan, _AgentFrameworkChatGenerationContext]]" = self.span_map.get(
-                parent_id
+            parent: "Optional[Union[Span, _AgentFrameworkChatGenerationContext]]" = (
+                self.span_map.get(parent_id)
             )
             if parent:
                 context = _AgentFrameworkChatGenerationContext(
@@ -319,7 +319,7 @@ class SentryLangchainCallback(BaseCallbackHandler):
 
     def _exit_span(
         self: "SentryLangchainCallback",
-        span: "StreamedSpan",
+        span: "Span",
         run_id: "UUID",
     ) -> None:
         span.__exit__(None, None, None)
@@ -854,7 +854,7 @@ def _get_token_usage(obj: "Any") -> "Optional[Dict[str, Any]]":
     return None
 
 
-def _record_token_usage(span: "StreamedSpan", response: "LLMResult") -> None:
+def _record_token_usage(span: "Span", response: "LLMResult") -> None:
     input_tokens = None
     output_tokens = None
     total_tokens = None
@@ -1000,7 +1000,7 @@ def _simplify_langchain_tools(tools: "Any") -> "Optional[List[Any]]":
     return simplified_tools if simplified_tools else None
 
 
-def _set_tools_on_span(span: "StreamedSpan", tools: "Any") -> None:
+def _set_tools_on_span(span: "Span", tools: "Any") -> None:
     """Set available tools data on a span if tools are provided."""
     if tools is None:
         return

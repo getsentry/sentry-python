@@ -6,7 +6,7 @@ from sentry_sdk.ai.utils import (
     set_data_normalized,
 )
 from sentry_sdk.consts import OP, SPANDATA
-from sentry_sdk.traces import StreamedSpan, _AgentFrameworkChatGenerationContext
+from sentry_sdk.traces import Span, _AgentFrameworkChatGenerationContext
 from sentry_sdk.utils import safe_serialize
 
 from ..consts import SPAN_ORIGIN
@@ -99,7 +99,7 @@ def _get_system_instructions(
     return permanent_instructions, current_instructions
 
 
-def _set_input_messages(span: "StreamedSpan", messages: "list[ModelMessage]") -> None:
+def _set_input_messages(span: "Span", messages: "list[ModelMessage]") -> None:
     """Set input messages data on a span."""
     if not _should_send_inputs():
         return
@@ -212,7 +212,7 @@ def _set_input_messages(span: "StreamedSpan", messages: "list[ModelMessage]") ->
 
 
 def _set_output_data(
-    span: "StreamedSpan",
+    span: "Span",
     response: "Optional[ModelResponse]",
 ) -> None:
     """Set output data on a span."""
@@ -304,7 +304,7 @@ def ai_client_context(
 
 
 def update_ai_client_span(
-    span: "StreamedSpan",
+    span: "Span",
     model_response: "Optional[ModelResponse]",
 ) -> None:
     """Update the AI client span with response data."""

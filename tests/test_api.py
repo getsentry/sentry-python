@@ -15,25 +15,25 @@ from sentry_sdk import (
     set_tags,
 )
 from sentry_sdk.client import Client, NonRecordingClient
-from sentry_sdk.traces import StreamedSpan
+from sentry_sdk.traces import Span
 from tests.conftest import TestTransportWithOptions
 
 
 def test_get_current_span():
     fake_scope = mock.MagicMock()
-    fake_scope.streamed_span = mock.MagicMock()
-    assert get_current_span(fake_scope) == fake_scope.streamed_span
+    fake_scope.span = mock.MagicMock()
+    assert get_current_span(fake_scope) == fake_scope.span
 
-    fake_scope.streamed_span = None
+    fake_scope.span = None
     assert get_current_span(fake_scope) is None
 
 
 def test_get_current_span_via_traces():
     fake_scope = mock.MagicMock()
-    fake_scope.streamed_span = mock.MagicMock()
-    assert sentry_sdk.traces.get_current_span(fake_scope) == fake_scope.streamed_span
+    fake_scope.span = mock.MagicMock()
+    assert sentry_sdk.traces.get_current_span(fake_scope) == fake_scope.span
 
-    fake_scope.streamed_span = None
+    fake_scope.span = None
     assert sentry_sdk.traces.get_current_span(fake_scope) is None
 
 
@@ -43,9 +43,9 @@ def test_get_current_span_current_scope_via_traces(sentry_init):
     assert sentry_sdk.traces.get_current_span() is None
 
     scope = get_current_scope()
-    fake_span = StreamedSpan(name="abc", scope=scope)
+    fake_span = Span(name="abc", scope=scope)
 
-    assert scope.streamed_span == fake_span
+    assert scope.span == fake_span
     assert sentry_sdk.traces.get_current_span() == fake_span
 
 

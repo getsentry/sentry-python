@@ -16,7 +16,7 @@ from sentry_sdk.integrations.celery.beat import (
 from sentry_sdk.integrations.celery.utils import _now_seconds_since_epoch
 from sentry_sdk.integrations.logging import ignore_logger_for_events
 from sentry_sdk.scope import Scope, should_send_default_pii
-from sentry_sdk.traces import SegmentNameSource, StreamedSpan
+from sentry_sdk.traces import SegmentNameSource, Span
 from sentry_sdk.tracing import BAGGAGE_HEADER_NAME
 from sentry_sdk.tracing_utils import Baggage
 from sentry_sdk.utils import (
@@ -170,7 +170,7 @@ def _make_event_processor(
 
 def _update_celery_task_headers(
     original_headers: "dict[str, Any]",
-    span: "Optional[StreamedSpan]",
+    span: "Optional[Span]",
     monitor_beat_tasks: bool,
 ) -> "dict[str, Any]":
     """
@@ -358,7 +358,7 @@ def _wrap_tracer(task: "Any", f: "F") -> "F":
     return _inner  # type: ignore
 
 
-def _set_messaging_destination_name(task: "Any", span: "StreamedSpan") -> None:
+def _set_messaging_destination_name(task: "Any", span: "Span") -> None:
     """Set "messaging.destination.name" tag for span"""
     with capture_internal_exceptions():
         delivery_info = task.request.delivery_info

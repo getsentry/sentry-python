@@ -10,7 +10,7 @@ if TYPE_CHECKING:
 
 def agent_workflow_span(
     agent: "agents.Agent",
-) -> "sentry_sdk.traces.StreamedSpan":
+) -> "sentry_sdk.traces.Span":
     return sentry_sdk.traces.start_span(
         name=f"{agent.name} workflow", attributes={"sentry.origin": SPAN_ORIGIN}
     )

@@ -6,7 +6,7 @@ from sentry_sdk.ai.utils import (
     set_data_normalized,
 )
 from sentry_sdk.consts import OP, SPANDATA
-from sentry_sdk.traces import StreamedSpan
+from sentry_sdk.traces import Span
 
 from ..consts import SPAN_ORIGIN
 from ..utils import (
@@ -41,7 +41,7 @@ def invoke_agent_span(
     agent: "Optional[Agent]",
     model: "AbstractModel",
     model_settings: "Optional[Union[ModelSettings, RealtimeModelSettings]]",
-) -> "StreamedSpan":
+) -> "Span":
     """Create a span for invoking the agent."""
     # Determine agent name for span
     name = "agent"
@@ -137,7 +137,7 @@ def invoke_agent_span(
 
 
 def update_invoke_agent_span(
-    span: "StreamedSpan",
+    span: "Span",
     result: "Any",
 ) -> None:
     """Update and close the invoke agent span."""

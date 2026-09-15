@@ -7,7 +7,7 @@ from sentry_sdk.ai.utils import (
 )
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.traces import StreamedSpan
+from sentry_sdk.traces import Span
 from sentry_sdk.utils import has_data_collection_enabled, safe_serialize
 
 from ..consts import SPAN_ORIGIN
@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 
 def invoke_agent_span(
     context: "agents.RunContextWrapper", agent: "agents.Agent", kwargs: "dict[str, Any]"
-) -> "StreamedSpan":
+) -> "Span":
     client_options = sentry_sdk.get_client().options
 
     span = sentry_sdk.traces.start_span(
@@ -84,7 +84,7 @@ def invoke_agent_span(
 
 
 def update_invoke_agent_span(
-    span: "StreamedSpan",
+    span: "Span",
     context: "Optional[agents.RunContextWrapper]",
     agent: "Optional[agents.Agent]",
     output: "Any" = None,

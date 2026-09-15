@@ -23,8 +23,8 @@ from sentry_sdk.feature_flags import DEFAULT_FLAG_CAPACITY, FlagBuffer
 from sentry_sdk.session import Session
 from sentry_sdk.traces import (
     _DEFAULT_PARENT_SPAN,
-    NoOpStreamedSpan,
-    StreamedSpan,
+    NoOpSpan,
+    Span,
 )
 from sentry_sdk.tracing import (
     BAGGAGE_HEADER_NAME,
@@ -243,7 +243,7 @@ class Scope:
         self._propagation_context: "Optional[PropagationContext]" = None
         self._n_breadcrumbs_truncated: int = 0
 
-        self._server_segment_span: "Optional[StreamedSpan]" = None
+        self._server_segment_span: "Optional[Span]" = None
         self._agent_framework_chat_generation_entered: "bool" = False
 
         self.client: "sentry_sdk.client.BaseClient" = NonRecordingClient()
@@ -574,8 +574,8 @@ class Scope:
             return self.get_active_propagation_context().to_traceparent()
 
         # If we have an active span, return traceparent from there
-        if self.streamed_span is not None:
-            return self.streamed_span._to_traceparent()
+        if self.span is not None:
+            return self.span._to_traceparent()
 
         # else return traceparent from the propagation context
         return self.get_active_propagation_context().to_traceparent()
@@ -591,8 +591,8 @@ class Scope:
             return self.get_active_propagation_context().get_baggage()
 
         # If we have an active span, return baggage from there
-        if self.streamed_span is not None:
-            return self.streamed_span._to_baggage()
+        if self.span is not None:
+            return self.span._to_baggage()
 
         # else return baggage from the propagation context
         return self.get_active_propagation_context().get_baggage()
@@ -642,7 +642,7 @@ class Scope:
         """
         client = self.get_client()
 
-        span = kwargs.pop("span", None) or self.streamed_span
+        span = kwargs.pop("span", None) or self.span
 
         if has_tracing_enabled(client.options) and span is not None:
             for header in span._iter_headers():
@@ -693,7 +693,7 @@ class Scope:
         self.clear_breadcrumbs()
         self._should_capture: bool = True
 
-        self._span: "Optional[StreamedSpan]" = None
+        self._span: "Optional[Span]" = None
         self._session: "Optional[Session]" = None
         self._force_auto_session_tracking: "Optional[bool]" = None
 
@@ -742,20 +742,20 @@ class Scope:
             session.update(user=value)
 
     @property
-    def streamed_span(self) -> "Optional[StreamedSpan]":
+    def span(self) -> "Optional[Span]":
         """Get/set current tracing span."""
-        return self._span if isinstance(self._span, StreamedSpan) else None
+        return self._span if isinstance(self._span, Span) else None
 
-    @streamed_span.setter
-    def streamed_span(self, span: "Optional[StreamedSpan]") -> None:
+    @span.setter
+    def span(self, span: "Optional[Span]") -> None:
         self._span = span
 
         # Also set _transaction and _transaction_info in streaming mode as this
         # is used for populating events and linking them to segments
-        if not isinstance(span, StreamedSpan) or not span._is_segment():
+        if not isinstance(span, Span) or not span._is_segment():
             return
 
-        if type(span) is StreamedSpan:
+        if type(span) is Span:
             self._transaction = span.name
             if span._attributes.get("sentry.segment.name.source"):
                 self._transaction_info["source"] = str(
@@ -763,7 +763,7 @@ class Scope:
                 )
             return
 
-        if type(span) is NoOpStreamedSpan:
+        if type(span) is NoOpSpan:
             if span._name is not None:
                 self._transaction = span.name
             if span._attributes.get("sentry.segment.name.source"):
@@ -937,20 +937,18 @@ class Scope:
         self,
         name: str,
         attributes: "Optional[Attributes]",
-        parent_span: "Optional[StreamedSpan]",
+        parent_span: "Optional[Span]",
         active: bool,
-    ) -> "StreamedSpan":
-        if isinstance(parent_span, NoOpStreamedSpan):
+    ) -> "Span":
+        if isinstance(parent_span, NoOpSpan):
             # parent_span is only set if the user explicitly set it
             logger.debug(
                 "Ignored parent span provided. Span will be parented to the "
                 "currently active span instead."
             )
 
-        if parent_span is _DEFAULT_PARENT_SPAN or isinstance(
-            parent_span, NoOpStreamedSpan
-        ):
-            parent_span = self.streamed_span
+        if parent_span is _DEFAULT_PARENT_SPAN or isinstance(parent_span, NoOpSpan):
+            parent_span = self.span
 
         # If no eligible parent_span was provided and there is no currently
         # active span, this is a new segment
@@ -958,7 +956,7 @@ class Scope:
             propagation_context = self.get_active_propagation_context()
 
             if is_ignored_span(name, attributes):
-                return NoOpStreamedSpan(
+                return NoOpSpan(
                     name=name,
                     attributes=attributes,
                     scope=self,
@@ -980,7 +978,7 @@ class Scope:
                 self._update_sample_rate(sample_rate)
 
             if sampled is False or sampled is None:
-                return NoOpStreamedSpan(
+                return NoOpSpan(
                     name=name,
                     attributes=attributes,
                     scope=self,
@@ -995,7 +993,7 @@ class Scope:
                     sample_rate=sample_rate,
                 )
 
-            return StreamedSpan(
+            return Span(
                 name=name,
                 attributes=attributes,
                 active=active,
@@ -1012,7 +1010,7 @@ class Scope:
         # This is a child span; take propagation context from the parent span
         with new_scope():
             if is_ignored_span(name, attributes):
-                return NoOpStreamedSpan(
+                return NoOpSpan(
                     name=name,
                     attributes=attributes,
                     segment=parent_span._segment,
@@ -1022,8 +1020,8 @@ class Scope:
                     unsampled_reason="ignored",
                 )
 
-            if isinstance(parent_span, NoOpStreamedSpan):
-                return NoOpStreamedSpan(
+            if isinstance(parent_span, NoOpSpan):
+                return NoOpSpan(
                     name=name,
                     attributes=attributes,
                     segment=parent_span._segment,
@@ -1033,7 +1031,7 @@ class Scope:
                     unsampled_reason=parent_span._unsampled_reason,
                 )
 
-            return StreamedSpan(
+            return Span(
                 name=name,
                 attributes=attributes,
                 active=active,
@@ -1122,7 +1120,7 @@ class Scope:
 
         client._capture_metric(metric, scope=merged_scope)
 
-    def _capture_span(self, span: "Optional[StreamedSpan]") -> None:
+    def _capture_span(self, span: "Optional[Span]") -> None:
         if span is None:
             return
 
@@ -1375,7 +1373,7 @@ class Scope:
             )
 
     def _apply_scope_attributes_to_telemetry(
-        self, telemetry: "Union[Log, Metric, StreamedSpan]"
+        self, telemetry: "Union[Log, Metric, Span]"
     ) -> None:
         # TODO: turn Logs, Metrics into actual classes
         if isinstance(telemetry, dict):
@@ -1388,7 +1386,7 @@ class Scope:
                 attributes[attribute] = value
 
     def _apply_user_attributes_to_telemetry(
-        self, telemetry: "Union[Log, Metric, StreamedSpan]"
+        self, telemetry: "Union[Log, Metric, Span]"
     ) -> None:
         if isinstance(telemetry, dict):
             attributes = telemetry["attributes"]
@@ -1518,10 +1516,10 @@ class Scope:
         return event
 
     @_disable_capture
-    def apply_to_telemetry(self, telemetry: "Union[Log, Metric, StreamedSpan]") -> None:
+    def apply_to_telemetry(self, telemetry: "Union[Log, Metric, Span]") -> None:
         # Attributes-based events and telemetry go through here (logs, metrics,
         # spansV2)
-        if not isinstance(telemetry, StreamedSpan):
+        if not isinstance(telemetry, Span):
             trace_context = self.get_trace_context()
             trace_id = trace_context.get("trace_id")
             if telemetry.get("trace_id") is None and trace_id is not None:
@@ -1531,9 +1529,7 @@ class Scope:
             # use the trace_context here because it synthesizes a span_id if there
             # isn't one
             if telemetry.get("span_id") is None:
-                if self._span is not None and not isinstance(
-                    self._span, NoOpStreamedSpan
-                ):
+                if self._span is not None and not isinstance(self._span, NoOpSpan):
                     telemetry["span_id"] = self._span.span_id
                 else:
                     external_propagation_context = get_external_propagation_context()

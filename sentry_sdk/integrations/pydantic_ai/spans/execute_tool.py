@@ -2,7 +2,7 @@ from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
-from sentry_sdk.traces import StreamedSpan
+from sentry_sdk.traces import Span
 from sentry_sdk.utils import safe_serialize
 
 from ..consts import SPAN_ORIGIN
@@ -20,7 +20,7 @@ def execute_tool_span(
     tool_args: "dict[str, Any]",
     agent: "Optional[Agent[Any, Any]]",
     tool_definition: "ToolDefinition",
-) -> "StreamedSpan":
+) -> "Span":
     """Create a span for tool execution.
 
     Args:
@@ -53,7 +53,7 @@ def execute_tool_span(
     return span
 
 
-def update_execute_tool_span(span: "StreamedSpan", result: "Any") -> None:
+def update_execute_tool_span(span: "Span", result: "Any") -> None:
     """Update the execute tool span with the result."""
     if not span:
         return

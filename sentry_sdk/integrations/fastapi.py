@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 import sentry_sdk
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable, _check_minimum_version
-from sentry_sdk.traces import StreamedSpan, get_current_span
+from sentry_sdk.traces import Span, get_current_span
 from sentry_sdk.tracing import SOURCE_FOR_STYLE, TransactionSource
 from sentry_sdk.utils import (
     has_data_collection_enabled,
@@ -164,7 +164,7 @@ async def _wrap_async_handler(
     finally:
         current_span = get_current_span()
 
-        if type(current_span) is StreamedSpan:
+        if type(current_span) is Span:
             attach_request_data = True
             if has_data_collection_enabled(client.options):
                 attach_request_data = (
@@ -205,7 +205,7 @@ def patch_get_request_handler() -> None:
             def _sentry_call(*args: "Any", **kwargs: "Any") -> "Any":
                 current_span = sentry_sdk.traces.get_current_span()
 
-                if type(current_span) is StreamedSpan:
+                if type(current_span) is Span:
                     segment = current_span._segment
                     segment._update_active_thread()
 

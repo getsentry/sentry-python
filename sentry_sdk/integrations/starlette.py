@@ -25,7 +25,7 @@ from sentry_sdk.integrations._wsgi_common import (
 )
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.traces import StreamedSpan
+from sentry_sdk.traces import Span
 from sentry_sdk.tracing import (
     SOURCE_FOR_STYLE,
     TransactionSource,
@@ -568,7 +568,7 @@ async def _wrap_async_handler(
     finally:
         current_span = sentry_sdk.traces.get_current_span()
 
-        if type(current_span) is StreamedSpan:
+        if type(current_span) is Span:
             attach_request_data = True
             if has_data_collection_enabled(client.options):
                 attach_request_data = (
@@ -613,7 +613,7 @@ def patch_request_response() -> None:
 
                 current_span = sentry_sdk.traces.get_current_span()
 
-                if type(current_span) is StreamedSpan:
+                if type(current_span) is Span:
                     current_span._segment._update_active_thread()
 
                 sentry_scope = sentry_sdk.get_isolation_scope()

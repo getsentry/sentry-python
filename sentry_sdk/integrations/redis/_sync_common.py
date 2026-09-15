@@ -21,14 +21,14 @@ if TYPE_CHECKING:
     from collections.abc import Callable
     from typing import Any, Optional
 
-    from sentry_sdk.traces import StreamedSpan
+    from sentry_sdk.traces import Span
 
 
 def patch_redis_pipeline(
     pipeline_cls: "Any",
     is_cluster: bool,
     get_command_args_fn: "Any",
-    set_db_data_fn: "Callable[[StreamedSpan, Any], None]",
+    set_db_data_fn: "Callable[[Span, Any], None]",
 ) -> None:
     old_execute = pipeline_cls.execute
 
@@ -72,7 +72,7 @@ def patch_redis_pipeline(
 def patch_redis_client(
     cls: "Any",
     is_cluster: bool,
-    set_db_data_fn: "Callable[[StreamedSpan, Any], None]",
+    set_db_data_fn: "Callable[[Span, Any], None]",
 ) -> None:
     """
     This function can be used to instrument custom redis client classes or
@@ -124,7 +124,7 @@ def patch_redis_client(
                 _get_safe_command(name, args)
             )
 
-        cache_span: "Optional[StreamedSpan]" = None
+        cache_span: "Optional[Span]" = None
         if cache_properties["is_cache_key"] and cache_properties["op"] is not None:
             cache_span = sentry_sdk.traces.start_span(
                 name=cache_properties["description"],

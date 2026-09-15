@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 import sentry_sdk
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable
-from sentry_sdk.traces import StreamedSpan
+from sentry_sdk.traces import Span
 from sentry_sdk.tracing import BAGGAGE_HEADER_NAME
 from sentry_sdk.tracing_utils import (
     add_sentry_baggage_to_headers,
@@ -28,7 +28,7 @@ except ImportError:
 
 
 def _inject_trace_propagation_headers(
-    hosted_tool: "HostedMCPTool", span: "StreamedSpan"
+    hosted_tool: "HostedMCPTool", span: "Span"
 ) -> None:
     headers = hosted_tool.tool_config.get("headers")
     if headers is None:

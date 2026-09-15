@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
-from sentry_sdk.traces import StreamedSpan
+from sentry_sdk.traces import Span
 from sentry_sdk.tracing import BAGGAGE_HEADER_NAME
 from sentry_sdk.tracing_utils import (
     add_http_breadcrumb,
@@ -78,7 +78,7 @@ def _sentry_request_created(
 
     breadcrumb: "dict[str, Any]" = {}
 
-    span: "Optional[StreamedSpan]" = None
+    span: "Optional[Span]" = None
 
     url_attributes = get_url_attributes(client, parsed_url)
     breadcrumb.update(url_attributes)
@@ -165,7 +165,7 @@ def _sentry_before_sign(
 def _sentry_after_call(
     context: "Dict[str, Any]", parsed: "Dict[str, Any]", **kwargs: "Any"
 ) -> None:
-    span: "Optional[StreamedSpan]" = context.pop("_sentrysdk_span", None)
+    span: "Optional[Span]" = context.pop("_sentrysdk_span", None)
 
     # Span could be absent if the integration is disabled.
     if span is None:
@@ -213,7 +213,7 @@ def _sentry_after_call(
 def _sentry_after_call_error(
     context: "Dict[str, Any]", exception: "Type[BaseException]", **kwargs: "Any"
 ) -> None:
-    span: "Optional[StreamedSpan]" = context.pop("_sentrysdk_span", None)
+    span: "Optional[Span]" = context.pop("_sentrysdk_span", None)
 
     # Span could be absent if the integration is disabled.
     if span is None:

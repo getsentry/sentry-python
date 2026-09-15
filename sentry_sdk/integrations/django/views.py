@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk.consts import OP
-from sentry_sdk.traces import StreamedSpan
+from sentry_sdk.traces import Span
 
 if TYPE_CHECKING:
     from typing import Any
@@ -63,7 +63,7 @@ def _wrap_sync_view(callback: "Any") -> "Any":
         client = sentry_sdk.get_client()
 
         current_span = sentry_sdk.traces.get_current_span()
-        if type(current_span) is StreamedSpan:
+        if type(current_span) is Span:
             segment = current_span._segment
             segment._update_active_thread()
 

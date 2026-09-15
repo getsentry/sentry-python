@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from redis import Redis
 
     from sentry_sdk.integrations.redis import RedisIntegration
-    from sentry_sdk.traces import StreamedSpan
+    from sentry_sdk.traces import Span
 
 
 def _compile_db_span_properties(
@@ -41,9 +41,7 @@ def _get_db_span_description(
     return description
 
 
-def _set_db_data_on_span(
-    span: "StreamedSpan", connection_params: "dict[str, Any]"
-) -> None:
+def _set_db_data_on_span(span: "Span", connection_params: "dict[str, Any]") -> None:
     db = connection_params.get("db")
     host = connection_params.get("host")
     port = connection_params.get("port")
@@ -61,7 +59,7 @@ def _set_db_data_on_span(
         span.set_attribute(SPANDATA.SERVER_PORT, port)
 
 
-def _set_db_data(span: "StreamedSpan", redis_instance: "Redis[Any]") -> None:
+def _set_db_data(span: "Span", redis_instance: "Redis[Any]") -> None:
     try:
         _set_db_data_on_span(span, redis_instance.connection_pool.connection_kwargs)
     except AttributeError:

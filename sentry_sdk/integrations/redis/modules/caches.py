@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from typing import Any, Optional
 
     from sentry_sdk.integrations.redis import RedisIntegration
-    from sentry_sdk.traces import StreamedSpan
+    from sentry_sdk.traces import Span
 
 
 def _get_op(name: str) -> "Optional[str]":
@@ -77,7 +77,7 @@ def _get_cache_span_description(
 
 
 def _set_cache_data(
-    span: "StreamedSpan",
+    span: "Span",
     redis_client: "Any",
     properties: "dict[str, Any]",
     return_value: "Optional[Any]",

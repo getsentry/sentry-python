@@ -22,8 +22,8 @@ from sentry_sdk.scope import Scope, should_send_default_pii
 from sentry_sdk.sessions import track_session
 from sentry_sdk.traces import (
     SegmentNameSource,
+    Span,
     SpanStatus,
-    StreamedSpan,
 )
 from sentry_sdk.tracing import (
     BAGGAGE_HEADER_NAME,
@@ -342,7 +342,7 @@ def create_trace_config() -> "TraceConfig":
             parsed_url.url if parsed_url else SENSITIVE_DATA_SUBSTITUTE,
         )
 
-        span: "Optional[StreamedSpan]" = None
+        span: "Optional[Span]" = None
         attributes: "Attributes" = {
             "sentry.op": OP.HTTP_CLIENT,
             "sentry.origin": AioHttpIntegration.origin,

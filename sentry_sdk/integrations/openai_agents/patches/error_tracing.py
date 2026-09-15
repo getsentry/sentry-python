@@ -54,7 +54,7 @@ def _patch_error_tracing() -> None:
         the agents library swallows exceptions.
         """
         # Set the current Sentry span to errored
-        current_span = sentry_sdk.get_current_scope().streamed_span
+        current_span = sentry_sdk.get_current_scope().span
         if current_span is not None:
             current_span.status = SpanStatus.ERROR
 

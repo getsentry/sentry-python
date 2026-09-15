@@ -1,6 +1,6 @@
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
-from sentry_sdk.traces import SpanStatus, StreamedSpan
+from sentry_sdk.traces import Span, SpanStatus
 from sentry_sdk.tracing_utils import (
     add_query_source,
     record_sql_queries,
@@ -78,7 +78,7 @@ def _after_cursor_execute(
     )
 
     # Record query source immediately before span is finished: accurate end timestamp and before the span is flushed.
-    span: "Optional[StreamedSpan]" = getattr(context, "_sentry_sql_span", None)
+    span: "Optional[Span]" = getattr(context, "_sentry_sql_span", None)
     if span is not None:
         with capture_internal_exceptions():
             add_query_source(span)
@@ -93,9 +93,7 @@ def _handle_error(context: "Any", *args: "Any") -> None:
     if execution_context is None:
         return
 
-    span: "Optional[StreamedSpan]" = getattr(
-        execution_context, "_sentry_sql_span", None
-    )
+    span: "Optional[Span]" = getattr(execution_context, "_sentry_sql_span", None)
 
     if span is not None:
         span.status = SpanStatus.ERROR
@@ -146,7 +144,7 @@ def _get_db_system(name: str) -> "Optional[str]":
     return None
 
 
-def _set_db_data(span: "StreamedSpan", conn: "Any") -> None:
+def _set_db_data(span: "Span", conn: "Any") -> None:
     db_system = _get_db_system(conn.engine.name)
 
     if db_system is not None:

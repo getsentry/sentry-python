@@ -6,7 +6,7 @@ from typing import Any, Awaitable, Callable, TypeVar
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
-from sentry_sdk.traces import StreamedSpan
+from sentry_sdk.traces import Span
 from sentry_sdk.tracing_utils import (
     add_query_source,
     record_sql_queries,
@@ -105,11 +105,11 @@ def _wrap_execute(f: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]
             if conn:
                 _set_db_data(span, conn)
             res = await f(*args, **kwargs)
-            if isinstance(span, StreamedSpan):
+            if isinstance(span, Span):
                 with capture_internal_exceptions():
                     add_query_source(span)
 
-        if not isinstance(span, StreamedSpan):
+        if not isinstance(span, Span):
             with capture_internal_exceptions():
                 add_query_source(span)
 
@@ -158,11 +158,11 @@ def _wrap_executemany(f: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable
                 if conn:
                     _set_db_data(span, conn)
                 res = await f(*args, **kwargs)
-                if isinstance(span, StreamedSpan):
+                if isinstance(span, Span):
                     with capture_internal_exceptions():
                         add_query_source(span)
 
-            if not isinstance(span, StreamedSpan):
+            if not isinstance(span, Span):
                 with capture_internal_exceptions():
                     add_query_source(span)
 
