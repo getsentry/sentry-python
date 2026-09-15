@@ -16,7 +16,6 @@ async def my_async_example_function():
 def test_trace_decorator(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -44,7 +43,6 @@ def test_trace_decorator(sentry_init, capture_items):
 def test_trace_decorator_arguments(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -71,7 +69,6 @@ def test_trace_decorator_arguments(sentry_init, capture_items):
 def test_trace_decorator_inactive(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -100,7 +97,6 @@ def test_trace_decorator_inactive(sentry_init, capture_items):
 async def test_trace_decorator_async(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -130,7 +126,6 @@ async def test_trace_decorator_async(sentry_init, capture_items):
 async def test_trace_decorator_async_arguments(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -158,7 +153,6 @@ async def test_trace_decorator_async_arguments(sentry_init, capture_items):
 async def test_trace_decorator_async_inactive(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -187,7 +181,6 @@ def test_trace_decorator_child(sentry_init, capture_items):
     """Spans created with @trace show up as children if a span is active."""
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -220,7 +213,6 @@ async def test_trace_decorator_async_child(sentry_init, capture_items):
     """Spans created with @trace show up as children if a span is active."""
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -251,7 +243,6 @@ async def test_trace_decorator_async_child(sentry_init, capture_items):
 def test_functions_to_trace_signature_unchanged_sync(sentry_init):
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     def _some_function(a, b, c):
@@ -270,7 +261,6 @@ def test_functions_to_trace_signature_unchanged_sync(sentry_init):
 async def test_functions_to_trace_signature_unchanged_async(sentry_init):
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     async def _some_function(a, b, c):

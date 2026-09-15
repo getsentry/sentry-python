@@ -296,7 +296,6 @@ async def test_fastmcp_tool_sync(
         integrations=[MCPIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
 
     mcp = FastMCP("Test Server")
@@ -354,7 +353,6 @@ async def test_fastmcp_tool_async(
         integrations=[MCPIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
 
     mcp = FastMCP("Test Server")
@@ -433,7 +431,6 @@ async def test_fastmcp_tool_with_error(
     sentry_init(
         integrations=[MCPIntegration(), LoggingIntegration(event_level=logging.ERROR)],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     mcp = FastMCP("Test Server")
@@ -483,7 +480,6 @@ async def test_fastmcp_tool_with_complex_return(
         integrations=[MCPIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
 
     mcp = FastMCP("Test Server")
@@ -544,7 +540,6 @@ async def test_fastmcp_prompt_sync(
         integrations=[MCPIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
 
     mcp = FastMCP("Test Server")
@@ -620,7 +615,6 @@ async def test_fastmcp_resource_sync(
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     mcp = FastMCP("Test Server")
@@ -673,7 +667,6 @@ async def test_fastmcp_resource_async(sentry_init, capture_items, FastMCP, json_
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     mcp = FastMCP("Test Server")
@@ -747,7 +740,6 @@ async def test_fastmcp_span_origin(
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     mcp = FastMCP("Test Server")
@@ -799,7 +791,6 @@ async def test_fastmcp_sse_transport(
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     mcp = FastMCP("Test Server")
@@ -875,7 +866,6 @@ def test_fastmcp_http_transport(sentry_init, capture_items, FastMCP, json_rpc):
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     mcp = FastMCP("Test Server")
@@ -939,7 +929,6 @@ async def test_fastmcp_stdio_transport(
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     mcp = FastMCP("Test Server")

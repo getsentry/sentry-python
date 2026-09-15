@@ -11,7 +11,6 @@ def test_getaddrinfo_trace(sentry_init, capture_items):
     sentry_init(
         integrations=[SocketIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -37,7 +36,6 @@ def test_create_connection_trace(sentry_init, capture_items):
     sentry_init(
         integrations=[SocketIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -67,7 +65,6 @@ def test_span_origin(sentry_init, capture_items):
     sentry_init(
         integrations=[SocketIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")

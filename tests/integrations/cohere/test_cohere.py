@@ -25,7 +25,6 @@ def test_nonstreaming_chat(
         integrations=[CohereIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
 
     client = Client(api_key="z")
@@ -94,7 +93,6 @@ def test_streaming_chat(
         integrations=[CohereIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
 
     client = Client(api_key="z")
@@ -167,7 +165,6 @@ def test_bad_chat(sentry_init, capture_items):
     sentry_init(
         integrations=[CohereIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("event", "span")
@@ -191,7 +188,6 @@ def test_span_status_error(sentry_init, capture_items):
     sentry_init(
         integrations=[CohereIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     items = capture_items("span")
 
@@ -223,7 +219,6 @@ def test_embed(
         integrations=[CohereIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
 
     client = Client(api_key="z")
@@ -267,7 +262,6 @@ def test_span_origin_chat(sentry_init, capture_items):
     sentry_init(
         integrations=[CohereIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -303,7 +297,6 @@ def test_span_origin_embed(sentry_init, capture_items):
     sentry_init(
         integrations=[CohereIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -404,7 +397,6 @@ def _init_with_data_collection(
         integrations=[CohereIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
     if data_collection is not None:
         kwargs["_experiments"] = {"data_collection": data_collection}

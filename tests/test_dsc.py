@@ -26,7 +26,6 @@ def test_dsc_head_of_trace(sentry_init, capture_envelopes):
         release="myapp@0.0.1",
         environment="canary",
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         transport=TestTransportWithOptions,
     )
     envelopes = capture_envelopes()
@@ -85,7 +84,6 @@ def test_dsc_head_of_trace_uses_custom_org_id(sentry_init, capture_envelopes):
         release="myapp@0.0.1",
         environment="canary",
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         transport=TestTransportWithOptions,
     )
     envelopes = capture_envelopes()
@@ -116,7 +114,6 @@ def test_dsc_continuation_of_trace(sentry_init, capture_envelopes):
         release="myapp@0.0.1",
         environment="canary",
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         transport=TestTransportWithOptions,
     )
     envelopes = capture_envelopes()
@@ -197,7 +194,6 @@ def test_dsc_continuation_of_trace_sample_rate_changed_in_traces_sampler(
         release="myapp@0.0.1",
         environment="canary",
         traces_sampler=my_traces_sampler,
-        trace_lifecycle="stream",
         transport=TestTransportWithOptions,
     )
     envelopes = capture_envelopes()
@@ -270,7 +266,6 @@ def test_dsc_issue(sentry_init, capture_envelopes):
         dsn="https://mysecret@o1234.ingest.sentry.io/12312012",
         release="myapp@0.0.1",
         environment="canary",
-        trace_lifecycle="stream",
         transport=TestTransportWithOptions,
     )
     envelopes = capture_envelopes()
@@ -323,7 +318,6 @@ def test_dsc_issue_with_tracing(sentry_init, capture_envelopes):
         release="myapp@0.0.1",
         environment="canary",
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         transport=TestTransportWithOptions,
     )
     envelopes = capture_envelopes()
@@ -398,7 +392,6 @@ def test_dsc_issue_twp(sentry_init, capture_envelopes, traces_sample_rate):
         release="myapp@0.0.1",
         environment="canary",
         traces_sample_rate=traces_sample_rate,
-        trace_lifecycle="stream",
         transport=TestTransportWithOptions,
     )
     envelopes = capture_envelopes()

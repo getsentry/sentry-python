@@ -27,7 +27,6 @@ def test_basic(
         # disabled because session.resource() or s3.Bucket() result in a subprocess span for a
         # shell that runs "uname -p 2> /dev/null" on Python 3.7 with boto3 version 1.12.49.
         default_integrations=False,
-        trace_lifecycle="stream",
     )
 
     s3 = session.resource("s3")
@@ -62,7 +61,6 @@ def test_streaming(
         traces_sample_rate=1.0,
         integrations=[Boto3Integration()],
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
 
     s3 = session.resource("s3")
@@ -126,7 +124,6 @@ def test_streaming_close(
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[Boto3Integration()],
-        trace_lifecycle="stream",
     )
 
     s3 = session.resource("s3")
@@ -161,7 +158,6 @@ def test_omit_url_data_if_parsing_fails(
         traces_sample_rate=1.0,
         integrations=[Boto3Integration()],
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
 
     s3 = session.resource("s3")
@@ -214,7 +210,6 @@ def test_span_origin(
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[Boto3Integration()],
-        trace_lifecycle="stream",
     )
 
     s3 = session.resource("s3")
@@ -238,7 +233,6 @@ def test_breadcrumb(sentry_init, capture_events, send_default_pii):
     sentry_init(
         integrations=[Boto3Integration()],
         default_integrations=False,
-        trace_lifecycle="stream",
         send_default_pii=send_default_pii,
     )
 
@@ -365,7 +359,6 @@ def test_url_query_data_collection(
         traces_sample_rate=1.0,
         integrations=[Boto3Integration()],
         default_integrations=False,
-        trace_lifecycle="stream",
         **init_kwargs,
     )
 
@@ -406,7 +399,6 @@ def test_url_query_data_collection_breadcrumb(
     sentry_init(
         integrations=[Boto3Integration()],
         default_integrations=False,
-        trace_lifecycle="stream",
         **init_kwargs,
     )
 

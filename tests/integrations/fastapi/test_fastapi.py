@@ -130,7 +130,6 @@ async def test_request_info_json_body(sentry_init, capture_items):
         traces_sample_rate=1.0,
         send_default_pii=True,
         integrations=[StarletteIntegration()],
-        trace_lifecycle="stream",
     )
 
     app = fastapi_app_factory()
@@ -173,7 +172,6 @@ async def test_formdata_request_body(sentry_init, capture_items):
         send_default_pii=True,
         max_request_body_size="always",
         integrations=[StarletteIntegration()],
-        trace_lifecycle="stream",
     )
 
     app = fastapi_app_factory()
@@ -218,7 +216,6 @@ async def test_request_body_too_big(sentry_init, capture_items):
         traces_sample_rate=1.0,
         send_default_pii=True,
         integrations=[StarletteIntegration()],
-        trace_lifecycle="stream",
     )
 
     app = fastapi_app_factory()
@@ -264,7 +261,6 @@ async def test_formdata_request_body_data_collection_http_bodies_empty(
         traces_sample_rate=1.0,
         max_request_body_size="always",
         integrations=[StarletteIntegration()],
-        trace_lifecycle="stream",
         _experiments={"data_collection": {"http_bodies": []}},
     )
 
@@ -313,7 +309,6 @@ async def test_request_body_data_collection(
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[StarletteIntegration()],
-        trace_lifecycle="stream",
         _experiments=(
             {} if data_collection is None else {"data_collection": data_collection}
         ),
@@ -351,7 +346,6 @@ async def test_response(sentry_init, capture_events):
         integrations=[StarletteIntegration(), FastApiIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
 
     app = fastapi_app_factory()
@@ -459,7 +453,6 @@ def test_active_thread_id(sentry_init, capture_items, endpoint):
         auto_enabling_integrations=False,  # Ensure httpx is not auto-enabled; its legacy start_span interferes with streaming mode
         integrations=[StarletteIntegration(), FastApiIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     app = fastapi_app_factory()
 
@@ -488,13 +481,13 @@ async def test_original_request_not_scrubbed(sentry_init, capture_events):
             LoggingIntegration(event_level=logging.ERROR),
         ],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     app = FastAPI()
 
     @app.post("/error")
     async def _error(request: Request):
+        await request.json()
         logging.critical("Oh no!")
         assert request.headers["Authorization"] == "Bearer ohno"
         assert request.headers["Proxy-Authorization"] == "Basic ohno"
@@ -555,7 +548,6 @@ def test_transaction_name(
             FastApiIntegration(transaction_style=transaction_style),
         ],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -587,7 +579,6 @@ def test_http_route_with_prefix(
             FastApiIntegration(transaction_style="url"),
         ],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -624,7 +615,6 @@ def test_route_endpoint_equal_dependant_call(sentry_init):
             FastApiIntegration(),
         ],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     app = fastapi_app_factory()
@@ -678,7 +668,6 @@ def test_transaction_name_in_traces_sampler(
         integrations=[StarletteIntegration(transaction_style=transaction_style)],
         traces_sampler=dummy_traces_sampler,
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     app = fastapi_app_factory()
@@ -728,7 +717,6 @@ def test_transaction_name_in_middleware(
             ),
         ],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -771,7 +759,6 @@ def test_transaction_http_method_default(sentry_init, capture_items):
             StarletteIntegration(),
             FastApiIntegration(),
         ],
-        trace_lifecycle="stream",
     )
 
     app = fastapi_app_factory()
@@ -811,7 +798,6 @@ def test_transaction_http_method_custom(sentry_init, capture_items):
                 ),  # capitalization does not matter
             ),
         ],
-        trace_lifecycle="stream",
     )
 
     app = fastapi_app_factory()
@@ -838,7 +824,6 @@ def test_request_url(sentry_init, capture_items):
         integrations=[
             StarletteIntegration(),
         ],
-        trace_lifecycle="stream",
     )
 
     starlette_app = fastapi_app_factory()
@@ -901,7 +886,6 @@ def test_app_host(sentry_init, capture_items, transaction_style):
             StarletteIntegration(transaction_style=transaction_style),
             FastApiIntegration(transaction_style=transaction_style),
         ],
-        trace_lifecycle="stream",
     )
 
     app = FastAPI()
@@ -934,7 +918,6 @@ async def test_feature_flags(sentry_init, capture_events):
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[StarletteIntegration(), FastApiIntegration()],
-        trace_lifecycle="stream",
     )
 
     events = capture_events()

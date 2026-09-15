@@ -76,7 +76,6 @@ def test_on_new_span_on_close(
     sentry_init(
         integrations=[integration],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     items = capture_items("span")
     with sentry_sdk.traces.start_span(name="custom parent"):
@@ -127,7 +126,6 @@ def test_nested_on_new_span_on_close(
     sentry_init(
         integrations=[integration],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     items = capture_items("span")
     with sentry_sdk.traces.start_span(name="custom parent"):
@@ -201,7 +199,6 @@ def test_on_new_span_without_active_span(sentry_init):
     sentry_init(
         integrations=[integration],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     assert sentry_sdk.traces.get_current_span() is None
@@ -225,7 +222,6 @@ def test_on_event_exception(
     sentry_init(
         integrations=[integration],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     items = capture_items("event")
     sentry_sdk.get_isolation_scope().clear_breadcrumbs()
@@ -267,7 +263,6 @@ def test_on_event_breadcrumb(
     sentry_init(
         integrations=[integration],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     items = capture_items("event")
     sentry_sdk.get_isolation_scope().clear_breadcrumbs()
@@ -303,7 +298,6 @@ def test_on_event_event(
     sentry_init(
         integrations=[integration],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     items = capture_items("event")
     sentry_sdk.get_isolation_scope().clear_breadcrumbs()
@@ -345,7 +339,6 @@ def test_on_event_ignored(
     sentry_init(
         integrations=[integration],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     items = capture_items("span")
     sentry_sdk.get_isolation_scope().clear_breadcrumbs()
@@ -385,7 +378,6 @@ def test_span_filter(
     sentry_init(
         integrations=[integration],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     items = capture_items("span")
     with sentry_sdk.traces.start_span(name="custom parent"):
@@ -425,7 +417,6 @@ def test_record(
     sentry_init(
         integrations=[integration],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     with sentry_sdk.traces.start_span(name="custom parent"):
         rust_tracing.new_span(RustTracingLevel.Info, 3)
@@ -456,7 +447,6 @@ def test_record_in_ignored_span(
     sentry_init(
         integrations=[integration],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     with sentry_sdk.traces.start_span(name="custom parent"):
         rust_tracing.new_span(RustTracingLevel.Info, 3)
@@ -500,7 +490,6 @@ def test_include_tracing_fields(
         integrations=[integration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
     with sentry_sdk.traces.start_span(name="custom parent"):
         rust_tracing.new_span(RustTracingLevel.Info, 3)

@@ -414,7 +414,6 @@ def test_transactions(
         integrations=[SanicIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=send_pii,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -475,7 +474,6 @@ def test_span_origin(sentry_init, app, capture_items):
     sentry_init(
         integrations=[SanicIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -510,7 +508,6 @@ def test_user_ip_address_on_all_spans(
         integrations=[SanicIntegration()],
         default_integrations=False,
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         **init_kwargs,
     )
 
@@ -545,7 +542,6 @@ def test_client_address_span_attribute_data_collection(
         integrations=[SanicIntegration()],
         default_integrations=False,
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         **init_kwargs,
     )
 
@@ -652,7 +648,6 @@ def test_url_query_data_collection(
     sentry_init(
         integrations=[SanicIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         **init_kwargs,
     )
 

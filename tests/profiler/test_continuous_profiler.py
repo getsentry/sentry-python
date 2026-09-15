@@ -290,7 +290,6 @@ def test_continuous_profiler_auto_start_and_manual_stop(
     options = make_options(mode=mode, auto_start=True)
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         **options,
     )
 
@@ -350,7 +349,6 @@ def test_continuous_profiler_manual_start_and_stop_sampled(
     )
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         **options,
     )
 
@@ -409,7 +407,6 @@ def test_continuous_profiler_manual_start_and_stop_unsampled(
     )
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         **options,
     )
 
@@ -446,7 +443,6 @@ def test_continuous_profiler_auto_start_and_stop_sampled(
     )
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         **options,
     )
 
@@ -521,7 +517,6 @@ def test_continuous_profiler_auto_start_and_stop_unsampled(
     )
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         **options,
     )
 
@@ -564,7 +559,6 @@ def test_continuous_profiler_manual_start_and_stop_noop_when_using_trace_lifecyl
     )
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         **options,
     )
 
@@ -606,7 +600,6 @@ def test_continuous_profiler_run_does_not_null_buffer(
     )
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         **options,
     )
     envelopes = capture_envelopes()

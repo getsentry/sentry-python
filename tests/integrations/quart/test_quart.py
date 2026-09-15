@@ -149,7 +149,6 @@ async def test_http_route(
     sentry_init(
         integrations=[quart_sentry.QuartIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     app = quart_app_factory()
@@ -540,7 +539,6 @@ async def test_tracing_success(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[quart_sentry.QuartIntegration()],
-        trace_lifecycle="stream",
     )
     app = quart_app_factory()
 
@@ -577,7 +575,6 @@ async def test_tracing_error(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[quart_sentry.QuartIntegration()],
-        trace_lifecycle="stream",
     )
     app = quart_app_factory()
 
@@ -635,7 +632,6 @@ async def test_span_origin(sentry_init, capture_items):
     sentry_init(
         integrations=[quart_sentry.QuartIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     app = quart_app_factory()
     items = capture_items("span")
@@ -655,7 +651,6 @@ async def test_basic(sentry_init, capture_items):
     sentry_init(
         integrations=[quart_sentry.QuartIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     items = capture_items("span")
 
@@ -702,7 +697,6 @@ async def test_transaction_style(
             quart_sentry.QuartIntegration(transaction_style=transaction_style)
         ],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     items = capture_items("span")
 
@@ -727,7 +721,6 @@ async def test_with_error(sentry_init, capture_items):
     sentry_init(
         integrations=[quart_sentry.QuartIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     items = capture_items("event", "span")
 
@@ -771,7 +764,6 @@ async def test_request_attributes_no_pii(sentry_init, capture_items):
         integrations=[quart_sentry.QuartIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=False,
-        trace_lifecycle="stream",
     )
     items = capture_items("span")
 
@@ -802,7 +794,6 @@ async def test_request_attributes_with_pii(sentry_init, capture_items):
         integrations=[quart_sentry.QuartIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
     items = capture_items("span")
 
@@ -950,7 +941,6 @@ async def test_sensitive_header_scrubbing(
         integrations=[quart_sentry.QuartIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=options["send_default_pii"],
-        trace_lifecycle="stream",
         _experiments={
             "data_collection": options["data_collection"],
         },
@@ -996,7 +986,6 @@ async def test_sensitive_header_without_data_collection(sentry_init, capture_ite
         integrations=[quart_sentry.QuartIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=False,
-        trace_lifecycle="stream",
     )
     items = capture_items("span")
 
@@ -1039,7 +1028,6 @@ async def test_quart_auth_user_id(
         integrations=[quart_sentry.QuartIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
     items = capture_items("span")
 
@@ -1144,7 +1132,6 @@ async def test_quart_auth_user_id_data_collection(
     sentry_init(
         integrations=[quart_sentry.QuartIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         _experiments=kwargs.pop("_experiments", {}),
         **kwargs,
     )
@@ -1184,7 +1171,6 @@ async def test_request_attributes_data_collection(
     sentry_init(
         integrations=[quart_sentry.QuartIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         _experiments=kwargs.pop("_experiments", {}),
         **kwargs,
     )
@@ -1217,7 +1203,6 @@ async def test_sensitive_header_passthrough_with_pii_and_no_data_collection(
         integrations=[quart_sentry.QuartIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
     items = capture_items("span")
 
@@ -1323,7 +1308,6 @@ async def test_url_query_data_collection(
     sentry_init(
         integrations=[quart_sentry.QuartIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         _experiments=experiments,
         **kwargs,
     )
@@ -1366,7 +1350,6 @@ async def test_url_query_multi_and_blank_values(sentry_init, capture_items):
     sentry_init(
         integrations=[quart_sentry.QuartIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         _experiments={"data_collection": {}},
     )
     items = capture_items("span")

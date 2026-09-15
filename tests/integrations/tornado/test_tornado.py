@@ -286,7 +286,6 @@ def test_url_query_data_collection(
     sentry_init(
         integrations=[TornadoIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         **init_kwargs,
     )
 
@@ -326,7 +325,6 @@ def test_url_query_data_collection_no_query_string(
     sentry_init(
         integrations=[TornadoIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         _experiments={"data_collection": {}},
     )
 
@@ -351,7 +349,6 @@ def test_url_query_data_collection_repeated_and_blank_params(
     sentry_init(
         integrations=[TornadoIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         _experiments={"data_collection": {}},
     )
 
@@ -393,7 +390,6 @@ def test_request_body_data_collection(
     sentry_init(
         integrations=[TornadoIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         _experiments={"data_collection": data_collection},
     )
 
@@ -423,7 +419,6 @@ def test_oversized_request_body_not_annotated_data_collection(
     sentry_init(
         integrations=[TornadoIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         max_request_body_size="small",
         _experiments={"data_collection": {"http_bodies": []}},
     )
@@ -465,7 +460,6 @@ def test_request_body_data_collection_event_processor(
 ):
     sentry_init(
         integrations=[TornadoIntegration()],
-        trace_lifecycle="static",
         _experiments={"data_collection": data_collection},
     )
 
@@ -512,7 +506,6 @@ def test_transactions(
         integrations=[TornadoIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=send_pii,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("event", "span")
@@ -717,7 +710,6 @@ def test_error_has_new_trace_context_performance_enabled(
     sentry_init(
         integrations=[TornadoIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     items = capture_items()
 
@@ -750,7 +742,6 @@ def test_error_has_new_trace_context_performance_disabled(
     sentry_init(
         integrations=[TornadoIntegration()],
         traces_sample_rate=None,  # this is the default, just added for clarity
-        trace_lifecycle="stream",
     )
     events = capture_events()
 
@@ -781,7 +772,6 @@ def test_error_has_existing_trace_context_performance_enabled(
     sentry_init(
         integrations=[TornadoIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     items = capture_items()
 
@@ -822,7 +812,6 @@ def test_error_has_existing_trace_context_performance_disabled(
     sentry_init(
         integrations=[TornadoIntegration()],
         traces_sample_rate=None,  # this is the default, just added for clarity
-        trace_lifecycle="stream",
     )
     events = capture_events()
 
@@ -860,7 +849,6 @@ def test_span_origin(
     sentry_init(
         integrations=[TornadoIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -884,7 +872,6 @@ def test_user_ip_address_on_all_spans(
     sentry_init(
         integrations=[TornadoIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         **init_kwargs,
     )
 
@@ -912,7 +899,6 @@ def test_client_address_span_attribute_data_collection(
     sentry_init(
         integrations=[TornadoIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         **init_kwargs,
     )
 

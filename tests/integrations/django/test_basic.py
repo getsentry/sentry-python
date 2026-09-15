@@ -57,7 +57,6 @@ def test_view_exceptions(
     sentry_init(
         integrations=[DjangoIntegration()],
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
     exceptions = capture_exceptions()
     items = capture_items("event")
@@ -87,7 +86,6 @@ def test_ensures_x_forwarded_header_is_honored_in_sdk_when_enabled_in_django(
     sentry_init(
         integrations=[DjangoIntegration()],
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
     exceptions = capture_exceptions()
     items = capture_items("event")
@@ -114,7 +112,6 @@ def test_ensures_x_forwarded_header_is_not_honored_when_unenabled_in_django(
     sentry_init(
         integrations=[DjangoIntegration()],
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
     exceptions = capture_exceptions()
     items = capture_items("event")
@@ -144,7 +141,6 @@ def test_request_captured(
     sentry_init(
         integrations=[DjangoIntegration()],
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
     items = capture_items("event")
     content, status, headers = unpack_werkzeug_response(client.get(reverse("message")))
@@ -172,7 +168,6 @@ def test_transaction_with_class_view(
     sentry_init(
         integrations=[DjangoIntegration(transaction_style="function_name")],
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
     items = capture_items("event")
     content, status, headers = unpack_werkzeug_response(
@@ -199,7 +194,6 @@ def test_has_trace_if_performance_enabled(
             )
         ],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     items = capture_items("event", "span")
     client.head(reverse("view_exc_with_msg"))
@@ -234,7 +228,6 @@ def test_has_trace_if_performance_disabled(
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
-        trace_lifecycle="stream",
     )
     items = capture_items("event")
     client.head(reverse("view_exc_with_msg"))
@@ -268,7 +261,6 @@ def test_trace_from_headers_if_performance_enabled(
             )
         ],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     trace_id = "582b43a4192642f0b136d5159a501701"
@@ -311,7 +303,6 @@ def test_trace_from_headers_if_performance_disabled(
                 http_methods_to_capture=("HEAD",),
             )
         ],
-        trace_lifecycle="stream",
     )
 
     trace_id = "582b43a4192642f0b136d5159a501701"
@@ -347,7 +338,6 @@ def test_user_captured(
     sentry_init(
         integrations=[DjangoIntegration()],
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
     items = capture_items("event")
     content, status, headers = unpack_werkzeug_response(client.get(reverse("mylogin")))
@@ -379,7 +369,6 @@ def test_materialized_user_captured(
         integrations=[DjangoIntegration()],
         send_default_pii=True,
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     content, status, headers = unpack_werkzeug_response(client.get(reverse("mylogin")))
@@ -408,7 +397,6 @@ def test_queryset_repr(
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
-        trace_lifecycle="stream",
     )
 
     User.objects.create_user("john", "lennon@thebeatles.com", "johnpassword")
@@ -438,7 +426,6 @@ def test_context_nested_queryset_repr(
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
-        trace_lifecycle="stream",
     )
     User.objects.create_user("john", "lennon@thebeatles.com", "johnpassword")
     items = capture_items("event")
@@ -464,7 +451,6 @@ def test_custom_error_handler_request_context(
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
-        trace_lifecycle="stream",
     )
     items = capture_items("event")
     content, status, headers = unpack_werkzeug_response(client.post("/404"))
@@ -590,7 +576,6 @@ def test_response_trace(
     sentry_init(
         integrations=[DjangoIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     items = capture_items("span")
     content, status, headers = unpack_werkzeug_response(
@@ -626,7 +611,6 @@ def test_sql_psycopg2_string_composition(
     sentry_init(
         integrations=[DjangoIntegration()],
         send_default_pii=True,
-        trace_lifecycle="stream",
         _experiments={
             "record_sql_params": True,
         },
@@ -665,7 +649,6 @@ def test_sql_psycopg2_placeholders(
     sentry_init(
         integrations=[DjangoIntegration()],
         send_default_pii=True,
-        trace_lifecycle="stream",
         _experiments={
             "record_sql_params": True,
         },
@@ -738,7 +721,6 @@ def test_django_connect_trace(
         integrations=[DjangoIntegration()],
         send_default_pii=True,
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     from django.db import connections
@@ -779,7 +761,6 @@ def test_django_connect_breadcrumbs(
     sentry_init(
         integrations=[DjangoIntegration()],
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
 
     from django.db import connections
@@ -819,7 +800,6 @@ def test_db_connection_span_data(
         integrations=[DjangoIntegration()],
         send_default_pii=True,
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     from django.db import connections
@@ -906,7 +886,6 @@ def test_transaction_style(
         integrations=[DjangoIntegration(transaction_style=transaction_style)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
     items = capture_items("event", "span")
 
@@ -951,7 +930,6 @@ def test_transaction_style_tracing_disabled(
     sentry_init(
         integrations=[DjangoIntegration(transaction_style=transaction_style)],
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
     items = capture_items("event")
 
@@ -971,7 +949,6 @@ def test_http_route(
     sentry_init(
         integrations=[DjangoIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -990,7 +967,6 @@ def test_request_body(
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
-        trace_lifecycle="stream",
     )
     items = capture_items("event")
     content, status, headers = unpack_werkzeug_response(
@@ -1132,7 +1108,6 @@ def test_read_request(
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
-        trace_lifecycle="stream",
     )
     items = capture_items("event")
 
@@ -1158,7 +1133,6 @@ def test_request_body_already_read(
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
-        trace_lifecycle="stream",
     )
 
     class MockExtractor(DjangoRequestExtractor):
@@ -1187,7 +1161,6 @@ def test_template_tracing_meta(
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
-        trace_lifecycle="stream",
     )
 
     items = capture_items("event")
@@ -1221,7 +1194,6 @@ def test_template_exception(
 ):
     sentry_init(
         integrations=[DjangoIntegration()] + with_executing_integration,
-        trace_lifecycle="stream",
     )
     items = capture_items("event")
 
@@ -1292,7 +1264,6 @@ def test_rest_framework_basic(
     sentry_init(
         integrations=[DjangoIntegration()],
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
     exceptions = capture_exceptions()
     items = capture_items("event")
@@ -1329,7 +1300,6 @@ def test_rest_framework_authentication_span(
             DjangoIntegration(middleware_spans=False, signals_spans=False),
         ],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     items = capture_items("span")
 
@@ -1358,7 +1328,6 @@ def test_rest_framework_authentication_span_without_authenticators(
             DjangoIntegration(middleware_spans=False, signals_spans=False),
         ],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     items = capture_items("span")
 
@@ -1385,7 +1354,6 @@ def test_does_not_capture_403(
 
     sentry_init(
         integrations=[DjangoIntegration()],
-        trace_lifecycle="stream",
     )
 
     items = capture_items("event", "span")
@@ -1495,7 +1463,6 @@ def test_render_spans(
     sentry_init(
         integrations=[DjangoIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     views_tests = [
         (
@@ -1534,7 +1501,6 @@ def test_render_spans_queryset_in_data(sentry_init, client, capture_events):
             )
         ],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     events = capture_events()
 
@@ -1571,7 +1537,6 @@ def test_middleware_spans(
             DjangoIntegration(middleware_spans=True, signals_spans=False),
         ],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     items = capture_items("event", "span")
 
@@ -1619,7 +1584,6 @@ def test_middleware_spans_disabled(
             DjangoIntegration(signals_spans=False),
         ],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     items = capture_items("event", "span")
 
@@ -1645,7 +1609,6 @@ def test_signals_spans(
             DjangoIntegration(middleware_spans=False),
         ],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     items = capture_items("event", "span")
 
@@ -1683,7 +1646,6 @@ def test_signals_spans_disabled(
             DjangoIntegration(middleware_spans=False, signals_spans=False),
         ],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     items = capture_items("event", "span")
 
@@ -1715,7 +1677,6 @@ def test_signals_spans_filtering(
             ),
         ],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     items = capture_items("span")
 
@@ -1801,7 +1762,6 @@ def test_custom_urlconf_middleware(
     sentry_init(
         integrations=[DjangoIntegration(middleware_spans=middleware_spans)],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("event", "span")
@@ -1873,7 +1833,6 @@ def test_span_origin(
             )
         ],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     signal_span_found = False
     items = capture_items("span")
@@ -1904,7 +1863,6 @@ def test_transaction_http_method_default(
     sentry_init(
         integrations=[DjangoIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     items = capture_items("span")
 
@@ -1933,7 +1891,6 @@ def test_transaction_http_method_custom(
             )
         ],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     items = capture_items("span")
 

@@ -28,7 +28,6 @@ def init_huey(sentry_init):
             "integrations": [HueyIntegration()],
             "traces_sample_rate": 1.0,
             "send_default_pii": True,
-            "trace_lifecycle": "stream",
         }
         sentry_init_kwargs.update(init_kwargs or {})
         sentry_init(**sentry_init_kwargs)

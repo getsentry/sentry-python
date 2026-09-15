@@ -157,7 +157,6 @@ def test_nonstreaming_chat_completion(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
 
     messages = [
@@ -256,7 +255,6 @@ async def test_async_nonstreaming_chat_completion(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
 
     messages = [
@@ -357,7 +355,6 @@ def test_streaming_chat_completion(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
 
     messages = [
@@ -432,7 +429,6 @@ async def test_async_streaming_chat_completion(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
 
     messages = [
@@ -503,7 +499,6 @@ def test_embeddings_create(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
 
     client = OpenAI(api_key="test-key")
@@ -574,7 +569,6 @@ async def test_async_embeddings_create(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
 
     client = AsyncOpenAI(api_key="test-key")
@@ -640,7 +634,6 @@ def test_embeddings_create_with_list_input(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
 
     client = OpenAI(api_key="test-key")
@@ -705,7 +698,6 @@ async def test_async_embeddings_create_with_list_input(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
 
     client = AsyncOpenAI(api_key="test-key")
@@ -769,7 +761,6 @@ def test_embeddings_no_pii(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=False,  # PII disabled
-        trace_lifecycle="stream",
     )
 
     client = OpenAI(api_key="test-key")
@@ -826,7 +817,6 @@ async def test_async_embeddings_no_pii(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=False,  # PII disabled
-        trace_lifecycle="stream",
     )
 
     client = AsyncOpenAI(api_key="test-key")
@@ -880,7 +870,6 @@ def test_exception_handling(
         integrations=[LiteLLMIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     messages = [{"role": "user", "content": "Hello!"}]
@@ -916,7 +905,6 @@ async def test_async_exception_handling(
         integrations=[LiteLLMIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     messages = [{"role": "user", "content": "Hello!"}]
@@ -953,7 +941,6 @@ def test_span_origin(
         integrations=[LiteLLMIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     messages = [{"role": "user", "content": "Hello!"}]
@@ -1009,7 +996,6 @@ def test_multiple_providers(
         integrations=[LiteLLMIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     messages = [{"role": "user", "content": "Hello!"}]
@@ -1111,7 +1097,6 @@ async def test_async_multiple_providers(
         integrations=[LiteLLMIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     messages = [{"role": "user", "content": "Hello!"}]
@@ -1214,7 +1199,6 @@ def test_additional_parameters(
         integrations=[LiteLLMIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     messages = [{"role": "user", "content": "Hello!"}]
@@ -1285,7 +1269,6 @@ async def test_async_additional_parameters(
         integrations=[LiteLLMIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     messages = [{"role": "user", "content": "Hello!"}]
@@ -1356,7 +1339,6 @@ def test_no_integration(
     sentry_init(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     messages = [{"role": "user", "content": "Hello!"}]
@@ -1414,7 +1396,6 @@ async def test_async_no_integration(
     sentry_init(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     messages = [{"role": "user", "content": "Hello!"}]
@@ -1471,7 +1452,6 @@ def test_response_without_usage(
         integrations=[LiteLLMIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     messages = [{"role": "user", "content": "Hello!"}]
@@ -1514,7 +1494,6 @@ def test_integration_setup(sentry_init):
         integrations=[LiteLLMIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     # Check that callbacks are registered
@@ -1540,7 +1519,6 @@ def test_binary_content_encoding_image_url(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
 
     messages = [
@@ -1631,7 +1609,6 @@ async def test_async_binary_content_encoding_image_url(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
 
     messages = [
@@ -1723,7 +1700,6 @@ def test_binary_content_encoding_mixed_content(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
 
     messages = [
@@ -1803,7 +1779,6 @@ async def test_async_binary_content_encoding_mixed_content(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
 
     messages = [
@@ -1884,7 +1859,6 @@ def test_binary_content_encoding_uri_type(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
 
     messages = [
@@ -1968,7 +1942,6 @@ async def test_async_binary_content_encoding_uri_type(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
 
     messages = [
@@ -2220,7 +2193,6 @@ def test_chat_completion_data_collection(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
     if data_collection is not None:
         sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
@@ -2348,7 +2320,6 @@ def test_embeddings_data_collection(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
     if data_collection is not None:
         sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}

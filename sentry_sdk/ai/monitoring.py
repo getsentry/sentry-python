@@ -24,13 +24,12 @@ def record_token_usage(
 
     if input_tokens_cached is not None:
         span.set_attribute(
-            SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED,
-            input_tokens_cached,
+            SPANDATA.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS, input_tokens_cached
         )
 
     if input_tokens_cache_write is not None:
         span.set_attribute(
-            SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE,
+            SPANDATA.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS,
             input_tokens_cache_write,
         )
 
@@ -39,7 +38,7 @@ def record_token_usage(
 
     if output_tokens_reasoning is not None:
         span.set_attribute(
-            SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS_REASONING,
+            SPANDATA.GEN_AI_USAGE_REASONING_OUTPUT_TOKENS,
             output_tokens_reasoning,
         )
 

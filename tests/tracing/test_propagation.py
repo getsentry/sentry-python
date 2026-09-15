@@ -2,7 +2,7 @@ import sentry_sdk
 
 
 def test_span_in_segment(sentry_init):
-    sentry_init(traces_sample_rate=1.0, trace_lifecycle="stream")
+    sentry_init(traces_sample_rate=1.0)
 
     with sentry_sdk.traces.start_span(name="test"):
         with sentry_sdk.traces.start_span(name="test2") as span:
@@ -11,7 +11,7 @@ def test_span_in_segment(sentry_init):
 
 
 def test_span_in_span_in_segment(sentry_init):
-    sentry_init(traces_sample_rate=1.0, trace_lifecycle="stream")
+    sentry_init(traces_sample_rate=1.0)
 
     with sentry_sdk.traces.start_span(name="test"):
         with sentry_sdk.traces.start_span(name="test2"):

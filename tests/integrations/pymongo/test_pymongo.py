@@ -11,7 +11,7 @@ from sentry_sdk.integrations.pymongo import PyMongoIntegration, _strip_pii
 @pytest.fixture(scope="session")
 def mongo_server():
     server = MockupDB(verbose=True)
-    server.autoresponds("ismaster", maxWireVersion=8)
+    server.autoresponds("ismaster", maxWireVersion=9)
     server.run()
     server.autoresponds(
         {"find": "test_collection"}, cursor={"id": 123, "firstBatch": []}
@@ -66,7 +66,6 @@ def test_segment(sentry_init, capture_items, mongo_server, with_pii):
         integrations=[PyMongoIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=with_pii,
-        trace_lifecycle="stream",
     )
     items = capture_items("span")
 
@@ -139,7 +138,6 @@ def test_segment_with_data_collection(
     sentry_init(
         integrations=[PyMongoIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         **init_kwargs,
     )
     items = capture_items("span")
@@ -187,7 +185,6 @@ def test_breadcrumbs(sentry_init, capture_items, mongo_server, with_pii):
         integrations=[PyMongoIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=with_pii,
-        trace_lifecycle="stream",
     )
     items = capture_items("event")
 
@@ -231,7 +228,6 @@ def test_breadcrumbs_with_data_collection(
     sentry_init(
         integrations=[PyMongoIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         **init_kwargs,
     )
     items = capture_items("event")
@@ -556,7 +552,6 @@ def test_span_origin(sentry_init, capture_items, mongo_server):
     sentry_init(
         integrations=[PyMongoIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     items = capture_items("span")
 
@@ -579,7 +574,6 @@ def test_status_on_success(sentry_init, capture_items, mongo_server):
     sentry_init(
         integrations=[PyMongoIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     items = capture_items("span")
 
@@ -600,7 +594,6 @@ def test_status_on_failure(sentry_init, capture_items, mongo_server):
     sentry_init(
         integrations=[PyMongoIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     items = capture_items("span")
 

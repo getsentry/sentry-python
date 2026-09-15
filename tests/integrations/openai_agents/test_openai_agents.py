@@ -393,7 +393,6 @@ async def test_tool_definitions(
             disabled_integrations=[StdlibIntegration],
             traces_sample_rate=1.0,
             send_default_pii=False,
-            trace_lifecycle="stream",
         )
 
         items = capture_items("span")
@@ -444,7 +443,6 @@ async def test_agent_invocation_span_no_pii(
             disabled_integrations=[StdlibIntegration],
             traces_sample_rate=1.0,
             send_default_pii=False,
-            trace_lifecycle="stream",
         )
 
         items = capture_items("span")
@@ -576,7 +574,6 @@ async def test_invoke_agent_span_data_collection_inputs(
             integrations=[OpenAIAgentsIntegration()],
             disabled_integrations=[StdlibIntegration],
             traces_sample_rate=1.0,
-            trace_lifecycle="stream",
             **init_kwargs,
         )
 
@@ -677,7 +674,6 @@ async def test_invoke_agent_span_data_collection_outputs(
             integrations=[OpenAIAgentsIntegration()],
             disabled_integrations=[StdlibIntegration],
             traces_sample_rate=1.0,
-            trace_lifecycle="stream",
             **init_kwargs,
         )
 
@@ -777,7 +773,6 @@ async def test_data_collection_inputs(
         "send_default_pii": send_default_pii,
     }
     init_kwargs["disabled_integrations"] = [StdlibIntegration]
-    init_kwargs["trace_lifecycle"] = "stream"
     if data_collection is not None:
         init_kwargs["_experiments"] = {"data_collection": data_collection}
 
@@ -914,7 +909,6 @@ async def test_data_collection_outputs(
         "send_default_pii": send_default_pii,
     }
     init_kwargs["disabled_integrations"] = [StdlibIntegration]
-    init_kwargs["trace_lifecycle"] = "stream"
     if data_collection is not None:
         init_kwargs["_experiments"] = {"data_collection": data_collection}
 
@@ -1184,7 +1178,6 @@ async def test_agent_invocation_span(
             disabled_integrations=[StdlibIntegration],
             traces_sample_rate=1.0,
             send_default_pii=True,
-            trace_lifecycle="stream",
         )
 
         items = capture_items("span")
@@ -1270,7 +1263,6 @@ async def test_client_span_custom_model(
             integrations=[OpenAIAgentsIntegration()],
             disabled_integrations=[StdlibIntegration],
             traces_sample_rate=1.0,
-            trace_lifecycle="stream",
         )
 
         items = capture_items("span")
@@ -1320,7 +1312,6 @@ def test_agent_invocation_span_sync_no_pii(
             disabled_integrations=[StdlibIntegration],
             traces_sample_rate=1.0,
             send_default_pii=False,
-            trace_lifecycle="stream",
         )
 
         items = capture_items("span")
@@ -1588,7 +1579,6 @@ def test_agent_invocation_span_sync(
             disabled_integrations=[StdlibIntegration],
             traces_sample_rate=1.0,
             send_default_pii=True,
-            trace_lifecycle="stream",
         )
 
         items = capture_items("span")
@@ -1748,7 +1738,6 @@ async def test_handoff_span(
             integrations=[OpenAIAgentsIntegration()],
             disabled_integrations=[StdlibIntegration],
             traces_sample_rate=1.0,
-            trace_lifecycle="stream",
         )
 
         items = capture_items("span")
@@ -1883,7 +1872,6 @@ async def test_max_turns_before_handoff_span(
             integrations=[OpenAIAgentsIntegration()],
             disabled_integrations=[StdlibIntegration],
             traces_sample_rate=1.0,
-            trace_lifecycle="stream",
         )
 
         items = capture_items("span")
@@ -1983,7 +1971,6 @@ async def test_tool_execution_span(
             disabled_integrations=[StdlibIntegration],
             traces_sample_rate=1.0,
             send_default_pii=True,
-            trace_lifecycle="stream",
         )
 
         items = capture_items("span")
@@ -2066,9 +2053,15 @@ async def test_tool_execution_span(
     assert ai_client_span1["attributes"]["gen_ai.request.temperature"] == 0.7
     assert ai_client_span1["attributes"]["gen_ai.request.top_p"] == 1.0
     assert ai_client_span1["attributes"]["gen_ai.usage.input_tokens"] == 10
-    assert ai_client_span1["attributes"]["gen_ai.usage.input_tokens.cached"] == 0
+    assert (
+        ai_client_span1["attributes"][SPANDATA.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]
+        == 0
+    )
     assert ai_client_span1["attributes"]["gen_ai.usage.output_tokens"] == 5
-    assert ai_client_span1["attributes"]["gen_ai.usage.output_tokens.reasoning"] == 0
+    assert (
+        ai_client_span1["attributes"][SPANDATA.GEN_AI_USAGE_REASONING_OUTPUT_TOKENS]
+        == 0
+    )
     assert ai_client_span1["attributes"]["gen_ai.usage.total_tokens"] == 15
 
     tool_call = {
@@ -2155,9 +2148,15 @@ async def test_tool_execution_span(
         == "Task completed using the tool"
     )
     assert ai_client_span2["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "openai"
-    assert ai_client_span2["attributes"]["gen_ai.usage.input_tokens.cached"] == 0
+    assert (
+        ai_client_span2["attributes"][SPANDATA.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]
+        == 0
+    )
     assert ai_client_span2["attributes"]["gen_ai.usage.input_tokens"] == 15
-    assert ai_client_span2["attributes"]["gen_ai.usage.output_tokens.reasoning"] == 0
+    assert (
+        ai_client_span2["attributes"][SPANDATA.GEN_AI_USAGE_REASONING_OUTPUT_TOKENS]
+        == 0
+    )
     assert ai_client_span2["attributes"]["gen_ai.usage.output_tokens"] == 10
     assert ai_client_span2["attributes"]["gen_ai.usage.total_tokens"] == 25
 
@@ -2242,7 +2241,6 @@ async def test_run_streamed_tool_execution_span(
             disabled_integrations=[StdlibIntegration],
             traces_sample_rate=1.0,
             send_default_pii=True,
-            trace_lifecycle="stream",
         )
 
         items = capture_items("span")
@@ -2363,7 +2361,6 @@ def run_tool_agent(
                 integrations=[OpenAIAgentsIntegration()],
                 disabled_integrations=[StdlibIntegration],
                 traces_sample_rate=1.0,
-                trace_lifecycle="stream",
                 **init_kwargs,
             )
 
@@ -2573,7 +2570,6 @@ async def test_hosted_mcp_tool_propagation_header_streamed(
         integrations=[OpenAIAgentsIntegration()],
         traces_sample_rate=1.0,
         release="d08ebdb9309e1b004c6f52202de58a09c2268e42",
-        trace_lifecycle="stream",
     )
 
     request_headers = {"X-Stainless-Raw-Response": "stream"}
@@ -2741,7 +2737,6 @@ async def test_hosted_mcp_tool_propagation_headers(
         integrations=[OpenAIAgentsIntegration()],
         traces_sample_rate=1.0,
         release="d08ebdb9309e1b004c6f52202de58a09c2268e42",
-        trace_lifecycle="stream",
     )
 
     response = get_model_response(EXAMPLE_RESPONSE, serialize_pydantic=True)
@@ -2846,7 +2841,6 @@ async def test_model_behavior_error(
             disabled_integrations=[StdlibIntegration],
             traces_sample_rate=1.0,
             send_default_pii=True,
-            trace_lifecycle="stream",
         )
 
         items = capture_items("span")
@@ -2897,7 +2891,6 @@ async def test_run_error_handling(
             ],
             disabled_integrations=[StdlibIntegration],
             traces_sample_rate=1.0,
-            trace_lifecycle="stream",
         )
 
         items = capture_items("event", "span")
@@ -2949,7 +2942,6 @@ async def test_run_streamed_error_handling(
             ],
             disabled_integrations=[StdlibIntegration],
             traces_sample_rate=1.0,
-            trace_lifecycle="stream",
         )
 
         items = capture_items("event", "span")
@@ -3013,7 +3005,6 @@ async def test_error_captures_input_data(
             disabled_integrations=[StdlibIntegration],
             traces_sample_rate=1.0,
             send_default_pii=True,
-            trace_lifecycle="stream",
         )
 
         items = capture_items("event", "span")
@@ -3062,7 +3053,6 @@ async def test_span_status_error(
             ],
             disabled_integrations=[StdlibIntegration],
             traces_sample_rate=1.0,
-            trace_lifecycle="stream",
         )
 
         items = capture_items("event", "span")
@@ -3111,7 +3101,6 @@ async def test_multiple_agents_asyncio(
             integrations=[OpenAIAgentsIntegration()],
             disabled_integrations=[StdlibIntegration],
             traces_sample_rate=1.0,
-            trace_lifecycle="stream",
         )
 
         items = capture_items("span")
@@ -3153,7 +3142,6 @@ def test_openai_agents_message_role_mapping(sentry_init, test_message, expected_
     sentry_init(
         integrations=[OpenAIAgentsIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         send_default_pii=True,
     )
 
@@ -3253,7 +3241,6 @@ async def test_tool_execution_error_tracing(
             disabled_integrations=[StdlibIntegration],
             traces_sample_rate=1.0,
             send_default_pii=True,
-            trace_lifecycle="stream",
         )
         items = capture_items("span")
 
@@ -3352,7 +3339,6 @@ async def test_invoke_agent_span_includes_usage_data(
             disabled_integrations=[StdlibIntegration],
             traces_sample_rate=1.0,
             send_default_pii=True,
-            trace_lifecycle="stream",
         )
         items = capture_items("span")
 
@@ -3379,8 +3365,14 @@ async def test_invoke_agent_span_includes_usage_data(
     assert invoke_agent_span["attributes"]["gen_ai.usage.input_tokens"] == 10
     assert invoke_agent_span["attributes"]["gen_ai.usage.output_tokens"] == 20
     assert invoke_agent_span["attributes"]["gen_ai.usage.total_tokens"] == 30
-    assert invoke_agent_span["attributes"]["gen_ai.usage.input_tokens.cached"] == 0
-    assert invoke_agent_span["attributes"]["gen_ai.usage.output_tokens.reasoning"] == 5
+    assert (
+        invoke_agent_span["attributes"][SPANDATA.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]
+        == 0
+    )
+    assert (
+        invoke_agent_span["attributes"][SPANDATA.GEN_AI_USAGE_REASONING_OUTPUT_TOKENS]
+        == 5
+    )
 
 
 @pytest.mark.asyncio
@@ -3447,7 +3439,6 @@ async def test_ai_client_span_includes_response_model(
             disabled_integrations=[StdlibIntegration],
             traces_sample_rate=1.0,
             send_default_pii=True,
-            trace_lifecycle="stream",
         )
         items = capture_items("span")
 
@@ -3537,7 +3528,6 @@ async def test_ai_client_span_response_model_with_chat_completions(
             integrations=[OpenAIAgentsIntegration()],
             disabled_integrations=[StdlibIntegration],
             traces_sample_rate=1.0,
-            trace_lifecycle="stream",
         )
 
         items = capture_items("span")
@@ -3666,7 +3656,6 @@ async def test_multiple_llm_calls_aggregate_usage(
             disabled_integrations=[StdlibIntegration],
             traces_sample_rate=1.0,
             send_default_pii=True,
-            trace_lifecycle="stream",
         )
 
         items = capture_items("span")
@@ -3690,9 +3679,15 @@ async def test_multiple_llm_calls_aggregate_usage(
     assert invoke_agent_span["attributes"]["gen_ai.usage.output_tokens"] == 20
     assert invoke_agent_span["attributes"]["gen_ai.usage.total_tokens"] == 50
     # Cached tokens should be aggregated: 0 + 5 = 5
-    assert invoke_agent_span["attributes"]["gen_ai.usage.input_tokens.cached"] == 5
+    assert (
+        invoke_agent_span["attributes"][SPANDATA.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]
+        == 5
+    )
     # Reasoning tokens should be aggregated: 0 + 3 = 3
-    assert invoke_agent_span["attributes"]["gen_ai.usage.output_tokens.reasoning"] == 3
+    assert (
+        invoke_agent_span["attributes"][SPANDATA.GEN_AI_USAGE_REASONING_OUTPUT_TOKENS]
+        == 3
+    )
 
 
 @pytest.mark.asyncio
@@ -3758,7 +3753,6 @@ async def test_invoke_agent_span_includes_response_model(
             disabled_integrations=[StdlibIntegration],
             traces_sample_rate=1.0,
             send_default_pii=True,
-            trace_lifecycle="stream",
         )
 
         items = capture_items("span")
@@ -3884,7 +3878,6 @@ async def test_invoke_agent_span_uses_last_response_model(
             disabled_integrations=[StdlibIntegration],
             traces_sample_rate=1.0,
             send_default_pii=True,
-            trace_lifecycle="stream",
         )
 
         items = capture_items("span")
@@ -3927,7 +3920,6 @@ async def test_streaming_span_update_captures_response_data(
         integrations=[OpenAIAgentsIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
 
     # Create a mock streaming response object (similar to what we'd get from ResponseCompletedEvent)
@@ -3996,7 +3988,6 @@ async def test_streaming_ttft_on_chat_span(
     sentry_init(
         integrations=[OpenAIAgentsIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     request_headers = {"X-Stainless-Raw-Response": "stream"}
@@ -4107,7 +4098,7 @@ async def test_streaming_ttft_on_chat_span(
     assert len(chat_spans) >= 1
     chat_span = chat_spans[0]
 
-    assert SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN in chat_span["attributes"]
+    assert SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_CHUNK in chat_span["attributes"]
     assert chat_span["attributes"].get(SPANDATA.GEN_AI_RESPONSE_STREAMING) is True
 
 
@@ -4139,7 +4130,6 @@ async def test_conversation_id_on_all_spans(
             integrations=[OpenAIAgentsIntegration()],
             disabled_integrations=[StdlibIntegration],
             traces_sample_rate=1.0,
-            trace_lifecycle="stream",
         )
 
         items = capture_items("span")
@@ -4275,7 +4265,6 @@ async def test_conversation_id_on_tool_span(
             integrations=[OpenAIAgentsIntegration()],
             disabled_integrations=[StdlibIntegration],
             traces_sample_rate=1.0,
-            trace_lifecycle="stream",
         )
 
         items = capture_items("span")
@@ -4336,7 +4325,6 @@ async def test_no_conversation_id_when_not_provided(
             integrations=[OpenAIAgentsIntegration()],
             disabled_integrations=[StdlibIntegration],
             traces_sample_rate=1.0,
-            trace_lifecycle="stream",
         )
 
         items = capture_items("span")
@@ -4397,7 +4385,6 @@ async def test_runner_run_with_starting_agent_kwarg(
         sentry_init(
             integrations=[OpenAIAgentsIntegration()],
             traces_sample_rate=1.0,
-            trace_lifecycle="stream",
         )
 
         items = capture_items("span")
@@ -4507,7 +4494,6 @@ async def test_runner_run_streamed_with_starting_agent_kwarg(
         sentry_init(
             integrations=[OpenAIAgentsIntegration()],
             traces_sample_rate=1.0,
-            trace_lifecycle="stream",
         )
 
         items = capture_items("span")
