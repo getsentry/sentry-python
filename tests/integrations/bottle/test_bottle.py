@@ -166,6 +166,37 @@ def test_large_json_request(
         assert len(event["request"]["data"]["foo"]["bar"]) == 1034
 
 
+def test_attach_stacktrace_works(sentry_init, capture_events, app, get_client):
+    sentry_init(
+        integrations=[BottleIntegration()],
+        max_request_body_size="always",
+        attach_stacktrace=True,
+    )
+
+    data = {"foo": {"bar": "a" * (1024)}}
+
+    @app.route("/", method="POST")
+    def index():
+        import bottle
+
+        assert bottle.request.json == data
+        assert bottle.request.body.read() == json.dumps(data).encode("ascii")
+        capture_message("hi")
+        return "ok"
+
+    events = capture_events()
+
+    client = get_client()
+    response = client.get("/")
+
+    response = client.post("/", content_type="application/json", data=json.dumps(data))
+    assert response[1] == "200 OK"
+
+    (event,) = events
+
+    assert len(event["request"]["data"]["foo"]["bar"]) == 1024
+
+
 @pytest.mark.parametrize("data", [{}, []], ids=["empty-dict", "empty-list"])
 def test_empty_json_request(sentry_init, capture_events, app, data, get_client):
     sentry_init(integrations=[BottleIntegration()])
