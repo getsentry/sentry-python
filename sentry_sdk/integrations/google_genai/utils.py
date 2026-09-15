@@ -608,7 +608,7 @@ def extract_tool_calls(
 
     # Extract from candidates, sometimes tool calls are nested under the content.parts object
     candidates = getattr(response, "candidates", [])
-    if response is not None:
+    if candidates and response is not None:
         for candidate in candidates:
             if not hasattr(candidate, "content") or not getattr(
                 candidate.content, "parts", []
