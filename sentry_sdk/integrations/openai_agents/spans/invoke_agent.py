@@ -11,7 +11,7 @@ from sentry_sdk.traces import Span
 from sentry_sdk.utils import has_data_collection_enabled, safe_serialize
 
 from ..consts import SPAN_ORIGIN
-from ..utils import _set_agent_data, _set_usage_data
+from ..utils import _set_agent_data
 
 if TYPE_CHECKING:
     from typing import Any, Optional
@@ -85,14 +85,9 @@ def invoke_agent_span(
 
 def update_invoke_agent_span(
     span: "Span",
-    context: "Optional[agents.RunContextWrapper]",
     agent: "Optional[agents.Agent]",
     output: "Any" = None,
 ) -> None:
-    # Add aggregated usage data from context_wrapper
-    if context and hasattr(context, "usage"):
-        _set_usage_data(span, context.usage)
-
     client = sentry_sdk.get_client()
     if has_data_collection_enabled(client.options):
         if client.options["data_collection"]["gen_ai"]["outputs"]:
