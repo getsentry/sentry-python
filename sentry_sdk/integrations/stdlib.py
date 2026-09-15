@@ -9,8 +9,7 @@ import sentry_sdk
 from sentry_sdk.consts import _SENTRY_HEADER_NAMES, OP, SPANDATA
 from sentry_sdk.integrations import Integration
 from sentry_sdk.scope import add_global_event_processor
-from sentry_sdk.traces import Span
-from sentry_sdk.tracing import SENTRY_TRACE_HEADER_NAME
+from sentry_sdk.traces import SENTRY_TRACE_HEADER_NAME, Span
 from sentry_sdk.tracing_utils import (
     EnvironHeaders,
     add_http_breadcrumb,

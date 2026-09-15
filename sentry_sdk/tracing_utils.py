@@ -1296,10 +1296,8 @@ def is_ignored_span(name: str, attributes: "Optional[Attributes]") -> bool:
 
 # Circular imports
 from sentry_sdk.traces import (
-    LOW_QUALITY_SEGMENT_SOURCES,
-    Span,
-)
-from sentry_sdk.tracing import (
     BAGGAGE_HEADER_NAME,
+    LOW_QUALITY_SEGMENT_SOURCES,
     SENTRY_TRACE_HEADER_NAME,
+    Span,
 )

@@ -6,10 +6,10 @@ from sentry_sdk.api import get_baggage, get_traceparent
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.integrations._wsgi_common import request_body_within_bounds
-from sentry_sdk.traces import SegmentNameSource
-from sentry_sdk.tracing import (
+from sentry_sdk.traces import (
     BAGGAGE_HEADER_NAME,
     SENTRY_TRACE_HEADER_NAME,
+    SegmentNameSource,
 )
 from sentry_sdk.utils import (
     AnnotatedValue,

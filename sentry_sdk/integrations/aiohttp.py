@@ -21,14 +21,12 @@ from sentry_sdk.integrations.logging import ignore_logger_for_events
 from sentry_sdk.scope import Scope, should_send_default_pii
 from sentry_sdk.sessions import track_session
 from sentry_sdk.traces import (
-    SegmentNameSource,
-    Span,
-    SpanStatus,
-)
-from sentry_sdk.tracing import (
     BAGGAGE_HEADER_NAME,
     SENTRY_TRACE_HEADER_NAME,
     SOURCE_FOR_STYLE,
+    SegmentNameSource,
+    Span,
+    SpanStatus,
 )
 from sentry_sdk.tracing_utils import (
     add_http_breadcrumb,

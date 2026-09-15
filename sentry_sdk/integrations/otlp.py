@@ -2,7 +2,7 @@ from sentry_sdk import capture_event, get_client
 from sentry_sdk.consts import VERSION, EndpointType
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.scope import register_external_propagation_context
-from sentry_sdk.tracing import (
+from sentry_sdk.traces import (
     BAGGAGE_HEADER_NAME,
     SENTRY_TRACE_HEADER_NAME,
 )

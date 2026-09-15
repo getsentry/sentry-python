@@ -29,15 +29,9 @@ from sentry_sdk.integrations._wsgi_common import (
 from sentry_sdk.scope import Scope, should_send_default_pii
 from sentry_sdk.sessions import track_session
 from sentry_sdk.traces import (
-    SOURCE_FOR_STYLE as SEGMENT_SOURCE_FOR_STYLE,
-)
-from sentry_sdk.traces import (
+    SOURCE_FOR_STYLE,
     SegmentNameSource,
     Span,
-)
-from sentry_sdk.tracing import (
-    SOURCE_FOR_STYLE,
-    TransactionSource,
 )
 from sentry_sdk.utils import (
     _get_installed_modules,
@@ -354,9 +348,9 @@ class SentryAsgiMiddleware:
             and transaction != _DEFAULT_TRANSACTION_NAME
             and transaction_source
             in [
-                TransactionSource.COMPONENT,
-                TransactionSource.ROUTE,
-                TransactionSource.CUSTOM,
+                SegmentNameSource.COMPONENT,
+                SegmentNameSource.ROUTE,
+                SegmentNameSource.CUSTOM,
             ]
         )
         if not already_set:
@@ -397,7 +391,7 @@ class SentryAsgiMiddleware:
                         asgi_scope=asgi_scope, root_path_in_path=self.root_path_in_path
                     ),
                 )
-                source = TransactionSource.URL
+                source = SegmentNameSource.URL
 
         elif transaction_style == "url":
             # FastAPI includes the route object in the scope to let Sentry extract the
@@ -416,11 +410,11 @@ class SentryAsgiMiddleware:
                         asgi_scope=asgi_scope, root_path_in_path=self.root_path_in_path
                     ),
                 )
-                source = TransactionSource.URL
+                source = SegmentNameSource.URL
 
         if name is None:
             name = _DEFAULT_TRANSACTION_NAME
-            source = TransactionSource.ROUTE
+            source = SegmentNameSource.ROUTE
             return name, source
 
         return name, source
@@ -429,7 +423,7 @@ class SentryAsgiMiddleware:
         self: "SentryAsgiMiddleware", segment_style: str, asgi_scope: "Any"
     ) -> "Tuple[str, str]":
         name = None
-        source = SEGMENT_SOURCE_FOR_STYLE[segment_style].value
+        source = SOURCE_FOR_STYLE[segment_style].value
         ty = asgi_scope.get("type")
 
         if segment_style == "endpoint":

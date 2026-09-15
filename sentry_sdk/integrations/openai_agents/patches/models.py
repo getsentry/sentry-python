@@ -6,8 +6,7 @@ from typing import TYPE_CHECKING
 import sentry_sdk
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable
-from sentry_sdk.traces import Span
-from sentry_sdk.tracing import BAGGAGE_HEADER_NAME
+from sentry_sdk.traces import BAGGAGE_HEADER_NAME, Span
 from sentry_sdk.tracing_utils import (
     add_sentry_baggage_to_headers,
     should_propagate_trace,

@@ -23,12 +23,10 @@ from sentry_sdk.feature_flags import DEFAULT_FLAG_CAPACITY, FlagBuffer
 from sentry_sdk.session import Session
 from sentry_sdk.traces import (
     _DEFAULT_PARENT_SPAN,
-    NoOpSpan,
-    Span,
-)
-from sentry_sdk.tracing import (
     BAGGAGE_HEADER_NAME,
     SENTRY_TRACE_HEADER_NAME,
+    NoOpSpan,
+    Span,
 )
 from sentry_sdk.tracing_utils import (
     Baggage,

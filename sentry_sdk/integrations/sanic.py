@@ -13,7 +13,6 @@ from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_ve
 from sentry_sdk.integrations._wsgi_common import RequestExtractor, _filter_headers
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import SegmentNameSource
-from sentry_sdk.tracing import TransactionSource
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
@@ -189,7 +188,7 @@ async def _set_transaction(request: "Request", route: "Route", **_: "Any") -> No
         with capture_internal_exceptions():
             scope = sentry_sdk.get_current_scope()
             route_name = route.name.replace(request.app.name, "").strip(".")
-            scope.set_transaction_name(route_name, source=TransactionSource.COMPONENT)
+            scope.set_transaction_name(route_name, source=SegmentNameSource.COMPONENT)
 
 
 def _sentry_error_handler_lookup(
