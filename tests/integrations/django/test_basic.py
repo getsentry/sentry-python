@@ -851,9 +851,7 @@ def test_set_db_data_custom_backend():
             return {}
 
     try:
-        _set_db_data(
-            Span(name="name", scope=sentry_sdk.Scope()), DummyBackend()
-        )
+        _set_db_data(Span(name="name", scope=sentry_sdk.Scope()), DummyBackend())
     except TypeError:
         pytest.fail("A TypeError was raised")
 
