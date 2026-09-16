@@ -12,6 +12,7 @@ from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_ve
 from sentry_sdk.utils import (
     Components,
     Dsn,
+    _generate_installed_modules,
     _get_installed_modules,
     datetime_from_isoformat,
     ensure_integration_enabled,
@@ -962,6 +963,31 @@ def test_installed_modules_caching():
 
             _get_installed_modules()
             mock_generate_installed_modules.assert_not_called()
+
+
+def test_generate_installed_modules():
+    def make_dist(name, version):
+        dist = mock.Mock()
+        dist.metadata = {"Name": name} if name is not None else {}
+        dist.version = version
+        return dist
+
+    fake_distributions = [
+        make_dist("Foo-Package", "1.0.0"),
+        make_dist(None, "9.9.9"),  # no Name in metadata -- must be skipped
+        # normalizes to the same name as the first entry (case-insensitive) --
+        # must be skipped in favor of the first occurrence
+        make_dist("FOO-PACKAGE", "2.0.0"),
+        make_dist("Baz", None),  # no version -- must be skipped
+        make_dist("Bar", "3.0.0"),
+    ]
+
+    with mock.patch(
+        "importlib.metadata.distributions", return_value=fake_distributions
+    ):
+        result = dict(_generate_installed_modules())
+
+    assert result == {"foo-package": "1.0.0", "bar": "3.0.0"}
 
 
 def test_devnull_inaccessible():
