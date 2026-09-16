@@ -42,3 +42,19 @@ def test_flush_disabled(sentry_init, capture_exceptions, monkeypatch):
     assert isinstance(exception, ZeroDivisionError)
 
     assert flush_calls == []
+
+def test_dedupe_reset_between_invocations(sentry_init, capture_events, monkeypatch):
+    sentry_init()
+    events = capture_events()
+
+    monkeypatch.setattr("sentry_sdk.flush", lambda: None)
+
+    @serverless_function
+    def foo():
+        1 / 0
+
+    for _ in range(2):
+        with pytest.raises(ZeroDivisionError):
+            foo()
+
+    assert len(events) == 2, "Each invocation should send an error event and not be deduplicated."
