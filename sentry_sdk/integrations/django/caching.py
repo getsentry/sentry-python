@@ -162,14 +162,9 @@ def _get_address_port(
 def should_enable_cache_spans() -> bool:
     from sentry_sdk.integrations.django import DjangoIntegration
 
-    client = sentry_sdk.get_client()
-    integration = client.get_integration(DjangoIntegration)
-    from django.conf import settings
+    integration = sentry_sdk.get_client().get_integration(DjangoIntegration)
 
-    return integration is not None and (
-        (client.spotlight is not None and settings.DEBUG is True)
-        or integration.cache_spans is True
-    )
+    return integration is not None and integration.cache_spans is True
 
 
 def patch_caching() -> None:
