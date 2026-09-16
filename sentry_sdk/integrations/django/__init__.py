@@ -97,7 +97,7 @@ class DjangoIntegration(Integration):
     :param middleware_spans: Whether to create spans for middleware. Defaults to `False`.
     :param signals_spans: Whether to create spans for signals. Defaults to `True`.
     :param signals_denylist: A list of signals to ignore when creating spans.
-    :param cache_spans: Whether to create spans for cache operations. Defaults to `False`.
+    :param cache_spans: Whether to create spans for cache operations. Defaults to `True`.
     :param failed_request_status_codes: Which HTTP error responses to report to Sentry.
         Django answers some exceptions itself instead of failing: `raise Http404` gets
         the user a 404 page, `PermissionDenied` a 403. Those are reported only if their
@@ -120,7 +120,7 @@ class DjangoIntegration(Integration):
         transaction_style: str = "url",
         middleware_spans: bool = False,
         signals_spans: bool = True,
-        cache_spans: bool = False,
+        cache_spans: bool = True,
         db_transaction_spans: bool = False,
         signals_denylist: "Optional[list[signals.Signal]]" = None,
         http_methods_to_capture: "tuple[str, ...]" = DEFAULT_HTTP_METHODS_TO_CAPTURE,

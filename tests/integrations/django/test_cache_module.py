@@ -243,6 +243,37 @@ def test_cache_spans_middleware(
 
 @pytest.mark.forked
 @pytest_mark_django_db_decorator()
+def test_cache_spans_enabled_by_default(
+    sentry_init,
+    client,
+    capture_items,
+    use_django_caching_with_middlewares,
+):
+    sentry_init(
+        integrations=[
+            DjangoIntegration(
+                middleware_spans=False,
+                signals_spans=False,
+            )
+        ],
+        traces_sample_rate=1.0,
+    )
+
+    client.application.load_middleware()
+    items = capture_items("span")
+
+    client.get(reverse("not_cached_view"))
+
+    sentry_sdk.flush()
+    spans = [item.payload for item in items]
+    assert spans[0]["attributes"]["sentry.op"] == "cache.get"
+    assert spans[0]["name"].startswith("views.decorators.cache.cache_header.")
+    assert spans[1]["attributes"]["sentry.op"] == "cache.put"
+    assert spans[1]["name"].startswith("views.decorators.cache.cache_header.")
+
+
+@pytest.mark.forked
+@pytest_mark_django_db_decorator()
 def test_cache_spans_decorator(
     sentry_init,
     client,
