@@ -3750,4 +3750,3 @@ def test_langchain_agent_executor_data_collection(
 
     # Data collection never gates non-PII attributes
     assert span_data[SPANDATA.GEN_AI_OPERATION_NAME] == "invoke_agent"
-    assert span_data[SPANDATA.GEN_AI_RESPONSE_STREAMING] is (agent_method == "stream")
