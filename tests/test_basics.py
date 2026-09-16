@@ -138,6 +138,30 @@ def test_dedupe_builtin_exceptions(sentry_init, capture_events):
     assert len(events) == 1, "Built-in exceptions are not deduplicated"
 
 
+def test_dedupe_builtin_exceptions_different_raise_sites(sentry_init, capture_events):
+    def raise_here():
+        try:
+            raise ValueError("hello world!")
+        except Exception:
+            capture_exception()
+
+    def raise_there():
+        try:
+            raise ValueError("hello world!")
+        except Exception:
+            capture_exception()
+
+    sentry_init()
+    events = capture_events()
+
+    raise_here()
+    raise_there()
+
+    assert len(events) == 2, (
+        "Built-in exceptions with the exact same type and arguments raised from different code paths are not deduplicated"
+    )
+
+
 def test_option_before_send(sentry_init, capture_events):
     def before_send(event, hint):
         event["extra"] = {"before_send_called": True}
