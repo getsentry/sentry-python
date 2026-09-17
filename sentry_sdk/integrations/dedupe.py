@@ -57,6 +57,9 @@ class DedupeIntegration(Integration):
 
                 updated_cache_entries.add((exception_item, last_seen))
 
+            if not found_duplicate:
+                updated_cache_entries.add((exc, now))
+
             integration._last_seen.set(updated_cache_entries)
 
             if found_duplicate:
