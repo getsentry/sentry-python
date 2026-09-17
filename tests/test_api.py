@@ -15,7 +15,6 @@ from sentry_sdk import (
     set_tags,
 )
 from sentry_sdk.client import Client, NonRecordingClient
-from sentry_sdk.integrations.dedupe import DedupeIntegration
 from sentry_sdk.traces import Span
 from tests.conftest import TestTransportWithOptions
 
@@ -172,7 +171,7 @@ def raise_and_capture():
 
 
 def test_set_tags(sentry_init, capture_events):
-    sentry_init(disabled_integrations=[DedupeIntegration])
+    sentry_init()
     events = capture_events()
 
     set_tags({"tag1": "value1", "tag2": "value2"})
