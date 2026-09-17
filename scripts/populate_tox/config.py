@@ -312,6 +312,12 @@ TEST_SUITE_CONFIG = {
             "*": ["pytest-asyncio", "httpx"],
         },
     },
+    "mistral": {
+        "package": "mistralai",
+        "deps": {
+            "*": ["pytest-asyncio", "httpx"],
+        },
+    },
     "fastmcp": {
         "package": "fastmcp",
         "deps": {

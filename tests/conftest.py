@@ -1281,6 +1281,7 @@ def get_model_response():
             200,
             request=model_request,
             content=response_content,
+            headers={"Content-Type": "application/json"},
         )
 
         return response
