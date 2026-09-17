@@ -26,9 +26,9 @@ class MistralIntegration(Integration):
 
     @staticmethod
     def setup_once() -> None:
-        Chat.complete = _wrap_complete(Chat.complete)
+        Chat.complete = _wrap_complete(Chat.complete)  # type: ignore[method-assign]
 
-        Chat.complete_async = _wrap_complete_async(Chat.complete_async)
+        Chat.complete_async = _wrap_complete_async(Chat.complete_async)  # type: ignore[method-assign]
 
 
 def _wrap_complete(f: "Callable[..., Any]") -> "Callable[..., Any]":
