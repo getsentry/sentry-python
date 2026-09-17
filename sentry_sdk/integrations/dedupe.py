@@ -8,10 +8,15 @@ from sentry_sdk.scope import add_global_event_processor
 from sentry_sdk.utils import logger
 
 if TYPE_CHECKING:
-    from typing import Any, Optional
+    from typing import Any, Optional, Tuple, Type
 
     from sentry_sdk._types import Event, Hint
 
+
+def _fingerprint(
+    exc: BaseException,
+) -> "Tuple[Type[BaseException], int, str]":
+    return (type(exc), hash(exc.args), hex(id(exc)))
 
 class DedupeIntegration(Integration):
     identifier = "dedupe"
@@ -35,14 +40,15 @@ class DedupeIntegration(Integration):
                 return event
 
             last_seen = integration._last_seen.get(None)
-            if last_seen is not None:
-                # last_seen is either a weakref or the original instance
-                last_seen = (
-                    last_seen() if isinstance(last_seen, weakref.ref) else last_seen
-                )
-
             exc = exc_info[1]
-            if last_seen is exc:
+
+            is_duplicate = False
+            if isinstance(last_seen, weakref.ref):
+                is_duplicate = last_seen() is exc
+            elif isinstance(last_seen, tuple):
+                is_duplicate = last_seen == _fingerprint(exc)
+
+            if is_duplicate:
                 logger.info("DedupeIntegration dropped duplicated error event %s", exc)
                 return None
 
@@ -50,7 +56,7 @@ class DedupeIntegration(Integration):
             try:
                 integration._last_seen.set(weakref.ref(exc))
             except TypeError:
-                integration._last_seen.set(exc)
+                integration._last_seen.set(_fingerprint(exc))
 
             return event
 
