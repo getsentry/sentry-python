@@ -3,6 +3,7 @@ from functools import wraps
 from typing import TYPE_CHECKING
 
 import sentry_sdk
+from sentry_sdk.integrations.dedupe import DedupeIntegration
 from sentry_sdk.utils import event_from_exception, reraise
 
 if TYPE_CHECKING:
@@ -34,6 +35,7 @@ def serverless_function(  # noqa
         def inner(*args: "Any", **kwargs: "Any") -> "Any":
             with sentry_sdk.isolation_scope() as scope:
                 scope.clear_breadcrumbs()
+                DedupeIntegration.reset_last_seen()
 
                 try:
                     return f(*args, **kwargs)

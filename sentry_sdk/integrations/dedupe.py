@@ -13,10 +13,33 @@ if TYPE_CHECKING:
     from sentry_sdk._types import Event, Hint
 
 
+def _safe_args_hash(args: "Tuple[Any, ...]") -> int:
+    try:
+        return hash(args)
+    except Exception:
+        try:
+            return hash(repr(args))
+        except Exception:
+            return 0
+
+
+def _raise_site(exc: BaseException) -> "Optional[Tuple[str, int]]":
+    try:
+        tb = exc.__traceback__
+        if tb is None:
+            return None
+        while tb.tb_next is not None:
+            tb = tb.tb_next
+        return (tb.tb_frame.f_code.co_filename, tb.tb_lineno)
+    except Exception:
+        return None
+
+
 def _fingerprint(
     exc: BaseException,
-) -> "Tuple[Type[BaseException], str]":
-    return (type(exc), hex(id(exc)))
+) -> "Tuple[Type[BaseException], int, Optional[Tuple[str, int]]]":
+    return (type(exc), _safe_args_hash(exc.args), _raise_site(exc))
+
 
 class DedupeIntegration(Integration):
     identifier = "dedupe"

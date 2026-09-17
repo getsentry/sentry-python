@@ -122,6 +122,46 @@ def test_generic_mechanism(sentry_init, capture_events):
     assert event["exception"]["values"][0]["mechanism"]["handled"]
 
 
+def test_dedupe_builtin_exceptions(sentry_init, capture_events):
+    def do_this():
+        try:
+            raise ValueError("hello world!")
+        except Exception:
+            capture_exception()
+
+    sentry_init()
+    events = capture_events()
+
+    do_this()
+    do_this()
+
+    assert len(events) == 1, "Built-in exceptions are not deduplicated"
+
+
+def test_dedupe_builtin_exceptions_different_raise_sites(sentry_init, capture_events):
+    def raise_here():
+        try:
+            raise ValueError("hello world!")
+        except Exception:
+            capture_exception()
+
+    def raise_there():
+        try:
+            raise ValueError("hello world!")
+        except Exception:
+            capture_exception()
+
+    sentry_init()
+    events = capture_events()
+
+    raise_here()
+    raise_there()
+
+    assert len(events) == 2, (
+        "Built-in exceptions with the exact same type and arguments raised from different code paths are not deduplicated"
+    )
+
+
 def test_option_before_send(sentry_init, capture_events):
     def before_send(event, hint):
         event["extra"] = {"before_send_called": True}
@@ -187,19 +227,19 @@ def test_option_before_breadcrumb(sentry_init, capture_events, monkeypatch):
         sentry_sdk.get_client().transport, "record_lost_event", record_lost_event
     )
 
-    def do_this():
+    def do_this(msg):
         add_breadcrumb(message="Hello", hint={"foo": 42})
         try:
-            raise ValueError("aha!")
+            raise ValueError(msg)
         except Exception:
             capture_exception()
 
-    do_this()
+    do_this("aha!")
     drop_breadcrumbs = True
-    do_this()
+    do_this("another aha!")
     assert not reports
     drop_events = True
-    do_this()
+    do_this("why not one more aha!")
     assert reports == [("before_send", "error")]
 
     normal, no_crumbs = events
@@ -284,7 +324,7 @@ def test_breadcrumbs(sentry_init, capture_events):
 
     sentry_sdk.get_isolation_scope().clear()
 
-    capture_exception(ValueError())
+    capture_exception(ValueError("another one!"))
     (event,) = events
     assert len(event["breadcrumbs"]["values"]) == 0
 
