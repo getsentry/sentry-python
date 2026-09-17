@@ -882,15 +882,15 @@ def test_check_minimum_version(monkeypatch, version, min_version, expected_pass)
 
 
 @pytest.fixture
-def mock_client_with_dsn_netloc():
+def mock_client_with_dsn():
     """
-    Returns a mocked Client with a DSN netloc of "abcd1234.ingest.sentry.io".
+    Returns a mocked Client with a DSN host of "abcd1234.ingest.sentry.io".
     """
     mock_client = mock.Mock(spec=sentry_sdk.Client)
     mock_client.transport = mock.Mock(spec=sentry_sdk.Transport)
     mock_client.transport.parsed_dsn = mock.Mock(spec=Dsn)
 
-    mock_client.transport.parsed_dsn.netloc = "abcd1234.ingest.sentry.io"
+    mock_client.transport.parsed_dsn.host = "abcd1234.ingest.sentry.io"
 
     return mock_client
 
@@ -899,13 +899,37 @@ def mock_client_with_dsn_netloc():
     ["test_url", "is_sentry_url_expected"],
     [
         ["https://asdf@abcd1234.ingest.sentry.io/123456789", True],
+        ["HTTP://ABCD1234.INGEST.SENTRY.IO:8443/envelope", True],
+        ["abcd1234.ingest.sentry.io", True],
+        ["abcd1234.ingest.sentry.io:9000", True],
         ["https://asdf@abcd1234.ingest.notsentry.io/123456789", False],
+        ["https://abcd1234.ingest.sentry.io.evil.test/api/1", False],
+        ["https://abcd1234.ingest.sentry.io@attacker.test/api/1", False],
+        ["https://attacker.test/abcd1234.ingest.sentry.io", False],
+        ["https://attacker.test/?next=abcd1234.ingest.sentry.io", False],
+        ["abcd1234.ingest.sentry.io.evil.test", False],
+        ["https://[::1", False],
     ],
 )
-def test_is_sentry_url_true(
-    test_url, is_sentry_url_expected, mock_client_with_dsn_netloc
-):
-    ret_val = is_sentry_url(mock_client_with_dsn_netloc, test_url)
+def test_is_sentry_url(test_url, is_sentry_url_expected, mock_client_with_dsn):
+    ret_val = is_sentry_url(mock_client_with_dsn, test_url)
+
+    assert ret_val == is_sentry_url_expected
+
+
+@pytest.mark.parametrize(
+    ["test_url", "is_sentry_url_expected"],
+    [
+        ["2001:db8::1", True],
+        ["[2001:db8::1]:9000", True],
+        ["HTTP://[2001:DB8::1]:9000/envelope", True],
+        ["http://[2001:db8::2]:9000/envelope", False],
+    ],
+)
+def test_is_sentry_url_ipv6(test_url, is_sentry_url_expected, mock_client_with_dsn):
+    mock_client_with_dsn.transport.parsed_dsn.host = "2001:db8::1"
+
+    ret_val = is_sentry_url(mock_client_with_dsn, test_url)
 
     assert ret_val == is_sentry_url_expected
 
