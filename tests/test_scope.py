@@ -11,7 +11,6 @@ from sentry_sdk import (
     new_scope,
 )
 from sentry_sdk.client import Client, NonRecordingClient
-from sentry_sdk.integrations.dedupe import DedupeIntegration
 from sentry_sdk.scope import (
     Scope,
     ScopeType,
@@ -70,7 +69,7 @@ def test_scope_flags_copy():
 
 
 def test_set_user(sentry_init, capture_events):
-    sentry_init(disabled_integrations=[DedupeIntegration])
+    sentry_init()
     events = capture_events()
 
     sentry_sdk.get_isolation_scope().set_user({"id": "42", "email": "bob@example.com"})

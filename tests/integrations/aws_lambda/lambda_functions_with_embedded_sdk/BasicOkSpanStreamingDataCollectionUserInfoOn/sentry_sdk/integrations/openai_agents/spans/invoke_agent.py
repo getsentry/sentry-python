@@ -1,0 +1,103 @@
+from typing import TYPE_CHECKING
+
+import sentry_sdk
+from sentry_sdk.ai.utils import (
+    normalize_message_roles,
+    set_data_normalized,
+)
+from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.scope import should_send_default_pii
+from sentry_sdk.traces import Span
+from sentry_sdk.utils import has_data_collection_enabled, safe_serialize
+
+from ..consts import SPAN_ORIGIN
+from ..utils import _set_agent_data
+
+if TYPE_CHECKING:
+    from typing import Any, Optional
+
+    import agents
+
+
+def invoke_agent_span(
+    context: "agents.RunContextWrapper", agent: "agents.Agent", kwargs: "dict[str, Any]"
+) -> "Span":
+    client_options = sentry_sdk.get_client().options
+
+    span = sentry_sdk.traces.start_span(
+        name=f"invoke_agent {agent.name}",
+        attributes={
+            "sentry.op": OP.GEN_AI_INVOKE_AGENT,
+            "sentry.origin": SPAN_ORIGIN,
+            SPANDATA.GEN_AI_OPERATION_NAME: "invoke_agent",
+        },
+    )
+
+    record_inputs = False
+    if has_data_collection_enabled(client_options):
+        if client_options["data_collection"]["gen_ai"]["inputs"]:
+            record_inputs = True
+    elif should_send_default_pii():
+        record_inputs = True
+
+    if record_inputs:
+        messages = []
+        if agent.instructions:
+            message = (
+                agent.instructions
+                if isinstance(agent.instructions, str)
+                else safe_serialize(agent.instructions)
+            )
+            messages.append(
+                {
+                    "content": [{"text": message, "type": "text"}],
+                    "role": "system",
+                }
+            )
+
+        original_input = kwargs.get("original_input")
+        if original_input is not None:
+            message = (
+                original_input
+                if isinstance(original_input, str)
+                else safe_serialize(original_input)
+            )
+            messages.append(
+                {
+                    "content": [{"text": message, "type": "text"}],
+                    "role": "user",
+                }
+            )
+
+        if len(messages) > 0:
+            normalized_messages = normalize_message_roles(messages)
+            set_data_normalized(
+                span,
+                SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                normalized_messages,
+                unpack=False,
+            )
+
+    _set_agent_data(span, agent)
+
+    return span
+
+
+def update_invoke_agent_span(
+    span: "Span",
+    agent: "Optional[agents.Agent]",
+    output: "Any" = None,
+) -> None:
+    client = sentry_sdk.get_client()
+    if has_data_collection_enabled(client.options):
+        if client.options["data_collection"]["gen_ai"]["outputs"]:
+            set_data_normalized(
+                span, SPANDATA.GEN_AI_RESPONSE_TEXT, output, unpack=False
+            )
+    elif should_send_default_pii():
+        set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, output, unpack=False)
+
+    # Add conversation ID from agent
+    conv_id = getattr(agent, "_sentry_conversation_id", None)
+    if conv_id:
+        span.set_attribute(SPANDATA.GEN_AI_CONVERSATION_ID, conv_id)

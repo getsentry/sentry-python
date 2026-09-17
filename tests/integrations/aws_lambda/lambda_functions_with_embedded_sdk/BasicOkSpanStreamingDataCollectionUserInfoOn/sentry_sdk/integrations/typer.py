@@ -1,0 +1,63 @@
+from typing import TYPE_CHECKING
+
+import sentry_sdk
+from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
+from sentry_sdk.utils import (
+    capture_internal_exceptions,
+    event_from_exception,
+    parse_version,
+)
+
+if TYPE_CHECKING:
+    from types import TracebackType
+    from typing import Any, Callable, Optional, Type
+
+    Excepthook = Callable[
+        [Type[BaseException], BaseException, Optional[TracebackType]],
+        Any,
+    ]
+
+try:
+    import typer
+    from typer import __version__ as TYPER_VERSION
+    from typer.main import except_hook
+except ImportError:
+    raise DidNotEnable("Typer not installed or incompatible")
+
+
+class TyperIntegration(Integration):
+    identifier = "typer"
+
+    @staticmethod
+    def setup_once() -> None:
+        version = parse_version(TYPER_VERSION)
+        _check_minimum_version(TyperIntegration, version)
+
+        typer.main.except_hook = _make_excepthook(except_hook)  # type: ignore
+
+
+def _make_excepthook(old_excepthook: "Excepthook") -> "Excepthook":
+    def sentry_sdk_excepthook(
+        type_: "Type[BaseException]",
+        value: BaseException,
+        traceback: "Optional[TracebackType]",
+    ) -> None:
+        integration = sentry_sdk.get_client().get_integration(TyperIntegration)
+
+        # Note: If we replace this with ensure_integration_enabled then
+        # we break the exceptiongroup backport;
+        # See: https://github.com/getsentry/sentry-python/issues/3097
+        if integration is None:
+            return old_excepthook(type_, value, traceback)
+
+        with capture_internal_exceptions():
+            event, hint = event_from_exception(
+                (type_, value, traceback),
+                client_options=sentry_sdk.get_client().options,
+                mechanism={"type": "typer", "handled": False},
+            )
+            sentry_sdk.capture_event(event, hint=hint)
+
+        return old_excepthook(type_, value, traceback)
+
+    return sentry_sdk_excepthook

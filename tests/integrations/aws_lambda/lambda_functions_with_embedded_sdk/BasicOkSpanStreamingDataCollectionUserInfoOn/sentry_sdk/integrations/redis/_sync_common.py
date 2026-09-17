@@ -1,0 +1,166 @@
+from typing import TYPE_CHECKING
+
+import sentry_sdk
+from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.integrations.redis.consts import (
+    SPAN_ORIGIN,
+)
+from sentry_sdk.integrations.redis.modules.caches import (
+    _compile_cache_span_properties,
+    _set_cache_data,
+)
+from sentry_sdk.integrations.redis.modules.queries import _compile_db_span_properties
+from sentry_sdk.integrations.redis.utils import (
+    _extract_key,
+    _get_safe_command,
+    _set_client_data,
+)
+from sentry_sdk.utils import capture_internal_exceptions
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+    from typing import Any, Optional
+
+    from sentry_sdk.traces import Span
+
+
+def patch_redis_pipeline(
+    pipeline_cls: "Any",
+    is_cluster: bool,
+    get_command_args_fn: "Any",
+    set_db_data_fn: "Callable[[Span, Any], None]",
+) -> None:
+    old_execute = pipeline_cls.execute
+
+    from sentry_sdk.integrations.redis import RedisIntegration
+
+    def sentry_patched_execute(self: "Any", *args: "Any", **kwargs: "Any") -> "Any":
+        client = sentry_sdk.get_client()
+        if client.get_integration(RedisIntegration) is None:
+            return old_execute(self, *args, **kwargs)
+
+        sentry_sdk.add_breadcrumb(
+            message="redis.pipeline.execute",
+            type="redis",
+            category="redis",
+            data={
+                "redis.is_cluster": is_cluster,
+                "redis.transaction": False if is_cluster else self.transaction,
+            },
+        )
+
+        if sentry_sdk.traces.get_current_span() is None:
+            return old_execute(self, *args, **kwargs)
+
+        span = sentry_sdk.traces.start_span(
+            name="redis.pipeline.execute",
+            attributes={
+                "sentry.origin": SPAN_ORIGIN,
+                "sentry.op": OP.DB_REDIS,
+            },
+        )
+
+        with span:
+            with capture_internal_exceptions():
+                set_db_data_fn(span, self)
+
+            return old_execute(self, *args, **kwargs)
+
+    pipeline_cls.execute = sentry_patched_execute
+
+
+def patch_redis_client(
+    cls: "Any",
+    is_cluster: bool,
+    set_db_data_fn: "Callable[[Span, Any], None]",
+) -> None:
+    """
+    This function can be used to instrument custom redis client classes or
+    subclasses.
+    """
+    old_execute_command = cls.execute_command
+
+    from sentry_sdk.integrations.redis import RedisIntegration
+
+    def sentry_patched_execute_command(
+        self: "Any", name: str, *args: "Any", **kwargs: "Any"
+    ) -> "Any":
+        client = sentry_sdk.get_client()
+        integration = client.get_integration(RedisIntegration)
+        if integration is None:
+            return old_execute_command(self, name, *args, **kwargs)
+
+        db_properties = _compile_db_span_properties(integration, name, args)
+
+        breadcrumb_data = {
+            "redis.is_cluster": is_cluster,
+            "redis.command": name,
+            "db.operation": name,
+        }
+        key = _extract_key(name, args)
+        if key is not None:
+            breadcrumb_data["redis.key"] = key
+
+        sentry_sdk.add_breadcrumb(
+            message=db_properties["description"],
+            type="redis",
+            category="redis",
+            data=breadcrumb_data,
+        )
+
+        if sentry_sdk.traces.get_current_span() is None:
+            return old_execute_command(self, name, *args, **kwargs)
+
+        cache_properties = _compile_cache_span_properties(
+            name,
+            args,
+            kwargs,
+            integration,
+        )
+
+        additional_cache_span_attributes = {}
+        with capture_internal_exceptions():
+            additional_cache_span_attributes[SPANDATA.DB_QUERY_TEXT] = (
+                _get_safe_command(name, args)
+            )
+
+        cache_span: "Optional[Span]" = None
+        if cache_properties["is_cache_key"] and cache_properties["op"] is not None:
+            cache_span = sentry_sdk.traces.start_span(
+                name=cache_properties["description"],
+                attributes={
+                    "sentry.op": cache_properties["op"],
+                    "sentry.origin": SPAN_ORIGIN,
+                    **additional_cache_span_attributes,
+                },
+            )
+
+        additional_db_span_attributes = {}
+        with capture_internal_exceptions():
+            additional_db_span_attributes[SPANDATA.DB_QUERY_TEXT] = _get_safe_command(
+                name, args
+            )
+
+        db_span = sentry_sdk.traces.start_span(
+            name=db_properties["description"],
+            attributes={
+                "sentry.op": db_properties["op"],
+                "sentry.origin": SPAN_ORIGIN,
+                **additional_db_span_attributes,
+            },
+        )
+
+        set_db_data_fn(db_span, self)
+        _set_client_data(db_span, is_cluster, name, *args)
+
+        value = old_execute_command(self, name, *args, **kwargs)
+
+        db_span.end()
+
+        if cache_span:
+            _set_cache_data(cache_span, self, cache_properties, value)
+            cache_span.end()
+
+        return value
+
+    cls.execute_command = sentry_patched_execute_command

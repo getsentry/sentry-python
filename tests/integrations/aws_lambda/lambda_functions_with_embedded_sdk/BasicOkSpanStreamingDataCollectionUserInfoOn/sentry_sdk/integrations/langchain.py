@@ -1,0 +1,1261 @@
+import itertools
+import json
+import sys
+from collections import OrderedDict
+from functools import wraps
+from typing import TYPE_CHECKING, NamedTuple
+
+import sentry_sdk
+from sentry_sdk.ai.utils import (
+    GEN_AI_ALLOWED_MESSAGE_ROLES,
+    normalize_message_roles,
+    set_data_normalized,
+    transform_content_part,
+)
+from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
+from sentry_sdk.scope import should_send_default_pii
+from sentry_sdk.traces import Span, _AgentFrameworkChatGenerationContext
+from sentry_sdk.tracing_utils import (
+    _get_value,
+)
+from sentry_sdk.utils import (
+    capture_internal_exceptions,
+    event_from_exception,
+    has_data_collection_enabled,
+    logger,
+    parse_version,
+)
+
+if TYPE_CHECKING:
+    from typing import (
+        Any,
+        AsyncIterator,
+        Callable,
+        Dict,
+        Iterator,
+        List,
+        Optional,
+        Union,
+    )
+    from uuid import UUID
+
+    from sentry_sdk._types import TextPart
+
+
+try:
+    from langchain_core import __version__ as LANGCHAIN_VERSION
+    from langchain_core.callbacks import (
+        BaseCallbackHandler,
+        BaseCallbackManager,
+        Callbacks,
+        manager,
+    )
+    from langchain_core.messages import AIMessage, BaseMessage
+    from langchain_core.outputs import (
+        ChatGeneration,
+        ChatGenerationChunk,
+        Generation,
+        GenerationChunk,
+        LLMResult,
+    )
+
+except ImportError:
+    raise DidNotEnable("langchain not installed or incompatible")
+
+
+class TokenUsage(NamedTuple):
+    input_tokens: "Optional[int]"
+    output_tokens: "Optional[int]"
+    total_tokens: "Optional[int]"
+    cache_read: "Optional[int]"
+    cache_creation: "Optional[int]"
+    reasoning: "Optional[int]"
+
+
+try:
+    # >=v1
+    from langchain_classic.agents import AgentExecutor  # type: ignore[import-not-found]
+except ImportError:
+    try:
+        # <v1
+        from langchain.agents import AgentExecutor
+    # Catch TypeError due to changes in type hint evaluation order: https://github.com/pydantic/pydantic/issues/13036
+    except (ImportError, TypeError):
+        AgentExecutor = None
+
+
+def _get_ai_system(all_params: "Dict[str, Any]") -> "Optional[str]":
+    ai_type = all_params.get("_type")
+
+    if not ai_type or not isinstance(ai_type, str):
+        return None
+
+    return ai_type
+
+
+DATA_FIELDS = {
+    "frequency_penalty": SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY,
+    # "function_call" is an OpenAI convention for the now-legacy Chat Completions API field
+    "function_call": SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
+    "max_tokens": SPANDATA.GEN_AI_REQUEST_MAX_TOKENS,
+    "presence_penalty": SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY,
+    "temperature": SPANDATA.GEN_AI_REQUEST_TEMPERATURE,
+    "tool_calls": SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
+    "top_k": SPANDATA.GEN_AI_REQUEST_TOP_K,
+    "top_p": SPANDATA.GEN_AI_REQUEST_TOP_P,
+}
+
+
+def _transform_langchain_content_block(
+    content_block: "Dict[str, Any]",
+) -> "Dict[str, Any]":
+    """
+    Transform a LangChain content block using the shared transform_content_part function.
+
+    Returns the original content block if transformation is not applicable
+    (e.g., for text blocks or unrecognized formats).
+    """
+    result = transform_content_part(content_block)
+    return result if result is not None else content_block
+
+
+def _transform_langchain_message_content(content: "Any") -> "Any":
+    """
+    Transform LangChain message content, handling both string content and
+    list of content blocks.
+    """
+    if isinstance(content, str):
+        return content
+
+    if isinstance(content, (list, tuple)):
+        transformed = []
+        for block in content:
+            if isinstance(block, dict):
+                transformed.append(_transform_langchain_content_block(block))
+            else:
+                transformed.append(block)
+        return transformed
+
+    return content
+
+
+def _get_system_instructions(messages: "List[List[BaseMessage]]") -> "List[str]":
+    system_instructions = []
+
+    for list_ in messages:
+        for message in list_:
+            # type of content: str | list[str | dict] | None
+            if message.type == "system" and isinstance(message.content, str):
+                system_instructions.append(message.content)
+
+            elif message.type == "system" and isinstance(message.content, list):
+                for item in message.content:
+                    if isinstance(item, str):
+                        system_instructions.append(item)
+
+                    elif isinstance(item, dict) and item.get("type") == "text":
+                        instruction = item.get("text")
+                        if isinstance(instruction, str):
+                            system_instructions.append(instruction)
+
+    return system_instructions
+
+
+def _transform_system_instructions(
+    system_instructions: "List[str]",
+) -> "List[TextPart]":
+    return [
+        {
+            "type": "text",
+            "content": instruction,
+        }
+        for instruction in system_instructions
+    ]
+
+
+class LangchainIntegration(Integration):
+    identifier = "langchain"
+    origin = f"auto.ai.{identifier}"
+
+    _ignored_exceptions: "set[type[Exception]]" = set()
+
+    def __init__(
+        self: "LangchainIntegration",
+        include_prompts: bool = True,
+    ) -> None:
+        self.include_prompts = include_prompts
+
+    @staticmethod
+    def setup_once() -> None:
+        version = parse_version(LANGCHAIN_VERSION)
+        _check_minimum_version(LangchainIntegration, version)
+
+        manager._configure = _wrap_configure(manager._configure)
+
+        if AgentExecutor is not None:
+            AgentExecutor.invoke = _wrap_agent_executor_invoke(AgentExecutor.invoke)
+            AgentExecutor.stream = _wrap_agent_executor_stream(AgentExecutor.stream)
+
+
+def _capture_exception(exc: "Any", scope: "Optional[Any]" = None) -> None:
+    event, hint = event_from_exception(
+        exc,
+        client_options=sentry_sdk.get_client().options,
+        mechanism={"type": "langchain", "handled": False},
+    )
+    sentry_sdk.capture_event(event, hint=hint, scope=scope)
+
+
+class SentryLangchainCallback(BaseCallbackHandler):
+    """Callback handler that creates Sentry spans."""
+
+    def __init__(self, include_prompts: bool) -> None:
+        self.span_map: "OrderedDict[UUID, Union[Span, _AgentFrameworkChatGenerationContext]]" = OrderedDict()
+        self.include_prompts = include_prompts
+
+    def _handle_error(self, run_id: "UUID", error: "Any") -> None:
+        is_ignored = isinstance(error, tuple(LangchainIntegration._ignored_exceptions))
+
+        with capture_internal_exceptions():
+            if not run_id or run_id not in self.span_map:
+                return
+
+            context = self.span_map[run_id]
+
+            if is_ignored:
+                context.__exit__(None, None, None)
+            else:
+                _capture_exception(
+                    error,
+                    context.span._scope
+                    if isinstance(context, _AgentFrameworkChatGenerationContext)
+                    else context._scope,
+                )
+                context.__exit__(type(error), error, error.__traceback__)
+
+            del self.span_map[run_id]
+
+    def _normalize_langchain_message(self, message: "BaseMessage") -> "Any":
+        # Transform content to handle multimodal data (images, audio, video, files)
+        transformed_content = _transform_langchain_message_content(message.content)
+        parsed = {"role": message.type, "content": transformed_content}
+        parsed.update(message.additional_kwargs)
+        return parsed
+
+    def _create_span(
+        self: "SentryLangchainCallback",
+        run_id: "UUID",
+        parent_id: "Optional[Any]",
+        op: str,
+        name: str,
+        origin: str,
+    ) -> "Span":
+        span = None
+        if parent_id:
+            parent: "Optional[Union[Span, _AgentFrameworkChatGenerationContext]]" = (
+                self.span_map.get(parent_id)
+            )
+            if parent:
+                span = sentry_sdk.traces.start_span(
+                    parent_span=parent.span
+                    if isinstance(parent, _AgentFrameworkChatGenerationContext)
+                    else parent,
+                    name=name,
+                    attributes={
+                        "sentry.op": op,
+                        "sentry.origin": origin,
+                    },
+                )
+
+        if span is None:
+            span = sentry_sdk.traces.start_span(
+                name=name,
+                attributes={
+                    "sentry.op": op,
+                    "sentry.origin": origin,
+                },
+            )
+
+        self.span_map[run_id] = span
+        return span
+
+    def _create_generation_span(
+        self: "SentryLangchainCallback",
+        run_id: "UUID",
+        parent_id: "Optional[Any]",
+        op: str,
+        name: str,
+        origin: str,
+    ) -> "_AgentFrameworkChatGenerationContext":
+        context = None
+        if parent_id:
+            parent: "Optional[Union[Span, _AgentFrameworkChatGenerationContext]]" = (
+                self.span_map.get(parent_id)
+            )
+            if parent:
+                context = _AgentFrameworkChatGenerationContext(
+                    parent_span=parent.span
+                    if isinstance(parent, _AgentFrameworkChatGenerationContext)
+                    else parent,
+                    name=name,
+                    attributes={
+                        "sentry.op": op,
+                        "sentry.origin": origin,
+                    },
+                )
+
+        if context is None:
+            context = _AgentFrameworkChatGenerationContext(
+                name=name,
+                attributes={
+                    "sentry.op": op,
+                    "sentry.origin": origin,
+                },
+            )
+
+        self.span_map[run_id] = context
+        return context
+
+    def _exit_span(
+        self: "SentryLangchainCallback",
+        span: "Span",
+        run_id: "UUID",
+    ) -> None:
+        span.__exit__(None, None, None)
+        del self.span_map[run_id]
+
+    def on_llm_start(
+        self: "SentryLangchainCallback",
+        serialized: "Dict[str, Any]",
+        prompts: "List[str]",
+        *,
+        run_id: "UUID",
+        tags: "Optional[List[str]]" = None,
+        parent_run_id: "Optional[UUID]" = None,
+        metadata: "Optional[Dict[str, Any]]" = None,
+        **kwargs: "Any",
+    ) -> "Any":
+        with capture_internal_exceptions():
+            if not run_id:
+                return
+
+            all_params = kwargs.get("invocation_params", {})
+            all_params.update(serialized.get("kwargs", {}))
+
+            model = (
+                all_params.get("model")
+                or all_params.get("model_name")
+                or all_params.get("model_id")
+                or ""
+            )
+
+            span = self._create_span(
+                run_id,
+                parent_run_id,
+                op=OP.GEN_AI_TEXT_COMPLETION,
+                name=f"text_completion {model}".strip(),
+                origin=LangchainIntegration.origin,
+            )
+
+            span.set_attribute(SPANDATA.GEN_AI_OPERATION_NAME, "text_completion")
+
+            run_name = kwargs.get("name")
+            if run_name:
+                span.set_attribute(SPANDATA.GEN_AI_FUNCTION_ID, run_name)
+
+            if model:
+                span.set_attribute(
+                    SPANDATA.GEN_AI_REQUEST_MODEL,
+                    model,
+                )
+
+            ai_system = _get_ai_system(all_params)
+            if ai_system:
+                span.set_attribute(SPANDATA.GEN_AI_PROVIDER_NAME, ai_system)
+
+            client = sentry_sdk.get_client()
+
+            for key, attribute in DATA_FIELDS.items():
+                if key in all_params and all_params[key] is not None:
+                    # This is correctly gated on "inputs" at the moment because the
+                    # "on_llm_start" method is the start of a request.
+                    #
+                    # TODO: GEN_AI_RESPONSE_TOOL_CALLS will need to be
+                    # transitioned to non-deprecated tool call attributes
+
+                    if (
+                        attribute == SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS
+                        and has_data_collection_enabled(client.options)
+                        and not client.options["data_collection"]["gen_ai"]["inputs"]
+                    ):
+                        continue
+
+                    set_data_normalized(span, attribute, all_params[key], unpack=False)
+
+            _set_tools_on_span(span, all_params.get("tools"))
+
+            record_inputs = False
+            if has_data_collection_enabled(client.options):
+                record_inputs = client.options["data_collection"]["gen_ai"]["inputs"]
+            elif should_send_default_pii() and self.include_prompts:
+                # TODO: Remove this branch once `send_default_pii` is deprecated
+                record_inputs = True
+
+            if record_inputs:
+                normalized_messages = [
+                    {
+                        "role": GEN_AI_ALLOWED_MESSAGE_ROLES.USER,
+                        "content": {"type": "text", "text": prompt},
+                    }
+                    for prompt in prompts
+                ]
+                set_data_normalized(
+                    span,
+                    SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                    normalized_messages,
+                    unpack=False,
+                )
+
+    def on_chat_model_start(
+        self: "SentryLangchainCallback",
+        serialized: "Dict[str, Any]",
+        messages: "List[List[BaseMessage]]",
+        *,
+        run_id: "UUID",
+        **kwargs: "Any",
+    ) -> "Any":
+        """Run when Chat Model starts running."""
+        with capture_internal_exceptions():
+            if not run_id:
+                return
+
+            all_params = kwargs.get("invocation_params", {})
+            all_params.update(serialized.get("kwargs", {}))
+
+            model = (
+                all_params.get("model")
+                or all_params.get("model_name")
+                or all_params.get("model_id")
+                or ""
+            )
+
+            context = self._create_generation_span(
+                run_id,
+                kwargs.get("parent_run_id"),
+                op=OP.GEN_AI_CHAT,
+                name=f"chat {model}".strip(),
+                origin=LangchainIntegration.origin,
+            )
+            span = context.span
+
+            span.set_attribute(SPANDATA.GEN_AI_OPERATION_NAME, "chat")
+            if model:
+                span.set_attribute(SPANDATA.GEN_AI_REQUEST_MODEL, model)
+
+            ai_system = _get_ai_system(all_params)
+            if ai_system:
+                span.set_attribute(SPANDATA.GEN_AI_PROVIDER_NAME, ai_system)
+
+            agent_metadata = kwargs.get("metadata")
+            if isinstance(agent_metadata, dict) and "lc_agent_name" in agent_metadata:
+                span.set_attribute(
+                    SPANDATA.GEN_AI_AGENT_NAME, agent_metadata["lc_agent_name"]
+                )
+
+            run_name = kwargs.get("name")
+            if run_name:
+                span.set_attribute(
+                    SPANDATA.GEN_AI_FUNCTION_ID,
+                    run_name,
+                )
+
+            client = sentry_sdk.get_client()
+
+            for key, attribute in DATA_FIELDS.items():
+                if key in all_params and all_params[key] is not None:
+                    if (
+                        # This is correctly gated on "inputs" at the moment because the
+                        # "on_chat_model_start" method is the start of a request.
+                        #
+                        # TODO: GEN_AI_RESPONSE_TOOL_CALLS will need to be
+                        # transitioned to non-deprecated tool call attributes
+                        attribute == SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS
+                        and has_data_collection_enabled(client.options)
+                        and not client.options["data_collection"]["gen_ai"]["inputs"]
+                    ):
+                        continue
+
+                    set_data_normalized(span, attribute, all_params[key], unpack=False)
+
+            _set_tools_on_span(span, all_params.get("tools"))
+
+            record_inputs = False
+            if has_data_collection_enabled(client.options):
+                record_inputs = client.options["data_collection"]["gen_ai"]["inputs"]
+            elif should_send_default_pii() and self.include_prompts:
+                # TODO: Remove this branch once `send_default_pii` is deprecated
+                record_inputs = True
+
+            if record_inputs:
+                system_instructions = _get_system_instructions(messages)
+                if len(system_instructions) > 0:
+                    span.set_attribute(
+                        SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+                        json.dumps(_transform_system_instructions(system_instructions)),
+                    )
+
+                normalized_messages = []
+                for list_ in messages:
+                    for message in list_:
+                        if message.type == "system":
+                            continue
+
+                        normalized_messages.append(
+                            self._normalize_langchain_message(message)
+                        )
+                normalized_messages = normalize_message_roles(normalized_messages)
+                set_data_normalized(
+                    span,
+                    SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                    normalized_messages,
+                    unpack=False,
+                )
+
+    def on_chat_model_end(
+        self: "SentryLangchainCallback",
+        response: "LLMResult",
+        *,
+        run_id: "UUID",
+        **kwargs: "Any",
+    ) -> "Any":
+        """Run when Chat Model ends running."""
+        with capture_internal_exceptions():
+            if not run_id or run_id not in self.span_map:
+                return
+
+            context = self.span_map[run_id]
+            span = (
+                context.span
+                if isinstance(context, _AgentFrameworkChatGenerationContext)
+                else context
+            )
+
+            client = sentry_sdk.get_client()
+
+            record_outputs = False
+            if has_data_collection_enabled(client.options):
+                record_outputs = client.options["data_collection"]["gen_ai"]["outputs"]
+            elif should_send_default_pii() and self.include_prompts:
+                # TODO: Remove this branch once `send_default_pii` is deprecated
+                record_outputs = True
+
+            if record_outputs:
+                set_data_normalized(
+                    span,
+                    SPANDATA.GEN_AI_RESPONSE_TEXT,
+                    [[x.text for x in list_] for list_ in response.generations],
+                )
+
+            _record_token_usage(span, response)
+            self._exit_span(span, run_id)
+
+    def on_llm_end(
+        self: "SentryLangchainCallback",
+        response: "LLMResult",
+        *,
+        run_id: "UUID",
+        **kwargs: "Any",
+    ) -> "Any":
+        """Run when LLM ends running."""
+        with capture_internal_exceptions():
+            if not run_id or run_id not in self.span_map:
+                return
+
+            context = self.span_map[run_id]
+            span = (
+                context.span
+                if isinstance(context, _AgentFrameworkChatGenerationContext)
+                else context
+            )
+
+            client = sentry_sdk.get_client()
+
+            record_outputs = False
+            if has_data_collection_enabled(client.options):
+                record_outputs = client.options["data_collection"]["gen_ai"]["outputs"]
+            elif should_send_default_pii() and self.include_prompts:
+                # TODO: Remove this branch once `send_default_pii` is deprecated
+                record_outputs = True
+
+            try:
+                generation = response.generations[0][0]
+            except IndexError:
+                generation = None
+
+            if generation is not None and generation.generation_info is not None:
+                finish_reason = generation.generation_info.get("finish_reason")
+                if finish_reason is not None:
+                    span.set_attribute(
+                        SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS,
+                        [finish_reason],
+                    )
+
+            if isinstance(generation, ChatGeneration):
+                response_model = generation.message.response_metadata.get("model_name")
+                if response_model is not None:
+                    span.set_attribute(SPANDATA.GEN_AI_RESPONSE_MODEL, response_model)
+
+                if record_outputs:
+                    tool_calls = getattr(generation.message, "tool_calls", None)
+                    if tool_calls is not None and tool_calls != []:
+                        set_data_normalized(
+                            span,
+                            SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
+                            tool_calls,
+                            unpack=False,
+                        )
+
+            if record_outputs:
+                set_data_normalized(
+                    span,
+                    SPANDATA.GEN_AI_RESPONSE_TEXT,
+                    [[x.text for x in list_] for list_ in response.generations],
+                )
+
+            _record_token_usage(span, response)
+            self._exit_span(span, run_id)
+
+    def on_llm_error(
+        self: "SentryLangchainCallback",
+        error: "BaseException",
+        *,
+        run_id: "UUID",
+        **kwargs: "Any",
+    ) -> "Any":
+        """Run when LLM errors."""
+        self._handle_error(run_id, error)
+
+    def on_chat_model_error(
+        self: "SentryLangchainCallback",
+        error: "Union[Exception, KeyboardInterrupt]",
+        *,
+        run_id: "UUID",
+        **kwargs: "Any",
+    ) -> "Any":
+        """Run when Chat Model errors."""
+        self._handle_error(run_id, error)
+
+    def on_tool_start(
+        self: "SentryLangchainCallback",
+        serialized: "Dict[str, Any]",
+        input_str: str,
+        *,
+        run_id: "UUID",
+        **kwargs: "Any",
+    ) -> "Any":
+        """Run when tool starts running."""
+        with capture_internal_exceptions():
+            if not run_id:
+                return
+
+            tool_name = serialized.get("name") or kwargs.get("name") or ""
+
+            span = self._create_span(
+                run_id,
+                kwargs.get("parent_run_id"),
+                op=OP.GEN_AI_EXECUTE_TOOL,
+                name=f"execute_tool {tool_name}".strip(),
+                origin=LangchainIntegration.origin,
+            )
+
+            span.set_attribute(SPANDATA.GEN_AI_OPERATION_NAME, "execute_tool")
+            span.set_attribute(SPANDATA.GEN_AI_TOOL_NAME, tool_name)
+
+            tool_description = serialized.get("description")
+            if tool_description is not None:
+                span.set_attribute(SPANDATA.GEN_AI_TOOL_DESCRIPTION, tool_description)
+
+            agent_metadata = kwargs.get("metadata")
+            if isinstance(agent_metadata, dict) and "lc_agent_name" in agent_metadata:
+                span.set_attribute(
+                    SPANDATA.GEN_AI_AGENT_NAME, agent_metadata["lc_agent_name"]
+                )
+
+            run_name = kwargs.get("name")
+            if run_name:
+                span.set_attribute(
+                    SPANDATA.GEN_AI_FUNCTION_ID,
+                    run_name,
+                )
+
+            client = sentry_sdk.get_client()
+
+            record_inputs = False
+            if has_data_collection_enabled(client.options):
+                record_inputs = client.options["data_collection"]["gen_ai"]["inputs"]
+            elif should_send_default_pii() and self.include_prompts:
+                # TODO: Remove this branch once `send_default_pii` is deprecated
+                record_inputs = True
+
+            if record_inputs:
+                set_data_normalized(
+                    span,
+                    SPANDATA.GEN_AI_TOOL_INPUT,
+                    kwargs.get("inputs", [input_str]),
+                )
+
+    def on_tool_end(
+        self: "SentryLangchainCallback", output: str, *, run_id: "UUID", **kwargs: "Any"
+    ) -> "Any":
+        """Run when tool ends running."""
+        with capture_internal_exceptions():
+            if not run_id or run_id not in self.span_map:
+                return
+
+            context = self.span_map[run_id]
+            span = (
+                context.span
+                if isinstance(context, _AgentFrameworkChatGenerationContext)
+                else context
+            )
+
+            client = sentry_sdk.get_client()
+
+            record_outputs = False
+            if has_data_collection_enabled(client.options):
+                record_outputs = client.options["data_collection"]["gen_ai"]["outputs"]
+            elif should_send_default_pii() and self.include_prompts:
+                # TODO: Remove this branch once `send_default_pii` is deprecated
+                record_outputs = True
+
+            if record_outputs:
+                set_data_normalized(span, SPANDATA.GEN_AI_TOOL_OUTPUT, output)
+
+            self._exit_span(span, run_id)
+
+    def on_tool_error(
+        self,
+        error: "BaseException",
+        *,
+        run_id: "UUID",
+        **kwargs: "Any",
+    ) -> "Any":
+        """Run when tool errors."""
+        self._handle_error(run_id, error)
+
+
+def _extract_tokens(
+    token_usage: "Any",
+) -> "tuple[Optional[int], Optional[int], Optional[int]]":
+    if not token_usage:
+        return None, None, None
+
+    input_tokens = _get_value(token_usage, "prompt_tokens") or _get_value(
+        token_usage, "input_tokens"
+    )
+    output_tokens = _get_value(token_usage, "completion_tokens") or _get_value(
+        token_usage, "output_tokens"
+    )
+    total_tokens = _get_value(token_usage, "total_tokens")
+
+    return input_tokens, output_tokens, total_tokens
+
+
+def _extract_tokens_from_generations(
+    generations: "list[list[Generation | ChatGeneration | GenerationChunk | ChatGenerationChunk]]",
+) -> "TokenUsage":
+    """Extract token usage from response.generations structure."""
+    total_input = 0
+    total_output = 0
+    total_total = 0
+    total_cache_read = None
+    total_cache_creation = None
+    reasoning = None
+
+    for gen_list in generations:
+        if not gen_list:
+            continue
+
+        token_usage = _get_token_usage(gen_list[0])
+        input_tokens, output_tokens, total_tokens = _extract_tokens(token_usage)
+        total_input += input_tokens if isinstance(input_tokens, int) else 0
+        total_output += output_tokens if isinstance(output_tokens, int) else 0
+        total_total += total_tokens if isinstance(total_tokens, int) else 0
+
+        if not isinstance(gen_list[0], ChatGeneration):
+            continue
+
+        message = gen_list[0].message
+
+        # The property was added in https://github.com/langchain-ai/langchain/commit/fbfed65fb1ccff3eb8477c4f114450537a0510b2
+        if not isinstance(message, AIMessage) or not hasattr(message, "usage_metadata"):
+            continue
+
+        usage_metadata = message.usage_metadata
+
+        if not isinstance(usage_metadata, dict):
+            continue
+
+        input_token_details = usage_metadata.get("input_token_details")
+        if isinstance(input_token_details, dict):
+            if isinstance(input_token_details.get("cache_read"), int):
+                total_cache_read = (total_cache_read or 0) + input_token_details[
+                    "cache_read"
+                ]
+
+            if isinstance(input_token_details.get("cache_creation"), int):
+                total_cache_creation = (
+                    total_cache_creation or 0
+                ) + input_token_details["cache_creation"]
+
+        output_token_details = usage_metadata.get("output_token_details")
+        if not isinstance(output_token_details, dict):
+            continue
+
+        if isinstance(output_token_details.get("reasoning"), int):
+            reasoning = (reasoning or 0) + output_token_details["reasoning"]
+
+    return TokenUsage(
+        total_input if total_input > 0 else None,
+        total_output if total_output > 0 else None,
+        total_total if total_total > 0 else None,
+        total_cache_read,
+        total_cache_creation,
+        reasoning,
+    )
+
+
+def _get_token_usage(obj: "Any") -> "Optional[Dict[str, Any]]":
+    """
+    Check multiple paths to extract token usage from different objects.
+    """
+    possible_names = ("usage", "token_usage", "usage_metadata")
+
+    message = _get_value(obj, "message")
+    if message is not None:
+        for name in possible_names:
+            usage = _get_value(message, name)
+            if usage is not None:
+                return usage
+
+    llm_output = _get_value(obj, "llm_output")
+    if llm_output is not None:
+        for name in possible_names:
+            usage = _get_value(llm_output, name)
+            if usage is not None:
+                return usage
+
+    for name in possible_names:
+        usage = _get_value(obj, name)
+        if usage is not None:
+            return usage
+
+    return None
+
+
+def _record_token_usage(span: "Span", response: "LLMResult") -> None:
+    input_tokens = None
+    output_tokens = None
+    total_tokens = None
+    cache_read_tokens = None
+    cache_creation_tokens = None
+    reasoning = None
+
+    # Legacy that reads provider-specific token information.
+    token_usage = _get_token_usage(response)
+    if token_usage:
+        input_tokens, output_tokens, total_tokens = _extract_tokens(token_usage)
+
+    # Prefer provider-agnostic UsageMetadata if available.
+    if response.generations is not None:
+        token_usage = _extract_tokens_from_generations(response.generations)
+        if token_usage.input_tokens is not None:
+            input_tokens = token_usage.input_tokens
+        if token_usage.output_tokens is not None:
+            output_tokens = token_usage.output_tokens
+        if token_usage.total_tokens is not None:
+            total_tokens = token_usage.total_tokens
+        if token_usage.cache_read is not None:
+            cache_read_tokens = token_usage.cache_read
+        if token_usage.cache_creation is not None:
+            cache_creation_tokens = token_usage.cache_creation
+        if token_usage.reasoning is not None:
+            reasoning = token_usage.reasoning
+
+    if input_tokens is not None:
+        span.set_attribute(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, input_tokens)
+
+    if output_tokens is not None:
+        span.set_attribute(SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS, output_tokens)
+
+    if total_tokens is not None:
+        span.set_attribute(SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, total_tokens)
+
+    if cache_read_tokens is not None:
+        span.set_attribute(
+            SPANDATA.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS, cache_read_tokens
+        )
+
+    if cache_creation_tokens is not None:
+        span.set_attribute(
+            SPANDATA.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS, cache_creation_tokens
+        )
+
+    if reasoning is not None:
+        span.set_attribute(SPANDATA.GEN_AI_USAGE_REASONING_OUTPUT_TOKENS, reasoning)
+
+
+def _get_request_data(
+    obj: "Any", args: "Any", kwargs: "Any"
+) -> "tuple[Optional[str], Optional[List[Any]]]":
+    """
+    Get the agent name and available tools for the agent.
+    """
+    agent = getattr(obj, "agent", None)
+    runnable = getattr(agent, "runnable", None)
+    runnable_config = getattr(runnable, "config", {})
+    tools = (
+        getattr(obj, "tools", None)
+        or getattr(agent, "tools", None)
+        or runnable_config.get("tools")
+        or runnable_config.get("available_tools")
+    )
+    tools = tools if tools and len(tools) > 0 else None
+
+    try:
+        agent_name = None
+        if len(args) > 1:
+            agent_name = args[1].get("run_name")
+        if agent_name is None:
+            agent_name = runnable_config.get("run_name")
+    except Exception:
+        pass
+
+    return (agent_name, tools)
+
+
+def _simplify_langchain_tools(tools: "Any") -> "Optional[List[Any]]":
+    """Parse and simplify tools into a cleaner format."""
+    if not tools:
+        return None
+
+    if not isinstance(tools, (list, tuple)):
+        return None
+
+    simplified_tools = []
+    for tool in tools:
+        try:
+            if isinstance(tool, dict):
+                if "function" in tool and isinstance(tool["function"], dict):
+                    func = tool["function"]
+                    simplified_tool = {
+                        "name": func.get("name"),
+                        "description": func.get("description"),
+                    }
+                    if simplified_tool["name"]:
+                        simplified_tools.append(simplified_tool)
+                elif "name" in tool:
+                    simplified_tool = {
+                        "name": tool.get("name"),
+                        "description": tool.get("description"),
+                    }
+                    simplified_tools.append(simplified_tool)
+                else:
+                    name = (
+                        tool.get("name")
+                        or tool.get("tool_name")
+                        or tool.get("function_name")
+                    )
+                    if name:
+                        simplified_tools.append(
+                            {
+                                "name": name,
+                                "description": tool.get("description")
+                                or tool.get("desc"),
+                            }
+                        )
+            elif hasattr(tool, "name"):
+                simplified_tool = {
+                    "name": getattr(tool, "name", None),
+                    "description": getattr(tool, "description", None)
+                    or getattr(tool, "desc", None),
+                }
+                if simplified_tool["name"]:
+                    simplified_tools.append(simplified_tool)
+            elif hasattr(tool, "__name__"):
+                simplified_tools.append(
+                    {
+                        "name": tool.__name__,
+                        "description": getattr(tool, "__doc__", None),
+                    }
+                )
+            else:
+                tool_str = str(tool)
+                if tool_str and tool_str != "":
+                    simplified_tools.append({"name": tool_str, "description": None})
+        except Exception:
+            continue
+
+    return simplified_tools if simplified_tools else None
+
+
+def _set_tools_on_span(span: "Span", tools: "Any") -> None:
+    """Set available tools data on a span if tools are provided."""
+    if tools is None:
+        return
+
+    client = sentry_sdk.get_client()
+    attribute_name = SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS
+    if has_data_collection_enabled(client.options):
+        if not client.options["data_collection"]["gen_ai"]["inputs"]:
+            return
+        else:
+            attribute_name = SPANDATA.GEN_AI_TOOL_DEFINITIONS
+    # Before data collection was introduced this was set unconditionally, so it
+    # stays that way when data collection is not configured.
+    simplified_tools = _simplify_langchain_tools(tools)
+    if simplified_tools:
+        set_data_normalized(
+            span,
+            attribute_name,
+            simplified_tools,
+            unpack=False,
+        )
+
+
+def _wrap_configure(f: "Callable[..., Any]") -> "Callable[..., Any]":
+    @wraps(f)
+    def new_configure(
+        callback_manager_cls: type,
+        inheritable_callbacks: "Callbacks" = None,
+        local_callbacks: "Callbacks" = None,
+        *args: "Any",
+        **kwargs: "Any",
+    ) -> "Any":
+        integration = sentry_sdk.get_client().get_integration(LangchainIntegration)
+        if integration is None:
+            return f(
+                callback_manager_cls,
+                inheritable_callbacks,
+                local_callbacks,
+                *args,
+                **kwargs,
+            )
+
+        local_callbacks = local_callbacks or []
+
+        # Handle each possible type of local_callbacks. For each type, we
+        # extract the list of callbacks to check for SentryLangchainCallback,
+        # and define a function that would add the SentryLangchainCallback
+        # to the existing callbacks list.
+        if isinstance(local_callbacks, BaseCallbackManager):
+            callbacks_list = local_callbacks.handlers
+        elif isinstance(local_callbacks, BaseCallbackHandler):
+            callbacks_list = [local_callbacks]
+        elif isinstance(local_callbacks, list):
+            callbacks_list = local_callbacks
+        else:
+            logger.debug("Unknown callback type: %s", local_callbacks)
+            # Just proceed with original function call
+            return f(
+                callback_manager_cls,
+                inheritable_callbacks,
+                local_callbacks,
+                *args,
+                **kwargs,
+            )
+
+        # Handle each possible type of inheritable_callbacks.
+        if isinstance(inheritable_callbacks, BaseCallbackManager):
+            inheritable_callbacks_list = inheritable_callbacks.handlers
+        elif isinstance(inheritable_callbacks, list):
+            inheritable_callbacks_list = inheritable_callbacks
+        else:
+            inheritable_callbacks_list = []
+
+        if not any(
+            isinstance(cb, SentryLangchainCallback)
+            for cb in itertools.chain(callbacks_list, inheritable_callbacks_list)
+        ):
+            sentry_handler = SentryLangchainCallback(
+                integration.include_prompts,
+            )
+            if isinstance(local_callbacks, BaseCallbackManager):
+                local_callbacks = local_callbacks.copy()
+                local_callbacks.handlers = [
+                    *local_callbacks.handlers,
+                    sentry_handler,
+                ]
+            elif isinstance(local_callbacks, BaseCallbackHandler):
+                local_callbacks = [local_callbacks, sentry_handler]
+            else:
+                local_callbacks = [*local_callbacks, sentry_handler]
+
+        return f(
+            callback_manager_cls,
+            inheritable_callbacks,
+            local_callbacks,
+            *args,
+            **kwargs,
+        )
+
+    return new_configure
+
+
+def _wrap_agent_executor_invoke(f: "Callable[..., Any]") -> "Callable[..., Any]":
+    @wraps(f)
+    def new_invoke(self: "Any", *args: "Any", **kwargs: "Any") -> "Any":
+        client = sentry_sdk.get_client()
+        integration = client.get_integration(LangchainIntegration)
+        if integration is None:
+            return f(self, *args, **kwargs)
+
+        run_name, tools = _get_request_data(self, args, kwargs)
+
+        record_inputs = False
+        record_outputs = False
+        if has_data_collection_enabled(client.options):
+            record_inputs = client.options["data_collection"]["gen_ai"]["inputs"]
+            record_outputs = client.options["data_collection"]["gen_ai"]["outputs"]
+        elif should_send_default_pii() and integration.include_prompts:
+            # TODO: Remove this branch once `send_default_pii` is deprecated
+            record_inputs = True
+            record_outputs = True
+
+        with sentry_sdk.traces.start_span(
+            name=f"invoke_agent {run_name}" if run_name else "invoke_agent",
+            attributes={
+                "sentry.op": OP.GEN_AI_INVOKE_AGENT,
+                "sentry.origin": LangchainIntegration.origin,
+                SPANDATA.GEN_AI_OPERATION_NAME: "invoke_agent",
+                SPANDATA.GEN_AI_RESPONSE_STREAMING: False,
+            },
+        ) as span:
+            if run_name:
+                span.set_attribute(SPANDATA.GEN_AI_FUNCTION_ID, run_name)
+
+            _set_tools_on_span(span, tools)
+
+            # Run the agent
+            result = f(self, *args, **kwargs)
+
+            input = result.get("input")
+            if input is not None and record_inputs:
+                normalized_messages = normalize_message_roles([input])
+                set_data_normalized(
+                    span,
+                    SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                    normalized_messages,
+                    unpack=False,
+                )
+
+            output = result.get("output")
+            if output is not None and record_outputs:
+                set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, output)
+
+            return result
+
+    return new_invoke
+
+
+def _wrap_agent_executor_stream(f: "Callable[..., Any]") -> "Callable[..., Any]":
+    @wraps(f)
+    def new_stream(self: "Any", *args: "Any", **kwargs: "Any") -> "Any":
+        client = sentry_sdk.get_client()
+        integration = client.get_integration(LangchainIntegration)
+        if integration is None:
+            return f(self, *args, **kwargs)
+
+        run_name, tools = _get_request_data(self, args, kwargs)
+
+        record_inputs = False
+        record_outputs = False
+        if has_data_collection_enabled(client.options):
+            record_inputs = client.options["data_collection"]["gen_ai"]["inputs"]
+            record_outputs = client.options["data_collection"]["gen_ai"]["outputs"]
+        elif should_send_default_pii() and integration.include_prompts:
+            # TODO: Remove this branch once `send_default_pii` is deprecated
+            record_inputs = True
+            record_outputs = True
+
+        span = sentry_sdk.traces.start_span(
+            name=f"invoke_agent {run_name}" if run_name else "invoke_agent",
+            attributes={
+                "sentry.op": OP.GEN_AI_INVOKE_AGENT,
+                "sentry.origin": LangchainIntegration.origin,
+                SPANDATA.GEN_AI_OPERATION_NAME: "invoke_agent",
+                SPANDATA.GEN_AI_RESPONSE_STREAMING: True,
+            },
+        )
+
+        if run_name:
+            span.set_attribute(SPANDATA.GEN_AI_FUNCTION_ID, run_name)
+
+        _set_tools_on_span(span, tools)
+
+        input = args[0].get("input") if len(args) >= 1 else None
+        if input is not None and record_inputs:
+            normalized_messages = normalize_message_roles([input])
+            set_data_normalized(
+                span,
+                SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                normalized_messages,
+                unpack=False,
+            )
+
+        # Run the agent
+        result = f(self, *args, **kwargs)
+
+        old_iterator = result
+
+        def new_iterator() -> "Iterator[Any]":
+            exc_info: "tuple[Any, Any, Any]" = (None, None, None)
+            try:
+                for event in old_iterator:
+                    yield event
+
+                try:
+                    output = event.get("output")
+                except Exception:
+                    output = None
+
+                if output is not None and record_outputs:
+                    set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, output)
+
+                span.__exit__(None, None, None)
+            except Exception:
+                exc_info = sys.exc_info()
+                with capture_internal_exceptions():
+                    span.__exit__(*exc_info)
+                raise
+
+        async def new_iterator_async() -> "AsyncIterator[Any]":
+            exc_info: "tuple[Any, Any, Any]" = (None, None, None)
+            try:
+                async for event in old_iterator:
+                    yield event
+
+                try:
+                    output = event.get("output")
+                except Exception:
+                    output = None
+
+                if output is not None and record_outputs:
+                    set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, output)
+
+                span.__exit__(None, None, None)
+            except Exception:
+                exc_info = sys.exc_info()
+                with capture_internal_exceptions():
+                    span.__exit__(*exc_info)
+                raise
+
+        if str(type(result)) == "<class 'async_generator'>":
+            result = new_iterator_async()
+        else:
+            result = new_iterator()
+
+        return result
+
+    return new_stream

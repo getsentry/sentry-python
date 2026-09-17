@@ -1,0 +1,86 @@
+import functools
+from typing import TYPE_CHECKING
+
+import sentry_sdk
+from sentry_sdk.consts import OP
+from sentry_sdk.traces import Span
+
+if TYPE_CHECKING:
+    from typing import Any
+
+from sentry_sdk.integrations.django.asgi import iscoroutinefunction, wrap_async_view
+
+
+def patch_views() -> None:
+    from django.core.handlers.base import BaseHandler
+    from django.template.response import SimpleTemplateResponse
+
+    from sentry_sdk.integrations.django import DjangoIntegration
+
+    old_make_view_atomic = BaseHandler.make_view_atomic
+    old_render = SimpleTemplateResponse.render
+
+    def sentry_patched_render(self: "SimpleTemplateResponse") -> "Any":
+        if sentry_sdk.traces.get_current_span() is None:
+            return old_render(self)
+
+        with sentry_sdk.traces.start_span(
+            name="serialize response",
+            attributes={
+                "sentry.op": OP.VIEW_RESPONSE_RENDER,
+                "sentry.origin": DjangoIntegration.origin,
+            },
+        ):
+            return old_render(self)
+
+    @functools.wraps(old_make_view_atomic)
+    def sentry_patched_make_view_atomic(
+        self: "Any", *args: "Any", **kwargs: "Any"
+    ) -> "Any":
+        callback = old_make_view_atomic(self, *args, **kwargs)
+
+        # XXX: The wrapper function is created for every request. Find more
+        # efficient way to wrap views (or build a cache?)
+
+        integration = sentry_sdk.get_client().get_integration(DjangoIntegration)
+        if integration is None:
+            return callback
+
+        if iscoroutinefunction(callback):
+            return wrap_async_view(callback)
+
+        return _wrap_sync_view(callback)
+
+    SimpleTemplateResponse.render = sentry_patched_render
+    BaseHandler.make_view_atomic = sentry_patched_make_view_atomic
+
+
+def _wrap_sync_view(callback: "Any") -> "Any":
+    from sentry_sdk.integrations.django import DjangoIntegration
+
+    @functools.wraps(callback)
+    def sentry_wrapped_callback(request: "Any", *args: "Any", **kwargs: "Any") -> "Any":
+        client = sentry_sdk.get_client()
+
+        current_span = sentry_sdk.traces.get_current_span()
+        if type(current_span) is Span:
+            segment = current_span._segment
+            segment._update_active_thread()
+
+        integration = client.get_integration(DjangoIntegration)
+        if not integration or not integration.middleware_spans:
+            return callback(request, *args, **kwargs)
+
+        if sentry_sdk.traces.get_current_span() is None:
+            return callback(request, *args, **kwargs)
+
+        with sentry_sdk.traces.start_span(
+            name=request.resolver_match.view_name,
+            attributes={
+                "sentry.op": OP.VIEW_RENDER,
+                "sentry.origin": DjangoIntegration.origin,
+            },
+        ):
+            return callback(request, *args, **kwargs)
+
+    return sentry_wrapped_callback

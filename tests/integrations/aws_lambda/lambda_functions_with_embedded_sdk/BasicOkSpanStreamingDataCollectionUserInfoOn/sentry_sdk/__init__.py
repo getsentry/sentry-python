@@ -1,0 +1,63 @@
+from sentry_sdk import metrics, profiler
+
+from sentry_sdk.scope import Scope  # isort: skip
+from sentry_sdk.client import Client  # isort: skip
+from sentry_sdk.consts import VERSION
+from sentry_sdk.transport import HttpTransport, Transport
+
+from sentry_sdk.api import *  # noqa # isort: skip
+
+__all__ = [  # noqa
+    "Scope",
+    "Client",
+    "Transport",
+    "HttpTransport",
+    "VERSION",
+    "integrations",
+    # From sentry_sdk.api
+    "init",
+    "add_attachment",
+    "add_breadcrumb",
+    "capture_event",
+    "capture_exception",
+    "capture_message",
+    "continue_trace",
+    "new_trace",
+    "flush",
+    "flush_async",
+    "get_baggage",
+    "get_client",
+    "get_global_scope",
+    "get_isolation_scope",
+    "get_current_scope",
+    "get_current_span",
+    "get_traceparent",
+    "is_initialized",
+    "isolation_scope",
+    "last_event_id",
+    "new_scope",
+    "remove_attribute",
+    "set_attribute",
+    "set_attributes",
+    "set_context",
+    "set_extra",
+    "set_level",
+    "set_tag",
+    "set_tags",
+    "set_user",
+    "start_span",
+    "trace",
+    "monitor",
+    "logger",
+    "metrics",
+    "profiler",
+    "start_session",
+    "end_session",
+    "set_transaction_name",
+]
+
+# Initialize the debug support after everything is loaded
+from sentry_sdk.debug import init_debug_support
+
+init_debug_support()
+del init_debug_support
