@@ -42,17 +42,11 @@ def main():
     for module_path in walk_package_modules():
         scan_file(module_path)
 
-    # TODO: Investigate why we suppress exception chains here.
-    ignored_raises = {
-        pathlib.Path("sentry_sdk/integrations/asgi.py"): 2,
-        pathlib.Path("sentry_sdk/integrations/asyncio.py"): 1,
-    }
-
     raise_from_none_count = {
         file: len(occurences)
         for file, occurences in RaiseFromNoneVisitor.line_numbers.items()
     }
-    if raise_from_none_count != ignored_raises:
+    if raise_from_none_count:
         exc = Exception("Detected unexpected raise ... from None.")
         exc.add_note(
             "Raise ... from None suppresses chained exceptions, removing valuable context."

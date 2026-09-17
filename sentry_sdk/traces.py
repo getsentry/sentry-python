@@ -1,26 +1,5 @@
-"""
-The API in this file is only meant to be used in span streaming mode. It should
-not be mixed with the legacy tracing API (sentry_sdk.start_transaction,
-sentry_sdk.start_span, etc.).
-
-You can enable span streaming mode via:
-
-```
-import sentry_sdk
-
-sentry_sdk.init(
-    trace_lifecycle="stream",
-)
-```
-
-See
-https://docs.sentry.io/platforms/python/tracing/streamed-spans/migration-guide/
-for how to migrate to span streaming.
-"""
-
 import sys
 import uuid
-import warnings
 from datetime import datetime, timedelta, timezone
 from enum import Enum
 from typing import TYPE_CHECKING
@@ -32,9 +11,9 @@ from sentry_sdk.profiler.continuous_profiler import (
     try_autostart_continuous_profiler,
     try_profile_lifecycle_trace_start,
 )
-from sentry_sdk.tracing_utils import Baggage
 from sentry_sdk.utils import (
     capture_internal_exceptions,
+    deprecation_warning,
     format_attribute,
     get_current_thread_meta,
     logger,
@@ -114,14 +93,61 @@ SOURCE_FOR_STYLE = {
 _DEFAULT_PARENT_SPAN = object()
 
 
+class _AgentFrameworkChatGenerationContext:
+    """
+    Starts a span for a chat generation and marks the current scope as being
+    inside a chat generation as viewed by an agent framework.
+
+    Agent framework integrations should use this class to create chat client spans. By using this context
+    manager, chat client spans in "lower-level" client libraries can be suppressed by checking the
+    `_agent_framework_chat_generation_entered` scope flag.
+    """
+
+    def __init__(
+        self,
+        name: str,
+        attributes: "Optional[Attributes]" = None,
+        parent_span: "Optional[Span]" = _DEFAULT_PARENT_SPAN,  # type: ignore[assignment]
+        active: bool = True,
+    ):
+        self._span = start_span(
+            name=name,
+            attributes=attributes,
+            parent_span=parent_span,
+            active=active,
+        )
+        if type(self._span) is not Span:
+            return
+
+        self.span._scope._agent_framework_chat_generation_entered = True
+
+    @property
+    def span(self) -> "Span":
+        return self._span
+
+    def __enter__(self) -> "_AgentFrameworkChatGenerationContext":
+        return self
+
+    def __exit__(
+        self, ty: "Optional[Any]", value: "Optional[Any]", tb: "Optional[Any]"
+    ) -> None:
+        if type(self._span) is not Span:
+            self._span.__exit__(ty, value, tb)
+
+        try:
+            self._span.__exit__(ty, value, tb)
+        finally:
+            self._span._scope._agent_framework_chat_generation_entered = False
+
+
 def start_span(
     name: str,
     attributes: "Optional[Attributes]" = None,
-    parent_span: "Optional[StreamedSpan]" = _DEFAULT_PARENT_SPAN,  # type: ignore[assignment]
+    parent_span: "Optional[Span]" = _DEFAULT_PARENT_SPAN,  # type: ignore[assignment]
     active: bool = True,
-) -> "StreamedSpan":
+) -> "Span":
     """
-    Start a span in streaming mode.
+    Start a span.
 
     The span's parent, unless provided explicitly via the `parent_span` argument,
     will be the current active span, if any. If there is none, this span will
@@ -163,7 +189,7 @@ def start_span(
         parent. If not provided, the parent will be set to the currently active
         span, if any. If set to `None`, this span will become a new root-level
         span.
-    :type parent_span: "Optional[StreamedSpan]"
+    :type parent_span: "Optional[Span]"
 
     :param active: Controls whether spans started while this span is running
         will automatically become its children. That's the default behavior. If
@@ -172,28 +198,16 @@ def start_span(
     :type active: bool
 
     :return: The span that has been started.
-    :rtype: StreamedSpan
+    :rtype: Span
     """
-    from sentry_sdk.tracing_utils import has_span_streaming_enabled
-
-    client = sentry_sdk.get_client()
-    if client.is_active() and not has_span_streaming_enabled(client.options):
-        warnings.warn(
-            "Using span streaming API in non-span-streaming mode. Use "
-            "sentry_sdk.start_transaction() and sentry_sdk.start_span() "
-            "instead.",
-            stacklevel=2,
-        )
-        return NoOpStreamedSpan()
-
-    return sentry_sdk.get_current_scope().start_streamed_span(
+    return sentry_sdk.get_current_scope().start_span(
         name, attributes, parent_span, active
     )
 
 
 def continue_trace(incoming: "dict[str, Any]") -> None:
     """
-    Continue a trace from headers or environment variables in streaming mode.
+    Continue a trace from headers or environment variables.
 
     This function sets the propagation context on the scope. Any span started
     in the updated scope will belong under the trace extracted from the
@@ -217,7 +231,7 @@ def continue_trace(incoming: "dict[str, Any]") -> None:
 
 def new_trace() -> None:
     """
-    Resets the propagation context, forcing a new trace, in streaming mode.
+    Resets the propagation context, forcing a new trace.
 
     This function sets the propagation context on the scope. Any span started
     in the updated scope will start its own trace.
@@ -229,7 +243,7 @@ def new_trace() -> None:
     sentry_sdk.get_current_scope().set_new_propagation_context()
 
 
-class StreamedSpan:
+class Span:
     """
     A span holds timing information of a block of code.
 
@@ -267,7 +281,7 @@ class StreamedSpan:
         attributes: "Optional[Attributes]" = None,
         active: bool = True,
         scope: "sentry_sdk.Scope",
-        segment: "Optional[StreamedSpan]" = None,
+        segment: "Optional[Span]" = None,
         trace_id: "Optional[str]" = None,
         parent_span_id: "Optional[str]" = None,
         parent_sampled: "Optional[bool]" = None,
@@ -328,7 +342,7 @@ class StreamedSpan:
             f"active={self._active})>"
         )
 
-    def __enter__(self) -> "StreamedSpan":
+    def __enter__(self) -> "Span":
         return self
 
     def __exit__(
@@ -353,18 +367,16 @@ class StreamedSpan:
         self._end(end_timestamp)
 
     def finish(self, end_timestamp: "Optional[Union[float, datetime]]" = None) -> None:
-        warnings.warn(
+        deprecation_warning(
             "span.finish() is deprecated. Use span.end() instead.",
-            stacklevel=2,
-            category=DeprecationWarning,
         )
 
         self.end(end_timestamp)
 
     def _start(self) -> None:
         if self._active:
-            old_span = self._scope.streamed_span
-            self._scope.streamed_span = self
+            old_span = self._scope.span
+            self._scope.span = self
             self._previous_span_on_scope = old_span
 
     def _end(self, end_timestamp: "Optional[Union[float, datetime]]" = None) -> None:
@@ -382,7 +394,7 @@ class StreamedSpan:
             with capture_internal_exceptions():
                 old_span = self._previous_span_on_scope
                 del self._previous_span_on_scope
-                self._scope.streamed_span = old_span
+                self._scope.span = old_span
 
         # Set attributes from the segment. These are set on span end on purpose
         # so that we have the best chance to capture the segment's final name
@@ -627,7 +639,7 @@ class StreamedSpan:
         return res
 
 
-class NoOpStreamedSpan(StreamedSpan):
+class NoOpSpan(Span):
     __slots__ = (
         "_sampled",
         "_finished",
@@ -638,7 +650,7 @@ class NoOpStreamedSpan(StreamedSpan):
         self,
         name: "Optional[str]" = None,
         attributes: "Optional[Attributes]" = None,
-        segment: "Optional[StreamedSpan]" = None,
+        segment: "Optional[Span]" = None,
         trace_id: "Optional[str]" = None,
         parent_span_id: "Optional[str]" = None,
         parent_sampled: "Optional[bool]" = None,
@@ -676,9 +688,9 @@ class NoOpStreamedSpan(StreamedSpan):
         self._start()
 
     def __repr__(self) -> str:
-        return f"<{self.__class__.__name__}(sampled={self.sampled})>"
+        return f"<{self.__class__.__name__}(name={self.name}, sampled={self.sampled})>"
 
-    def __enter__(self) -> "NoOpStreamedSpan":
+    def __enter__(self) -> "NoOpSpan":
         return self
 
     def __exit__(
@@ -690,8 +702,8 @@ class NoOpStreamedSpan(StreamedSpan):
         if self._scope is None:
             return
 
-        old_span = self._scope.streamed_span
-        self._scope.streamed_span = self
+        old_span = self._scope.span
+        self._scope.span = self
         self._previous_span_on_scope = old_span
 
     def _end(self, end_timestamp: "Optional[Union[float, datetime]]" = None) -> None:
@@ -714,7 +726,7 @@ class NoOpStreamedSpan(StreamedSpan):
             with capture_internal_exceptions():
                 old_span = self._previous_span_on_scope
                 del self._previous_span_on_scope
-                self._scope.streamed_span = old_span
+                self._scope.span = old_span
 
         self._finished = True
 
@@ -722,10 +734,8 @@ class NoOpStreamedSpan(StreamedSpan):
         self._end()
 
     def finish(self, end_timestamp: "Optional[Union[float, datetime]]" = None) -> None:
-        warnings.warn(
+        deprecation_warning(
             "span.finish() is deprecated. Use span.end() instead.",
-            stacklevel=2,
-            category=DeprecationWarning,
         )
 
         self._end()
@@ -789,6 +799,10 @@ class NoOpStreamedSpan(StreamedSpan):
             "dynamic_sampling_context": self._dynamic_sampling_context(),
         }
 
+
+# backwards compat
+StreamedSpan = Span
+NoOpStreamedSpan = NoOpSpan
 
 if TYPE_CHECKING:
 
@@ -865,10 +879,10 @@ def trace(
             pass
     """
     from sentry_sdk.tracing_utils import (
-        create_streaming_span_decorator,
+        create_span_decorator,
     )
 
-    decorator = create_streaming_span_decorator(
+    decorator = create_span_decorator(
         name=name,
         attributes=attributes,
         active=active,
@@ -882,13 +896,14 @@ def trace(
 
 def get_current_span(
     scope: "Optional[sentry_sdk.Scope]" = None,
-) -> "Optional[StreamedSpan]":
+) -> "Optional[Span]":
     """
-    Returns the currently active span on the scope if the span is a `StreamedSpan`, otherwise `None`.
-
-    This function will only return a non-`None` value when the streaming trace lifecycle is enabled.
-    To enable the lifecycle, pass `trace_lifecycle="stream"` to `sentry.init()`.
+    Returns the currently active span on the scope if the span is a `Span`, otherwise `None`.
     """
     scope = scope or sentry_sdk.get_current_scope()
-    current_span = scope.streamed_span
+    current_span = scope.span
     return current_span
+
+
+# Circular import
+from sentry_sdk.tracing_utils import Baggage  # noqa: E402, F401, I001

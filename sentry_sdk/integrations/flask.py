@@ -9,7 +9,7 @@ from sentry_sdk.integrations._wsgi_common import (
 )
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.tracing import SOURCE_FOR_STYLE
+from sentry_sdk.traces import SOURCE_FOR_STYLE
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
@@ -42,12 +42,12 @@ try:
     )
     from markupsafe import Markup
 except ImportError:
-    raise DidNotEnable("Flask is not installed")
+    raise DidNotEnable("Flask is not installed or incompatible")
 
 try:
     import blinker  # noqa
 except ImportError:
-    raise DidNotEnable("blinker is not installed")
+    raise DidNotEnable("blinker is not installed or incompatible")
 
 TRANSACTION_STYLE_VALUES = ("endpoint", "url")
 

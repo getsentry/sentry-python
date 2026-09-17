@@ -1,13 +1,9 @@
 import re
 from unittest import mock
 
-import pytest
-
 import sentry_sdk
 from sentry_sdk import (
     capture_exception,
-    configure_scope,
-    continue_trace,
     get_baggage,
     get_client,
     get_current_scope,
@@ -16,13 +12,10 @@ from sentry_sdk import (
     get_isolation_scope,
     get_traceparent,
     is_initialized,
-    push_scope,
     set_tags,
-    start_transaction,
 )
 from sentry_sdk.client import Client, NonRecordingClient
-from sentry_sdk.traces import StreamedSpan
-from sentry_sdk.tracing import Span
+from sentry_sdk.traces import Span
 from tests.conftest import TestTransportWithOptions
 
 
@@ -35,50 +28,29 @@ def test_get_current_span():
     assert get_current_span(fake_scope) is None
 
 
-def test_get_current_span_span_streaming():
+def test_get_current_span_via_traces():
     fake_scope = mock.MagicMock()
-    fake_scope.streamed_span = mock.MagicMock()
-    assert sentry_sdk.traces.get_current_span(fake_scope) == fake_scope.streamed_span
+    fake_scope.span = mock.MagicMock()
+    assert sentry_sdk.traces.get_current_span(fake_scope) == fake_scope.span
 
-    fake_scope.streamed_span = None
+    fake_scope.span = None
     assert sentry_sdk.traces.get_current_span(fake_scope) is None
 
 
-def test_get_current_span_current_scope(sentry_init):
+def test_get_current_span_current_scope_via_traces(sentry_init):
     sentry_init()
-
-    assert get_current_span() is None
-
-    scope = get_current_scope()
-    fake_span = Span()
-    scope.span = fake_span
-
-    assert get_current_span() == fake_span
-
-
-def test_get_current_span_current_scope_span_streaming(sentry_init):
-    sentry_init(trace_lifecycle="stream")
 
     assert sentry_sdk.traces.get_current_span() is None
 
     scope = get_current_scope()
-    fake_span = StreamedSpan(name="abc", scope=scope)
+    fake_span = Span(name="abc", scope=scope)
 
-    assert scope.streamed_span == fake_span
+    assert scope.span == fake_span
     assert sentry_sdk.traces.get_current_span() == fake_span
 
 
-def test_get_current_span_with_transaction(sentry_init):
-    sentry_init()
-
-    assert get_current_span() is None
-
-    with start_transaction() as new_transaction:
-        assert get_current_span() == new_transaction
-
-
 def test_get_current_span_with_segment(sentry_init):
-    sentry_init(trace_lifecycle="stream")
+    sentry_init()
 
     assert sentry_sdk.traces.get_current_span() is None
 
@@ -88,17 +60,6 @@ def test_get_current_span_with_segment(sentry_init):
 
 def test_traceparent_with_tracing_enabled(sentry_init):
     sentry_init(traces_sample_rate=1.0)
-
-    with start_transaction() as transaction:
-        expected_traceparent = "%s-%s-1" % (
-            transaction.trace_id,
-            transaction.span_id,
-        )
-        assert get_traceparent() == expected_traceparent
-
-
-def test_traceparent_with_tracing_enabled_span_streaming(sentry_init):
-    sentry_init(traces_sample_rate=1.0, trace_lifecycle="stream")
 
     with sentry_sdk.traces.start_span(name="span") as segment:
         expected_traceparent = "%s-%s-1" % (
@@ -119,17 +80,6 @@ def test_traceparent_with_tracing_disabled(sentry_init):
     assert get_traceparent() == expected_traceparent
 
 
-def test_traceparent_with_tracing_disabled_span_streaming(sentry_init):
-    sentry_init(trace_lifecycle="stream")
-
-    propagation_context = get_isolation_scope()._propagation_context
-    expected_traceparent = "%s-%s" % (
-        propagation_context.trace_id,
-        propagation_context.span_id,
-    )
-    assert get_traceparent() == expected_traceparent
-
-
 def test_baggage_with_tracing_disabled(sentry_init):
     sentry_init(release="1.0.0", environment="dev")
     propagation_context = get_isolation_scope()._propagation_context
@@ -141,30 +91,9 @@ def test_baggage_with_tracing_disabled(sentry_init):
     assert get_baggage() == expected_baggage
 
 
-def test_baggage_with_tracing_disabled_span_streaming(sentry_init):
-    sentry_init(release="1.0.0", environment="dev", trace_lifecycle="stream")
-    propagation_context = get_isolation_scope()._propagation_context
-    expected_baggage = (
-        "sentry-trace_id={},sentry-environment=dev,sentry-release=1.0.0".format(
-            propagation_context.trace_id
-        )
-    )
-    assert get_baggage() == expected_baggage
-
-
 def test_baggage_with_tracing_enabled(sentry_init):
-    sentry_init(traces_sample_rate=1.0, release="1.0.0", environment="dev")
-    with start_transaction() as transaction:
-        expected_baggage_re = r"^sentry-trace_id={},sentry-sample_rand=0\.\d{{6}},sentry-environment=dev,sentry-release=1\.0\.0,sentry-sample_rate=1\.0,sentry-sampled={}$".format(
-            transaction.trace_id, "true" if transaction.sampled else "false"
-        )
-        assert re.match(expected_baggage_re, get_baggage())
-
-
-def test_baggage_with_tracing_enabled_span_streaming(sentry_init):
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         release="1.0.0",
         environment="dev",
     )
@@ -183,22 +112,6 @@ def test_baggage_with_dsn(sentry_init):
         environment="dev",
         transport=TestTransportWithOptions,
     )
-    with start_transaction() as transaction:
-        expected_baggage_re = r"^sentry-trace_id={},sentry-sample_rand=0\.\d{{6}},sentry-environment=dev,sentry-release=2\.0\.0,sentry-public_key=97333d956c9e40989a0139756c121c34,sentry-sample_rate=1\.0,sentry-sampled={}$".format(
-            transaction.trace_id, "true" if transaction.sampled else "false"
-        )
-        assert re.match(expected_baggage_re, get_baggage())
-
-
-def test_baggage_with_dsn_span_streaming(sentry_init):
-    sentry_init(
-        dsn="http://97333d956c9e40989a0139756c121c34@sentry-x.sentry-y.s.c.local/976543210",
-        traces_sample_rate=1.0,
-        trace_lifecycle="stream",
-        release="2.0.0",
-        environment="dev",
-        transport=TestTransportWithOptions,
-    )
     with sentry_sdk.traces.start_span(name="segment") as segment:
         expected_baggage_re = r"^sentry-trace_id={},sentry-sample_rand=0\.\d{{6}},sentry-environment=dev,sentry-release=2\.0\.0,sentry-public_key=97333d956c9e40989a0139756c121c34,sentry-transaction=segment,sentry-sample_rate=1\.0,sentry-sampled={}$".format(
             segment.trace_id, "true" if segment.sampled else "false"
@@ -208,32 +121,6 @@ def test_baggage_with_dsn_span_streaming(sentry_init):
 
 def test_continue_trace(sentry_init):
     sentry_init()
-
-    trace_id = "471a43a4192642f0b136d5159a501701"
-    parent_span_id = "6e8f22c393e68f19"
-    parent_sampled = 1
-    transaction = continue_trace(
-        {
-            "sentry-trace": "{}-{}-{}".format(trace_id, parent_span_id, parent_sampled),
-            "baggage": "sentry-trace_id=566e3688a61d4bc888951642d6f14a19,sentry-sample_rand=0.123456",
-        },
-        name="some name",
-    )
-    with start_transaction(transaction):
-        assert transaction.name == "some name"
-
-        propagation_context = get_isolation_scope()._propagation_context
-        assert propagation_context.trace_id == transaction.trace_id == trace_id
-        assert propagation_context.parent_span_id == parent_span_id
-        assert propagation_context.parent_sampled == parent_sampled
-        assert propagation_context.dynamic_sampling_context == {
-            "trace_id": "566e3688a61d4bc888951642d6f14a19",
-            "sample_rand": "0.123456",
-        }
-
-
-def test_continue_trace_span_streaming(sentry_init):
-    sentry_init(trace_lifecycle="stream")
 
     trace_id = "471a43a4192642f0b136d5159a501701"
     parent_span_id = "6e8f22c393e68f19"
@@ -312,31 +199,3 @@ def test_set_tags(sentry_init, capture_events):
         "tag2": "updated",
         "tag3": "new",
     }, "Updating tags with empty dict changed tags"
-
-
-def test_configure_scope_deprecation():
-    with pytest.warns(DeprecationWarning):
-        with configure_scope():
-            ...
-
-
-def test_push_scope_deprecation():
-    with pytest.warns(DeprecationWarning):
-        with push_scope():
-            ...
-
-
-def test_init_context_manager_deprecation():
-    with pytest.warns(DeprecationWarning):
-        with sentry_sdk.init():
-            ...
-
-
-def test_init_enter_deprecation():
-    with pytest.warns(DeprecationWarning):
-        sentry_sdk.init().__enter__()
-
-
-def test_init_exit_deprecation():
-    with pytest.warns(DeprecationWarning):
-        sentry_sdk.init().__exit__(None, None, None)

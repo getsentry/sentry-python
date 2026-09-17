@@ -5,54 +5,22 @@ import httpx
 import pytest
 
 import sentry_sdk
-from sentry_sdk import capture_message, start_transaction
+from sentry_sdk import capture_message
 from sentry_sdk.consts import MATCH_ALL, OP, SPANDATA
 from sentry_sdk.integrations.httpx import HttpxIntegration
 from tests.conftest import ApproxDict
 
 
-def test_crumb_capture_and_hint_sync(sentry_init, capture_events, httpx_mock):
-    httpx_mock.add_response()
-
-    def before_breadcrumb(crumb, hint):
-        crumb["data"]["extra"] = "foo"
-        return crumb
-
-    sentry_init(
-        integrations=[HttpxIntegration()],
-        before_breadcrumb=before_breadcrumb,
+def _get_http_client_span(items):
+    return next(
+        item.payload
+        for item in items
+        if item.payload.get("attributes", {}).get("sentry.op") == OP.HTTP_CLIENT
     )
-
-    url = "http://example.com/"
-
-    with start_transaction():
-        events = capture_events()
-
-        response = httpx.Client().get(url)
-
-        assert response.status_code == 200
-        capture_message("Testing!")
-
-        (event,) = events
-
-        crumb = event["breadcrumbs"]["values"][0]
-        assert crumb["type"] == "http"
-        assert crumb["category"] == "httplib"
-        assert crumb["data"] == ApproxDict(
-            {
-                "url": url,
-                SPANDATA.HTTP_METHOD: "GET",
-                SPANDATA.HTTP_FRAGMENT: "",
-                SPANDATA.HTTP_QUERY: "",
-                SPANDATA.HTTP_STATUS_CODE: 200,
-                "reason": "OK",
-                "extra": "foo",
-            }
-        )
 
 
 @pytest.mark.parametrize("send_default_pii", [True, False])
-def test_crumb_capture_and_hint_sync_span_streaming(
+def test_crumb_capture_and_hint_sync(
     sentry_init, capture_events, httpx_mock, send_default_pii
 ):
     httpx_mock.add_response()
@@ -64,7 +32,6 @@ def test_crumb_capture_and_hint_sync_span_streaming(
     sentry_init(
         integrations=[HttpxIntegration()],
         before_breadcrumb=before_breadcrumb,
-        trace_lifecycle="stream",
         send_default_pii=send_default_pii,
     )
 
@@ -108,46 +75,8 @@ def test_crumb_capture_and_hint_sync_span_streaming(
 
 
 @pytest.mark.asyncio
-async def test_crumb_capture_and_hint_async(sentry_init, capture_events, httpx_mock):
-    httpx_mock.add_response()
-
-    def before_breadcrumb(crumb, hint):
-        crumb["data"]["extra"] = "foo"
-        return crumb
-
-    sentry_init(integrations=[HttpxIntegration()], before_breadcrumb=before_breadcrumb)
-
-    url = "http://example.com/"
-
-    with start_transaction():
-        events = capture_events()
-
-        response = await httpx.AsyncClient().get(url)
-
-        assert response.status_code == 200
-        capture_message("Testing!")
-
-        (event,) = events
-
-        crumb = event["breadcrumbs"]["values"][0]
-        assert crumb["type"] == "http"
-        assert crumb["category"] == "httplib"
-        assert crumb["data"] == ApproxDict(
-            {
-                "url": url,
-                SPANDATA.HTTP_METHOD: "GET",
-                SPANDATA.HTTP_FRAGMENT: "",
-                SPANDATA.HTTP_QUERY: "",
-                SPANDATA.HTTP_STATUS_CODE: 200,
-                "reason": "OK",
-                "extra": "foo",
-            }
-        )
-
-
-@pytest.mark.asyncio
 @pytest.mark.parametrize("send_default_pii", [True, False])
-async def test_crumb_capture_and_hint_async_span_streaming(
+async def test_crumb_capture_and_hint_async(
     sentry_init, capture_events, httpx_mock, send_default_pii
 ):
     httpx_mock.add_response()
@@ -159,7 +88,6 @@ async def test_crumb_capture_and_hint_async_span_streaming(
     sentry_init(
         integrations=[HttpxIntegration()],
         before_breadcrumb=before_breadcrumb,
-        trace_lifecycle="stream",
         send_default_pii=send_default_pii,
     )
 
@@ -217,42 +145,6 @@ def test_crumb_capture_without_span_sync(sentry_init, capture_events, httpx_mock
     assert response.status_code == 200
     capture_message("Testing!")
 
-    (event,) = events
-
-    crumb = event["breadcrumbs"]["values"][0]
-    assert crumb["type"] == "http"
-    assert crumb["category"] == "httplib"
-    assert crumb["data"] == ApproxDict(
-        {
-            "url": url,
-            SPANDATA.HTTP_METHOD: "GET",
-            SPANDATA.HTTP_FRAGMENT: "",
-            SPANDATA.HTTP_QUERY: "",
-            SPANDATA.HTTP_STATUS_CODE: 200,
-            "reason": "OK",
-        }
-    )
-
-
-def test_crumb_capture_without_span_sync_span_streaming(
-    sentry_init, capture_events, httpx_mock
-):
-    httpx_mock.add_response()
-
-    sentry_init(
-        integrations=[HttpxIntegration()],
-        trace_lifecycle="stream",
-    )
-
-    url = "http://example.com/"
-
-    events = capture_events()
-
-    response = httpx.Client().get(url)
-
-    assert response.status_code == 200
-    capture_message("Testing!")
-
     sentry_sdk.flush()
 
     (event,) = events
@@ -288,43 +180,6 @@ async def test_crumb_capture_without_span_async(
     assert response.status_code == 200
     capture_message("Testing!")
 
-    (event,) = events
-
-    crumb = event["breadcrumbs"]["values"][0]
-    assert crumb["type"] == "http"
-    assert crumb["category"] == "httplib"
-    assert crumb["data"] == ApproxDict(
-        {
-            "url": url,
-            SPANDATA.HTTP_METHOD: "GET",
-            SPANDATA.HTTP_FRAGMENT: "",
-            SPANDATA.HTTP_QUERY: "",
-            SPANDATA.HTTP_STATUS_CODE: 200,
-            "reason": "OK",
-        }
-    )
-
-
-@pytest.mark.asyncio
-async def test_crumb_capture_without_span_async_span_streaming(
-    sentry_init, capture_events, httpx_mock
-):
-    httpx_mock.add_response()
-
-    sentry_init(
-        integrations=[HttpxIntegration()],
-        trace_lifecycle="stream",
-    )
-
-    url = "http://example.com/"
-
-    events = capture_events()
-
-    response = await httpx.AsyncClient().get(url)
-
-    assert response.status_code == 200
-    capture_message("Testing!")
-
     sentry_sdk.flush()
 
     (event,) = events
@@ -351,64 +206,14 @@ async def test_crumb_capture_without_span_async_span_streaming(
         (500, "error"),
     ],
 )
+@pytest.mark.parametrize("send_default_pii", [True, False])
 def test_crumb_capture_client_error_sync(
-    sentry_init, capture_events, httpx_mock, status_code, level
-):
-    httpx_mock.add_response(status_code=status_code)
-
-    sentry_init(integrations=[HttpxIntegration()])
-
-    url = "http://example.com/"
-
-    with start_transaction():
-        events = capture_events()
-
-        response = httpx.Client().get(url)
-
-        assert response.status_code == status_code
-        capture_message("Testing!")
-
-        (event,) = events
-
-        crumb = event["breadcrumbs"]["values"][0]
-        assert crumb["type"] == "http"
-        assert crumb["category"] == "httplib"
-
-        if level is None:
-            assert "level" not in crumb
-        else:
-            assert crumb["level"] == level
-
-        assert crumb["data"] == ApproxDict(
-            {
-                "url": url,
-                SPANDATA.HTTP_METHOD: "GET",
-                SPANDATA.HTTP_FRAGMENT: "",
-                SPANDATA.HTTP_QUERY: "",
-                SPANDATA.HTTP_STATUS_CODE: status_code,
-            }
-        )
-
-
-@pytest.mark.parametrize(
-    "status_code,level",
-    [
-        (200, None),
-        (301, None),
-        (403, "warning"),
-        (405, "warning"),
-        (500, "error"),
-    ],
-)
-@pytest.mark.parametrize("send_default_pii", [True, False])
-def test_crumb_capture_client_error_sync_span_streaming(
     sentry_init, capture_events, httpx_mock, status_code, level, send_default_pii
 ):
     httpx_mock.add_response(status_code=status_code)
 
     sentry_init(
         integrations=[HttpxIntegration()],
-        trace_lifecycle="stream",
         send_default_pii=send_default_pii,
     )
 
@@ -463,65 +268,14 @@ def test_crumb_capture_client_error_sync_span_streaming(
         (500, "error"),
     ],
 )
+@pytest.mark.parametrize("send_default_pii", [True, False])
 async def test_crumb_capture_client_error_async(
-    sentry_init, capture_events, httpx_mock, status_code, level
-):
-    httpx_mock.add_response(status_code=status_code)
-
-    sentry_init(integrations=[HttpxIntegration()])
-
-    url = "http://example.com/"
-
-    with start_transaction():
-        events = capture_events()
-
-        response = await httpx.AsyncClient().get(url)
-
-        assert response.status_code == status_code
-        capture_message("Testing!")
-
-        (event,) = events
-
-        crumb = event["breadcrumbs"]["values"][0]
-        assert crumb["type"] == "http"
-        assert crumb["category"] == "httplib"
-
-        if level is None:
-            assert "level" not in crumb
-        else:
-            assert crumb["level"] == level
-
-        assert crumb["data"] == ApproxDict(
-            {
-                "url": url,
-                SPANDATA.HTTP_METHOD: "GET",
-                SPANDATA.HTTP_FRAGMENT: "",
-                SPANDATA.HTTP_QUERY: "",
-                SPANDATA.HTTP_STATUS_CODE: status_code,
-            }
-        )
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "status_code,level",
-    [
-        (200, None),
-        (301, None),
-        (403, "warning"),
-        (405, "warning"),
-        (500, "error"),
-    ],
-)
-@pytest.mark.parametrize("send_default_pii", [True, False])
-async def test_crumb_capture_client_error_async_span_streaming(
     sentry_init, capture_events, httpx_mock, status_code, level, send_default_pii
 ):
     httpx_mock.add_response(status_code=status_code)
 
     sentry_init(
         integrations=[HttpxIntegration()],
-        trace_lifecycle="stream",
         send_default_pii=send_default_pii,
     )
 
@@ -562,138 +316,6 @@ async def test_crumb_capture_client_error_async_span_streaming(
                     SPANDATA.HTTP_METHOD: "GET",
                     SPANDATA.HTTP_STATUS_CODE: status_code,
                 }
-            )
-
-
-def test_outgoing_trace_headers_legacy_sync(sentry_init, httpx_mock):
-    httpx_mock.add_response()
-
-    sentry_init(
-        traces_sample_rate=1.0,
-        integrations=[HttpxIntegration()],
-    )
-
-    url = "http://example.com/"
-
-    with start_transaction(
-        name="/interactions/other-dogs/new-dog",
-        op="greeting.sniff",
-        trace_id="01234567890123456789012345678901",
-    ) as transaction:
-        response = httpx.Client().get(url)
-
-        request_span = transaction._span_recorder.spans[-1]
-        assert response.request.headers[
-            "sentry-trace"
-        ] == "{trace_id}-{parent_span_id}-{sampled}".format(
-            trace_id=transaction.trace_id,
-            parent_span_id=request_span.span_id,
-            sampled=1,
-        )
-
-
-@pytest.mark.asyncio
-async def test_outgoing_trace_headers_legacy_async(sentry_init, httpx_mock):
-    httpx_mock.add_response()
-
-    sentry_init(
-        traces_sample_rate=1.0,
-        integrations=[HttpxIntegration()],
-    )
-
-    url = "http://example.com/"
-
-    with start_transaction(
-        name="/interactions/other-dogs/new-dog",
-        op="greeting.sniff",
-        trace_id="01234567890123456789012345678901",
-    ) as transaction:
-        response = await httpx.AsyncClient().get(url)
-
-        request_span = transaction._span_recorder.spans[-1]
-        assert response.request.headers[
-            "sentry-trace"
-        ] == "{trace_id}-{parent_span_id}-{sampled}".format(
-            trace_id=transaction.trace_id,
-            parent_span_id=request_span.span_id,
-            sampled=1,
-        )
-
-
-def test_outgoing_trace_headers_append_to_baggage_legacy_sync(
-    sentry_init,
-    httpx_mock,
-):
-    httpx_mock.add_response()
-
-    sentry_init(
-        traces_sample_rate=1.0,
-        integrations=[HttpxIntegration()],
-        release="d08ebdb9309e1b004c6f52202de58a09c2268e42",
-    )
-
-    url = "http://example.com/"
-
-    # patch random.randrange to return a predictable sample_rand value
-    with mock.patch("sentry_sdk.tracing_utils.Random.randrange", return_value=500000):
-        with start_transaction(
-            name="/interactions/other-dogs/new-dog",
-            op="greeting.sniff",
-            trace_id="01234567890123456789012345678901",
-        ) as transaction:
-            response = httpx.Client().get(url, headers={"baGGage": "custom=data"})
-
-            request_span = transaction._span_recorder.spans[-1]
-            assert response.request.headers[
-                "sentry-trace"
-            ] == "{trace_id}-{parent_span_id}-{sampled}".format(
-                trace_id=transaction.trace_id,
-                parent_span_id=request_span.span_id,
-                sampled=1,
-            )
-            assert (
-                response.request.headers["baggage"]
-                == "custom=data,sentry-trace_id=01234567890123456789012345678901,sentry-sample_rand=0.500000,sentry-environment=production,sentry-release=d08ebdb9309e1b004c6f52202de58a09c2268e42,sentry-transaction=/interactions/other-dogs/new-dog,sentry-sample_rate=1.0,sentry-sampled=true"
-            )
-
-
-@pytest.mark.asyncio
-async def test_outgoing_trace_headers_append_to_baggage_legacy_async(
-    sentry_init,
-    httpx_mock,
-):
-    httpx_mock.add_response()
-
-    sentry_init(
-        traces_sample_rate=1.0,
-        integrations=[HttpxIntegration()],
-        release="d08ebdb9309e1b004c6f52202de58a09c2268e42",
-    )
-
-    url = "http://example.com/"
-
-    # patch random.randrange to return a predictable sample_rand value
-    with mock.patch("sentry_sdk.tracing_utils.Random.randrange", return_value=500000):
-        with start_transaction(
-            name="/interactions/other-dogs/new-dog",
-            op="greeting.sniff",
-            trace_id="01234567890123456789012345678901",
-        ) as transaction:
-            response = await httpx.AsyncClient().get(
-                url, headers={"baGGage": "custom=data"}
-            )
-
-            request_span = transaction._span_recorder.spans[-1]
-            assert response.request.headers[
-                "sentry-trace"
-            ] == "{trace_id}-{parent_span_id}-{sampled}".format(
-                trace_id=transaction.trace_id,
-                parent_span_id=request_span.span_id,
-                sampled=1,
-            )
-            assert (
-                response.request.headers["baggage"]
-                == "custom=data,sentry-trace_id=01234567890123456789012345678901,sentry-sample_rand=0.500000,sentry-environment=production,sentry-release=d08ebdb9309e1b004c6f52202de58a09c2268e42,sentry-transaction=/interactions/other-dogs/new-dog,sentry-sample_rate=1.0,sentry-sampled=true"
             )
 
 
@@ -763,8 +385,7 @@ def test_option_trace_propagation_targets_sync(
         integrations=[HttpxIntegration()],
     )
 
-    with sentry_sdk.start_transaction():
-        httpx.Client().get(url)
+    httpx.Client().get(url)
 
     request_headers = httpx_mock.get_request().headers
 
@@ -841,8 +462,7 @@ async def test_option_trace_propagation_targets_async(
         integrations=[HttpxIntegration()],
     )
 
-    with sentry_sdk.start_transaction():
-        await httpx.AsyncClient().get(url)
+    await httpx.AsyncClient().get(url)
 
     request_headers = httpx_mock.get_request().headers
 
@@ -852,600 +472,12 @@ async def test_option_trace_propagation_targets_async(
         assert "sentry-trace" not in request_headers
 
 
-def test_do_not_propagate_outside_transaction(sentry_init, httpx_mock):
-    httpx_mock.add_response()
-
-    sentry_init(
-        traces_sample_rate=1.0,
-        trace_propagation_targets=[MATCH_ALL],
-        integrations=[HttpxIntegration()],
-    )
-
-    httpx_client = httpx.Client()
-    httpx_client.get("http://example.com/")
-
-    request_headers = httpx_mock.get_request().headers
-    assert "sentry-trace" not in request_headers
-
-
-@pytest.mark.tests_internal_exceptions
-def test_omit_url_data_if_parsing_fails(sentry_init, capture_events, httpx_mock):
-    httpx_mock.add_response()
-
-    sentry_init(integrations=[HttpxIntegration()])
-
-    httpx_client = httpx.Client()
-    url = "http://example.com"
-
-    events = capture_events()
-    with mock.patch(
-        "sentry_sdk.integrations.httpx.parse_url",
-        side_effect=ValueError,
-    ):
-        response = httpx_client.get(url)
-
-    assert response.status_code == 200
-    capture_message("Testing!")
-
-    (event,) = events
-    assert event["breadcrumbs"]["values"][0]["data"] == ApproxDict(
-        {
-            SPANDATA.HTTP_METHOD: "GET",
-            SPANDATA.HTTP_STATUS_CODE: 200,
-            "reason": "OK",
-            # no url related data
-        }
-    )
-
-    assert "url" not in event["breadcrumbs"]["values"][0]["data"]
-    assert SPANDATA.HTTP_FRAGMENT not in event["breadcrumbs"]["values"][0]["data"]
-    assert SPANDATA.HTTP_QUERY not in event["breadcrumbs"]["values"][0]["data"]
-
-
-def test_request_source_disabled_legacy_sync(sentry_init, capture_events, httpx_mock):
-    httpx_mock.add_response()
-    sentry_options = {
-        "integrations": [HttpxIntegration()],
-        "traces_sample_rate": 1.0,
-        "enable_http_request_source": False,
-        "http_request_source_threshold_ms": 0,
-    }
-
-    sentry_init(**sentry_options)
-
-    events = capture_events()
-
-    url = "http://example.com/"
-
-    with start_transaction(name="test_transaction"):
-        httpx.Client().get(url)
-
-    (event,) = events
-
-    span = event["spans"][-1]
-    assert span["description"].startswith("GET")
-
-    data = span.get("data", {})
-
-    assert SPANDATA.CODE_LINENO not in data
-    assert SPANDATA.CODE_NAMESPACE not in data
-    assert SPANDATA.CODE_FILEPATH not in data
-    assert SPANDATA.CODE_FUNCTION not in data
-
-
-@pytest.mark.asyncio
-async def test_request_source_disabled_legacy_async(
-    sentry_init, capture_events, httpx_mock
-):
-    httpx_mock.add_response()
-    sentry_options = {
-        "integrations": [HttpxIntegration()],
-        "traces_sample_rate": 1.0,
-        "enable_http_request_source": False,
-        "http_request_source_threshold_ms": 0,
-    }
-
-    sentry_init(**sentry_options)
-
-    events = capture_events()
-
-    url = "http://example.com/"
-
-    with start_transaction(name="test_transaction"):
-        await httpx.AsyncClient().get(url)
-
-    (event,) = events
-
-    span = event["spans"][-1]
-    assert span["description"].startswith("GET")
-
-    data = span.get("data", {})
-
-    assert SPANDATA.CODE_LINENO not in data
-    assert SPANDATA.CODE_NAMESPACE not in data
-    assert SPANDATA.CODE_FILEPATH not in data
-    assert SPANDATA.CODE_FUNCTION not in data
-
-
-@pytest.mark.parametrize("enable_http_request_source", [None, True])
-def test_request_source_enabled_legacy_sync(
-    sentry_init,
-    capture_events,
-    enable_http_request_source,
-    httpx_mock,
-):
-    httpx_mock.add_response()
-    sentry_options = {
-        "integrations": [HttpxIntegration()],
-        "traces_sample_rate": 1.0,
-        "http_request_source_threshold_ms": 0,
-    }
-    if enable_http_request_source is not None:
-        sentry_options["enable_http_request_source"] = enable_http_request_source
-
-    sentry_init(**sentry_options)
-
-    events = capture_events()
-
-    url = "http://example.com/"
-
-    with start_transaction(name="test_transaction"):
-        httpx.Client().get(url)
-
-    (event,) = events
-
-    span = event["spans"][-1]
-    assert span["description"].startswith("GET")
-
-    data = span.get("data", {})
-
-    assert SPANDATA.CODE_LINENO in data
-    assert SPANDATA.CODE_NAMESPACE in data
-    assert SPANDATA.CODE_FILEPATH in data
-    assert SPANDATA.CODE_FUNCTION in data
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize("enable_http_request_source", [None, True])
-async def test_request_source_enabled_legacy_async(
-    sentry_init,
-    capture_events,
-    enable_http_request_source,
-    httpx_mock,
-):
-    httpx_mock.add_response()
-    sentry_options = {
-        "integrations": [HttpxIntegration()],
-        "traces_sample_rate": 1.0,
-        "http_request_source_threshold_ms": 0,
-    }
-    if enable_http_request_source is not None:
-        sentry_options["enable_http_request_source"] = enable_http_request_source
-
-    sentry_init(**sentry_options)
-
-    events = capture_events()
-
-    url = "http://example.com/"
-
-    with start_transaction(name="test_transaction"):
-        await httpx.AsyncClient().get(url)
-
-    (event,) = events
-
-    span = event["spans"][-1]
-    assert span["description"].startswith("GET")
-
-    data = span.get("data", {})
-
-    assert SPANDATA.CODE_LINENO in data
-    assert SPANDATA.CODE_NAMESPACE in data
-    assert SPANDATA.CODE_FILEPATH in data
-    assert SPANDATA.CODE_FUNCTION in data
-
-
-def test_request_source_legacy_sync(sentry_init, capture_events, httpx_mock):
-    httpx_mock.add_response()
-
-    sentry_init(
-        integrations=[HttpxIntegration()],
-        traces_sample_rate=1.0,
-        enable_http_request_source=True,
-        http_request_source_threshold_ms=0,
-    )
-
-    events = capture_events()
-
-    url = "http://example.com/"
-
-    with start_transaction(name="test_transaction"):
-        httpx.Client().get(url)
-
-    (event,) = events
-
-    span = event["spans"][-1]
-    assert span["description"].startswith("GET")
-
-    data = span.get("data", {})
-
-    assert SPANDATA.CODE_LINENO in data
-    assert SPANDATA.CODE_NAMESPACE in data
-    assert SPANDATA.CODE_FILEPATH in data
-    assert SPANDATA.CODE_FUNCTION in data
-
-    assert type(data.get(SPANDATA.CODE_LINENO)) == int
-    assert data.get(SPANDATA.CODE_LINENO) > 0
-    assert data.get(SPANDATA.CODE_NAMESPACE) == "tests.integrations.httpx.test_httpx"
-    assert data.get(SPANDATA.CODE_FILEPATH).endswith(
-        "tests/integrations/httpx/test_httpx.py"
-    )
-
-    is_relative_path = data.get(SPANDATA.CODE_FILEPATH)[0] != os.sep
-    assert is_relative_path
-
-    assert data.get(SPANDATA.CODE_FUNCTION) == "test_request_source_legacy_sync"
-
-
-@pytest.mark.asyncio
-async def test_request_source_legacy_async(sentry_init, capture_events, httpx_mock):
-    httpx_mock.add_response()
-
-    sentry_init(
-        integrations=[HttpxIntegration()],
-        traces_sample_rate=1.0,
-        enable_http_request_source=True,
-        http_request_source_threshold_ms=0,
-    )
-
-    events = capture_events()
-
-    url = "http://example.com/"
-
-    with start_transaction(name="test_transaction"):
-        await httpx.AsyncClient().get(url)
-
-    (event,) = events
-
-    span = event["spans"][-1]
-    assert span["description"].startswith("GET")
-
-    data = span.get("data", {})
-
-    assert SPANDATA.CODE_LINENO in data
-    assert SPANDATA.CODE_NAMESPACE in data
-    assert SPANDATA.CODE_FILEPATH in data
-    assert SPANDATA.CODE_FUNCTION in data
-
-    assert type(data.get(SPANDATA.CODE_LINENO)) == int
-    assert data.get(SPANDATA.CODE_LINENO) > 0
-    assert data.get(SPANDATA.CODE_NAMESPACE) == "tests.integrations.httpx.test_httpx"
-    assert data.get(SPANDATA.CODE_FILEPATH).endswith(
-        "tests/integrations/httpx/test_httpx.py"
-    )
-
-    is_relative_path = data.get(SPANDATA.CODE_FILEPATH)[0] != os.sep
-    assert is_relative_path
-
-    assert data.get(SPANDATA.CODE_FUNCTION) == "test_request_source_legacy_async"
-
-
-def test_request_source_with_module_in_search_path_legacy_sync(
-    sentry_init, capture_events, httpx_mock
-):
-    """
-    Test that request source is relative to the path of the module it ran in
-    """
-    httpx_mock.add_response()
-    sentry_init(
-        integrations=[HttpxIntegration()],
-        traces_sample_rate=1.0,
-        enable_http_request_source=True,
-        http_request_source_threshold_ms=0,
-    )
-
-    events = capture_events()
-
-    url = "http://example.com/"
-
-    with start_transaction(name="test_transaction"):
-        from httpx_helpers.helpers import get_request_with_client
-
-        get_request_with_client(httpx.Client(), url)
-
-    (event,) = events
-
-    span = event["spans"][-1]
-    assert span["description"].startswith("GET")
-
-    data = span.get("data", {})
-
-    assert SPANDATA.CODE_LINENO in data
-    assert SPANDATA.CODE_NAMESPACE in data
-    assert SPANDATA.CODE_FILEPATH in data
-    assert SPANDATA.CODE_FUNCTION in data
-
-    assert type(data.get(SPANDATA.CODE_LINENO)) == int
-    assert data.get(SPANDATA.CODE_LINENO) > 0
-    assert data.get(SPANDATA.CODE_NAMESPACE) == "httpx_helpers.helpers"
-    assert data.get(SPANDATA.CODE_FILEPATH) == "httpx_helpers/helpers.py"
-
-    is_relative_path = data.get(SPANDATA.CODE_FILEPATH)[0] != os.sep
-    assert is_relative_path
-
-    assert data.get(SPANDATA.CODE_FUNCTION) == "get_request_with_client"
-
-
-@pytest.mark.asyncio
-async def test_request_source_with_module_in_search_path_legacy_async(
-    sentry_init, capture_events, httpx_mock
-):
-    """
-    Test that request source is relative to the path of the module it ran in
-    """
-    httpx_mock.add_response()
-    sentry_init(
-        integrations=[HttpxIntegration()],
-        traces_sample_rate=1.0,
-        enable_http_request_source=True,
-        http_request_source_threshold_ms=0,
-    )
-
-    events = capture_events()
-
-    url = "http://example.com/"
-
-    with start_transaction(name="test_transaction"):
-        from httpx_helpers.helpers import async_get_request_with_client
-
-        await async_get_request_with_client(httpx.AsyncClient(), url)
-
-    (event,) = events
-
-    span = event["spans"][-1]
-    assert span["description"].startswith("GET")
-
-    data = span.get("data", {})
-
-    assert SPANDATA.CODE_LINENO in data
-    assert SPANDATA.CODE_NAMESPACE in data
-    assert SPANDATA.CODE_FILEPATH in data
-    assert SPANDATA.CODE_FUNCTION in data
-
-    assert type(data.get(SPANDATA.CODE_LINENO)) == int
-    assert data.get(SPANDATA.CODE_LINENO) > 0
-    assert data.get(SPANDATA.CODE_NAMESPACE) == "httpx_helpers.helpers"
-    assert data.get(SPANDATA.CODE_FILEPATH) == "httpx_helpers/helpers.py"
-
-    is_relative_path = data.get(SPANDATA.CODE_FILEPATH)[0] != os.sep
-    assert is_relative_path
-
-    assert data.get(SPANDATA.CODE_FUNCTION) == "async_get_request_with_client"
-
-
-def test_no_request_source_if_duration_too_short_legacy_sync(
-    sentry_init, capture_events, httpx_mock
-):
-    httpx_mock.add_response()
-
-    sentry_init(
-        integrations=[HttpxIntegration()],
-        traces_sample_rate=1.0,
-        enable_http_request_source=True,
-        # Threshold so high no real request will ever exceed it
-        http_request_source_threshold_ms=9999999,
-    )
-
-    events = capture_events()
-
-    url = "http://example.com/"
-
-    with start_transaction(name="test_transaction"):
-        httpx.Client().get(url)
-
-    (event,) = events
-
-    span = event["spans"][-1]
-    assert span["description"].startswith("GET")
-
-    data = span.get("data", {})
-
-    assert SPANDATA.CODE_LINENO not in data
-    assert SPANDATA.CODE_NAMESPACE not in data
-    assert SPANDATA.CODE_FILEPATH not in data
-    assert SPANDATA.CODE_FUNCTION not in data
-
-
-@pytest.mark.asyncio
-async def test_no_request_source_if_duration_too_short_legacy_async(
-    sentry_init, capture_events, httpx_mock
-):
-    httpx_mock.add_response()
-
-    sentry_init(
-        integrations=[HttpxIntegration()],
-        traces_sample_rate=1.0,
-        enable_http_request_source=True,
-        # Threshold so high no real request will ever exceed it
-        http_request_source_threshold_ms=9999999,
-    )
-
-    events = capture_events()
-
-    url = "http://example.com/"
-
-    with start_transaction(name="test_transaction"):
-        await httpx.AsyncClient().get(url)
-
-    (event,) = events
-
-    span = event["spans"][-1]
-    assert span["description"].startswith("GET")
-
-    data = span.get("data", {})
-
-    assert SPANDATA.CODE_LINENO not in data
-    assert SPANDATA.CODE_NAMESPACE not in data
-    assert SPANDATA.CODE_FILEPATH not in data
-    assert SPANDATA.CODE_FUNCTION not in data
-
-
-def test_request_source_if_duration_over_threshold_legacy_sync(
-    sentry_init, capture_events, httpx_mock
-):
-    httpx_mock.add_response()
-
-    sentry_init(
-        integrations=[HttpxIntegration()],
-        traces_sample_rate=1.0,
-        enable_http_request_source=True,
-        # Threshold is low so any request will exceed it
-        http_request_source_threshold_ms=0,
-    )
-
-    events = capture_events()
-
-    url = "http://example.com/"
-
-    with start_transaction(name="test_transaction"):
-        httpx.Client().get(url)
-
-    (event,) = events
-
-    span = event["spans"][-1]
-    assert span["description"].startswith("GET")
-
-    data = span.get("data", {})
-
-    assert SPANDATA.CODE_LINENO in data
-    assert SPANDATA.CODE_NAMESPACE in data
-    assert SPANDATA.CODE_FILEPATH in data
-    assert SPANDATA.CODE_FUNCTION in data
-
-    assert type(data.get(SPANDATA.CODE_LINENO)) == int
-    assert data.get(SPANDATA.CODE_LINENO) > 0
-    assert data.get(SPANDATA.CODE_NAMESPACE) == "tests.integrations.httpx.test_httpx"
-    assert data.get(SPANDATA.CODE_FILEPATH).endswith(
-        "tests/integrations/httpx/test_httpx.py"
-    )
-
-    is_relative_path = data.get(SPANDATA.CODE_FILEPATH)[0] != os.sep
-    assert is_relative_path
-
-    assert (
-        data.get(SPANDATA.CODE_FUNCTION)
-        == "test_request_source_if_duration_over_threshold_legacy_sync"
-    )
-
-
-@pytest.mark.asyncio
-async def test_request_source_if_duration_over_threshold_legacy_async(
-    sentry_init, capture_events, httpx_mock
-):
-    httpx_mock.add_response()
-
-    sentry_init(
-        integrations=[HttpxIntegration()],
-        traces_sample_rate=1.0,
-        enable_http_request_source=True,
-        # Threshold is low so any request will exceed it
-        http_request_source_threshold_ms=0,
-    )
-
-    events = capture_events()
-
-    url = "http://example.com/"
-
-    with start_transaction(name="test_transaction"):
-        await httpx.AsyncClient().get(url)
-
-    (event,) = events
-
-    span = event["spans"][-1]
-    assert span["description"].startswith("GET")
-
-    data = span.get("data", {})
-
-    assert SPANDATA.CODE_LINENO in data
-    assert SPANDATA.CODE_NAMESPACE in data
-    assert SPANDATA.CODE_FILEPATH in data
-    assert SPANDATA.CODE_FUNCTION in data
-
-    assert type(data.get(SPANDATA.CODE_LINENO)) == int
-    assert data.get(SPANDATA.CODE_LINENO) > 0
-    assert data.get(SPANDATA.CODE_NAMESPACE) == "tests.integrations.httpx.test_httpx"
-    assert data.get(SPANDATA.CODE_FILEPATH).endswith(
-        "tests/integrations/httpx/test_httpx.py"
-    )
-
-    is_relative_path = data.get(SPANDATA.CODE_FILEPATH)[0] != os.sep
-    assert is_relative_path
-
-    assert (
-        data.get(SPANDATA.CODE_FUNCTION)
-        == "test_request_source_if_duration_over_threshold_legacy_async"
-    )
-
-
-def test_span_origin_legacy_sync(sentry_init, capture_events, httpx_mock):
-    httpx_mock.add_response()
-
-    sentry_init(
-        integrations=[HttpxIntegration()],
-        traces_sample_rate=1.0,
-    )
-
-    events = capture_events()
-
-    url = "http://example.com/"
-
-    with start_transaction(name="test_transaction"):
-        httpx.Client().get(url)
-
-    (event,) = events
-
-    assert event["contexts"]["trace"]["origin"] == "manual"
-    assert event["spans"][0]["origin"] == "auto.http.httpx"
-
-
-@pytest.mark.asyncio
-async def test_span_origin_legacy_async(sentry_init, capture_events, httpx_mock):
-    httpx_mock.add_response()
-
-    sentry_init(
-        integrations=[HttpxIntegration()],
-        traces_sample_rate=1.0,
-    )
-
-    events = capture_events()
-
-    url = "http://example.com/"
-
-    with start_transaction(name="test_transaction"):
-        await httpx.AsyncClient().get(url)
-
-    (event,) = events
-
-    assert event["contexts"]["trace"]["origin"] == "manual"
-    assert event["spans"][0]["origin"] == "auto.http.httpx"
-
-
-def _get_http_client_span(items):
-    return next(
-        item.payload
-        for item in items
-        if item.payload.get("attributes", {}).get("sentry.op") == OP.HTTP_CLIENT
-    )
-
-
-def test_outgoing_trace_headers_span_streaming_sync(
-    sentry_init, capture_items, httpx_mock
-):
+def test_outgoing_trace_headers_sync(sentry_init, capture_items, httpx_mock):
     httpx_mock.add_response()
 
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[HttpxIntegration()],
-        trace_lifecycle="stream",
     )
 
     url = "http://example.com/"
@@ -1469,15 +501,12 @@ def test_outgoing_trace_headers_span_streaming_sync(
 
 
 @pytest.mark.asyncio
-async def test_outgoing_trace_headers_span_streaming_async(
-    sentry_init, capture_items, httpx_mock
-):
+async def test_outgoing_trace_headers_async(sentry_init, capture_items, httpx_mock):
     httpx_mock.add_response()
 
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[HttpxIntegration()],
-        trace_lifecycle="stream",
     )
 
     url = "http://example.com/"
@@ -1500,7 +529,7 @@ async def test_outgoing_trace_headers_span_streaming_async(
     )
 
 
-def test_outgoing_trace_headers_append_to_baggage_span_streaming_sync(
+def test_outgoing_trace_headers_append_to_baggage_sync(
     sentry_init,
     capture_items,
     httpx_mock,
@@ -1511,7 +540,6 @@ def test_outgoing_trace_headers_append_to_baggage_span_streaming_sync(
         traces_sample_rate=1.0,
         integrations=[HttpxIntegration()],
         release="d08ebdb9309e1b004c6f52202de58a09c2268e42",
-        trace_lifecycle="stream",
     )
 
     url = "http://example.com/"
@@ -1534,7 +562,7 @@ def test_outgoing_trace_headers_append_to_baggage_span_streaming_sync(
 
 
 @pytest.mark.asyncio
-async def test_outgoing_trace_headers_append_to_baggage_span_streaming_async(
+async def test_outgoing_trace_headers_append_to_baggage_async(
     sentry_init,
     capture_items,
     httpx_mock,
@@ -1545,7 +573,6 @@ async def test_outgoing_trace_headers_append_to_baggage_span_streaming_async(
         traces_sample_rate=1.0,
         integrations=[HttpxIntegration()],
         release="d08ebdb9309e1b004c6f52202de58a09c2268e42",
-        trace_lifecycle="stream",
     )
 
     url = "http://example.com/"
@@ -1569,7 +596,7 @@ async def test_outgoing_trace_headers_append_to_baggage_span_streaming_async(
     assert "sentry-sampled=true" in baggage
 
 
-def test_outgoing_trace_headers_span_streaming_no_current_span(sentry_init, httpx_mock):
+def test_outgoing_trace_headers_no_current_span(sentry_init, httpx_mock):
     """
     Even when there is no active span, trace propagation headers should still
     be attached to outgoing requests when span streaming is enabled.
@@ -1586,14 +613,12 @@ def test_outgoing_trace_headers_span_streaming_no_current_span(sentry_init, http
         traces_sample_rate=1.0,
         trace_propagation_targets=[MATCH_ALL],
         integrations=[HttpxIntegration()],
-        trace_lifecycle="stream",
     )
 
     url = "http://example.com/"
 
     httpx_client = httpx.Client()
 
-    # No start_span / start_transaction -> get_current_span() is None
     assert sentry_sdk.traces.get_current_span() is None
 
     response = httpx_client.get(url)
@@ -1612,9 +637,7 @@ def test_outgoing_trace_headers_span_streaming_no_current_span(sentry_init, http
 
 
 @pytest.mark.asyncio
-async def test_outgoing_trace_headers_span_streaming_no_current_span_async(
-    sentry_init, httpx_mock
-):
+async def test_outgoing_trace_headers_no_current_span_async(sentry_init, httpx_mock):
     """
     The async client must match the sync client: trace propagation headers are
     attached to outgoing requests even when there is no active span and span
@@ -1626,14 +649,12 @@ async def test_outgoing_trace_headers_span_streaming_no_current_span_async(
         traces_sample_rate=1.0,
         trace_propagation_targets=[MATCH_ALL],
         integrations=[HttpxIntegration()],
-        trace_lifecycle="stream",
     )
 
     url = "http://example.com/"
 
     httpx_client = httpx.AsyncClient()
 
-    # No start_span / start_transaction -> get_current_span() is None
     assert sentry_sdk.traces.get_current_span() is None
 
     response = await httpx_client.get(url)
@@ -1651,9 +672,7 @@ async def test_outgoing_trace_headers_span_streaming_no_current_span_async(
     assert f"sentry-trace_id={trace_id}" in request_headers["baggage"]
 
 
-def test_request_source_disabled_span_streaming_sync(
-    sentry_init, capture_items, httpx_mock
-):
+def test_request_source_disabled_sync(sentry_init, capture_items, httpx_mock):
     httpx_mock.add_response()
 
     sentry_init(
@@ -1661,7 +680,6 @@ def test_request_source_disabled_span_streaming_sync(
         traces_sample_rate=1.0,
         enable_http_request_source=False,
         http_request_source_threshold_ms=0,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -1682,9 +700,7 @@ def test_request_source_disabled_span_streaming_sync(
 
 
 @pytest.mark.asyncio
-async def test_request_source_disabled_span_streaming_async(
-    sentry_init, capture_items, httpx_mock
-):
+async def test_request_source_disabled_async(sentry_init, capture_items, httpx_mock):
     httpx_mock.add_response()
 
     sentry_init(
@@ -1692,7 +708,6 @@ async def test_request_source_disabled_span_streaming_async(
         traces_sample_rate=1.0,
         enable_http_request_source=False,
         http_request_source_threshold_ms=0,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -1713,7 +728,7 @@ async def test_request_source_disabled_span_streaming_async(
 
 
 @pytest.mark.parametrize("enable_http_request_source", [None, True])
-def test_request_source_enabled_span_streaming_sync(
+def test_request_source_enabled_sync(
     sentry_init,
     capture_items,
     enable_http_request_source,
@@ -1725,7 +740,6 @@ def test_request_source_enabled_span_streaming_sync(
         "integrations": [HttpxIntegration()],
         "traces_sample_rate": 1.0,
         "http_request_source_threshold_ms": 0,
-        "trace_lifecycle": "stream",
     }
     if enable_http_request_source is not None:
         sentry_options["enable_http_request_source"] = enable_http_request_source
@@ -1751,7 +765,7 @@ def test_request_source_enabled_span_streaming_sync(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("enable_http_request_source", [None, True])
-async def test_request_source_enabled_span_streaming_async(
+async def test_request_source_enabled_async(
     sentry_init,
     capture_items,
     enable_http_request_source,
@@ -1763,7 +777,6 @@ async def test_request_source_enabled_span_streaming_async(
         "integrations": [HttpxIntegration()],
         "traces_sample_rate": 1.0,
         "http_request_source_threshold_ms": 0,
-        "trace_lifecycle": "stream",
     }
     if enable_http_request_source is not None:
         sentry_options["enable_http_request_source"] = enable_http_request_source
@@ -1787,7 +800,7 @@ async def test_request_source_enabled_span_streaming_async(
     assert SPANDATA.CODE_FUNCTION in http_span["attributes"]
 
 
-def test_request_source_span_streaming_sync(sentry_init, capture_items, httpx_mock):
+def test_request_source_sync(sentry_init, capture_items, httpx_mock):
     httpx_mock.add_response()
 
     sentry_init(
@@ -1795,7 +808,6 @@ def test_request_source_span_streaming_sync(sentry_init, capture_items, httpx_mo
         traces_sample_rate=1.0,
         enable_http_request_source=True,
         http_request_source_threshold_ms=0,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -1827,16 +839,11 @@ def test_request_source_span_streaming_sync(sentry_init, capture_items, httpx_mo
     is_relative_path = http_span["attributes"]["code.file.path"][0] != os.sep
     assert is_relative_path
 
-    assert (
-        http_span["attributes"][SPANDATA.CODE_FUNCTION]
-        == "test_request_source_span_streaming_sync"
-    )
+    assert http_span["attributes"][SPANDATA.CODE_FUNCTION] == "test_request_source_sync"
 
 
 @pytest.mark.asyncio
-async def test_request_source_span_streaming_async(
-    sentry_init, capture_items, httpx_mock
-):
+async def test_request_source_async(sentry_init, capture_items, httpx_mock):
     httpx_mock.add_response()
 
     sentry_init(
@@ -1844,7 +851,6 @@ async def test_request_source_span_streaming_async(
         traces_sample_rate=1.0,
         enable_http_request_source=True,
         http_request_source_threshold_ms=0,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -1877,12 +883,11 @@ async def test_request_source_span_streaming_async(
     assert is_relative_path
 
     assert (
-        http_span["attributes"][SPANDATA.CODE_FUNCTION]
-        == "test_request_source_span_streaming_async"
+        http_span["attributes"][SPANDATA.CODE_FUNCTION] == "test_request_source_async"
     )
 
 
-def test_request_source_with_module_in_search_path_span_streaming_sync(
+def test_request_source_with_module_in_search_path_sync(
     sentry_init, capture_items, httpx_mock
 ):
     """
@@ -1895,7 +900,6 @@ def test_request_source_with_module_in_search_path_span_streaming_sync(
         traces_sample_rate=1.0,
         enable_http_request_source=True,
         http_request_source_threshold_ms=0,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -1928,7 +932,7 @@ def test_request_source_with_module_in_search_path_span_streaming_sync(
 
 
 @pytest.mark.asyncio
-async def test_request_source_with_module_in_search_path_span_streaming_async(
+async def test_request_source_with_module_in_search_path_async(
     sentry_init, capture_items, httpx_mock
 ):
     """
@@ -1941,7 +945,6 @@ async def test_request_source_with_module_in_search_path_span_streaming_async(
         traces_sample_rate=1.0,
         enable_http_request_source=True,
         http_request_source_threshold_ms=0,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -1976,7 +979,7 @@ async def test_request_source_with_module_in_search_path_span_streaming_async(
     )
 
 
-def test_no_request_source_if_duration_too_short_span_streaming_sync(
+def test_no_request_source_if_duration_too_short_sync(
     sentry_init, capture_items, httpx_mock
 ):
     httpx_mock.add_response()
@@ -1987,7 +990,6 @@ def test_no_request_source_if_duration_too_short_span_streaming_sync(
         enable_http_request_source=True,
         # Threshold so high no real request will ever exceed it
         http_request_source_threshold_ms=9999999,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -2008,7 +1010,7 @@ def test_no_request_source_if_duration_too_short_span_streaming_sync(
 
 
 @pytest.mark.asyncio
-async def test_no_request_source_if_duration_too_short_span_streaming_async(
+async def test_no_request_source_if_duration_too_short_async(
     sentry_init, capture_items, httpx_mock
 ):
     httpx_mock.add_response()
@@ -2019,7 +1021,6 @@ async def test_no_request_source_if_duration_too_short_span_streaming_async(
         enable_http_request_source=True,
         # Threshold so high no real request will ever exceed it
         http_request_source_threshold_ms=9999999,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -2039,7 +1040,7 @@ async def test_no_request_source_if_duration_too_short_span_streaming_async(
     assert SPANDATA.CODE_FUNCTION not in http_span["attributes"]
 
 
-def test_request_source_if_duration_over_threshold_span_streaming_sync(
+def test_request_source_if_duration_over_threshold_sync(
     sentry_init, capture_items, httpx_mock
 ):
     httpx_mock.add_response()
@@ -2050,7 +1051,6 @@ def test_request_source_if_duration_over_threshold_span_streaming_sync(
         enable_http_request_source=True,
         # Threshold of 0 means any non-zero duration qualifies
         http_request_source_threshold_ms=0,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -2084,12 +1084,12 @@ def test_request_source_if_duration_over_threshold_span_streaming_sync(
 
     assert (
         http_span["attributes"][SPANDATA.CODE_FUNCTION]
-        == "test_request_source_if_duration_over_threshold_span_streaming_sync"
+        == "test_request_source_if_duration_over_threshold_sync"
     )
 
 
 @pytest.mark.asyncio
-async def test_request_source_if_duration_over_threshold_span_streaming_async(
+async def test_request_source_if_duration_over_threshold_async(
     sentry_init, capture_items, httpx_mock
 ):
     httpx_mock.add_response()
@@ -2100,7 +1100,6 @@ async def test_request_source_if_duration_over_threshold_span_streaming_async(
         enable_http_request_source=True,
         # Threshold of 0 means any non-zero duration qualifies
         http_request_source_threshold_ms=0,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -2134,17 +1133,16 @@ async def test_request_source_if_duration_over_threshold_span_streaming_async(
 
     assert (
         http_span["attributes"][SPANDATA.CODE_FUNCTION]
-        == "test_request_source_if_duration_over_threshold_span_streaming_async"
+        == "test_request_source_if_duration_over_threshold_async"
     )
 
 
-def test_span_origin_span_streaming_sync(sentry_init, capture_items, httpx_mock):
+def test_span_origin_sync(sentry_init, capture_items, httpx_mock):
     httpx_mock.add_response()
 
     sentry_init(
         integrations=[HttpxIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -2162,13 +1160,12 @@ def test_span_origin_span_streaming_sync(sentry_init, capture_items, httpx_mock)
 
 
 @pytest.mark.asyncio
-async def test_span_origin_span_streaming_async(sentry_init, capture_items, httpx_mock):
+async def test_span_origin_async(sentry_init, capture_items, httpx_mock):
     httpx_mock.add_response()
 
     sentry_init(
         integrations=[HttpxIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -2186,7 +1183,7 @@ async def test_span_origin_span_streaming_async(sentry_init, capture_items, http
 
 
 @pytest.mark.parametrize("send_default_pii", [True, False])
-def test_http_url_attributes_span_streaming_sync(
+def test_http_url_attributes_sync(
     sentry_init, capture_items, httpx_mock, send_default_pii
 ):
     httpx_mock.add_response()
@@ -2195,7 +1192,6 @@ def test_http_url_attributes_span_streaming_sync(
         integrations=[HttpxIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -2224,7 +1220,7 @@ def test_http_url_attributes_span_streaming_sync(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("send_default_pii", [True, False])
-async def test_http_url_attributes_span_streaming_async(
+async def test_http_url_attributes_async(
     sentry_init, capture_items, httpx_mock, send_default_pii
 ):
     httpx_mock.add_response()
@@ -2233,7 +1229,6 @@ async def test_http_url_attributes_span_streaming_async(
         integrations=[HttpxIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -2261,7 +1256,7 @@ async def test_http_url_attributes_span_streaming_async(
 
 
 @pytest.mark.parametrize("send_default_pii", [True, False])
-def test_http_url_attributes_no_query_or_fragment_span_streaming_sync(
+def test_http_url_attributes_no_query_or_fragment_sync(
     sentry_init, capture_items, httpx_mock, send_default_pii
 ):
     httpx_mock.add_response()
@@ -2270,7 +1265,6 @@ def test_http_url_attributes_no_query_or_fragment_span_streaming_sync(
         integrations=[HttpxIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -2297,7 +1291,7 @@ def test_http_url_attributes_no_query_or_fragment_span_streaming_sync(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("send_default_pii", [True, False])
-async def test_http_url_attributes_no_query_or_fragment_span_streaming_async(
+async def test_http_url_attributes_no_query_or_fragment_async(
     sentry_init, capture_items, httpx_mock, send_default_pii
 ):
     httpx_mock.add_response()
@@ -2306,7 +1300,6 @@ async def test_http_url_attributes_no_query_or_fragment_span_streaming_async(
         integrations=[HttpxIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -2408,7 +1401,7 @@ async def test_http_url_attributes_no_query_or_fragment_span_streaming_async(
         ),
     ],
 )
-def test_url_query_data_collection_span_streaming_sync(
+def test_url_query_data_collection_sync(
     sentry_init, capture_items, httpx_mock, init_kwargs, expected_query
 ):
     httpx_mock.add_response()
@@ -2416,7 +1409,6 @@ def test_url_query_data_collection_span_streaming_sync(
     sentry_init(
         integrations=[HttpxIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         **init_kwargs,
     )
 
@@ -2515,7 +1507,7 @@ def test_url_query_data_collection_span_streaming_sync(
         ),
     ],
 )
-async def test_url_query_data_collection_span_streaming_async(
+async def test_url_query_data_collection_async(
     sentry_init, capture_items, httpx_mock, init_kwargs, expected_query
 ):
     httpx_mock.add_response()
@@ -2523,7 +1515,6 @@ async def test_url_query_data_collection_span_streaming_async(
     sentry_init(
         integrations=[HttpxIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         **init_kwargs,
     )
 
@@ -2565,7 +1556,7 @@ async def test_url_query_data_collection_span_streaming_async(
         ),
     ],
 )
-def test_url_full_reassembly_span_streaming_sync(
+def test_url_full_reassembly_sync(
     sentry_init, capture_items, httpx_mock, init_kwargs, expected_url_full
 ):
     httpx_mock.add_response()
@@ -2573,7 +1564,6 @@ def test_url_full_reassembly_span_streaming_sync(
     sentry_init(
         integrations=[HttpxIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         **init_kwargs,
     )
 
@@ -2613,7 +1603,7 @@ def test_url_full_reassembly_span_streaming_sync(
         ),
     ],
 )
-async def test_url_full_reassembly_span_streaming_async(
+async def test_url_full_reassembly_async(
     sentry_init, capture_items, httpx_mock, init_kwargs, expected_url_full
 ):
     httpx_mock.add_response()
@@ -2621,7 +1611,6 @@ async def test_url_full_reassembly_span_streaming_async(
     sentry_init(
         integrations=[HttpxIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         **init_kwargs,
     )
 
@@ -2668,7 +1657,7 @@ async def test_url_full_reassembly_span_streaming_async(
         ),
     ],
 )
-def test_url_query_params_off_keeps_bare_url_span_streaming_sync(
+def test_url_query_params_off_keeps_bare_url_sync(
     sentry_init, capture_items, httpx_mock, init_kwargs, expected_url_full
 ):
     httpx_mock.add_response()
@@ -2676,7 +1665,6 @@ def test_url_query_params_off_keeps_bare_url_span_streaming_sync(
     sentry_init(
         integrations=[HttpxIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         **init_kwargs,
     )
 
@@ -2731,7 +1719,7 @@ def test_url_query_params_off_keeps_bare_url_span_streaming_sync(
         ),
     ],
 )
-async def test_url_query_params_off_keeps_bare_url_span_streaming_async(
+async def test_url_query_params_off_keeps_bare_url_async(
     sentry_init, capture_items, httpx_mock, init_kwargs, expected_url_full
 ):
     httpx_mock.add_response()
@@ -2739,7 +1727,6 @@ async def test_url_query_params_off_keeps_bare_url_span_streaming_async(
     sentry_init(
         integrations=[HttpxIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         **init_kwargs,
     )
 
@@ -2807,7 +1794,7 @@ async def test_url_query_params_off_keeps_bare_url_span_streaming_async(
         ),
     ],
 )
-def test_crumb_url_query_data_collection_span_streaming_sync(
+def test_crumb_url_query_data_collection_sync(
     sentry_init,
     capture_events,
     httpx_mock,
@@ -2820,7 +1807,6 @@ def test_crumb_url_query_data_collection_span_streaming_sync(
 
     sentry_init(
         integrations=[HttpxIntegration()],
-        trace_lifecycle="stream",
         **init_kwargs,
     )
 
@@ -2890,7 +1876,7 @@ def test_crumb_url_query_data_collection_span_streaming_sync(
         ),
     ],
 )
-async def test_crumb_url_query_data_collection_span_streaming_async(
+async def test_crumb_url_query_data_collection_async(
     sentry_init,
     capture_events,
     httpx_mock,
@@ -2903,7 +1889,6 @@ async def test_crumb_url_query_data_collection_span_streaming_async(
 
     sentry_init(
         integrations=[HttpxIntegration()],
-        trace_lifecycle="stream",
         **init_kwargs,
     )
 
@@ -2927,96 +1912,10 @@ async def test_crumb_url_query_data_collection_span_streaming_async(
         assert crumb["data"]["url"] == expected_url
         assert crumb["data"][SPANDATA.HTTP_QUERY] == expected_query
         assert crumb["data"][SPANDATA.HTTP_FRAGMENT] == expected_fragment
-
-
-@pytest.mark.parametrize(
-    "init_kwargs",
-    [
-        pytest.param(
-            {"_experiments": {"data_collection": {}}},
-            id="data_collection_denylist_default",
-        ),
-        pytest.param(
-            {
-                "_experiments": {
-                    "data_collection": {"url_query_params": {"mode": "off"}}
-                }
-            },
-            id="data_collection_off",
-        ),
-    ],
-)
-def test_crumb_url_query_unfiltered_legacy_sync(
-    sentry_init, capture_events, httpx_mock, init_kwargs
-):
-    """
-    Behaviour that existed prior to data collection and span streaming.
-    Remove when we've dropped transaction support and have fully migrated
-    to span streaming.
-    """
-    httpx_mock.add_response()
-
-    sentry_init(integrations=[HttpxIntegration()], **init_kwargs)
-
-    url = "http://example.com/?toy=tennisball&color=red&auth=secret#frag"
-
-    events = capture_events()
-
-    httpx.Client().get(url)
-    capture_message("Testing!")
-
-    (event,) = events
-
-    crumb = event["breadcrumbs"]["values"][0]
-
-    assert crumb["data"]["url"] == "http://example.com/"
-    assert crumb["data"][SPANDATA.HTTP_QUERY] == "toy=tennisball&color=red&auth=secret"
-    assert crumb["data"][SPANDATA.HTTP_FRAGMENT] == "frag"
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "init_kwargs",
-    [
-        pytest.param(
-            {"_experiments": {"data_collection": {}}},
-            id="data_collection_denylist_default",
-        ),
-        pytest.param(
-            {
-                "_experiments": {
-                    "data_collection": {"url_query_params": {"mode": "off"}}
-                }
-            },
-            id="data_collection_off",
-        ),
-    ],
-)
-async def test_crumb_url_query_unfiltered_legacy_async(
-    sentry_init, capture_events, httpx_mock, init_kwargs
-):
-    httpx_mock.add_response()
-
-    sentry_init(integrations=[HttpxIntegration()], **init_kwargs)
-
-    url = "http://example.com/?toy=tennisball&color=red&auth=secret#frag"
-
-    events = capture_events()
-
-    await httpx.AsyncClient().get(url)
-    capture_message("Testing!")
-
-    (event,) = events
-
-    crumb = event["breadcrumbs"]["values"][0]
-
-    assert crumb["data"]["url"] == "http://example.com/"
-    assert crumb["data"][SPANDATA.HTTP_QUERY] == "toy=tennisball&color=red&auth=secret"
-    assert crumb["data"][SPANDATA.HTTP_FRAGMENT] == "frag"
 
 
 @pytest.mark.tests_internal_exceptions
-def test_omit_url_data_if_parsing_fails_span_streaming(
+def test_omit_url_data_if_parsing_fails(
     sentry_init, capture_events, capture_items, httpx_mock
 ):
     httpx_mock.add_response()
@@ -3024,7 +1923,6 @@ def test_omit_url_data_if_parsing_fails_span_streaming(
     sentry_init(
         integrations=[HttpxIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         _experiments={"data_collection": {}},
     )
 

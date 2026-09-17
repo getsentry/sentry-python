@@ -29,7 +29,6 @@ class CompressionAlgo(Enum):
 
 if TYPE_CHECKING:
     from typing import (
-        AbstractSet,
         Any,
         Callable,
         Dict,
@@ -54,10 +53,8 @@ if TYPE_CHECKING:
         IgnoreSpansConfig,
         Log,
         Metric,
-        ProfilerMode,
         SpanJSON,
         TracesSampler,
-        TransactionProcessor,
     )
 
     # Experiments are feature flags to enable and disable certain unstable SDK
@@ -67,28 +64,15 @@ if TYPE_CHECKING:
     Experiments = TypedDict(
         "Experiments",
         {
-            "max_spans": Optional[int],
             "max_flags": Optional[int],
             "record_sql_params": Optional[bool],
             "continuous_profiling_auto_start": Optional[bool],
-            "continuous_profiling_mode": Optional[ContinuousProfilerMode],
-            "otel_powered_performance": Optional[bool],
             "transport_zlib_compression_level": Optional[int],
             "transport_compression_level": Optional[int],
             "transport_compression_algo": Optional[CompressionAlgo],
             "transport_num_pools": Optional[int],
             "transport_http2": Optional[bool],
             "transport_async": Optional[bool],
-            "enable_logs": Optional[bool],
-            "before_send_log": Optional[Callable[[Log, Hint], Optional[Log]]],
-            "enable_metrics": Optional[bool],
-            "before_send_metric": Optional[Callable[[Metric, Hint], Optional[Metric]]],
-            "trace_lifecycle": Optional[Literal["static", "stream"]],
-            "ignore_spans": Optional[IgnoreSpansConfig],
-            "before_send_span": Optional[
-                Callable[[SpanJSON, Hint], Optional[SpanJSON]]
-            ],
-            "suppress_asgi_chained_exceptions": Optional[bool],
             "data_collection": Optional[DataCollectionUserOptions],
         },
         total=False,
@@ -105,21 +89,6 @@ FALSE_VALUES = [
     "n",
     "0",
 ]
-
-
-class SPANTEMPLATE(str, Enum):
-    DEFAULT = "default"
-    AI_AGENT = "ai_agent"
-    AI_TOOL = "ai_tool"
-    AI_CHAT = "ai_chat"
-
-    def __str__(self) -> str:
-        return self.value
-
-
-class INSTRUMENTER:
-    SENTRY = "sentry"
-    OTEL = "otel"
 
 
 class SPANNAME:
@@ -620,6 +589,12 @@ class SPANDATA:
     """
     The model's response messages. It has to be a stringified version of an array of message objects, which can include text responses and tool calls.
     Example: [{"role": "assistant", "parts": [{"type": "text", "content": "The weather in Paris is currently rainy with a temperature of 57°F."}], "finish_reason": "stop"}]
+    """
+
+    GEN_AI_RESPONSE_TIME_TO_FIRST_CHUNK = "gen_ai.response.time_to_first_chunk"
+    """
+    Time in seconds when the first response content chunk arrived in streaming responses.
+    Example: 0.6853435
     """
 
     GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN = "gen_ai.response.time_to_first_token"
@@ -1195,32 +1170,6 @@ class SPANDATA:
     """
 
 
-class SPANSTATUS:
-    """
-    The status of a Sentry span.
-
-    See: https://develop.sentry.dev/sdk/event-payloads/contexts/#trace-context
-    """
-
-    ABORTED = "aborted"
-    ALREADY_EXISTS = "already_exists"
-    CANCELLED = "cancelled"
-    DATA_LOSS = "data_loss"
-    DEADLINE_EXCEEDED = "deadline_exceeded"
-    FAILED_PRECONDITION = "failed_precondition"
-    INTERNAL_ERROR = "internal_error"
-    INVALID_ARGUMENT = "invalid_argument"
-    NOT_FOUND = "not_found"
-    OK = "ok"
-    OUT_OF_RANGE = "out_of_range"
-    PERMISSION_DENIED = "permission_denied"
-    RESOURCE_EXHAUSTED = "resource_exhausted"
-    UNAUTHENTICATED = "unauthenticated"
-    UNAVAILABLE = "unavailable"
-    UNIMPLEMENTED = "unimplemented"
-    UNKNOWN_ERROR = "unknown_error"
-
-
 class OP:
     ANTHROPIC_MESSAGES_CREATE = "ai.messages.create.anthropic"
     CACHE_GET = "cache.get"
@@ -1312,7 +1261,7 @@ class ClientConstructor:
         in_app_exclude: "List[str]" = [],  # noqa: B006
         default_integrations: bool = True,
         dist: "Optional[str]" = None,
-        transport: "Optional[Union[sentry_sdk.transport.Transport, Type[sentry_sdk.transport.Transport], Callable[[Event], None]]]" = None,
+        transport: "Optional[Union[sentry_sdk.transport.Transport, Type[sentry_sdk.transport.Transport], None]]" = None,
         transport_queue_size: int = DEFAULT_QUEUE_SIZE,
         sample_rate: float = 1.0,
         send_default_pii: "Optional[bool]" = None,
@@ -1325,15 +1274,11 @@ class ClientConstructor:
         before_send: "Optional[EventProcessor]" = None,
         before_breadcrumb: "Optional[BreadcrumbProcessor]" = None,
         debug: "Optional[bool]" = None,
-        attach_stacktrace: bool = False,
+        attach_stacktrace: bool = True,
         ca_certs: "Optional[str]" = None,
-        propagate_traces: bool = True,
         traces_sample_rate: "Optional[float]" = None,
-        trace_lifecycle: "Optional[Literal['static', 'stream']]" = None,
         traces_sampler: "Optional[TracesSampler]" = None,
-        profiles_sample_rate: "Optional[float]" = None,
-        profiles_sampler: "Optional[TracesSampler]" = None,
-        profiler_mode: "Optional[ProfilerMode]" = None,
+        profiler_mode: "Optional[ContinuousProfilerMode]" = None,
         profile_lifecycle: 'Literal["manual", "trace"]' = "manual",
         profile_session_sample_rate: "Optional[float]" = None,
         auto_enabling_integrations: bool = True,
@@ -1342,10 +1287,7 @@ class ClientConstructor:
         send_client_reports: bool = True,
         _experiments: "Experiments" = {},  # noqa: B006
         proxy_headers: "Optional[Dict[str, str]]" = None,
-        instrumenter: "Optional[str]" = INSTRUMENTER.SENTRY,
-        before_send_transaction: "Optional[TransactionProcessor]" = None,
         project_root: "Optional[str]" = None,
-        enable_tracing: "Optional[bool]" = None,
         include_local_variables: "Optional[bool]" = True,
         include_source_context: "Optional[bool]" = True,
         trace_propagation_targets: "Optional[Sequence[str]]" = [  # noqa: B006
@@ -1366,15 +1308,11 @@ class ClientConstructor:
         custom_repr: "Optional[Callable[..., Optional[str]]]" = None,
         add_full_stack: bool = DEFAULT_ADD_FULL_STACK,
         max_stack_frames: "Optional[int]" = DEFAULT_MAX_STACK_FRAMES,
-        enable_logs: bool = False,
         before_send_log: "Optional[Callable[[Log, Hint], Optional[Log]]]" = None,
-        trace_ignore_status_codes: "AbstractSet[int]" = frozenset(),
-        enable_metrics: bool = True,
         before_send_metric: "Optional[Callable[[Metric, Hint], Optional[Metric]]]" = None,
         before_send_span: "Optional[Callable[[SpanJSON, Hint], Optional[SpanJSON]]]" = None,
         org_id: "Optional[str]" = None,
         strict_trace_continuation: bool = False,
-        stream_gen_ai_spans: bool = True,
     ) -> None:
         """Initialize the Sentry SDK with the given parameters. All parameters described here can be used in a call to `sentry_sdk.init()`.
 
@@ -1585,11 +1523,6 @@ class ClientConstructor:
             By the time `before_send` is executed, all scope data has already been applied to the event. Further
             modification of the scope won't have any effect.
 
-        :param before_send_transaction: This function is called with an SDK-specific transaction event object, and can
-            return a modified transaction event object, or `null` to skip reporting the event.
-
-            One way this might be used is for manual PII stripping before sending.
-
         :param before_breadcrumb: This function is called with an SDK-specific breadcrumb object before the breadcrumb
             is added to the scope.
 
@@ -1653,28 +1586,28 @@ class ClientConstructor:
             If provided, the options will override the default `urllib3` `socket options
             <https://urllib3.readthedocs.io/en/stable/reference/urllib3.connection.html#urllib3.connection.HTTPConnection>`_.
 
-        :param traces_sample_rate: A number between `0` and `1`, controlling the percentage chance a given transaction
+        :param traces_sample_rate: A number between `0` and `1`, controlling the percentage chance a given service span
             will be sent to Sentry.
 
-            (`0` represents 0% while `1` represents 100%.) Applies equally to all transactions created in the app.
+            (`0` represents 0% while `1` represents 100%.) Applies equally to all service spans created in the app.
 
             Either this or `traces_sampler` must be defined to enable tracing.
 
             If `traces_sample_rate` is `0`, this means that no new traces will be created. However, if you have
             another service (for example a JS frontend) that makes requests to your service that include trace
-            information, those traces will be continued and thus transactions will be sent to Sentry.
+            information, those traces will be continued and thus spans will be sent to Sentry.
 
             If you want to disable all tracing you need to set `traces_sample_rate=None`. In this case, no new traces
             will be started and no incoming traces will be continued.
 
-        :param traces_sampler: A function responsible for determining the percentage chance a given transaction will be
+        :param traces_sampler: A function responsible for determining the percentage chance a given service span will be
             sent to Sentry.
 
-            It will automatically be passed information about the transaction and the context in which it's being
+            It will automatically be passed information about the service span and the context in which it's being
             created, and must return a number between `0` (0% chance of being sent) and `1` (100% chance of being
             sent).
 
-            Can also be used for filtering transactions, by returning `0` for those that are unwanted.
+            Can also be used for filtering service spans, by returning `0` for those that are unwanted.
 
             Either this or `traces_sample_rate` must be defined to enable tracing.
 
@@ -1735,49 +1668,20 @@ class ClientConstructor:
             Return a string for that repr value to be used or `None` to continue serializing how Sentry would have
             done it anyway.
 
-        :param profiles_sample_rate: A number between `0` and `1`, controlling the percentage chance a given sampled
-            transaction will be profiled.
-
-            (`0` represents 0% while `1` represents 100%.) Applies equally to all transactions created in the app.
-
-            This is relative to the tracing sample rate - e.g. `0.5` means 50% of sampled transactions will be
-            profiled.
-
-        :param profiles_sampler:
-
         :param profiler_mode:
 
         :param profile_lifecycle:
 
         :param profile_session_sample_rate:
 
-        :param enable_tracing:
-
-        :param propagate_traces:
-
         :param auto_session_tracking:
 
         :param spotlight:
-
-        :param instrumenter:
-
-        :param enable_logs: Set `enable_logs` to True to enable the SDK to emit
-            Sentry logs. Defaults to False.
 
         :param before_send_log: An optional function to modify or filter out logs
             before they're sent to Sentry. Any modifications to the log in this
             function will be retained. If the function returns None, the log will
             not be sent to Sentry.
-
-        :param trace_ignore_status_codes: An optional property that disables tracing for
-            HTTP requests with certain status codes.
-
-            Requests are not traced if the status code is contained in the provided set.
-
-            If `trace_ignore_status_codes` is not provided, requests with any status code
-            may be traced.
-
-            This option has no effect in span streaming mode (`trace_lifecycle="stream"`).
 
         :param strict_trace_continuation: If set to `True`, the SDK will only continue a trace if the `org_id` of the incoming trace found in the
            `baggage` header matches the `org_id` of the current Sentry client and only if BOTH are present.
@@ -1794,17 +1698,9 @@ class ClientConstructor:
 
         :param before_send_span: An optional function to modify spans before they're sent to Sentry.
             Modifications to the span's attributes and name will be retained. Unlike ``before_send_log``
-            and ``before_send_metric``, spans cannot be dropped by returning None. Only works when
-            ``trace_lifecycle="stream"`` is enabled.
+            and ``before_send_metric``, spans cannot be dropped by returning None.
 
-        :param stream_gen_ai_spans: When set, generative AI spans are sent in a new transport format to
-            reduce downstream data loss.
-
-        :param trace_lifecycle: Controls how traces are sent. Set to `"stream"` to send spans as they
-            finish, or `"static"` to send a completed trace as a transaction event.
-
-        :param ignore_spans: A sequence of span-matching rules. Matching spans are ignored when
-            `trace_lifecycle="stream"` is enabled.
+        :param ignore_spans: A sequence of span-matching rules. Matching spans are ignored.
 
         :param _experiments: Dictionary of experimental, opt-in features that are not yet stable.
 

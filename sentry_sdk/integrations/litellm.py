@@ -5,20 +5,17 @@ import sentry_sdk
 from sentry_sdk import consts
 from sentry_sdk.ai.monitoring import record_token_usage
 from sentry_sdk.ai.utils import (
-    get_start_span_function,
     set_data_normalized,
     transform_openai_content_part,
-    truncate_and_annotate_embedding_inputs,
-    truncate_and_annotate_messages,
 )
 from sentry_sdk.consts import SPANDATA
-from sentry_sdk.integrations import DidNotEnable, Integration
+from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.tracing_utils import (
-    has_span_streaming_enabled,
-    should_truncate_gen_ai_input,
+from sentry_sdk.utils import (
+    event_from_exception,
+    has_data_collection_enabled,
+    package_version,
 )
-from sentry_sdk.utils import event_from_exception, has_data_collection_enabled
 
 if TYPE_CHECKING:
     from datetime import datetime
@@ -28,7 +25,7 @@ try:
     import litellm  # type: ignore[import-not-found]
     from litellm import failure_callback, input_callback, success_callback
 except ImportError:
-    raise DidNotEnable("LiteLLM not installed")
+    raise DidNotEnable("LiteLLM not installed or incompatible")
 
 
 # Stash the span on a top-level key of the per-request kwargs dict litellm passes
@@ -98,34 +95,22 @@ def _input_callback(kwargs: "Dict[str, Any]") -> None:
         operation = "chat"
 
     # Start a new span/transaction
-    if has_span_streaming_enabled(client.options):
-        span = sentry_sdk.traces.start_span(
-            name=f"{operation} {model}",
-            attributes={
-                "sentry.op": (
-                    consts.OP.GEN_AI_CHAT
-                    if operation == "chat"
-                    else consts.OP.GEN_AI_EMBEDDINGS
-                ),
-                "sentry.origin": LiteLLMIntegration.origin,
-            },
-        )
-    else:
-        span = get_start_span_function()(
-            op=(
+    span = sentry_sdk.traces.start_span(
+        name=f"{operation} {model}",
+        attributes={
+            "sentry.op": (
                 consts.OP.GEN_AI_CHAT
                 if operation == "chat"
                 else consts.OP.GEN_AI_EMBEDDINGS
             ),
-            name=f"{operation} {model}",
-            origin=LiteLLMIntegration.origin,
-        )
-        span.__enter__()
+            "sentry.origin": LiteLLMIntegration.origin,
+        },
+    )
 
     _store_span(kwargs, span)
 
     # Set basic data
-    set_data_normalized(span, SPANDATA.GEN_AI_SYSTEM, provider)
+    set_data_normalized(span, SPANDATA.GEN_AI_PROVIDER_NAME, provider)
     set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, operation)
 
     # Record input/messages if allowed
@@ -140,43 +125,30 @@ def _input_callback(kwargs: "Dict[str, Any]") -> None:
             # For embeddings, look for the 'input' parameter
             embedding_input = kwargs.get("input")
             if embedding_input:
-                scope = sentry_sdk.get_current_scope()
                 # Normalize to list format
                 input_list = (
                     embedding_input
                     if isinstance(embedding_input, list)
                     else [embedding_input]
                 )
-                messages_data = (
-                    truncate_and_annotate_embedding_inputs(input_list, span, scope)
-                    if should_truncate_gen_ai_input(client.options)
-                    else input_list
-                )
-                if messages_data is not None:
+                if input_list is not None:
                     set_data_normalized(
                         span,
                         SPANDATA.GEN_AI_EMBEDDINGS_INPUT,
-                        messages_data,
+                        input_list,
                         unpack=False,
                     )
         else:
             # For chat, look for the 'messages' parameter
             messages = kwargs.get("messages", [])
             if messages:
-                scope = sentry_sdk.get_current_scope()
                 messages = _convert_message_parts(messages)
-                messages_data = (
-                    truncate_and_annotate_messages(messages, span, scope)
-                    if should_truncate_gen_ai_input(client.options)
-                    else messages
+                set_data_normalized(
+                    span,
+                    SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                    messages,
+                    unpack=False,
                 )
-                if messages_data is not None:
-                    set_data_normalized(
-                        span,
-                        SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                        messages_data,
-                        unpack=False,
-                    )
 
     # Record other parameters
     params = {
@@ -370,6 +342,9 @@ class LiteLLMIntegration(Integration):
     @staticmethod
     def setup_once() -> None:
         """Set up LiteLLM callbacks for monitoring."""
+        version = package_version("litellm")
+        _check_minimum_version(LiteLLMIntegration, version)
+
         litellm.input_callback = input_callback or []
         if _input_callback not in litellm.input_callback:
             litellm.input_callback.append(_input_callback)

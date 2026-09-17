@@ -21,7 +21,7 @@ fi
 
 # `uv run` itself uses the workspace venv's interpreter (uv's default
 # `managed` preference). tox-uv, which provisions per-env interpreters, may
-# need a different preference (e.g. `only-system` inside the 3.6/3.7
+# need a different preference (e.g. `only-system` inside the 3.7
 # container); the workflow passes that via TOX_UV_PYTHON_PREFERENCE.
 TOX_ENV=()
 if [ -n "$TOX_UV_PYTHON_PREFERENCE" ]; then

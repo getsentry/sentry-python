@@ -4,8 +4,6 @@ import os
 import subprocess
 import sys
 import time
-import warnings
-from collections import Counter, defaultdict
 from collections.abc import Mapping
 from textwrap import dedent
 from unittest import mock
@@ -15,14 +13,11 @@ import pytest
 import sentry_sdk
 from sentry_sdk import (
     Client,
-    Hub,
     add_breadcrumb,
     capture_event,
     capture_exception,
     capture_message,
-    configure_scope,
     set_tag,
-    start_transaction,
 )
 from sentry_sdk._compat import PY38
 from sentry_sdk.consts import DEFAULT_MAX_BREADCRUMBS
@@ -395,13 +390,6 @@ def test_socks_proxy(testcase, http2):
     )
 
 
-def test_simple_transport(sentry_init):
-    events = []
-    sentry_init(transport=events.append)
-    capture_message("Hello World!")
-    assert events[0]["message"] == "Hello World!"
-
-
 def test_ignore_errors(sentry_init, capture_events):
     sentry_init(ignore_errors=[ZeroDivisionError])
     events = capture_events()
@@ -516,6 +504,25 @@ def test_function_names(sentry_init, capture_events, integrations):
         assert functions == ["foo", "bar"]
 
 
+def test_attach_stacktrace_default(sentry_init, capture_events):
+    sentry_init()
+    events = capture_events()
+
+    def foo():
+        bar()
+
+    def bar():
+        capture_message("HI")
+
+    foo()
+
+    (event,) = events
+    (thread,) = event["threads"]["values"]
+    functions = [x["function"] for x in thread["stacktrace"]["frames"]]
+
+    assert functions[-2:] == ["foo", "bar"]
+
+
 def test_attach_stacktrace_enabled(sentry_init, capture_events):
     sentry_init(attach_stacktrace=True)
     events = capture_events()
@@ -576,15 +583,6 @@ def test_attach_stacktrace_disabled(sentry_init, capture_events):
     assert "threads" not in event
 
 
-def test_attach_stacktrace_transaction(sentry_init, capture_events):
-    sentry_init(traces_sample_rate=1.0, attach_stacktrace=True)
-    events = capture_events()
-    with start_transaction(name="transaction"):
-        pass
-    (event,) = events
-    assert "threads" not in event
-
-
 def test_capture_event_works(sentry_init):
     sentry_init(transport=_TestTransport())
     pytest.raises(EnvelopeCapturedError, lambda: capture_event({}))
@@ -633,31 +631,6 @@ def test_atexit(tmpdir, monkeypatch, num_messages, http2):
     assert int(end - start) >= num_messages / 10
 
     assert output.count(b"HI") == num_messages
-
-
-def test_configure_scope_available(
-    sentry_init, request, monkeypatch, suppress_deprecation_warnings
-):
-    """
-    Test that scope is configured if client is configured
-
-    This test can be removed once configure_scope and the Hub are removed.
-    """
-    sentry_init()
-
-    with configure_scope() as scope:
-        assert scope is Hub.current.scope
-        scope.set_tag("foo", "bar")
-
-    calls = []
-
-    def callback(scope):
-        calls.append(scope)
-        scope.set_tag("foo", "bar")
-
-    assert configure_scope(callback) is None
-    assert len(calls) == 1
-    assert calls[0] is Hub.current.scope
 
 
 @pytest.mark.tests_internal_exceptions
@@ -1307,204 +1280,19 @@ def test_error_sampler(_, sentry_init, capture_events, test_config):
         [{"py-call-uwsgi-fork-hooks": True}, ["--enable-threads"]],
     ],
 )
-def test_uwsgi_warnings(sentry_init, recwarn, opt, missing_flags):
+def test_uwsgi_warnings(sentry_init, opt, missing_flags):
     uwsgi = mock.MagicMock()
     uwsgi.opt = opt
-    with mock.patch.dict("sys.modules", uwsgi=uwsgi):
-        sentry_init(profiles_sample_rate=1.0)
-        if missing_flags:
-            assert len(recwarn) == 1
-            record = recwarn.pop()
-            for flag in missing_flags:
-                assert flag in str(record.message)
-        else:
-            assert not recwarn
-
-
-class TestSpanClientReports:
-    """
-    Tests for client reports related to spans.
-    """
-
-    __test__ = False
-
-    @staticmethod
-    def span_dropper(spans_to_drop):
-        """
-        Returns a function that can be used to drop spans from an event.
-        """
-
-        def drop_spans(event, _):
-            event["spans"] = event["spans"][spans_to_drop:]
-            return event
-
-        return drop_spans
-
-    @staticmethod
-    def mock_transaction_event(span_count):
-        """
-        Returns a mock transaction event with the given number of spans.
-        """
-
-        return defaultdict(
-            mock.MagicMock,
-            type="transaction",
-            spans=[mock.MagicMock() for _ in range(span_count)],
-        )
-
-    def __init__(self, span_count):
-        """Configures a test case with the number of spans dropped and whether the transaction was dropped."""
-        self.span_count = span_count
-        self.expected_record_lost_event_calls = Counter()
-        self.before_send = lambda event, _: event
-        self.event_processor = lambda event, _: event
-
-    def _update_resulting_calls(self, reason, drops_transactions=0, drops_spans=0):
-        """
-        Updates the expected calls with the given resulting calls.
-        """
-        if drops_transactions > 0:
-            self.expected_record_lost_event_calls[
-                (reason, "transaction", None, drops_transactions)
-            ] += 1
-
-        if drops_spans > 0:
-            self.expected_record_lost_event_calls[
-                (reason, "span", None, drops_spans)
-            ] += 1
-
-    def with_before_send(
-        self,
-        before_send,
-        *,
-        drops_transactions=0,
-        drops_spans=0,
-    ):
-        self.before_send = before_send
-        self._update_resulting_calls(
-            "before_send",
-            drops_transactions,
-            drops_spans,
-        )
-
-        return self
-
-    def with_event_processor(
-        self,
-        event_processor,
-        *,
-        drops_transactions=0,
-        drops_spans=0,
-    ):
-        self.event_processor = event_processor
-        self._update_resulting_calls(
-            "event_processor",
-            drops_transactions,
-            drops_spans,
-        )
-
-        return self
-
-    def run(self, sentry_init, capture_record_lost_event_calls):
-        """Runs the test case with the configured parameters."""
-        sentry_init(before_send_transaction=self.before_send)
-        record_lost_event_calls = capture_record_lost_event_calls()
-
-        with sentry_sdk.isolation_scope() as scope:
-            scope.add_event_processor(self.event_processor)
-            event = self.mock_transaction_event(self.span_count)
-            sentry_sdk.get_client().capture_event(event, scope=scope)
-
-        # We use counters to ensure that the calls are made the expected number of times, disregarding order.
-        assert Counter(record_lost_event_calls) == self.expected_record_lost_event_calls
-
-
-@pytest.mark.parametrize(
-    "test_config",
-    (
-        TestSpanClientReports(span_count=10),  # No spans dropped
-        TestSpanClientReports(span_count=0).with_before_send(
-            lambda e, _: None,
-            drops_transactions=1,
-            drops_spans=1,
-        ),
-        TestSpanClientReports(span_count=10).with_before_send(
-            lambda e, _: None,
-            drops_transactions=1,
-            drops_spans=11,
-        ),
-        TestSpanClientReports(span_count=10).with_before_send(
-            TestSpanClientReports.span_dropper(3),
-            drops_spans=3,
-        ),
-        TestSpanClientReports(span_count=10).with_before_send(
-            TestSpanClientReports.span_dropper(10),
-            drops_spans=10,
-        ),
-        TestSpanClientReports(span_count=10).with_event_processor(
-            lambda e, _: None,
-            drops_transactions=1,
-            drops_spans=11,
-        ),
-        TestSpanClientReports(span_count=10).with_event_processor(
-            TestSpanClientReports.span_dropper(3),
-            drops_spans=3,
-        ),
-        TestSpanClientReports(span_count=10).with_event_processor(
-            TestSpanClientReports.span_dropper(10),
-            drops_spans=10,
-        ),
-        TestSpanClientReports(span_count=10)
-        .with_event_processor(
-            TestSpanClientReports.span_dropper(3),
-            drops_spans=3,
-        )
-        .with_before_send(
-            TestSpanClientReports.span_dropper(5),
-            drops_spans=5,
-        ),
-        TestSpanClientReports(10)
-        .with_event_processor(
-            TestSpanClientReports.span_dropper(3),
-            drops_spans=3,
-        )
-        .with_before_send(
-            lambda e, _: None,
-            drops_transactions=1,
-            drops_spans=8,  # 3 of the 11 (incl. transaction) spans already dropped
-        ),
-    ),
-)
-def test_dropped_transaction(sentry_init, capture_record_lost_event_calls, test_config):
-    test_config.run(sentry_init, capture_record_lost_event_calls)
-
-
-@pytest.mark.parametrize("enable_tracing", [True, False])
-def test_enable_tracing_deprecated(sentry_init, enable_tracing):
-    with pytest.warns(DeprecationWarning):
-        sentry_init(enable_tracing=enable_tracing)
-
-
-def test_ignore_spans_warns_without_streaming(sentry_init):
-    with pytest.warns(UserWarning, match=r"`ignore_spans` parameter only works"):
-        sentry_init(ignore_spans=["/health"], trace_lifecycle="static")
-
-
-@pytest.mark.parametrize(
-    "options",
-    [
-        {"ignore_spans": ["/health"], "trace_lifecycle": "stream"},
-        {"ignore_spans": ["/health"], "_experiments": {"trace_lifecycle": "stream"}},
-        {},
-    ],
-)
-def test_ignore_spans_does_not_warn(sentry_init, options):
-    with warnings.catch_warnings(record=True) as caught:
-        warnings.simplefilter("always")
-        sentry_init(**options)
-
-    ignore_spans_warnings = [w for w in caught if "ignore_spans" in str(w.message)]
-    assert ignore_spans_warnings == []
+    with mock.patch("sentry_sdk.utils.logger") as mock_logger:
+        with mock.patch.dict("sys.modules", uwsgi=uwsgi):
+            sentry_init()
+            if missing_flags:
+                assert mock_logger.warning.call_count == 1
+                message = mock_logger.warning.call_args[0][0]
+                for flag in missing_flags:
+                    assert flag in message
+            else:
+                mock_logger.warning.assert_not_called()
 
 
 def make_options_transport_cls():
@@ -1629,8 +1417,6 @@ async def test_async_proxy(monkeypatch, testcase):
 @pytest.mark.skipif(not PY38, reason="Async client methods require Python 3.8+")
 async def test_close_with_async_transport_warns():
     """Test close() with AsyncHttpTransport emits a warning."""
-    import warnings as _warnings
-
     client = Client(
         "https://foo@sentry.io/123",
         _experiments={"transport_async": True},
@@ -1638,10 +1424,11 @@ async def test_close_with_async_transport_warns():
     )
     assert isinstance(client.transport, AsyncHttpTransport)
 
-    with _warnings.catch_warnings(record=True) as w:
-        _warnings.simplefilter("always")
+    with mock.patch("sentry_sdk.client.logger") as mock_logger:
         client.close()
-        assert any("close_async()" in str(warning.message) for warning in w)
+        assert any(
+            "close_async()" in str(c) for c in mock_logger.warning.call_args_list
+        )
 
 
 @skip_under_gevent
@@ -1694,8 +1481,6 @@ async def test_close_async_no_transport():
 @pytest.mark.skipif(not PY38, reason="Async client methods require Python 3.8+")
 async def test_flush_with_async_transport_warns():
     """Test flush() with AsyncHttpTransport emits a warning and returns."""
-    import warnings as _warnings
-
     client = Client(
         "https://foo@sentry.io/123",
         _experiments={"transport_async": True},
@@ -1703,10 +1488,11 @@ async def test_flush_with_async_transport_warns():
     )
     assert isinstance(client.transport, AsyncHttpTransport)
 
-    with _warnings.catch_warnings(record=True) as w:
-        _warnings.simplefilter("always")
+    with mock.patch("sentry_sdk.client.logger") as mock_logger:
         client.flush(timeout=1.0)
-        assert any("flush_async()" in str(warning.message) for warning in w)
+        assert any(
+            "flush_async()" in str(c) for c in mock_logger.warning.call_args_list
+        )
     await client.close_async()
 
 

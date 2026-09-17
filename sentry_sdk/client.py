@@ -1,15 +1,12 @@
-import json
 import os
-import platform
 import random
 import socket
-import sys
 import uuid
-import warnings
-from collections.abc import Iterable, Mapping
+from collections.abc import Mapping
+from contextvars import ContextVar
 from datetime import datetime, timezone
 from importlib import import_module
-from typing import TYPE_CHECKING, Dict, List, cast, overload
+from typing import TYPE_CHECKING, Dict, cast, overload
 
 from sentry_sdk._compat import check_uwsgi_thread_support
 from sentry_sdk._log_batcher import LogBatcher
@@ -18,9 +15,6 @@ from sentry_sdk._span_batcher import SpanBatcher
 from sentry_sdk.consts import (
     DEFAULT_MAX_VALUE_LENGTH,
     DEFAULT_OPTIONS,
-    INSTRUMENTER,
-    SPANDATA,
-    SPANSTATUS,
     VERSION,
     ClientConstructor,
 )
@@ -28,23 +22,15 @@ from sentry_sdk.data_collection import (
     _map_from_send_default_pii,
     _resolve_data_collection,
 )
-from sentry_sdk.envelope import Envelope, Item, PayloadRef
-from sentry_sdk.integrations import _DEFAULT_INTEGRATIONS, setup_integrations
+from sentry_sdk.envelope import Envelope, Item
+from sentry_sdk.integrations import setup_integrations
 from sentry_sdk.integrations.dedupe import DedupeIntegration
 from sentry_sdk.monitor import Monitor
 from sentry_sdk.profiler.continuous_profiler import setup_continuous_profiler
-from sentry_sdk.profiler.transaction_profiler import (
-    Profile,
-    has_profiling_enabled,
-    setup_profiler,
-)
 from sentry_sdk.scrubber import EventScrubber
 from sentry_sdk.serializer import serialize
 from sentry_sdk.sessions import SessionFlusher
-from sentry_sdk.traces import SpanStatus, StreamedSpan
-from sentry_sdk.traces import trace as streaming_trace
-from sentry_sdk.tracing import trace as legacy_trace
-from sentry_sdk.tracing_utils import has_span_streaming_enabled
+from sentry_sdk.traces import Span, trace
 from sentry_sdk.transport import (
     AsyncHttpTransport,
     HttpTransportCore,
@@ -52,10 +38,8 @@ from sentry_sdk.transport import (
 )
 from sentry_sdk.utils import (
     AnnotatedValue,
-    ContextVar,
     capture_internal_exceptions,
     current_stacktrace,
-    datetime_from_isoformat,
     env_to_bool,
     format_timestamp,
     get_before_send_log,
@@ -81,19 +65,18 @@ if TYPE_CHECKING:
         Log,
         Metric,
         SDKInfo,
-        SerializedAttributeValue,
     )
     from sentry_sdk.integrations import Integration
     from sentry_sdk.scope import Scope
     from sentry_sdk.session import Session
     from sentry_sdk.spotlight import SpotlightClient
-    from sentry_sdk.traces import StreamedSpan
+    from sentry_sdk.traces import Span
     from sentry_sdk.transport import Item, Transport
     from sentry_sdk.utils import Dsn
 
     I = TypeVar("I", bound=Integration)  # noqa: E741
 
-_client_init_debug = ContextVar("client_init_debug")
+_client_init_debug: "ContextVar[bool]" = ContextVar("client_init_debug")
 
 
 SDK_INFO: "SDKInfo" = {
@@ -101,203 +84,6 @@ SDK_INFO: "SDKInfo" = {
     "version": VERSION,
     "packages": [{"name": "pypi:sentry-sdk", "version": VERSION}],
 }
-
-
-def _serialized_v1_attribute_to_serialized_v2_attribute(
-    attribute_value: "Any",
-) -> "Optional[SerializedAttributeValue]":
-    if isinstance(attribute_value, bool):
-        return {
-            "value": attribute_value,
-            "type": "boolean",
-        }
-
-    if isinstance(attribute_value, int):
-        return {
-            "value": attribute_value,
-            "type": "integer",
-        }
-
-    if isinstance(attribute_value, float):
-        return {
-            "value": attribute_value,
-            "type": "double",
-        }
-
-    if isinstance(attribute_value, str):
-        return {
-            "value": attribute_value,
-            "type": "string",
-        }
-
-    if isinstance(attribute_value, list):
-        if not attribute_value:
-            return {"value": [], "type": "array"}
-
-        ty = type(attribute_value[0])
-        if ty in (int, str, bool, float) and all(
-            type(v) is ty for v in attribute_value
-        ):
-            return {
-                "value": attribute_value,
-                "type": "array",
-            }
-
-    # Types returned when the serializer for V1 span attributes recurses into some container types.
-    if isinstance(attribute_value, (dict, list)):
-        return {
-            "value": json.dumps(attribute_value),
-            "type": "string",
-        }
-
-    return None
-
-
-def _serialized_v1_span_to_serialized_v2_span(
-    span: "dict[str, Any]", event: "Event"
-) -> "dict[str, Any]":
-    # See SpanBatcher._to_transport_format() for analogous population of all entries except "attributes".
-    res: "dict[str, Any]" = {
-        "status": SpanStatus.OK.value,
-        "is_segment": False,
-    }
-
-    if "trace_id" in span:
-        res["trace_id"] = span["trace_id"]
-
-    if "span_id" in span:
-        res["span_id"] = span["span_id"]
-
-    if "description" in span:
-        description = span["description"]
-
-        if description is None and "op" in span:
-            description = span["op"]
-
-        res["name"] = description
-
-    if "start_timestamp" in span:
-        start_timestamp = None
-        try:
-            start_timestamp = datetime_from_isoformat(span["start_timestamp"])
-        except Exception:
-            pass
-
-        if start_timestamp is not None:
-            res["start_timestamp"] = start_timestamp.timestamp()
-
-    if "timestamp" in span:
-        end_timestamp = None
-        try:
-            end_timestamp = datetime_from_isoformat(span["timestamp"])
-        except Exception:
-            pass
-
-        if end_timestamp is not None:
-            res["end_timestamp"] = end_timestamp.timestamp()
-
-    if "parent_span_id" in span:
-        res["parent_span_id"] = span["parent_span_id"]
-
-    if "status" in span and span["status"] != SPANSTATUS.OK:
-        res["status"] = "error"
-
-    attributes: "Dict[str, Any]" = {}
-
-    if "op" in span:
-        attributes["sentry.op"] = span["op"]
-    if "origin" in span:
-        attributes["sentry.origin"] = span["origin"]
-
-    span_data = span.get("data")
-    if isinstance(span_data, dict):
-        attributes.update(span_data)
-
-    span_tags = span.get("tags")
-    if isinstance(span_tags, dict):
-        attributes.update(span_tags)
-
-    # See Scope._apply_user_attributes_to_telemetry() for user attributes.
-    user = event.get("user")
-    if isinstance(user, dict):
-        if "id" in user:
-            attributes["user.id"] = user["id"]
-        if "username" in user:
-            attributes["user.name"] = user["username"]
-        if "email" in user:
-            attributes["user.email"] = user["email"]
-
-    # See Scope.set_global_attributes() for release, environment, and SDK metadata.
-    if "release" in event:
-        attributes["sentry.release"] = event["release"]
-    if "environment" in event:
-        attributes["sentry.environment"] = event["environment"]
-    if "server_name" in event:
-        attributes["server.address"] = event["server_name"]
-    if "transaction" in event:
-        attributes["sentry.segment.name"] = event["transaction"]
-
-    trace_context = event.get("contexts", {}).get("trace", {})
-    if "span_id" in trace_context:
-        attributes["sentry.segment.id"] = trace_context["span_id"]
-
-    sdk_info = event.get("sdk")
-    if isinstance(sdk_info, dict):
-        if "name" in sdk_info:
-            attributes["sentry.sdk.name"] = sdk_info["name"]
-        if "version" in sdk_info:
-            attributes["sentry.sdk.version"] = sdk_info["version"]
-
-    attributes["process.runtime.name"] = platform.python_implementation()
-    attributes["process.runtime.version"] = (
-        f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
-    )
-
-    if not attributes:
-        return res
-
-    res["attributes"] = {}
-    for key, value in attributes.items():
-        converted_value = _serialized_v1_attribute_to_serialized_v2_attribute(value)
-        if converted_value is None:
-            continue
-
-        res["attributes"][key] = converted_value
-
-    # Remove redundant attribute, as status is stored in the status field.
-    if "status" in res["attributes"]:
-        del res["attributes"]["status"]
-
-    return res
-
-
-def _split_gen_ai_spans(
-    event_opt: "Event",
-) -> "Optional[tuple[List[Dict[str, object]], List[Dict[str, object]]]]":
-    if "spans" not in event_opt:
-        return None
-
-    spans: "Any" = event_opt["spans"]
-    if isinstance(spans, AnnotatedValue):
-        spans = spans.value
-
-    if not isinstance(spans, Iterable):
-        return None
-
-    non_gen_ai_spans = []
-    gen_ai_spans = []
-    for span in spans:
-        if not isinstance(span, dict):
-            non_gen_ai_spans.append(span)
-            continue
-
-        span_op = span.get("op")
-        if isinstance(span_op, str) and span_op.startswith("gen_ai."):
-            gen_ai_spans.append(span)
-        else:
-            non_gen_ai_spans.append(span)
-
-    return non_gen_ai_spans, gen_ai_spans
 
 
 def _get_options(*args: "Optional[str]", **kwargs: "Any") -> "Dict[str, Any]":
@@ -336,9 +122,6 @@ def _get_options(*args: "Optional[str]", **kwargs: "Any") -> "Dict[str, Any]":
     if rv["server_name"] is None and hasattr(socket, "gethostname"):
         rv["server_name"] = socket.gethostname()
 
-    if rv["instrumenter"] is None:
-        rv["instrumenter"] = INSTRUMENTER.SENTRY
-
     if rv["project_root"] is None:
         try:
             project_root = os.getcwd()
@@ -346,9 +129,6 @@ def _get_options(*args: "Optional[str]", **kwargs: "Any") -> "Dict[str, Any]":
             project_root = None
 
         rv["project_root"] = project_root
-
-    if rv["enable_tracing"] is True and rv["traces_sample_rate"] is None:
-        rv["traces_sample_rate"] = 1.0
 
     rv["data_collection"] = _resolve_data_collection(rv)
 
@@ -361,9 +141,8 @@ def _get_options(*args: "Optional[str]", **kwargs: "Any") -> "Dict[str, Any]":
             else rv["send_default_pii"]
         )
     elif has_data_collection_enabled(rv) and rv["event_scrubber"]:
-        warnings.warn(
+        logger.warning(
             "Event scrubbers are not enabled when data collection configuration is provided. Ignoring event_scrubber...",
-            stacklevel=2,
         )
         rv["event_scrubber"] = None
 
@@ -376,31 +155,6 @@ def _get_options(*args: "Optional[str]", **kwargs: "Any") -> "Dict[str, Any]":
     if rv["keep_alive"] is None:
         rv["keep_alive"] = (
             env_to_bool(os.environ.get("SENTRY_KEEP_ALIVE"), strict=True) or False
-        )
-
-    if rv["enable_tracing"] is not None:
-        warnings.warn(
-            "The `enable_tracing` parameter is deprecated. Please use `traces_sample_rate` instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-
-    if rv["trace_ignore_status_codes"] and has_span_streaming_enabled(rv):
-        warnings.warn(
-            "The `trace_ignore_status_codes` parameter is ignored in span streaming mode.",
-            stacklevel=2,
-        )
-
-    if rv["ignore_spans"] and not has_span_streaming_enabled(rv):
-        warnings.warn(
-            "The `ignore_spans` parameter only works when `trace_lifecycle` is set to `stream`.",
-            stacklevel=2,
-        )
-
-    if rv["before_send_span"] and not has_span_streaming_enabled(rv):
-        warnings.warn(
-            "The `before_send_span` parameter only works when `trace_lifecycle` is set to `stream`.",
-            stacklevel=2,
         )
 
     return rv
@@ -461,7 +215,7 @@ class BaseClient:
     def _capture_metric(self, metric: "Metric", scope: "Scope") -> None:
         pass
 
-    def _capture_span(self, span: "StreamedSpan", scope: "Scope") -> None:
+    def _capture_span(self, span: "Span", scope: "Scope") -> None:
         pass
 
     def capture_session(self, *args: "Any", **kwargs: "Any") -> None:
@@ -536,12 +290,6 @@ class _Client(BaseClient):
         """
         Instruments the functions given in the list `functions_to_trace` with a trace decorator.
         """
-        trace = (
-            streaming_trace
-            if has_span_streaming_enabled(self.options)
-            else legacy_trace
-        )
-
         for function in functions_to_trace:
             class_name = None
             function_qualname = function["qualified_name"]
@@ -638,7 +386,6 @@ class _Client(BaseClient):
                 self.options["send_default_pii"] = True
                 self.options["error_sampler"] = sample_all
                 self.options["traces_sampler"] = sample_all
-                self.options["profiles_sampler"] = sample_all
                 # data_collection was resolved in _get_options() before this
                 # spotlight override flipped send_default_pii on. Re-derive it so
                 # data_collection agrees with should_send_default_pii() in
@@ -660,22 +407,15 @@ class _Client(BaseClient):
                 record_lost_func=_record_lost_event,
             )
 
-            if self.options.get("enable_metrics", True) is False:
-                logger.warning(
-                    "The enable_metrics option has no effect and will be removed in the next major."
-                )
-
             self.metrics_batcher = MetricsBatcher(
                 capture_func=_capture_envelope,
                 record_lost_func=_record_lost_event,
             )
 
-            self.span_batcher = None
-            if has_span_streaming_enabled(self.options):
-                self.span_batcher = SpanBatcher(
-                    capture_func=_capture_envelope,
-                    record_lost_func=_record_lost_event,
-                )
+            self.span_batcher = SpanBatcher(
+                capture_func=_capture_envelope,
+                record_lost_func=_record_lost_event,
+            )
 
             max_request_body_size = ("always", "never", "small", "medium")
             if self.options["max_request_body_size"] not in max_request_body_size:
@@ -684,19 +424,6 @@ class _Client(BaseClient):
                         max_request_body_size
                     )
                 )
-
-            if self.options["_experiments"].get("otel_powered_performance", False):
-                logger.debug(
-                    "[OTel] Enabling experimental OTel-powered performance monitoring."
-                )
-                self.options["instrumenter"] = INSTRUMENTER.OTEL
-                if (
-                    "sentry_sdk.integrations.opentelemetry.integration.OpenTelemetryIntegration"
-                    not in _DEFAULT_INTEGRATIONS
-                ):
-                    _DEFAULT_INTEGRATIONS.append(
-                        "sentry_sdk.integrations.opentelemetry.integration.OpenTelemetryIntegration",
-                    )
 
             self.integrations = setup_integrations(
                 self.options["integrations"],
@@ -712,20 +439,14 @@ class _Client(BaseClient):
             SDK_INFO["name"] = sdk_name
             logger.debug("Setting SDK name to '%s'", sdk_name)
 
-            if has_profiling_enabled(self.options):
-                try:
-                    setup_profiler(self.options)
-                except Exception as e:
-                    logger.debug("Can not set up profiler. (%s)", e)
-            else:
-                try:
-                    setup_continuous_profiler(
-                        self.options,
-                        sdk_info=SDK_INFO,
-                        capture_func=_capture_envelope,
-                    )
-                except Exception as e:
-                    logger.debug("Can not set up continuous profiler. (%s)", e)
+            try:
+                setup_continuous_profiler(
+                    self.options,
+                    sdk_info=SDK_INFO,
+                    capture_func=_capture_envelope,
+                )
+            except Exception as e:
+                logger.debug("Can not set up continuous profiler. (%s)", e)
 
         finally:
             _client_init_debug.set(old_debug)
@@ -737,7 +458,6 @@ class _Client(BaseClient):
             or self.log_batcher
             or self.metrics_batcher
             or self.span_batcher
-            or has_profiling_enabled(self.options)
             or isinstance(self.transport, HttpTransportCore)
         ):
             # If we have anything on that could spawn a background thread, we
@@ -776,17 +496,14 @@ class _Client(BaseClient):
         hint: "Hint",
         scope: "Optional[Scope]",
     ) -> "Optional[Event]":
-        previous_total_spans: "Optional[int]" = None
         previous_total_breadcrumbs: "Optional[int]" = None
 
         if event.get("timestamp") is None:
             event["timestamp"] = datetime.now(timezone.utc)
 
-        is_transaction = event.get("type") == "transaction"
         is_checkin = event.get("type") == "check_in"
 
         if scope is not None:
-            spans_before = len(cast(List[Dict[str, object]], event.get("spans", [])))
             event_ = scope.apply_to_event(event, hint, self.options)
 
             # one of the event/error processors returned None
@@ -794,37 +511,12 @@ class _Client(BaseClient):
                 if self.transport:
                     self.transport.record_lost_event(
                         "event_processor",
-                        data_category=("transaction" if is_transaction else "error"),
+                        data_category="error",
                     )
-                    if is_transaction:
-                        self.transport.record_lost_event(
-                            "event_processor",
-                            data_category="span",
-                            quantity=spans_before + 1,  # +1 for the transaction itself
-                        )
                 return None
 
             event = event_
-            spans_delta = spans_before - len(
-                cast(List[Dict[str, object]], event.get("spans", []))
-            )
-            span_recorder_dropped_spans: int = event.pop("_dropped_spans", 0)
 
-            if is_transaction and self.transport is not None:
-                if spans_delta > 0:
-                    self.transport.record_lost_event(
-                        "event_processor", data_category="span", quantity=spans_delta
-                    )
-                if span_recorder_dropped_spans > 0:
-                    self.transport.record_lost_event(
-                        "buffer_overflow",
-                        data_category="span",
-                        quantity=span_recorder_dropped_spans,
-                    )
-
-            dropped_spans: int = span_recorder_dropped_spans + spans_delta
-            if dropped_spans > 0:
-                previous_total_spans = spans_before + dropped_spans
             if scope._n_breadcrumbs_truncated > 0:
                 breadcrumbs = event.get("breadcrumbs", {})
                 values = (
@@ -837,8 +529,7 @@ class _Client(BaseClient):
                 )
 
         if (
-            not is_transaction
-            and not is_checkin
+            not is_checkin
             and self.options["attach_stacktrace"]
             and "exception" not in event
             and "stacktrace" not in event
@@ -885,25 +576,6 @@ class _Client(BaseClient):
             if event_scrubber:
                 event_scrubber.scrub_event(event)
 
-        if scope is not None and scope._gen_ai_original_message_count:
-            spans: "List[Dict[str, Any]] | AnnotatedValue" = event.get("spans", [])
-            if isinstance(spans, list):
-                for span in spans:
-                    span_id = span.get("span_id", None)
-                    span_data = span.get("data", {})
-                    if (
-                        span_id
-                        and span_id in scope._gen_ai_original_message_count
-                        and SPANDATA.GEN_AI_REQUEST_MESSAGES in span_data
-                    ):
-                        span_data[SPANDATA.GEN_AI_REQUEST_MESSAGES] = AnnotatedValue(
-                            span_data[SPANDATA.GEN_AI_REQUEST_MESSAGES],
-                            {"len": scope._gen_ai_original_message_count[span_id]},
-                        )
-        if previous_total_spans is not None:
-            event["spans"] = AnnotatedValue(
-                event.get("spans", []), {"len": previous_total_spans}
-            )
         if previous_total_breadcrumbs is not None:
             event["breadcrumbs"] = AnnotatedValue(
                 event.get("breadcrumbs", {"values": []}),
@@ -924,11 +596,7 @@ class _Client(BaseClient):
             )
 
         before_send = self.options["before_send"]
-        if (
-            before_send is not None
-            and event is not None
-            and event.get("type") != "transaction"
-        ):
+        if before_send is not None and event is not None:
             new_event = None
             with capture_internal_exceptions():
                 new_event = before_send(event, hint or {})
@@ -945,36 +613,6 @@ class _Client(BaseClient):
                 # in before_send, it'd get dropped by DedupeIntegration.
                 if event.get("exception"):
                     DedupeIntegration.reset_last_seen()
-
-            event = new_event
-
-        before_send_transaction = self.options["before_send_transaction"]
-        if (
-            before_send_transaction is not None
-            and event is not None
-            and event.get("type") == "transaction"
-        ):
-            new_event = None
-            spans_before = len(cast(List[Dict[str, object]], event.get("spans", [])))
-            with capture_internal_exceptions():
-                new_event = before_send_transaction(event, hint or {})
-            if new_event is None:
-                logger.info("before send transaction dropped event")
-                if self.transport:
-                    self.transport.record_lost_event(
-                        reason="before_send", data_category="transaction"
-                    )
-                    self.transport.record_lost_event(
-                        reason="before_send",
-                        data_category="span",
-                        quantity=spans_before + 1,  # +1 for the transaction itself
-                    )
-            else:
-                spans_delta = spans_before - len(new_event.get("spans", []))
-                if spans_delta > 0 and self.transport is not None:
-                    self.transport.record_lost_event(
-                        reason="before_send", data_category="span", quantity=spans_delta
-                    )
 
             event = new_event
 
@@ -1007,11 +645,6 @@ class _Client(BaseClient):
         hint: "Hint",
         scope: "Optional[Scope]" = None,
     ) -> bool:
-        # Transactions are sampled independent of error events.
-        is_transaction = event.get("type") == "transaction"
-        if is_transaction:
-            return True
-
         ignoring_prevents_recursion = scope is not None and not scope._should_capture
         if ignoring_prevents_recursion:
             return False
@@ -1127,13 +760,10 @@ class _Client(BaseClient):
         if not self._should_capture(event, hint, scope):
             return None
 
-        profile = event.pop("profile", None)
-
         event_id = event.get("event_id")
         if event_id is None:
             event["event_id"] = event_id = uuid.uuid4().hex
 
-        span_recorder_has_gen_ai_span = event.pop("_has_gen_ai_span", False)
         event_opt = self._prepare_event(event, hint, scope)
         if event_opt is None:
             return None
@@ -1144,14 +774,9 @@ class _Client(BaseClient):
         if session:
             self._update_session_from_event(session, event)
 
-        is_transaction = event_opt.get("type") == "transaction"
         is_checkin = event_opt.get("type") == "check_in"
 
-        if (
-            not is_transaction
-            and not is_checkin
-            and not self._should_sample_error(event, hint)
-        ):
+        if not is_checkin and not self._should_sample_error(event, hint):
             return None
 
         attachments = hint.get("attachments")
@@ -1169,44 +794,7 @@ class _Client(BaseClient):
 
         envelope = Envelope(headers=headers)
 
-        if is_transaction and isinstance(profile, Profile):
-            envelope.add_profile(profile.to_json(event_opt, self.options))
-
-        if is_transaction and not span_recorder_has_gen_ai_span:
-            envelope.add_transaction(event_opt)
-        elif is_transaction:
-            split_spans = _split_gen_ai_spans(event_opt)
-            if split_spans is None or not split_spans[1]:
-                envelope.add_transaction(event_opt)
-            else:
-                non_gen_ai_spans, gen_ai_spans = split_spans
-
-                event_opt["spans"] = non_gen_ai_spans
-                envelope.add_transaction(event_opt)
-
-                converted_gen_ai_spans = [
-                    _serialized_v1_span_to_serialized_v2_span(span, event_opt)
-                    for span in gen_ai_spans
-                    if isinstance(span, dict)
-                ]
-
-                envelope.add_item(
-                    Item(
-                        type=SpanBatcher.TYPE,
-                        content_type=SpanBatcher.CONTENT_TYPE,
-                        headers={
-                            "item_count": len(converted_gen_ai_spans),
-                        },
-                        payload=PayloadRef(
-                            json={
-                                "version": 2,
-                                "items": converted_gen_ai_spans,
-                            },
-                        ),
-                    )
-                )
-
-        elif is_checkin:
+        if is_checkin:
             envelope.add_checkin(event_opt)
         else:
             envelope.add_event(event_opt)
@@ -1227,7 +815,7 @@ class _Client(BaseClient):
 
     def _capture_telemetry(
         self,
-        telemetry: "Optional[Union[Log, Metric, StreamedSpan]]",
+        telemetry: "Optional[Union[Log, Metric, Span]]",
         ty: str,
         scope: "Scope",
     ) -> None:
@@ -1276,7 +864,7 @@ class _Client(BaseClient):
                 if serialized is None:
                     return
 
-            elif ty == "span" and isinstance(telemetry, StreamedSpan):
+            elif ty == "span" and isinstance(telemetry, Span):
                 # Reset the span to its original value before we attempted
                 # to call the `before_send_span` callback
                 if exception_raised_in_before_send_func:
@@ -1320,7 +908,7 @@ class _Client(BaseClient):
     def _capture_metric(self, metric: "Optional[Metric]", scope: "Scope") -> None:
         self._capture_telemetry(metric, "metric", scope)
 
-    def _capture_span(self, span: "Optional[StreamedSpan]", scope: "Scope") -> None:
+    def _capture_span(self, span: "Optional[Span]", scope: "Scope") -> None:
         self._capture_telemetry(span, "span", scope)
 
     def capture_session(
@@ -1393,9 +981,8 @@ class _Client(BaseClient):
         """
         if self.transport is not None:
             if self._has_async_transport():
-                warnings.warn(
+                logger.warning(
                     "close() used with AsyncHttpTransport. Use close_async() instead.",
-                    stacklevel=2,
                 )
                 self._flush_components()
             else:
@@ -1440,9 +1027,8 @@ class _Client(BaseClient):
         """
         if self.transport is not None:
             if self._has_async_transport():
-                warnings.warn(
+                logger.warning(
                     "flush() used with AsyncHttpTransport. Use flush_async() instead.",
-                    stacklevel=2,
                 )
                 return
             if timeout is None:

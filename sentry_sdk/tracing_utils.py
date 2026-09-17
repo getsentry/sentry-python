@@ -5,22 +5,15 @@ import os
 import re
 import sys
 import uuid
-import warnings
 from collections.abc import Mapping, MutableMapping
 from datetime import datetime, timedelta, timezone
 from random import Random
+from re import Pattern
+from typing import TYPE_CHECKING
 from urllib.parse import quote, unquote
 
-try:
-    from re import Pattern
-except ImportError:
-    # 3.6
-    from typing import Pattern
-
-from typing import TYPE_CHECKING
-
 import sentry_sdk
-from sentry_sdk.consts import OP, SPANDATA, SPANTEMPLATE
+from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.data_collection import (
     _apply_data_collection_filtering_to_query_string,
 )
@@ -36,7 +29,6 @@ from sentry_sdk.utils import (
     logger,
     match_regex_list,
     qualname_from_function,
-    safe_repr,
     to_string,
     try_convert,
 )
@@ -48,7 +40,6 @@ if TYPE_CHECKING:
         Dict,
         Generator,
         Iterator,
-        Literal,
         Optional,
         Tuple,
         Union,
@@ -109,41 +100,15 @@ class EnvironHeaders(Mapping):  # type: ignore
 def has_tracing_enabled(options: "Optional[Dict[str, Any]]") -> bool:
     """
     Returns True if either traces_sample_rate or traces_sampler is
-    defined and enable_tracing is set and not false.
+    defined.
     """
     if options is None:
         return False
 
     return bool(
-        options.get("enable_tracing") is not False
-        and (
-            options.get("traces_sample_rate") is not None
-            or options.get("traces_sampler") is not None
-        )
+        options.get("traces_sample_rate") is not None
+        or options.get("traces_sampler") is not None
     )
-
-
-def has_span_streaming_enabled(options: "Optional[dict[str, Any]]") -> bool:
-    if options is None:
-        return False
-
-    is_enabled_in_experiment_config = (options.get("_experiments") or {}).get(
-        "trace_lifecycle"
-    ) == "stream"
-
-    if options.get("trace_lifecycle") is not None:
-        return options.get("trace_lifecycle") == "stream"
-
-    return is_enabled_in_experiment_config
-
-
-def should_truncate_gen_ai_input(options: "Optional[dict[str, Any]]") -> bool:
-    if options is None:
-        return True
-
-    return not options.get(
-        "stream_gen_ai_spans", True
-    ) and not has_span_streaming_enabled(options)
 
 
 @contextlib.contextmanager
@@ -156,7 +121,7 @@ def record_sql_queries(
     record_cursor_repr: bool = False,
     span_origin: str = "manual",
     span_op_override_value: "Optional[str]" = None,
-) -> "Generator[Union[sentry_sdk.tracing.Span, sentry_sdk.traces.StreamedSpan], None, None]":
+) -> "Generator[sentry_sdk.traces.Span, None, None]":
     # TODO: Bring back capturing of params by default
     client = sentry_sdk.get_client()
     if has_data_collection_enabled(client.options):
@@ -196,31 +161,19 @@ def record_sql_queries(
     with capture_internal_exceptions():
         sentry_sdk.add_breadcrumb(message=query, category="query", data=data)
 
-    if has_span_streaming_enabled(client.options):
-        additional_attributes = {}
-        if query is not None:
-            additional_attributes["db.query.text"] = query
+    additional_attributes = {}
+    if query is not None:
+        additional_attributes["db.query.text"] = query
 
-        with sentry_sdk.traces.start_span(
-            name="<unknown SQL query>" if query is None else query,
-            attributes={
-                "sentry.origin": span_origin,
-                "sentry.op": span_op_override_value
-                if span_op_override_value
-                else OP.DB,
-                **additional_attributes,
-            },
-        ) as span:
-            yield span
-    else:
-        with sentry_sdk.start_span(
-            op=span_op_override_value if span_op_override_value is not None else OP.DB,
-            name=query,
-            origin=span_origin,
-        ) as span:
-            for k, v in data.items():
-                span.set_data(k, v)
-            yield span
+    with sentry_sdk.start_span(
+        name="<unknown SQL query>" if query is None else query,
+        attributes={
+            "sentry.origin": span_origin,
+            "sentry.op": span_op_override_value if span_op_override_value else OP.DB,
+            **additional_attributes,
+        },
+    ) as span:
+        yield span
 
 
 def add_http_breadcrumb(status_code: "Optional[int]", data: "dict[str, Any]") -> None:
@@ -305,7 +258,7 @@ def _should_be_included(
 
 
 def add_source(
-    span: "Union[sentry_sdk.tracing.Span, sentry_sdk.traces.StreamedSpan]",
+    span: "sentry_sdk.traces.Span",
     project_root: "Optional[str]",
     in_app_include: "Optional[list[str]]",
     in_app_exclude: "Optional[list[str]]",
@@ -349,20 +302,14 @@ def add_source(
         except Exception:
             lineno = None
         if lineno is not None:
-            if isinstance(span, Span):
-                span.set_data(SPANDATA.CODE_LINENO, lineno)
-            else:
-                span.set_attribute("code.line.number", lineno)
+            span.set_attribute("code.line.number", lineno)
 
         try:
             namespace = frame.f_globals.get("__name__")
         except Exception:
             namespace = None
         if namespace is not None:
-            if isinstance(span, Span):
-                span.set_data(SPANDATA.CODE_NAMESPACE, namespace)
-            else:
-                span.set_attribute(SPANDATA.CODE_NAMESPACE, namespace)
+            span.set_attribute(SPANDATA.CODE_NAMESPACE, namespace)
 
         filepath = _get_frame_module_abs_path(frame)
         if filepath is not None:
@@ -373,11 +320,8 @@ def add_source(
             else:
                 in_app_path = filepath
 
-            if isinstance(span, Span):
-                span.set_data(SPANDATA.CODE_FILEPATH, in_app_path)
-            else:
-                if in_app_path is not None:
-                    span.set_attribute("code.file.path", in_app_path)
+            if in_app_path is not None:
+                span.set_attribute("code.file.path", in_app_path)
 
         try:
             code_function = frame.f_code.co_name
@@ -385,14 +329,11 @@ def add_source(
             code_function = None
 
         if code_function is not None:
-            if isinstance(span, Span):
-                span.set_data(SPANDATA.CODE_FUNCTION, frame.f_code.co_name)
-            else:
-                span.set_attribute(SPANDATA.CODE_FUNCTION, frame.f_code.co_name)
+            span.set_attribute(SPANDATA.CODE_FUNCTION, frame.f_code.co_name)
 
 
 def add_query_source(
-    span: "Union[sentry_sdk.tracing.Span, sentry_sdk.traces.StreamedSpan]",
+    span: "sentry_sdk.traces.Span",
 ) -> None:
     """
     Adds OTel compatible source code information to a database query span
@@ -401,13 +342,6 @@ def add_query_source(
     if not client.is_active():
         return
 
-    if isinstance(span, Span):
-        # In the StreamedSpan case, we need to add the extra span information before
-        # the span finishes, so it's expected that this will be None. In the Span case,
-        # it should already be finished.
-        if span.timestamp is None:
-            return
-
     if span.start_timestamp is None:
         return
 
@@ -415,12 +349,7 @@ def add_query_source(
     if not should_add_query_source:
         return
 
-    if isinstance(span, StreamedSpan):
-        end_timestamp = span.end_timestamp
-    else:
-        end_timestamp = span.timestamp
-
-    end_timestamp = end_timestamp or datetime.now(timezone.utc)
+    end_timestamp = span.end_timestamp or datetime.now(timezone.utc)
 
     duration = end_timestamp - span.start_timestamp
     threshold = client.options.get("db_query_source_threshold_ms", 0)
@@ -437,22 +366,13 @@ def add_query_source(
     )
 
 
-def add_http_request_source(
-    span: "Union[sentry_sdk.tracing.Span, sentry_sdk.traces.StreamedSpan]",
-) -> None:
+def add_http_request_source(span: "sentry_sdk.traces.Span") -> None:
     """
     Adds OTel compatible source code information to a span for an outgoing HTTP request
     """
     client = sentry_sdk.get_client()
     if not client.is_active():
         return
-
-    if isinstance(span, Span):
-        # In the StreamedSpan case, we need to add the extra span information before
-        # the span finishes, so it's expected that this will be None. In the Span case,
-        # it should already be finished.
-        if span.timestamp is None:
-            return
 
     if span.start_timestamp is None:
         return
@@ -461,12 +381,7 @@ def add_http_request_source(
     if not should_add_request_source:
         return
 
-    if isinstance(span, StreamedSpan):
-        end_timestamp = span.end_timestamp
-    else:
-        end_timestamp = span.timestamp
-
-    end_timestamp = end_timestamp or datetime.now(timezone.utc)
+    end_timestamp = span.end_timestamp or datetime.now(timezone.utc)
 
     duration = end_timestamp - span.start_timestamp
     threshold = client.options.get("http_request_source_threshold_ms", 0)
@@ -812,16 +727,6 @@ class Baggage:
         return Baggage(sentry_items, third_party_items, mutable)
 
     @classmethod
-    def from_options(cls, scope: "sentry_sdk.scope.Scope") -> "Optional[Baggage]":
-        """
-        Deprecated: use populate_from_propagation_context
-        """
-        if scope._propagation_context is None:
-            return Baggage({})
-
-        return Baggage.populate_from_propagation_context(scope._propagation_context)
-
-    @classmethod
     def populate_from_propagation_context(
         cls, propagation_context: "PropagationContext"
     ) -> "Baggage":
@@ -855,57 +760,7 @@ class Baggage:
         return Baggage(sentry_items, third_party_items, mutable)
 
     @classmethod
-    def populate_from_transaction(
-        cls, transaction: "sentry_sdk.tracing.Transaction"
-    ) -> "Baggage":
-        """
-        Populate fresh baggage entry with sentry_items and make it immutable
-        if this is the head SDK which originates traces.
-        """
-        client = sentry_sdk.get_client()
-        sentry_items: "Dict[str, str]" = {}
-
-        if not client.is_active():
-            return Baggage(sentry_items)
-
-        options = client.options or {}
-
-        sentry_items["trace_id"] = transaction.trace_id
-        sentry_items["sample_rand"] = f"{transaction._sample_rand:.6f}"  # noqa: E231
-
-        if options.get("environment"):
-            sentry_items["environment"] = options["environment"]
-
-        if options.get("release"):
-            sentry_items["release"] = options["release"]
-
-        if client.parsed_dsn:
-            sentry_items["public_key"] = client.parsed_dsn.public_key
-            if client.parsed_dsn.org_id:
-                sentry_items["org_id"] = client.parsed_dsn.org_id
-
-        if (
-            transaction.name
-            and transaction.source not in LOW_QUALITY_TRANSACTION_SOURCES
-        ):
-            sentry_items["transaction"] = transaction.name
-
-        if transaction.sample_rate is not None:
-            sentry_items["sample_rate"] = str(transaction.sample_rate)
-
-        if transaction.sampled is not None:
-            sentry_items["sampled"] = "true" if transaction.sampled else "false"
-
-        # there's an existing baggage but it was mutable,
-        # which is why we are creating this new baggage.
-        # However, if by chance the user put some sentry items in there, give them precedence.
-        if transaction._baggage and transaction._baggage.sentry_items:
-            sentry_items.update(transaction._baggage.sentry_items)
-
-        return Baggage(sentry_items, mutable=False)
-
-    @classmethod
-    def populate_from_segment(cls, segment: "StreamedSpan") -> "Baggage":
+    def populate_from_segment(cls, segment: "Span") -> "Baggage":
         """
         Populate fresh baggage entry with sentry_items and make it immutable
         if this is the head SDK which originates traces.
@@ -1068,134 +923,6 @@ def normalize_incoming_data(incoming_data: "Dict[str, Any]") -> "Dict[str, Any]"
 
 
 def create_span_decorator(
-    op: "Optional[Union[str, OP]]" = None,
-    name: "Optional[str]" = None,
-    attributes: "Optional[dict[str, Any]]" = None,
-    template: "SPANTEMPLATE" = SPANTEMPLATE.DEFAULT,
-) -> "Any":
-    """
-    Create a span decorator that can wrap both sync and async functions.
-
-    :param op: The operation type for the span.
-    :type op: str or :py:class:`sentry_sdk.consts.OP` or None
-    :param name: The name of the span.
-    :type name: str or None
-    :param attributes: Additional attributes to set on the span.
-    :type attributes: dict or None
-    :param template: The type of span to create. This determines what kind of
-        span instrumentation and data collection will be applied. Use predefined
-        constants from :py:class:`sentry_sdk.consts.SPANTEMPLATE`.
-        The default is `SPANTEMPLATE.DEFAULT` which is the right choice for most
-        use cases.
-    :type template: :py:class:`sentry_sdk.consts.SPANTEMPLATE`
-    """
-
-    def span_decorator(f: "Any") -> "Any":
-        """
-        Decorator to create a span for the given function.
-        """
-
-        @functools.wraps(f)
-        async def async_wrapper(*args: "Any", **kwargs: "Any") -> "Any":
-            current_span = get_current_span()
-
-            if current_span is None:
-                logger.debug(
-                    "Cannot create a child span for %s. "
-                    "Please start a Sentry transaction before calling this function.",
-                    qualname_from_function(f),
-                )
-                return await f(*args, **kwargs)
-
-            if isinstance(current_span, StreamedSpan):
-                warnings.warn(
-                    "Use the @sentry_sdk.traces.trace decorator in span streaming mode.",
-                    DeprecationWarning,
-                    stacklevel=2,
-                )
-                return await f(*args, **kwargs)
-
-            span_op = op or _get_span_op(template)
-            function_name = name or qualname_from_function(f) or ""
-            span_name = _get_span_name(template, function_name, kwargs)
-            collect_inputs = _should_collect_gen_ai("inputs")
-            collect_outputs = _should_collect_gen_ai("outputs")
-
-            with current_span.start_child(
-                op=span_op,
-                name=span_name,
-            ) as span:
-                span.update_data(attributes or {})
-                _set_input_attributes(
-                    span, template, collect_inputs, function_name, f, args, kwargs
-                )
-
-                result = await f(*args, **kwargs)
-
-                _set_output_attributes(span, template, collect_outputs, result)
-
-                return result
-
-        try:
-            async_wrapper.__signature__ = inspect.signature(f)  # type: ignore[attr-defined]
-        except Exception:
-            pass
-
-        @functools.wraps(f)
-        def sync_wrapper(*args: "Any", **kwargs: "Any") -> "Any":
-            current_span = get_current_span()
-
-            if current_span is None:
-                logger.debug(
-                    "Cannot create a child span for %s. "
-                    "Please start a Sentry transaction before calling this function.",
-                    qualname_from_function(f),
-                )
-                return f(*args, **kwargs)
-
-            if isinstance(current_span, StreamedSpan):
-                warnings.warn(
-                    "Use the @sentry_sdk.traces.trace decorator in span streaming mode.",
-                    DeprecationWarning,
-                    stacklevel=2,
-                )
-                return f(*args, **kwargs)
-
-            span_op = op or _get_span_op(template)
-            function_name = name or qualname_from_function(f) or ""
-            span_name = _get_span_name(template, function_name, kwargs)
-            collect_inputs = _should_collect_gen_ai("inputs")
-            collect_outputs = _should_collect_gen_ai("outputs")
-
-            with current_span.start_child(
-                op=span_op,
-                name=span_name,
-            ) as span:
-                span.update_data(attributes or {})
-                _set_input_attributes(
-                    span, template, collect_inputs, function_name, f, args, kwargs
-                )
-
-                result = f(*args, **kwargs)
-
-                _set_output_attributes(span, template, collect_outputs, result)
-
-                return result
-
-        try:
-            sync_wrapper.__signature__ = inspect.signature(f)  # type: ignore[attr-defined]
-        except Exception:
-            pass
-
-        if inspect.iscoroutinefunction(f):
-            return async_wrapper
-        else:
-            return sync_wrapper
-
-    return span_decorator
-
-
-def create_streaming_span_decorator(
     name: "Optional[str]" = None,
     attributes: "Optional[dict[str, Any]]" = None,
     active: bool = True,
@@ -1214,17 +941,9 @@ def create_streaming_span_decorator(
 
         @functools.wraps(f)
         async def async_wrapper(*args: "Any", **kwargs: "Any") -> "Any":
-            client = sentry_sdk.get_client()
-            if client.is_active() and not has_span_streaming_enabled(client.options):
-                warnings.warn(
-                    "Using span streaming API in non-span-streaming mode. Use "
-                    "@sentry_sdk.trace instead.",
-                    stacklevel=2,
-                )
-
             span_name = name or qualname_from_function(f) or ""
 
-            with start_streaming_span(
+            with sentry_sdk.start_span(
                 name=span_name, attributes=new_attributes, active=active
             ):
                 result = await f(*args, **kwargs)
@@ -1237,17 +956,9 @@ def create_streaming_span_decorator(
 
         @functools.wraps(f)
         def sync_wrapper(*args: "Any", **kwargs: "Any") -> "Any":
-            client = sentry_sdk.get_client()
-            if client.is_active() and not has_span_streaming_enabled(client.options):
-                warnings.warn(
-                    "Using span streaming API in non-span-streaming mode. Use "
-                    "@sentry_sdk.trace instead.",
-                    stacklevel=2,
-                )
-
             span_name = name or qualname_from_function(f) or ""
 
-            with start_streaming_span(
+            with sentry_sdk.start_span(
                 name=span_name, attributes=new_attributes, active=active
             ):
                 return f(*args, **kwargs)
@@ -1263,17 +974,6 @@ def create_streaming_span_decorator(
             return sync_wrapper
 
     return span_decorator
-
-
-def get_current_span(
-    scope: "Optional[sentry_sdk.Scope]" = None,
-) -> "Optional[Span]":
-    """
-    Returns the currently active span if there is one running, otherwise `None`
-    """
-    scope = scope or sentry_sdk.get_current_scope()
-    current_span = scope.span
-    return current_span
 
 
 def _generate_sample_rand(
@@ -1340,125 +1040,6 @@ def _get_value(source: "Any", key: str) -> "Optional[Any]":
     return value
 
 
-def _get_span_name(
-    template: "Union[str, SPANTEMPLATE]",
-    name: str,
-    kwargs: "Optional[dict[str, Any]]" = None,
-) -> str:
-    """
-    Get the name of the span based on the template and the name.
-    """
-    span_name = name
-
-    if template == SPANTEMPLATE.AI_CHAT:
-        model = None
-        if kwargs:
-            for key in ("model", "model_name"):
-                if kwargs.get(key) and isinstance(kwargs[key], str):
-                    model = kwargs[key]
-                    break
-
-        span_name = f"chat {model}" if model else "chat"
-
-    elif template == SPANTEMPLATE.AI_AGENT:
-        span_name = f"invoke_agent {name}"
-
-    elif template == SPANTEMPLATE.AI_TOOL:
-        span_name = f"execute_tool {name}"
-
-    return span_name
-
-
-def _get_span_op(template: "Union[str, SPANTEMPLATE]") -> str:
-    """
-    Get the operation of the span based on the template.
-    """
-    mapping: "dict[Union[str, SPANTEMPLATE], Union[str, OP]]" = {
-        SPANTEMPLATE.AI_CHAT: OP.GEN_AI_CHAT,
-        SPANTEMPLATE.AI_AGENT: OP.GEN_AI_INVOKE_AGENT,
-        SPANTEMPLATE.AI_TOOL: OP.GEN_AI_EXECUTE_TOOL,
-    }
-    op = mapping.get(template, OP.FUNCTION)
-
-    return str(op)
-
-
-_AI_TEMPLATES = frozenset(
-    {SPANTEMPLATE.AI_AGENT, SPANTEMPLATE.AI_CHAT, SPANTEMPLATE.AI_TOOL}
-)
-
-
-def _should_collect_gen_ai(kind: 'Literal["inputs", "outputs"]') -> bool:
-    client = sentry_sdk.get_client()
-    if has_data_collection_enabled(client.options):
-        return bool(client.options["data_collection"]["gen_ai"][kind])
-
-    return client.should_send_default_pii()
-
-
-def _get_input_attributes(
-    template: "Union[str, SPANTEMPLATE]",
-    collect_inputs: bool,
-    args: "tuple[Any, ...]",
-    kwargs: "dict[str, Any]",
-) -> "dict[str, Any]":
-    """
-    Get input attributes for the given span template.
-    """
-    attributes: "dict[str, Any]" = {}
-
-    if template in _AI_TEMPLATES:
-        mapping = {
-            "model": (SPANDATA.GEN_AI_REQUEST_MODEL, str),
-            "model_name": (SPANDATA.GEN_AI_REQUEST_MODEL, str),
-            "agent": (SPANDATA.GEN_AI_AGENT_NAME, str),
-            "agent_name": (SPANDATA.GEN_AI_AGENT_NAME, str),
-            "max_tokens": (SPANDATA.GEN_AI_REQUEST_MAX_TOKENS, int),
-            "frequency_penalty": (SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY, float),
-            "presence_penalty": (SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY, float),
-            "temperature": (SPANDATA.GEN_AI_REQUEST_TEMPERATURE, float),
-            "top_p": (SPANDATA.GEN_AI_REQUEST_TOP_P, float),
-            "top_k": (SPANDATA.GEN_AI_REQUEST_TOP_K, int),
-        }
-
-        def _set_from_key(key: str, value: "Any") -> None:
-            if key in mapping:
-                (attribute, data_type) = mapping[key]
-                if value is not None and isinstance(value, data_type):
-                    attributes[attribute] = value
-
-        # Pre-data collection, prompts were always recorded here, so they stay
-        # ungated until `send_default_pii` is removed.
-        collect_messages = True
-        if has_data_collection_enabled(sentry_sdk.get_client().options):
-            collect_messages = collect_inputs
-
-        roles = {"prompt": "user", "system_prompt": "system"}
-
-        for key, value in list(kwargs.items()):
-            if key in roles:
-                if collect_messages and isinstance(value, str):
-                    attributes.setdefault(SPANDATA.GEN_AI_REQUEST_MESSAGES, []).append(
-                        {"role": roles[key], "content": value}
-                    )
-                continue
-
-            _set_from_key(key, value)
-
-    if template == SPANTEMPLATE.AI_TOOL and collect_inputs:
-        attributes[SPANDATA.GEN_AI_TOOL_INPUT] = safe_repr(
-            {"args": args, "kwargs": kwargs}
-        )
-
-    # Coerce to string
-    if SPANDATA.GEN_AI_REQUEST_MESSAGES in attributes:
-        attributes[SPANDATA.GEN_AI_REQUEST_MESSAGES] = safe_repr(
-            attributes[SPANDATA.GEN_AI_REQUEST_MESSAGES]
-        )
-
-    return attributes
-
-
 def _get_usage_attributes(usage: "Any") -> "dict[str, Any]":
     """
     Get usage attributes.
@@ -1485,107 +1066,6 @@ def _get_usage_attributes(usage: "Any") -> "dict[str, Any]":
     )
 
     return attributes
-
-
-def _get_output_attributes(
-    template: "Union[str, SPANTEMPLATE]", collect_outputs: bool, result: "Any"
-) -> "dict[str, Any]":
-    """
-    Get output attributes for the given span template.
-    """
-    attributes: "dict[str, Any]" = {}
-
-    if template in _AI_TEMPLATES:
-        with capture_internal_exceptions():
-            # Usage from result, result.usage, and result.metadata.usage
-            usage_candidates = [result]
-
-            usage = _get_value(result, "usage")
-            usage_candidates.append(usage)
-
-            meta = _get_value(result, "metadata")
-            usage = _get_value(meta, "usage")
-            usage_candidates.append(usage)
-
-            for usage_candidate in usage_candidates:
-                if usage_candidate is not None:
-                    attributes.update(_get_usage_attributes(usage_candidate))
-
-            # Response model
-            model_name = _get_value(result, "model")
-            if model_name is not None and isinstance(model_name, str):
-                attributes[SPANDATA.GEN_AI_RESPONSE_MODEL] = model_name
-
-            model_name = _get_value(result, "model_name")
-            if model_name is not None and isinstance(model_name, str):
-                attributes[SPANDATA.GEN_AI_RESPONSE_MODEL] = model_name
-
-    # Tool output
-    if template == SPANTEMPLATE.AI_TOOL and collect_outputs:
-        attributes[SPANDATA.GEN_AI_TOOL_OUTPUT] = safe_repr(result)
-
-    return attributes
-
-
-def _set_input_attributes(
-    span: "Span",
-    template: "Union[str, SPANTEMPLATE]",
-    collect_inputs: bool,
-    name: str,
-    f: "Any",
-    args: "tuple[Any, ...]",
-    kwargs: "dict[str, Any]",
-) -> None:
-    """
-    Set span input attributes based on the given span template.
-
-    :param span: The span to set attributes on.
-    :param template: The template to use to set attributes on the span.
-    :param collect_inputs: Whether gen_ai inputs may be collected.
-    :param f: The wrapped function.
-    :param args: The arguments to the wrapped function.
-    :param kwargs: The keyword arguments to the wrapped function.
-    """
-    attributes: "dict[str, Any]" = {}
-
-    if template == SPANTEMPLATE.AI_AGENT:
-        attributes = {
-            SPANDATA.GEN_AI_OPERATION_NAME: "invoke_agent",
-            SPANDATA.GEN_AI_AGENT_NAME: name,
-        }
-    elif template == SPANTEMPLATE.AI_CHAT:
-        attributes = {
-            SPANDATA.GEN_AI_OPERATION_NAME: "chat",
-        }
-    elif template == SPANTEMPLATE.AI_TOOL:
-        attributes = {
-            SPANDATA.GEN_AI_OPERATION_NAME: "execute_tool",
-            SPANDATA.GEN_AI_TOOL_NAME: name,
-        }
-
-        docstring = f.__doc__
-        if docstring is not None:
-            attributes[SPANDATA.GEN_AI_TOOL_DESCRIPTION] = docstring
-
-    attributes.update(_get_input_attributes(template, collect_inputs, args, kwargs))
-    span.update_data(attributes or {})
-
-
-def _set_output_attributes(
-    span: "Span",
-    template: "Union[str, SPANTEMPLATE]",
-    collect_outputs: bool,
-    result: "Any",
-) -> None:
-    """
-    Set span output attributes based on the given span template.
-
-    :param span: The span to set attributes on.
-    :param template: The template to use to set attributes on the span.
-    :param collect_outputs: Whether gen_ai outputs may be collected.
-    :param result: The result of the wrapped function.
-    """
-    span.update_data(_get_output_attributes(template, collect_outputs, result) or {})
 
 
 def _should_continue_trace(baggage: "Optional[Baggage]") -> bool:
@@ -1772,16 +1252,7 @@ def _make_sampling_decision(
 def is_ignored_span(name: str, attributes: "Optional[Attributes]") -> bool:
     """Determine if a span fits one of the rules in ignore_spans."""
     client = sentry_sdk.get_client()
-    is_ignored_at_top_level = client.options.get("ignore_spans", None)
-    is_ignored_in_experiment_config = (client.options.get("_experiments") or {}).get(
-        "ignore_spans"
-    )
-
-    ignore_spans = (
-        is_ignored_at_top_level
-        if is_ignored_at_top_level is not None
-        else is_ignored_in_experiment_config
-    )
+    ignore_spans = client.options.get("ignore_spans", None)
 
     if not ignore_spans:
         return False
@@ -1825,18 +1296,8 @@ def is_ignored_span(name: str, attributes: "Optional[Attributes]") -> bool:
 
 # Circular imports
 from sentry_sdk.traces import (
-    LOW_QUALITY_SEGMENT_SOURCES,
-    StreamedSpan,
-)
-from sentry_sdk.traces import (
-    start_span as start_streaming_span,
-)
-from sentry_sdk.tracing import (
     BAGGAGE_HEADER_NAME,
-    LOW_QUALITY_TRANSACTION_SOURCES,
+    LOW_QUALITY_SEGMENT_SOURCES,
     SENTRY_TRACE_HEADER_NAME,
     Span,
 )
-
-if TYPE_CHECKING:
-    from sentry_sdk.tracing import Span
