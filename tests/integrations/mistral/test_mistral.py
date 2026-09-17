@@ -90,6 +90,10 @@ def test_nonstreaming_chat(
             span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "mistral-medium-latest"
         )
         assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
+
+        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+        assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
+        assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
     else:
         items = capture_items("transaction")
 
@@ -112,6 +116,10 @@ def test_nonstreaming_chat(
 
         assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "open-mistral"
         assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
+
+        assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+        assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
+        assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
 
 
 @pytest.mark.asyncio
@@ -168,6 +176,10 @@ async def test_nonstreaming_chat_async(
             span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "mistral-medium-latest"
         )
         assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
+
+        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+        assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
+        assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
     else:
         items = capture_items("transaction")
 
@@ -190,3 +202,7 @@ async def test_nonstreaming_chat_async(
 
         assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "mistral-medium-latest"
         assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
+
+        assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+        assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
+        assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
