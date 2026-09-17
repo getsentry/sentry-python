@@ -1,4 +1,4 @@
-import weakref
+import time
 from contextvars import ContextVar
 from typing import TYPE_CHECKING
 
@@ -34,25 +34,36 @@ class DedupeIntegration(Integration):
             if exc_info is None:
                 return event
 
-            last_seen = integration._last_seen.get(None)
-            if last_seen is not None:
-                # last_seen is either a weakref or the original instance
-                last_seen = (
-                    last_seen() if isinstance(last_seen, weakref.ref) else last_seen
-                )
+            last_seen_entries = integration._last_seen.get(None)
+            updated_cache_entries = set()
 
             exc = exc_info[1]
-            if last_seen is exc:
+            now = time.time()
+
+            if not last_seen_entries:
+                integration._last_seen.set([(exc, now)])
+                return event
+
+            found_duplicate = False
+            for cache_item in last_seen_entries:
+                exception_item, last_seen = cache_item
+                if last_seen < (now - 60):  # 1 minute TTL
+                    continue
+
+                if exc is exception_item:
+                    updated_cache_entries.add((exception_item, now))
+                    found_duplicate = True
+                    continue
+
+                updated_cache_entries.add((exception_item, last_seen))
+
+            integration._last_seen.set(updated_cache_entries)
+
+            if found_duplicate:
                 logger.info("DedupeIntegration dropped duplicated error event %s", exc)
                 return None
-
-            # we can only weakref non builtin types
-            try:
-                integration._last_seen.set(weakref.ref(exc))
-            except TypeError:
-                integration._last_seen.set(exc)
-
-            return event
+            else:
+                return event
 
     @staticmethod
     def reset_last_seen() -> None:
