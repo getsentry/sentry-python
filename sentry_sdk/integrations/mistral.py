@@ -41,7 +41,7 @@ def _wrap_complete(f: "Callable[..., Any]") -> "Callable[..., Any]":
 
         model = kwargs.get("model")
 
-        if has_span_streaming_enabled(sentry_sdk.get_client().options):
+        if has_span_streaming_enabled(client.options):
             span = sentry_sdk.traces.start_span(
                 name=f"chat {model}".strip(),
                 attributes={
@@ -85,7 +85,7 @@ def _wrap_complete_async(f: "Callable[..., Any]") -> "Callable[..., Any]":
 
         model = kwargs.get("model", "")
 
-        if has_span_streaming_enabled(sentry_sdk.get_client().options):
+        if has_span_streaming_enabled(client.options):
             span = sentry_sdk.traces.start_span(
                 name=f"chat {model}".strip(),
                 attributes={
