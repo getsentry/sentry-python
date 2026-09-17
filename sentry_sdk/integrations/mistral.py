@@ -83,7 +83,7 @@ def _wrap_complete_async(f: "Callable[..., Any]") -> "Callable[..., Any]":
         if integration is None or kwargs.get("stream"):
             return f(self, *args, **kwargs)
 
-        model = kwargs.get("model", "")
+        model = kwargs.get("model")
 
         if has_span_streaming_enabled(client.options):
             span = sentry_sdk.traces.start_span(
