@@ -17,6 +17,7 @@ from sentry_sdk.integrations.boto3._instrumentation import (
     _get_response_attributes,
     _instrument_streaming_body,
 )
+from sentry_sdk.integrations.boto3._services.base import _ServiceExtension
 from sentry_sdk.integrations.boto3.consts import ORIGIN
 from sentry_sdk.integrations.stdlib import StdlibIntegration
 from sentry_sdk.traces import StreamedSpan
@@ -388,6 +389,115 @@ def _capture_stubbed_client_span(
 
 def _span_attributes(span, span_streaming):
     return span["attributes"] if span_streaming else span["data"]
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_service_extension_customizes_client_span(
+    capture_items,
+    client_factory,
+    monkeypatch,
+    span_streaming,
+):
+    class TestServiceExtension(_ServiceExtension):
+        def get_span_config(self, ctx):
+            return ("aws.test", None)
+
+        def get_request_attributes(self, ctx):
+            return {
+                "aws.test.request": ctx.params["Key"],
+                SPANDATA.RPC_METHOD: "must-not-override",
+            }
+
+        def get_response_attributes(self, ctx, response):
+            return {
+                "aws.test.response": response["ResponseMetadata"]["RequestId"],
+                SPANDATA.HTTP_STATUS_CODE: 418,
+            }
+
+    extension = TestServiceExtension()
+    monkeypatch.setattr(
+        "sentry_sdk.integrations.boto3._client._resolve_service",
+        lambda service_name: extension,
+    )
+    client = client_factory()
+    api_params = {"Bucket": "bucket", "Key": "foo"}
+
+    with Stubber(client) as stubber:
+        stubber.add_response(
+            "head_object",
+            {
+                "ResponseMetadata": {
+                    "HTTPStatusCode": 200,
+                    "RequestId": "request-id",
+                }
+            },
+            api_params,
+        )
+        spans_by_op = _capture_boto3_spans_by_op(
+            lambda: client.head_object(**api_params),
+            capture_items,
+            span_streaming,
+        )
+
+    spans = spans_by_op.get("aws.test", [])
+    assert len(spans) == 1
+    attributes = _span_attributes(spans[0], span_streaming)
+    assert attributes["aws.test.request"] == "foo"
+    assert attributes["aws.test.response"] == "request-id"
+    assert attributes[SPANDATA.RPC_METHOD] == "HeadObject"
+    assert attributes[SPANDATA.HTTP_STATUS_CODE] == 200
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_service_extension_enriches_client_error(
+    capture_items,
+    client_factory,
+    monkeypatch,
+    span_streaming,
+):
+    class TestServiceExtension(_ServiceExtension):
+        def get_response_attributes(self, ctx, response):
+            return {
+                "aws.test.error": response["Error"]["Code"],
+                SPANDATA.ERROR_TYPE: "must-not-override",
+                SPANDATA.HTTP_STATUS_CODE: 418,
+            }
+
+    monkeypatch.setattr(
+        "sentry_sdk.integrations.boto3._client._resolve_service",
+        lambda service_name: TestServiceExtension(),
+    )
+    client = client_factory()
+    error = ClientError(
+        {
+            "Error": {"Code": "AccessDeniedException"},
+            "ResponseMetadata": {"HTTPStatusCode": 403},
+        },
+        "HeadObject",
+    )
+
+    def raise_client_error(**kwargs):
+        raise error
+
+    client.meta.events.register("before-parameter-build", raise_client_error)
+
+    def invoke_failing_client_method():
+        with pytest.raises(ClientError) as exc_info:
+            client.head_object(Bucket="bucket", Key="foo")
+        assert exc_info.value is error
+
+    spans_by_op = _capture_boto3_spans_by_op(
+        invoke_failing_client_method,
+        capture_items,
+        span_streaming,
+    )
+    spans = spans_by_op.get(OP.HTTP_CLIENT, [])
+
+    _assert_one_failed_span(spans, span_streaming)
+    attributes = _span_attributes(spans[0], span_streaming)
+    assert attributes["aws.test.error"] == "AccessDeniedException"
+    assert attributes[SPANDATA.ERROR_TYPE] == "AccessDeniedException"
+    assert attributes[SPANDATA.HTTP_STATUS_CODE] == 403
 
 
 @pytest.mark.parametrize(
