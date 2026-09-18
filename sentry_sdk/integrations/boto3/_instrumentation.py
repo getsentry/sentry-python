@@ -207,13 +207,10 @@ def _start_client_span(
     span_origin = ORIGIN
 
     if service_ext is not None:
-        service_span_config = None
         with capture_internal_exceptions():
-            service_span_config = service_ext.get_span_config(ctx)
-
-        with capture_internal_exceptions():
-            if service_span_config is not None:
-                service_op, service_origin = service_span_config
+            config = service_ext.get_span_config(ctx)
+            if config is not None:
+                service_op, service_origin = config
                 if isinstance(service_op, str) and service_op:
                     span_op = service_op
                 if isinstance(service_origin, str) and service_origin:
