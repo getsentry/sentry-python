@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 import sentry_sdk
 from sentry_sdk.integrations import Integration
 from sentry_sdk.scope import add_global_event_processor
-from sentry_sdk.utils import logger
+from sentry_sdk.utils import capture_internal_exceptions, logger
 
 if TYPE_CHECKING:
     from typing import Any, Optional
@@ -15,9 +15,6 @@ if TYPE_CHECKING:
 
 class DedupeIntegration(Integration):
     identifier = "dedupe"
-
-    def __init__(self) -> None:
-        self._last_seen: "ContextVar[Any]" = ContextVar("last-seen")
 
     @staticmethod
     def setup_once() -> None:
@@ -34,44 +31,12 @@ class DedupeIntegration(Integration):
             if exc_info is None:
                 return event
 
-            last_seen_entries = integration._last_seen.get(None)
-            updated_cache_entries = set()
-
             exc = exc_info[1]
-            now = time.time()
 
-            if not last_seen_entries:
-                integration._last_seen.set([(exc, now)])
-                return event
-
-            found_duplicate = False
-            for cache_item in last_seen_entries:
-                exception_item, last_seen = cache_item
-                if last_seen < (now - 60):  # 1 minute TTL
-                    continue
-
-                if exc is exception_item:
-                    updated_cache_entries.add((exception_item, now))
-                    found_duplicate = True
-                    continue
-
-                updated_cache_entries.add((exception_item, last_seen))
-
-            if not found_duplicate:
-                updated_cache_entries.add((exc, now))
-
-            integration._last_seen.set(updated_cache_entries)
-
-            if found_duplicate:
+            if getattr(exc, "_handled_by_sentry", False):
                 logger.info("DedupeIntegration dropped duplicated error event %s", exc)
                 return None
             else:
+                with capture_internal_exceptions():
+                    exc._handled_by_sentry = True
                 return event
-
-    @staticmethod
-    def reset_last_seen() -> None:
-        integration = sentry_sdk.get_client().get_integration(DedupeIntegration)
-        if integration is None:
-            return
-
-        integration._last_seen.set(None)

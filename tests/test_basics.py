@@ -614,13 +614,33 @@ def test_dedupe_doesnt_take_into_account_dropped_exception(sentry_init, capture_
     sentry_init(before_send=before_send)
     events = capture_events()
 
-    exc = ValueError("aha!")
     for _ in range(2):
         # The first ValueError will be dropped by before_send. The second
         # ValueError will be accepted by before_send, and should be sent to
         # Sentry.
         try:
-            raise exc
+            raise ValueError("aha!")
+        except Exception:
+            capture_exception()
+
+    assert len(events) == 1
+
+def test_dedupe_drops_exception_when_seen_a_second_time(sentry_init, capture_events):
+    """
+    This test is intended to emulate behavior seen in frameworks like Django,
+    where an exception is raised in a view and then is re-raised in middleware.
+
+    In cases like that we don't want to send a second event for that exception.
+    """
+    sentry_init()
+    events = capture_events()
+
+    test = None
+    for _ in range(2):
+        try:
+            if test is None:
+                test = ValueError("foo")
+            raise test
         except Exception:
             capture_exception()
 
