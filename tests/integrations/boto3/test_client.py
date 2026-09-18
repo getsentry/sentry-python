@@ -73,9 +73,7 @@ def _capture_boto3_spans_by_op(invoke_client_method, capture_items, span_streami
 
     spans_by_op = {}
     for span in spans:
-        op = (
-            span["attributes"].get("sentry.op") if span_streaming else span["op"]
-        )
+        op = span["attributes"].get("sentry.op") if span_streaming else span["op"]
         spans_by_op.setdefault(op, []).append(span)
     return spans_by_op
 
