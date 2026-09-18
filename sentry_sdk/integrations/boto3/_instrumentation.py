@@ -122,29 +122,33 @@ def _get_response_attributes(response: "Any") -> "Attributes":
     if not isinstance(headers, dict):
         headers = {}
 
-    request_id = metadata.get("RequestId")
-    if not isinstance(request_id, str) or not request_id:
-        request_id = next(
-            (
-                value
-                for value in (
-                    headers.get("x-amzn-requestid"),
-                    headers.get("x-amzn-request-id"),
-                    headers.get("x-amz-request-id"),
-                )
-                if isinstance(value, str) and value
-            ),
-            None,
-        )
-    if isinstance(request_id, str) and request_id:
+    request_id = next(
+        (
+            value
+            for value in (
+                metadata.get("RequestId"),
+                headers.get("x-amzn-requestid"),
+                headers.get("x-amzn-request-id"),
+                headers.get("x-amz-request-id"),
+            )
+            if isinstance(value, str) and value
+        ),
+        None,
+    )
+    if request_id is not None:
         attributes[SPANDATA.AWS_REQUEST_ID] = request_id
 
     # S3's `HostId` is the extended request ID returned in `x-amz-id-2`.
     # https://docs.aws.amazon.com/AmazonS3/latest/developerguide/get-request-ids.html
-    extended_request_id = metadata.get("HostId")
-    if not isinstance(extended_request_id, str) or not extended_request_id:
-        extended_request_id = headers.get("x-amz-id-2")
-    if isinstance(extended_request_id, str) and extended_request_id:
+    extended_request_id = next(
+        (
+            value
+            for value in (metadata.get("HostId"), headers.get("x-amz-id-2"))
+            if isinstance(value, str) and value
+        ),
+        None,
+    )
+    if extended_request_id is not None:
         attributes[SPANDATA.AWS_EXTENDED_REQUEST_ID] = extended_request_id
 
     return attributes
