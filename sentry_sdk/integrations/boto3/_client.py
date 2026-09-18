@@ -67,7 +67,7 @@ def _patch_botocore_client() -> None:
         if client.get_integration(Boto3Integration) is None:
             return orig_make_api_call(self, operation_name, api_params)
 
-        ctx = AwsCallContext(operation_name)
+        ctx = AwsCallContext(operation_name, api_params)
 
         # add optional metadata to context.
         with capture_internal_exceptions():
