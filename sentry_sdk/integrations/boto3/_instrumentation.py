@@ -1,10 +1,10 @@
 from typing import TYPE_CHECKING
 
 import sentry_sdk
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.consts import OP, SPANDATA, SPANSTATUS
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.integrations.boto3.consts import ORIGIN
-from sentry_sdk.traces import StreamedSpan
+from sentry_sdk.traces import NoOpStreamedSpan, StreamedSpan
 from sentry_sdk.tracing import BAGGAGE_HEADER_NAME, Span
 from sentry_sdk.tracing_utils import (
     add_http_breadcrumb,
@@ -164,26 +164,39 @@ def _sentry_before_sign(
             )
 
 
-def _sentry_after_call(
-    context: "Dict[str, Any]", parsed: "Dict[str, Any]", **kwargs: "Any"
+def _finish_span(
+    span: "Union[Span, StreamedSpan]",
+    error: "Optional[BaseException]" = None,
 ) -> None:
-    span: "Optional[Union[Span, StreamedSpan]]" = context.pop("_sentrysdk_span", None)
+    with capture_internal_exceptions():
+        if not isinstance(span, StreamedSpan):
+            if error is not None:
+                span.set_status(SPANSTATUS.INTERNAL_ERROR)
+            span.finish()
+            return
 
-    # Span could be absent if the integration is disabled.
-    if span is None:
-        return
+        if error is None:
+            span.end()
+        else:
+            span.__exit__(type(error), error, error.__traceback__)
 
-    span.__exit__(None, None, None)
+
+def _instrument_streaming_body(
+    span: "Union[Span, StreamedSpan]", parsed: "Dict[str, Any]"
+) -> bool:
+    if isinstance(span, NoOpStreamedSpan):
+        return False
 
     body = parsed.get("Body")
     if not isinstance(body, StreamingBody):
-        return
+        return False
 
     streaming_span: "Union[Span, StreamedSpan]"
     if isinstance(span, StreamedSpan):
         streaming_span = sentry_sdk.traces.start_span(
             name=span.name,
             parent_span=span,
+            active=False,
             attributes={
                 "sentry.op": OP.HTTP_CLIENT_STREAM,
                 "sentry.origin": ORIGIN,
@@ -198,35 +211,86 @@ def _sentry_after_call(
 
     orig_read = body.read
     orig_close = body.close
+    raw_stream = body._raw_stream  # type: ignore[attr-defined]
+    orig_raw_close = raw_stream.close
+    finished = False
+
+    def finish(error: "Optional[BaseException]" = None) -> None:
+        nonlocal finished
+        if finished:
+            return
+
+        finished = True
+        _finish_span(streaming_span, error)
+
+    def content_length_reached() -> bool:
+        content_length = getattr(body, "_content_length", None)
+        amount_read = getattr(body, "_amount_read", None)
+        return (
+            content_length is not None
+            and amount_read is not None
+            and amount_read >= int(content_length)
+        )
 
     def sentry_streaming_body_read(*args: "Any", **kwargs: "Any") -> bytes:
         try:
             ret = orig_read(*args, **kwargs)
-            if ret:
-                return ret
-
-            if isinstance(streaming_span, StreamedSpan):
-                streaming_span.end()
-            else:
-                streaming_span.finish()
+            with capture_internal_exceptions():
+                amount = args[0] if args else kwargs.get("amt")
+                if (
+                    amount is None
+                    or amount < 0
+                    or (amount > 0 and not ret)
+                    or content_length_reached()
+                ):
+                    finish()
             return ret
-        except Exception:
-            if isinstance(streaming_span, StreamedSpan):
-                streaming_span.end()
-            else:
-                streaming_span.finish()
+        except BaseException as error:
+            finish(error)
             raise
 
-    body.read = sentry_streaming_body_read  # type: ignore
-
     def sentry_streaming_body_close(*args: "Any", **kwargs: "Any") -> None:
-        if isinstance(streaming_span, StreamedSpan):
-            streaming_span.end()
-        else:
-            streaming_span.finish()
-        orig_close(*args, **kwargs)
+        try:
+            orig_close(*args, **kwargs)
+            finish()
+        except BaseException as error:
+            finish(error)
+            raise
 
-    body.close = sentry_streaming_body_close  # type: ignore
+    def sentry_raw_stream_close(*args: "Any", **kwargs: "Any") -> None:
+        try:
+            orig_raw_close(*args, **kwargs)
+            finish()
+        except BaseException as error:
+            finish(error)
+            raise
+
+    try:
+        # StreamingBody.__exit__ closes `_raw_stream` directly, bypassing
+        # StreamingBody.close(), so both levels need to be instrumented.
+        raw_stream.close = sentry_raw_stream_close
+        body.read = sentry_streaming_body_read  # type: ignore
+        body.close = sentry_streaming_body_close  # type: ignore
+    except Exception:
+        finish()
+        raise
+
+    return True
+
+
+def _sentry_after_call(
+    context: "Dict[str, Any]", parsed: "Dict[str, Any]", **kwargs: "Any"
+) -> None:
+    span: "Optional[Union[Span, StreamedSpan]]" = context.pop("_sentrysdk_span", None)
+
+    # Span could be absent if the integration is disabled.
+    if span is None:
+        return
+
+    span.__exit__(None, None, None)
+
+    with capture_internal_exceptions():
+        _instrument_streaming_body(span, parsed)
 
 
 def _sentry_after_call_error(
