@@ -122,9 +122,7 @@ def _patch_botocore_client() -> None:
                 else:
                     if span is not None:
                         with capture_internal_exceptions():
-                            _set_span_attributes(
-                                span, _get_response_attributes(parsed)
-                            )
+                            _set_span_attributes(span, _get_response_attributes(parsed))
         except BaseException as error:
             _finish_span(span, error)
             raise
