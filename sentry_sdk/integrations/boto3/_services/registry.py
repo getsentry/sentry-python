@@ -22,13 +22,12 @@ def _resolve_service(
     if target is None:
         return None
 
-    # preserve generic instrumentation when lookup fails.
-    extension = None
     with capture_internal_exceptions():
         module_name, class_name = target
         extension_class = getattr(import_module(module_name), class_name)
         candidate = extension_class()
         if isinstance(candidate, _ServiceExtension):
-            extension = candidate
+            return candidate
 
-    return extension
+    # preserve generic instrumentation when lookup fails.
+    return None
