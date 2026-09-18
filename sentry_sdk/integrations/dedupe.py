@@ -6,7 +6,7 @@ from sentry_sdk.scope import add_global_event_processor
 from sentry_sdk.utils import capture_internal_exceptions, logger
 
 if TYPE_CHECKING:
-    from typing import Any, Optional
+    from typing import Optional
 
     from sentry_sdk._types import Event, Hint
 
