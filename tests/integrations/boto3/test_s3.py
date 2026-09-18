@@ -126,7 +126,8 @@ def test_streaming(
 
         expected_attrs = {
             "http.request.method": "GET",
-            "rpc.method": "S3/GetObject",
+            "rpc.method": "GetObject",
+            "rpc.service": "S3",
             "sentry.environment": "production",
             "sentry.op": "http.client",
             "sentry.origin": "auto.http.boto3",
@@ -287,7 +288,8 @@ def test_omit_url_data_if_parsing_fails(
                 assert spans[0]["attributes"] == ApproxDict(
                     {
                         "http.request.method": "GET",
-                        "rpc.method": "S3/ListObjects",
+                        "rpc.method": "ListObjects",
+                        "rpc.service": "S3",
                         "sentry.environment": "production",
                         "sentry.op": "http.client",
                         "sentry.origin": "auto.http.boto3",
