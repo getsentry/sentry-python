@@ -24,7 +24,6 @@ from sentry_sdk.data_collection import (
 )
 from sentry_sdk.envelope import Envelope, Item
 from sentry_sdk.integrations import setup_integrations
-from sentry_sdk.integrations.dedupe import DedupeIntegration
 from sentry_sdk.monitor import Monitor
 from sentry_sdk.profiler.continuous_profiler import setup_continuous_profiler
 from sentry_sdk.scrubber import EventScrubber
