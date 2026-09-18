@@ -1,5 +1,3 @@
-import time
-from contextvars import ContextVar
 from typing import TYPE_CHECKING
 
 import sentry_sdk

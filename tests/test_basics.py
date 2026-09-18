@@ -625,6 +625,7 @@ def test_dedupe_doesnt_take_into_account_dropped_exception(sentry_init, capture_
 
     assert len(events) == 1
 
+
 def test_dedupe_drops_exception_when_seen_a_second_time(sentry_init, capture_events):
     """
     This test is intended to emulate behavior seen in frameworks like Django,
