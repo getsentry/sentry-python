@@ -253,7 +253,7 @@ def test_omit_url_data_if_parsing_fails(
         items = capture_items("span")
 
         with mock.patch(
-            "sentry_sdk.integrations.boto3.parse_url",
+            "sentry_sdk.integrations.boto3._instrumentation.parse_url",
             side_effect=ValueError,
         ):
             with sentry_sdk.traces.start_span(
@@ -294,7 +294,7 @@ def test_omit_url_data_if_parsing_fails(
         events = capture_events()
 
         with mock.patch(
-            "sentry_sdk.integrations.boto3.parse_url",
+            "sentry_sdk.integrations.boto3._instrumentation.parse_url",
             side_effect=ValueError,
         ):
             with sentry_sdk.start_transaction() as transaction, MockResponse(
