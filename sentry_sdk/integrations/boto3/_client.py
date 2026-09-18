@@ -15,16 +15,22 @@ from sentry_sdk.integrations.boto3._instrumentation import (
     _set_span_attributes,
     _start_client_span,
 )
+from sentry_sdk.integrations.boto3._services.registry import (
+    _resolve_service,
+)
 from sentry_sdk.traces import NoOpStreamedSpan, StreamedSpan
 from sentry_sdk.utils import capture_internal_exceptions
 
 if TYPE_CHECKING:
     from typing import Any, Iterator, Optional, Union
 
+    from sentry_sdk._types import Attributes
+    from sentry_sdk.integrations.boto3._services.base import _ServiceExtension
     from sentry_sdk.tracing import Span
 
 try:
     from botocore.client import BaseClient
+    from botocore.exceptions import ClientError
 except ImportError:
     raise DidNotEnable("botocore not installed")
 
@@ -76,9 +82,14 @@ def _patch_botocore_client() -> None:
         with capture_internal_exceptions():
             ctx.add_metadata(self)
 
+        service_ext: "Optional[_ServiceExtension]" = None
+        with capture_internal_exceptions():
+            # resolve service extension for service-specific enrichment.
+            service_ext = _resolve_service(ctx.service_name)
+
         span: "Optional[Union[Span, StreamedSpan]]" = None
         with capture_internal_exceptions():
-            span = _start_client_span(ctx)
+            span = _start_client_span(ctx, service_ext)
 
         if span is None:
             return orig_make_api_call(self, operation_name, api_params)
@@ -88,17 +99,33 @@ def _patch_botocore_client() -> None:
             _activate_client_span(span) if isinstance(span, StreamedSpan) else span
         )
 
+        attributes: "Attributes" = {}
         try:
             with span_ctx:
                 try:
                     parsed = orig_make_api_call(self, operation_name, api_params)
                 except BaseException as error:
+                    if service_ext is not None and isinstance(error, ClientError):
+                        with capture_internal_exceptions():
+                            attributes.update(
+                                service_ext.get_response_attributes(ctx, error.response)
+                            )
+                    # generic attributes outweigh service-specific attributes.
                     with capture_internal_exceptions():
-                        _set_span_attributes(span, _get_error_attributes(error))
+                        attributes.update(_get_error_attributes(error))
                     raise
                 else:
+                    if service_ext is not None:
+                        with capture_internal_exceptions():
+                            attributes.update(
+                                service_ext.get_response_attributes(ctx, parsed)
+                            )
                     with capture_internal_exceptions():
-                        _set_span_attributes(span, _get_response_attributes(parsed))
+                        attributes.update(_get_response_attributes(parsed))
+                finally:
+                    # enrich before the static span's context manager finishes it.
+                    with capture_internal_exceptions():
+                        _set_span_attributes(span, attributes)
         except BaseException as error:
             # finish `StreamedSpan` explicitly; static spans are finished by
             # their context manager.

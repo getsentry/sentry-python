@@ -24,6 +24,7 @@ if TYPE_CHECKING:
 
     from sentry_sdk._types import Attributes
     from sentry_sdk.integrations.boto3._context import AwsCallContext
+    from sentry_sdk.integrations.boto3._services.base import _ServiceExtension
 
 try:
     from botocore.awsrequest import AWSRequest
@@ -186,6 +187,7 @@ def _get_error_attributes(exception: "BaseException") -> "Attributes":
 
 def _start_client_span(
     ctx: "AwsCallContext",
+    service_ext: "Optional[_ServiceExtension]" = None,
 ) -> "Optional[Union[Span, StreamedSpan]]":
     client = sentry_sdk.get_client()
     if client.get_integration(Boto3Integration) is None:
@@ -195,14 +197,32 @@ def _start_client_span(
     # e.g. "aws.unkown.GetObject"
     service_name = ctx.service_id_hyphenized or "unknown"
     span_name = "aws.%s.%s" % (service_name, ctx.operation_name)
-    attributes: "Attributes" = {
-        SPANDATA.RPC_METHOD: ctx.operation_name,
-        SPANDATA.RPC_SYSTEM_NAME: _AWS_RPC_SYSTEM_NAME,
-    }
-    with capture_internal_exceptions():
-        attributes.update(_get_client_attributes(ctx))
+    attributes: "Attributes" = {}
     span_op = OP.HTTP_CLIENT
     span_origin = Boto3Integration.origin
+
+    if service_ext is not None:
+        with capture_internal_exceptions():
+            config = service_ext.get_span_config(ctx)
+            if config is not None:
+                service_op, service_origin = config
+                if isinstance(service_op, str) and service_op:
+                    span_op = service_op
+                if isinstance(service_origin, str) and service_origin:
+                    span_origin = service_origin
+
+        with capture_internal_exceptions():
+            attributes.update(service_ext.get_request_attributes(ctx))
+
+    # Generic attributes take precedence over service-specific attributes.
+    attributes.update(
+        {
+            SPANDATA.RPC_METHOD: ctx.operation_name,
+            SPANDATA.RPC_SYSTEM_NAME: _AWS_RPC_SYSTEM_NAME,
+        }
+    )
+    with capture_internal_exceptions():
+        attributes.update(_get_client_attributes(ctx))
 
     if has_span_streaming_enabled(client.options):
         if sentry_sdk.traces.get_current_span() is None:
