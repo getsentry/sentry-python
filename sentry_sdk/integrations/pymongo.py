@@ -86,6 +86,19 @@ def _strip_pii(command: "Dict[str, Any]") -> "Dict[str, Any]":
     return command
 
 
+def _bytes_safe_str(value: "Any") -> str:
+    """
+    Convert a BSON value to a string without triggering ``BytesWarning``.
+
+    ``str()`` on a ``bytes`` instance (or a subclass such as BSON ``Binary``,
+    e.g. the ``lsid`` session id) emits ``BytesWarning`` under ``python -b``
+    and produces a useless ``b'...'`` representation. Decode instead.
+    """
+    if isinstance(value, bytes):
+        return value.decode("utf-8", errors="replace")
+    return str(value)
+
+
 def _get_db_data(event: "Any") -> "Dict[str, Any]":
     data = {}
 
@@ -152,7 +165,7 @@ class CommandTracer(monitoring.CommandListener):
             elif not should_send_default_pii():
                 command = _strip_pii(command)
 
-            query = json.dumps(command, default=str)
+            query = json.dumps(command, default=_bytes_safe_str)
 
             if has_span_streaming_enabled(client.options):
                 span_first_data = {
@@ -205,7 +218,7 @@ class CommandTracer(monitoring.CommandListener):
                 try:
                     if lsid:
                         lsid_id = lsid["id"]
-                        data["operation_ids"]["session"] = str(lsid_id)
+                        data["operation_ids"]["session"] = _bytes_safe_str(lsid_id)
                 except KeyError:
                     pass
 

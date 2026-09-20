@@ -1,11 +1,20 @@
+import datetime
+import warnings
+
 import pytest
+from bson.binary import Binary
 from mockupdb import MockupDB, OpQuery
 from pymongo import MongoClient
+from pymongo.monitoring import CommandStartedEvent, CommandSucceededEvent
 
 import sentry_sdk
 from sentry_sdk import capture_message, start_transaction
 from sentry_sdk.consts import SPANDATA
-from sentry_sdk.integrations.pymongo import PyMongoIntegration, _strip_pii
+from sentry_sdk.integrations.pymongo import (
+    CommandTracer,
+    PyMongoIntegration,
+    _strip_pii,
+)
 
 
 @pytest.fixture(scope="session")
@@ -840,3 +849,110 @@ def test_span_streaming_status_on_failure(sentry_init, capture_items, mongo_serv
 
     assert segment["name"] == "test_segment"
     assert db_span["status"] == "error"
+
+
+def test_bytes_safe_str():
+    """_bytes_safe_str decodes bytes instead of str()-ing them (#4782)."""
+    from sentry_sdk.integrations.pymongo import _bytes_safe_str
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", BytesWarning)
+        assert _bytes_safe_str(b"test_collection") == "test_collection"
+        # Invalid UTF-8 must not raise, it is replaced instead
+        assert _bytes_safe_str(b"caf\xe9") == "caf\ufffd"
+        # Non-bytes values keep the normal str() behavior
+        assert _bytes_safe_str(42) == "42"
+        assert _bytes_safe_str("plain") == "plain"
+
+
+def _make_started_event(command, request_id=1):
+    return CommandStartedEvent(
+        command=command,
+        database_name="test_db",
+        request_id=request_id,
+        connection_id=("localhost", 27017),
+        operation_id=request_id,
+    )
+
+
+def _make_succeeded_event(command_name, request_id=1):
+    return CommandSucceededEvent(
+        duration=datetime.timedelta(seconds=1),
+        reply={"ok": 1},
+        command_name=command_name,
+        request_id=request_id,
+        connection_id=("localhost", 27017),
+        operation_id=request_id,
+    )
+
+
+@pytest.mark.parametrize("with_pii", [False, True])
+def test_bytes_lsid_does_not_raise_byteswarning(sentry_init, capture_events, with_pii):
+    """
+    The BSON logical session id (``lsid.id``) is a ``Binary`` instance, which
+    is a subclass of ``bytes``. ``str()`` on it raises ``BytesWarning`` under
+    ``python -b`` (see #4782). Turn BytesWarning into an error and make sure
+    the span is created with a decoded session id.
+    """
+    sentry_init(
+        integrations=[PyMongoIntegration()],
+        traces_sample_rate=1.0,
+        send_default_pii=with_pii,
+    )
+    events = capture_events()
+
+    tracer = CommandTracer()
+    started = _make_started_event(
+        {
+            "find": "test_collection",
+            "lsid": {"id": Binary(b"session-bytes", 4)},
+        }
+    )
+    succeeded = _make_succeeded_event("find")
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", BytesWarning)
+        with start_transaction():
+            tracer.started(started)
+            tracer.succeeded(succeeded)
+
+    (event,) = events
+    (span,) = event["spans"]
+
+    session = span["data"]["operation_ids"]["session"]
+    assert isinstance(session, str)
+    assert "b'" not in session
+    assert "session-bytes" in session
+
+
+def test_bytes_collection_name_in_query_does_not_raise_byteswarning(
+    sentry_init, capture_events
+):
+    """
+    BSON values in the command can be ``bytes`` (e.g. a bytes collection
+    name). ``json.dumps(..., default=str)`` calls ``str()`` on them, which
+    raises ``BytesWarning`` under ``python -b`` (#4782). The query JSON must
+    contain the decoded name, not ``b'...'``.
+    """
+    sentry_init(
+        integrations=[PyMongoIntegration()],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    tracer = CommandTracer()
+    started = _make_started_event({"find": b"test_collection", "limit": 1})
+    succeeded = _make_succeeded_event("find")
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", BytesWarning)
+        with start_transaction():
+            tracer.started(started)
+            tracer.succeeded(succeeded)
+
+    (event,) = events
+    (span,) = event["spans"]
+
+    assert "test_collection" in span["description"]
+    assert "b'" not in span["description"]
