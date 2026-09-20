@@ -853,7 +853,7 @@ def test_span_streaming_status_on_failure(sentry_init, capture_items, mongo_serv
 
 def test_bytes_safe_str():
     """_bytes_safe_str decodes bytes instead of str()-ing them (#4782)."""
-    from sentry_sdk.integrations.pymongo import _bytes_safe_str
+    from sentry_sdk.integrations.pymongo import _bytes_safe_str, _bytes_to_hex
 
     with warnings.catch_warnings():
         warnings.simplefilter("error", BytesWarning)
@@ -863,6 +863,17 @@ def test_bytes_safe_str():
         # Non-bytes values keep the normal str() behavior
         assert _bytes_safe_str(42) == "42"
         assert _bytes_safe_str("plain") == "plain"
+
+        # Binary identifiers must be hex-encoded, not decoded: session ids
+        # are random bytes, and UTF-8 decoding them is lossy (collisions).
+        assert _bytes_to_hex(b"\x00\x01\xff") == "0001ff"
+        assert _bytes_to_hex(42) == "42"
+        assert _bytes_to_hex("plain") == "plain"
+        # Distinct random ids stay distinct (the collision Bugbot flagged)
+        id1 = Binary(bytes(range(16)), 4)
+        id2 = Binary(bytes(range(1, 17)), 4)
+        assert _bytes_to_hex(id1) != _bytes_to_hex(id2)
+        assert _bytes_to_hex(id1) == "000102030405060708090a0b0c0d0e0f"
 
 
 def _make_started_event(command, request_id=1):
@@ -902,10 +913,11 @@ def test_bytes_lsid_does_not_raise_byteswarning(sentry_init, capture_events, wit
     events = capture_events()
 
     tracer = CommandTracer()
+    session_id = Binary(bytes(range(16)), 4)
     started = _make_started_event(
         {
             "find": "test_collection",
-            "lsid": {"id": Binary(b"session-bytes", 4)},
+            "lsid": {"id": session_id},
         }
     )
     succeeded = _make_succeeded_event("find")
@@ -922,7 +934,9 @@ def test_bytes_lsid_does_not_raise_byteswarning(sentry_init, capture_events, wit
     session = span["data"]["operation_ids"]["session"]
     assert isinstance(session, str)
     assert "b'" not in session
-    assert "session-bytes" in session
+    # Random binary ids must round-trip losslessly (hex), not be decoded
+    # as UTF-8 -- decoding random bytes loses information and collides.
+    assert session == bytes(range(16)).hex()
 
 
 def test_bytes_collection_name_in_query_does_not_raise_byteswarning(

@@ -90,12 +90,29 @@ def _bytes_safe_str(value: "Any") -> str:
     """
     Convert a BSON value to a string without triggering ``BytesWarning``.
 
-    ``str()`` on a ``bytes`` instance (or a subclass such as BSON ``Binary``,
-    e.g. the ``lsid`` session id) emits ``BytesWarning`` under ``python -b``
-    and produces a useless ``b'...'`` representation. Decode instead.
+    ``str()`` on a ``bytes`` instance emits ``BytesWarning`` under
+    ``python -b`` and produces a useless ``b'...'`` representation, so
+    decode instead. This is for human-readable BSON values (collection
+    names etc.); for opaque identifiers such as the ``lsid`` session id
+    use ``_bytes_to_hex()`` instead, since decoding random bytes as UTF-8
+    is lossy and would make different ids collide.
     """
     if isinstance(value, bytes):
         return value.decode("utf-8", errors="replace")
+    return str(value)
+
+
+def _bytes_to_hex(value: "Any") -> str:
+    """
+    Render a binary identifier (e.g. the BSON ``lsid.id`` ``Binary``, a
+    ``bytes`` subclass) as a stable, lossless hex string.
+
+    ``str()`` on it emits ``BytesWarning`` under ``python -b`` (see #4782),
+    and decoding it as UTF-8 would be lossy: session ids are random bytes,
+    so replacement characters would make distinct ids collide.
+    """
+    if isinstance(value, bytes):
+        return value.hex()
     return str(value)
 
 
@@ -218,7 +235,7 @@ class CommandTracer(monitoring.CommandListener):
                 try:
                     if lsid:
                         lsid_id = lsid["id"]
-                        data["operation_ids"]["session"] = _bytes_safe_str(lsid_id)
+                        data["operation_ids"]["session"] = _bytes_to_hex(lsid_id)
                 except KeyError:
                     pass
 
