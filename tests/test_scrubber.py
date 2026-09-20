@@ -62,6 +62,59 @@ def test_request_scrubbing(sentry_init, capture_events):
     }
 
 
+def test_request_scrubbing_list_body(sentry_init, capture_events):
+    sentry_init()
+    events = capture_events()
+
+    try:
+        1 / 0
+    except ZeroDivisionError:
+        ev, _hint = event_from_exception(sys.exc_info())
+
+        ev["request"] = {
+            "data": [
+                {"token": "secret", "foo": "bar"},
+                {"password": "secret", "baz": "qux"},
+            ],
+        }
+
+        capture_event(ev)
+
+    (event,) = events
+
+    assert event["request"] == {
+        "data": [
+            {"token": "[Filtered]", "foo": "bar"},
+            {"password": "[Filtered]", "baz": "qux"},
+        ],
+    }
+
+    assert event["_meta"]["request"] == {
+        "data": {
+            "0": {"token": {"": {"rem": [["!config", "s"]]}}},
+            "1": {"password": {"": {"rem": [["!config", "s"]]}}},
+        }
+    }
+
+
+def test_recursive_request_scrubbing_list_body(sentry_init, capture_events):
+    sentry_init(event_scrubber=EventScrubber(recursive=True))
+    events = capture_events()
+
+    try:
+        1 / 0
+    except ZeroDivisionError:
+        ev, _hint = event_from_exception(sys.exc_info())
+
+        ev["request"] = {"data": [{"deep": {"password": "secret"}}]}
+
+        capture_event(ev)
+
+    (event,) = events
+
+    assert event["request"] == {"data": [{"deep": {"password": "[Filtered]"}}]}
+
+
 def test_ip_address_not_scrubbed_when_pii_enabled(sentry_init, capture_events):
     sentry_init(send_default_pii=True)
     events = capture_events()
