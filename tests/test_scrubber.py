@@ -62,6 +62,41 @@ def test_request_scrubbing(sentry_init, capture_events):
     }
 
 
+def test_request_scrubbing_top_level_array_body(sentry_init, capture_events):
+    sentry_init()
+    events = capture_events()
+
+    try:
+        1 / 0
+    except ZeroDivisionError:
+        ev, _hint = event_from_exception(sys.exc_info())
+
+        ev["request"] = {
+            "data": [
+                {"password": "secret", "name": "record-a"},
+                {"api_key": "secret", "name": "record-b"},
+            ],
+        }
+
+        capture_event(ev)
+
+    (event,) = events
+
+    assert event["request"] == {
+        "data": [
+            {"password": "[Filtered]", "name": "record-a"},
+            {"api_key": "[Filtered]", "name": "record-b"},
+        ],
+    }
+
+    assert event["_meta"]["request"] == {
+        "data": {
+            "0": {"password": {"": {"rem": [["!config", "s"]]}}},
+            "1": {"api_key": {"": {"rem": [["!config", "s"]]}}},
+        },
+    }
+
+
 def test_ip_address_not_scrubbed_when_pii_enabled(sentry_init, capture_events):
     sentry_init(send_default_pii=True)
     events = capture_events()
