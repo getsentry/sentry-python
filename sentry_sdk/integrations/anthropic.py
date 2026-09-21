@@ -5,7 +5,6 @@ from functools import wraps
 from typing import TYPE_CHECKING, cast
 
 import sentry_sdk
-from sentry_sdk.ai.monitoring import record_token_usage
 from sentry_sdk.ai.utils import (
     GEN_AI_ALLOWED_MESSAGE_ROLES,
     normalize_message_roles,
@@ -692,13 +691,27 @@ def _set_output_data(
                 span, SPANDATA.GEN_AI_RESPONSE_TEXT, output_messages["response"]
             )
 
-    record_token_usage(
-        span,
-        input_tokens=input_tokens,
-        output_tokens=output_tokens,
-        input_tokens_cached=cache_read_input_tokens,
-        input_tokens_cache_write=cache_write_input_tokens,
-    )
+    if input_tokens is not None:
+        span.set_attribute(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, input_tokens)
+
+    if cache_read_input_tokens is not None:
+        span.set_attribute(
+            SPANDATA.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS, cache_read_input_tokens
+        )
+
+    if cache_write_input_tokens is not None:
+        span.set_attribute(
+            SPANDATA.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS,
+            cache_write_input_tokens,
+        )
+
+    if output_tokens is not None:
+        span.set_attribute(SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS, output_tokens)
+
+    if input_tokens is not None and output_tokens is not None:
+        span.set_attribute(
+            SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, input_tokens + output_tokens
+        )
 
 
 def _sentry_patched_create_sync(f: "Any", *args: "Any", **kwargs: "Any") -> "Any":

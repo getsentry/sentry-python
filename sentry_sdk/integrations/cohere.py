@@ -3,7 +3,6 @@ from functools import wraps
 from typing import TYPE_CHECKING
 
 from sentry_sdk import consts
-from sentry_sdk.ai.monitoring import record_token_usage
 from sentry_sdk.ai.utils import set_data_normalized
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.traces import Span
@@ -133,17 +132,28 @@ def _wrap_chat(f: "Callable[..., Any]", streaming: bool) -> "Callable[..., Any]"
 
         if hasattr(res, "meta"):
             if hasattr(res.meta, "billed_units"):
-                record_token_usage(
-                    span,
-                    input_tokens=res.meta.billed_units.input_tokens,
-                    output_tokens=res.meta.billed_units.output_tokens,
-                )
+                if res.meta.billed_units.input_tokens is not None:
+                    span.set_attribute(
+                        SPANDATA.GEN_AI_USAGE_INPUT_TOKENS,
+                        res.meta.billed_units.input_tokens,
+                    )
+
+                if res.meta.billed_units.output_tokens is not None:
+                    span.set_attribute(
+                        SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS,
+                        res.meta.billed_units.output_tokens,
+                    )
             elif hasattr(res.meta, "tokens"):
-                record_token_usage(
-                    span,
-                    input_tokens=res.meta.tokens.input_tokens,
-                    output_tokens=res.meta.tokens.output_tokens,
-                )
+                if res.meta.tokens.input_tokens is not None:
+                    span.set_attribute(
+                        SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, res.meta.tokens.input_tokens
+                    )
+
+                if res.meta.tokens.output_tokens is not None:
+                    span.set_attribute(
+                        SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS,
+                        res.meta.tokens.output_tokens,
+                    )
 
             if hasattr(res.meta, "warnings"):
                 set_data_normalized(span, SPANDATA.AI_WARNINGS, res.meta.warnings)
@@ -277,11 +287,18 @@ def _wrap_embed(f: "Callable[..., Any]") -> "Callable[..., Any]":
                 and hasattr(res.meta, "billed_units")
                 and hasattr(res.meta.billed_units, "input_tokens")
             ):
-                record_token_usage(
-                    span,
-                    input_tokens=res.meta.billed_units.input_tokens,
-                    total_tokens=res.meta.billed_units.input_tokens,
-                )
+                if res.meta.billed_units.input_tokens is not None:
+                    span.set_attribute(
+                        SPANDATA.GEN_AI_USAGE_INPUT_TOKENS,
+                        res.meta.billed_units.input_tokensns,
+                    )
+
+                if res.meta.billed_units.input_tokens is not None:
+                    span.set_attribute(
+                        SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS,
+                        res.meta.billed_units.input_tokens,
+                    )
+
             return res
 
     return new_embed

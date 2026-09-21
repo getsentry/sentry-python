@@ -34,7 +34,6 @@ from sentry_sdk.ai._openai_responses_api import (
 from sentry_sdk.ai._openai_responses_api import (
     _transform_tool_definitions as _transform_tool_definitions_responses,
 )
-from sentry_sdk.ai.monitoring import record_token_usage
 from sentry_sdk.ai.utils import (
     normalize_message_roles,
     set_data_normalized,
@@ -238,19 +237,32 @@ def _calculate_completions_token_usage(
 
     # Do not set token data if it is 0
     input_tokens = input_tokens or None
-    input_tokens_cached = input_tokens_cached or None
-    output_tokens = output_tokens or None
-    output_tokens_reasoning = output_tokens_reasoning or None
-    total_tokens = total_tokens or None
+    if input_tokens is not None:
+        span.set_attribute(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, input_tokens)
 
-    record_token_usage(
-        span,
-        input_tokens=input_tokens,
-        input_tokens_cached=input_tokens_cached,
-        output_tokens=output_tokens,
-        output_tokens_reasoning=output_tokens_reasoning,
-        total_tokens=total_tokens,
-    )
+    input_tokens_cached = input_tokens_cached or None
+    if input_tokens_cached is not None:
+        span.set_attribute(
+            SPANDATA.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS, input_tokens_cached
+        )
+
+    output_tokens = output_tokens or None
+    if output_tokens is not None:
+        span.set_attribute(SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS, output_tokens)
+
+    output_tokens_reasoning = output_tokens_reasoning or None
+    if output_tokens_reasoning is not None:
+        span.set_attribute(
+            SPANDATA.GEN_AI_USAGE_REASONING_OUTPUT_TOKENS,
+            output_tokens_reasoning,
+        )
+
+    total_tokens = total_tokens or None
+    if total_tokens is None and input_tokens is not None and output_tokens is not None:
+        if total_tokens is not None:
+            span.set_attribute(
+                SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, input_tokens + output_tokens
+            )
 
 
 def _calculate_responses_token_usage(
@@ -316,19 +328,31 @@ def _calculate_responses_token_usage(
 
     # Do not set token data if it is 0
     input_tokens = input_tokens or None
-    input_tokens_cached = input_tokens_cached or None
-    output_tokens = output_tokens or None
-    output_tokens_reasoning = output_tokens_reasoning or None
-    total_tokens = total_tokens or None
+    if input_tokens is not None:
+        span.set_attribute(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, input_tokens)
 
-    record_token_usage(
-        span,
-        input_tokens=input_tokens,
-        input_tokens_cached=input_tokens_cached,
-        output_tokens=output_tokens,
-        output_tokens_reasoning=output_tokens_reasoning,
-        total_tokens=total_tokens,
-    )
+    input_tokens_cached = input_tokens_cached or None
+    if input_tokens_cached is not None:
+        span.set_attribute(
+            SPANDATA.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS, input_tokens_cached
+        )
+
+    output_tokens = output_tokens or None
+    if output_tokens is not None:
+        span.set_attribute(SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS, output_tokens)
+
+    output_tokens_reasoning = output_tokens_reasoning or None
+    if output_tokens_reasoning is not None:
+        span.set_attribute(
+            SPANDATA.GEN_AI_USAGE_REASONING_OUTPUT_TOKENS,
+            output_tokens_reasoning,
+        )
+
+    total_tokens = total_tokens or None
+    if total_tokens is None and input_tokens is not None and output_tokens is not None:
+        span.set_attribute(
+            SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, input_tokens + output_tokens
+        )
 
 
 def _set_responses_api_input_data(
