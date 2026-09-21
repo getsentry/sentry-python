@@ -129,7 +129,9 @@ def _transform_input_messages(
             continue
 
         text_parts = [
-            part for part in content if isinstance(part, dict) and "text" in part
+            part
+            for part in content
+            if isinstance(part, dict) and part.get("type") == "text" and "text" in part
         ]
         input_messages.append(
             {
@@ -173,7 +175,11 @@ def _transform_output_message(
     if isinstance(content, str):
         return {"role": "assistant", "parts": [{"type": "text", "content": content}]}
 
-    text_parts = [part for part in content if isinstance(part, dict) and "text" in part]
+    text_parts = [
+        part
+        for part in content
+        if isinstance(part, dict) and part.get("type") == "text"
+    ]
     return {
         "role": "assistant",
         "parts": [
