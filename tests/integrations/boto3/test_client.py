@@ -54,7 +54,7 @@ def test_public_api():
 
 @pytest.mark.parametrize(
     "consume",
-    ["read_exact", "context"],
+    ["read", "read_exact", "context", "close"],
 )
 def test_streaming_span_order_and_scope(
     sentry_init,
@@ -84,7 +84,9 @@ def test_streaming_span_order_and_scope(
         body = client.get_object(Bucket="bucket", Key="key")["Body"]
         assert sentry_sdk.traces.get_current_span() is parent  # type: ignore[attr-defined]
 
-        if consume == "read_exact":
+        if consume == "read":
+            assert body.read() == b"x"
+        elif consume == "read_exact":
             assert body.read(1) == b"x"
         elif consume == "context":
             if not hasattr(body, "__enter__"):
@@ -92,6 +94,8 @@ def test_streaming_span_order_and_scope(
                 pytest.skip("`StreamingBody` context manager is unavailable.")
             with body as raw_stream:
                 assert raw_stream.read() == b"x"
+        else:
+            body.close()
 
         assert sentry_sdk.traces.get_current_span() is parent  # type: ignore[attr-defined]
 
