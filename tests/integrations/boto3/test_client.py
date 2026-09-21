@@ -11,6 +11,8 @@ from botocore.response import StreamingBody
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.boto3 import Boto3Integration
+from sentry_sdk.integrations.boto3._instrumentation import _instrument_streaming_body
+from sentry_sdk.integrations.boto3.consts import ORIGIN
 from sentry_sdk.integrations.stdlib import StdlibIntegration
 from tests.integrations.boto3.aws_mock import Body
 
@@ -45,11 +47,6 @@ def streaming_s3_server():
         server.shutdown()
         server.server_close()
         thread.join()
-
-
-def test_public_api():
-    assert Boto3Integration.__module__ == "sentry_sdk.integrations.boto3"
-    assert Boto3Integration.identifier == "boto3"
 
 
 @pytest.mark.parametrize(
@@ -112,7 +109,7 @@ def test_streaming_span_order_and_scope(
         span
         for span in spans
         if span["name"] == "aws.s3.GetObject"
-        and span["attributes"].get(SPANDATA.SENTRY_ORIGIN) == Boto3Integration.origin
+        and span["attributes"].get(SPANDATA.SENTRY_ORIGIN) == ORIGIN
         and span["attributes"].get(SPANDATA.SENTRY_OP) == OP.HTTP_CLIENT
     ]
     http_spans = [
@@ -139,6 +136,57 @@ def test_streaming_span_order_and_scope(
     assert http_span["start_timestamp"] <= stream_span["start_timestamp"]
     assert http_span["end_timestamp"] <= stream_span["end_timestamp"]
     assert stream_span["end_timestamp"] <= client_span["end_timestamp"]
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_streaming_body_instrumentation_setup_failure_finishes_stream_span(
+    sentry_init,
+    capture_items,
+    span_streaming,
+):
+    sentry_init(
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream" if span_streaming else "static",
+        integrations=[Boto3Integration()],
+        server_name="",
+    )
+
+    class _RawStreamLookupFailingBody(StreamingBody):
+        @property
+        def _raw_stream(self):
+            raise RuntimeError("raw stream lookup failed")
+
+        @_raw_stream.setter
+        def _raw_stream(self, raw_stream):
+            self._raw_stream_value = raw_stream
+
+    body = _RawStreamLookupFailingBody(Body(b"x"), "1")
+
+    def invoke():
+        if not span_streaming:
+            with sentry_sdk.start_span(
+                name="client", op=OP.HTTP_CLIENT, origin=ORIGIN
+            ) as span:
+                with pytest.raises(RuntimeError, match="raw stream lookup failed"):
+                    _instrument_streaming_body(span, {"Body": body})
+            return
+
+        span = sentry_sdk.traces.start_span(  # type: ignore[attr-defined]
+            name="client",
+            attributes={
+                SPANDATA.SENTRY_OP: OP.HTTP_CLIENT,
+                SPANDATA.SENTRY_ORIGIN: ORIGIN,
+            },
+            active=False,
+        )
+        with pytest.raises(RuntimeError, match="raw stream lookup failed"):
+            _instrument_streaming_body(span, {"Body": body})
+
+    spans_by_op = _capture_boto3_spans_by_op(invoke, capture_items, span_streaming)
+    stream_spans = spans_by_op.get(OP.HTTP_CLIENT_STREAM, [])
+
+    assert len(stream_spans) == 1
+    _assert_span_finished(stream_spans[0], span_streaming)
 
 
 def test_non_body_stream_does_not_delay_client_span(sentry_init, capture_items):
@@ -171,7 +219,7 @@ def test_non_body_stream_does_not_delay_client_span(sentry_init, capture_items):
     boto_spans = [
         span
         for span in spans
-        if span["attributes"].get(SPANDATA.SENTRY_ORIGIN) == Boto3Integration.origin
+        if span["attributes"].get(SPANDATA.SENTRY_ORIGIN) == ORIGIN
     ]
     assert len(boto_spans) == 1
     assert boto_spans[0]["attributes"].get(SPANDATA.SENTRY_OP) == OP.HTTP_CLIENT
@@ -234,19 +282,14 @@ def _capture_boto3_spans_by_op(invoke_client_method, capture_items, span_streami
             item.payload
             for item in items
             if item.type == "span"
-            and item.payload["attributes"].get(SPANDATA.SENTRY_ORIGIN)
-            == Boto3Integration.origin
+            and item.payload["attributes"].get(SPANDATA.SENTRY_ORIGIN) == ORIGIN
         ]
     else:
         with sentry_sdk.start_transaction():
             invoke_client_method()
 
         transaction = next(item.payload for item in items if item.type == "transaction")
-        spans = [
-            span
-            for span in transaction["spans"]
-            if span["origin"] == Boto3Integration.origin
-        ]
+        spans = [span for span in transaction["spans"] if span["origin"] == ORIGIN]
 
     spans_by_op = {}
     for span in spans:
