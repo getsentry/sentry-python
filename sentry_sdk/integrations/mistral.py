@@ -17,13 +17,14 @@ if TYPE_CHECKING:
     from typing import Any, Callable, Iterable, Optional, TypeGuard, Union
 
     from mistralai.client.models import (
+        AssistantMessageTypedDict,
         ChatCompletionRequestMessage,
         ChatCompletionRequestMessageTypedDict,
         SystemMessageTypedDict,
         TextChunkTypedDict,
     )
 
-    from sentry_sdk._types import InputMessage, TextPart
+    from sentry_sdk._types import InputMessage, OutputMessage, TextPart
 
 try:
     from mistralai.client.chat import Chat
@@ -137,6 +138,48 @@ def _transform_input_messages(
         )
 
     return input_messages
+
+
+def _transform_output_message(
+    message: "Union[AssistantMessage, AssistantMessageTypedDict]",
+) -> "list[OutputMessage]":
+    if isinstance(message, AssistantMessage):
+        if message.content is None:
+            return []
+
+        if isinstance(message.content, str):
+            return [
+                {
+                    "role": "assistant",
+                    "parts": [{"type": "text", "content": message.content}],
+                }
+            ]
+
+        parts = [part for part in message.content if isinstance(part, TextChunk)]
+        return [
+            {
+                "role": "assistant",
+                "parts": [{"type": "text", "content": part.text} for part in parts],
+            }
+        ]
+
+    content = message.get("content")
+    if content is None:
+        return []
+
+    if isinstance(content, str):
+        return [{"role": "assistant", "parts": [{"type": "text", "content": content}]}]
+
+    text_parts = [part for part in content if isinstance(part, dict) and "text" in part]
+    return [
+        {
+            "role": "assistant",
+            "parts": [
+                {"type": "text", "content": cast("TextChunkTypedDict", part)["text"]}
+                for part in text_parts
+            ],
+        }
+    ]
 
 
 def _transform_system_instructions(
@@ -273,6 +316,17 @@ def _wrap_complete(f: "Callable[..., Any]") -> "Callable[..., Any]":
                     SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, response.usage.total_tokens
                 )
 
+            set_on_span(
+                SPANDATA.GEN_AI_OUTPUT_MESSAGES,
+                json.dumps(
+                    [
+                        _transform_output_message(choice.message)
+                        for choice in response.choices
+                        if choice.message is not None
+                    ]
+                ),
+            )
+
             return response
 
     return wrap_complete
@@ -382,6 +436,17 @@ def _wrap_complete_async(f: "Callable[..., Any]") -> "Callable[..., Any]":
                 set_on_span(
                     SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, response.usage.total_tokens
                 )
+
+            set_on_span(
+                SPANDATA.GEN_AI_OUTPUT_MESSAGES,
+                json.dumps(
+                    [
+                        _transform_output_message(choice.message)
+                        for choice in response.choices
+                        if choice.message is not None
+                    ]
+                ),
+            )
 
             return response
 

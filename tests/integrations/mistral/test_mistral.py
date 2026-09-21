@@ -36,7 +36,17 @@ def mistral_response():
                 index=0,
                 finish_reason="stop",
                 message=AssistantMessage(content="Hello, how can I help you?"),
-            )
+            ),
+            ChatCompletionChoice(
+                index=1,
+                finish_reason="stop",
+                message=AssistantMessage(
+                    content=[
+                        TextChunk(text="Response 1"),
+                        TextChunk(text="Response 2"),
+                    ]
+                ),
+            ),
         ],
     )
 
@@ -687,3 +697,210 @@ async def test_input_attributes_nonstreaming_chat_async(
             json.loads(span["data"][SPANDATA.GEN_AI_INPUT_MESSAGES])
             == expected_input_messages
         )
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+def test_output_attributes_nonstreaming_chat(
+    sentry_init,
+    capture_items,
+    get_model_response,
+    mistral_response,
+    stream_gen_ai_spans,
+    span_streaming,
+):
+    sentry_init(
+        integrations=[MistralIntegration()],
+        traces_sample_rate=1.0,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
+
+    client = Mistral(api_key="z")
+
+    model_response = get_model_response(
+        mistral_response,
+        serialize_pydantic=True,
+    )
+
+    if span_streaming or stream_gen_ai_spans:
+        items = capture_items("span")
+
+        with mock.patch.object(
+            Chat,
+            "do_request",
+            return_value=model_response,
+        ), sentry_sdk.start_transaction(name="mistral"):
+            client.chat.complete(
+                model="mistral-medium-latest",
+                messages=[{"role": "user", "content": "Hello, Mistral"}],
+            )
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items]
+        (span,) = (
+            span
+            for span in spans
+            if span["attributes"].get("sentry.op") == OP.GEN_AI_CHAT
+        )
+
+        assert span["name"] == "chat mistral-medium-latest"
+        assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+            [
+                {
+                    "role": "assistant",
+                    "parts": [
+                        {"type": "text", "content": "Hello, how can I help you?"},
+                    ],
+                },
+            ],
+            [
+                {
+                    "role": "assistant",
+                    "parts": [
+                        {"type": "text", "content": "Response 1"},
+                        {"type": "text", "content": "Response 2"},
+                    ],
+                }
+            ],
+        ]
+    else:
+        items = capture_items("transaction")
+
+        with mock.patch.object(
+            Chat,
+            "do_request",
+            return_value=model_response,
+        ), sentry_sdk.start_transaction(name="mistral"):
+            client.chat.complete(
+                model="open-mistral",
+                messages=[{"role": "user", "content": "Hello, Mistral"}],
+            )
+
+        (transaction,) = [item.payload for item in items]
+        (span,) = transaction["spans"]
+
+        assert span["description"] == "chat open-mistral"
+        assert json.loads(span["data"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+            [
+                {
+                    "role": "assistant",
+                    "parts": [
+                        {"type": "text", "content": "Hello, how can I help you?"},
+                    ],
+                },
+            ],
+            [
+                {
+                    "role": "assistant",
+                    "parts": [
+                        {"type": "text", "content": "Response 1"},
+                        {"type": "text", "content": "Response 2"},
+                    ],
+                }
+            ],
+        ]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+async def test_output_attributes_nonstreaming_chat_async(
+    sentry_init,
+    capture_items,
+    get_model_response,
+    mistral_response,
+    stream_gen_ai_spans,
+    span_streaming,
+):
+    sentry_init(
+        integrations=[MistralIntegration()],
+        traces_sample_rate=1.0,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
+
+    client = Mistral(api_key="z")
+
+    model_response = get_model_response(
+        mistral_response,
+        serialize_pydantic=True,
+    )
+
+    if span_streaming or stream_gen_ai_spans:
+        items = capture_items("span")
+
+        with mock.patch.object(
+            Chat,
+            "do_request_async",
+            return_value=model_response,
+        ), sentry_sdk.start_transaction(name="mistral"):
+            await client.chat.complete_async(
+                model="mistral-medium-latest",
+                messages=[{"role": "user", "content": "Hello, Mistral"}],
+            )
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items]
+        (span,) = (
+            span
+            for span in spans
+            if span["attributes"].get("sentry.op") == OP.GEN_AI_CHAT
+        )
+
+        assert span["name"] == "chat mistral-medium-latest"
+        assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+            [
+                {
+                    "role": "assistant",
+                    "parts": [
+                        {"type": "text", "content": "Hello, how can I help you?"},
+                    ],
+                },
+            ],
+            [
+                {
+                    "role": "assistant",
+                    "parts": [
+                        {"type": "text", "content": "Response 1"},
+                        {"type": "text", "content": "Response 2"},
+                    ],
+                }
+            ],
+        ]
+    else:
+        items = capture_items("transaction")
+
+        with mock.patch.object(
+            Chat,
+            "do_request_async",
+            return_value=model_response,
+        ), sentry_sdk.start_transaction(name="mistral"):
+            await client.chat.complete_async(
+                model="mistral-medium-latest",
+                messages=[{"role": "user", "content": "Hello, Mistral"}],
+            )
+
+        (transaction,) = [item.payload for item in items]
+        (span,) = transaction["spans"]
+
+        assert span["description"] == "chat mistral-medium-latest"
+        assert json.loads(span["data"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+            [
+                {
+                    "role": "assistant",
+                    "parts": [
+                        {"type": "text", "content": "Hello, how can I help you?"},
+                    ],
+                },
+            ],
+            [
+                {
+                    "role": "assistant",
+                    "parts": [
+                        {"type": "text", "content": "Response 1"},
+                        {"type": "text", "content": "Response 2"},
+                    ],
+                }
+            ],
+        ]
