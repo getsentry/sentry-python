@@ -26,19 +26,30 @@ except ImportError:
 
 
 @contextmanager
-def _activate_client_span(span: "StreamedSpan") -> "Iterator[StreamedSpan]":
+def _activate_client_span(
+    span: "Union[Span, StreamedSpan]",
+) -> "Iterator[Union[Span, StreamedSpan]]":
     """Temporarily activate an inactive boto span without ending it."""
     if isinstance(span, NoOpStreamedSpan):
         yield span
         return
 
     scope = sentry_sdk.get_current_scope()
-    previous_span = scope.streamed_span
+    if not isinstance(span, StreamedSpan):
+        previous_span = scope.span
+        scope.span = span
+        try:
+            yield span
+        finally:
+            scope.span = previous_span
+        return
+
+    previous_streamed_span = scope.streamed_span
     scope.streamed_span = span
     try:
         yield span
     finally:
-        scope.streamed_span = previous_span
+        scope.streamed_span = previous_streamed_span
 
 
 def _patch_botocore_client() -> None:
@@ -82,18 +93,13 @@ def _patch_botocore_client() -> None:
             return orig_make_api_call(self, operation_name, api_params)
 
         # activate without finishing; a streaming response may outlive the call.
-        span_ctx = (
-            _activate_client_span(span) if isinstance(span, StreamedSpan) else span
-        )
+        span_ctx = _activate_client_span(span)
 
         try:
             with span_ctx:
                 parsed = orig_make_api_call(self, operation_name, api_params)
         except BaseException as error:
-            # finish `StreamedSpan` explicitly; static spans are finished by
-            # their context manager.
-            if isinstance(span, StreamedSpan):
-                _finish_span(span, error)
+            _finish_span(span, error)
             raise
 
         streaming_body_instrumented = False
@@ -101,7 +107,7 @@ def _patch_botocore_client() -> None:
             streaming_body_instrumented = _instrument_streaming_body(span, parsed)
 
         # `StreamingBody`s finish their span when consumed or closed.
-        if isinstance(span, StreamedSpan) and not streaming_body_instrumented:
+        if not streaming_body_instrumented:
             _finish_span(span)
         return parsed
 
