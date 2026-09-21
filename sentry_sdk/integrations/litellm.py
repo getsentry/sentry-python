@@ -246,9 +246,7 @@ def _success_callback(
                 total_tokens = input_tokens + output_tokens
 
             if total_tokens is not None:
-                span.set_attribute(
-                    SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, input_tokens + output_tokens
-                )
+                span.set_attribute(SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, total_tokens)
 
     finally:
         is_streaming = kwargs.get("stream")
