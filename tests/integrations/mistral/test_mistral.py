@@ -786,23 +786,19 @@ def test_output_attributes_nonstreaming_chat(
 
         assert span["name"] == "chat mistral-medium-latest"
         assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
-            [
-                {
-                    "role": "assistant",
-                    "parts": [
-                        {"type": "text", "content": "Hello, how can I help you?"},
-                    ],
-                },
-            ],
-            [
-                {
-                    "role": "assistant",
-                    "parts": [
-                        {"type": "text", "content": "Response 1"},
-                        {"type": "text", "content": "Response 2"},
-                    ],
-                }
-            ],
+            {
+                "role": "assistant",
+                "parts": [
+                    {"type": "text", "content": "Hello, how can I help you?"},
+                ],
+            },
+            {
+                "role": "assistant",
+                "parts": [
+                    {"type": "text", "content": "Response 1"},
+                    {"type": "text", "content": "Response 2"},
+                ],
+            },
         ]
     else:
         items = capture_items("transaction")
@@ -822,23 +818,19 @@ def test_output_attributes_nonstreaming_chat(
 
         assert span["description"] == "chat open-mistral"
         assert json.loads(span["data"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
-            [
-                {
-                    "role": "assistant",
-                    "parts": [
-                        {"type": "text", "content": "Hello, how can I help you?"},
-                    ],
-                },
-            ],
-            [
-                {
-                    "role": "assistant",
-                    "parts": [
-                        {"type": "text", "content": "Response 1"},
-                        {"type": "text", "content": "Response 2"},
-                    ],
-                }
-            ],
+            {
+                "role": "assistant",
+                "parts": [
+                    {"type": "text", "content": "Hello, how can I help you?"},
+                ],
+            },
+            {
+                "role": "assistant",
+                "parts": [
+                    {"type": "text", "content": "Response 1"},
+                    {"type": "text", "content": "Response 2"},
+                ],
+            },
         ]
 
 
@@ -904,23 +896,19 @@ async def test_output_attributes_nonstreaming_chat_async(
 
         assert span["name"] == "chat mistral-medium-latest"
         assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
-            [
-                {
-                    "role": "assistant",
-                    "parts": [
-                        {"type": "text", "content": "Hello, how can I help you?"},
-                    ],
-                },
-            ],
-            [
-                {
-                    "role": "assistant",
-                    "parts": [
-                        {"type": "text", "content": "Response 1"},
-                        {"type": "text", "content": "Response 2"},
-                    ],
-                }
-            ],
+            {
+                "role": "assistant",
+                "parts": [
+                    {"type": "text", "content": "Hello, how can I help you?"},
+                ],
+            },
+            {
+                "role": "assistant",
+                "parts": [
+                    {"type": "text", "content": "Response 1"},
+                    {"type": "text", "content": "Response 2"},
+                ],
+            },
         ]
     else:
         items = capture_items("transaction")
@@ -940,21 +928,17 @@ async def test_output_attributes_nonstreaming_chat_async(
 
         assert span["description"] == "chat mistral-medium-latest"
         assert json.loads(span["data"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
-            [
-                {
-                    "role": "assistant",
-                    "parts": [
-                        {"type": "text", "content": "Hello, how can I help you?"},
-                    ],
-                },
-            ],
-            [
-                {
-                    "role": "assistant",
-                    "parts": [
-                        {"type": "text", "content": "Response 1"},
-                        {"type": "text", "content": "Response 2"},
-                    ],
-                }
-            ],
+            {
+                "role": "assistant",
+                "parts": [
+                    {"type": "text", "content": "Hello, how can I help you?"},
+                ],
+            },
+            {
+                "role": "assistant",
+                "parts": [
+                    {"type": "text", "content": "Response 1"},
+                    {"type": "text", "content": "Response 2"},
+                ],
+            },
         ]

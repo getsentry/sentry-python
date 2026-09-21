@@ -144,44 +144,38 @@ def _transform_input_messages(
 
 def _transform_output_message(
     message: "Union[AssistantMessage, AssistantMessageTypedDict]",
-) -> "list[OutputMessage]":
+) -> "Optional[OutputMessage]":
     if isinstance(message, AssistantMessage):
         if message.content is None:
-            return []
+            return None
 
         if isinstance(message.content, str):
-            return [
-                {
-                    "role": "assistant",
-                    "parts": [{"type": "text", "content": message.content}],
-                }
-            ]
+            return {
+                "role": "assistant",
+                "parts": [{"type": "text", "content": message.content}],
+            }
 
         parts = [part for part in message.content if isinstance(part, TextChunk)]
-        return [
-            {
-                "role": "assistant",
-                "parts": [{"type": "text", "content": part.text} for part in parts],
-            }
-        ]
+        return {
+            "role": "assistant",
+            "parts": [{"type": "text", "content": part.text} for part in parts],
+        }
 
     content = message.get("content")
     if content is None:
-        return []
+        return None
 
     if isinstance(content, str):
-        return [{"role": "assistant", "parts": [{"type": "text", "content": content}]}]
+        return {"role": "assistant", "parts": [{"type": "text", "content": content}]}
 
     text_parts = [part for part in content if isinstance(part, dict) and "text" in part]
-    return [
-        {
-            "role": "assistant",
-            "parts": [
-                {"type": "text", "content": cast("TextChunkTypedDict", part)["text"]}
-                for part in text_parts
-            ],
-        }
-    ]
+    return {
+        "role": "assistant",
+        "parts": [
+            {"type": "text", "content": cast("TextChunkTypedDict", part)["text"]}
+            for part in text_parts
+        ],
+    }
 
 
 def _transform_system_instructions(
@@ -326,25 +320,27 @@ def _wrap_complete(f: "Callable[..., Any]") -> "Callable[..., Any]":
                     SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, response.usage.total_tokens
                 )
 
-            if isinstance(messages, Sequence) and (
-                (
-                    has_data_collection_enabled(client.options)
-                    and client.options["data_collection"]["gen_ai"]["outputs"]
-                )
-                or (
-                    not has_data_collection_enabled(client.options)
-                    and should_send_default_pii()
-                )
+            if (
+                has_data_collection_enabled(client.options)
+                and client.options["data_collection"]["gen_ai"]["outputs"]
+            ) or (
+                not has_data_collection_enabled(client.options)
+                and should_send_default_pii()
             ):
+                output_messages: "list[OutputMessage]" = []
+                for choice in response.choices:
+                    if choice.message is None:
+                        continue
+
+                    transformed_message = _transform_output_message(choice.message)
+                    if transformed_message is None:
+                        continue
+
+                    output_messages.append(transformed_message)
+
                 set_on_span(
                     SPANDATA.GEN_AI_OUTPUT_MESSAGES,
-                    json.dumps(
-                        [
-                            _transform_output_message(choice.message)
-                            for choice in response.choices
-                            if choice.message is not None
-                        ]
-                    ),
+                    json.dumps(output_messages),
                 )
 
             return response
@@ -465,25 +461,27 @@ def _wrap_complete_async(f: "Callable[..., Any]") -> "Callable[..., Any]":
                     SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, response.usage.total_tokens
                 )
 
-            if isinstance(messages, Sequence) and (
-                (
-                    has_data_collection_enabled(client.options)
-                    and client.options["data_collection"]["gen_ai"]["outputs"]
-                )
-                or (
-                    not has_data_collection_enabled(client.options)
-                    and should_send_default_pii()
-                )
+            if (
+                has_data_collection_enabled(client.options)
+                and client.options["data_collection"]["gen_ai"]["outputs"]
+            ) or (
+                not has_data_collection_enabled(client.options)
+                and should_send_default_pii()
             ):
+                output_messages: "list[OutputMessage]" = []
+                for choice in response.choices:
+                    if choice.message is None:
+                        continue
+
+                    transformed_message = _transform_output_message(choice.message)
+                    if transformed_message is None:
+                        continue
+
+                    output_messages.append(transformed_message)
+
                 set_on_span(
                     SPANDATA.GEN_AI_OUTPUT_MESSAGES,
-                    json.dumps(
-                        [
-                            _transform_output_message(choice.message)
-                            for choice in response.choices
-                            if choice.message is not None
-                        ]
-                    ),
+                    json.dumps(output_messages),
                 )
 
             return response
