@@ -392,6 +392,7 @@ async def test_nonstreaming_chat_async(
         ),
     ),
 )
+@pytest.mark.parametrize("data_collection", [True, False])
 @pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_input_attributes_nonstreaming_chat(
@@ -402,15 +403,26 @@ def test_input_attributes_nonstreaming_chat(
     messages,
     expected_system_instructions,
     expected_input_messages,
+    data_collection,
     stream_gen_ai_spans,
     span_streaming,
 ):
-    sentry_init(
-        integrations=[MistralIntegration()],
-        traces_sample_rate=1.0,
-        stream_gen_ai_spans=stream_gen_ai_spans,
-        trace_lifecycle="stream" if span_streaming else "static",
-    )
+    if data_collection:
+        sentry_init(
+            integrations=[MistralIntegration()],
+            traces_sample_rate=1.0,
+            stream_gen_ai_spans=stream_gen_ai_spans,
+            trace_lifecycle="stream" if span_streaming else "static",
+            _experiments={"data_collection": {}},
+        )
+    else:
+        sentry_init(
+            integrations=[MistralIntegration()],
+            traces_sample_rate=1.0,
+            stream_gen_ai_spans=stream_gen_ai_spans,
+            trace_lifecycle="stream" if span_streaming else "static",
+            send_default_pii=True,
+        )
 
     client = Mistral(api_key="z")
 
@@ -477,7 +489,7 @@ def test_input_attributes_nonstreaming_chat(
 
 
 @pytest.mark.parametrize(
-    "messages,expected_system_instructions,expected_input_messages",
+    "messages,expected_system_instructions",
     (
         (
             [
@@ -605,6 +617,7 @@ def test_input_attributes_nonstreaming_chat(
     ),
 )
 @pytest.mark.asyncio
+@pytest.mark.parametrize("data_collection", [True, False])
 @pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 async def test_input_attributes_nonstreaming_chat_async(
@@ -615,16 +628,26 @@ async def test_input_attributes_nonstreaming_chat_async(
     messages,
     expected_system_instructions,
     expected_input_messages,
+    data_collection,
     stream_gen_ai_spans,
     span_streaming,
 ):
-    sentry_init(
-        integrations=[MistralIntegration()],
-        traces_sample_rate=1.0,
-        stream_gen_ai_spans=stream_gen_ai_spans,
-        trace_lifecycle="stream" if span_streaming else "static",
-    )
-
+    if data_collection:
+        sentry_init(
+            integrations=[MistralIntegration()],
+            traces_sample_rate=1.0,
+            stream_gen_ai_spans=stream_gen_ai_spans,
+            trace_lifecycle="stream" if span_streaming else "static",
+            _experiments={"data_collection": {}},
+        )
+    else:
+        sentry_init(
+            integrations=[MistralIntegration()],
+            traces_sample_rate=1.0,
+            stream_gen_ai_spans=stream_gen_ai_spans,
+            trace_lifecycle="stream" if span_streaming else "static",
+            send_default_pii=True,
+        )
     client = Mistral(api_key="z")
 
     model_response = get_model_response(
