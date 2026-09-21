@@ -25,14 +25,16 @@ if TYPE_CHECKING:
         TextChunkTypedDict,
     )
 
-    from sentry_sdk._types import TextPart
+    from sentry_sdk._types import InputMessage, TextPart
 
 try:
     from mistralai.client.chat import Chat
     from mistralai.client.models import (
+        AssistantMessage,
         ChatCompletionResponse,
         SystemMessage,
         TextChunk,
+        UserMessage,
     )
 except ImportError:
     raise DidNotEnable("mistralai not installed")
@@ -59,6 +61,91 @@ def _is_system_instruction(
         return message.get("role") == "system"
 
     return False
+
+
+def _transform_input_messages(
+    messages: "Sequence[Union[ChatCompletionRequestMessage, ChatCompletionRequestMessageTypedDict]]",
+) -> "list[InputMessage]":
+    input_messages: "list[InputMessage]" = []
+
+    for message in messages:
+        if isinstance(message, UserMessage) and isinstance(message.content, str):
+            input_messages.append(
+                {
+                    "role": "user",
+                    "parts": [{"type": "text", "content": message.content}],
+                }
+            )
+        elif isinstance(message, UserMessage) and isinstance(message.content, list):
+            text_parts = [
+                part for part in message.content if isinstance(part, TextChunk)
+            ]
+            input_messages.append(
+                {
+                    "role": "user",
+                    "parts": [
+                        {"type": "text", "content": part.text} for part in text_parts
+                    ],
+                }
+            )
+
+        if isinstance(message, AssistantMessage) and isinstance(message.content, str):
+            input_messages.append(
+                {
+                    "role": "assistant",
+                    "parts": [{"type": "text", "content": message.content}],
+                }
+            )
+        elif isinstance(message, AssistantMessage) and isinstance(
+            message.content, list
+        ):
+            text_parts = [
+                part for part in message.content if isinstance(part, TextChunk)
+            ]
+            input_messages.append(
+                {
+                    "role": "assistant",
+                    "parts": [
+                        {"type": "text", "content": part.text} for part in text_parts
+                    ],
+                }
+            )
+
+        if not isinstance(message, dict):
+            continue
+
+        role = message.get("role")
+        if role != "user" and role != "assistant":
+            continue
+
+        content = message.get("content")
+        if isinstance(content, str):
+            input_messages.append(
+                {"role": role, "parts": [{"type": "text", "content": content}]}
+            )
+
+        if not isinstance(content, list):
+            continue
+
+        text_parts = [
+            part
+            for part in content
+            if isinstance(part, dict) and part.get("type") == "text" and "text" in part
+        ]
+        input_messages.append(
+            {
+                "role": role,
+                "parts": [
+                    {
+                        "type": "text",
+                        "content": cast("TextChunkTypedDict", part)["text"],
+                    }
+                    for part in text_parts
+                ],
+            }
+        )
+
+    return input_messages
 
 
 def _transform_system_instructions(
@@ -156,6 +243,11 @@ def _wrap_complete(f: "Callable[..., Any]") -> "Callable[..., Any]":
                         SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
                         json.dumps(_transform_system_instructions(system_instructions)),
                     )
+
+                set_on_span(
+                    SPANDATA.GEN_AI_INPUT_MESSAGES,
+                    json.dumps(_transform_input_messages(messages)),
+                )
 
             max_tokens = kwargs.get("max_tokens")
             if max_tokens is not None:
@@ -269,6 +361,11 @@ def _wrap_complete_async(f: "Callable[..., Any]") -> "Callable[..., Any]":
                         SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
                         json.dumps(_transform_system_instructions(system_instructions)),
                     )
+
+                set_on_span(
+                    SPANDATA.GEN_AI_INPUT_MESSAGES,
+                    json.dumps(_transform_input_messages(messages)),
+                )
 
             max_tokens = kwargs.get("max_tokens")
             if max_tokens is not None:

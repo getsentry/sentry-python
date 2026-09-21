@@ -268,7 +268,7 @@ async def test_nonstreaming_chat_async(
 
 
 @pytest.mark.parametrize(
-    "messages,expected_system_instructions",
+    "messages,expected_system_instructions,expected_input_messages",
     (
         (
             [
@@ -276,12 +276,35 @@ async def test_nonstreaming_chat_async(
                     content="You are a helpful math tutor. You will be provided with a math problem, and your goal will be to output a step by step solution, along with a final answer. For each step, just provide the output as an equation use the explanation field to detail the reasoning."
                 ),
                 UserMessage(content="How can I solve 8x + 7 = -23"),
+                AssistantMessage(
+                    content="Subtract 7 from both sides to isolate the term with x ..."
+                ),
             ],
             [
                 {
                     "type": "text",
                     "content": "You are a helpful math tutor. You will be provided with a math problem, and your goal will be to output a step by step solution, along with a final answer. For each step, just provide the output as an equation use the explanation field to detail the reasoning.",
                 }
+            ],
+            [
+                {
+                    "role": "user",
+                    "parts": [
+                        {
+                            "type": "text",
+                            "content": "How can I solve 8x + 7 = -23",
+                        }
+                    ],
+                },
+                {
+                    "role": "assistant",
+                    "parts": [
+                        {
+                            "type": "text",
+                            "content": "Subtract 7 from both sides to isolate the term with x ...",
+                        }
+                    ],
+                },
             ],
         ),
         (
@@ -298,10 +321,44 @@ async def test_nonstreaming_chat_async(
                         TextChunk(text="give the best 50"),
                     ]
                 ),
+                AssistantMessage(
+                    content=[
+                        TextChunk(text="Camembert de Normandie"),
+                        TextChunk(text="Brie de Meaux"),
+                    ]
+                ),
             ],
             [
                 {"type": "text", "content": "You are a helpful assistant."},
                 {"type": "text", "content": "Be concise and clear."},
+            ],
+            [
+                {
+                    "role": "user",
+                    "parts": [
+                        {
+                            "type": "text",
+                            "content": "What is the best French cheese?",
+                        },
+                        {
+                            "type": "text",
+                            "content": "give the best 50",
+                        },
+                    ],
+                },
+                {
+                    "role": "assistant",
+                    "parts": [
+                        {
+                            "type": "text",
+                            "content": "Camembert de Normandie",
+                        },
+                        {
+                            "type": "text",
+                            "content": "Brie de Meaux",
+                        },
+                    ],
+                },
             ],
         ),
         (
@@ -311,12 +368,36 @@ async def test_nonstreaming_chat_async(
                     "content": "You are a helpful math tutor. You will be provided with a math problem, and your goal will be to output a step by step solution, along with a final answer. For each step, just provide the output as an equation use the explanation field to detail the reasoning.",
                 },
                 {"role": "user", "content": "How can I solve 8x + 7 = -23"},
+                {
+                    "role": "assistant",
+                    "content": "Subtract 7 from both sides to isolate the term with x ...",
+                },
             ],
             [
                 {
                     "type": "text",
                     "content": "You are a helpful math tutor. You will be provided with a math problem, and your goal will be to output a step by step solution, along with a final answer. For each step, just provide the output as an equation use the explanation field to detail the reasoning.",
                 }
+            ],
+            [
+                {
+                    "role": "user",
+                    "parts": [
+                        {
+                            "type": "text",
+                            "content": "How can I solve 8x + 7 = -23",
+                        }
+                    ],
+                },
+                {
+                    "role": "assistant",
+                    "parts": [
+                        {
+                            "type": "text",
+                            "content": "Subtract 7 from both sides to isolate the term with x ...",
+                        }
+                    ],
+                },
             ],
         ),
         (
@@ -335,10 +416,45 @@ async def test_nonstreaming_chat_async(
                         {"type": "text", "text": "give the best 50"},
                     ],
                 },
+                {
+                    "role": "assistant",
+                    "content": [
+                        {"type": "text", "text": "Camembert de Normandie"},
+                        {"type": "text", "text": "Brie de Meaux"},
+                    ],
+                },
             ],
             [
                 {"type": "text", "content": "You are a helpful assistant."},
                 {"type": "text", "content": "Be concise and clear."},
+            ],
+            [
+                {
+                    "role": "user",
+                    "parts": [
+                        {
+                            "type": "text",
+                            "content": "What is the best French cheese?",
+                        },
+                        {
+                            "type": "text",
+                            "content": "give the best 50",
+                        },
+                    ],
+                },
+                {
+                    "role": "assistant",
+                    "parts": [
+                        {
+                            "type": "text",
+                            "content": "Camembert de Normandie",
+                        },
+                        {
+                            "type": "text",
+                            "content": "Brie de Meaux",
+                        },
+                    ],
+                },
             ],
         ),
     ),
@@ -353,6 +469,7 @@ def test_input_attributes_nonstreaming_chat(
     mistral_response,
     messages,
     expected_system_instructions,
+    expected_input_messages,
     data_collection,
     stream_gen_ai_spans,
     span_streaming,
@@ -406,6 +523,10 @@ def test_input_attributes_nonstreaming_chat(
         assert (
             json.loads(span["attributes"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS])
             == expected_system_instructions
+        )
+        assert (
+            json.loads(span["attributes"][SPANDATA.GEN_AI_INPUT_MESSAGES])
+            == expected_input_messages
         )
     else:
         items = capture_items("transaction")
@@ -428,10 +549,14 @@ def test_input_attributes_nonstreaming_chat(
             json.loads(span["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS])
             == expected_system_instructions
         )
+        assert (
+            json.loads(span["data"][SPANDATA.GEN_AI_INPUT_MESSAGES])
+            == expected_input_messages
+        )
 
 
 @pytest.mark.parametrize(
-    "messages,expected_system_instructions",
+    "messages,expected_system_instructions,expected_input_messages",
     (
         (
             [
@@ -439,12 +564,35 @@ def test_input_attributes_nonstreaming_chat(
                     content="You are a helpful math tutor. You will be provided with a math problem, and your goal will be to output a step by step solution, along with a final answer. For each step, just provide the output as an equation use the explanation field to detail the reasoning."
                 ),
                 UserMessage(content="How can I solve 8x + 7 = -23"),
+                AssistantMessage(
+                    content="Subtract 7 from both sides to isolate the term with x ..."
+                ),
             ],
             [
                 {
                     "type": "text",
                     "content": "You are a helpful math tutor. You will be provided with a math problem, and your goal will be to output a step by step solution, along with a final answer. For each step, just provide the output as an equation use the explanation field to detail the reasoning.",
                 }
+            ],
+            [
+                {
+                    "role": "user",
+                    "parts": [
+                        {
+                            "type": "text",
+                            "content": "How can I solve 8x + 7 = -23",
+                        }
+                    ],
+                },
+                {
+                    "role": "assistant",
+                    "parts": [
+                        {
+                            "type": "text",
+                            "content": "Subtract 7 from both sides to isolate the term with x ...",
+                        }
+                    ],
+                },
             ],
         ),
         (
@@ -461,10 +609,44 @@ def test_input_attributes_nonstreaming_chat(
                         TextChunk(text="give the best 50"),
                     ]
                 ),
+                AssistantMessage(
+                    content=[
+                        TextChunk(text="Camembert de Normandie"),
+                        TextChunk(text="Brie de Meaux"),
+                    ]
+                ),
             ],
             [
                 {"type": "text", "content": "You are a helpful assistant."},
                 {"type": "text", "content": "Be concise and clear."},
+            ],
+            [
+                {
+                    "role": "user",
+                    "parts": [
+                        {
+                            "type": "text",
+                            "content": "What is the best French cheese?",
+                        },
+                        {
+                            "type": "text",
+                            "content": "give the best 50",
+                        },
+                    ],
+                },
+                {
+                    "role": "assistant",
+                    "parts": [
+                        {
+                            "type": "text",
+                            "content": "Camembert de Normandie",
+                        },
+                        {
+                            "type": "text",
+                            "content": "Brie de Meaux",
+                        },
+                    ],
+                },
             ],
         ),
         (
@@ -474,12 +656,36 @@ def test_input_attributes_nonstreaming_chat(
                     "content": "You are a helpful math tutor. You will be provided with a math problem, and your goal will be to output a step by step solution, along with a final answer. For each step, just provide the output as an equation use the explanation field to detail the reasoning.",
                 },
                 {"role": "user", "content": "How can I solve 8x + 7 = -23"},
+                {
+                    "role": "assistant",
+                    "content": "Subtract 7 from both sides to isolate the term with x ...",
+                },
             ],
             [
                 {
                     "type": "text",
                     "content": "You are a helpful math tutor. You will be provided with a math problem, and your goal will be to output a step by step solution, along with a final answer. For each step, just provide the output as an equation use the explanation field to detail the reasoning.",
                 }
+            ],
+            [
+                {
+                    "role": "user",
+                    "parts": [
+                        {
+                            "type": "text",
+                            "content": "How can I solve 8x + 7 = -23",
+                        }
+                    ],
+                },
+                {
+                    "role": "assistant",
+                    "parts": [
+                        {
+                            "type": "text",
+                            "content": "Subtract 7 from both sides to isolate the term with x ...",
+                        }
+                    ],
+                },
             ],
         ),
         (
@@ -498,10 +704,45 @@ def test_input_attributes_nonstreaming_chat(
                         {"type": "text", "text": "give the best 50"},
                     ],
                 },
+                {
+                    "role": "assistant",
+                    "content": [
+                        {"type": "text", "text": "Camembert de Normandie"},
+                        {"type": "text", "text": "Brie de Meaux"},
+                    ],
+                },
             ],
             [
                 {"type": "text", "content": "You are a helpful assistant."},
                 {"type": "text", "content": "Be concise and clear."},
+            ],
+            [
+                {
+                    "role": "user",
+                    "parts": [
+                        {
+                            "type": "text",
+                            "content": "What is the best French cheese?",
+                        },
+                        {
+                            "type": "text",
+                            "content": "give the best 50",
+                        },
+                    ],
+                },
+                {
+                    "role": "assistant",
+                    "parts": [
+                        {
+                            "type": "text",
+                            "content": "Camembert de Normandie",
+                        },
+                        {
+                            "type": "text",
+                            "content": "Brie de Meaux",
+                        },
+                    ],
+                },
             ],
         ),
     ),
@@ -517,6 +758,7 @@ async def test_input_attributes_nonstreaming_chat_async(
     mistral_response,
     messages,
     expected_system_instructions,
+    expected_input_messages,
     data_collection,
     stream_gen_ai_spans,
     span_streaming,
@@ -570,6 +812,10 @@ async def test_input_attributes_nonstreaming_chat_async(
             json.loads(span["attributes"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS])
             == expected_system_instructions
         )
+        assert (
+            json.loads(span["attributes"][SPANDATA.GEN_AI_INPUT_MESSAGES])
+            == expected_input_messages
+        )
     else:
         items = capture_items("transaction")
 
@@ -590,4 +836,8 @@ async def test_input_attributes_nonstreaming_chat_async(
         assert (
             json.loads(span["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS])
             == expected_system_instructions
+        )
+        assert (
+            json.loads(span["data"][SPANDATA.GEN_AI_INPUT_MESSAGES])
+            == expected_input_messages
         )
