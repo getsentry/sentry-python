@@ -3,7 +3,6 @@ from typing import TYPE_CHECKING
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable
-from sentry_sdk.integrations.boto3 import Boto3Integration
 from sentry_sdk.integrations.boto3.consts import ORIGIN
 from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing import BAGGAGE_HEADER_NAME, Span
@@ -35,6 +34,8 @@ except ImportError:
 def _sentry_request_created(
     service_id: "ServiceId", request: "AWSRequest", operation_name: str, **kwargs: "Any"
 ) -> None:
+    from sentry_sdk.integrations.boto3 import Boto3Integration
+
     description = "aws.%s.%s" % (service_id.hyphenize(), operation_name)
 
     client = sentry_sdk.get_client()
@@ -110,6 +111,8 @@ def _sentry_request_created(
 def _sentry_before_sign(
     request: "AWSRequest", signature_version: "Any", **kwargs: "Any"
 ) -> None:
+    from sentry_sdk.integrations.boto3 import Boto3Integration
+
     client = sentry_sdk.get_client()
     if client.get_integration(Boto3Integration) is None:
         return
