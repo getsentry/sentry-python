@@ -290,7 +290,7 @@ def _wrap_embed(f: "Callable[..., Any]") -> "Callable[..., Any]":
                 if res.meta.billed_units.input_tokens is not None:
                     span.set_attribute(
                         SPANDATA.GEN_AI_USAGE_INPUT_TOKENS,
-                        res.meta.billed_units.input_tokensns,
+                        res.meta.billed_units.input_tokens,
                     )
 
                 if res.meta.billed_units.input_tokens is not None:
