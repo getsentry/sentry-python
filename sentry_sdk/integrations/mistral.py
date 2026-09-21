@@ -1,5 +1,7 @@
+import json
+from collections.abc import Sequence
 from functools import wraps
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import sentry_sdk
 from sentry_sdk.ai.utils import (
@@ -12,11 +14,24 @@ from sentry_sdk.tracing_utils import (
 )
 
 if TYPE_CHECKING:
-    from typing import Any, Callable
+    from typing import Any, Callable, Iterable, Optional, TypeGuard, Union
+
+    from mistralai.client.models import (
+        ChatCompletionRequestMessage,
+        ChatCompletionRequestMessageTypedDict,
+        SystemMessageTypedDict,
+        TextChunkTypedDict,
+    )
+
+    from sentry_sdk._types import TextPart
 
 try:
     from mistralai.client.chat import Chat
-    from mistralai.client.models import ChatCompletionResponse
+    from mistralai.client.models import (
+        ChatCompletionResponse,
+        SystemMessage,
+        TextChunk,
+    )
 except ImportError:
     raise DidNotEnable("mistralai not installed")
 
@@ -30,6 +45,49 @@ class MistralIntegration(Integration):
         Chat.complete = _wrap_complete(Chat.complete)  # type: ignore[method-assign]
 
         Chat.complete_async = _wrap_complete_async(Chat.complete_async)  # type: ignore[method-assign]
+
+
+def _is_system_instruction(
+    message: "Union[ChatCompletionRequestMessage, ChatCompletionRequestMessageTypedDict]",
+) -> "TypeGuard[Union[SystemMessage, SystemMessageTypedDict]]":
+    if isinstance(message, SystemMessage):
+        return True
+
+    if isinstance(message, dict):
+        return message.get("role") == "system"
+
+    return False
+
+
+def _transform_system_instructions(
+    messages: "list[Union[SystemMessage, SystemMessageTypedDict]]",
+) -> "list[TextPart]":
+    system_instructions: "list[TextPart]" = []
+    for message in messages:
+        if isinstance(message, SystemMessage) and isinstance(message.content, str):
+            system_instructions.append({"type": "text", "content": message.content})
+        elif isinstance(message, SystemMessage) and isinstance(message.content, list):
+            for part in message.content:
+                if not isinstance(part, TextChunk):
+                    continue
+                system_instructions.append({"type": "text", "content": part.text})
+
+        if not isinstance(message, dict):
+            continue
+
+        content = message.get("content")
+        if isinstance(content, str):
+            system_instructions.append({"type": "text", "content": content})
+
+        if not isinstance(content, list):
+            continue
+
+        for part in content:
+            if isinstance(part, dict) and "text" in part:
+                text = cast("TextChunkTypedDict", part)["text"]
+                system_instructions.append({"type": "text", "content": text})
+
+    return system_instructions
 
 
 def _wrap_complete(f: "Callable[..., Any]") -> "Callable[..., Any]":
@@ -71,6 +129,17 @@ def _wrap_complete(f: "Callable[..., Any]") -> "Callable[..., Any]":
                 set_on_span(SPANDATA.GEN_AI_REQUEST_MODEL, model)
 
             set_on_span(SPANDATA.GEN_AI_RESPONSE_STREAMING, False)
+
+            messages = kwargs.get("messages")
+            if isinstance(messages, Sequence):
+                system_instructions = [
+                    message for message in messages if _is_system_instruction(message)
+                ]
+                if len(system_instructions) > 0:
+                    set_on_span(
+                        SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+                        json.dumps(_transform_system_instructions(system_instructions)),
+                    )
 
             max_tokens = kwargs.get("max_tokens")
             if max_tokens is not None:
@@ -163,6 +232,19 @@ def _wrap_complete_async(f: "Callable[..., Any]") -> "Callable[..., Any]":
                 set_on_span(SPANDATA.GEN_AI_REQUEST_MODEL, model)
 
             set_on_span(SPANDATA.GEN_AI_RESPONSE_STREAMING, False)
+
+            messages: "Optional[Union[Iterable[ChatCompletionRequestMessage], Iterable[ChatCompletionRequestMessageTypedDict]]]" = kwargs.get(
+                "messages"
+            )
+            if isinstance(messages, Sequence):
+                system_instructions = [
+                    message for message in messages if _is_system_instruction(message)
+                ]
+                if len(system_instructions) > 0:
+                    set_on_span(
+                        SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+                        json.dumps(_transform_system_instructions(system_instructions)),
+                    )
 
             max_tokens = kwargs.get("max_tokens")
             if max_tokens is not None:
