@@ -29,7 +29,19 @@ except ImportError:
 def _activate_client_span(
     span: "Union[Span, StreamedSpan]",
 ) -> "Iterator[Union[Span, StreamedSpan]]":
-    """Temporarily activate an inactive boto span without ending it."""
+    """
+    Activate the boto span temporarily during `_make_api_call()` without ending it.
+
+    Botocore returns a `StreamingBody` before its bytes are consumed. Using the
+    context manager would finish it as soon as `_make_api_call()` returns, so
+    restore the caller's span here and let the `StreamingBody` wrapper finish
+    the boto span when body is consumed/closed.
+
+    faulty:                               desired:
+           boto3  [_make_api_call]                boto3  [_make_api_call------]
+           http     [request]                     http       [request]
+           stream               [read]            stream                [read]
+    """
     if isinstance(span, NoOpStreamedSpan):
         yield span
         return
