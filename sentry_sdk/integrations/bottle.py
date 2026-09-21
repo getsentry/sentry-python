@@ -192,55 +192,38 @@ class BottleRequestExtractor(RequestExtractor):
         return file.content_length
 
 
-def _set_segment_name_and_source(transaction_style: str) -> None:
+def _get_transaction_name(transaction_style: str, request: "Any") -> str:
     try:
         if transaction_style == "url":
-            name = bottle_request.route.rule or "bottle request"
+            return request.route.rule or ""
         else:
-            name = (
-                bottle_request.route.name
-                or transaction_from_function(bottle_request.route.callback)
-                or "bottle request"
-            )
-
-        sentry_sdk.get_current_scope().set_transaction_name(
-            name,
-            source=SEGMENT_SOURCE_FOR_STYLE[transaction_style],
-        )
-    except RuntimeError:
-        pass
-
-
-def _set_transaction_name_and_source(
-    event: "Event", transaction_style: str, request: "Any"
-) -> None:
-    name = ""
-
-    if transaction_style == "url":
-        try:
-            name = request.route.rule or ""
-        except RuntimeError:
-            pass
-
-    elif transaction_style == "endpoint":
-        try:
-            name = (
+            return (
                 request.route.name
                 or transaction_from_function(request.route.callback)
                 or ""
             )
-        except RuntimeError:
-            pass
+    except RuntimeError:
+        return ""
 
-    event["transaction"] = name
-    event["transaction_info"] = {"source": SEGMENT_SOURCE_FOR_STYLE[transaction_style]}
+
+def _set_segment_name_and_source(transaction_style: str) -> None:
+    name = _get_transaction_name(transaction_style, bottle_request)
+    if name:
+        sentry_sdk.get_current_scope().set_transaction_name(
+            name,
+            source=SEGMENT_SOURCE_FOR_STYLE[transaction_style],
+        )
 
 
 def _make_request_event_processor(
     app: "Bottle", request: "LocalRequest", integration: "BottleIntegration"
 ) -> "EventProcessor":
     def event_processor(event: "Event", hint: "dict[str, Any]") -> "Event":
-        _set_transaction_name_and_source(event, integration.transaction_style, request)
+        name = _get_transaction_name(integration.transaction_style, request)
+        event["transaction"] = name
+        event["transaction_info"] = {
+            "source": SEGMENT_SOURCE_FOR_STYLE[integration.transaction_style]
+        }
 
         with capture_internal_exceptions():
             BottleRequestExtractor(request).extract_into_event(event)
