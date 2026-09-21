@@ -264,7 +264,7 @@ def _sentry_request_created(
     """
     Enrich a single `AWSRequest` attempt. Botocore creates a
     fresh `AWSRequest` on every retry.
-    https://github.com/boto/botocore/blob/develop/botocore/endpoint.py#L178-L202
+    https://github.com/boto/botocore/blob/f9195c79ea2bf46350dd320d2a0bf3db7da0b460/botocore/endpoint.py#L178-L202
     """
     from sentry_sdk.integrations.boto3 import Boto3Integration
 
