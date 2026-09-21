@@ -64,6 +64,7 @@ if TYPE_CHECKING:
 
     from sentry_sdk._types import (
         AttributeValue,
+        DataCollection,
         Event,
         ExcInfo,
         Hint,
@@ -2106,13 +2107,16 @@ def safe_serialize(data: "Any") -> str:
 
 
 def has_data_collection_enabled(options: "Optional[dict[str, Any]]") -> bool:
-    # Callers pass post-resolution client options, where `data_collection` is always
-    # a fully-resolved dict. `provided_by_user` -- not the key's presence -- records
-    # whether the user actually configured it.
     if options is None:
         return False
 
-    return bool((options.get("data_collection") or {}).get("provided_by_user", False))
+    data_collection: "Optional[DataCollection]" = options.get("data_collection")
+    # Client options are resolved as part of client initialization, so `data_collection`
+    # being None could be that the user just didn't provide it.
+    # `provided_by_user` is what actually records whether the user actually configured it.
+    return data_collection is not None and data_collection.get(
+        "provided_by_user", False
+    )
 
 
 def get_before_send_log(
