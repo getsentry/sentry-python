@@ -110,9 +110,19 @@ def test_streaming(
         spans = [item.payload for item in items]
         assert len(spans) == 3
 
-        span1 = spans[0]
-        assert span1["attributes"]["sentry.op"] == "http.client"
-        assert span1["name"] == "aws.s3.GetObject"
+        stream_span, client_span, parent_span = spans
+        assert stream_span["attributes"]["sentry.op"] == "http.client.stream"
+        assert stream_span["name"] == "aws.s3.GetObject"
+        assert stream_span["parent_span_id"] == client_span["span_id"]
+
+        assert client_span["attributes"]["sentry.op"] == "http.client"
+        assert client_span["name"] == "aws.s3.GetObject"
+        assert client_span["parent_span_id"] == parent_span["span_id"]
+
+        assert parent_span["name"] == "custom parent"
+        assert parent_span["start_timestamp"] <= client_span["start_timestamp"]
+        assert client_span["start_timestamp"] <= stream_span["start_timestamp"]
+        assert stream_span["end_timestamp"] <= client_span["end_timestamp"]
 
         expected_attrs = {
             "http.request.method": "GET",
@@ -131,17 +141,12 @@ def test_streaming(
         }
         if send_default_pii:
             expected_attrs["url.full"] = "https://bucket.s3.amazonaws.com/foo.pdf"
-        assert span1["attributes"] == ApproxDict(expected_attrs)
+        assert client_span["attributes"] == ApproxDict(expected_attrs)
 
-        assert "url.fragment" not in span1["attributes"]
-        assert "url.query" not in span1["attributes"]
+        assert "url.fragment" not in client_span["attributes"]
+        assert "url.query" not in client_span["attributes"]
         if not send_default_pii:
-            assert "url.full" not in span1["attributes"]
-
-        span2 = spans[1]
-        assert span2["attributes"]["sentry.op"] == "http.client.stream"
-        assert span2["name"] == "aws.s3.GetObject"
-        assert span2["parent_span_id"] == span1["span_id"]
+            assert "url.full" not in client_span["attributes"]
     else:
         events = capture_events()
 
@@ -207,10 +212,20 @@ def test_streaming_close(
         sentry_sdk.flush()
         spans = [item.payload for item in items]
         assert len(spans) == 3
-        span1 = spans[0]
-        assert span1["attributes"]["sentry.op"] == "http.client"
-        span2 = spans[1]
-        assert span2["attributes"]["sentry.op"] == "http.client.stream"
+
+        stream_span, client_span, parent_span = spans
+        assert stream_span["attributes"]["sentry.op"] == "http.client.stream"
+        assert stream_span["name"] == "aws.s3.GetObject"
+        assert stream_span["parent_span_id"] == client_span["span_id"]
+
+        assert client_span["attributes"]["sentry.op"] == "http.client"
+        assert client_span["name"] == "aws.s3.GetObject"
+        assert client_span["parent_span_id"] == parent_span["span_id"]
+
+        assert parent_span["name"] == "custom parent"
+        assert parent_span["start_timestamp"] <= client_span["start_timestamp"]
+        assert client_span["start_timestamp"] <= stream_span["start_timestamp"]
+        assert stream_span["end_timestamp"] <= client_span["end_timestamp"]
     else:
         events = capture_events()
 

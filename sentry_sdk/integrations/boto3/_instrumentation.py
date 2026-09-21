@@ -19,28 +19,93 @@ from sentry_sdk.utils import (
 )
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, Optional, Type, Union
+    from typing import Any, Dict, Optional, Union
 
-    from botocore.model import ServiceId
-
+    from sentry_sdk._types import Attributes
+    from sentry_sdk.integrations.boto3._context import AwsCallContext
 
 try:
     from botocore.awsrequest import AWSRequest
     from botocore.response import StreamingBody
 except ImportError:
-    raise DidNotEnable("botocore is not installed")
+    raise DidNotEnable("botocore not installed")
 
 
-def _sentry_request_created(
-    service_id: "ServiceId", request: "AWSRequest", operation_name: str, **kwargs: "Any"
-) -> None:
+def _start_client_span(
+    ctx: "AwsCallContext",
+) -> "Optional[Union[Span, StreamedSpan]]":
     from sentry_sdk.integrations.boto3 import Boto3Integration
-
-    description = "aws.%s.%s" % (service_id.hyphenize(), operation_name)
 
     client = sentry_sdk.get_client()
     if client.get_integration(Boto3Integration) is None:
+        return None
+
+    # Use unknown if `service_id_hyphenized` is unavailable so a span name can
+    # still be created, e.g. "aws.unknown.GetObject".
+    service_name = ctx.service_id_hyphenized or "unknown"
+    span_name = "aws.%s.%s" % (service_name, ctx.operation_name)
+
+    if has_span_streaming_enabled(client.options):
+        if sentry_sdk.traces.get_current_span() is None:
+            return None
+
+        attributes: "Attributes" = {
+            SPANDATA.SENTRY_OP: OP.HTTP_CLIENT,
+            SPANDATA.SENTRY_ORIGIN: ORIGIN,
+        }
+        if ctx.service_id:
+            attributes[SPANDATA.RPC_METHOD] = "%s/%s" % (
+                ctx.service_id,
+                ctx.operation_name,
+            )
+        return sentry_sdk.traces.start_span(
+            name=span_name,
+            attributes=attributes,
+            # `StreamingBody` responses outlive `_make_api_call()`. `_activate_client_span()`
+            # activates this span only while the call itself runs.
+            active=False,
+        )
+
+    span = sentry_sdk.start_span(
+        name=span_name,
+        op=OP.HTTP_CLIENT,
+        origin=ORIGIN,
+    )
+    with capture_internal_exceptions():
+        if ctx.service_id_hyphenized:
+            span.set_tag("aws.service_id", ctx.service_id_hyphenized)
+        span.set_tag("aws.operation_name", ctx.operation_name)
+    return span
+
+
+def _set_request_attributes(
+    span: "Union[Span, StreamedSpan]",
+    request: "AWSRequest",
+) -> None:
+    client = sentry_sdk.get_client()
+
+    parsed_url = None
+    if request.url is not None:
+        with capture_internal_exceptions():
+            parsed_url = parse_url(request.url, sanitize=False)
+
+    if isinstance(span, StreamedSpan):
+        span.set_attributes(get_url_attributes(client, parsed_url))
+        if request.method is not None:
+            span.set_attribute(SPANDATA.HTTP_REQUEST_METHOD, request.method)
         return
+
+    if parsed_url is not None:
+        span.set_data("aws.request.url", parsed_url.url)
+        span.set_data(SPANDATA.HTTP_QUERY, parsed_url.query)
+        span.set_data(SPANDATA.HTTP_FRAGMENT, parsed_url.fragment)
+
+    if request.method is not None:
+        span.set_data(SPANDATA.HTTP_METHOD, request.method)
+
+
+def _add_request_breadcrumb(request: "AWSRequest") -> None:
+    client = sentry_sdk.get_client()
 
     parsed_url = None
     if request.url is not None:
@@ -49,39 +114,12 @@ def _sentry_request_created(
 
     breadcrumb: "dict[str, Any]" = {}
 
-    is_span_streaming_enabled = has_span_streaming_enabled(client.options)
-    span: "Union[Span, StreamedSpan, None]" = None
-    if is_span_streaming_enabled:
-        url_attributes = get_url_attributes(client, parsed_url)
-        breadcrumb.update(url_attributes)
-
+    if has_span_streaming_enabled(client.options):
+        breadcrumb.update(get_url_attributes(client, parsed_url))
         if request.method is not None:
             breadcrumb[SPANDATA.HTTP_REQUEST_METHOD] = request.method
-
-        if sentry_sdk.traces.get_current_span() is not None:
-            span = sentry_sdk.traces.start_span(
-                name=description,
-                attributes={
-                    "sentry.op": OP.HTTP_CLIENT,
-                    "sentry.origin": ORIGIN,
-                    SPANDATA.RPC_METHOD: f"{service_id}/{operation_name}",
-                },
-            )
-            span.set_attributes(url_attributes)
-
-            if request.method is not None:
-                span.set_attribute(SPANDATA.HTTP_REQUEST_METHOD, request.method)
     else:
-        span = sentry_sdk.start_span(
-            op=OP.HTTP_CLIENT,
-            name=description,
-            origin=ORIGIN,
-        )
-
-        if parsed_url:
-            span.set_data("aws.request.url", parsed_url.url)
-            span.set_data(SPANDATA.HTTP_QUERY, parsed_url.query)
-            span.set_data(SPANDATA.HTTP_FRAGMENT, parsed_url.fragment)
+        if parsed_url is not None:
             breadcrumb.update(
                 {
                     "aws.request.url": parsed_url.url,
@@ -90,21 +128,45 @@ def _sentry_request_created(
                 }
             )
 
-        span.set_tag("aws.service_id", service_id.hyphenize())
-        span.set_tag("aws.operation_name", operation_name)
         if request.method is not None:
-            span.set_data(SPANDATA.HTTP_METHOD, request.method)
             breadcrumb[SPANDATA.HTTP_METHOD] = request.method
-
-        # We do it in order for subsequent http calls/retries be
-        # attached to this span.
-        span.__enter__()
 
     add_http_breadcrumb(None, breadcrumb)
 
-    if span is not None:
-        # request.context is an open-ended data-structure
-        # where we can add anything useful in request life cycle.
+
+def _sentry_request_created(
+    request: "AWSRequest", operation_name: str, **kwargs: "Any"
+) -> None:
+    """
+    Enrich a single `AWSRequest` attempt. Botocore creates a fresh
+    `AWSRequest` on every retry.
+    https://github.com/boto/botocore/blob/develop/botocore/endpoint.py#L178-L202
+    """
+    from sentry_sdk.integrations.boto3 import Boto3Integration
+
+    client = sentry_sdk.get_client()
+    if client.get_integration(Boto3Integration) is None:
+        return
+
+    with capture_internal_exceptions():
+        _add_request_breadcrumb(request)
+
+        span = (
+            sentry_sdk.traces.get_current_span()
+            if has_span_streaming_enabled(client.options)
+            else sentry_sdk.get_current_span()
+        )
+        if span is None:
+            return
+
+        # An ignored streamed span is not activated; avoid enriching its parent.
+        if isinstance(span, StreamedSpan) and (
+            span.get_attributes().get(SPANDATA.SENTRY_ORIGIN) != ORIGIN
+        ):
+            return
+
+        _set_request_attributes(span, request)
+        # Each attempt has a fresh `request.context`; carry the active client span.
         request.context["_sentrysdk_span"] = span
 
 
@@ -118,8 +180,9 @@ def _sentry_before_sign(
         return
 
     with capture_internal_exceptions():
-        # presigned requests are executed later by another caller. Adding propagation
-        # headers here would make those headers part of the signature, requiring the caller to reproduce the same values.
+        # Presigned requests are executed later by another caller. Adding propagation
+        # headers here would make those headers part of the signature, requiring the
+        # caller to reproduce the same values.
         if isinstance(signature_version, str) and signature_version.endswith(
             ("-query", "-presign-post")
         ):
@@ -140,24 +203,23 @@ def _sentry_before_sign(
                 del request.headers[key]
             request.headers[key] = value
 
-        # use span associated with this botocore request
+        # Use the span associated with this botocore request.
         span = request.context.get("_sentrysdk_span")
-
         headers = sentry_sdk.get_current_scope().iter_trace_propagation_headers(
             span=span
         )
         for header_name, header_value in headers:
             if header_name != BAGGAGE_HEADER_NAME:
-                # normal headers (e.g. `sentry-trace`) are non-shared, so replace stale values
+                # Normal headers (e.g. `sentry-trace`) are non-shared, so replace
+                # stale values.
                 _replace_header(request, header_name, header_value)
                 continue
 
-            # merge existing `baggage` values under single header
+            # Preserve third-party baggage and replace stale `sentry-*` values.
             existing_values = request.headers.get_all(BAGGAGE_HEADER_NAME, [])
             combined_baggage = {
                 BAGGAGE_HEADER_NAME: ",".join(str(value) for value in existing_values)
             }
-            # preserve third-party baggage, replace stale `sentry-*` values
             add_sentry_baggage_to_headers(combined_baggage, header_value)
             _replace_header(
                 request, BAGGAGE_HEADER_NAME, combined_baggage[BAGGAGE_HEADER_NAME]
@@ -228,6 +290,8 @@ def _instrument_streaming_body(
 
         finished = True
         _finish_span(streaming_span, error)
+        if isinstance(span, StreamedSpan):
+            _finish_span(span, error)
 
     def content_length_reached() -> bool:
         content_length = getattr(body, "_content_length", None)
@@ -287,30 +351,3 @@ def _instrument_streaming_body(
         raise
 
     return True
-
-
-def _sentry_after_call(
-    context: "Dict[str, Any]", parsed: "Dict[str, Any]", **kwargs: "Any"
-) -> None:
-    span: "Optional[Union[Span, StreamedSpan]]" = context.pop("_sentrysdk_span", None)
-
-    # Span could be absent if the integration is disabled.
-    if span is None:
-        return
-
-    span.__exit__(None, None, None)
-
-    with capture_internal_exceptions():
-        _instrument_streaming_body(span, parsed)
-
-
-def _sentry_after_call_error(
-    context: "Dict[str, Any]", exception: "Type[BaseException]", **kwargs: "Any"
-) -> None:
-    span: "Optional[Union[Span, StreamedSpan]]" = context.pop("_sentrysdk_span", None)
-
-    # Span could be absent if the integration is disabled.
-    if span is None:
-        return
-
-    span.__exit__(type(exception), exception, None)
