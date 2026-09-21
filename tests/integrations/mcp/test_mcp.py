@@ -2247,7 +2247,7 @@ async def test_tool_data_collection_inputs(
         "trace_lifecycle": "stream" if span_streaming else "static",
     }
     if data_collection is not None:
-        init_kwargs["_experiments"] = {"data_collection": data_collection}
+        init_kwargs["data_collection"] = data_collection
 
     sentry_init(**init_kwargs)
 
@@ -2365,7 +2365,7 @@ async def test_tool_data_collection_outputs(
         "trace_lifecycle": "stream" if span_streaming else "static",
     }
     if data_collection is not None:
-        init_kwargs["_experiments"] = {"data_collection": data_collection}
+        init_kwargs["data_collection"] = data_collection
 
     sentry_init(**init_kwargs)
 
@@ -2486,7 +2486,7 @@ async def test_prompt_data_collection_inputs(
         "trace_lifecycle": "stream" if span_streaming else "static",
     }
     if data_collection is not None:
-        init_kwargs["_experiments"] = {"data_collection": data_collection}
+        init_kwargs["data_collection"] = data_collection
 
     sentry_init(**init_kwargs)
 
@@ -2572,7 +2572,7 @@ async def test_include_prompts_ignored_when_data_collection_set(
         traces_sample_rate=1.0,
         send_default_pii=True,
         trace_lifecycle="stream" if span_streaming else "static",
-        _experiments={"data_collection": {"gen_ai": {"outputs": True}}},
+        data_collection={"gen_ai": {"outputs": True}},
     )
 
     server = Server("test-server")

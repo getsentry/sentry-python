@@ -879,10 +879,8 @@ def test_span_templates_ai_data_collection(
     sentry_init(
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={
-            "data_collection": {
-                "gen_ai": {"inputs": collect_inputs, "outputs": collect_outputs}
-            }
+        data_collection={
+            "gen_ai": {"inputs": collect_inputs, "outputs": collect_outputs}
         },
     )
 

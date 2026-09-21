@@ -2350,16 +2350,14 @@ async def test_http_url_attributes_no_query_or_fragment_span_streaming_async(
             id="defaults",
         ),
         pytest.param(
-            {"_experiments": {"data_collection": {}}},
+            {"data_collection": {}},
             "toy=tennisball&color=red&auth=%5BFiltered%5D",
             id="data_collection_denylist_default",
         ),
         pytest.param(
             {
-                "_experiments": {
-                    "data_collection": {
-                        "url_query_params": {"mode": "denylist", "terms": ["toy"]}
-                    }
+                "data_collection": {
+                    "url_query_params": {"mode": "denylist", "terms": ["toy"]}
                 }
             },
             "toy=%5BFiltered%5D&color=red&auth=%5BFiltered%5D",
@@ -2367,10 +2365,8 @@ async def test_http_url_attributes_no_query_or_fragment_span_streaming_async(
         ),
         pytest.param(
             {
-                "_experiments": {
-                    "data_collection": {
-                        "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
-                    }
+                "data_collection": {
+                    "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
                 }
             },
             "toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D",
@@ -2378,30 +2374,22 @@ async def test_http_url_attributes_no_query_or_fragment_span_streaming_async(
         ),
         pytest.param(
             {
-                "_experiments": {
-                    "data_collection": {
-                        "url_query_params": {"mode": "allowlist", "terms": ["auth"]}
-                    }
+                "data_collection": {
+                    "url_query_params": {"mode": "allowlist", "terms": ["auth"]}
                 }
             },
             "toy=%5BFiltered%5D&color=%5BFiltered%5D&auth=%5BFiltered%5D",
             id="data_collection_allowlist_sensitive_term",
         ),
         pytest.param(
-            {
-                "_experiments": {
-                    "data_collection": {"url_query_params": {"mode": "off"}}
-                }
-            },
+            {"data_collection": {"url_query_params": {"mode": "off"}}},
             None,
             id="data_collection_off",
         ),
         pytest.param(
             {
                 "send_default_pii": True,
-                "_experiments": {
-                    "data_collection": {"url_query_params": {"mode": "off"}}
-                },
+                "data_collection": {"url_query_params": {"mode": "off"}},
             },
             None,
             id="data_collection_wins_over_send_default_pii",
@@ -2457,16 +2445,14 @@ def test_url_query_data_collection_span_streaming_sync(
             id="defaults",
         ),
         pytest.param(
-            {"_experiments": {"data_collection": {}}},
+            {"data_collection": {}},
             "toy=tennisball&color=red&auth=%5BFiltered%5D",
             id="data_collection_denylist_default",
         ),
         pytest.param(
             {
-                "_experiments": {
-                    "data_collection": {
-                        "url_query_params": {"mode": "denylist", "terms": ["toy"]}
-                    }
+                "data_collection": {
+                    "url_query_params": {"mode": "denylist", "terms": ["toy"]}
                 }
             },
             "toy=%5BFiltered%5D&color=red&auth=%5BFiltered%5D",
@@ -2474,10 +2460,8 @@ def test_url_query_data_collection_span_streaming_sync(
         ),
         pytest.param(
             {
-                "_experiments": {
-                    "data_collection": {
-                        "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
-                    }
+                "data_collection": {
+                    "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
                 }
             },
             "toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D",
@@ -2485,30 +2469,22 @@ def test_url_query_data_collection_span_streaming_sync(
         ),
         pytest.param(
             {
-                "_experiments": {
-                    "data_collection": {
-                        "url_query_params": {"mode": "allowlist", "terms": ["auth"]}
-                    }
+                "data_collection": {
+                    "url_query_params": {"mode": "allowlist", "terms": ["auth"]}
                 }
             },
             "toy=%5BFiltered%5D&color=%5BFiltered%5D&auth=%5BFiltered%5D",
             id="data_collection_allowlist_sensitive_term",
         ),
         pytest.param(
-            {
-                "_experiments": {
-                    "data_collection": {"url_query_params": {"mode": "off"}}
-                }
-            },
+            {"data_collection": {"url_query_params": {"mode": "off"}}},
             None,
             id="data_collection_off",
         ),
         pytest.param(
             {
                 "send_default_pii": True,
-                "_experiments": {
-                    "data_collection": {"url_query_params": {"mode": "off"}}
-                },
+                "data_collection": {"url_query_params": {"mode": "off"}},
             },
             None,
             id="data_collection_wins_over_send_default_pii",
@@ -2548,16 +2524,14 @@ async def test_url_query_data_collection_span_streaming_async(
     "init_kwargs, expected_url_full",
     [
         pytest.param(
-            {"_experiments": {"data_collection": {}}},
+            {"data_collection": {}},
             "http://example.com/?toy=tennisball&color=red&auth=%5BFiltered%5D#frag",
             id="data_collection_denylist_default",
         ),
         pytest.param(
             {
-                "_experiments": {
-                    "data_collection": {
-                        "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
-                    }
+                "data_collection": {
+                    "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
                 }
             },
             "http://example.com/?toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D#frag",
@@ -2596,16 +2570,14 @@ def test_url_full_reassembly_span_streaming_sync(
     "init_kwargs, expected_url_full",
     [
         pytest.param(
-            {"_experiments": {"data_collection": {}}},
+            {"data_collection": {}},
             "http://example.com/?toy=tennisball&color=red&auth=%5BFiltered%5D#frag",
             id="data_collection_denylist_default",
         ),
         pytest.param(
             {
-                "_experiments": {
-                    "data_collection": {
-                        "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
-                    }
+                "data_collection": {
+                    "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
                 }
             },
             "http://example.com/?toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D#frag",
@@ -2643,20 +2615,14 @@ async def test_url_full_reassembly_span_streaming_async(
     "init_kwargs, expected_url_full",
     [
         pytest.param(
-            {
-                "_experiments": {
-                    "data_collection": {"url_query_params": {"mode": "off"}}
-                }
-            },
+            {"data_collection": {"url_query_params": {"mode": "off"}}},
             "http://example.com/#frag",
             id="data_collection_off",
         ),
         pytest.param(
             {
                 "send_default_pii": True,
-                "_experiments": {
-                    "data_collection": {"url_query_params": {"mode": "off"}}
-                },
+                "data_collection": {"url_query_params": {"mode": "off"}},
             },
             "http://example.com/#frag",
             id="data_collection_wins_over_send_default_pii",
@@ -2706,20 +2672,14 @@ def test_url_query_params_off_keeps_bare_url_span_streaming_sync(
     "init_kwargs, expected_url_full",
     [
         pytest.param(
-            {
-                "_experiments": {
-                    "data_collection": {"url_query_params": {"mode": "off"}}
-                }
-            },
+            {"data_collection": {"url_query_params": {"mode": "off"}}},
             "http://example.com/#frag",
             id="data_collection_off",
         ),
         pytest.param(
             {
                 "send_default_pii": True,
-                "_experiments": {
-                    "data_collection": {"url_query_params": {"mode": "off"}}
-                },
+                "data_collection": {"url_query_params": {"mode": "off"}},
             },
             "http://example.com/#frag",
             id="data_collection_wins_over_send_default_pii",
@@ -2768,7 +2728,7 @@ async def test_url_query_params_off_keeps_bare_url_span_streaming_async(
     "init_kwargs, expected_url, expected_query, expected_fragment",
     [
         pytest.param(
-            {"_experiments": {"data_collection": {}}},
+            {"data_collection": {}},
             "http://example.com/?toy=tennisball&color=red&auth=%5BFiltered%5D#frag",
             "toy=tennisball&color=red&auth=%5BFiltered%5D",
             "frag",
@@ -2776,10 +2736,8 @@ async def test_url_query_params_off_keeps_bare_url_span_streaming_async(
         ),
         pytest.param(
             {
-                "_experiments": {
-                    "data_collection": {
-                        "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
-                    }
+                "data_collection": {
+                    "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
                 }
             },
             "http://example.com/?toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D#frag",
@@ -2788,11 +2746,7 @@ async def test_url_query_params_off_keeps_bare_url_span_streaming_async(
             id="data_collection_allowlist",
         ),
         pytest.param(
-            {
-                "_experiments": {
-                    "data_collection": {"url_query_params": {"mode": "off"}}
-                }
-            },
+            {"data_collection": {"url_query_params": {"mode": "off"}}},
             "http://example.com/#frag",
             "",
             "frag",
@@ -2851,7 +2805,7 @@ def test_crumb_url_query_data_collection_span_streaming_sync(
     "init_kwargs, expected_url, expected_query, expected_fragment",
     [
         pytest.param(
-            {"_experiments": {"data_collection": {}}},
+            {"data_collection": {}},
             "http://example.com/?toy=tennisball&color=red&auth=%5BFiltered%5D#frag",
             "toy=tennisball&color=red&auth=%5BFiltered%5D",
             "frag",
@@ -2859,10 +2813,8 @@ def test_crumb_url_query_data_collection_span_streaming_sync(
         ),
         pytest.param(
             {
-                "_experiments": {
-                    "data_collection": {
-                        "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
-                    }
+                "data_collection": {
+                    "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
                 }
             },
             "http://example.com/?toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D#frag",
@@ -2871,11 +2823,7 @@ def test_crumb_url_query_data_collection_span_streaming_sync(
             id="data_collection_allowlist",
         ),
         pytest.param(
-            {
-                "_experiments": {
-                    "data_collection": {"url_query_params": {"mode": "off"}}
-                }
-            },
+            {"data_collection": {"url_query_params": {"mode": "off"}}},
             "http://example.com/#frag",
             "",
             "frag",
@@ -2933,15 +2881,11 @@ async def test_crumb_url_query_data_collection_span_streaming_async(
     "init_kwargs",
     [
         pytest.param(
-            {"_experiments": {"data_collection": {}}},
+            {"data_collection": {}},
             id="data_collection_denylist_default",
         ),
         pytest.param(
-            {
-                "_experiments": {
-                    "data_collection": {"url_query_params": {"mode": "off"}}
-                }
-            },
+            {"data_collection": {"url_query_params": {"mode": "off"}}},
             id="data_collection_off",
         ),
     ],
@@ -2979,15 +2923,11 @@ def test_crumb_url_query_unfiltered_legacy_sync(
     "init_kwargs",
     [
         pytest.param(
-            {"_experiments": {"data_collection": {}}},
+            {"data_collection": {}},
             id="data_collection_denylist_default",
         ),
         pytest.param(
-            {
-                "_experiments": {
-                    "data_collection": {"url_query_params": {"mode": "off"}}
-                }
-            },
+            {"data_collection": {"url_query_params": {"mode": "off"}}},
             id="data_collection_off",
         ),
     ],
@@ -3025,7 +2965,7 @@ def test_omit_url_data_if_parsing_fails_span_streaming(
         integrations=[HttpxIntegration()],
         traces_sample_rate=1.0,
         trace_lifecycle="stream",
-        _experiments={"data_collection": {}},
+        data_collection={},
     )
 
     items = capture_items("span")

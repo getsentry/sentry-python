@@ -857,7 +857,7 @@ def _build_init_kwargs(send_default_pii, data_collection):
     if send_default_pii is not None:
         kwargs.append("send_default_pii=%r" % send_default_pii)
     if data_collection is not None:
-        kwargs.append("_experiments=%r" % {"data_collection": data_collection})
+        kwargs.append("data_collection=%r" % (data_collection,))
 
     return ", ".join(kwargs)
 

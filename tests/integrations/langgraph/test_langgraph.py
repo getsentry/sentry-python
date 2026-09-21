@@ -2195,7 +2195,7 @@ def test_pregel_invoke_gates_request_messages_on_inputs_setting(
         "trace_lifecycle": "stream" if span_streaming else "static",
     }
     if data_collection is not None:
-        init_kwargs["_experiments"] = {"data_collection": data_collection}
+        init_kwargs["data_collection"] = data_collection
 
     sentry_init(**init_kwargs)
 
@@ -2286,7 +2286,7 @@ def test_pregel_invoke_gates_response_text_and_tool_calls_on_outputs_setting(
         "trace_lifecycle": "stream" if span_streaming else "static",
     }
     if data_collection is not None:
-        init_kwargs["_experiments"] = {"data_collection": data_collection}
+        init_kwargs["data_collection"] = data_collection
 
     sentry_init(**init_kwargs)
 
@@ -2383,7 +2383,7 @@ def test_pregel_ainvoke_gates_inputs_and_outputs_independently(
         "trace_lifecycle": "stream" if span_streaming else "static",
     }
     if data_collection is not None:
-        init_kwargs["_experiments"] = {"data_collection": data_collection}
+        init_kwargs["data_collection"] = data_collection
 
     sentry_init(**init_kwargs)
 
@@ -2448,9 +2448,7 @@ def test_pregel_invoke_message_delta_ignores_gen_ai_inputs_setting(
         traces_sample_rate=1.0,
         stream_gen_ai_spans=span_streaming,
         trace_lifecycle="stream" if span_streaming else "static",
-        _experiments={
-            "data_collection": {"gen_ai": {"inputs": False, "outputs": True}}
-        },
+        data_collection={"gen_ai": {"inputs": False, "outputs": True}},
     )
 
     prior_response = "Of course! How can I assist you?"
@@ -2522,9 +2520,7 @@ def test_pregel_ainvoke_message_delta_ignores_gen_ai_inputs_setting(
         traces_sample_rate=1.0,
         stream_gen_ai_spans=span_streaming,
         trace_lifecycle="stream" if span_streaming else "static",
-        _experiments={
-            "data_collection": {"gen_ai": {"inputs": False, "outputs": True}}
-        },
+        data_collection={"gen_ai": {"inputs": False, "outputs": True}},
     )
 
     prior_response = "It is sunny in Berlin."
@@ -2630,7 +2626,7 @@ def test_state_graph_compile_gates_available_tools_only_when_data_collection_con
         "stream_gen_ai_spans": False,
     }
     if data_collection is not None:
-        init_kwargs["_experiments"] = {"data_collection": data_collection}
+        init_kwargs["data_collection"] = data_collection
 
     sentry_init(**init_kwargs)
 

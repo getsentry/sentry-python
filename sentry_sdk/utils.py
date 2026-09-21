@@ -2106,10 +2106,13 @@ def safe_serialize(data: "Any") -> str:
 
 
 def has_data_collection_enabled(options: "Optional[dict[str, Any]]") -> bool:
+    # Callers pass post-resolution client options, where `data_collection` is always
+    # a fully-resolved dict. `provided_by_user` -- not the key's presence -- records
+    # whether the user actually configured it.
     if options is None:
         return False
 
-    return "data_collection" in options.get("_experiments", {})
+    return bool((options.get("data_collection") or {}).get("provided_by_user", False))
 
 
 def get_before_send_log(

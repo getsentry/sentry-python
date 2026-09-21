@@ -497,19 +497,19 @@ def test_warns_on_invalid_sample_rate(rate, StringContaining):  # noqa: N803
         pytest.param({}, True, True, id="no_data_collection-include_true"),
         pytest.param({}, False, False, id="no_data_collection-include_false"),
         pytest.param(
-            {"_experiments": {"data_collection": {}}},
+            {"data_collection": {}},
             False,
             True,
             id="data_collection-spec_default_overrides_include_false",
         ),
         pytest.param(
-            {"_experiments": {"data_collection": {"frame_context_lines": 3}}},
+            {"data_collection": {"frame_context_lines": 3}},
             True,
             True,
             id="data_collection-frame_context_lines_3",
         ),
         pytest.param(
-            {"_experiments": {"data_collection": {"frame_context_lines": 0}}},
+            {"data_collection": {"frame_context_lines": 0}},
             True,
             False,
             id="data_collection-frame_context_lines_0_overrides_include_true",
@@ -563,7 +563,7 @@ def _frame_with_locals():
 def test_stack_frame_variables_bool_when_serializing_frame(
     sentry_init, data_collection, include_local_variables, expected_vars
 ):
-    sentry_init(_experiments={"data_collection": data_collection})
+    sentry_init(data_collection=data_collection)
 
     result = serialize_frame(
         _frame_with_locals(), include_local_variables=include_local_variables
@@ -573,7 +573,7 @@ def test_stack_frame_variables_bool_when_serializing_frame(
 
 
 def test_stack_frame_variables_true_does_not_filter_sensitive_locals(sentry_init):
-    sentry_init(_experiments={"data_collection": {"stack_frame_variables": True}})
+    sentry_init(data_collection={"stack_frame_variables": True})
 
     result = serialize_frame(_frame_with_locals())
 
@@ -629,7 +629,7 @@ def test_stack_frame_variables_true_does_not_filter_sensitive_locals(sentry_init
 def test_stack_frame_variables_filtering_when_serializing_frame(
     sentry_init, behaviour, expected_vars
 ):
-    sentry_init(_experiments={"data_collection": {"stack_frame_variables": behaviour}})
+    sentry_init(data_collection={"stack_frame_variables": behaviour})
 
     result = serialize_frame(_frame_with_locals())
 
@@ -637,9 +637,7 @@ def test_stack_frame_variables_filtering_when_serializing_frame(
 
 
 def test_stack_frame_variables_off_omits_vars(sentry_init):
-    sentry_init(
-        _experiments={"data_collection": {"stack_frame_variables": {"mode": "off"}}}
-    )
+    sentry_init(data_collection={"stack_frame_variables": {"mode": "off"}})
 
     result = serialize_frame(_frame_with_locals())
 
@@ -650,11 +648,7 @@ def test_stack_frame_variables_omits_vars_when_frame_has_no_locals(sentry_init):
     def _frame_without_locals():
         return sys._getframe()
 
-    sentry_init(
-        _experiments={
-            "data_collection": {"stack_frame_variables": {"mode": "denylist"}}
-        }
-    )
+    sentry_init(data_collection={"stack_frame_variables": {"mode": "denylist"}})
 
     result = serialize_frame(_frame_without_locals())
 
@@ -662,11 +656,7 @@ def test_stack_frame_variables_omits_vars_when_frame_has_no_locals(sentry_init):
 
 
 def test_stack_frame_variables_filtering_uses_custom_repr(sentry_init):
-    sentry_init(
-        _experiments={
-            "data_collection": {"stack_frame_variables": {"mode": "denylist"}}
-        }
-    )
+    sentry_init(data_collection={"stack_frame_variables": {"mode": "denylist"}})
 
     def custom_repr(value):
         return "CUSTOM" if value == "not sensitive" else None
@@ -711,7 +701,7 @@ def test_data_collection_stack_frame_variables_overrides_include_local_variables
 ):
     sentry_init(
         include_local_variables=False,
-        _experiments={"data_collection": {"stack_frame_variables": True}},
+        data_collection={"stack_frame_variables": True},
     )
     events = capture_events()
 
@@ -733,10 +723,8 @@ def test_data_collection_stack_frame_variables_filtering_applies_to_captured_exc
     sentry_init, capture_events
 ):
     sentry_init(
-        _experiments={
-            "data_collection": {
-                "stack_frame_variables": {"mode": "denylist", "terms": ["nickname"]}
-            }
+        data_collection={
+            "stack_frame_variables": {"mode": "denylist", "terms": ["nickname"]}
         }
     )
     events = capture_events()
@@ -762,10 +750,8 @@ def test_data_collection_stack_frame_variables_filtering_applies_to_captured_exc
 
 def test_serialize_frame_variables_serializer_failure(sentry_init):
     sentry_init(
-        _experiments={
-            "data_collection": {
-                "stack_frame_variables": {"mode": "denylist", "terms": ["password"]}
-            }
+        data_collection={
+            "stack_frame_variables": {"mode": "denylist", "terms": ["password"]}
         }
     )
 
@@ -1348,23 +1334,23 @@ def test_get_lines_from_file_handle_linecache_errors():
     [
         pytest.param({}, 5, id="no_data_collection-defaults_to_5"),
         pytest.param(
-            {"_experiments": {"data_collection": {}}},
+            {"data_collection": {}},
             5,
             id="data_collection-spec_default_5",
         ),
         pytest.param(
-            {"_experiments": {"data_collection": {"frame_context_lines": 3}}},
+            {"data_collection": {"frame_context_lines": 3}},
             3,
             id="data_collection-frame_context_lines_3",
         ),
         pytest.param(
-            {"_experiments": {"data_collection": {"frame_context_lines": 0}}},
+            {"data_collection": {"frame_context_lines": 0}},
             0,
             id="data_collection-frame_context_lines_0",
         ),
         pytest.param(
             {
-                "_experiments": {"data_collection": {}},
+                "data_collection": {},
                 "include_source_context": False,
             },
             5,

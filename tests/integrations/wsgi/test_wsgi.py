@@ -835,7 +835,7 @@ def test_request_headers_data_collection_default_redacts_sensitive(
     sentry_init, crashing_app, capture_events, send_default_pii
 ):
     """
-    When ``data_collection`` is configured (even as ``None``, i.e. spec
+    When ``data_collection`` is configured (here as ``{}``, i.e. spec
     defaults), the WSGI event processor routes request headers through the
     data-collection filtering path. Sensitive headers are redacted regardless
     of ``send_default_pii`` -- the value of that legacy option must not change
@@ -843,7 +843,7 @@ def test_request_headers_data_collection_default_redacts_sensitive(
     """
     sentry_init(
         send_default_pii=send_default_pii,
-        _experiments={"data_collection": None},
+        data_collection={},
     )
     app = SentryWsgiMiddleware(crashing_app)
     client = Client(app)
@@ -914,9 +914,7 @@ def test_request_headers_data_collection_off_collects_no_headers(
     collected at all -- the filtering returns an empty mapping.
     """
     sentry_init(
-        _experiments={
-            "data_collection": {"http_headers": {"request": {"mode": "off"}}}
-        },
+        data_collection={"http_headers": {"request": {"mode": "off"}}},
     )
     app = SentryWsgiMiddleware(crashing_app)
     client = Client(app)
@@ -945,10 +943,8 @@ def test_request_headers_data_collection_allowlist_redacts_all_but_allowed_terms
     is redacted.
     """
     sentry_init(
-        _experiments={
-            "data_collection": {
-                "http_headers": {"request": {"mode": "allowlist", "terms": ["custom"]}}
-            }
+        data_collection={
+            "http_headers": {"request": {"mode": "allowlist", "terms": ["custom"]}}
         },
     )
     app = SentryWsgiMiddleware(crashing_app)
@@ -980,10 +976,8 @@ def test_request_headers_data_collection_denylist_redacts_only_matched_terms(
     matching a configured term (partial, case-insensitive).
     """
     sentry_init(
-        _experiments={
-            "data_collection": {
-                "http_headers": {"request": {"mode": "denylist", "terms": ["custom"]}}
-            }
+        data_collection={
+            "http_headers": {"request": {"mode": "denylist", "terms": ["custom"]}}
         },
     )
     app = SentryWsgiMiddleware(crashing_app)
@@ -1020,11 +1014,9 @@ def test_request_headers_data_collection_cookie_always_redacted(
     ``Client`` manages its own cookie jar and strips the ``Cookie`` header.
     """
     sentry_init(
-        _experiments={
-            "data_collection": {
-                "http_headers": {
-                    "request": {"mode": "allowlist", "terms": ["cookie", "custom"]}
-                }
+        data_collection={
+            "http_headers": {
+                "request": {"mode": "allowlist", "terms": ["cookie", "custom"]}
             }
         },
     )
@@ -1103,16 +1095,14 @@ def test_request_headers_legacy_pii_passes_headers_through(
         # data_collection configured: query string is routed through filtering.
         # Spec defaults -> denylist: only the sensitive ``auth`` is redacted.
         pytest.param(
-            {"_experiments": {"data_collection": {}}},
+            {"data_collection": {}},
             "toy=tennisball&color=red&auth=%5BFiltered%5D",
             id="data_collection_denylist_default",
         ),
         pytest.param(
             {
-                "_experiments": {
-                    "data_collection": {
-                        "url_query_params": {"mode": "denylist", "terms": ["toy"]}
-                    }
+                "data_collection": {
+                    "url_query_params": {"mode": "denylist", "terms": ["toy"]}
                 }
             },
             "toy=%5BFiltered%5D&color=red&auth=%5BFiltered%5D",
@@ -1122,21 +1112,15 @@ def test_request_headers_legacy_pii_passes_headers_through(
         # it is not sensitive, proving the redaction comes from the allowlist.
         pytest.param(
             {
-                "_experiments": {
-                    "data_collection": {
-                        "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
-                    }
+                "data_collection": {
+                    "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
                 }
             },
             "toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D",
             id="data_collection_allowlist",
         ),
         pytest.param(
-            {
-                "_experiments": {
-                    "data_collection": {"url_query_params": {"mode": "off"}}
-                }
-            },
+            {"data_collection": {"url_query_params": {"mode": "off"}}},
             None,
             id="data_collection_off",
         ),
@@ -1183,16 +1167,14 @@ def test_query_string_data_collection(
         ),
         # data_collection configured: attribute is routed through filtering.
         pytest.param(
-            {"_experiments": {"data_collection": {}}},
+            {"data_collection": {}},
             "toy=tennisball&color=red&auth=%5BFiltered%5D",
             id="data_collection_denylist_default",
         ),
         pytest.param(
             {
-                "_experiments": {
-                    "data_collection": {
-                        "url_query_params": {"mode": "denylist", "terms": ["toy"]}
-                    }
+                "data_collection": {
+                    "url_query_params": {"mode": "denylist", "terms": ["toy"]}
                 }
             },
             "toy=%5BFiltered%5D&color=red&auth=%5BFiltered%5D",
@@ -1202,21 +1184,15 @@ def test_query_string_data_collection(
         # it is not sensitive, proving the redaction comes from the allowlist.
         pytest.param(
             {
-                "_experiments": {
-                    "data_collection": {
-                        "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
-                    }
+                "data_collection": {
+                    "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
                 }
             },
             "toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D",
             id="data_collection_allowlist",
         ),
         pytest.param(
-            {
-                "_experiments": {
-                    "data_collection": {"url_query_params": {"mode": "off"}}
-                }
-            },
+            {"data_collection": {"url_query_params": {"mode": "off"}}},
             None,
             id="data_collection_off",
         ),
@@ -1346,7 +1322,7 @@ def test_user_info_error_event_data_collection(
 def test_error_event_no_user_ip_address_without_remote_addr(
     sentry_init, crashing_app, capture_events
 ):
-    sentry_init(_experiments={"data_collection": {"user_info": True}})
+    sentry_init(data_collection={"user_info": True})
     app = SentryWsgiMiddleware(crashing_app)
     client = Client(app)
     events = capture_events()

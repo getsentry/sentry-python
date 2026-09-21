@@ -8,10 +8,8 @@ sentry_sdk.init(
     traces_sample_rate=1.0,
     integrations=[AwsLambdaIntegration()],
     trace_lifecycle="stream",
-    _experiments={
-        "data_collection": {
-            "user_info": False,
-        }
+    data_collection={
+        "user_info": False,
     },
 )
 

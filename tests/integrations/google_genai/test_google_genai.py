@@ -3764,7 +3764,7 @@ def test_generate_content_data_collection(
         trace_lifecycle="stream" if span_streaming else "static",
     )
     if data_collection is not None:
-        sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
+        sentry_init_kwargs["data_collection"] = data_collection
 
     sentry_init(**sentry_init_kwargs)
 
@@ -3891,7 +3891,7 @@ def test_generate_content_data_collection_tools(
         trace_lifecycle="stream" if span_streaming else "static",
     )
     if data_collection is not None:
-        sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
+        sentry_init_kwargs["data_collection"] = data_collection
 
     sentry_init(**sentry_init_kwargs)
 
@@ -4087,7 +4087,7 @@ def test_streaming_generate_content_data_collection(
         trace_lifecycle="stream" if span_streaming else "static",
     )
     if data_collection is not None:
-        sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
+        sentry_init_kwargs["data_collection"] = data_collection
 
     sentry_init(**sentry_init_kwargs)
 
@@ -4245,7 +4245,7 @@ def test_streaming_generate_content_data_collection_tools(
         trace_lifecycle="stream" if span_streaming else "static",
     )
     if data_collection is not None:
-        sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
+        sentry_init_kwargs["data_collection"] = data_collection
 
     sentry_init(**sentry_init_kwargs)
 
@@ -4430,7 +4430,7 @@ def test_embed_content_data_collection(
         trace_lifecycle="stream" if span_streaming else "static",
     )
     if data_collection is not None:
-        sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
+        sentry_init_kwargs["data_collection"] = data_collection
 
     sentry_init(**sentry_init_kwargs)
 
@@ -4584,7 +4584,7 @@ async def test_async_generate_content_data_collection(
         trace_lifecycle="stream" if span_streaming else "static",
     )
     if data_collection is not None:
-        sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
+        sentry_init_kwargs["data_collection"] = data_collection
 
     sentry_init(**sentry_init_kwargs)
 
@@ -4725,7 +4725,7 @@ async def test_async_embed_content_data_collection(
         trace_lifecycle="stream" if span_streaming else "static",
     )
     if data_collection is not None:
-        sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
+        sentry_init_kwargs["data_collection"] = data_collection
 
     sentry_init(**sentry_init_kwargs)
 
