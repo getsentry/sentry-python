@@ -1,5 +1,48 @@
 # Changelog
 
+## 2.69.2
+
+### Bug Fixes 🐛
+
+- (aws-lambda) Attach user info when streaming spans by @sentrivana in [#7429](https://github.com/getsentry/sentry-python/pull/7429)
+- (bottle) Avoid infinite serializing loop by @sentrivana in [#7511](https://github.com/getsentry/sentry-python/pull/7511)
+- (clickhouse_driver) Only set `db.result` in breadcrumb with sensitive data opt-in by @alexander-alderman-webb in [#7432](https://github.com/getsentry/sentry-python/pull/7432)
+- (google-genai) Tolerate `None` candidates by @alexander-alderman-webb in [#7519](https://github.com/getsentry/sentry-python/pull/7519)
+- (pydantic-ai) Stop capturing tool execution spans when validation fails by @alexander-alderman-webb in [#7448](https://github.com/getsentry/sentry-python/pull/7448)
+- (serializer) Add type annotations to databag limits by @8rulerstar in [#7505](https://github.com/getsentry/sentry-python/pull/7505)
+- (tracing) Make `functions_to_trace` work when streaming spans by @sentrivana in [#7430](https://github.com/getsentry/sentry-python/pull/7430)
+- (typing) Fix `disabled_integrations` type by @sentrivana in [#7506](https://github.com/getsentry/sentry-python/pull/7506)
+- Don't attach stacktrace to check-ins by @sentrivana in [#7497](https://github.com/getsentry/sentry-python/pull/7497)
+
+### Documentation 📚
+
+- Update span streaming docstrings by @sentrivana in [#7463](https://github.com/getsentry/sentry-python/pull/7463)
+
+### Internal Changes 🔧
+
+#### Huggingface Hub
+
+- Parametrize tests on the streaming trace lifecycle by @alexander-alderman-webb in [#7436](https://github.com/getsentry/sentry-python/pull/7436)
+- Only check relevant data with `ApproxDict` by @alexander-alderman-webb in [#7434](https://github.com/getsentry/sentry-python/pull/7434)
+
+#### Pydantic Ai
+
+- Remove vacuous `_set_model_data()` tests by @alexander-alderman-webb in [#7453](https://github.com/getsentry/sentry-python/pull/7453)
+- Remove vacuous `_set_agent_data()` tests by @alexander-alderman-webb in [#7450](https://github.com/getsentry/sentry-python/pull/7450)
+
+#### Other
+
+- (deps) Lock file maintenance by @renovate in [#7302](https://github.com/getsentry/sentry-python/pull/7302)
+- (django) Fix flaky cache tests by using uuid for cache LOCATION by @sentry-junior in [#7444](https://github.com/getsentry/sentry-python/pull/7444)
+- (pymongo) Raise `maxWireVersion` by @alexander-alderman-webb in [#7473](https://github.com/getsentry/sentry-python/pull/7473)
+- Remove unused base64 utils by @sentrivana in [#7495](https://github.com/getsentry/sentry-python/pull/7495)
+- 🤖 Update test matrix with new releases (09/14) by @github-actions in [#7486](https://github.com/getsentry/sentry-python/pull/7486)
+- 🤖 Update test matrix with new releases (09/07) by @github-actions in [#7399](https://github.com/getsentry/sentry-python/pull/7399)
+
+### Other
+
+- Skip formatting log records when Sentry logs are off by @gyanu2507 in [#7422](https://github.com/getsentry/sentry-python/pull/7422)
+
 ## 2.69.1
 
 ### New Features ✨
