@@ -4,7 +4,7 @@ from urllib.parse import urlsplit
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA, SPANSTATUS
 from sentry_sdk.integrations import DidNotEnable
-from sentry_sdk.integrations.boto3.consts import ORIGIN
+from sentry_sdk.integrations.boto3.consts import IDENTIFIER, ORIGIN
 from sentry_sdk.traces import NoOpStreamedSpan, StreamedSpan
 from sentry_sdk.tracing import BAGGAGE_HEADER_NAME, Span
 from sentry_sdk.tracing_utils import (
@@ -188,7 +188,7 @@ def _start_client_span(
     ctx: "AwsCallContext",
 ) -> "Optional[Union[Span, StreamedSpan]]":
     client = sentry_sdk.get_client()
-    if client.get_integration("boto3") is None:
+    if client.get_integration(IDENTIFIER) is None:
         return None
 
     # use unknown if `service_id_hyphenized` so span name can still be created.
@@ -440,7 +440,7 @@ def _sentry_request_created(
     """
 
     client = sentry_sdk.get_client()
-    if client.get_integration("boto3") is None:
+    if client.get_integration(IDENTIFIER) is None:
         return
 
     with capture_internal_exceptions():
@@ -468,7 +468,7 @@ def _sentry_before_sign(
     request: "AWSRequest", signature_version: "Any", **kwargs: "Any"
 ) -> None:
     client = sentry_sdk.get_client()
-    if client.get_integration("boto3") is None:
+    if client.get_integration(IDENTIFIER) is None:
         return
 
     with capture_internal_exceptions():

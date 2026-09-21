@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 import sentry_sdk
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.integrations.boto3._context import AwsCallContext
+from sentry_sdk.integrations.boto3.consts import IDENTIFIER
 from sentry_sdk.integrations.boto3._instrumentation import (
     _finish_span,
     _get_error_attributes,
@@ -68,8 +69,6 @@ def _activate_client_span(
 
 
 def _patch_botocore_client() -> None:
-    from sentry_sdk.integrations.boto3 import Boto3Integration
-
     orig_init = BaseClient.__init__
     orig_make_api_call = BaseClient._make_api_call  # type: ignore
 
@@ -91,7 +90,7 @@ def _patch_botocore_client() -> None:
         https://opentelemetry.io/docs/specs/semconv/rpc/rpc-spans/#rpc-client-span
         """
         client = sentry_sdk.get_client()
-        if client.get_integration(Boto3Integration) is None:
+        if client.get_integration(IDENTIFIER) is None:
             return orig_make_api_call(self, operation_name, api_params)
 
         ctx = AwsCallContext(operation_name, api_params)
