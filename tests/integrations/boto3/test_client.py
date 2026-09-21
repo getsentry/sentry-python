@@ -104,6 +104,8 @@ def test_streaming_body_read_failure_finishes_stream_span(
             self._exception = exception
 
         def read(self, *args, **kwargs):
+            # urllib3 closes the response before propagating some read failures.
+            self.close()
             raise self._exception
 
     def respond(request, **kwargs):

@@ -219,6 +219,7 @@ def _instrument_streaming_body(
     raw_stream = body._raw_stream  # type: ignore[attr-defined]
     orig_raw_close = raw_stream.close
     finished = False
+    read_in_progress = False
 
     def finish_span(error: "Optional[BaseException]" = None) -> None:
         nonlocal finished
@@ -238,6 +239,8 @@ def _instrument_streaming_body(
         )
 
     def sentry_streaming_body_read(*args: "Any", **kwargs: "Any") -> bytes:
+        nonlocal read_in_progress
+        read_in_progress = True
         try:
             read_return_value = orig_read(*args, **kwargs)
             with capture_internal_exceptions():
@@ -253,6 +256,8 @@ def _instrument_streaming_body(
         except BaseException as error:
             finish_span(error)
             raise
+        finally:
+            read_in_progress = False
 
     def sentry_streaming_body_close(*args: "Any", **kwargs: "Any") -> None:
         try:
@@ -265,7 +270,8 @@ def _instrument_streaming_body(
     def sentry_raw_stream_close(*args: "Any", **kwargs: "Any") -> None:
         try:
             orig_raw_close(*args, **kwargs)
-            finish_span()
+            if not read_in_progress:
+                finish_span()
         except BaseException as error:
             finish_span(error)
             raise
