@@ -195,7 +195,12 @@ def _instrument_streaming_body(
     if isinstance(span, StreamedSpan):
         streaming_span = sentry_sdk.traces.start_span(
             name=span.name,
+            # `parent_span` is set explicitly to the boto span.
             parent_span=span,
+            # avoid making the streaming span the current span on the scope since the application might
+            # keep `StreamingBody` open before reading it. Otherwise: 1. when the streamingspan ends it
+            # could restore the parent span on the scope, breaking the parent-child relation of newly
+            # created spans; 2. newly created spans would be attached to the streaming span.
             active=False,
             attributes={
                 "sentry.op": OP.HTTP_CLIENT_STREAM,
