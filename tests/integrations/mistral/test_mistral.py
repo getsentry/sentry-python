@@ -93,7 +93,7 @@ def test_nonstreaming_chat(
                 frequency_penalty=0.2,
                 temperature=0.7,
                 top_p=0.9,
-                reasoning_effort="medium",
+                reasoning_effort="high",
             )
         sentry_sdk.flush()
         spans = [item.payload for item in items]
@@ -117,7 +117,7 @@ def test_nonstreaming_chat(
         assert span["attributes"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
         assert span["attributes"][SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.1
         assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 1024
-        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_REASONING_LEVEL] == "medium"
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_REASONING_LEVEL] == "high"
 
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
@@ -138,7 +138,7 @@ def test_nonstreaming_chat(
                 frequency_penalty=0.2,
                 temperature=0.7,
                 top_p=0.9,
-                reasoning_effort="medium",
+                reasoning_effort="high",
             )
 
         (transaction,) = [item.payload for item in items]
@@ -156,7 +156,7 @@ def test_nonstreaming_chat(
         assert span["data"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
         assert span["data"][SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.1
         assert span["data"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 1024
-        assert span["data"][SPANDATA.GEN_AI_REQUEST_REASONING_LEVEL] == "medium"
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_REASONING_LEVEL] == "high"
 
         assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
         assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
@@ -206,7 +206,7 @@ async def test_nonstreaming_chat_async(
                 frequency_penalty=0.2,
                 temperature=0.7,
                 top_p=0.9,
-                reasoning_effort="medium",
+                reasoning_effort="high",
             )
 
         sentry_sdk.flush()
@@ -231,7 +231,7 @@ async def test_nonstreaming_chat_async(
         assert span["attributes"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
         assert span["attributes"][SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.1
         assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 1024
-        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_REASONING_LEVEL] == "medium"
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_REASONING_LEVEL] == "high"
 
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
@@ -252,7 +252,7 @@ async def test_nonstreaming_chat_async(
                 frequency_penalty=0.2,
                 temperature=0.7,
                 top_p=0.9,
-                reasoning_effort="medium",
+                reasoning_effort="high",
             )
 
         (transaction,) = [item.payload for item in items]
@@ -270,7 +270,7 @@ async def test_nonstreaming_chat_async(
         assert span["data"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
         assert span["data"][SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.1
         assert span["data"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 1024
-        assert span["data"][SPANDATA.GEN_AI_REQUEST_REASONING_LEVEL] == "medium"
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_REASONING_LEVEL] == "high"
 
         assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
         assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
