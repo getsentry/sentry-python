@@ -121,7 +121,7 @@ def _transform_input_messages(
         content = message.get("content")
         if isinstance(content, str):
             input_messages.append(
-                {"role": "user", "parts": [{"type": "text", "content": content}]}
+                {"role": role, "parts": [{"type": "text", "content": content}]}
             )
 
         if not isinstance(content, list):
@@ -132,7 +132,7 @@ def _transform_input_messages(
         ]
         input_messages.append(
             {
-                "role": "user",
+                "role": role,
                 "parts": [
                     {
                         "type": "text",
