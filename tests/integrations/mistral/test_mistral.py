@@ -71,7 +71,9 @@ def test_nonstreaming_chat(
         ), sentry_sdk.start_transaction(name="mistral"):
             client.chat.complete(
                 model="mistral-medium-latest",
-                messages=[{"role": "user", "content": "Hello, Mistral"}],
+                messages=[
+                    {"role": "user", "content": "What is the best French cheese?"}
+                ],
             )
 
         sentry_sdk.flush()
@@ -149,7 +151,9 @@ async def test_nonstreaming_chat_async(
         ), sentry_sdk.start_transaction(name="mistral"):
             await client.chat.complete_async(
                 model="mistral-medium-latest",
-                messages=[{"role": "user", "content": "Hello, Mistral"}],
+                messages=[
+                    {"role": "user", "content": "What is the best French cheese?"}
+                ],
             )
 
         sentry_sdk.flush()
