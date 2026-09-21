@@ -226,7 +226,7 @@ def _wrap_complete(f: "Callable[..., Any]") -> "Callable[..., Any]":
 
         if has_span_streaming_enabled(client.options):
             span = sentry_sdk.traces.start_span(
-                name=f"chat {model}".strip(),
+                name=f"chat {model}" if model is not None else "chat",
                 attributes={
                     "sentry.op": OP.GEN_AI_CHAT,
                     "sentry.origin": MistralIntegration.origin,
@@ -365,7 +365,7 @@ def _wrap_complete_async(f: "Callable[..., Any]") -> "Callable[..., Any]":
 
         if has_span_streaming_enabled(client.options):
             span = sentry_sdk.traces.start_span(
-                name=f"chat {model}".strip(),
+                name=f"chat {model}" if model is not None else "chat",
                 attributes={
                     "sentry.op": OP.GEN_AI_CHAT,
                     "sentry.origin": MistralIntegration.origin,
