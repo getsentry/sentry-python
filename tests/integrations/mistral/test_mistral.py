@@ -75,7 +75,9 @@ def test_nonstreaming_chat(
         ), sentry_sdk.start_transaction(name="mistral"):
             client.chat.complete(
                 model="mistral-medium-latest",
-                messages=[{"role": "user", "content": "Hello, Mistral"}],
+                messages=[
+                    {"role": "user", "content": "What is the best French cheese?"}
+                ],
                 max_tokens=1024,
                 presence_penalty=0.1,
                 frequency_penalty=0.2,
@@ -83,7 +85,6 @@ def test_nonstreaming_chat(
                 top_p=0.9,
                 reasoning_effort="medium",
             )
-
         sentry_sdk.flush()
         spans = [item.payload for item in items]
         (span,) = (
@@ -187,7 +188,9 @@ async def test_nonstreaming_chat_async(
         ), sentry_sdk.start_transaction(name="mistral"):
             await client.chat.complete_async(
                 model="mistral-medium-latest",
-                messages=[{"role": "user", "content": "Hello, Mistral"}],
+                messages=[
+                    {"role": "user", "content": "What is the best French cheese?"}
+                ],
                 max_tokens=1024,
                 presence_penalty=0.1,
                 frequency_penalty=0.2,
