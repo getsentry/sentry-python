@@ -215,7 +215,7 @@ def _instrument_streaming_body(
     orig_raw_close = raw_stream.close
     finished = False
 
-    def finish(error: "Optional[BaseException]" = None) -> None:
+    def finish_span(error: "Optional[BaseException]" = None) -> None:
         nonlocal finished
         if finished:
             return
@@ -234,35 +234,35 @@ def _instrument_streaming_body(
 
     def sentry_streaming_body_read(*args: "Any", **kwargs: "Any") -> bytes:
         try:
-            ret = orig_read(*args, **kwargs)
+            read_return_value = orig_read(*args, **kwargs)
             with capture_internal_exceptions():
-                amount = args[0] if args else kwargs.get("amt")
+                amount_of_bytes_requested = args[0] if args else kwargs.get("amt")
                 if (
-                    amount is None
-                    or amount < 0
-                    or (amount > 0 and not ret)
+                    amount_of_bytes_requested is None
+                    or amount_of_bytes_requested < 0
+                    or (amount_of_bytes_requested > 0 and not read_return_value)
                     or content_length_reached()
                 ):
-                    finish()
-            return ret
+                    finish_span()
+            return read_return_value
         except BaseException as error:
-            finish(error)
+            finish_span(error)
             raise
 
     def sentry_streaming_body_close(*args: "Any", **kwargs: "Any") -> None:
         try:
             orig_close(*args, **kwargs)
-            finish()
+            finish_span()
         except BaseException as error:
-            finish(error)
+            finish_span(error)
             raise
 
     def sentry_raw_stream_close(*args: "Any", **kwargs: "Any") -> None:
         try:
             orig_raw_close(*args, **kwargs)
-            finish()
+            finish_span()
         except BaseException as error:
-            finish(error)
+            finish_span(error)
             raise
 
     try:
@@ -272,7 +272,7 @@ def _instrument_streaming_body(
         body.read = sentry_streaming_body_read  # type: ignore
         body.close = sentry_streaming_body_close  # type: ignore
     except Exception:
-        finish()
+        finish_span()
         raise
 
     return True
