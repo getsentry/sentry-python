@@ -1,4 +1,5 @@
 from typing import TYPE_CHECKING
+from urllib.parse import urlsplit
 
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA, SPANSTATUS
@@ -31,30 +32,95 @@ except ImportError:
     raise DidNotEnable("botocore not installed")
 
 
+_AWS_RPC_SYSTEM_NAME = "aws-api"
+
+
+def _set_span_attributes(
+    span: "Union[Span, StreamedSpan]", attributes: "Attributes"
+) -> None:
+    if isinstance(span, StreamedSpan):
+        span.set_attributes(attributes)
+        return
+
+    for key, value in attributes.items():
+        span.set_data(key, value)
+
+
+def _get_server_attributes(endpoint_url: "Optional[str]") -> "Attributes":
+    if not endpoint_url:
+        return {}
+
+    default_ports = {
+        "http": 80,
+        "https": 443,
+    }
+
+    try:
+        parsed_url = urlsplit(endpoint_url)
+        if parsed_url.scheme not in default_ports or not parsed_url.hostname:
+            return {}
+
+        # `server.port` is only defined together with `server.address`.
+        # Infer the effective port when the configured HTTP(S) endpoint omits it.
+        # https://opentelemetry.io/docs/specs/semconv/rpc/rpc-spans/
+        return {
+            SPANDATA.SERVER_ADDRESS: parsed_url.hostname,
+            SPANDATA.SERVER_PORT: parsed_url.port or default_ports[parsed_url.scheme],
+        }
+
+    except (TypeError, UnicodeError, ValueError):
+        # Invalid client metadata must not prevent the AWS call from running.
+        return {}
+
+
+def _get_client_attributes(
+    ctx: "AwsCallContext",
+) -> "Attributes":
+    attributes: "Attributes" = {}
+
+    # `rpc.service` is deprecated in OTel, but js still uses it.
+    if ctx.service_id:
+        attributes[SPANDATA.RPC_SERVICE] = ctx.service_id
+
+    if ctx.region_name:
+        attributes[SPANDATA.CLOUD_REGION] = ctx.region_name
+
+    attributes.update(_get_server_attributes(ctx.endpoint_url))
+    return attributes
+
+
 def _start_client_span(
     ctx: "AwsCallContext",
 ) -> "Optional[Union[Span, StreamedSpan]]":
-    from sentry_sdk.integrations.boto3 import Boto3Integration
-
     client = sentry_sdk.get_client()
-    if client.get_integration(Boto3Integration) is None:
+    if client.get_integration("boto3") is None:
         return None
 
     # use unknown if `service_id_hyphenized` so span name can still be created.
     # e.g. "aws.unkown.GetObject"
     service_name = ctx.service_id_hyphenized or "unknown"
     span_name = f"aws.{service_name}.{ctx.operation_name}"
+    attributes: "Attributes" = {
+        SPANDATA.RPC_METHOD: ctx.operation_name,
+        SPANDATA.RPC_SYSTEM_NAME: _AWS_RPC_SYSTEM_NAME,
+    }
+    with capture_internal_exceptions():
+        attributes.update(_get_client_attributes(ctx))
+    span_op = OP.HTTP_CLIENT
+    span_origin = ORIGIN
 
     if has_span_streaming_enabled(client.options):
         if sentry_sdk.traces.get_current_span() is None:
             return None
 
-        attributes: "Attributes" = {
-            SPANDATA.SENTRY_OP: OP.HTTP_CLIENT,
-            SPANDATA.SENTRY_ORIGIN: ORIGIN,
-        }
-        if ctx.service_id:
-            attributes[SPANDATA.RPC_METHOD] = f"{ctx.service_id}/{ctx.operation_name}"
+        # `start_span()` evaluates `ignore_spans` against the initial attributes.
+        # https://opentelemetry.io/docs/specs/semconv/rpc/rpc-spans/#rpc-client-span
+        attributes.update(
+            {
+                SPANDATA.SENTRY_OP: span_op,
+                SPANDATA.SENTRY_ORIGIN: span_origin,
+            }
+        )
         return sentry_sdk.traces.start_span(
             name=span_name,
             attributes=attributes,
@@ -65,9 +131,11 @@ def _start_client_span(
 
     span = sentry_sdk.start_span(
         name=span_name,
-        op=OP.HTTP_CLIENT,
-        origin=ORIGIN,
+        op=span_op,
+        origin=span_origin,
     )
+    with capture_internal_exceptions():
+        _set_span_attributes(span, attributes)
     with capture_internal_exceptions():
         if ctx.service_id_hyphenized:
             span.set_tag("aws.service_id", ctx.service_id_hyphenized)
@@ -113,8 +181,8 @@ def _instrument_streaming_body(
             # unrelated new spans attach to the stream span since it's the current span.
             active=False,
             attributes={
-                "sentry.op": OP.HTTP_CLIENT_STREAM,
-                "sentry.origin": ORIGIN,
+                SPANDATA.SENTRY_OP: OP.HTTP_CLIENT_STREAM,
+                SPANDATA.SENTRY_ORIGIN: ORIGIN,
             },
         )
     else:
@@ -265,10 +333,9 @@ def _sentry_request_created(
     fresh `AWSRequest` on every retry.
     https://github.com/boto/botocore/blob/f9195c79ea2bf46350dd320d2a0bf3db7da0b460/botocore/endpoint.py#L178-L202
     """
-    from sentry_sdk.integrations.boto3 import Boto3Integration
 
     client = sentry_sdk.get_client()
-    if client.get_integration(Boto3Integration) is None:
+    if client.get_integration("boto3") is None:
         return
 
     with capture_internal_exceptions():
@@ -295,10 +362,8 @@ def _sentry_request_created(
 def _sentry_before_sign(
     request: "AWSRequest", signature_version: "Any", **kwargs: "Any"
 ) -> None:
-    from sentry_sdk.integrations.boto3 import Boto3Integration
-
     client = sentry_sdk.get_client()
-    if client.get_integration(Boto3Integration) is None:
+    if client.get_integration("boto3") is None:
         return
 
     with capture_internal_exceptions():
