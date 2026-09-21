@@ -296,6 +296,7 @@ def _install_httplib() -> None:
                     == getattr(client.get_integration("boto3"), "origin", None)
                     and not getattr(parent_span, "active", True)
                 )
+                # fmt: off
                 span = sentry_sdk.traces.start_span(
                     name="%s %s"
                     % (
@@ -309,8 +310,9 @@ def _install_httplib() -> None:
                     },
                     # boto3 integration owns span's lifecycle; keep child inactive so it
                     # can't restore boto3 span later on.
-                    active=not is_inactive_boto3_span,
+                    active = not is_inactive_boto3_span,
                 )
+                # fmt: on
 
                 for key, value in url_attributes.items():
                     span.set_attribute(key, value)
