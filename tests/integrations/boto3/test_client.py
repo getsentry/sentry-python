@@ -14,6 +14,8 @@ from sentry_sdk.integrations.boto3 import Boto3Integration
 from sentry_sdk.integrations.boto3._instrumentation import _instrument_streaming_body
 from sentry_sdk.integrations.boto3.consts import ORIGIN
 from sentry_sdk.integrations.stdlib import StdlibIntegration
+from sentry_sdk.traces import StreamedSpan
+from sentry_sdk.tracing import Span
 from tests.integrations.boto3.aws_mock import Body
 
 session = boto3.Session(  # type: ignore[attr-defined]
@@ -53,15 +55,17 @@ def streaming_s3_server():
     "consume",
     ["read", "read_exact", "context", "close"],
 )
+@pytest.mark.parametrize("span_streaming", [True, False])
 def test_streaming_span_order_and_scope(
     sentry_init,
     capture_items,
     streaming_s3_server,
     consume,
+    span_streaming,
 ):
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
+        trace_lifecycle="stream" if span_streaming else "static",
         default_integrations=False,
         integrations=[Boto3Integration(), StdlibIntegration()],
         server_name="",
@@ -75,11 +79,31 @@ def test_streaming_span_order_and_scope(
             s3={"addressing_style": "path"},
         ),
     )
-    items = capture_items("span")
+    request_client_spans = []
 
-    with sentry_sdk.traces.start_span(name="parent") as parent:  # type: ignore[attr-defined]
+    def record_client_span(request, **kwargs):
+        request_client_spans.append(request.context["_sentrysdk_span"])
+
+    client.meta.events.register("request-created", record_client_span)
+    items = capture_items()
+
+    parent_context = (
+        sentry_sdk.traces.start_span(name="parent")  # type: ignore[attr-defined]
+        if span_streaming
+        else sentry_sdk.start_transaction(name="parent")
+    )
+    with parent_context as parent:
         body = client.get_object(Bucket="bucket", Key="key")["Body"]
-        assert sentry_sdk.traces.get_current_span() is parent  # type: ignore[attr-defined]
+        assert len(request_client_spans) == 1
+        request_client_span = request_client_spans[0]
+        if span_streaming:
+            assert isinstance(request_client_span, StreamedSpan)
+            assert request_client_span.end_timestamp is None
+            assert sentry_sdk.traces.get_current_span() is parent  # type: ignore[attr-defined]
+        else:
+            assert isinstance(request_client_span, Span)
+            assert not isinstance(request_client_span, StreamedSpan)
+            assert request_client_span.timestamp is None
 
         if consume == "read":
             assert body.read() == b"x"
@@ -94,34 +118,54 @@ def test_streaming_span_order_and_scope(
         else:
             body.close()
 
-        assert sentry_sdk.traces.get_current_span() is parent  # type: ignore[attr-defined]
+        if span_streaming:
+            assert request_client_span.end_timestamp is not None
+            assert sentry_sdk.traces.get_current_span() is parent  # type: ignore[attr-defined]
 
-        probe = sentry_sdk.traces.start_span(name="probe")  # type: ignore[attr-defined]
-        assert probe._parent_span_id == parent.span_id
-        probe.end()
+            probe = sentry_sdk.traces.start_span(name="probe")  # type: ignore[attr-defined]
+            assert probe._parent_span_id == parent.span_id
+            probe.end()
 
-        body.close()
-        assert sentry_sdk.traces.get_current_span() is parent  # type: ignore[attr-defined]
+            body.close()
+            assert sentry_sdk.traces.get_current_span() is parent  # type: ignore[attr-defined]
+        else:
+            assert request_client_span.timestamp is not None
 
     sentry_sdk.flush()
-    spans = [item.payload for item in items]
+    if span_streaming:
+        spans = [item.payload for item in items]
+    else:
+        transaction = next(item.payload for item in items if item.type == "transaction")
+        spans = transaction["spans"]
     client_spans = [
         span
         for span in spans
-        if span["name"] == "aws.s3.GetObject"
-        and span["attributes"].get(SPANDATA.SENTRY_ORIGIN) == ORIGIN
-        and span["attributes"].get(SPANDATA.SENTRY_OP) == OP.HTTP_CLIENT
+        if span.get("name", span.get("description")) == "aws.s3.GetObject"
+        and (
+            span["attributes"].get(SPANDATA.SENTRY_ORIGIN) == ORIGIN
+            and span["attributes"].get(SPANDATA.SENTRY_OP) == OP.HTTP_CLIENT
+            if span_streaming
+            else span["origin"] == ORIGIN and span["op"] == OP.HTTP_CLIENT
+        )
     ]
     http_spans = [
         span
         for span in spans
-        if span["attributes"].get(SPANDATA.SENTRY_ORIGIN) == "auto.http.stdlib.httplib"
+        if (
+            span["attributes"].get(SPANDATA.SENTRY_ORIGIN) == "auto.http.stdlib.httplib"
+            if span_streaming
+            else span["origin"] == "auto.http.stdlib.httplib"
+        )
     ]
     stream_spans = [
         span
         for span in spans
-        if span["name"] == "aws.s3.GetObject"
-        and span["attributes"].get(SPANDATA.SENTRY_OP) == OP.HTTP_CLIENT_STREAM
+        if span.get("name", span.get("description")) == "aws.s3.GetObject"
+        and (
+            span["attributes"].get(SPANDATA.SENTRY_OP) == OP.HTTP_CLIENT_STREAM
+            if span_streaming
+            else span["op"] == OP.HTTP_CLIENT_STREAM
+        )
     ]
     assert len(client_spans) == 1
     assert len(http_spans) == 1
@@ -132,10 +176,12 @@ def test_streaming_span_order_and_scope(
 
     assert http_span["parent_span_id"] == client_span["span_id"]
     assert stream_span["parent_span_id"] == client_span["span_id"]
+    assert client_span["span_id"] == request_client_span.span_id
+    end_timestamp = "end_timestamp" if span_streaming else "timestamp"
     assert client_span["start_timestamp"] <= http_span["start_timestamp"]
     assert http_span["start_timestamp"] <= stream_span["start_timestamp"]
-    assert http_span["end_timestamp"] <= stream_span["end_timestamp"]
-    assert stream_span["end_timestamp"] <= client_span["end_timestamp"]
+    assert http_span[end_timestamp] <= stream_span[end_timestamp]
+    assert stream_span[end_timestamp] <= client_span[end_timestamp]
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
@@ -437,7 +483,5 @@ def test_streaming_body_read_failure_finishes_stream_span(
     client_spans = spans_by_op.get(OP.HTTP_CLIENT, [])
     stream_spans = spans_by_op.get(OP.HTTP_CLIENT_STREAM, [])
 
-    assert len(client_spans) == 1
-    if span_streaming:
-        _assert_one_failed_span(client_spans, span_streaming=True)
+    _assert_one_failed_span(client_spans, span_streaming)
     _assert_one_failed_span(stream_spans, span_streaming)

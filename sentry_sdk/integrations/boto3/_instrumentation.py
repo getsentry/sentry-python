@@ -134,8 +134,7 @@ def _instrument_streaming_body(
 
         finished = True
         _finish_span(streaming_span, error)
-        if isinstance(span, StreamedSpan):
-            _finish_span(span, error)
+        _finish_span(span, error)
 
     def content_length_reached() -> bool:
         content_length = getattr(body, "_content_length", None)
