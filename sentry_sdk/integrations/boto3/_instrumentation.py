@@ -106,12 +106,11 @@ def _instrument_streaming_body(
     if isinstance(span, StreamedSpan):
         streaming_span = sentry_sdk.traces.start_span(
             name=span.name,
-            # `parent_span` is set explicitly to the boto span.
+            # keep stream span under the boto span after `_make_api_call()` returns.
             parent_span=span,
-            # avoid making the streaming span the current span on the scope since the application might
-            # keep `StreamingBody` open before reading it. Otherwise: 1. when the streamingspan ends it
-            # could restore the parent span on the scope, breaking the parent-child relation of newly
-            # created spans; 2. newly created spans would be attached to the streaming span.
+            # the body may outlive the api call, so keep it inactive. Otherwise it
+            # 1. could restore the already-finished boto span when it ends; 2. make
+            # unrelated new spans attach to the stream span since it's the current span.
             active=False,
             attributes={
                 "sentry.op": OP.HTTP_CLIENT_STREAM,
@@ -134,6 +133,7 @@ def _instrument_streaming_body(
             return
 
         finished = True
+        # finish stream span before boto span, and only once across read/close.
         _finish_span(streaming_span, error)
         _finish_span(span, error)
 
@@ -153,6 +153,7 @@ def _instrument_streaming_body(
             read_return_value = orig_read(*args, **kwargs)
             with capture_internal_exceptions():
                 amount_of_bytes_requested = args[0] if args else kwargs.get("amt")
+                # detect read-to-end, eof, or the known content length being consumed.
                 if (
                     amount_of_bytes_requested is None
                     or amount_of_bytes_requested < 0
@@ -190,8 +191,6 @@ def _instrument_streaming_body(
         raw_stream = body._raw_stream  # type: ignore[attr-defined]
         orig_raw_close = raw_stream.close
 
-        # StreamingBody.__exit__ closes `_raw_stream` directly, bypassing
-        # StreamingBody.close(), so both levels need to be instrumented.
         raw_stream.close = sentry_raw_stream_close
         body.read = sentry_streaming_body_read  # type: ignore
         body.close = sentry_streaming_body_close  # type: ignore
