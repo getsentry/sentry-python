@@ -195,15 +195,15 @@ class BottleRequestExtractor(RequestExtractor):
 def _get_transaction_name(transaction_style: str, request: "Any") -> str:
     try:
         if transaction_style == "url":
-            return request.route.rule or ""
+            return request.route.rule or "bottle request"
         else:
             return (
                 request.route.name
                 or transaction_from_function(request.route.callback)
-                or ""
+                or "bottle request"
             )
     except RuntimeError:
-        return ""
+        return "bottle request"
 
 
 def _set_segment_name_and_source(transaction_style: str) -> None:
