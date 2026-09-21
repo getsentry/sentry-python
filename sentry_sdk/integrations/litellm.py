@@ -243,6 +243,9 @@ def _success_callback(
                 and input_tokens is not None
                 and output_tokens is not None
             ):
+                total_tokens = input_tokens + output_tokens
+
+            if total_tokens is not None:
                 span.set_attribute(
                     SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, input_tokens + output_tokens
                 )

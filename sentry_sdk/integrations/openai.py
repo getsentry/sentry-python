@@ -259,10 +259,10 @@ def _calculate_completions_token_usage(
 
     total_tokens = total_tokens or None
     if total_tokens is None and input_tokens is not None and output_tokens is not None:
-        if total_tokens is not None:
-            span.set_attribute(
-                SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, input_tokens + output_tokens
-            )
+        total_tokens = input_tokens + output_tokens
+
+    if total_tokens is not None:
+        span.set_attribute(SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, total_tokens)
 
 
 def _calculate_responses_token_usage(
@@ -350,9 +350,10 @@ def _calculate_responses_token_usage(
 
     total_tokens = total_tokens or None
     if total_tokens is None and input_tokens is not None and output_tokens is not None:
-        span.set_attribute(
-            SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, input_tokens + output_tokens
-        )
+        total_tokens = input_tokens + output_tokens
+
+    if total_tokens is not None:
+        span.set_attribute(SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, total_tokens)
 
 
 def _set_responses_api_input_data(
