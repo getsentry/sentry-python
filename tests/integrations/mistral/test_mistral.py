@@ -492,7 +492,7 @@ def test_input_attributes_nonstreaming_chat(
 
 
 @pytest.mark.parametrize(
-    "messages,expected_system_instructions",
+    "messages,expected_system_instructions,expected_input_messages",
     (
         (
             [
