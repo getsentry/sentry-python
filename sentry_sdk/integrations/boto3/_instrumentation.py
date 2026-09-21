@@ -125,10 +125,6 @@ def _instrument_streaming_body(
             origin=ORIGIN,
         )
 
-    orig_read = body.read
-    orig_close = body.close
-    raw_stream = body._raw_stream  # type: ignore[attr-defined]
-    orig_raw_close = raw_stream.close
     finished = False
     read_in_progress = False
 
@@ -190,6 +186,11 @@ def _instrument_streaming_body(
             raise
 
     try:
+        orig_read = body.read
+        orig_close = body.close
+        raw_stream = body._raw_stream  # type: ignore[attr-defined]
+        orig_raw_close = raw_stream.close
+
         # StreamingBody.__exit__ closes `_raw_stream` directly, bypassing
         # StreamingBody.close(), so both levels need to be instrumented.
         raw_stream.close = sentry_raw_stream_close
