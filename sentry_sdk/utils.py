@@ -865,7 +865,8 @@ def exceptions_from_error(
     seen_exception_ids: "Optional[Set[int]]" = None,
 ) -> "Tuple[int, List[Dict[str, Any]]]":
     """
-    Converts the given exception information into the Sentry structured "exception" format.
+    Convert the given exception information into the Sentry "exception" format.
+
     This will return a list of exceptions (a flattened tree of exceptions) in the
     format of the Exception Interface documentation:
     https://develop.sentry.dev/sdk/data-model/event-payloads/exception/
@@ -975,9 +976,10 @@ def exceptions_from_error_tuple(
     full_stack: "Optional[list[dict[str, Any]]]" = None,
 ) -> "List[Dict[str, Any]]":
     """
-    Convert Python's exception information into Sentry's structured "exception" format in the event.
+    Convert an exception into Sentry's structured "exception" format.
+
     See https://develop.sentry.dev/sdk/data-model/event-payloads/exception/
-    This is the entry point for the exception handling.
+    This is the entry point for exception handling.
     """
     exc_type, exc_value, tb = exc_info
 
