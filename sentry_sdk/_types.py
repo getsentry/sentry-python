@@ -485,6 +485,10 @@ if TYPE_CHECKING:
         role: Literal["user", "assistant", "tool"]
         parts: list[Union[TextPart, ReasoningPart, ToolCallPart]]
 
+    class OutputMessage(TypedDict):
+        role: Literal["assistant"]
+        parts: list[Union[TextPart, ReasoningPart]]
+
     class ToolDefinition(TypedDict):
         type: str
         name: NotRequired[str]

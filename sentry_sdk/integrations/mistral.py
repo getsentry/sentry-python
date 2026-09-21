@@ -19,13 +19,14 @@ if TYPE_CHECKING:
     from typing import Any, Callable, Iterable, Optional, TypeGuard, Union
 
     from mistralai.client.models import (
+        AssistantMessageTypedDict,
         ChatCompletionRequestMessage,
         ChatCompletionRequestMessageTypedDict,
         SystemMessageTypedDict,
         TextChunkTypedDict,
     )
 
-    from sentry_sdk._types import InputMessage, TextPart
+    from sentry_sdk._types import InputMessage, OutputMessage, TextPart
 
 try:
     from mistralai.client.chat import Chat
@@ -146,6 +147,46 @@ def _transform_input_messages(
         )
 
     return input_messages
+
+
+def _transform_output_message(
+    message: "Union[AssistantMessage, AssistantMessageTypedDict]",
+) -> "Optional[OutputMessage]":
+    if isinstance(message, AssistantMessage):
+        if message.content is None:
+            return None
+
+        if isinstance(message.content, str):
+            return {
+                "role": "assistant",
+                "parts": [{"type": "text", "content": message.content}],
+            }
+
+        parts = [part for part in message.content if isinstance(part, TextChunk)]
+        return {
+            "role": "assistant",
+            "parts": [{"type": "text", "content": part.text} for part in parts],
+        }
+
+    content = message.get("content")
+    if content is None:
+        return None
+
+    if isinstance(content, str):
+        return {"role": "assistant", "parts": [{"type": "text", "content": content}]}
+
+    text_parts = [
+        part
+        for part in content
+        if isinstance(part, dict) and part.get("type") == "text"
+    ]
+    return {
+        "role": "assistant",
+        "parts": [
+            {"type": "text", "content": cast("TextChunkTypedDict", part)["text"]}
+            for part in text_parts
+        ],
+    }
 
 
 def _transform_system_instructions(
@@ -296,6 +337,29 @@ def _wrap_complete(f: "Callable[..., Any]") -> "Callable[..., Any]":
                     SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, response.usage.total_tokens
                 )
 
+            if (
+                has_data_collection_enabled(client.options)
+                and client.options["data_collection"]["gen_ai"]["outputs"]
+            ) or (
+                not has_data_collection_enabled(client.options)
+                and should_send_default_pii()
+            ):
+                output_messages: "list[OutputMessage]" = []
+                for choice in response.choices:
+                    if choice.message is None:
+                        continue
+
+                    transformed_message = _transform_output_message(choice.message)
+                    if transformed_message is None:
+                        continue
+
+                    output_messages.append(transformed_message)
+
+                set_on_span(
+                    SPANDATA.GEN_AI_OUTPUT_MESSAGES,
+                    json.dumps(output_messages),
+                )
+
             return response
 
     return wrap_complete
@@ -412,6 +476,29 @@ def _wrap_complete_async(f: "Callable[..., Any]") -> "Callable[..., Any]":
             if response.usage.total_tokens is not None:
                 set_on_span(
                     SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, response.usage.total_tokens
+                )
+
+            if (
+                has_data_collection_enabled(client.options)
+                and client.options["data_collection"]["gen_ai"]["outputs"]
+            ) or (
+                not has_data_collection_enabled(client.options)
+                and should_send_default_pii()
+            ):
+                output_messages: "list[OutputMessage]" = []
+                for choice in response.choices:
+                    if choice.message is None:
+                        continue
+
+                    transformed_message = _transform_output_message(choice.message)
+                    if transformed_message is None:
+                        continue
+
+                    output_messages.append(transformed_message)
+
+                set_on_span(
+                    SPANDATA.GEN_AI_OUTPUT_MESSAGES,
+                    json.dumps(output_messages),
                 )
 
             return response
