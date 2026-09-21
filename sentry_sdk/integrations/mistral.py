@@ -326,16 +326,26 @@ def _wrap_complete(f: "Callable[..., Any]") -> "Callable[..., Any]":
                     SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, response.usage.total_tokens
                 )
 
-            set_on_span(
-                SPANDATA.GEN_AI_OUTPUT_MESSAGES,
-                json.dumps(
-                    [
-                        _transform_output_message(choice.message)
-                        for choice in response.choices
-                        if choice.message is not None
-                    ]
-                ),
-            )
+            if isinstance(messages, Sequence) and (
+                (
+                    has_data_collection_enabled(client.options)
+                    and client.options["data_collection"]["gen_ai"]["outputs"]
+                )
+                or (
+                    not has_data_collection_enabled(client.options)
+                    and should_send_default_pii()
+                )
+            ):
+                set_on_span(
+                    SPANDATA.GEN_AI_OUTPUT_MESSAGES,
+                    json.dumps(
+                        [
+                            _transform_output_message(choice.message)
+                            for choice in response.choices
+                            if choice.message is not None
+                        ]
+                    ),
+                )
 
             return response
 
@@ -455,16 +465,26 @@ def _wrap_complete_async(f: "Callable[..., Any]") -> "Callable[..., Any]":
                     SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, response.usage.total_tokens
                 )
 
-            set_on_span(
-                SPANDATA.GEN_AI_OUTPUT_MESSAGES,
-                json.dumps(
-                    [
-                        _transform_output_message(choice.message)
-                        for choice in response.choices
-                        if choice.message is not None
-                    ]
-                ),
-            )
+            if isinstance(messages, Sequence) and (
+                (
+                    has_data_collection_enabled(client.options)
+                    and client.options["data_collection"]["gen_ai"]["outputs"]
+                )
+                or (
+                    not has_data_collection_enabled(client.options)
+                    and should_send_default_pii()
+                )
+            ):
+                set_on_span(
+                    SPANDATA.GEN_AI_OUTPUT_MESSAGES,
+                    json.dumps(
+                        [
+                            _transform_output_message(choice.message)
+                            for choice in response.choices
+                            if choice.message is not None
+                        ]
+                    ),
+                )
 
             return response
 
