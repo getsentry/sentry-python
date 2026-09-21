@@ -140,8 +140,18 @@ def _wrap_chat(f: "Callable[..., Any]", streaming: bool) -> "Callable[..., Any]"
 
                 if res.meta.billed_units.output_tokens is not None:
                     span.set_attribute(
-                        SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS,
+                        SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS,
                         res.meta.billed_units.output_tokens,
+                    )
+
+                if (
+                    res.meta.billed_units.input_tokens is not None
+                    and res.meta.billed_units.output_tokens is not None
+                ):
+                    span.set_attribute(
+                        SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS,
+                        res.meta.billed_units.input_tokens
+                        + res.meta.billed_units.output_tokens,
                     )
             elif hasattr(res.meta, "tokens"):
                 if res.meta.tokens.input_tokens is not None:
@@ -151,8 +161,17 @@ def _wrap_chat(f: "Callable[..., Any]", streaming: bool) -> "Callable[..., Any]"
 
                 if res.meta.tokens.output_tokens is not None:
                     span.set_attribute(
-                        SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS,
+                        SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS,
                         res.meta.tokens.output_tokens,
+                    )
+
+                if (
+                    res.meta.tokens.input_tokens is not None
+                    and res.meta.tokens.output_tokens is not None
+                ):
+                    span.set_attribute(
+                        SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS,
+                        res.meta.tokens.input_tokens + res.meta.tokens.output_tokens,
                     )
 
             if hasattr(res.meta, "warnings"):
