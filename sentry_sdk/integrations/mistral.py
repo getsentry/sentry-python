@@ -93,19 +93,24 @@ def _transform_input_messages(
         if isinstance(message, AssistantMessage) and isinstance(message.content, str):
             input_messages.append(
                 {
-                    "role": "user",
+                    "role": "assistant",
                     "parts": [{"type": "text", "content": message.content}],
                 }
             )
         elif isinstance(message, AssistantMessage) and isinstance(
             message.content, list
         ):
-            for part in message.content:
-                if not isinstance(part, TextChunk):
-                    continue
-                input_messages.append(
-                    {"role": "user", "parts": [{"type": "text", "content": part.text}]}
-                )
+            text_parts = [
+                part for part in message.content if isinstance(part, TextChunk)
+            ]
+            input_messages.append(
+                {
+                    "role": "assistant",
+                    "parts": [
+                        {"type": "text", "content": part.text} for part in text_parts
+                    ],
+                }
+            )
 
         if not isinstance(message, dict):
             continue
@@ -117,7 +122,7 @@ def _transform_input_messages(
         content = message.get("content")
         if isinstance(content, str):
             input_messages.append(
-                {"role": "user", "parts": [{"type": "text", "content": content}]}
+                {"role": role, "parts": [{"type": "text", "content": content}]}
             )
 
         if not isinstance(content, list):
@@ -128,7 +133,7 @@ def _transform_input_messages(
         ]
         input_messages.append(
             {
-                "role": "user",
+                "role": role,
                 "parts": [
                     {
                         "type": "text",
