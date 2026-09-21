@@ -613,7 +613,7 @@ def test_client_call_attributes_are_available_at_span_creation(
         item.payload
         for item in items
         if item.payload["attributes"].get(SPANDATA.SENTRY_ORIGIN)
-        == Boto3Integration.origin
+        == ORIGIN
     ]
     assert client_spans == []
 

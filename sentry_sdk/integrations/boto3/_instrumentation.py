@@ -438,7 +438,7 @@ def _sentry_request_created(
     """
 
     client = sentry_sdk.get_client()
-    if client.get_integration("boto3") is None:
+    if client.get_integration(IDENTIFIER) is None:
         return
 
     with capture_internal_exceptions():
@@ -466,7 +466,7 @@ def _sentry_before_sign(
     request: "AWSRequest", signature_version: "Any", **kwargs: "Any"
 ) -> None:
     client = sentry_sdk.get_client()
-    if client.get_integration("boto3") is None:
+    if client.get_integration(IDENTIFIER) is None:
         return
 
     with capture_internal_exceptions():

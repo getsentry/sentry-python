@@ -7,6 +7,7 @@ import sentry_sdk
 from sentry_sdk import capture_message
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.boto3 import Boto3Integration
+from sentry_sdk.integrations.boto3.consts import ORIGIN
 from tests.conftest import ApproxDict
 from tests.integrations.boto3 import read_fixture
 from tests.integrations.boto3.aws_mock import MockResponse
@@ -130,7 +131,7 @@ def test_streaming(
             "rpc.service": "S3",
             "sentry.environment": "production",
             "sentry.op": "http.client",
-            "sentry.origin": "auto.http.boto3",
+            "sentry.origin": ORIGIN,
             "sentry.release": mock.ANY,
             "sentry.sdk.name": "sentry.python",
             "sentry.sdk.version": mock.ANY,
@@ -292,7 +293,7 @@ def test_omit_url_data_if_parsing_fails(
                         "rpc.service": "S3",
                         "sentry.environment": "production",
                         "sentry.op": "http.client",
-                        "sentry.origin": "auto.http.boto3",
+                        "sentry.origin": ORIGIN,
                         "sentry.release": mock.ANY,
                         "sentry.sdk.name": "sentry.python",
                         "sentry.sdk.version": mock.ANY,
@@ -364,7 +365,7 @@ def test_span_origin(
         spans = [item.payload for item in items]
 
         assert spans[1]["attributes"]["sentry.origin"] == "manual"
-        assert spans[0]["attributes"]["sentry.origin"] == "auto.http.boto3"
+        assert spans[0]["attributes"]["sentry.origin"] == ORIGIN
     else:
         events = capture_events()
 
@@ -376,7 +377,7 @@ def test_span_origin(
         (event,) = events
 
         assert event["contexts"]["trace"]["origin"] == "manual"
-        assert event["spans"][0]["origin"] == "auto.http.boto3"
+        assert event["spans"][0]["origin"] == ORIGIN
 
 
 def test_breadcrumb(sentry_init, capture_events):
