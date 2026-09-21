@@ -341,7 +341,9 @@ def test_event_processor_data_collection(
     assert len(events) == 1
 
     (error_event,) = events
-    assert error_event["exception"]["values"][0]["mechanism"]["type"] == "strawberry"
+    assert len(error_event["exception"]["values"]) == 2
+    assert error_event["exception"]["values"][0]["mechanism"]["type"] == "chained"
+    assert error_event["exception"]["values"][-1]["mechanism"]["type"] == "strawberry"
 
     # request.data comes from the framework integration and must not be
     # overwritten by the strawberry integration
