@@ -42,7 +42,7 @@ def _start_client_span(
     # use unknown if `service_id_hyphenized` so span name can still be created.
     # e.g. "aws.unkown.GetObject"
     service_name = ctx.service_id_hyphenized or "unknown"
-    span_name = "aws.%s.%s" % (service_name, ctx.operation_name)
+    span_name = f"aws.{service_name}.{ctx.operation_name}"
 
     if has_span_streaming_enabled(client.options):
         if sentry_sdk.traces.get_current_span() is None:
@@ -53,10 +53,7 @@ def _start_client_span(
             SPANDATA.SENTRY_ORIGIN: ORIGIN,
         }
         if ctx.service_id:
-            attributes[SPANDATA.RPC_METHOD] = "%s/%s" % (
-                ctx.service_id,
-                ctx.operation_name,
-            )
+            attributes[SPANDATA.RPC_METHOD] = f"{ctx.service_id}/{ctx.operation_name}"
         return sentry_sdk.traces.start_span(
             name=span_name,
             attributes=attributes,
@@ -286,10 +283,9 @@ def _sentry_request_created(
             return
 
         # an ignored streamed span is not activated; avoid enriching its parent.
-        if isinstance(span, StreamedSpan) and (
-            span.get_attributes().get(SPANDATA.SENTRY_ORIGIN) != ORIGIN
-        ):
-            return
+        if isinstance(span, StreamedSpan):
+            if not (span.get_attributes().get(SPANDATA.SENTRY_ORIGIN) == ORIGIN):
+                return
 
         _set_request_attributes(span, request)
         # each attempt has a fresh `request.context`; carry the active client span.
