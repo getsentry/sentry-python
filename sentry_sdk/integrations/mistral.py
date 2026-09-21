@@ -16,6 +16,7 @@ if TYPE_CHECKING:
 
 try:
     from mistralai.client.chat import Chat
+    from mistralai.client.models import ChatCompletionResponse
 except ImportError:
     raise DidNotEnable("mistralai not installed")
 
@@ -69,7 +70,29 @@ def _wrap_complete(f: "Callable[..., Any]") -> "Callable[..., Any]":
                 set_on_span(SPANDATA.GEN_AI_REQUEST_MODEL, model)
 
             set_on_span(SPANDATA.GEN_AI_RESPONSE_STREAMING, False)
-            return f(self, *args, **kwargs)
+
+            response = f(self, *args, **kwargs)
+
+            if not isinstance(response, ChatCompletionResponse):
+                return response
+
+            if response.usage.prompt_tokens is not None:
+                set_on_span(
+                    SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, response.usage.prompt_tokens
+                )
+
+            if response.usage.completion_tokens is not None:
+                set_on_span(
+                    SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS,
+                    response.usage.completion_tokens,
+                )
+
+            if response.usage.total_tokens is not None:
+                set_on_span(
+                    SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, response.usage.total_tokens
+                )
+
+            return response
 
     return wrap_complete
 
@@ -112,6 +135,28 @@ def _wrap_complete_async(f: "Callable[..., Any]") -> "Callable[..., Any]":
                 set_on_span(SPANDATA.GEN_AI_REQUEST_MODEL, model)
 
             set_on_span(SPANDATA.GEN_AI_RESPONSE_STREAMING, False)
-            return await f(self, *args, **kwargs)
+
+            response = await f(self, *args, **kwargs)
+
+            if not isinstance(response, ChatCompletionResponse):
+                return response
+
+            if response.usage.prompt_tokens is not None:
+                set_on_span(
+                    SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, response.usage.prompt_tokens
+                )
+
+            if response.usage.completion_tokens is not None:
+                set_on_span(
+                    SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS,
+                    response.usage.completion_tokens,
+                )
+
+            if response.usage.total_tokens is not None:
+                set_on_span(
+                    SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, response.usage.total_tokens
+                )
+
+            return response
 
     return wrap_complete_async
