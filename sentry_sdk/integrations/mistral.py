@@ -60,7 +60,6 @@ def _wrap_complete(f: "Callable[..., Any]") -> "Callable[..., Any]":
                 name=f"chat {model}" if model is not None else "chat",
                 origin=MistralIntegration.origin,
             )
-            span.__enter__()
             span.set_data(SPANDATA.GEN_AI_PROVIDER_NAME, "mistral")
             span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "chat")
 
@@ -104,7 +103,7 @@ def _wrap_complete_async(f: "Callable[..., Any]") -> "Callable[..., Any]":
         client = sentry_sdk.get_client()
         integration = client.get_integration(MistralIntegration)
         if integration is None or kwargs.get("stream"):
-            return f(self, *args, **kwargs)
+            return await f(self, *args, **kwargs)
 
         model = kwargs.get("model")
 
@@ -126,7 +125,6 @@ def _wrap_complete_async(f: "Callable[..., Any]") -> "Callable[..., Any]":
                 name=f"chat {model}" if model is not None else "chat",
                 origin=MistralIntegration.origin,
             )
-            span.__enter__()
             span.set_data(SPANDATA.GEN_AI_PROVIDER_NAME, "mistral")
             span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "chat")
 
