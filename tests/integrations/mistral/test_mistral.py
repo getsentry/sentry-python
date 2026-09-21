@@ -265,7 +265,7 @@ async def test_nonstreaming_chat_async(
 
 
 @pytest.mark.parametrize(
-    "messages,expected_system_instructions",
+    "messages,expected_system_instructions,expected_input_messages",
     (
         (
             [
@@ -278,6 +278,17 @@ async def test_nonstreaming_chat_async(
                 {
                     "type": "text",
                     "content": "You are a helpful math tutor. You will be provided with a math problem, and your goal will be to output a step by step solution, along with a final answer. For each step, just provide the output as an equation use the explanation field to detail the reasoning.",
+                }
+            ],
+            [
+                {
+                    "role": "user",
+                    "parts": [
+                        {
+                            "type": "text",
+                            "content": "How can I solve 8x + 7 = -23",
+                        }
+                    ],
                 }
             ],
         ),
@@ -300,6 +311,21 @@ async def test_nonstreaming_chat_async(
                 {"type": "text", "content": "You are a helpful assistant."},
                 {"type": "text", "content": "Be concise and clear."},
             ],
+            [
+                {
+                    "role": "user",
+                    "parts": [
+                        {
+                            "type": "text",
+                            "content": "What is the best French cheese?",
+                        },
+                        {
+                            "type": "text",
+                            "content": "give the best 50",
+                        },
+                    ],
+                }
+            ],
         ),
         (
             [
@@ -313,6 +339,17 @@ async def test_nonstreaming_chat_async(
                 {
                     "type": "text",
                     "content": "You are a helpful math tutor. You will be provided with a math problem, and your goal will be to output a step by step solution, along with a final answer. For each step, just provide the output as an equation use the explanation field to detail the reasoning.",
+                }
+            ],
+            [
+                {
+                    "role": "user",
+                    "parts": [
+                        {
+                            "type": "text",
+                            "content": "How can I solve 8x + 7 = -23",
+                        }
+                    ],
                 }
             ],
         ),
@@ -337,6 +374,21 @@ async def test_nonstreaming_chat_async(
                 {"type": "text", "content": "You are a helpful assistant."},
                 {"type": "text", "content": "Be concise and clear."},
             ],
+            [
+                {
+                    "role": "user",
+                    "parts": [
+                        {
+                            "type": "text",
+                            "content": "What is the best French cheese?",
+                        },
+                        {
+                            "type": "text",
+                            "content": "give the best 50",
+                        },
+                    ],
+                }
+            ],
         ),
     ),
 )
@@ -349,6 +401,7 @@ def test_input_attributes_nonstreaming_chat(
     mistral_response,
     messages,
     expected_system_instructions,
+    expected_input_messages,
     stream_gen_ai_spans,
     span_streaming,
 ):
@@ -391,6 +444,10 @@ def test_input_attributes_nonstreaming_chat(
         assert (
             json.loads(span["attributes"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS])
             == expected_system_instructions
+        )
+        assert (
+            json.loads(span["attributes"][SPANDATA.GEN_AI_INPUT_MESSAGES])
+            == expected_input_messages
         )
     else:
         items = capture_items("transaction")
@@ -413,6 +470,10 @@ def test_input_attributes_nonstreaming_chat(
             json.loads(span["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS])
             == expected_system_instructions
         )
+        assert (
+            json.loads(span["data"][SPANDATA.GEN_AI_INPUT_MESSAGES])
+            == expected_input_messages
+        )
 
 
 @pytest.mark.parametrize(
@@ -429,6 +490,17 @@ def test_input_attributes_nonstreaming_chat(
                 {
                     "type": "text",
                     "content": "You are a helpful math tutor. You will be provided with a math problem, and your goal will be to output a step by step solution, along with a final answer. For each step, just provide the output as an equation use the explanation field to detail the reasoning.",
+                }
+            ],
+            [
+                {
+                    "role": "user",
+                    "parts": [
+                        {
+                            "type": "text",
+                            "content": "How can I solve 8x + 7 = -23",
+                        }
+                    ],
                 }
             ],
         ),
@@ -451,6 +523,21 @@ def test_input_attributes_nonstreaming_chat(
                 {"type": "text", "content": "You are a helpful assistant."},
                 {"type": "text", "content": "Be concise and clear."},
             ],
+            [
+                {
+                    "role": "user",
+                    "parts": [
+                        {
+                            "type": "text",
+                            "content": "What is the best French cheese?",
+                        },
+                        {
+                            "type": "text",
+                            "content": "give the best 50",
+                        },
+                    ],
+                }
+            ],
         ),
         (
             [
@@ -464,6 +551,17 @@ def test_input_attributes_nonstreaming_chat(
                 {
                     "type": "text",
                     "content": "You are a helpful math tutor. You will be provided with a math problem, and your goal will be to output a step by step solution, along with a final answer. For each step, just provide the output as an equation use the explanation field to detail the reasoning.",
+                }
+            ],
+            [
+                {
+                    "role": "user",
+                    "parts": [
+                        {
+                            "type": "text",
+                            "content": "How can I solve 8x + 7 = -23",
+                        }
+                    ],
                 }
             ],
         ),
@@ -488,6 +586,21 @@ def test_input_attributes_nonstreaming_chat(
                 {"type": "text", "content": "You are a helpful assistant."},
                 {"type": "text", "content": "Be concise and clear."},
             ],
+            [
+                {
+                    "role": "user",
+                    "parts": [
+                        {
+                            "type": "text",
+                            "content": "What is the best French cheese?",
+                        },
+                        {
+                            "type": "text",
+                            "content": "give the best 50",
+                        },
+                    ],
+                }
+            ],
         ),
     ),
 )
@@ -501,6 +614,7 @@ async def test_input_attributes_nonstreaming_chat_async(
     mistral_response,
     messages,
     expected_system_instructions,
+    expected_input_messages,
     stream_gen_ai_spans,
     span_streaming,
 ):
@@ -544,6 +658,10 @@ async def test_input_attributes_nonstreaming_chat_async(
             json.loads(span["attributes"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS])
             == expected_system_instructions
         )
+        assert (
+            json.loads(span["attributes"][SPANDATA.GEN_AI_INPUT_MESSAGES])
+            == expected_input_messages
+        )
     else:
         items = capture_items("transaction")
 
@@ -564,4 +682,8 @@ async def test_input_attributes_nonstreaming_chat_async(
         assert (
             json.loads(span["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS])
             == expected_system_instructions
+        )
+        assert (
+            json.loads(span["data"][SPANDATA.GEN_AI_INPUT_MESSAGES])
+            == expected_input_messages
         )
