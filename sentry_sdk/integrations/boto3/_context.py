@@ -4,7 +4,7 @@ from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.utils import capture_internal_exceptions
 
 if TYPE_CHECKING:
-    from typing import Any, Optional, Dict
+    from typing import Any, Dict, Optional
 
 try:
     from botocore.client import BaseClient
