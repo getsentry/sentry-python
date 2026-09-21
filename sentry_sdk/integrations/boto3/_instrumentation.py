@@ -4,6 +4,7 @@ import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.integrations.boto3 import Boto3Integration
+from sentry_sdk.integrations.boto3.consts import ORIGIN
 from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing import BAGGAGE_HEADER_NAME, Span
 from sentry_sdk.tracing_utils import (
@@ -61,7 +62,7 @@ def _sentry_request_created(
                 name=description,
                 attributes={
                     "sentry.op": OP.HTTP_CLIENT,
-                    "sentry.origin": Boto3Integration.origin,
+                    "sentry.origin": ORIGIN,
                     SPANDATA.RPC_METHOD: f"{service_id}/{operation_name}",
                 },
             )
@@ -73,7 +74,7 @@ def _sentry_request_created(
         span = sentry_sdk.start_span(
             op=OP.HTTP_CLIENT,
             name=description,
-            origin=Boto3Integration.origin,
+            origin=ORIGIN,
         )
 
         if parsed_url:
@@ -182,14 +183,14 @@ def _sentry_after_call(
             parent_span=span,
             attributes={
                 "sentry.op": OP.HTTP_CLIENT_STREAM,
-                "sentry.origin": Boto3Integration.origin,
+                "sentry.origin": ORIGIN,
             },
         )
     else:
         streaming_span = span.start_child(
             op=OP.HTTP_CLIENT_STREAM,
             name=span.description,
-            origin=Boto3Integration.origin,
+            origin=ORIGIN,
         )
 
     orig_read = body.read
