@@ -71,6 +71,32 @@ def _wrap_complete(f: "Callable[..., Any]") -> "Callable[..., Any]":
 
             set_on_span(SPANDATA.GEN_AI_RESPONSE_STREAMING, False)
 
+            max_tokens = kwargs.get("max_tokens")
+            if max_tokens is not None:
+                set_on_span(SPANDATA.GEN_AI_REQUEST_MAX_TOKENS, max_tokens)
+
+            frequency_penalty = kwargs.get("frequency_penalty")
+            if frequency_penalty is not None:
+                set_on_span(
+                    SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY, frequency_penalty
+                )
+
+            presence_penalty = kwargs.get("presence_penalty")
+            if presence_penalty is not None:
+                set_on_span(SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY, presence_penalty)
+
+            temperature = kwargs.get("temperature")
+            if temperature is not None:
+                set_on_span(SPANDATA.GEN_AI_REQUEST_TEMPERATURE, temperature)
+
+            top_p = kwargs.get("top_p")
+            if top_p is not None:
+                set_on_span(SPANDATA.GEN_AI_REQUEST_TOP_P, top_p)
+
+            reasoning_effort = kwargs.get("reasoning_effort")
+            if reasoning_effort is not None:
+                set_on_span(SPANDATA.GEN_AI_REQUEST_REASONING_LEVEL, reasoning_effort)
+
             response = f(self, *args, **kwargs)
 
             if not isinstance(response, ChatCompletionResponse):
@@ -135,6 +161,32 @@ def _wrap_complete_async(f: "Callable[..., Any]") -> "Callable[..., Any]":
                 set_on_span(SPANDATA.GEN_AI_REQUEST_MODEL, model)
 
             set_on_span(SPANDATA.GEN_AI_RESPONSE_STREAMING, False)
+
+            max_tokens = kwargs.get("max_tokens")
+            if max_tokens is not None:
+                set_on_span(SPANDATA.GEN_AI_REQUEST_MAX_TOKENS, max_tokens)
+
+            frequency_penalty = kwargs.get("frequency_penalty")
+            if frequency_penalty is not None:
+                set_on_span(
+                    SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY, frequency_penalty
+                )
+
+            presence_penalty = kwargs.get("presence_penalty")
+            if presence_penalty is not None:
+                set_on_span(SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY, presence_penalty)
+
+            temperature = kwargs.get("temperature")
+            if temperature is not None:
+                set_on_span(SPANDATA.GEN_AI_REQUEST_TEMPERATURE, temperature)
+
+            top_p = kwargs.get("top_p")
+            if top_p is not None:
+                set_on_span(SPANDATA.GEN_AI_REQUEST_TOP_P, top_p)
+
+            reasoning_effort = kwargs.get("reasoning_effort")
+            if reasoning_effort is not None:
+                set_on_span(SPANDATA.GEN_AI_REQUEST_REASONING_LEVEL, reasoning_effort)
 
             response = await f(self, *args, **kwargs)
 

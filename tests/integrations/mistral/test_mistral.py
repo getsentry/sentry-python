@@ -74,8 +74,13 @@ def test_nonstreaming_chat(
                 messages=[
                     {"role": "user", "content": "What is the best French cheese?"}
                 ],
+                max_tokens=1024,
+                presence_penalty=0.1,
+                frequency_penalty=0.2,
+                temperature=0.7,
+                top_p=0.9,
+                reasoning_effort="high",
             )
-
         sentry_sdk.flush()
         spans = [item.payload for item in items]
         (span,) = (
@@ -93,6 +98,13 @@ def test_nonstreaming_chat(
         )
         assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
 
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.1
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 1024
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_REASONING_LEVEL] == "high"
+
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
@@ -107,6 +119,12 @@ def test_nonstreaming_chat(
             client.chat.complete(
                 model="open-mistral",
                 messages=[{"role": "user", "content": "Hello, Mistral"}],
+                max_tokens=1024,
+                presence_penalty=0.1,
+                frequency_penalty=0.2,
+                temperature=0.7,
+                top_p=0.9,
+                reasoning_effort="high",
             )
 
         (transaction,) = [item.payload for item in items]
@@ -118,6 +136,13 @@ def test_nonstreaming_chat(
 
         assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "open-mistral"
         assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
+
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.1
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 1024
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_REASONING_LEVEL] == "high"
 
         assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
         assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
@@ -162,6 +187,12 @@ async def test_nonstreaming_chat_async(
                 messages=[
                     {"role": "user", "content": "What is the best French cheese?"}
                 ],
+                max_tokens=1024,
+                presence_penalty=0.1,
+                frequency_penalty=0.2,
+                temperature=0.7,
+                top_p=0.9,
+                reasoning_effort="high",
             )
 
         sentry_sdk.flush()
@@ -181,6 +212,13 @@ async def test_nonstreaming_chat_async(
         )
         assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
 
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.1
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 1024
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_REASONING_LEVEL] == "high"
+
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
@@ -195,6 +233,12 @@ async def test_nonstreaming_chat_async(
             await client.chat.complete_async(
                 model="mistral-medium-latest",
                 messages=[{"role": "user", "content": "Hello, Mistral"}],
+                max_tokens=1024,
+                presence_penalty=0.1,
+                frequency_penalty=0.2,
+                temperature=0.7,
+                top_p=0.9,
+                reasoning_effort="high",
             )
 
         (transaction,) = [item.payload for item in items]
@@ -206,6 +250,13 @@ async def test_nonstreaming_chat_async(
 
         assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "mistral-medium-latest"
         assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
+
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.1
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 1024
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_REASONING_LEVEL] == "high"
 
         assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
         assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
