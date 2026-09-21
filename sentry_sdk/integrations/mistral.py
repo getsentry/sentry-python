@@ -170,9 +170,15 @@ def _transform_system_instructions(
             continue
 
         for part in content:
-            if isinstance(part, dict) and "text" in part:
-                text = cast("TextChunkTypedDict", part)["text"]
-                system_instructions.append({"type": "text", "content": text})
+            if (
+                not isinstance(part, dict)
+                or part.get("type") != "text"
+                or "text" not in part
+            ):
+                continue
+
+            text = cast("TextChunkTypedDict", part)["text"]
+            system_instructions.append({"type": "text", "content": text})
 
     return system_instructions
 
