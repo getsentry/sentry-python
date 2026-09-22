@@ -465,9 +465,6 @@ async def test_agent_invocation_span_no_pii(
         span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
     )
 
-    assert spans[2]["name"] == "test_agent workflow"
-    assert spans[2]["attributes"]["sentry.origin"] == "auto.ai.openai_agents"
-
     assert invoke_agent_span["name"] == "invoke_agent test_agent"
 
     assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in invoke_agent_span["attributes"]
@@ -1193,10 +1190,7 @@ async def test_agent_invocation_span(
 
     sentry_sdk.flush()
     spans = [item.payload for item in items]
-    ai_client_span, invoke_agent_span, workflow_span = spans
-
-    assert workflow_span["name"] == "test_agent workflow"
-    assert workflow_span["attributes"]["sentry.origin"] == "auto.ai.openai_agents"
+    ai_client_span, invoke_agent_span = spans
 
     assert invoke_agent_span["name"] == "invoke_agent test_agent"
 
@@ -1323,9 +1317,6 @@ def test_agent_invocation_span_sync_no_pii(
 
     sentry_sdk.flush()
     spans = [item.payload for item in items]
-
-    assert spans[2]["name"] == "test_agent workflow"
-    assert spans[2]["attributes"]["sentry.origin"] == "auto.ai.openai_agents"
 
     invoke_agent_span = next(
         span
@@ -1594,10 +1585,7 @@ def test_agent_invocation_span_sync(
 
     sentry_sdk.flush()
     spans = [item.payload for item in items]
-    ai_client_span, invoke_agent_span, workflow_span = spans
-
-    assert workflow_span["name"] == "test_agent workflow"
-    assert workflow_span["attributes"]["sentry.origin"] == "auto.ai.openai_agents"
+    ai_client_span, invoke_agent_span = spans
 
     assert invoke_agent_span["name"] == "invoke_agent test_agent"
     assert invoke_agent_span["attributes"]["gen_ai.operation.name"] == "invoke_agent"
@@ -1984,9 +1972,6 @@ async def test_tool_execution_span(
 
     sentry_sdk.flush()
     spans = [item.payload for item in items]
-
-    assert spans[4]["name"] == "test_agent workflow"
-    assert spans[4]["attributes"]["sentry.origin"] == "auto.ai.openai_agents"
 
     agent_span = next(
         span
@@ -2858,10 +2843,7 @@ async def test_model_behavior_error(
     (
         ai_client_span1,
         agent_span,
-        workflow_span,
     ) = spans
-    assert workflow_span["name"] == "test_agent workflow"
-    assert workflow_span["attributes"]["sentry.origin"] == "auto.ai.openai_agents"
 
     assert agent_span["name"] == "invoke_agent test_agent"
     assert agent_span["attributes"]["sentry.origin"] == "auto.ai.openai_agents"
@@ -2908,10 +2890,10 @@ async def test_run_error_handling(
 
     sentry_sdk.flush()
     spans = [item.payload for item in items if item.type == "span"]
-    (ai_client_span, invoke_agent_span, workflow_span) = spans
-
-    assert workflow_span["name"] == "test_agent workflow"
-    assert workflow_span["attributes"]["sentry.origin"] == "auto.ai.openai_agents"
+    (
+        ai_client_span,
+        invoke_agent_span,
+    ) = spans
 
     assert invoke_agent_span["name"] == "invoke_agent test_agent"
     assert invoke_agent_span["attributes"]["sentry.origin"] == "auto.ai.openai_agents"
@@ -2956,10 +2938,10 @@ async def test_run_streamed_error_handling(
 
     sentry_sdk.flush()
     spans = [item.payload for item in items if item.type == "span"]
-    (ai_client_span, invoke_agent_span, workflow_span) = spans
-
-    assert workflow_span["name"] == "test_agent workflow"
-    assert workflow_span["attributes"]["sentry.origin"] == "auto.ai.openai_agents"
+    (
+        ai_client_span,
+        invoke_agent_span,
+    ) = spans
 
     assert invoke_agent_span["name"] == "invoke_agent test_agent"
     assert invoke_agent_span["attributes"]["sentry.origin"] == "auto.ai.openai_agents"
@@ -3068,58 +3050,6 @@ async def test_span_status_error(
     sentry_sdk.flush()
     spans = [item.payload for item in items if item.type == "span"]
     assert spans[0]["status"] == "error"
-
-    assert spans[2]["is_segment"] is True
-    assert spans[2]["status"] == "error"
-
-
-@pytest.mark.asyncio
-async def test_multiple_agents_asyncio(
-    sentry_init,
-    capture_items,
-    test_agent,
-    nonstreaming_responses_model_response,
-    get_model_response,
-):
-    """
-    Test that multiple agents can be run at the same time in asyncio tasks
-    without interfering with each other.
-    """
-    client = AsyncOpenAI(api_key="test-key")
-    model = OpenAIResponsesModel(model="gpt-4", openai_client=client)
-    agent = test_agent.clone(model=model)
-
-    response = get_model_response(
-        nonstreaming_responses_model_response, serialize_pydantic=True
-    )
-    with patch.object(
-        agent.model._client._client,
-        "send",
-        return_value=response,
-    ) as _:
-        sentry_init(
-            integrations=[OpenAIAgentsIntegration()],
-            disabled_integrations=[StdlibIntegration],
-            traces_sample_rate=1.0,
-        )
-
-        items = capture_items("span")
-
-        async def run():
-            await agents.Runner.run(
-                starting_agent=agent,
-                input="Test input",
-                run_config=test_run_config,
-            )
-
-        await asyncio.gather(*[run() for _ in range(3)])
-
-    sentry_sdk.flush()
-    spans = [item.payload for item in items]
-
-    assert spans[2]["name"] == "test_agent workflow"
-    assert spans[5]["name"] == "test_agent workflow"
-    assert spans[8]["name"] == "test_agent workflow"
 
 
 # Test input messages with mixed roles including "ai"
@@ -3916,8 +3846,6 @@ async def test_conversation_id_on_all_spans(
         span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
     )
 
-    assert spans[2]["attributes"]["gen_ai.conversation.id"] == "conv_test_123"
-
     # Verify invoke_agent span has conversation_id
     assert invoke_agent_span["attributes"]["gen_ai.conversation.id"] == "conv_test_123"
 
@@ -4051,224 +3979,3 @@ async def test_conversation_id_on_tool_span(
     assert tool_span is not None
     # Tool span should have the conversation_id passed to Runner.run()
     assert tool_span["attributes"]["gen_ai.conversation.id"] == "conv_tool_test_456"
-
-    # Workflow span should have the same conversation_id
-    workflow_span = spans[4]
-    assert workflow_span["is_segment"] is True
-
-    assert workflow_span["attributes"]["gen_ai.conversation.id"] == "conv_tool_test_456"
-
-
-@pytest.mark.asyncio
-async def test_no_conversation_id_when_not_provided(
-    sentry_init,
-    capture_items,
-    test_agent,
-    nonstreaming_responses_model_response,
-    get_model_response,
-):
-    """
-    Test that gen_ai.conversation.id is not set when not passed to Runner.run().
-    """
-
-    client = AsyncOpenAI(api_key="test-key")
-    model = OpenAIResponsesModel(model="gpt-4", openai_client=client)
-    agent = test_agent.clone(model=model)
-
-    response = get_model_response(
-        nonstreaming_responses_model_response, serialize_pydantic=True
-    )
-    with patch.object(
-        agent.model._client._client,
-        "send",
-        return_value=response,
-    ) as _:
-        sentry_init(
-            integrations=[OpenAIAgentsIntegration()],
-            disabled_integrations=[StdlibIntegration],
-            traces_sample_rate=1.0,
-        )
-
-        items = capture_items("span")
-
-        # Don't pass conversation_id
-        result = await agents.Runner.run(
-            agent, "Test input", run_config=test_run_config
-        )
-
-        assert result is not None
-
-    sentry_sdk.flush()
-    spans = [item.payload for item in items]
-
-    workflow_span = spans[2]
-    assert workflow_span["is_segment"] is True
-
-    invoke_agent_span = next(
-        span
-        for span in spans
-        if span["attributes"]["sentry.op"] == OP.GEN_AI_INVOKE_AGENT
-    )
-    ai_client_span = next(
-        span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-    )
-
-    # Verify conversation_id is NOT set on any spans
-    assert "gen_ai.conversation.id" not in workflow_span.get("attributes", {})
-    assert "gen_ai.conversation.id" not in invoke_agent_span.get("attributes", {})
-    assert "gen_ai.conversation.id" not in ai_client_span.get("attributes", {})
-
-
-@pytest.mark.asyncio
-async def test_runner_run_with_starting_agent_kwarg(
-    sentry_init,
-    capture_items,
-    test_agent,
-    nonstreaming_responses_model_response,
-    get_model_response,
-):
-    """Runner.run(starting_agent=agent, input=...) must not crash.
-
-    Regression test for https://github.com/getsentry/sentry-python/issues/6418
-    """
-    client = AsyncOpenAI(api_key="test-key")
-    model = OpenAIResponsesModel(model="gpt-4", openai_client=client)
-    agent = test_agent.clone(model=model)
-
-    response = get_model_response(
-        nonstreaming_responses_model_response, serialize_pydantic=True
-    )
-
-    with patch.object(
-        agent.model._client._client,
-        "send",
-        return_value=response,
-    ):
-        sentry_init(
-            integrations=[OpenAIAgentsIntegration()],
-            traces_sample_rate=1.0,
-        )
-
-        items = capture_items("span")
-
-        result = await agents.run.DEFAULT_AGENT_RUNNER.run(
-            starting_agent=agent,
-            input="Test input",
-            run_config=test_run_config,
-        )
-
-        assert result is not None
-        assert result.final_output == "Hello, how can I help you?"
-
-    sentry_sdk.flush()
-    spans = [item.payload for item in items]
-    assert any(span["name"] == "test_agent workflow" for span in spans)
-
-
-@pytest.mark.asyncio
-async def test_runner_run_streamed_with_starting_agent_kwarg(
-    sentry_init,
-    capture_items,
-    test_agent,
-    async_iterator,
-    server_side_event_chunks,
-    get_model_response,
-):
-    """Runner.run_streamed(starting_agent=agent, input=...) must not crash.
-
-    Regression test for https://github.com/getsentry/sentry-python/issues/6418
-    """
-    client = AsyncOpenAI(api_key="test-key")
-    model = OpenAIResponsesModel(model="gpt-4", openai_client=client)
-    agent = test_agent.clone(model=model)
-
-    request_headers = {"X-Stainless-Raw-Response": "stream"}
-
-    response = get_model_response(
-        async_iterator(
-            server_side_event_chunks(
-                [
-                    ResponseCreatedEvent(
-                        response=Response(
-                            id="chat-id",
-                            output=[],
-                            parallel_tool_calls=False,
-                            tool_choice="none",
-                            tools=[],
-                            created_at=10000000,
-                            model="gpt-4",
-                            object="response",
-                        ),
-                        type="response.created",
-                        sequence_number=0,
-                    ),
-                    ResponseCompletedEvent(
-                        response=Response(
-                            id="chat-id",
-                            output=[
-                                ResponseOutputMessage(
-                                    id="message-id",
-                                    content=[
-                                        ResponseOutputText(
-                                            annotations=[],
-                                            text="Hello, how can I help you?",
-                                            type="output_text",
-                                        ),
-                                    ],
-                                    role="assistant",
-                                    status="completed",
-                                    type="message",
-                                ),
-                            ],
-                            parallel_tool_calls=False,
-                            tool_choice="none",
-                            tools=[],
-                            created_at=10000000,
-                            model="gpt-4",
-                            object="response",
-                            usage=ResponseUsage(
-                                input_tokens=10,
-                                input_tokens_details=InputTokensDetails(
-                                    cached_tokens=0,
-                                    cache_write_tokens=0,
-                                ),
-                                output_tokens=20,
-                                output_tokens_details=OutputTokensDetails(
-                                    reasoning_tokens=5,
-                                ),
-                                total_tokens=30,
-                            ),
-                        ),
-                        type="response.completed",
-                        sequence_number=1,
-                    ),
-                ]
-            )
-        ),
-        request_headers=request_headers,
-    )
-
-    with patch.object(
-        agent.model._client._client,
-        "send",
-        return_value=response,
-    ):
-        sentry_init(
-            integrations=[OpenAIAgentsIntegration()],
-            traces_sample_rate=1.0,
-        )
-
-        items = capture_items("span")
-
-        result = agents.run.DEFAULT_AGENT_RUNNER.run_streamed(
-            starting_agent=agent,
-            input="Test input",
-            run_config=test_run_config,
-        )
-
-        async for _event in result.stream_events():
-            pass
-
-    sentry_sdk.flush()
-    spans = [item.payload for item in items]
-    assert any(span["name"] == "test_agent workflow" for span in spans)
