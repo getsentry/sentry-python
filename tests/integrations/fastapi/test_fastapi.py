@@ -358,7 +358,7 @@ async def test_formdata_request_body_data_collection_http_bodies_empty(
         max_request_body_size="always",
         integrations=[StarletteIntegration()],
         trace_lifecycle="stream" if span_streaming else "static",
-        _experiments={"data_collection": {"http_bodies": []}},
+        data_collection={"http_bodies": []},
     )
 
     app = fastapi_app_factory()
@@ -418,9 +418,7 @@ async def test_request_body_data_collection(
         traces_sample_rate=1.0,
         integrations=[StarletteIntegration()],
         trace_lifecycle="stream" if span_streaming else "static",
-        _experiments=(
-            {} if data_collection is None else {"data_collection": data_collection}
-        ),
+        data_collection=data_collection,
     )
 
     app = fastapi_app_factory()

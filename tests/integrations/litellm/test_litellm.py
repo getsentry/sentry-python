@@ -3673,7 +3673,7 @@ def test_chat_completion_data_collection(
         trace_lifecycle="static",
     )
     if data_collection is not None:
-        sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
+        sentry_init_kwargs["data_collection"] = data_collection
 
     sentry_init(**sentry_init_kwargs)
 
@@ -3800,7 +3800,7 @@ def test_embeddings_data_collection(
         trace_lifecycle="static",
     )
     if data_collection is not None:
-        sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
+        sentry_init_kwargs["data_collection"] = data_collection
 
     sentry_init(**sentry_init_kwargs)
 

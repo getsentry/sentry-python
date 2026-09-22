@@ -490,7 +490,7 @@ def test_input_attributes_nonstreaming_chat(
             traces_sample_rate=1.0,
             stream_gen_ai_spans=stream_gen_ai_spans,
             trace_lifecycle="stream" if span_streaming else "static",
-            _experiments={"data_collection": {}},
+            data_collection={},
         )
     else:
         sentry_init(
@@ -779,7 +779,7 @@ async def test_input_attributes_nonstreaming_chat_async(
             traces_sample_rate=1.0,
             stream_gen_ai_spans=stream_gen_ai_spans,
             trace_lifecycle="stream" if span_streaming else "static",
-            _experiments={"data_collection": {}},
+            data_collection={},
         )
     else:
         sentry_init(
@@ -871,7 +871,7 @@ def test_output_attributes_nonstreaming_chat(
             traces_sample_rate=1.0,
             stream_gen_ai_spans=stream_gen_ai_spans,
             trace_lifecycle="stream" if span_streaming else "static",
-            _experiments={"data_collection": {}},
+            data_collection={},
         )
     else:
         sentry_init(
@@ -981,7 +981,7 @@ async def test_output_attributes_nonstreaming_chat_async(
             traces_sample_rate=1.0,
             stream_gen_ai_spans=stream_gen_ai_spans,
             trace_lifecycle="stream" if span_streaming else "static",
-            _experiments={"data_collection": {}},
+            data_collection={},
         )
     else:
         sentry_init(

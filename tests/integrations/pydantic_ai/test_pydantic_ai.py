@@ -4499,7 +4499,7 @@ async def test_data_collection_gen_ai_inputs_gates_request_messages_tool_inputs_
         "trace_lifecycle": "stream" if span_streaming else "static",
     }
     if data_collection is not None:
-        init_kwargs["_experiments"] = {"data_collection": data_collection}
+        init_kwargs["data_collection"] = data_collection
 
     sentry_init(**init_kwargs)
 
@@ -4639,7 +4639,7 @@ async def test_data_collection_gen_ai_outputs_gates_response_text_and_tool_outpu
         "trace_lifecycle": "stream" if span_streaming else "static",
     }
     if data_collection is not None:
-        init_kwargs["_experiments"] = {"data_collection": data_collection}
+        init_kwargs["data_collection"] = data_collection
 
     sentry_init(**init_kwargs)
 
@@ -4755,7 +4755,7 @@ async def test_data_collection_gen_ai_output_message_parts_follow_outputs_gate(
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
         trace_lifecycle="stream" if span_streaming else "static",
-        _experiments={"data_collection": {"gen_ai": gen_ai}},
+        data_collection={"gen_ai": gen_ai},
     )
 
     test_agent = get_test_agent()
@@ -4830,9 +4830,7 @@ async def test_data_collection_gen_ai_request_messages_keep_tool_returns_when_ou
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
         trace_lifecycle="stream" if span_streaming else "static",
-        _experiments={
-            "data_collection": {"gen_ai": {"inputs": True, "outputs": False}}
-        },
+        data_collection={"gen_ai": {"inputs": True, "outputs": False}},
     )
 
     test_agent = get_test_agent()

@@ -155,7 +155,7 @@ async def test_aiohttp_request_body_data_collection(
 ):
     sentry_init(
         integrations=[AioHttpIntegration()],
-        _experiments={"data_collection": data_collection},
+        data_collection=data_collection,
     )
 
     body = {"some": "value"}
@@ -207,7 +207,7 @@ async def test_aiohttp_oversized_request_body_data_collection(
     sentry_init(
         integrations=[AioHttpIntegration()],
         max_request_body_size="small",
-        _experiments={"data_collection": data_collection},
+        data_collection=data_collection,
     )
 
     body = "a" * 2000
@@ -643,10 +643,8 @@ async def test_crumb_capture(
         ({"send_default_pii": False}, False, False),
         (
             {
-                "_experiments": {
-                    "data_collection": {
-                        "url_query_params": {"mode": "denylist", "terms": []}
-                    }
+                "data_collection": {
+                    "url_query_params": {"mode": "denylist", "terms": []}
                 }
             },
             True,
@@ -654,10 +652,8 @@ async def test_crumb_capture(
         ),
         (
             {
-                "_experiments": {
-                    "data_collection": {
-                        "url_query_params": {"mode": "allowlist", "terms": []}
-                    }
+                "data_collection": {
+                    "url_query_params": {"mode": "allowlist", "terms": []}
                 }
             },
             True,
@@ -794,10 +790,8 @@ async def test_crumb_capture_client_error(
         ({"send_default_pii": False}, False, False),
         (
             {
-                "_experiments": {
-                    "data_collection": {
-                        "url_query_params": {"mode": "denylist", "terms": []}
-                    }
+                "data_collection": {
+                    "url_query_params": {"mode": "denylist", "terms": []}
                 }
             },
             True,
@@ -805,10 +799,8 @@ async def test_crumb_capture_client_error(
         ),
         (
             {
-                "_experiments": {
-                    "data_collection": {
-                        "url_query_params": {"mode": "allowlist", "terms": []}
-                    }
+                "data_collection": {
+                    "url_query_params": {"mode": "allowlist", "terms": []}
                 }
             },
             True,
@@ -1678,7 +1670,7 @@ async def test_sensitive_header_scrubbing_span_streaming(
         pytest.param(
             {
                 "send_default_pii": True,
-                "data_collection": None,
+                "data_collection": {},
             },
             {
                 "authorization": "[Filtered]",
@@ -1690,7 +1682,7 @@ async def test_sensitive_header_scrubbing_span_streaming(
         pytest.param(
             {
                 "send_default_pii": False,
-                "data_collection": None,
+                "data_collection": {},
             },
             {
                 "authorization": "[Filtered]",
@@ -1794,9 +1786,7 @@ async def test_sensitive_header_passthrough_with_pii_span_streaming(
         traces_sample_rate=1.0,
         send_default_pii=options["send_default_pii"],
         trace_lifecycle="stream",
-        _experiments={
-            "data_collection": options["data_collection"],
-        },
+        data_collection=options["data_collection"],
     )
 
     async def hello(request):
@@ -2256,16 +2246,14 @@ _QUERY_PARAM_DATA_COLLECTION_CASES = [
         id="defaults",
     ),
     pytest.param(
-        {"_experiments": {"data_collection": {}}},
+        {"data_collection": {}},
         "toy=tennisball&color=red&auth=%5BFiltered%5D",
         id="data_collection_denylist_default",
     ),
     pytest.param(
         {
-            "_experiments": {
-                "data_collection": {
-                    "url_query_params": {"mode": "denylist", "terms": ["toy"]}
-                }
+            "data_collection": {
+                "url_query_params": {"mode": "denylist", "terms": ["toy"]}
             }
         },
         "toy=%5BFiltered%5D&color=red&auth=%5BFiltered%5D",
@@ -2273,10 +2261,8 @@ _QUERY_PARAM_DATA_COLLECTION_CASES = [
     ),
     pytest.param(
         {
-            "_experiments": {
-                "data_collection": {
-                    "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
-                }
+            "data_collection": {
+                "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
             }
         },
         "toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D",
@@ -2284,24 +2270,22 @@ _QUERY_PARAM_DATA_COLLECTION_CASES = [
     ),
     pytest.param(
         {
-            "_experiments": {
-                "data_collection": {
-                    "url_query_params": {"mode": "allowlist", "terms": ["auth"]}
-                }
+            "data_collection": {
+                "url_query_params": {"mode": "allowlist", "terms": ["auth"]}
             }
         },
         "toy=%5BFiltered%5D&color=%5BFiltered%5D&auth=%5BFiltered%5D",
         id="data_collection_allowlist_sensitive_term",
     ),
     pytest.param(
-        {"_experiments": {"data_collection": {"url_query_params": {"mode": "off"}}}},
+        {"data_collection": {"url_query_params": {"mode": "off"}}},
         None,
         id="data_collection_off",
     ),
     pytest.param(
         {
             "send_default_pii": True,
-            "_experiments": {"data_collection": {"url_query_params": {"mode": "off"}}},
+            "data_collection": {"url_query_params": {"mode": "off"}},
         },
         None,
         id="data_collection_wins_over_send_default_pii",
@@ -2422,7 +2406,7 @@ async def test_server_url_query_data_collection_event_processor(
     assert event["request"]["url"] == "http://{host}/".format(host=host)
     assert event["request"]["method"] == "GET"
 
-    if "data_collection" not in init_kwargs.get("_experiments", {}):
+    if "data_collection" not in init_kwargs:
         assert (
             event["request"]["query_string"] == "toy=tennisball&color=red&auth=secret"
         )
