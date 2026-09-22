@@ -544,7 +544,7 @@ def test_completions_api_data_collection(
         integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        _experiments={"data_collection": data_collection},
+        data_collection=data_collection,
     )
 
     client = OpenAI(api_key="z")
@@ -655,7 +655,7 @@ def test_completions_api_data_collection_outputs(
         "send_default_pii": send_default_pii,
     }
     if data_collection is not None:
-        init_kwargs["_experiments"] = {"data_collection": data_collection}
+        init_kwargs["data_collection"] = data_collection
 
     sentry_init(**init_kwargs)
 
@@ -749,7 +749,7 @@ async def test_completions_api_data_collection_outputs_async(
         "send_default_pii": send_default_pii,
     }
     if data_collection is not None:
-        init_kwargs["_experiments"] = {"data_collection": data_collection}
+        init_kwargs["data_collection"] = data_collection
 
     sentry_init(**init_kwargs)
 
@@ -794,7 +794,7 @@ def test_completions_api_data_collection_outputs_empty_choices(
         integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        _experiments={"data_collection": {"gen_ai": {"outputs": True}}},
+        data_collection={"gen_ai": {"outputs": True}},
     )
 
     client = OpenAI(api_key="z")
@@ -860,7 +860,7 @@ def test_streaming_chat_completion_data_collection_outputs(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=False,
-        _experiments={"data_collection": data_collection},
+        data_collection=data_collection,
     )
 
     client = OpenAI(api_key="z")
@@ -944,7 +944,7 @@ async def test_streaming_chat_completion_data_collection_outputs_async(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=False,
-        _experiments={"data_collection": data_collection},
+        data_collection=data_collection,
     )
 
     client = AsyncOpenAI(api_key="z")
@@ -2556,7 +2556,7 @@ def test_embeddings_create_data_collection(
 
     sentry_init_kwargs = dict(init_kwargs)
     if data_collection is not None:
-        sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
+        sentry_init_kwargs["data_collection"] = data_collection
 
     sentry_init(**sentry_init_kwargs)
 
@@ -2613,7 +2613,7 @@ def test_embeddings_create_data_collection_inputs_disabled_input_shapes(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"data_collection": {"gen_ai": {"inputs": False}}},
+        data_collection={"gen_ai": {"inputs": False}},
     )
 
     client = OpenAI(api_key="z")
@@ -2862,7 +2862,7 @@ async def test_embeddings_create_async_data_collection(
 
     sentry_init_kwargs = dict(init_kwargs)
     if data_collection is not None:
-        sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
+        sentry_init_kwargs["data_collection"] = data_collection
 
     sentry_init(**sentry_init_kwargs)
 
@@ -4072,7 +4072,7 @@ def test_responses_api_data_collection(
         integrations=[OpenAIIntegration(include_prompts=include_prompts)],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        _experiments={"data_collection": data_collection},
+        data_collection=data_collection,
     )
 
     client = OpenAI(api_key="z")
@@ -4217,7 +4217,7 @@ def test_responses_api_data_collection_outputs(
         "send_default_pii": send_default_pii,
     }
     if data_collection is not None:
-        init_kwargs["_experiments"] = {"data_collection": data_collection}
+        init_kwargs["data_collection"] = data_collection
 
     sentry_init(**init_kwargs)
 
@@ -4308,7 +4308,7 @@ def test_responses_api_data_collection_outputs_shapes(
         integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        _experiments={"data_collection": {"gen_ai": {"outputs": True}}},
+        data_collection={"gen_ai": {"outputs": True}},
     )
 
     client = OpenAI(api_key="z")
@@ -4366,7 +4366,7 @@ def test_streaming_responses_api_data_collection_outputs(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=False,
-        _experiments={"data_collection": data_collection},
+        data_collection=data_collection,
     )
 
     client = OpenAI(api_key="z")

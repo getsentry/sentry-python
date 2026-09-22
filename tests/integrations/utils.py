@@ -12,19 +12,19 @@ DATA_COLLECTION_USER_INFO_CASES = [
         {"send_default_pii": False}, False, id="legacy_send_default_pii_false"
     ),
     pytest.param(
-        {"_experiments": {"data_collection": {"user_info": True}}},
+        {"data_collection": {"user_info": True}},
         True,
         id="data_collection_user_info_true",
     ),
     pytest.param(
-        {"_experiments": {"data_collection": {"user_info": False}}},
+        {"data_collection": {"user_info": False}},
         False,
         id="data_collection_user_info_false",
     ),
     pytest.param(
         {
             "send_default_pii": True,
-            "_experiments": {"data_collection": {"user_info": False}},
+            "data_collection": {"user_info": False},
         },
         False,
         id="data_collection_wins_over_send_default_pii_true",
@@ -32,7 +32,7 @@ DATA_COLLECTION_USER_INFO_CASES = [
     pytest.param(
         {
             "send_default_pii": False,
-            "_experiments": {"data_collection": {"user_info": True}},
+            "data_collection": {"user_info": True},
         },
         True,
         id="data_collection_wins_over_send_default_pii_false",
@@ -48,23 +48,21 @@ DATA_COLLECTION_REMOTE_ADDR_CASES = [
     pytest.param({}, True, id="defaults"),
     pytest.param({"send_default_pii": True}, True, id="send_default_pii_true"),
     pytest.param({"send_default_pii": False}, True, id="send_default_pii_false"),
+    pytest.param({"data_collection": {}}, True, id="data_collection_default"),
     pytest.param(
-        {"_experiments": {"data_collection": {}}}, True, id="data_collection_default"
-    ),
-    pytest.param(
-        {"_experiments": {"data_collection": {"user_info": True}}},
+        {"data_collection": {"user_info": True}},
         True,
         id="data_collection_user_info_true",
     ),
     pytest.param(
-        {"_experiments": {"data_collection": {"user_info": False}}},
+        {"data_collection": {"user_info": False}},
         False,
         id="data_collection_user_info_false",
     ),
     pytest.param(
         {
             "send_default_pii": True,
-            "_experiments": {"data_collection": {"user_info": False}},
+            "data_collection": {"user_info": False},
         },
         False,
         id="data_collection_wins_over_send_default_pii",
@@ -72,25 +70,25 @@ DATA_COLLECTION_REMOTE_ADDR_CASES = [
 ]
 
 # Shared parametrization test matrix exercising the interaction between the
-# ``data_collection.queues`` experiment and the legacy ``send_default_pii`` boolean
+# ``data_collection.queues`` setting and the legacy ``send_default_pii`` boolean
 # for job/task args and kwargs collected by queue integrations (rq, arq, huey).
 # Each case is ``(init_kwargs, expected_args, expected_kwargs)`` where ``None`` for
 # the expected values means args/kwargs are not collected at all.
 DATA_COLLECTION_QUEUES_CASES = [
     pytest.param(
-        {"_experiments": {"data_collection": {}}},
+        {"data_collection": {}},
         [1],
         {"b": 0},
         id="data_collection_default",
     ),
     pytest.param(
-        {"_experiments": {"data_collection": {"queues": True}}},
+        {"data_collection": {"queues": True}},
         [1],
         {"b": 0},
         id="data_collection_queues_on",
     ),
     pytest.param(
-        {"_experiments": {"data_collection": {"queues": False}}},
+        {"data_collection": {"queues": False}},
         None,
         None,
         id="data_collection_queues_off",
@@ -103,7 +101,7 @@ DATA_COLLECTION_QUEUES_CASES = [
     ),
     pytest.param(
         {
-            "_experiments": {"data_collection": {"queues": False}},
+            "data_collection": {"queues": False},
             "send_default_pii": False,
         },
         None,
@@ -112,7 +110,7 @@ DATA_COLLECTION_QUEUES_CASES = [
     ),
     pytest.param(
         {
-            "_experiments": {"data_collection": {"queues": True}},
+            "data_collection": {"queues": True},
             "send_default_pii": False,
         },
         [1],

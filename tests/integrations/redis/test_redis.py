@@ -111,7 +111,7 @@ def test_redis_pipeline_data_collection(
     sentry_init(
         integrations=[RedisIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"data_collection": data_collection},
+        data_collection=data_collection,
     )
 
     connection = FakeRedis()
@@ -225,7 +225,7 @@ def test_data_collection_database_query_data(
     sentry_init(
         integrations=[RedisIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"data_collection": data_collection},
+        data_collection=data_collection,
     )
 
     connection = FakeRedis()
@@ -270,7 +270,7 @@ def test_database_query_data_takes_precedence_over_send_default_pii(
         integrations=[RedisIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        _experiments={"data_collection": data_collection},
+        data_collection=data_collection,
     )
 
     connection = FakeRedis()

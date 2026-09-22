@@ -2916,7 +2916,7 @@ def test_langchain_chat_data_collection(
         send_default_pii=send_default_pii,
     )
     if data_collection is not None:
-        sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
+        sentry_init_kwargs["data_collection"] = data_collection
 
     sentry_init(**sentry_init_kwargs)
 
@@ -3110,7 +3110,7 @@ def test_langchain_text_completion_data_collection(
         send_default_pii=send_default_pii,
     )
     if data_collection is not None:
-        sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
+        sentry_init_kwargs["data_collection"] = data_collection
 
     sentry_init(**sentry_init_kwargs)
 
@@ -3280,7 +3280,7 @@ def test_langchain_data_collection_tools(
         send_default_pii=send_default_pii,
     )
     if data_collection is not None:
-        sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
+        sentry_init_kwargs["data_collection"] = data_collection
 
     sentry_init(**sentry_init_kwargs)
 
@@ -3395,7 +3395,7 @@ def test_langchain_data_collection_request_tool_call_params(
         send_default_pii=send_default_pii,
     )
     if data_collection is not None:
-        sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
+        sentry_init_kwargs["data_collection"] = data_collection
 
     sentry_init(**sentry_init_kwargs)
 
@@ -3524,7 +3524,7 @@ def test_langchain_tool_execution_data_collection(
         send_default_pii=send_default_pii,
     )
     if data_collection is not None:
-        sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
+        sentry_init_kwargs["data_collection"] = data_collection
 
     sentry_init(**sentry_init_kwargs)
 
@@ -3686,7 +3686,7 @@ def test_langchain_agent_executor_data_collection(
         send_default_pii=send_default_pii,
     )
     if data_collection is not None:
-        sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
+        sentry_init_kwargs["data_collection"] = data_collection
 
     sentry_init(**sentry_init_kwargs)
 

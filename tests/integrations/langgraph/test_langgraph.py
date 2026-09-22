@@ -750,7 +750,7 @@ def test_pregel_invoke_gates_request_messages_on_inputs_setting(
         "send_default_pii": send_default_pii,
     }
     if data_collection is not None:
-        init_kwargs["_experiments"] = {"data_collection": data_collection}
+        init_kwargs["data_collection"] = data_collection
 
     sentry_init(**init_kwargs)
 
@@ -835,7 +835,7 @@ def test_pregel_invoke_gates_response_text_and_tool_calls_on_outputs_setting(
         "send_default_pii": send_default_pii,
     }
     if data_collection is not None:
-        init_kwargs["_experiments"] = {"data_collection": data_collection}
+        init_kwargs["data_collection"] = data_collection
 
     sentry_init(**init_kwargs)
 
@@ -926,7 +926,7 @@ def test_pregel_ainvoke_gates_inputs_and_outputs_independently(
         "send_default_pii": send_default_pii,
     }
     if data_collection is not None:
-        init_kwargs["_experiments"] = {"data_collection": data_collection}
+        init_kwargs["data_collection"] = data_collection
 
     sentry_init(**init_kwargs)
 

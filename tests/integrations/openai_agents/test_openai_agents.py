@@ -496,24 +496,24 @@ async def test_agent_invocation_span_no_pii(
     "init_kwargs,expect_messages",
     [
         pytest.param(
-            {"_experiments": {"data_collection": {"gen_ai": {"inputs": True}}}},
+            {"data_collection": {"gen_ai": {"inputs": True}}},
             True,
             id="gen_ai_inputs_true",
         ),
         pytest.param(
-            {"_experiments": {"data_collection": {"gen_ai": {"inputs": False}}}},
+            {"data_collection": {"gen_ai": {"inputs": False}}},
             False,
             id="gen_ai_inputs_false",
         ),
         pytest.param(
-            {"_experiments": {"data_collection": {}}},
+            {"data_collection": {}},
             True,
             id="data_collection_defaults_to_enabled",
         ),
         pytest.param(
             {
                 "send_default_pii": True,
-                "_experiments": {"data_collection": {"gen_ai": {"inputs": False}}},
+                "data_collection": {"gen_ai": {"inputs": False}},
             },
             False,
             id="data_collection_wins_over_send_default_pii_true",
@@ -521,7 +521,7 @@ async def test_agent_invocation_span_no_pii(
         pytest.param(
             {
                 "send_default_pii": False,
-                "_experiments": {"data_collection": {"gen_ai": {"inputs": True}}},
+                "data_collection": {"gen_ai": {"inputs": True}},
             },
             True,
             id="data_collection_wins_over_send_default_pii_false",
@@ -606,24 +606,24 @@ async def test_invoke_agent_span_data_collection_inputs(
     "init_kwargs,expect_response_text",
     [
         pytest.param(
-            {"_experiments": {"data_collection": {"gen_ai": {"outputs": True}}}},
+            {"data_collection": {"gen_ai": {"outputs": True}}},
             True,
             id="gen_ai_outputs_true",
         ),
         pytest.param(
-            {"_experiments": {"data_collection": {"gen_ai": {"outputs": False}}}},
+            {"data_collection": {"gen_ai": {"outputs": False}}},
             False,
             id="gen_ai_outputs_false",
         ),
         pytest.param(
-            {"_experiments": {"data_collection": {}}},
+            {"data_collection": {}},
             True,
             id="data_collection_defaults_to_enabled",
         ),
         pytest.param(
             {
                 "send_default_pii": True,
-                "_experiments": {"data_collection": {"gen_ai": {"outputs": False}}},
+                "data_collection": {"gen_ai": {"outputs": False}},
             },
             False,
             id="data_collection_wins_over_send_default_pii_true",
@@ -631,7 +631,7 @@ async def test_invoke_agent_span_data_collection_inputs(
         pytest.param(
             {
                 "send_default_pii": False,
-                "_experiments": {"data_collection": {"gen_ai": {"outputs": True}}},
+                "data_collection": {"gen_ai": {"outputs": True}},
             },
             True,
             id="data_collection_wins_over_send_default_pii_false",
@@ -774,7 +774,7 @@ async def test_data_collection_inputs(
     }
     init_kwargs["disabled_integrations"] = [StdlibIntegration]
     if data_collection is not None:
-        init_kwargs["_experiments"] = {"data_collection": data_collection}
+        init_kwargs["data_collection"] = data_collection
 
     with patch.object(
         agent.model._client._client,
@@ -910,7 +910,7 @@ async def test_data_collection_outputs(
     }
     init_kwargs["disabled_integrations"] = [StdlibIntegration]
     if data_collection is not None:
-        init_kwargs["_experiments"] = {"data_collection": data_collection}
+        init_kwargs["data_collection"] = data_collection
 
     with patch.object(
         agent_with_tool.model._client._client,
@@ -2476,7 +2476,7 @@ async def test_tool_execution_span_data_collection(
         "send_default_pii": send_default_pii,
     }
     if data_collection is not None:
-        init_kwargs["_experiments"] = {"data_collection": data_collection}
+        init_kwargs["data_collection"] = data_collection
 
     _, tool_span_data = await run_tool_agent(
         simple_test_tool,
@@ -2507,7 +2507,7 @@ async def test_tool_execution_error_data_collection(
 
     tool_span, tool_span_data = await run_tool_agent(
         failing_tool,
-        _experiments={"data_collection": {"gen_ai": {"outputs": False}}},
+        data_collection={"gen_ai": {"outputs": False}},
     )
 
     assert tool_span_data[SPANDATA.GEN_AI_TOOL_NAME] == "failing_tool"
@@ -2523,9 +2523,7 @@ async def test_tool_execution_span_non_pii_data_always_set(
     _, tool_span_data = await run_tool_agent(
         simple_test_tool,
         run_kwargs={"conversation_id": "conv_tool_test_456"},
-        _experiments={
-            "data_collection": {"gen_ai": {"inputs": False, "outputs": False}}
-        },
+        data_collection={"gen_ai": {"inputs": False, "outputs": False}},
     )
 
     assert tool_span_data[SPANDATA.GEN_AI_TOOL_NAME] == "simple_test_tool"

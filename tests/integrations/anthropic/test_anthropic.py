@@ -272,7 +272,7 @@ def test_nonstreaming_create_message_data_collection(
         send_default_pii=send_default_pii,
     )
     if data_collection is not None:
-        sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
+        sentry_init_kwargs["data_collection"] = data_collection
     sentry_init(**sentry_init_kwargs)
 
     client = Anthropic(api_key="z")
@@ -342,7 +342,7 @@ def test_nonstreaming_create_message_data_collection_tools(
         send_default_pii=False,
     )
     if data_collection is not None:
-        sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
+        sentry_init_kwargs["data_collection"] = data_collection
     sentry_init(**sentry_init_kwargs)
 
     client = Anthropic(api_key="z")
@@ -418,7 +418,7 @@ async def test_nonstreaming_create_message_data_collection_async(
         send_default_pii=send_default_pii,
     )
     if data_collection is not None:
-        sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
+        sentry_init_kwargs["data_collection"] = data_collection
     sentry_init(**sentry_init_kwargs)
 
     client = AsyncAnthropic(api_key="z")
@@ -517,7 +517,7 @@ def test_nonstreaming_create_message_data_collection_outputs(
         send_default_pii=send_default_pii,
     )
     if data_collection is not None:
-        sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
+        sentry_init_kwargs["data_collection"] = data_collection
     sentry_init(**sentry_init_kwargs)
 
     client = Anthropic(api_key="z")
@@ -626,7 +626,7 @@ async def test_nonstreaming_create_message_data_collection_outputs_async(
         send_default_pii=send_default_pii,
     )
     if data_collection is not None:
-        sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
+        sentry_init_kwargs["data_collection"] = data_collection
     sentry_init(**sentry_init_kwargs)
 
     client = AsyncAnthropic(api_key="z")
@@ -928,7 +928,7 @@ def test_streaming_create_message_data_collection(
         send_default_pii=send_default_pii,
     )
     if data_collection is not None:
-        sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
+        sentry_init_kwargs["data_collection"] = data_collection
     sentry_init(**sentry_init_kwargs)
 
     client = Anthropic(api_key="z")
@@ -1053,7 +1053,7 @@ def test_streaming_create_message_data_collection_outputs(
         send_default_pii=send_default_pii,
     )
     if data_collection is not None:
-        sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
+        sentry_init_kwargs["data_collection"] = data_collection
     sentry_init(**sentry_init_kwargs)
 
     client = Anthropic(api_key="z")
@@ -1512,7 +1512,7 @@ def test_stream_messages_data_collection_outputs(
         send_default_pii=send_default_pii,
     )
     if data_collection is not None:
-        sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
+        sentry_init_kwargs["data_collection"] = data_collection
     sentry_init(**sentry_init_kwargs)
 
     client = Anthropic(api_key="z")
@@ -1980,7 +1980,7 @@ async def test_streaming_create_message_data_collection_outputs_async(
         send_default_pii=send_default_pii,
     )
     if data_collection is not None:
-        sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
+        sentry_init_kwargs["data_collection"] = data_collection
     sentry_init(**sentry_init_kwargs)
 
     client = AsyncAnthropic(api_key="z")
@@ -2454,7 +2454,7 @@ async def test_stream_messages_data_collection_outputs_async(
         send_default_pii=send_default_pii,
     )
     if data_collection is not None:
-        sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
+        sentry_init_kwargs["data_collection"] = data_collection
     sentry_init(**sentry_init_kwargs)
 
     client = AsyncAnthropic(api_key="z")

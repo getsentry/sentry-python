@@ -80,6 +80,7 @@ typing = [
     "tiktoken>=0.14.0",
     "aiohttp>=3.14.3",
     "openai-agents>=0.22.0",
+    "mistralai>=2.10.1",
 ]
 test = [
     "dataclasses ; python_full_version < '3.7'",

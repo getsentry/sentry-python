@@ -229,7 +229,7 @@ def test_clickhouse_client_breadcrumbs_with_data_collection(
 ) -> None:
     sentry_init(
         integrations=[ClickhouseDriverIntegration()],
-        _experiments={"data_collection": {"database_query_data": True}},
+        data_collection={"database_query_data": True},
     )
     events = capture_events()
 
@@ -331,7 +331,7 @@ def test_clickhouse_client_breadcrumbs_with_data_collection_disabled(
 ) -> None:
     sentry_init(
         integrations=[ClickhouseDriverIntegration()],
-        _experiments={"data_collection": {"database_query_data": False}},
+        data_collection={"database_query_data": False},
     )
     events = capture_events()
 
@@ -431,7 +431,7 @@ def test_clickhouse_client_breadcrumbs_data_collection_overrides_pii(
     sentry_init(
         integrations=[ClickhouseDriverIntegration()],
         send_default_pii=True,
-        _experiments={"data_collection": {"database_query_data": False}},
+        data_collection={"database_query_data": False},
     )
     events = capture_events()
 
@@ -530,7 +530,7 @@ def test_clickhouse_client_breadcrumbs_with_data_collection_default(
 ) -> None:
     sentry_init(
         integrations=[ClickhouseDriverIntegration()],
-        _experiments={"data_collection": {}},
+        data_collection={},
     )
     events = capture_events()
 
@@ -633,9 +633,7 @@ def test_clickhouse_client_with_data_collection(sentry_init, capture_items) -> N
     sentry_init(
         integrations=[ClickhouseDriverIntegration()],
         traces_sample_rate=1.0,
-        _experiments={
-            "data_collection": {"database_query_data": True},
-        },
+        data_collection={"database_query_data": True},
     )
     items = capture_items("span")
 
@@ -660,6 +658,66 @@ def test_clickhouse_client_with_data_collection(sentry_init, capture_items) -> N
             for attribute in span.get("attributes", {})
         }
         assert "db.result" not in attribute_keys
+
+
+def test_clickhouse_client_send_data_generator_with_data_collection(
+    sentry_init, capture_events
+) -> None:
+    sentry_init(
+        integrations=[ClickhouseDriverIntegration()],
+        data_collection={"database_query_data": True},
+    )
+    events = capture_events()
+
+    client = Client("localhost")
+    client.execute("DROP TABLE IF EXISTS test")
+    client.execute("CREATE TABLE test (x Int32) ENGINE = Memory")
+    client.execute("INSERT INTO test (x) VALUES", ((i,) for i in range(3)))
+
+    res = client.execute("SELECT sum(x) FROM test")
+    assert res[0][0] == 3
+
+    capture_message("hi")
+
+    (event,) = events
+
+    (insert_breadcrumb,) = [
+        crumb
+        for crumb in event["breadcrumbs"]["values"]
+        if crumb["message"] == "INSERT INTO test (x) VALUES"
+    ]
+
+    assert "db.params" not in insert_breadcrumb["data"]
+
+
+def test_clickhouse_client_send_data_generator_with_data_collection_disabled(
+    sentry_init, capture_events
+) -> None:
+    sentry_init(
+        integrations=[ClickhouseDriverIntegration()],
+        data_collection={"database_query_data": False},
+    )
+    events = capture_events()
+
+    client = Client("localhost")
+    client.execute("DROP TABLE IF EXISTS test")
+    client.execute("CREATE TABLE test (x Int32) ENGINE = Memory")
+    client.execute("INSERT INTO test (x) VALUES", ((i,) for i in range(3)))
+
+    res = client.execute("SELECT sum(x) FROM test")
+    assert res[0][0] == 3
+
+    capture_message("hi")
+
+    (event,) = events
+
+    (insert_breadcrumb,) = [
+        crumb
+        for crumb in event["breadcrumbs"]["values"]
+        if crumb["message"] == "INSERT INTO test (x) VALUES"
+    ]
+
+    assert "db.params" not in insert_breadcrumb["data"]
 
 
 def test_clickhouse_client_spans(

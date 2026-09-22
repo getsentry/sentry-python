@@ -399,7 +399,7 @@ def _init_with_data_collection(
         send_default_pii=send_default_pii,
     )
     if data_collection is not None:
-        kwargs["_experiments"] = {"data_collection": data_collection}
+        kwargs["data_collection"] = data_collection
 
     sentry_init(**kwargs)
 
