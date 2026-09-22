@@ -1206,6 +1206,12 @@ class SPANDATA:
     Example: "prod"
     """
 
+    SENTRY_KIND = "sentry.kind"
+    """
+    Used to clarify the relationship between parents and children, or to distinguish between spans, e.g. a `server` and `client` span with the same name.
+    Example: "client", "server", "producer", "consumer", "internal"
+    """
+
     SENTRY_OP = "sentry.op"
     """
     The operation of a span.

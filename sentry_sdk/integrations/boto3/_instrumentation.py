@@ -200,6 +200,7 @@ def _start_client_span(
     attributes: "Attributes" = {
         SPANDATA.RPC_METHOD: ctx.operation_name,
         SPANDATA.RPC_SYSTEM_NAME: _AWS_RPC_SYSTEM_NAME,
+        SPANDATA.SENTRY_KIND: "client",
     }
     with capture_internal_exceptions():
         attributes.update(_get_client_attributes(ctx))

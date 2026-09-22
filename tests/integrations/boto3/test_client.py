@@ -405,6 +405,7 @@ def test_service_extension_customizes_client_span(
         def get_request_attributes(self, ctx):
             return {
                 "aws.test.request": ctx.params["Key"],
+                SPANDATA.SENTRY_KIND: "producer",
                 SPANDATA.RPC_METHOD: "must-not-override",
             }
 
@@ -444,6 +445,7 @@ def test_service_extension_customizes_client_span(
     attributes = _span_attributes(spans[0], span_streaming)
     assert attributes["aws.test.request"] == "foo"
     assert attributes["aws.test.response"] == "request-id"
+    assert attributes[SPANDATA.SENTRY_KIND] == "producer"
     assert attributes[SPANDATA.RPC_METHOD] == "HeadObject"
     assert attributes[SPANDATA.HTTP_STATUS_CODE] == 200
 
@@ -684,6 +686,7 @@ def test_client_call_has_common_attributes(
     assert attributes[SPANDATA.RPC_SERVICE] == rpc_service
     assert attributes[SPANDATA.RPC_METHOD] == rpc_method
     assert attributes[SPANDATA.RPC_SYSTEM_NAME] == "aws-api"
+    assert attributes[SPANDATA.SENTRY_KIND] == "client"
     assert attributes[SPANDATA.CLOUD_REGION] == "eu-north-1"
     assert attributes[SPANDATA.SERVER_ADDRESS] == server_address
     assert attributes[SPANDATA.SERVER_PORT] == server_port
