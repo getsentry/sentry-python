@@ -4,6 +4,23 @@
 
 ### New Features ✨
 
+- **New integration:** Mistral AI (#4733) by @alexander-alderman-webb
+
+  Add the Mistral integration to your `sentry_sdk.init` call:
+
+```python
+import sentry_sdk
+from sentry_sdk.integrations.mistral import MistralIntegration
+
+sentry_sdk.init(
+    dsn="...",
+    traces_sample_rate=1.0,
+    integrations=[
+        MistralIntegration(),
+    ]
+)
+```
+
 #### Mistral
 
 - Record `gen_ai.output.messages` by @alexander-alderman-webb in [#7549](https://github.com/getsentry/sentry-python/pull/7549)
