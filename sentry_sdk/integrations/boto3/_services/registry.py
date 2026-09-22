@@ -11,7 +11,9 @@ if TYPE_CHECKING:
 
 # service modules are imported lazily.
 # e.g. `s3` -> (`sentry_sdk.integrations.boto3._services.s3`, `_S3Extension)
-_SERVICE_EXTENSIONS: "Dict[str, Tuple[str, str]]" = {}
+_SERVICE_EXTENSIONS: "Dict[str, Tuple[str, str]]" = {
+    "s3": ("sentry_sdk.integrations.boto3._services.s3", "_S3Extension"),
+}
 
 
 @lru_cache(maxsize=None)
