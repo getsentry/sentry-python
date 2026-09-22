@@ -235,7 +235,7 @@ class SentryAsgiMiddleware:
 
                     if ty in ("http", "websocket"):
                         if ty == "websocket" or method in self.http_methods_to_capture:
-                            sentry_sdk.traces.continue_trace(_get_headers(scope))
+                            sentry_sdk.continue_trace(_get_headers(scope))
 
                             Scope.set_custom_sampling_context({"asgi_scope": scope})
 
@@ -247,7 +247,7 @@ class SentryAsgiMiddleware:
                             )
                             sentry_scope.get_current_scope()._server_segment_span = span
                     else:
-                        sentry_sdk.traces.new_trace()
+                        sentry_sdk.new_trace()
 
                         Scope.set_custom_sampling_context({"asgi_scope": scope})
 

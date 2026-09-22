@@ -44,7 +44,7 @@ def test_get_span_from_scope_regardless_of_sampling_decision(
 ):
     sentry_init(traces_sample_rate=1.0)
 
-    sentry_sdk.traces.continue_trace(
+    sentry_sdk.continue_trace(
         {
             "sentry-trace": f"0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-{int(sampling_decision)}"
         }
@@ -75,7 +75,7 @@ def test_uses_traces_sample_rate_correctly(
         traces_sample_rate=traces_sample_rate,
     )
 
-    sentry_sdk.traces.continue_trace(
+    sentry_sdk.continue_trace(
         {
             "sentry-trace": "0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331",
             "baggage": "sentry-sample_rand=0.500000",
@@ -99,7 +99,7 @@ def test_uses_traces_sampler_return_value_correctly(
         traces_sampler=mock.Mock(return_value=traces_sampler_return_value),
     )
 
-    sentry_sdk.traces.continue_trace(
+    sentry_sdk.continue_trace(
         {
             "sentry-trace": "0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331",
             "baggage": "sentry-sample_rand=0.500000",
@@ -133,7 +133,7 @@ def test_traces_sampler_raising_falls_back_to_parent_sampling_decision(
         traces_sample_rate=0.0 if parent_sampling_decision else 1.0,
     )
 
-    sentry_sdk.traces.continue_trace(
+    sentry_sdk.continue_trace(
         {
             "sentry-trace": f"0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-{int(parent_sampling_decision)}"
         }
@@ -157,7 +157,7 @@ def test_traces_sampler_raising_falls_back_to_traces_sample_rate(
         traces_sample_rate=traces_sample_rate,
     )
 
-    sentry_sdk.traces.continue_trace(
+    sentry_sdk.continue_trace(
         {
             "sentry-trace": "0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331",
             "baggage": "sentry-sample_rand=0.500000",
@@ -254,7 +254,7 @@ def test_ignores_inherited_sample_decision_when_traces_sampler_defined(
         traces_sampler=traces_sampler,
     )
 
-    sentry_sdk.traces.continue_trace(
+    sentry_sdk.continue_trace(
         {
             "sentry-trace": f"0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-{parent_sampling_decision}"
         }
@@ -271,7 +271,7 @@ def test_inherits_parent_sampling_decision_when_traces_sampler_undefined(
         traces_sample_rate=0.5,
     )
 
-    sentry_sdk.traces.continue_trace(
+    sentry_sdk.continue_trace(
         {
             "sentry-trace": f"0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-{parent_sampling_decision}"
         }
@@ -325,14 +325,14 @@ def test_custom_sampling_context_update_to_context_value_persists(sentry_init):
         traces_sampler=traces_sampler,
     )
 
-    sentry_sdk.traces.new_trace()
+    sentry_sdk.new_trace()
 
     sentry_sdk.get_current_scope().set_custom_sampling_context({"custom_value": 1})
 
     with sentry_sdk.start_span(name="span", attributes={"first": True}):
         ...
 
-    sentry_sdk.traces.new_trace()
+    sentry_sdk.new_trace()
 
     sentry_sdk.get_current_scope().set_custom_sampling_context({"custom_value": 2})
 

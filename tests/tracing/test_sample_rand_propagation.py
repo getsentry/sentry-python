@@ -23,7 +23,7 @@ def test_continue_trace_with_sample_rand(sentry_init):
         "baggage": "sentry-sample_rand=0.100000,sentry-sample_rate=0.5",
     }
 
-    sentry_sdk.traces.continue_trace(headers)
+    sentry_sdk.continue_trace(headers)
     with sentry_sdk.start_span(name="span") as segment:
         assert segment._get_baggage().sentry_items["sample_rand"] == "0.100000"
 
@@ -43,6 +43,6 @@ def test_continue_trace_missing_sample_rand(sentry_init):
     with mock.patch(
         "sentry_sdk.tracing_utils.Random.randrange", Mock(return_value=500000)
     ):
-        sentry_sdk.traces.continue_trace(headers)
+        sentry_sdk.continue_trace(headers)
         with sentry_sdk.start_span(name="span") as span:
             assert span._get_baggage().sentry_items["sample_rand"] == "0.500000"

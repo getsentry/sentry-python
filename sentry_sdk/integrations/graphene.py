@@ -154,7 +154,7 @@ def graphql_span(
 
     client_options = sentry_sdk.get_client().options
 
-    if sentry_sdk.traces.get_current_span() is None:
+    if sentry_sdk.get_current_span() is None:
         yield
         return
 

@@ -129,7 +129,7 @@ class SentryWsgiMiddleware:
 
                     span_ctx: "ContextManager[Union[Span, None]]" = nullcontext()
                     if method in self.http_methods_to_capture:
-                        sentry_sdk.traces.continue_trace(dict(_get_headers(environ)))
+                        sentry_sdk.continue_trace(dict(_get_headers(environ)))
                         Scope.set_custom_sampling_context({"wsgi_environ": environ})
 
                         if has_data_collection_enabled(client.options):

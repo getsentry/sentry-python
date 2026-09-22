@@ -132,7 +132,7 @@ async def _context_enter(request: "Request") -> None:
     scope.clear_breadcrumbs()
     scope.add_event_processor(_make_request_processor(weak_request))
 
-    sentry_sdk.traces.continue_trace(dict(request.headers))
+    sentry_sdk.continue_trace(dict(request.headers))
     scope.set_custom_sampling_context({"sanic_request": request})
 
     if request.remote_addr:

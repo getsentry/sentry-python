@@ -204,7 +204,7 @@ class RustTracingLayer:
         else:
             sentry_span_name = "<unknown>"
 
-        if sentry_sdk.traces.get_current_span() is None:
+        if sentry_sdk.get_current_span() is None:
             return None
 
         sentry_span = sentry_sdk.start_span(

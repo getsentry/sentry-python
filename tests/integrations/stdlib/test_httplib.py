@@ -311,7 +311,7 @@ def test_outgoing_trace_headers(
         ),
     }
     items = capture_items("span")
-    sentry_sdk.traces.continue_trace(headers)
+    sentry_sdk.continue_trace(headers)
 
     with sentry_sdk.start_span(
         name="/interactions/other-dogs/new-dog",
@@ -374,7 +374,7 @@ def test_outgoing_trace_headers_head_sdk(
 
     items = capture_items("span")
 
-    sentry_sdk.traces.continue_trace({})
+    sentry_sdk.continue_trace({})
 
     with mock.patch("sentry_sdk.tracing_utils.Random.randrange", return_value=250000):
         with sentry_sdk.start_span(name="Head SDK tx"):
@@ -445,8 +445,8 @@ def test_outgoing_trace_headers_no_current_span(sentry_init):
     }
 
     # Seed the scope's propagation context, but do NOT start a span.
-    sentry_sdk.traces.continue_trace(headers)
-    assert sentry_sdk.traces.get_current_span() is None
+    sentry_sdk.continue_trace(headers)
+    assert sentry_sdk.get_current_span() is None
 
     connection = HTTPSConnectionRecordingRequestHeaders("localhost", port=PORT)
     connection.request("GET", "/top-chasers")
@@ -568,7 +568,7 @@ def test_option_trace_propagation_targets(
             "sentry-public_key=49d0f7386ad645858ae85020e393bef3, sentry-sample_rate=0.01337, "
         )
     }
-    sentry_sdk.traces.continue_trace(headers)
+    sentry_sdk.continue_trace(headers)
 
     with sentry_sdk.start_span(
         name="/interactions/other-dogs/new-dog",

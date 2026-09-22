@@ -279,7 +279,7 @@ def _install_httplib() -> None:
         breadcrumb[SPANDATA.HTTP_REQUEST_METHOD] = method
         breadcrumb.update(url_attributes)
 
-        if sentry_sdk.traces.get_current_span() is not None:
+        if sentry_sdk.get_current_span() is not None:
             span = sentry_sdk.start_span(
                 name="%s %s"
                 % (
@@ -488,7 +488,7 @@ def _install_subprocess() -> None:
             data={"subprocess.cwd": cwd} if cwd else {},
         )
 
-        if sentry_sdk.traces.get_current_span() is None:
+        if sentry_sdk.get_current_span() is None:
             return old_popen_init(self, *a, **kw)
 
         with sentry_sdk.start_span(
@@ -525,7 +525,7 @@ def _install_subprocess() -> None:
     def sentry_patched_popen_wait(
         self: "subprocess.Popen[Any]", *a: "Any", **kw: "Any"
     ) -> "Any":
-        if sentry_sdk.traces.get_current_span() is None:
+        if sentry_sdk.get_current_span() is None:
             return old_popen_wait(self, *a, **kw)
         with sentry_sdk.start_span(
             name=OP.SUBPROCESS_WAIT,
@@ -545,7 +545,7 @@ def _install_subprocess() -> None:
     def sentry_patched_popen_communicate(
         self: "subprocess.Popen[Any]", *a: "Any", **kw: "Any"
     ) -> "Any":
-        if sentry_sdk.traces.get_current_span() is None:
+        if sentry_sdk.get_current_span() is None:
             return old_popen_communicate(self, *a, **kw)
         with sentry_sdk.start_span(
             name=OP.SUBPROCESS_COMMUNICATE,

@@ -49,7 +49,7 @@ def patch_redis_pipeline(
             },
         )
 
-        if sentry_sdk.traces.get_current_span() is None:
+        if sentry_sdk.get_current_span() is None:
             return old_execute(self, *args, **kwargs)
 
         span = sentry_sdk.start_span(
@@ -108,7 +108,7 @@ def patch_redis_client(
             data=breadcrumb_data,
         )
 
-        if sentry_sdk.traces.get_current_span() is None:
+        if sentry_sdk.get_current_span() is None:
             return old_execute_command(self, name, *args, **kwargs)
 
         cache_properties = _compile_cache_span_properties(

@@ -168,7 +168,7 @@ def enable_span_for_middleware(middleware: "Middleware") -> "Middleware":
             return await old_call(self, scope, receive, send)
 
         middleware_name = self.__class__.__name__
-        if sentry_sdk.traces.get_current_span() is None:
+        if sentry_sdk.get_current_span() is None:
             return await old_call(self, scope, receive, send)
         with sentry_sdk.start_span(
             name=middleware_name,
@@ -185,7 +185,7 @@ def enable_span_for_middleware(middleware: "Middleware") -> "Middleware":
             ) -> "Union[HTTPReceiveMessage, WebSocketReceiveMessage]":
                 if client.get_integration(LitestarIntegration) is None:
                     return await receive(*args, **kwargs)
-                if sentry_sdk.traces.get_current_span() is None:
+                if sentry_sdk.get_current_span() is None:
                     return await receive(*args, **kwargs)
                 with sentry_sdk.start_span(
                     name=getattr(receive, "__qualname__", str(receive)),
@@ -205,7 +205,7 @@ def enable_span_for_middleware(middleware: "Middleware") -> "Middleware":
             async def _sentry_send(message: "Message") -> None:
                 if client.get_integration(LitestarIntegration) is None:
                     return await send(message)
-                if sentry_sdk.traces.get_current_span() is None:
+                if sentry_sdk.get_current_span() is None:
                     return await send(message)
                 with sentry_sdk.start_span(
                     name=getattr(send, "__qualname__", str(send)),

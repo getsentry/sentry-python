@@ -163,7 +163,7 @@ class SentryAsyncExtension(SchemaExtension):
 
         client = sentry_sdk.get_client()
 
-        if sentry_sdk.traces.get_current_span() is None:
+        if sentry_sdk.get_current_span() is None:
             yield
             return
 
@@ -201,7 +201,7 @@ class SentryAsyncExtension(SchemaExtension):
         graphql_span.end()
 
     def on_validate(self) -> "Generator[None, None, None]":
-        if sentry_sdk.traces.get_current_span() is None:
+        if sentry_sdk.get_current_span() is None:
             yield
             return
 
@@ -220,7 +220,7 @@ class SentryAsyncExtension(SchemaExtension):
             validation_span.end()
 
     def on_parse(self) -> "Generator[None, None, None]":
-        if sentry_sdk.traces.get_current_span() is None:
+        if sentry_sdk.get_current_span() is None:
             yield
             return
 
@@ -273,7 +273,7 @@ class SentryAsyncExtension(SchemaExtension):
 
         field_path = "{}.{}".format(info.parent_type, info.field_name)
 
-        if sentry_sdk.traces.get_current_span() is None:
+        if sentry_sdk.get_current_span() is None:
             return await self._resolve(_next, root, info, *args, **kwargs)
 
         with sentry_sdk.start_span(
@@ -300,7 +300,7 @@ class SentrySyncExtension(SentryAsyncExtension):
 
         field_path = "{}.{}".format(info.parent_type, info.field_name)
 
-        if sentry_sdk.traces.get_current_span() is None:
+        if sentry_sdk.get_current_span() is None:
             return _next(root, info, *args, **kwargs)
 
         with sentry_sdk.start_span(

@@ -18,7 +18,7 @@ def test_envelope_by_trace_id(sentry_init, capture_envelopes, monkeypatch):
     envelopes = capture_envelopes()
 
     with sentry_sdk.new_scope():
-        sentry_sdk.traces.new_trace()
+        sentry_sdk.new_trace()
         # Keep parent open as its bucket in the batcher would be emptied when it is finished.
         parent_a = sentry_sdk.start_span(name="parent a")
         with sentry_sdk.start_span(name="span 1a", parent_span=parent_a) as span1:
@@ -27,7 +27,7 @@ def test_envelope_by_trace_id(sentry_init, capture_envelopes, monkeypatch):
             pass
 
     with sentry_sdk.new_scope():
-        sentry_sdk.traces.new_trace()
+        sentry_sdk.new_trace()
         parent_b = sentry_sdk.start_span(name="parent b")
         # Keep parent open as its bucket in the batcher would be emptied when it is finished.
         with sentry_sdk.start_span(name="span 2a", parent_span=parent_b) as span2:
@@ -153,7 +153,7 @@ def test_drop_isolated_per_bucket(
             pass
 
     with sentry_sdk.new_scope():
-        sentry_sdk.traces.new_trace()
+        sentry_sdk.new_trace()
         # Keep parent open as its bucket in the batcher would be emptied when it is finished.
         parent_b = sentry_sdk.start_span(name="parent b")
         with sentry_sdk.start_span(name="b1", parent_span=parent_b) as span_b:
@@ -274,7 +274,7 @@ def test_bucket_recreated_after_flush(sentry_init, capture_envelopes, monkeypatc
 
     envelopes = capture_envelopes()
 
-    sentry_sdk.traces.new_trace()
+    sentry_sdk.new_trace()
 
     with sentry_sdk.start_span(name="custom parent"):
         with sentry_sdk.start_span(name="span 1") as span1:
@@ -348,7 +348,7 @@ def test_quiet_buckets_flushed_with_busy_neighbors(
 
     envelopes = capture_envelopes()
 
-    sentry_sdk.traces.new_trace()
+    sentry_sdk.new_trace()
 
     with sentry_sdk.new_scope():
         # Keep parent open as its bucket in the batcher would be emptied when it is finished.
@@ -357,7 +357,7 @@ def test_quiet_buckets_flushed_with_busy_neighbors(
             trace_id1 = span1.trace_id
 
     with sentry_sdk.new_scope():
-        sentry_sdk.traces.new_trace()
+        sentry_sdk.new_trace()
         # Keep parent open as its bucket in the batcher would be emptied when it is finished.
         parent_b = sentry_sdk.start_span(name="parent b")
         with sentry_sdk.start_span(name="span 2", parent_span=parent_b) as span2:

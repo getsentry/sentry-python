@@ -137,7 +137,7 @@ def _wrap_func(func: "F") -> "F":
             if environ.get("ENTRY_POINT"):
                 additional_attributes["faas.entry_point"] = environ.get("ENTRY_POINT")
 
-            sentry_sdk.traces.continue_trace(headers)
+            sentry_sdk.continue_trace(headers)
             Scope.set_custom_sampling_context(sampling_context)
 
             with sentry_sdk.start_span(

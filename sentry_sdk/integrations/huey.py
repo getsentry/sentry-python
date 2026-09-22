@@ -85,7 +85,7 @@ def patch_enqueue() -> None:
             t for t in [HueyGroup, HueyChord] if t is not None
         )
 
-        if sentry_sdk.traces.get_current_span() is None:
+        if sentry_sdk.get_current_span() is None:
             if not isinstance(item, no_headers_types):
                 item.kwargs["sentry_headers"] = {
                     BAGGAGE_HEADER_NAME: get_baggage(),
@@ -198,7 +198,7 @@ def patch_execute() -> None:
 
             sentry_headers = task.kwargs.pop("sentry_headers", None)
             headers = sentry_headers or {}
-            sentry_sdk.traces.continue_trace(headers)
+            sentry_sdk.continue_trace(headers)
             span_ctx = sentry_sdk.start_span(
                 name=task.name,
                 attributes={

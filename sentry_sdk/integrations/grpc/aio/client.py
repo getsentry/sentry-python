@@ -49,7 +49,7 @@ class SentryUnaryUnaryClientInterceptor(ClientInterceptor, UnaryUnaryClientInter
     ) -> "Union[UnaryUnaryCall, Message]":
         method = client_call_details.method
 
-        if sentry_sdk.traces.get_current_span() is None:
+        if sentry_sdk.get_current_span() is None:
             client_call_details = self._update_client_call_details_metadata_from_scope(
                 client_call_details
             )
@@ -86,7 +86,7 @@ class SentryUnaryStreamClientInterceptor(
     ) -> "Union[AsyncIterable[Any], UnaryStreamCall]":
         method = client_call_details.method
 
-        if sentry_sdk.traces.get_current_span() is None:
+        if sentry_sdk.get_current_span() is None:
             client_call_details = self._update_client_call_details_metadata_from_scope(
                 client_call_details
             )

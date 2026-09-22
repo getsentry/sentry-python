@@ -2645,7 +2645,7 @@ async def test_hosted_mcp_tool_propagation_header_streamed(
     ) as create, mock.patch(
         "sentry_sdk.tracing_utils.Random.randrange", return_value=500000
     ):
-        sentry_sdk.traces.continue_trace(
+        sentry_sdk.continue_trace(
             {"sentry-trace": "01234567890123456789012345678901-0000000000000000"}
         )
 
@@ -2747,7 +2747,7 @@ async def test_hosted_mcp_tool_propagation_headers(
     ) as send, mock.patch(
         "sentry_sdk.tracing_utils.Random.randrange", return_value=500000
     ):
-        sentry_sdk.traces.continue_trace(
+        sentry_sdk.continue_trace(
             {"sentry-trace": "01234567890123456789012345678901-0000000000000000"}
         )
 

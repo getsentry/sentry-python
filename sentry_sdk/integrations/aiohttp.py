@@ -130,7 +130,7 @@ class AioHttpIntegration(Integration):
 
                     headers = dict(request.headers)
 
-                    sentry_sdk.traces.continue_trace(headers)
+                    sentry_sdk.continue_trace(headers)
                     Scope.set_custom_sampling_context({"aiohttp_request": request})
 
                     header_attributes: "dict[str, Any]" = {}
@@ -385,7 +385,7 @@ def create_trace_config() -> "TraceConfig":
                 attributes["url.full"] = url_full
                 breadcrumb["url"] = url_full
 
-        if sentry_sdk.traces.get_current_span() is not None:
+        if sentry_sdk.get_current_span() is not None:
             span = sentry_sdk.start_span(name=span_name, attributes=attributes)
 
         if should_propagate_trace(client, str(params.url)):

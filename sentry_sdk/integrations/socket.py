@@ -55,7 +55,7 @@ def _patch_create_connection() -> None:
         if integration is None:
             return real_create_connection(address, timeout, source_address)
 
-        if sentry_sdk.traces.get_current_span() is None:
+        if sentry_sdk.get_current_span() is None:
             return real_create_connection(address, timeout, source_address)
 
         with sentry_sdk.start_span(
@@ -92,7 +92,7 @@ def _patch_getaddrinfo() -> None:
         if integration is None:
             return real_getaddrinfo(host, port, family, type, proto, flags)
 
-        if sentry_sdk.traces.get_current_span() is None:
+        if sentry_sdk.get_current_span() is None:
             return real_getaddrinfo(host, port, family, type, proto, flags)
 
         with sentry_sdk.start_span(

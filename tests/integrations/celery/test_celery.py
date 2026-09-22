@@ -629,7 +629,7 @@ def test_sentry_propagate_traces_override(init_celery):
 
     @celery.task(name="dummy_task", bind=True)
     def dummy_task(self, message):
-        trace_id = sentry_sdk.traces.get_current_span().trace_id
+        trace_id = sentry_sdk.get_current_span().trace_id
         return trace_id
 
     with sentry_sdk.start_span(name="parent") as span:

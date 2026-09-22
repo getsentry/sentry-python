@@ -31,31 +31,31 @@ def test_get_current_span():
 def test_get_current_span_via_traces():
     fake_scope = mock.MagicMock()
     fake_scope.span = mock.MagicMock()
-    assert sentry_sdk.traces.get_current_span(fake_scope) == fake_scope.span
+    assert sentry_sdk.get_current_span(fake_scope) == fake_scope.span
 
     fake_scope.span = None
-    assert sentry_sdk.traces.get_current_span(fake_scope) is None
+    assert sentry_sdk.get_current_span(fake_scope) is None
 
 
 def test_get_current_span_current_scope_via_traces(sentry_init):
     sentry_init()
 
-    assert sentry_sdk.traces.get_current_span() is None
+    assert sentry_sdk.get_current_span() is None
 
     scope = get_current_scope()
     fake_span = Span(name="abc", scope=scope)
 
     assert scope.span == fake_span
-    assert sentry_sdk.traces.get_current_span() == fake_span
+    assert sentry_sdk.get_current_span() == fake_span
 
 
 def test_get_current_span_with_segment(sentry_init):
     sentry_init()
 
-    assert sentry_sdk.traces.get_current_span() is None
+    assert sentry_sdk.get_current_span() is None
 
     with sentry_sdk.start_span(name="segment") as new_segment:
-        assert sentry_sdk.traces.get_current_span() == new_segment
+        assert sentry_sdk.get_current_span() == new_segment
 
 
 def test_traceparent_with_tracing_enabled(sentry_init):
@@ -125,7 +125,7 @@ def test_continue_trace(sentry_init):
     trace_id = "471a43a4192642f0b136d5159a501701"
     parent_span_id = "6e8f22c393e68f19"
     parent_sampled = 1
-    sentry_sdk.traces.continue_trace(
+    sentry_sdk.continue_trace(
         {
             "sentry-trace": "{}-{}-{}".format(trace_id, parent_span_id, parent_sampled),
             "baggage": "sentry-trace_id=566e3688a61d4bc888951642d6f14a19,sentry-sample_rand=0.123456",

@@ -607,7 +607,7 @@ def test_sibling_segments_new_trace(sentry_init, capture_items):
     with sentry_sdk.start_span(name="segment1"):
         ...
 
-    sentry_sdk.traces.new_trace()
+    sentry_sdk.new_trace()
 
     with sentry_sdk.start_span(name="segment2"):
         ...
@@ -643,7 +643,7 @@ def test_continue_trace_sampled(sentry_init, capture_items):
     sample_rand = "0.222222"
     sampled = "1"
 
-    sentry_sdk.traces.continue_trace(
+    sentry_sdk.continue_trace(
         {
             "sentry-trace": f"{trace_id}-{parent_span_id}-{sampled}",
             "baggage": f"sentry-trace_id={trace_id},sentry-sample_rate=0.5,sentry-sample_rand={sample_rand}",
@@ -682,7 +682,7 @@ def test_continue_trace_unsampled(sentry_init, capture_items):
     sample_rand = "0.999999"
     sampled = "0"
 
-    sentry_sdk.traces.continue_trace(
+    sentry_sdk.continue_trace(
         {
             "sentry-trace": f"{trace_id}-{parent_span_id}-{sampled}",
             "baggage": f"sentry-trace_id={trace_id},sentry-sample_rate=0.5,sentry-sample_rand={sample_rand}",
@@ -735,7 +735,7 @@ def test_backpressure_outcome(
     trace_id = "0af7651916cd43dd8448eb211c80319c"
     parent_span_id = "b7ad6b7169203331"
 
-    sentry_sdk.traces.continue_trace(
+    sentry_sdk.continue_trace(
         {
             "sentry-trace": f"{trace_id}-{parent_span_id}",
             "baggage": f"sentry-trace_id={trace_id},sentry-sample_rand={sample_rand}",
@@ -777,7 +777,7 @@ def test_continue_trace_no_sample_rand(sentry_init, capture_items):
     parent_span_id = "b7ad6b7169203331"
     sampled = "1"
 
-    sentry_sdk.traces.continue_trace(
+    sentry_sdk.continue_trace(
         {
             "sentry-trace": f"{trace_id}-{parent_span_id}-{sampled}",
             "baggage": f"sentry-trace_id={trace_id},sentry-sample_rate=0.5",
@@ -825,7 +825,7 @@ def test_outgoing_traceparent_and_baggage_head_sdk(sentry_init, traces_sample_ra
         traces_sample_rate=traces_sample_rate,
     )
 
-    sentry_sdk.traces.new_trace()
+    sentry_sdk.new_trace()
 
     with sentry_sdk.start_span(name="span") as span:
         assert span.sampled is expected_sampled
@@ -917,7 +917,7 @@ def test_outgoing_traceparent_and_baggage_incoming_trace(
             }
         )
 
-    sentry_sdk.traces.continue_trace(
+    sentry_sdk.continue_trace(
         {
             "sentry-trace": incoming_sentry_trace,
             "baggage": ",".join(
@@ -983,7 +983,7 @@ def test_outgoing_traceparent_and_baggage_inconsistent_incoming_trace(
         "sentry-sampled": "true",
     }
 
-    sentry_sdk.traces.continue_trace(
+    sentry_sdk.continue_trace(
         {
             "sentry-trace": incoming_sentry_trace,
             "baggage": ",".join(
@@ -1039,7 +1039,7 @@ def test_outgoing_traceparent_and_baggage_incoming_trace_deferred(
 
     incoming_baggage = {"sentry-trace_id": trace_id, "sentry-sample_rand": "0.500000"}
 
-    sentry_sdk.traces.continue_trace(
+    sentry_sdk.continue_trace(
         {
             "sentry-trace": f"{trace_id}-{parent_span_id}-",
             "baggage": ",".join(
@@ -1095,7 +1095,7 @@ def test_outgoing_traceparent_and_baggage_ignored_segment(sentry_init):
         "sentry-sample_rate": "1.0",
     }
 
-    sentry_sdk.traces.continue_trace(
+    sentry_sdk.continue_trace(
         {
             "sentry-trace": f"{trace_id}-{parent_span_id}-1",
             "baggage": ",".join(
@@ -1132,7 +1132,7 @@ def test_outgoing_traceparent_and_baggage_ignored_child_span(sentry_init):
         "sentry-sample_rate": "1.0",
     }
 
-    sentry_sdk.traces.continue_trace(
+    sentry_sdk.continue_trace(
         {
             "sentry-trace": f"{trace_id}-{parent_span_id}-1",
             "baggage": ",".join(

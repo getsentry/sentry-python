@@ -58,7 +58,7 @@ def test_segment_uses_incoming_sample_rand(
     )
     items = capture_items("span")
 
-    sentry_sdk.traces.continue_trace(
+    sentry_sdk.continue_trace(
         {
             "sentry-trace": "0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331",
             "baggage": f"sentry-sample_rand={sample_rand:.6f}",

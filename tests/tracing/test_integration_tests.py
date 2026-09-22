@@ -103,7 +103,7 @@ def test_continue_trace(sentry_init, capture_items, parent_sampled, sample_rate)
         ),
     }
 
-    sentry_sdk.traces.continue_trace(headers)
+    sentry_sdk.continue_trace(headers)
 
     # child segment, to prove that we can read 'sentry-trace' header data correctly
     with sentry_sdk.start_span(name="WRONG") as child_segment:
@@ -198,7 +198,7 @@ def test_dynamic_sampling_head_sdk_creates_dsc(
 
     # make sure segment is sampled for both cases
     with mock.patch("sentry_sdk.tracing_utils.Random.randrange", return_value=250000):
-        sentry_sdk.traces.new_trace()
+        sentry_sdk.new_trace()
         with sentry_sdk.start_span(name="Head SDK segment") as segment:
             baggage = segment._baggage
             assert baggage is None
@@ -328,7 +328,7 @@ def test_trace_propagation_meta_head_sdk(sentry_init):
         release="foo",
     )
 
-    sentry_sdk.traces.new_trace()
+    sentry_sdk.new_trace()
 
     meta = None
     span = None
@@ -438,7 +438,7 @@ def test_continue_trace_strict_trace_continuation(
         ),
     }
 
-    sentry_sdk.traces.continue_trace(headers)
+    sentry_sdk.continue_trace(headers)
 
     with sentry_sdk.start_span(name="strict trace") as segment:
         headers = sentry_sdk.get_current_scope().iter_trace_propagation_headers(segment)
@@ -461,11 +461,11 @@ def test_continue_trace_forces_new_traces_when_no_propagation(
 
     sentry_init(traces_sample_rate=1.0)
 
-    sentry_sdk.traces.continue_trace({})
+    sentry_sdk.continue_trace({})
     with sentry_sdk.start_span(name="segment1") as segment1:
         pass
 
-    sentry_sdk.traces.continue_trace({})
+    sentry_sdk.continue_trace({})
     with sentry_sdk.start_span(name="segment2") as segment2:
         pass
 
@@ -477,11 +477,11 @@ def test_continue_trace_forces_new_traces_when_no_propagation_with_new_trace(
 ):
     sentry_init(traces_sample_rate=1.0)
 
-    sentry_sdk.traces.new_trace()
+    sentry_sdk.new_trace()
     with sentry_sdk.start_span(name="segment1") as segment1:
         pass
 
-    sentry_sdk.traces.new_trace()
+    sentry_sdk.new_trace()
     with sentry_sdk.start_span(name="segment2") as segment2:
         pass
 

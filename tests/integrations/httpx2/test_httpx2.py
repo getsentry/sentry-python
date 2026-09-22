@@ -619,7 +619,7 @@ def test_outgoing_trace_headers_no_current_span(sentry_init, httpx2_mock):
 
     httpx2_client = httpx2.Client()
 
-    assert sentry_sdk.traces.get_current_span() is None
+    assert sentry_sdk.get_current_span() is None
 
     response = httpx2_client.get(url)
 
@@ -655,7 +655,7 @@ async def test_outgoing_trace_headers_no_current_span_async(sentry_init, httpx2_
 
     httpx2_client = httpx2.AsyncClient()
 
-    assert sentry_sdk.traces.get_current_span() is None
+    assert sentry_sdk.get_current_span() is None
 
     response = await httpx2_client.get(url)
 

@@ -77,7 +77,7 @@ def patch_enqueue_job() -> None:
         if client.get_integration(ArqIntegration) is None:
             return await old_enqueue_job(self, function, *args, **kwargs)
 
-        if sentry_sdk.traces.get_current_span() is None:
+        if sentry_sdk.get_current_span() is None:
             return await old_enqueue_job(self, function, *args, **kwargs)
 
         with sentry_sdk.start_span(

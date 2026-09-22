@@ -179,7 +179,7 @@ def _enable_span_for_middleware(
         middleware_name = app.__class__.__name__
 
         def _start_middleware_span(op: str, name: str) -> "Any":
-            if sentry_sdk.traces.get_current_span() is None:
+            if sentry_sdk.get_current_span() is None:
                 return nullcontext()
 
             return sentry_sdk.start_span(
@@ -562,7 +562,7 @@ async def _wrap_async_handler(
     try:
         return await handler(*args, **kwargs)
     finally:
-        current_span = sentry_sdk.traces.get_current_span()
+        current_span = sentry_sdk.get_current_span()
 
         if type(current_span) is Span:
             attach_request_data = True
@@ -607,7 +607,7 @@ def patch_request_response() -> None:
                 if integration is None:
                     return old_func(*args, **kwargs)
 
-                current_span = sentry_sdk.traces.get_current_span()
+                current_span = sentry_sdk.get_current_span()
 
                 if type(current_span) is Span:
                     current_span._segment._update_active_thread()

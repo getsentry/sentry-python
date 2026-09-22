@@ -73,9 +73,7 @@ class RqIntegration(Integration):
                 scope.clear_breadcrumbs()
                 scope.add_event_processor(_make_event_processor(weakref.ref(job)))
 
-                sentry_sdk.traces.continue_trace(
-                    job.meta.get("_sentry_trace_headers") or {}
-                )
+                sentry_sdk.continue_trace(job.meta.get("_sentry_trace_headers") or {})
 
                 Scope.set_custom_sampling_context({"rq_job": job})
 

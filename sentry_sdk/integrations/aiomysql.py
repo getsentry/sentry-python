@@ -193,7 +193,7 @@ def _wrap_connect(f: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]
                 message="connect", category="query", data=breadcrumb_data
             )
 
-        if sentry_sdk.traces.get_current_span() is None:
+        if sentry_sdk.get_current_span() is None:
             return await f(self)
 
         span_attributes: dict[str, Any] = {

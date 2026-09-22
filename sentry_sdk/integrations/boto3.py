@@ -85,7 +85,7 @@ def _sentry_request_created(
     if request.method is not None:
         breadcrumb[SPANDATA.HTTP_REQUEST_METHOD] = request.method
 
-    if sentry_sdk.traces.get_current_span() is not None:
+    if sentry_sdk.get_current_span() is not None:
         span = sentry_sdk.start_span(
             name=description,
             attributes={

@@ -54,7 +54,7 @@ def patch_templates() -> None:
     @property  # type: ignore
     @ensure_integration_enabled(DjangoIntegration, real_rendered_content.fget)
     def rendered_content(self: "SimpleTemplateResponse") -> str:
-        if sentry_sdk.traces.get_current_span() is None:
+        if sentry_sdk.get_current_span() is None:
             return real_rendered_content.fget(self)
 
         with sentry_sdk.start_span(
@@ -88,7 +88,7 @@ def patch_templates() -> None:
                 sentry_sdk.get_current_scope().trace_propagation_meta()
             )
 
-        if sentry_sdk.traces.get_current_span() is None:
+        if sentry_sdk.get_current_span() is None:
             return real_render(request, template_name, context, *args, **kwargs)
 
         with sentry_sdk.start_span(
