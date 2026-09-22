@@ -66,3 +66,57 @@ Managing Scope (advanced)
 .. autofunction:: sentry_sdk.api.push_scope
 
 .. autofunction:: sentry_sdk.api.new_scope
+
+
+Session Tracking
+================
+
+Session tracking counts how many users are actively using your application, so
+that Sentry can show crash-free rates. When you use one of the web framework
+integrations (such as the WSGI, ASGI, or Django integrations), a session is
+started and finished automatically for each incoming request.
+
+For projects that are not served over WSGI/ASGI -- command line tools,
+background workers, daemons, and so on -- there is no automatic session
+tracking, but you can track sessions manually around a unit of work.
+
+The simplest way is the :py:func:`sentry_sdk.sessions.track_session` context
+manager, which starts a session on the given scope when entering and finishes
+it when exiting. It is a no-op if session tracking is not enabled, so you can
+use it unconditionally::
+
+    import sentry_sdk
+    from sentry_sdk.scope import isolation_scope
+    from sentry_sdk.sessions import track_session
+
+    sentry_sdk.init(
+        dsn="___DSN___",
+        # On by default; kept explicit here for clarity
+        auto_session_tracking=True,
+    )
+
+    # For example, wrap a single unit of work of a background worker.
+    with isolation_scope() as scope:
+        with track_session(scope, session_mode="application"):
+            process_job()
+
+If you prefer explicit control, you can start and stop sessions with
+:py:func:`sentry_sdk.api.start_session` and :py:func:`sentry_sdk.api.end_session`
+instead::
+
+    import sentry_sdk
+
+    sentry_sdk.init(
+        dsn="___DSN___",
+        auto_session_tracking=True,
+    )
+
+    sentry_sdk.start_session(session_mode="application")
+    try:
+        process_job()
+    finally:
+        sentry_sdk.end_session()
+
+.. autofunction:: sentry_sdk.sessions.track_session
+.. autofunction:: sentry_sdk.api.start_session
+.. autofunction:: sentry_sdk.api.end_session
