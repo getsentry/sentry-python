@@ -317,7 +317,6 @@ TEST_SUITE_CONFIG = {
         "deps": {
             "*": ["pytest-asyncio", "httpx"],
         },
-        "python": ">=3.11",
     },
     "fastmcp": {
         "package": "fastmcp",
