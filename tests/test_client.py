@@ -1076,6 +1076,51 @@ def test_max_breadcrumbs_option(
     assert len(events[0]["breadcrumbs"]["values"]) == expected_breadcrumbs
 
 
+def test_breadcrumbs_truncated_meta(sentry_init, capture_events):
+    sentry_init(max_breadcrumbs=3)
+    events = capture_events()
+
+    for i in range(10):
+        add_breadcrumb({"message": f"crumb {i}"})
+
+    capture_message("dogs are great")
+
+    (event,) = events
+
+    assert len(event["breadcrumbs"]["values"]) == 3
+    assert event["_meta"]["breadcrumbs"] == {"": {"len": 10}}
+
+
+def test_breadcrumbs_not_truncated_no_meta(sentry_init, capture_events):
+    sentry_init(max_breadcrumbs=3)
+    events = capture_events()
+
+    for i in range(3):
+        add_breadcrumb({"message": f"crumb {i}"})
+
+    capture_message("dogs are great")
+
+    (event,) = events
+
+    assert len(event["breadcrumbs"]["values"]) == 3
+    assert "breadcrumbs" not in event.get("_meta", {})
+
+
+def test_breadcrumbs_truncated_meta_from_child_scope(sentry_init, capture_events):
+    sentry_init(max_breadcrumbs=2)
+    events = capture_events()
+
+    with sentry_sdk.new_scope() as scope:
+        for i in range(5):
+            scope.add_breadcrumb({"message": f"crumb {i}"})
+        capture_message("dogs are great")
+
+    (event,) = events
+
+    assert len(event["breadcrumbs"]["values"]) == 2
+    assert event["_meta"]["breadcrumbs"] == {"": {"len": 5}}
+
+
 def test_multiple_positional_args(sentry_init):
     with pytest.raises(TypeError) as exinfo:
         sentry_init(1, None)
