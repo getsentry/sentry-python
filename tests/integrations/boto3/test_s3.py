@@ -295,16 +295,14 @@ URL_QUERY_PARAMS = [
         id="defaults",
     ),
     pytest.param(
-        {"_experiments": {"data_collection": {}}},
+        {"data_collection": {}},
         "list-type=2&prefix=foo&continuation-token=%5BFiltered%5D&encoding-type=url",
         id="data_collection_denylist_default",
     ),
     pytest.param(
         {
-            "_experiments": {
-                "data_collection": {
-                    "url_query_params": {"mode": "denylist", "terms": ["prefix"]}
-                }
+            "data_collection": {
+                "url_query_params": {"mode": "denylist", "terms": ["prefix"]}
             }
         },
         "list-type=2&prefix=%5BFiltered%5D&continuation-token=%5BFiltered%5D&encoding-type=url",
@@ -312,10 +310,8 @@ URL_QUERY_PARAMS = [
     ),
     pytest.param(
         {
-            "_experiments": {
-                "data_collection": {
-                    "url_query_params": {"mode": "allowlist", "terms": ["prefix"]}
-                }
+            "data_collection": {
+                "url_query_params": {"mode": "allowlist", "terms": ["prefix"]}
             }
         },
         "list-type=%5BFiltered%5D&prefix=foo&continuation-token=%5BFiltered%5D&encoding-type=%5BFiltered%5D",
@@ -323,12 +319,10 @@ URL_QUERY_PARAMS = [
     ),
     pytest.param(
         {
-            "_experiments": {
-                "data_collection": {
-                    "url_query_params": {
-                        "mode": "allowlist",
-                        "terms": ["continuation-token"],
-                    }
+            "data_collection": {
+                "url_query_params": {
+                    "mode": "allowlist",
+                    "terms": ["continuation-token"],
                 }
             }
         },
@@ -336,14 +330,14 @@ URL_QUERY_PARAMS = [
         id="data_collection_allowlist_sensitive_term",
     ),
     pytest.param(
-        {"_experiments": {"data_collection": {"url_query_params": {"mode": "off"}}}},
+        {"data_collection": {"url_query_params": {"mode": "off"}}},
         "",
         id="data_collection_off",
     ),
     pytest.param(
         {
             "send_default_pii": True,
-            "_experiments": {"data_collection": {"url_query_params": {"mode": "off"}}},
+            "data_collection": {"url_query_params": {"mode": "off"}},
         },
         "",
         id="data_collection_wins_over_send_default_pii",

@@ -220,19 +220,19 @@ def test_simple_without_performance(
     "init_kwargs,expected_args,expected_kwargs",
     [
         pytest.param(
-            {"_experiments": {"data_collection": {}}},
+            {"data_collection": {}},
             "included",
             "included",
             id="data_collection_default",
         ),
         pytest.param(
-            {"_experiments": {"data_collection": {"queues": True}}},
+            {"data_collection": {"queues": True}},
             "included",
             "included",
             id="data_collection_queues_on",
         ),
         pytest.param(
-            {"_experiments": {"data_collection": {"queues": False}}},
+            {"data_collection": {"queues": False}},
             None,
             None,
             id="data_collection_queues_off",
@@ -245,7 +245,7 @@ def test_simple_without_performance(
         ),
         pytest.param(
             {
-                "_experiments": {"data_collection": {"queues": False}},
+                "data_collection": {"queues": False},
                 "send_default_pii": False,
             },
             None,
@@ -254,7 +254,7 @@ def test_simple_without_performance(
         ),
         pytest.param(
             {
-                "_experiments": {"data_collection": {"queues": True}},
+                "data_collection": {"queues": True},
                 "send_default_pii": False,
             },
             "included",

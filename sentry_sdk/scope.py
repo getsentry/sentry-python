@@ -946,26 +946,24 @@ class Scope:
         become the root of a new span tree. If you explicitly want this span to be
         top-level without a parent, set `parent_span=None`.
 
-        `start_span()` can either be used as context manager or you can use the span
-        object it returns and explicitly end it via `span.end()`. The following is
-        equivalent:
+        ``start_span()`` can either be used as context manager or you can use the span
+        object it returns and explicitly end it via ``span.end()``. The following is
+        equivalent::
 
-        ```python
-        import sentry_sdk
+            import sentry_sdk
 
-        with sentry_sdk.start_span(name="My Span"):
+            with sentry_sdk.start_span(name="My Span"):
+                # do something
+
+            # The span automatically finishes once the ``with`` block is exited
+
+        ::
+
+            import sentry_sdk
+
+            span = sentry_sdk.start_span(name="My Span")
             # do something
-
-        # The span automatically finishes once the `with` block is exited
-        ```
-
-        ```python
-        import sentry_sdk
-
-        span = sentry_sdk.start_span(name="My Span")
-        # do something
-        span.end()
-        ```
+            span.end()
 
         To continue a trace from another service, call
         `sentry_sdk.continue_trace()` prior to creating a top-level span.

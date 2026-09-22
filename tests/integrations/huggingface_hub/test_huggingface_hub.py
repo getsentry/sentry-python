@@ -1177,7 +1177,7 @@ def test_text_generation_data_collection(
         integrations=[HuggingfaceHubIntegration(include_prompts=include_prompts)],
     )
     if data_collection is not None:
-        sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
+        sentry_init_kwargs["data_collection"] = data_collection
 
     sentry_init(**sentry_init_kwargs)
 
@@ -1311,7 +1311,7 @@ def test_text_generation_streaming_data_collection(
         integrations=[HuggingfaceHubIntegration(include_prompts=include_prompts)],
     )
     if data_collection is not None:
-        sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
+        sentry_init_kwargs["data_collection"] = data_collection
 
     sentry_init(**sentry_init_kwargs)
 
@@ -1455,7 +1455,7 @@ def test_chat_completion_data_collection_tools(
         integrations=[HuggingfaceHubIntegration(include_prompts=include_prompts)],
     )
     if data_collection is not None:
-        sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
+        sentry_init_kwargs["data_collection"] = data_collection
 
     sentry_init(**sentry_init_kwargs)
 
@@ -1615,7 +1615,7 @@ def test_chat_completion_streaming_data_collection_tools(
         integrations=[HuggingfaceHubIntegration(include_prompts=include_prompts)],
     )
     if data_collection is not None:
-        sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
+        sentry_init_kwargs["data_collection"] = data_collection
 
     sentry_init(**sentry_init_kwargs)
 

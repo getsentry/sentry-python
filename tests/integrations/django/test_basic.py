@@ -1024,7 +1024,7 @@ def test_request_body_data_collection(
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
-        _experiments={"data_collection": data_collection},
+        data_collection=data_collection,
     )
     items = capture_items("event")
 
@@ -1052,7 +1052,7 @@ def test_request_body_dropped_with_form_and_files_data_collection(
     sentry_init(
         integrations=[DjangoIntegration()],
         max_request_body_size="always",
-        _experiments={"data_collection": {"http_bodies": []}},
+        data_collection={"http_bodies": []},
     )
     items = capture_items("event")
 
@@ -1080,7 +1080,7 @@ def test_oversized_request_body_not_annotated_data_collection(
     sentry_init(
         integrations=[DjangoIntegration()],
         max_request_body_size="small",
-        _experiments={"data_collection": {"http_bodies": []}},
+        data_collection={"http_bodies": []},
     )
     items = capture_items("event")
 

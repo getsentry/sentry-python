@@ -1,5 +1,80 @@
 # Changelog
 
+## 2.70.0
+
+### New Features ✨
+
+- **New integration:** Mistral AI (#4733) by @alexander-alderman-webb
+
+  Add the Mistral integration to your `sentry_sdk.init` call:
+
+```python
+import sentry_sdk
+from sentry_sdk.integrations.mistral import MistralIntegration
+
+sentry_sdk.init(
+    dsn="...",
+    traces_sample_rate=1.0,
+    integrations=[
+        MistralIntegration(),
+    ]
+)
+```
+
+- **New option:** A fine-grained way to configure what data should be sent from the SDK.
+
+  Offers much more flexibility than `send_default_pii`, allowing you to specify what
+  data should be collected. If `data_collection` is defined, it takes precedence over
+  `send_default_pii`.
+  
+  See https://docs.sentry.io/platforms/python/configuration/options/#data_collection
+  for the available configuration options.
+
+```python
+import sentry_sdk
+
+sentry_sdk.init(
+    data_collection={
+        "user_info": False,
+        "gen_ai": {"inputs": False, "outputs": False},
+        "graphql": {"document": False, "variables": False},
+        "database_query_data": False,
+        "queues": False,
+        "http_bodies": [],
+        "cookies": {
+            "mode": "denylist",
+            "terms": ["forwarded", "-ip", "remote-", "via", "-user"],
+        },
+        "http_headers": {
+            "request": {
+                "mode": "denylist",
+                "terms": ["forwarded", "-ip", "remote-", "via", "-user"],
+            },
+        },
+        "url_query_params": {
+            "mode": "denylist",
+            "terms": ["forwarded", "-ip", "remote-", "via", "-user"],
+        },
+    }
+)
+```
+
+#### Mistral
+
+- Record `gen_ai.output.messages` by @alexander-alderman-webb in [#7549](https://github.com/getsentry/sentry-python/pull/7549)
+- Record `gen_ai.input.messages` by @alexander-alderman-webb in [#7548](https://github.com/getsentry/sentry-python/pull/7548)
+- Record `gen_ai.system_instructions` by @alexander-alderman-webb in [#7547](https://github.com/getsentry/sentry-python/pull/7547)
+- Record request parameters by @alexander-alderman-webb in [#7531](https://github.com/getsentry/sentry-python/pull/7531)
+- Record token usage by @alexander-alderman-webb in [#7529](https://github.com/getsentry/sentry-python/pull/7529)
+- Add integration with `Chat.complete` and `Chat.complete_async` patches by @alexander-alderman-webb in [#7528](https://github.com/getsentry/sentry-python/pull/7528)
+
+### Internal Changes 🔧
+
+- (data-collection) Promote `data_collection` from `_experiments` o top-level by @ericapisani in [#7560](https://github.com/getsentry/sentry-python/pull/7560)
+- Close client on teardown by @alexander-alderman-webb in [#7562](https://github.com/getsentry/sentry-python/pull/7562)
+- 🤖 Update test matrix with new releases (09/21) by @github-actions in [#7546](https://github.com/getsentry/sentry-python/pull/7546)
+- Remove `getsentry/testing-ai-sdk-integrations` by @alexander-alderman-webb in [#7526](https://github.com/getsentry/sentry-python/pull/7526)
+
 ## 2.69.2
 
 ### Bug Fixes 🐛

@@ -2942,7 +2942,7 @@ async def test_data_collection_gen_ai_inputs_gates_request_messages_tool_inputs_
         "send_default_pii": send_default_pii,
     }
     if data_collection is not None:
-        init_kwargs["_experiments"] = {"data_collection": data_collection}
+        init_kwargs["data_collection"] = data_collection
 
     sentry_init(**init_kwargs)
 
@@ -3069,7 +3069,7 @@ async def test_data_collection_gen_ai_outputs_gates_response_text_and_tool_outpu
         "send_default_pii": send_default_pii,
     }
     if data_collection is not None:
-        init_kwargs["_experiments"] = {"data_collection": data_collection}
+        init_kwargs["data_collection"] = data_collection
 
     sentry_init(**init_kwargs)
 
@@ -3164,7 +3164,7 @@ async def test_data_collection_gen_ai_output_message_parts_follow_outputs_gate(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"data_collection": {"gen_ai": gen_ai}},
+        data_collection={"gen_ai": gen_ai},
     )
 
     test_agent = get_test_agent()
@@ -3226,9 +3226,7 @@ async def test_data_collection_gen_ai_request_messages_keep_tool_returns_when_ou
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
-        _experiments={
-            "data_collection": {"gen_ai": {"inputs": True, "outputs": False}}
-        },
+        data_collection={"gen_ai": {"inputs": True, "outputs": False}},
     )
 
     test_agent = get_test_agent()

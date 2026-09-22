@@ -986,16 +986,14 @@ def test_chunked_response_span_covers_body_read(
             id="defaults",
         ),
         pytest.param(
-            {"_experiments": {"data_collection": {}}},
+            {"data_collection": {}},
             "toy=tennisball&color=red&auth=%5BFiltered%5D",
             id="data_collection_denylist_default",
         ),
         pytest.param(
             {
-                "_experiments": {
-                    "data_collection": {
-                        "url_query_params": {"mode": "denylist", "terms": ["toy"]}
-                    }
+                "data_collection": {
+                    "url_query_params": {"mode": "denylist", "terms": ["toy"]}
                 }
             },
             "toy=%5BFiltered%5D&color=red&auth=%5BFiltered%5D",
@@ -1003,10 +1001,8 @@ def test_chunked_response_span_covers_body_read(
         ),
         pytest.param(
             {
-                "_experiments": {
-                    "data_collection": {
-                        "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
-                    }
+                "data_collection": {
+                    "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
                 }
             },
             "toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D",
@@ -1014,30 +1010,22 @@ def test_chunked_response_span_covers_body_read(
         ),
         pytest.param(
             {
-                "_experiments": {
-                    "data_collection": {
-                        "url_query_params": {"mode": "allowlist", "terms": ["auth"]}
-                    }
+                "data_collection": {
+                    "url_query_params": {"mode": "allowlist", "terms": ["auth"]}
                 }
             },
             "toy=%5BFiltered%5D&color=%5BFiltered%5D&auth=%5BFiltered%5D",
             id="data_collection_allowlist_sensitive_term",
         ),
         pytest.param(
-            {
-                "_experiments": {
-                    "data_collection": {"url_query_params": {"mode": "off"}}
-                }
-            },
+            {"data_collection": {"url_query_params": {"mode": "off"}}},
             None,
             id="data_collection_off",
         ),
         pytest.param(
             {
                 "send_default_pii": True,
-                "_experiments": {
-                    "data_collection": {"url_query_params": {"mode": "off"}}
-                },
+                "data_collection": {"url_query_params": {"mode": "off"}},
             },
             None,
             id="data_collection_wins_over_send_default_pii",
@@ -1080,16 +1068,14 @@ def test_url_query_data_collection(
     "init_kwargs, expected_suffix",
     [
         pytest.param(
-            {"_experiments": {"data_collection": {}}},
+            {"data_collection": {}},
             "?toy=tennisball&color=red&auth=%5BFiltered%5D#frag",
             id="data_collection_denylist_default",
         ),
         pytest.param(
             {
-                "_experiments": {
-                    "data_collection": {
-                        "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
-                    }
+                "data_collection": {
+                    "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
                 }
             },
             "?toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D#frag",
@@ -1146,17 +1132,13 @@ def test_url_full_reassembly(sentry_init, capture_items, init_kwargs, expected_s
             id="defaults",
         ),
         pytest.param(
-            {"_experiments": {"data_collection": {}}},
+            {"data_collection": {}},
             "toy=tennisball&color=red&auth=%5BFiltered%5D",
             True,
             id="data_collection_denylist_default",
         ),
         pytest.param(
-            {
-                "_experiments": {
-                    "data_collection": {"url_query_params": {"mode": "off"}}
-                }
-            },
+            {"data_collection": {"url_query_params": {"mode": "off"}}},
             None,
             True,
             id="data_collection_off",

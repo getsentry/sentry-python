@@ -2418,7 +2418,7 @@ def test_generate_content_data_collection(
         send_default_pii=send_default_pii,
     )
     if data_collection is not None:
-        sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
+        sentry_init_kwargs["data_collection"] = data_collection
 
     sentry_init(**sentry_init_kwargs)
 
@@ -2530,7 +2530,7 @@ def test_generate_content_data_collection_tools(
         send_default_pii=send_default_pii,
     )
     if data_collection is not None:
-        sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
+        sentry_init_kwargs["data_collection"] = data_collection
 
     sentry_init(**sentry_init_kwargs)
 
@@ -2711,7 +2711,7 @@ def test_streaming_generate_content_data_collection(
         send_default_pii=send_default_pii,
     )
     if data_collection is not None:
-        sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
+        sentry_init_kwargs["data_collection"] = data_collection
 
     sentry_init(**sentry_init_kwargs)
 
@@ -2854,7 +2854,7 @@ def test_streaming_generate_content_data_collection_tools(
         send_default_pii=send_default_pii,
     )
     if data_collection is not None:
-        sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
+        sentry_init_kwargs["data_collection"] = data_collection
 
     sentry_init(**sentry_init_kwargs)
 
@@ -3024,7 +3024,7 @@ def test_embed_content_data_collection(
         send_default_pii=send_default_pii,
     )
     if data_collection is not None:
-        sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
+        sentry_init_kwargs["data_collection"] = data_collection
 
     sentry_init(**sentry_init_kwargs)
 
@@ -3165,7 +3165,7 @@ async def test_async_generate_content_data_collection(
         send_default_pii=send_default_pii,
     )
     if data_collection is not None:
-        sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
+        sentry_init_kwargs["data_collection"] = data_collection
 
     sentry_init(**sentry_init_kwargs)
 
@@ -3291,7 +3291,7 @@ async def test_async_embed_content_data_collection(
         send_default_pii=send_default_pii,
     )
     if data_collection is not None:
-        sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
+        sentry_init_kwargs["data_collection"] = data_collection
 
     sentry_init(**sentry_init_kwargs)
 
