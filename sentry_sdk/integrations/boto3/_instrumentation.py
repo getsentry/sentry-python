@@ -69,7 +69,7 @@ def _get_server_attributes(endpoint_url: "Optional[str]") -> "Attributes":
         }
 
     except (TypeError, UnicodeError, ValueError):
-        # Invalid client metadata must not prevent the AWS call from running.
+        # invalid client metadata must not prevent the AWS call from running.
         return {}
 
 
@@ -279,6 +279,9 @@ def _set_request_attributes(
     if request.url is not None:
         with capture_internal_exceptions():
             parsed_url = parse_url(request.url, sanitize=False)
+
+    # overwrite server attributes when actual request URL is resolved.
+    _set_span_attributes(span, _get_server_attributes(request.url))
 
     if isinstance(span, StreamedSpan):
         span.set_attributes(get_url_attributes(client, parsed_url))
