@@ -1,5 +1,25 @@
 # Changelog
 
+## 2.70.0
+
+### New Features ✨
+
+#### Mistral
+
+- Record `gen_ai.output.messages` by @alexander-alderman-webb in [#7549](https://github.com/getsentry/sentry-python/pull/7549)
+- Record `gen_ai.input.messages` by @alexander-alderman-webb in [#7548](https://github.com/getsentry/sentry-python/pull/7548)
+- Record `gen_ai.system_instructions` by @alexander-alderman-webb in [#7547](https://github.com/getsentry/sentry-python/pull/7547)
+- Record request parameters by @alexander-alderman-webb in [#7531](https://github.com/getsentry/sentry-python/pull/7531)
+- Record token usage by @alexander-alderman-webb in [#7529](https://github.com/getsentry/sentry-python/pull/7529)
+- Add integration with `Chat.complete` and `Chat.complete_async` patches by @alexander-alderman-webb in [#7528](https://github.com/getsentry/sentry-python/pull/7528)
+
+### Internal Changes 🔧
+
+- (data-collection) Promote `data_collection` from `_experiments` o top-level by @ericapisani in [#7560](https://github.com/getsentry/sentry-python/pull/7560)
+- Close client on teardown by @alexander-alderman-webb in [#7562](https://github.com/getsentry/sentry-python/pull/7562)
+- 🤖 Update test matrix with new releases (09/21) by @github-actions in [#7546](https://github.com/getsentry/sentry-python/pull/7546)
+- Remove `getsentry/testing-ai-sdk-integrations` by @alexander-alderman-webb in [#7526](https://github.com/getsentry/sentry-python/pull/7526)
+
 ## 2.69.2
 
 ### Bug Fixes 🐛
