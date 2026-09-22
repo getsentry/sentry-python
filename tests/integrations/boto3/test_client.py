@@ -612,8 +612,7 @@ def test_client_call_attributes_are_available_at_span_creation(
     client_spans = [
         item.payload
         for item in items
-        if item.payload["attributes"].get(SPANDATA.SENTRY_ORIGIN)
-        == ORIGIN
+        if item.payload["attributes"].get(SPANDATA.SENTRY_ORIGIN) == ORIGIN
     ]
     assert client_spans == []
 
