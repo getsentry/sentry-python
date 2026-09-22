@@ -353,8 +353,8 @@ def test_exception_group_chained_with_context():
 
     # innermost (oldest) to outermost (newest)
     assert [(e["type"], e["value"]) for e in exception_values] == [
-        ("RuntimeError", "2"),
-        ("RuntimeError", "1"),
+        ("RuntimeError", "grandchild2"),
+        ("RuntimeError", "grandchild1"),
         ("ExceptionGroup", "child2"),
         ("ValueError", "child1"),
         ("ExceptionGroup", "group"),
