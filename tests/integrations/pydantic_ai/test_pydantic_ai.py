@@ -21,12 +21,23 @@ from pydantic_ai.models.function import FunctionModel
 from pydantic_ai.usage import RequestUsage
 
 import sentry_sdk
-from sentry_sdk._types import BLOB_DATA_SUBSTITUTE
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.pydantic_ai import PydanticAIIntegration
-from sentry_sdk.integrations.pydantic_ai.spans.ai_client import _set_input_messages
-from sentry_sdk.integrations.pydantic_ai.spans.utils import _set_usage_data
+from sentry_sdk.integrations.pydantic_ai.spans.ai_client import (
+    ai_client_span,
+    update_ai_client_span,
+)
+from sentry_sdk.integrations.pydantic_ai.utils import (
+    get_current_agent,
+    pop_agent,
+    push_agent,
+)
 from sentry_sdk.utils import package_version
+
+# The SDK redacts binary payload in span data with this fixed substitute value
+# (part of the wire protocol the integration must produce, so tests assert on
+# the literal instead of importing an internal constant).
+BLOB_DATA_SUBSTITUTE = "[Blob substitute]"
 
 PYDANTIC_AI_VERSION = package_version("pydantic-ai")
 
@@ -1947,46 +1958,42 @@ async def test_context_cleanup_after_run(sentry_init, get_test_agent):
     """
     Test that the pydantic_ai_agent context is properly cleaned up after agent execution.
     """
-    import sentry_sdk
 
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
     )
 
-    # Verify context is not set before run
-    scope = sentry_sdk.get_current_scope()
-    assert "pydantic_ai_agent" not in scope._contexts
+    # Verify no agent context is set before the run
+    assert get_current_agent() is None
 
     # Run the agent
     test_agent = get_test_agent()
     await test_agent.run("Test input")
 
-    # Verify context is cleaned up after run
-    assert "pydantic_ai_agent" not in scope._contexts
+    # Verify the agent context is cleaned up after the run
+    assert get_current_agent() is None
 
 
 def test_context_cleanup_after_run_sync(sentry_init, get_test_agent, sync_event_loop):
     """
     Test that the pydantic_ai_agent context is properly cleaned up after sync agent execution.
     """
-    import sentry_sdk
 
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
     )
 
-    # Verify context is not set before run
-    scope = sentry_sdk.get_current_scope()
-    assert "pydantic_ai_agent" not in scope._contexts
+    # Verify no agent context is set before the run
+    assert get_current_agent() is None
 
     # Run the agent synchronously
     test_agent = get_test_agent()
     test_agent.run_sync("Test input")
 
-    # Verify context is cleaned up after run
-    assert "pydantic_ai_agent" not in scope._contexts
+    # Verify the agent context is cleaned up after the run
+    assert get_current_agent() is None
 
 
 @pytest.mark.asyncio
@@ -1994,16 +2001,14 @@ async def test_context_cleanup_after_streaming(sentry_init, get_test_agent):
     """
     Test that the pydantic_ai_agent context is properly cleaned up after streaming execution.
     """
-    import sentry_sdk
 
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
     )
 
-    # Verify context is not set before run
-    scope = sentry_sdk.get_current_scope()
-    assert "pydantic_ai_agent" not in scope._contexts
+    # Verify no agent context is set before the run
+    assert get_current_agent() is None
 
     test_agent = get_test_agent()
     # Run the agent with streaming
@@ -2011,8 +2016,8 @@ async def test_context_cleanup_after_streaming(sentry_init, get_test_agent):
         async for _ in result.stream_output():
             pass
 
-    # Verify context is cleaned up after streaming completes
-    assert "pydantic_ai_agent" not in scope._contexts
+    # Verify the agent context is cleaned up once streaming completes
+    assert get_current_agent() is None
 
 
 @pytest.mark.asyncio
@@ -2020,7 +2025,6 @@ async def test_context_cleanup_on_error(sentry_init, get_test_agent):
     """
     Test that the pydantic_ai_agent context is cleaned up even when an error occurs.
     """
-    import sentry_sdk
 
     sentry_init(
         integrations=[PydanticAIIntegration()],
@@ -2035,9 +2039,8 @@ async def test_context_cleanup_on_error(sentry_init, get_test_agent):
         """A tool that always fails."""
         raise ValueError("Tool error")
 
-    # Verify context is not set before run
-    scope = sentry_sdk.get_current_scope()
-    assert "pydantic_ai_agent" not in scope._contexts
+    # Verify no agent context is set before the run
+    assert get_current_agent() is None
 
     # Run the agent - this may or may not raise depending on pydantic-ai's error handling
     try:
@@ -2045,8 +2048,8 @@ async def test_context_cleanup_on_error(sentry_init, get_test_agent):
     except Exception:
         pass
 
-    # Verify context is cleaned up even if there was an error
-    assert "pydantic_ai_agent" not in scope._contexts
+    # Verify the agent context is cleaned up even if there was an error
+    assert get_current_agent() is None
 
 
 @pytest.mark.asyncio
@@ -2054,7 +2057,6 @@ async def test_context_isolation_concurrent_agents(sentry_init, get_test_agent):
     """
     Test that concurrent agent executions maintain isolated contexts.
     """
-    import sentry_sdk
 
     sentry_init(
         integrations=[PydanticAIIntegration()],
@@ -2070,16 +2072,11 @@ async def test_context_isolation_concurrent_agents(sentry_init, get_test_agent):
 
     async def run_and_check_context(agent, agent_name):
         """Run an agent and verify its context during and after execution."""
-        # Before execution, context should not exist in the outer scope
-        outer_scope = sentry_sdk.get_current_scope()
-
         # Run the agent
         await agent.run(f"Input for {agent_name}")
 
-        # After execution, verify context is cleaned up
-        # Note: Due to isolation_scope, we can't easily check the inner scope here,
-        # but we can verify the outer scope remains clean
-        assert "pydantic_ai_agent" not in outer_scope._contexts
+        # After execution, the agent context should be cleaned up
+        assert get_current_agent() is None
 
         return agent_name
 
@@ -2092,9 +2089,8 @@ async def test_context_isolation_concurrent_agents(sentry_init, get_test_agent):
 
     assert results == ["agent1", "agent2"]
 
-    # Final check: outer scope should be clean
-    final_scope = sentry_sdk.get_current_scope()
-    assert "pydantic_ai_agent" not in final_scope._contexts
+    # Final check: no agent context should remain
+    assert get_current_agent() is None
 
 
 # ==================== Additional Coverage Tests ====================
@@ -2277,56 +2273,64 @@ async def test_invoke_agent_with_instructions(
 @pytest.mark.asyncio
 async def test_model_name_extraction_with_callable(sentry_init, capture_items):
     """
-    Test model name extraction when model has a callable name() method.
+    Test that the chat span reports the model name of a model exposing a
+    callable name() attribute.
     """
     from unittest.mock import MagicMock
-
-    from sentry_sdk.integrations.pydantic_ai.utils import _get_model_name
 
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
     )
 
-    # Test the utility function directly
     mock_model = MagicMock()
-    # Remove model_name attribute so it checks name() next
+    # Remove model_name attribute so the integration falls back to name()
     del mock_model.model_name
     mock_model.name = lambda: "custom-model-name"
 
-    # Get model name - should call the callable name()
-    result = _get_model_name(mock_model)
+    items = capture_items()
+    with sentry_sdk.start_transaction(op="test", name="test"):
+        span = ai_client_span([], None, mock_model, None)
+        span.finish()
 
-    # Should return the result from callable
-    assert result == "custom-model-name"
+    sentry_sdk.flush()
+    chat_spans = _chat_spans(items)
+    assert len(chat_spans) == 1
+    assert (
+        chat_spans[0]["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL]
+        == "custom-model-name"
+    )
 
 
 @pytest.mark.asyncio
 async def test_model_name_extraction_fallback_to_str(sentry_init, capture_items):
     """
-    Test model name extraction falls back to str() when no name attribute exists.
+    Test the chat span falls back to str(model) when no name attribute exists.
     """
     from unittest.mock import MagicMock
-
-    from sentry_sdk.integrations.pydantic_ai.utils import _get_model_name
 
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
     )
 
-    # Test the utility function directly
     mock_model = MagicMock()
     # Remove name and model_name attributes
     del mock_model.name
     del mock_model.model_name
 
-    # Get model name - should fall back to str()
-    result = _get_model_name(mock_model)
+    items = capture_items()
+    with sentry_sdk.start_transaction(op="test", name="test"):
+        span = ai_client_span([], None, mock_model, None)
+        span.finish()
 
-    # Should return string representation
-    assert result is not None
-    assert isinstance(result, str)
+    sentry_sdk.flush()
+    chat_spans = _chat_spans(items)
+    assert len(chat_spans) == 1
+    # Should report the string representation of the model object
+    model = chat_spans[0]["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL]
+    assert isinstance(model, str)
+    assert model == str(mock_model)
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
@@ -2764,40 +2768,36 @@ async def test_agent_without_name(
 @pytest.mark.asyncio
 async def test_input_messages_error_handling(sentry_init, capture_items):
     """
-    Test that _set_input_messages handles errors gracefully.
+    Test that input message extraction handles malformed messages gracefully.
     """
-    import sentry_sdk
-
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
     )
 
+    items = capture_items()
     with sentry_sdk.start_transaction(op="test", name="test") as transaction:
-        span = sentry_sdk.start_span(op="test_span")
+        # Plain objects without the expected message attributes
+        invalid_messages = [object()]
 
-        # Pass invalid messages that would cause an error
-        invalid_messages = [object()]  # Plain object without expected attributes
-
-        # Should not raise, error is caught internally
-        _set_input_messages(span, invalid_messages)
-
+        # Should not raise
+        span = ai_client_span(invalid_messages, None, None, None)
         span.finish()
 
-    # Should not crash
+    sentry_sdk.flush()
+    chat_spans = _chat_spans(items)
+    assert len(chat_spans) == 1
+    assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in chat_spans[0]["attributes"]
     assert transaction is not None
 
 
 @pytest.mark.asyncio
 async def test_available_tools_error_handling(sentry_init, capture_items):
     """
-    Test that _set_available_tools handles errors gracefully.
+    Test that chat span creation survives agents whose toolset raises errors.
     """
     from unittest.mock import MagicMock
-
-    import sentry_sdk
-    from sentry_sdk.integrations.pydantic_ai.utils import _set_available_tools
 
     sentry_init(
         integrations=[PydanticAIIntegration()],
@@ -2805,15 +2805,14 @@ async def test_available_tools_error_handling(sentry_init, capture_items):
     )
 
     with sentry_sdk.start_transaction(op="test", name="test") as transaction:
-        span = sentry_sdk.start_span(op="test_span")
-
-        # Create mock agent with invalid toolset
+        # Mock agent whose toolset iteration raises
         mock_agent = MagicMock()
+        mock_agent.model = None
+        mock_agent.model_settings = None
         mock_agent._function_toolset.tools.items.side_effect = Exception("Error")
 
-        # Should not raise, error is caught internally
-        _set_available_tools(span, mock_agent)
-
+        # Should not raise, tool extraction errors are caught internally
+        span = ai_client_span([], mock_agent, None, None)
         span.finish()
 
     # Should not crash
@@ -2821,24 +2820,21 @@ async def test_available_tools_error_handling(sentry_init, capture_items):
 
 
 @pytest.mark.asyncio
-async def test_set_usage_data_with_none_usage(sentry_init, capture_items):
+async def test_update_ai_client_span_with_empty_usage(sentry_init, capture_items):
     """
-    Test that _set_usage_data handles None usage gracefully.
+    Test that updating the chat span with a response whose usage is None
+    does not raise.
     """
-    import sentry_sdk
-    from sentry_sdk.integrations.pydantic_ai.spans.ai_client import _set_usage_data
-
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
     )
 
+    response = ModelResponse(parts=[TextPart(content="ok")], usage=None)
+
     with sentry_sdk.start_transaction(op="test", name="test") as transaction:
-        span = sentry_sdk.start_span(op="test_span")
-
-        # Pass None usage - should not raise
-        _set_usage_data(span, None)
-
+        span = ai_client_span([], None, None, None)
+        update_ai_client_span(span, response)
         span.finish()
 
     # Should not crash
@@ -2846,36 +2842,30 @@ async def test_set_usage_data_with_none_usage(sentry_init, capture_items):
 
 
 @pytest.mark.asyncio
-async def test_set_usage_data_with_partial_fields(sentry_init, capture_items):
+async def test_usage_data_partial_fields(sentry_init, capture_items):
     """
-    Test that _set_usage_data handles usage with only some fields.
+    Test that token usage from a model response is recorded on the chat span.
     """
-    from unittest.mock import MagicMock
-
-    import sentry_sdk
-    from sentry_sdk.integrations.pydantic_ai.spans.ai_client import _set_usage_data
-
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
     )
 
-    with sentry_sdk.start_transaction(op="test", name="test") as transaction:
-        span = sentry_sdk.start_span(op="test_span")
+    usage = RequestUsage(input_tokens=100, output_tokens=25)
+    response = ModelResponse(parts=[TextPart(content="ok")], usage=usage)
 
-        # Create usage object with only some fields
-        mock_usage = MagicMock()
-        mock_usage.input_tokens = 100
-        mock_usage.output_tokens = None  # Missing
-        mock_usage.total_tokens = 100
-
-        # Should only set the non-None fields
-        _set_usage_data(span, mock_usage)
-
+    items = capture_items()
+    with sentry_sdk.start_transaction(op="test", name="test"):
+        span = ai_client_span([], None, None, None)
+        update_ai_client_span(span, response)
         span.finish()
 
-    # Should not crash
-    assert transaction is not None
+    sentry_sdk.flush()
+    chat_spans = _chat_spans(items)
+    assert len(chat_spans) == 1
+    data = chat_spans[0]["attributes"]
+    assert data[SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 100
+    assert data[SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 25
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
@@ -2943,7 +2933,6 @@ async def test_message_parts_with_list_content(sentry_init, capture_items):
     """
     Test that message parts with list content are handled correctly.
     """
-    from unittest.mock import MagicMock
 
     import sentry_sdk
 
@@ -2953,24 +2942,26 @@ async def test_message_parts_with_list_content(sentry_init, capture_items):
         send_default_pii=True,
     )
 
+    items = capture_items()
     with sentry_sdk.start_transaction(op="test", name="test") as transaction:
-        span = sentry_sdk.start_span(op="test_span")
-
         # Create message with list content
-        mock_msg = MagicMock()
-        mock_part = MagicMock()
-        mock_part.content = ["item1", "item2", {"complex": "item"}]
-        mock_msg.parts = [mock_part]
-        mock_msg.instructions = None
-
-        messages = [mock_msg]
+        part = UserPromptPart(content=["item1", "item2", {"complex": "item"}])
+        messages = [_ModelMessage([part])]
 
         # Should handle list content
-        _set_input_messages(span, messages)
-
+        span = ai_client_span(messages, None, None, None)
         span.finish()
 
-    # Should not crash
+    sentry_sdk.flush()
+    chat_spans = _chat_spans(items)
+    assert len(chat_spans) == 1
+    messages_data = _get_messages_from_span(chat_spans[0]["attributes"])
+    assert any(
+        content_item == {"type": "text", "text": "item1"}
+        for msg in messages_data
+        if isinstance(msg.get("content"), list)
+        for content_item in msg["content"]
+    )
     assert transaction is not None
 
 
@@ -3140,12 +3131,11 @@ async def test_output_data_transformations(
 @pytest.mark.asyncio
 async def test_output_data_error_handling(sentry_init, capture_items):
     """
-    Test that _set_output_data handles errors in formatting gracefully.
+    Test that response output extraction handles malformed responses gracefully.
     """
     from unittest.mock import MagicMock
 
     import sentry_sdk
-    from sentry_sdk.integrations.pydantic_ai.spans.ai_client import _set_output_data
 
     sentry_init(
         integrations=[PydanticAIIntegration()],
@@ -3153,20 +3143,26 @@ async def test_output_data_error_handling(sentry_init, capture_items):
         send_default_pii=True,
     )
 
-    with sentry_sdk.start_transaction(op="test", name="test") as transaction:
-        span = sentry_sdk.start_span(op="test_span")
+    items = capture_items()
 
-        # Create mock response that will cause error
+    with sentry_sdk.start_transaction(op="test", name="test") as transaction:
+        span = ai_client_span([], None, None, None)
+
+        # Create mock response whose parts raise when formatted
         mock_response = MagicMock()
         mock_response.model_name = "test-model"
         mock_response.parts = [MagicMock(side_effect=Exception("Error"))]
 
-        # Should catch error and not crash
-        _set_output_data(span, mock_response)
+        # Should catch the error and not crash
+        update_ai_client_span(span, mock_response)
 
         span.finish()
 
-    # Should not crash
+    sentry_sdk.flush()
+    chat_spans = _chat_spans(items)
+    assert len(chat_spans) == 1
+    # Output extraction failed gracefully: no output data on the span
+    assert SPANDATA.GEN_AI_OUTPUT_MESSAGES not in chat_spans[0]["attributes"]
     assert transaction is not None
 
 
@@ -3175,8 +3171,6 @@ async def test_message_with_system_prompt_part(sentry_init, capture_items):
     """
     Test that SystemPromptPart is handled with correct role.
     """
-    from unittest.mock import MagicMock
-
     from pydantic_ai import messages
 
     import sentry_sdk
@@ -3187,24 +3181,21 @@ async def test_message_with_system_prompt_part(sentry_init, capture_items):
         send_default_pii=True,
     )
 
+    items = capture_items()
     with sentry_sdk.start_transaction(op="test", name="test") as transaction:
-        span = sentry_sdk.start_span(op="test_span")
-
-        # Create message with SystemPromptPart
+        # Create message with only a SystemPromptPart
         system_part = messages.SystemPromptPart(content="You are a helpful assistant")
-
-        mock_msg = MagicMock()
-        mock_msg.parts = [system_part]
-        mock_msg.instructions = None
-
-        msgs = [mock_msg]
+        msgs = [_ModelMessage([system_part])]
 
         # Should handle system prompt
-        _set_input_messages(span, msgs)
-
+        span = ai_client_span(msgs, None, None, None)
         span.finish()
 
-    # Should not crash
+    sentry_sdk.flush()
+    chat_spans = _chat_spans(items)
+    assert len(chat_spans) == 1
+    # System prompts are not user-facing input messages
+    assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in chat_spans[0]["attributes"]
     assert transaction is not None
 
 
@@ -3213,71 +3204,61 @@ async def test_message_with_instructions(sentry_init, capture_items):
     """
     Test that messages with instructions field are handled correctly.
     """
-    from unittest.mock import MagicMock
-
-    import sentry_sdk
-
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
     )
 
+    items = capture_items()
     with sentry_sdk.start_transaction(op="test", name="test") as transaction:
-        span = sentry_sdk.start_span(op="test_span")
-
         # Create message with instructions
-        mock_msg = MagicMock()
-        mock_msg.instructions = "System instructions here"
-        mock_part = MagicMock()
-        mock_part.content = "User message"
-        mock_msg.parts = [mock_part]
-
-        msgs = [mock_msg]
+        part = UserPromptPart(content="User message")
+        msgs = [_ModelMessage([part], instructions="System instructions here")]
 
         # Should extract system prompt from instructions
-        _set_input_messages(span, msgs)
-
+        span = ai_client_span(msgs, None, None, None)
         span.finish()
 
-    # Should not crash
+    sentry_sdk.flush()
+    chat_spans = _chat_spans(items)
+    assert len(chat_spans) == 1
+    data = chat_spans[0]["attributes"]
+    assert "System instructions here" in data[SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
     assert transaction is not None
 
 
 @pytest.mark.asyncio
-async def test_set_input_messages_without_prompts(sentry_init, capture_items):
+async def test_chat_span_without_prompts(sentry_init, capture_items):
     """
-    Test that _set_input_messages respects _should_send_prompts().
+    Test that the chat span omits messages when include_prompts is disabled.
     """
-    import sentry_sdk
-
     sentry_init(
         integrations=[PydanticAIIntegration(include_prompts=False)],
         traces_sample_rate=1.0,
         send_default_pii=True,
     )
 
+    items = capture_items()
     with sentry_sdk.start_transaction(op="test", name="test") as transaction:
-        span = sentry_sdk.start_span(op="test_span")
-
-        # Even with messages, should not set them
-        messages = ["test"]
-        _set_input_messages(span, messages)
-
+        part = UserPromptPart(content="test")
+        span = ai_client_span([_ModelMessage([part])], None, None, None)
         span.finish()
 
-    # Should not crash and should not set messages
+    sentry_sdk.flush()
+    chat_spans = _chat_spans(items)
+    assert len(chat_spans) == 1
+    # Messages should not be captured with include_prompts disabled
+    assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in chat_spans[0]["attributes"]
     assert transaction is not None
 
 
 @pytest.mark.asyncio
-async def test_get_model_name_with_exception_in_callable(sentry_init, capture_items):
+async def test_model_name_exception_in_callable(sentry_init, capture_items):
     """
-    Test that _get_model_name handles exceptions in name() callable.
+    Test model-name extraction handles exceptions in a name() callable.
     """
     from unittest.mock import MagicMock
-
-    from sentry_sdk.integrations.pydantic_ai.utils import _get_model_name
 
     sentry_init(
         integrations=[PydanticAIIntegration()],
@@ -3286,140 +3267,165 @@ async def test_get_model_name_with_exception_in_callable(sentry_init, capture_it
 
     # Create model with callable name that raises exception
     mock_model = MagicMock()
+    del mock_model.model_name
     mock_model.name = MagicMock(side_effect=Exception("Error"))
 
-    # Should fall back to str()
-    result = _get_model_name(mock_model)
+    items = capture_items()
+    with sentry_sdk.start_transaction(op="test", name="test"):
+        span = ai_client_span([], None, mock_model, None)
+        span.finish()
 
-    # Should return something (str fallback)
-    assert result is not None
+    sentry_sdk.flush()
+    chat_spans = _chat_spans(items)
+    assert len(chat_spans) == 1
+    # Should fall back to str() and still report a model name
+    assert chat_spans[0]["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == str(mock_model)
 
 
 @pytest.mark.asyncio
-async def test_get_model_name_with_string_model(sentry_init, capture_items):
+async def test_model_name_from_string_model(sentry_init, capture_items):
     """
-    Test that _get_model_name handles string models.
+    Test that a string model is reported as the request model on the chat span.
     """
-    from sentry_sdk.integrations.pydantic_ai.utils import _get_model_name
-
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
     )
 
-    # Pass a string as model
-    result = _get_model_name("gpt-4")
+    items = capture_items()
+    with sentry_sdk.start_transaction(op="test", name="test"):
+        span = ai_client_span([], None, "gpt-4", None)
+        span.finish()
 
-    # Should return the string
-    assert result == "gpt-4"
+    sentry_sdk.flush()
+    chat_spans = _chat_spans(items)
+    assert len(chat_spans) == 1
+    assert chat_spans[0]["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "gpt-4"
 
 
 @pytest.mark.asyncio
-async def test_get_model_name_with_none(sentry_init, capture_items):
+async def test_model_name_from_none(sentry_init, capture_items):
     """
-    Test that _get_model_name handles None model.
+    Test that a None model yields a chat span without a request model.
     """
-    from sentry_sdk.integrations.pydantic_ai.utils import _get_model_name
-
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
     )
 
-    # Pass None
-    result = _get_model_name(None)
+    items = capture_items()
+    with sentry_sdk.start_transaction(op="test", name="test"):
+        span = ai_client_span([], None, None, None)
+        span.finish()
 
-    # Should return None
-    assert result is None
+    sentry_sdk.flush()
+    chat_spans = _chat_spans(items)
+    assert len(chat_spans) == 1
+    assert SPANDATA.GEN_AI_REQUEST_MODEL not in chat_spans[0]["attributes"]
 
 
 @pytest.mark.asyncio
-async def test_should_send_prompts_without_pii(sentry_init, capture_items):
+async def test_chat_span_data_without_pii(sentry_init, capture_items):
     """
-    Test that _should_send_inputs/_should_send_outputs return False when PII disabled.
+    Test that prompts and outputs are omitted from the chat span when PII is
+    disabled, even with include_prompts=True.
     """
-    from sentry_sdk.integrations.pydantic_ai.utils import (
-        _should_send_inputs,
-        _should_send_outputs,
-    )
-
     sentry_init(
         integrations=[PydanticAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=False,  # PII disabled
     )
 
-    # Should return False
-    assert _should_send_inputs() is False
-    assert _should_send_outputs() is False
+    part = UserPromptPart(content="secret prompt")
+    response = ModelResponse(parts=[TextPart(content="secret answer")])
+
+    items = capture_items()
+    with sentry_sdk.start_transaction(op="test", name="test"):
+        span = ai_client_span([_ModelMessage([part])], None, None, None)
+        update_ai_client_span(span, response)
+        span.finish()
+
+    sentry_sdk.flush()
+    chat_spans = _chat_spans(items)
+    assert len(chat_spans) == 1
+    data = chat_spans[0]["attributes"]
+    assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in data
+    assert SPANDATA.GEN_AI_OUTPUT_MESSAGES not in data
 
 
 @pytest.mark.asyncio
-async def test_set_available_tools_without_toolset(sentry_init, capture_items):
+async def test_chat_span_agent_without_toolset(sentry_init, capture_items):
     """
-    Test that _set_available_tools handles agent without toolset.
+    Test that chat span creation handles an agent without a toolset.
     """
     from unittest.mock import MagicMock
-
-    import sentry_sdk
-    from sentry_sdk.integrations.pydantic_ai.utils import _set_available_tools
 
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
     )
 
+    mock_agent = MagicMock()
+    mock_agent.model = None
+    mock_agent.model_settings = None
+    del mock_agent._function_toolset
+
+    items = capture_items()
     with sentry_sdk.start_transaction(op="test", name="test") as transaction:
-        span = sentry_sdk.start_span(op="test_span")
-
-        # Create agent without _function_toolset
-        mock_agent = MagicMock()
-        del mock_agent._function_toolset
-
-        # Should handle gracefully
-        _set_available_tools(span, mock_agent)
-
+        # Should not raise
+        span = ai_client_span([], mock_agent, None, None)
         span.finish()
 
-    # Should not crash
+    sentry_sdk.flush()
+    chat_spans = _chat_spans(items)
+    assert len(chat_spans) == 1
+    assert SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS not in chat_spans[0]["attributes"]
     assert transaction is not None
 
 
 @pytest.mark.asyncio
-async def test_set_available_tools_with_schema(sentry_init, capture_items):
+async def test_available_tools_schema_on_chat_span(sentry_init, capture_items):
     """
-    Test that _set_available_tools extracts tool schema correctly.
+    Test that tool schemas are extracted onto the chat span.
     """
+    import json as jsonlib
     from unittest.mock import MagicMock
-
-    import sentry_sdk
-    from sentry_sdk.integrations.pydantic_ai.utils import _set_available_tools
 
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
     )
 
-    with sentry_sdk.start_transaction(op="test", name="test") as transaction:
-        span = sentry_sdk.start_span(op="test_span")
+    # Create agent with toolset containing schema
+    mock_agent = MagicMock()
+    mock_agent.model = None
+    mock_agent.model_settings = None
+    mock_tool = MagicMock()
+    mock_schema = MagicMock()
+    mock_schema.description = "Test tool description"
+    mock_schema.json_schema = {"type": "object", "properties": {}}
+    mock_tool.function_schema = mock_schema
 
-        # Create agent with toolset containing schema
-        mock_agent = MagicMock()
-        mock_tool = MagicMock()
-        mock_schema = MagicMock()
-        mock_schema.description = "Test tool description"
-        mock_schema.json_schema = {"type": "object", "properties": {}}
-        mock_tool.function_schema = mock_schema
+    mock_agent._function_toolset.tools = {"test_tool": mock_tool}
 
-        mock_agent._function_toolset.tools = {"test_tool": mock_tool}
-
-        # Should extract schema
-        _set_available_tools(span, mock_agent)
-
+    items = capture_items()
+    with sentry_sdk.start_transaction(op="test", name="test"):
+        span = ai_client_span([], mock_agent, None, None)
         span.finish()
 
-    # Should not crash
-    assert transaction is not None
+    sentry_sdk.flush()
+    chat_spans = _chat_spans(items)
+    assert len(chat_spans) == 1
+    tools = jsonlib.loads(
+        chat_spans[0]["attributes"][SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS]
+    )
+    assert tools == [
+        {
+            "name": "test_tool",
+            "description": "Test tool description",
+            "parameters": {"type": "object", "properties": {}},
+        }
+    ]
 
 
 @pytest.mark.asyncio
@@ -3478,7 +3484,7 @@ async def test_execute_tool_span_with_mcp_type(sentry_init, capture_items):
 @pytest.mark.asyncio
 async def test_execute_tool_span_without_prompts(sentry_init, capture_items):
     """
-    Test that execute_tool span respects _should_send_prompts().
+    Test that the execute_tool span respects the include_prompts setting.
     """
     import sentry_sdk
     from sentry_sdk.integrations.pydantic_ai.spans.execute_tool import (
@@ -3670,59 +3676,83 @@ async def test_invoke_agent_span_with_string_instructions(sentry_init, capture_i
 @pytest.mark.asyncio
 async def test_ai_client_span_with_streaming_flag(sentry_init, capture_items):
     """
-    Test that ai_client_span reads streaming flag from scope.
+    Test that ai_client_span reads the streaming flag from the agent context.
     """
-    import sentry_sdk
-    from sentry_sdk.integrations.pydantic_ai.spans.ai_client import ai_client_span
-
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
     )
 
+    items = capture_items()
     with sentry_sdk.start_transaction(op="test", name="test") as transaction:
-        # Set streaming flag in scope
-        scope = sentry_sdk.get_current_scope()
-        scope._contexts["pydantic_ai_agent"] = {"_streaming": True}
+        push_agent(None, is_streaming=True)
+        try:
+            span = ai_client_span([], None, None, None)
+            span.finish()
+        finally:
+            pop_agent()
 
-        # Create ai_client span
-        span = ai_client_span([], None, None, None)
-        span.finish()
-
-    # Should not crash
+    sentry_sdk.flush()
+    chat_spans = _chat_spans(items)
+    assert len(chat_spans) == 1
+    assert chat_spans[0]["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
     assert transaction is not None
 
 
 @pytest.mark.asyncio
-async def test_ai_client_span_gets_agent_from_scope(sentry_init, capture_items):
+async def test_ai_client_span_gets_agent_from_context(sentry_init, capture_items):
     """
-    Test that ai_client_span gets agent from scope when not passed.
+    Test that ai_client_span gets the agent from the agent context when not
+    passed explicitly.
     """
     from unittest.mock import MagicMock
-
-    import sentry_sdk
-    from sentry_sdk.integrations.pydantic_ai.spans.ai_client import ai_client_span
 
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
     )
 
+    mock_agent = MagicMock()
+    mock_agent.name = "test_agent"
+    mock_agent._function_toolset = None
+
+    items = capture_items()
     with sentry_sdk.start_transaction(op="test", name="test") as transaction:
-        # Set agent in scope
-        scope = sentry_sdk.get_current_scope()
-        mock_agent = MagicMock()
-        mock_agent.name = "test_agent"
-        mock_agent._function_toolset = MagicMock()
-        mock_agent._function_toolset.tools = {}
-        scope._contexts["pydantic_ai_agent"] = {"_agent": mock_agent}
+        push_agent(mock_agent)
+        try:
+            # Create ai_client span without passing agent
+            span = ai_client_span([], None, None, None)
+            span.finish()
+        finally:
+            pop_agent()
 
-        # Create ai_client span without passing agent
-        span = ai_client_span([], None, None, None)
-        span.finish()
-
-    # Should not crash
+    sentry_sdk.flush()
+    chat_spans = _chat_spans(items)
+    assert len(chat_spans) == 1
+    assert chat_spans[0]["attributes"][SPANDATA.GEN_AI_AGENT_NAME] == "test_agent"
     assert transaction is not None
+
+
+class _ModelMessage:
+    """Minimal stand-in for a pydantic-ai model message (parts + instructions)."""
+
+    def __init__(self, parts, instructions=None):
+        self.parts = parts
+        self.instructions = instructions
+
+
+def _chat_spans(items):
+    """Chat span payloads from captured telemetry items.
+
+    GenAI chat spans are sent as standalone ``span`` envelope items; their
+    attribute values are already unwrapped by the ``capture_items`` fixture.
+    """
+    return [
+        item.payload
+        for item in items
+        if item.type == "span"
+        and item.payload["attributes"].get("sentry.op") == "gen_ai.chat"
+    ]
 
 
 def _get_messages_from_span(span_data):
@@ -3766,71 +3796,38 @@ async def test_binary_content_encoding_image(
         trace_lifecycle="stream" if span_streaming else "static",
     )
 
-    if span_streaming:
+    binary_content = BinaryContent(
+        data=b"fake_image_data_12345", media_type="image/png"
+    )
+    user_part = UserPromptPart(content=["Look at this image:", binary_content])
+    messages = [_ModelMessage([user_part])]
+
+    if span_streaming or stream_gen_ai_spans:
         items = capture_items("span")
 
-        with sentry_sdk.traces.start_span(
-            name="test", attributes={"sentry.op": "test"}
-        ):
-            span = sentry_sdk.traces.start_span(
-                name="custom span", attributes={"sentry.op": "test_span"}
-            )
-            binary_content = BinaryContent(
-                data=b"fake_image_data_12345", media_type="image/png"
-            )
-            user_part = UserPromptPart(content=["Look at this image:", binary_content])
-            mock_msg = MagicMock()
-            mock_msg.parts = [user_part]
-            mock_msg.instructions = None
-
-            _set_input_messages(span, [mock_msg])
+        with sentry_sdk.start_transaction(op="test", name="test"):
+            span = ai_client_span(messages, None, None, None)
             span.finish()
 
         sentry_sdk.flush()
         spans = [item.payload for item in items]
-
-        span_data = spans[0]["attributes"]
-        messages_data = _get_messages_from_span(span_data)
-        assert _find_binary_content(messages_data, "image", "image/png")
-    elif stream_gen_ai_spans:
-        items = capture_items("transaction")
-
-        with sentry_sdk.start_transaction(op="test", name="test"):
-            span = sentry_sdk.start_span(op="test_span")
-            binary_content = BinaryContent(
-                data=b"fake_image_data_12345", media_type="image/png"
-            )
-            user_part = UserPromptPart(content=["Look at this image:", binary_content])
-            mock_msg = MagicMock()
-            mock_msg.parts = [user_part]
-            mock_msg.instructions = None
-
-            _set_input_messages(span, [mock_msg])
-            span.finish()
-
-        (event,) = (item.payload for item in items)
-        span_data = event["spans"][0]["data"]
-        messages_data = _get_messages_from_span(span_data)
+        chat_spans = [
+            s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
+        ]
+        assert len(chat_spans) == 1
+        messages_data = _get_messages_from_span(chat_spans[0]["attributes"])
         assert _find_binary_content(messages_data, "image", "image/png")
     else:
         events = capture_events()
 
         with sentry_sdk.start_transaction(op="test", name="test"):
-            span = sentry_sdk.start_span(op="test_span")
-            binary_content = BinaryContent(
-                data=b"fake_image_data_12345", media_type="image/png"
-            )
-            user_part = UserPromptPart(content=["Look at this image:", binary_content])
-            mock_msg = MagicMock()
-            mock_msg.parts = [user_part]
-            mock_msg.instructions = None
-
-            _set_input_messages(span, [mock_msg])
+            span = ai_client_span(messages, None, None, None)
             span.finish()
 
         (event,) = events
-        span_data = event["spans"][0]["data"]
-        messages_data = _get_messages_from_span(span_data)
+        chat_spans = [s for s in event["spans"] if s["op"] == "gen_ai.chat"]
+        assert len(chat_spans) == 1
+        messages_data = _get_messages_from_span(chat_spans[0]["data"])
         assert _find_binary_content(messages_data, "image", "image/png")
 
 
@@ -3853,64 +3850,26 @@ async def test_binary_content_encoding_mixed_content(
         trace_lifecycle="stream" if span_streaming else "static",
     )
 
-    if span_streaming:
+    binary_content = BinaryContent(data=b"fake_image_bytes", media_type="image/jpeg")
+    user_part = UserPromptPart(
+        content=["Here is an image:", binary_content, "What do you see?"]
+    )
+    messages = [_ModelMessage([user_part])]
+
+    if span_streaming or stream_gen_ai_spans:
         items = capture_items("span")
 
-        with sentry_sdk.traces.start_span(
-            name="test", attributes={"sentry.op": "test"}
-        ):
-            span = sentry_sdk.traces.start_span(
-                name="custom span", attributes={"sentry.op": "test_span"}
-            )
-            binary_content = BinaryContent(
-                data=b"fake_image_bytes", media_type="image/jpeg"
-            )
-            user_part = UserPromptPart(
-                content=["Here is an image:", binary_content, "What do you see?"]
-            )
-            mock_msg = MagicMock()
-            mock_msg.parts = [user_part]
-            mock_msg.instructions = None
-
-            _set_input_messages(span, [mock_msg])
+        with sentry_sdk.start_transaction(op="test", name="test"):
+            span = ai_client_span(messages, None, None, None)
             span.finish()
 
         sentry_sdk.flush()
         spans = [item.payload for item in items]
-
-        span_data = spans[0]["attributes"]
-        messages_data = _get_messages_from_span(span_data)
-
-        # Verify both text and binary content are present
-        found_text = any(
-            content_item.get("type") == "text"
-            for msg in messages_data
-            if "content" in msg
-            for content_item in msg["content"]
-        )
-        assert found_text, "Text content should be found"
-        assert _find_binary_content(messages_data, "image", "image/jpeg")
-    elif stream_gen_ai_spans:
-        items = capture_items("transaction")
-
-        with sentry_sdk.start_transaction(op="test", name="test"):
-            span = sentry_sdk.start_span(op="test_span")
-            binary_content = BinaryContent(
-                data=b"fake_image_bytes", media_type="image/jpeg"
-            )
-            user_part = UserPromptPart(
-                content=["Here is an image:", binary_content, "What do you see?"]
-            )
-            mock_msg = MagicMock()
-            mock_msg.parts = [user_part]
-            mock_msg.instructions = None
-
-            _set_input_messages(span, [mock_msg])
-            span.finish()
-
-        (event,) = (item.payload for item in items)
-        span_data = event["spans"][0]["data"]
-        messages_data = _get_messages_from_span(span_data)
+        chat_spans = [
+            s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
+        ]
+        assert len(chat_spans) == 1
+        messages_data = _get_messages_from_span(chat_spans[0]["attributes"])
 
         # Verify both text and binary content are present
         found_text = any(
@@ -3925,23 +3884,13 @@ async def test_binary_content_encoding_mixed_content(
         events = capture_events()
 
         with sentry_sdk.start_transaction(op="test", name="test"):
-            span = sentry_sdk.start_span(op="test_span")
-            binary_content = BinaryContent(
-                data=b"fake_image_bytes", media_type="image/jpeg"
-            )
-            user_part = UserPromptPart(
-                content=["Here is an image:", binary_content, "What do you see?"]
-            )
-            mock_msg = MagicMock()
-            mock_msg.parts = [user_part]
-            mock_msg.instructions = None
-
-            _set_input_messages(span, [mock_msg])
+            span = ai_client_span(messages, None, None, None)
             span.finish()
 
         (event,) = events
-        span_data = event["spans"][0]["data"]
-        messages_data = _get_messages_from_span(span_data)
+        chat_spans = [s for s in event["spans"] if s["op"] == "gen_ai.chat"]
+        assert len(chat_spans) == 1
+        messages_data = _get_messages_from_span(chat_spans[0]["data"])
 
         # Verify both text and binary content are present
         found_text = any(
@@ -4018,7 +3967,7 @@ async def test_binary_content_in_agent_run(
 @pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
-async def test_set_usage_data_with_cache_tokens(
+async def test_usage_data_with_cache_tokens(
     sentry_init,
     capture_events,
     capture_items,
@@ -4033,67 +3982,45 @@ async def test_set_usage_data_with_cache_tokens(
         trace_lifecycle="stream" if span_streaming else "static",
     )
 
-    if span_streaming:
+    usage = RequestUsage(
+        input_tokens=100,
+        output_tokens=50,
+        cache_read_tokens=80,
+        cache_write_tokens=20,
+    )
+    response = ModelResponse(parts=[TextPart(content="ok")], usage=usage)
+
+    if span_streaming or stream_gen_ai_spans:
         items = capture_items("span")
 
-        with sentry_sdk.traces.start_span(
-            name="test", attributes={"sentry.op": "test"}
-        ):
-            span = sentry_sdk.traces.start_span(
-                name="custom span", attributes={"sentry.op": "test_span"}
-            )
-            usage = RequestUsage(
-                input_tokens=100,
-                output_tokens=50,
-                cache_read_tokens=80,
-                cache_write_tokens=20,
-            )
-            _set_usage_data(span, usage)
+        with sentry_sdk.start_transaction(op="test", name="test"):
+            span = ai_client_span([], None, None, None)
+            update_ai_client_span(span, response)
             span.finish()
 
         sentry_sdk.flush()
         spans = [item.payload for item in items]
-
-        assert spans[0]["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 80
-        assert (
-            spans[0]["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 20
-        )
-    elif stream_gen_ai_spans:
-        items = capture_items("transaction")
-
-        with sentry_sdk.start_transaction(op="test", name="test"):
-            span = sentry_sdk.start_span(op="test_span")
-            usage = RequestUsage(
-                input_tokens=100,
-                output_tokens=50,
-                cache_read_tokens=80,
-                cache_write_tokens=20,
-            )
-            _set_usage_data(span, usage)
-            span.finish()
-
-        (event,) = (item.payload for item in items)
-        (span_data,) = event["spans"]
-        assert span_data["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 80
-        assert span_data["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 20
+        chat_spans = [
+            s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
+        ]
+        assert len(chat_spans) == 1
+        attributes = chat_spans[0]["attributes"]
+        assert attributes[SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 80
+        assert attributes[SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 20
     else:
         events = capture_events()
 
         with sentry_sdk.start_transaction(op="test", name="test"):
-            span = sentry_sdk.start_span(op="test_span")
-            usage = RequestUsage(
-                input_tokens=100,
-                output_tokens=50,
-                cache_read_tokens=80,
-                cache_write_tokens=20,
-            )
-            _set_usage_data(span, usage)
+            span = ai_client_span([], None, None, None)
+            update_ai_client_span(span, response)
             span.finish()
 
         (event,) = events
-        (span_data,) = event["spans"]
-        assert span_data["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 80
-        assert span_data["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 20
+        chat_spans = [s for s in event["spans"] if s["op"] == "gen_ai.chat"]
+        assert len(chat_spans) == 1
+        span_data = chat_spans[0]["data"]
+        assert span_data[SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 80
+        assert span_data[SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 20
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
