@@ -273,7 +273,7 @@ def start_span(**kwargs: "Any") -> "Span":
 
 def get_current_span(scope: "Optional[Scope]" = None) -> "Optional[Span]":
     """
-    Returns the currently active span if there is one running, otherwise `None`
+    Returns the currently active span on the scope, otherwise `None`.
     """
     return traces.get_current_span(scope)
 
@@ -298,14 +298,27 @@ def get_baggage() -> "Optional[str]":
 
 def continue_trace(incoming: "Dict[str, Any]") -> None:
     """
-    Sets the propagation context from environment or headers.
+    Continue a trace from headers or environment variables.
+
+    This function sets the propagation context on the scope. Any span started
+    in the updated scope will belong under the trace extracted from the
+    provided propagation headers or environment variables.
+
+    continue_trace() doesn't start any spans on its own. Use the start_span()
+    API for that.
     """
     return traces.continue_trace(incoming)
 
 
 def new_trace() -> None:
     """
-    Resets the propagation context, forcing a new trace.
+    Reset the propagation context, forcing a new trace.
+
+    This function sets the propagation context on the scope. Any span started
+    in the updated scope will start its own trace.
+
+    new_trace() doesn't start any spans on its own. Use the start_span() API
+    for that.
     """
     return traces.new_trace()
 
