@@ -35,7 +35,7 @@ def patch_tasks() -> None:
         if sentry_sdk.traces.get_current_span() is None:
             return old_task_enqueue(self, *args, **kwargs)
 
-        with sentry_sdk.traces.start_span(
+        with sentry_sdk.start_span(
             name=name,
             attributes={
                 "sentry.op": OP.QUEUE_SUBMIT_DJANGO,

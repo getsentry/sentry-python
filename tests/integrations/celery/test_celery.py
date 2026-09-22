@@ -137,7 +137,7 @@ def test_simple_with_performance(
 
     items = capture_items("event", "span")
 
-    with sentry_sdk.traces.start_span(name="span") as span:
+    with sentry_sdk.start_span(name="span") as span:
         celery_invocation(dummy_task, 1, 2)
         _, expected_context = celery_invocation(dummy_task, 1, 0)
 
@@ -333,7 +333,7 @@ def test_transaction_events(
 
     items = capture_items("event", "span")
 
-    with sentry_sdk.traces.start_span(name="submission") as span:
+    with sentry_sdk.start_span(name="submission") as span:
         celery_invocation(dummy_task, 1, 0 if task_fails else 1)
 
     sentry_sdk.flush()
@@ -409,7 +409,7 @@ def test_simple_no_propagation(capture_events, init_celery):
     def dummy_task():
         1 / 0
 
-    with sentry_sdk.traces.start_span(name="segment") as segment:
+    with sentry_sdk.start_span(name="segment") as segment:
         dummy_task.delay()
 
     (event,) = events
@@ -553,7 +553,7 @@ def test_abstract_task(init_celery, capture_events, celery, celery_invocation):
     def dummy_task(x, y):
         return x / y
 
-    with sentry_sdk.traces.start_span(name="task"):
+    with sentry_sdk.start_span(name="task"):
         celery_invocation(dummy_task, 1, 0)
 
     assert not events
@@ -596,7 +596,7 @@ def test_baggage_propagation(init_celery):
 
     # patch random.randrange to return a predictable sample_rand value
     with mock.patch("sentry_sdk.tracing_utils.Random.randrange", return_value=500000):
-        with sentry_sdk.traces.start_span(name="segment") as segment:
+        with sentry_sdk.start_span(name="segment") as segment:
             result = dummy_task.apply_async(
                 args=(1, 0),
                 headers={"baggage": "custom=value"},
@@ -632,7 +632,7 @@ def test_sentry_propagate_traces_override(init_celery):
         trace_id = sentry_sdk.traces.get_current_span().trace_id
         return trace_id
 
-    with sentry_sdk.traces.start_span(name="parent") as span:
+    with sentry_sdk.start_span(name="parent") as span:
         parent_trace_id = span.trace_id
 
         # should propagate trace
@@ -815,7 +815,7 @@ def test_producer_span_data(system, monkeypatch, sentry_init, capture_items):
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="producer test"):
+    with sentry_sdk.start_span(name="producer test"):
         task.apply_async()
 
     sentry_sdk.flush()
@@ -885,7 +885,7 @@ def tests_span_origin_producer(monkeypatch, sentry_init, capture_items):
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         task.apply_async()
 
     sentry_sdk.flush()
@@ -915,7 +915,7 @@ def test_send_task_wrapped(
     celery = Celery(__name__, broker="redis://example.com")  # noqa: E231
 
     items = capture_items("span")
-    with sentry_sdk.traces.start_span(name="custom parent") as outer_span:
+    with sentry_sdk.start_span(name="custom parent") as outer_span:
         celery.send_task("very_creative_task_name", args=(1, 2), kwargs={"foo": "bar"})
     sentry_sdk.flush()
 
@@ -973,7 +973,7 @@ def test_user_custom_headers_accessible_in_task(init_celery):
         "tenant_id": "tenant-42",
     }
 
-    with sentry_sdk.traces.start_span(name="test"):
+    with sentry_sdk.start_span(name="test"):
         result = custom_headers_task.apply_async(headers=custom_headers)
 
     received_headers = result.get()

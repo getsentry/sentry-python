@@ -240,7 +240,7 @@ class SentryAsgiMiddleware:
                             Scope.set_custom_sampling_context({"asgi_scope": scope})
 
                             attributes["sentry.op"] = f"{ty}.server"
-                            span = sentry_sdk.traces.start_span(
+                            span = sentry_sdk.start_span(
                                 name=transaction_name,
                                 attributes=attributes,
                                 parent_span=None,
@@ -252,7 +252,7 @@ class SentryAsgiMiddleware:
                         Scope.set_custom_sampling_context({"asgi_scope": scope})
 
                         attributes["sentry.op"] = OP.HTTP_SERVER
-                        span = sentry_sdk.traces.start_span(
+                        span = sentry_sdk.start_span(
                             name=transaction_name,
                             attributes=attributes,
                             parent_span=None,

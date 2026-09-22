@@ -78,7 +78,7 @@ def test_on_new_span_on_close(
         traces_sample_rate=1.0,
     )
     items = capture_items("span")
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         rust_tracing.new_span(RustTracingLevel.Info, 3)
 
         sentry_first_rust_span = sentry_sdk.traces.get_current_span()
@@ -128,7 +128,7 @@ def test_nested_on_new_span_on_close(
         traces_sample_rate=1.0,
     )
     items = capture_items("span")
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         original_sentry_span = sentry_sdk.traces.get_current_span()
 
         rust_tracing.new_span(RustTracingLevel.Info, 3, index_arg=10)
@@ -226,7 +226,7 @@ def test_on_event_exception(
     items = capture_items("event")
     sentry_sdk.get_isolation_scope().clear_breadcrumbs()
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         rust_tracing.new_span(RustTracingLevel.Info, 3)
 
         # Mapped to Exception
@@ -267,7 +267,7 @@ def test_on_event_breadcrumb(
     items = capture_items("event")
     sentry_sdk.get_isolation_scope().clear_breadcrumbs()
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         rust_tracing.new_span(RustTracingLevel.Info, 3)
 
         # Mapped to Breadcrumb
@@ -302,7 +302,7 @@ def test_on_event_event(
     items = capture_items("event")
     sentry_sdk.get_isolation_scope().clear_breadcrumbs()
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         rust_tracing.new_span(RustTracingLevel.Info, 3)
 
         # Mapped to Event
@@ -343,7 +343,7 @@ def test_on_event_ignored(
     items = capture_items("span")
     sentry_sdk.get_isolation_scope().clear_breadcrumbs()
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         rust_tracing.new_span(RustTracingLevel.Info, 3)
 
         # Ignored
@@ -380,7 +380,7 @@ def test_span_filter(
         traces_sample_rate=1.0,
     )
     items = capture_items("span")
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         original_sentry_span = sentry_sdk.traces.get_current_span()
 
         # Span is not ignored
@@ -418,7 +418,7 @@ def test_record(
         integrations=[integration],
         traces_sample_rate=1.0,
     )
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         rust_tracing.new_span(RustTracingLevel.Info, 3)
 
         span_before_record = sentry_sdk.traces.get_current_span()._to_json()
@@ -448,7 +448,7 @@ def test_record_in_ignored_span(
         integrations=[integration],
         traces_sample_rate=1.0,
     )
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         rust_tracing.new_span(RustTracingLevel.Info, 3)
 
         span_before_record = sentry_sdk.traces.get_current_span()._to_json()
@@ -491,7 +491,7 @@ def test_include_tracing_fields(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
     )
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         rust_tracing.new_span(RustTracingLevel.Info, 3)
 
         span_before_record = sentry_sdk.traces.get_current_span()._to_json()

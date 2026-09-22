@@ -928,8 +928,8 @@ async def test_feature_flags(sentry_init, capture_events):
     async def _error():
         add_feature_flag("hello", False)
 
-        with sentry_sdk.traces.start_span(name="test-span"):
-            with sentry_sdk.traces.start_span(name="test-span-2"):
+        with sentry_sdk.start_span(name="test-span"):
+            with sentry_sdk.start_span(name="test-span-2"):
                 raise ValueError("something is wrong!")
 
     try:

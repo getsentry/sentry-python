@@ -64,7 +64,7 @@ def _install_httpx_client() -> None:
         if sentry_sdk.traces.get_current_span() is None:
             span_ctx = nullcontext()
         else:
-            span_ctx = sentry_sdk.traces.start_span(
+            span_ctx = sentry_sdk.start_span(
                 name="%s %s"
                 % (
                     request.method,
@@ -135,7 +135,7 @@ def _install_httpx_async_client() -> None:
         if sentry_sdk.traces.get_current_span() is None:
             span_ctx = nullcontext()
         else:
-            span_ctx = sentry_sdk.traces.start_span(
+            span_ctx = sentry_sdk.start_span(
                 name="%s %s"
                 % (
                     request.method,

@@ -107,7 +107,7 @@ def _handle_request_impl(self: "RequestHandler") -> "Generator[None, None, None]
             elif should_send_default_pii():
                 scope.set_attribute(SPANDATA.USER_IP_ADDRESS, self.request.remote_ip)
 
-        with sentry_sdk.traces.start_span(
+        with sentry_sdk.start_span(
             name=_DEFAULT_ROOT_SPAN_NAME,
             attributes={
                 "sentry.op": OP.HTTP_SERVER,

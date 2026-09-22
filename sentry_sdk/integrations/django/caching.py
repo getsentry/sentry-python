@@ -61,7 +61,7 @@ def _patch_cache_method(
         if sentry_sdk.traces.get_current_span() is None:
             return original_method(*args, **kwargs)
 
-        with sentry_sdk.traces.start_span(
+        with sentry_sdk.start_span(
             name=description,
             attributes={
                 "sentry.op": op,

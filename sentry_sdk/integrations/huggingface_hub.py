@@ -95,7 +95,7 @@ def _wrap_huggingface_task(f: "Callable[..., Any]", op: str) -> "Callable[..., A
         model = hf_client.model or kwargs.get("model") or ""
         operation_name = op.split(".")[-1]
 
-        span = sentry_sdk.traces.start_span(
+        span = sentry_sdk.start_span(
             name=f"{operation_name} {model}",
             attributes={
                 "sentry.op": op,

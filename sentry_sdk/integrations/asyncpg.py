@@ -225,7 +225,7 @@ def _wrap_connect_addr(
         if sentry_sdk.traces.get_current_span() is None:
             return await f(*args, **kwargs)
 
-        with sentry_sdk.traces.start_span(name="connect", attributes=span_attributes):
+        with sentry_sdk.start_span(name="connect", attributes=span_attributes):
             return await f(*args, **kwargs)
 
     return _inner

@@ -142,7 +142,7 @@ async def _context_enter(request: "Request") -> None:
         elif should_send_default_pii():
             scope.set_attribute(SPANDATA.USER_IP_ADDRESS, request.remote_addr)
 
-    span = sentry_sdk.traces.start_span(
+    span = sentry_sdk.start_span(
         # Unless the request results in a 404 error, the name and source
         # will get overwritten in _set_transaction
         name=request.path,

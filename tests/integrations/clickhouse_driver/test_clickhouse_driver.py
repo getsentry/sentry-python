@@ -639,7 +639,7 @@ def test_clickhouse_client_with_data_collection(sentry_init, capture_items) -> N
     )
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         client = Client("localhost")
         client.execute("DROP TABLE IF EXISTS test")
         client.execute("CREATE TABLE test (x Int32) ENGINE = Memory")
@@ -678,7 +678,7 @@ def test_clickhouse_client_spans(
     trace_id = None
     span_id = None
 
-    with sentry_sdk.traces.start_span(name="custom parent") as span:
+    with sentry_sdk.start_span(name="custom parent") as span:
         trace_id = span.trace_id
         span_id = span.span_id
 
@@ -815,7 +815,7 @@ def test_clickhouse_client_spans_with_pii(
     trace_id = None
     span_id = None
 
-    with sentry_sdk.traces.start_span(name="custom parent") as span:
+    with sentry_sdk.start_span(name="custom parent") as span:
         trace_id = span.trace_id
         span_id = span.span_id
 
@@ -1142,7 +1142,7 @@ def test_clickhouse_dbapi_spans(
     trace_id = None
     span_id = None
 
-    with sentry_sdk.traces.start_span(name="custom parent") as span:
+    with sentry_sdk.start_span(name="custom parent") as span:
         trace_id = span.trace_id
         span_id = span.span_id
 
@@ -1276,7 +1276,7 @@ def test_clickhouse_dbapi_spans_with_pii(
     trace_id = None
     span_id = None
 
-    with sentry_sdk.traces.start_span(name="custom parent") as span:
+    with sentry_sdk.start_span(name="custom parent") as span:
         trace_id = span.trace_id
         span_id = span.span_id
 
@@ -1401,7 +1401,7 @@ def test_span_origin(
     )
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         conn = connect("clickhouse://localhost")
         cursor = conn.cursor()
         cursor.execute("SELECT 1")

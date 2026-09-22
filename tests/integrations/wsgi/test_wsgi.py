@@ -1110,7 +1110,7 @@ def test_span_http_query_data_collection(
 @pytest.mark.parametrize("send_default_pii", [True, False])
 def test_user_ip_address_on_all_spans(sentry_init, capture_items, send_default_pii):
     def dogpark(environ, start_response):
-        with sentry_sdk.traces.start_span(name="child-span"):
+        with sentry_sdk.start_span(name="child-span"):
             pass
         start_response("200 OK", [])
         return ["Go get the ball! Good dog!"]
@@ -1143,7 +1143,7 @@ def test_user_info_span_attributes_data_collection(
     sentry_init, capture_items, init_kwargs, expect_ip
 ):
     def dogpark(environ, start_response):
-        with sentry_sdk.traces.start_span(name="child-span"):
+        with sentry_sdk.start_span(name="child-span"):
             pass
         start_response("200 OK", [])
         return ["Go get the ball! Good dog!"]

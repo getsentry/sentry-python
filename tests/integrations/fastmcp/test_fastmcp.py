@@ -550,7 +550,7 @@ async def test_fastmcp_prompt_sync(
             return [message]
 
         items = capture_items("span")
-        with sentry_sdk.traces.start_span(name="custom parent"):
+        with sentry_sdk.start_span(name="custom parent"):
             await stdio(
                 mcp._mcp_server,
                 method="prompts/get",

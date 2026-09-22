@@ -406,7 +406,7 @@ async def test_enqueue_job(
     pool, _ = init_fixture_method(**{source: [dummy_job]})
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent") as span:
+    with sentry_sdk.start_span(name="custom parent") as span:
         await pool.enqueue_job("dummy_job")
 
     sentry_sdk.flush()
@@ -465,7 +465,7 @@ async def test_span_origin_producer(
     pool, _ = init_fixture_method(**{source: [dummy_job]})
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         await pool.enqueue_job("dummy_job")
 
     sentry_sdk.flush()

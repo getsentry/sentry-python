@@ -157,7 +157,7 @@ def enable_span_for_middleware(middleware: "Middleware") -> "Middleware":
             if sentry_sdk.traces.get_current_span() is None:
                 return nullcontext()
 
-            return sentry_sdk.traces.start_span(
+            return sentry_sdk.start_span(
                 name=name,
                 attributes={
                     "sentry.op": op,

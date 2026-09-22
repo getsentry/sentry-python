@@ -95,7 +95,7 @@ def _input_callback(kwargs: "Dict[str, Any]") -> None:
         operation = "chat"
 
     # Start a new span/transaction
-    span = sentry_sdk.traces.start_span(
+    span = sentry_sdk.start_span(
         name=f"{operation} {model}",
         attributes={
             "sentry.op": (

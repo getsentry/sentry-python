@@ -354,7 +354,7 @@ def _patch_drf() -> None:
                     ):
                         return old_drf_authenticate(self)
 
-                    with sentry_sdk.traces.start_span(
+                    with sentry_sdk.start_span(
                         name="authenticate",
                         attributes={
                             "sentry.op": OP.VIEW_AUTHENTICATE,
@@ -833,7 +833,7 @@ def install_sql_hook() -> None:
 
         if sentry_sdk.traces.get_current_span() is None:
             return real_connect(self)
-        with sentry_sdk.traces.start_span(
+        with sentry_sdk.start_span(
             name="connect",
             attributes={
                 "sentry.op": OP.DB,
@@ -852,7 +852,7 @@ def install_sql_hook() -> None:
         if sentry_sdk.traces.get_current_span() is None:
             return real_commit(self)
 
-        with sentry_sdk.traces.start_span(
+        with sentry_sdk.start_span(
             name=SPANNAME.DB_COMMIT,
             attributes={
                 "sentry.op": OP.DB,
@@ -871,7 +871,7 @@ def install_sql_hook() -> None:
         if sentry_sdk.traces.get_current_span() is None:
             return real_rollback(self)
 
-        with sentry_sdk.traces.start_span(
+        with sentry_sdk.start_span(
             name=SPANNAME.DB_ROLLBACK,
             attributes={
                 "sentry.op": OP.DB,

@@ -201,7 +201,7 @@ def _wrap_connect(f: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]
             "sentry.origin": AioMySQLIntegration.origin,
         } | breadcrumb_data
 
-        with sentry_sdk.traces.start_span(name="connect", attributes=span_attributes):
+        with sentry_sdk.start_span(name="connect", attributes=span_attributes):
             return await f(self)
 
     return _inner

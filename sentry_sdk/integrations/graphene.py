@@ -165,7 +165,7 @@ def graphql_span(
     elif should_send_default_pii():
         additional_attributes["graphql.document"] = source
 
-    _graphql_span = sentry_sdk.traces.start_span(
+    _graphql_span = sentry_sdk.start_span(
         name=operation_name,
         attributes={
             "sentry.op": op,

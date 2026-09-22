@@ -121,7 +121,7 @@ def _sentry_pyreqwest_span(
         yield None
         return
 
-    with sentry_sdk.traces.start_span(
+    with sentry_sdk.start_span(
         name=f"{request.method} {parsed_url.url if parsed_url else SENSITIVE_DATA_SUBSTITUTE}",
         attributes={
             "sentry.op": OP.HTTP_CLIENT,

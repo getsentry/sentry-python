@@ -523,7 +523,7 @@ async def test_query_source_disabled(
     )
 
     items = capture_items("span")
-    with sentry_sdk.traces.start_span(name="test_segment"):
+    with sentry_sdk.start_span(name="test_segment"):
         conn: Connection = await connect(PG_CONNECTION_URI)
 
         await conn.execute(
@@ -571,7 +571,7 @@ async def test_query_source_enabled(
     sentry_init(**sentry_options)
 
     items = capture_items("span")
-    with sentry_sdk.traces.start_span(name="test_segment"):
+    with sentry_sdk.start_span(name="test_segment"):
         conn: Connection = await connect(PG_CONNECTION_URI)
 
         await conn.execute(
@@ -607,7 +607,7 @@ async def test_query_source(sentry_init, capture_items):
     )
 
     items = capture_items("span")
-    with sentry_sdk.traces.start_span(name="test_segment"):
+    with sentry_sdk.start_span(name="test_segment"):
         conn: Connection = await connect(PG_CONNECTION_URI)
 
         await conn.execute(
@@ -645,7 +645,7 @@ async def test_query_source_with_module_in_search_path(
     from asyncpg_helpers.helpers import execute_query_in_connection
 
     items = capture_items("span")
-    with sentry_sdk.traces.start_span(name="test_segment"):
+    with sentry_sdk.start_span(name="test_segment"):
         conn: Connection = await connect(PG_CONNECTION_URI)
 
         await execute_query_in_connection(
@@ -699,7 +699,7 @@ async def test_no_query_source_if_duration_too_short(
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="test_segment"):
+    with sentry_sdk.start_span(name="test_segment"):
         conn: Connection = await connect(PG_CONNECTION_URI)
 
         await conn.execute(
@@ -740,7 +740,7 @@ async def test_query_source_if_duration_over_threshold(sentry_init, capture_item
 
     items = capture_items()
 
-    with sentry_sdk.traces.start_span(name="test_segment"):
+    with sentry_sdk.start_span(name="test_segment"):
         conn: Connection = await connect(PG_CONNECTION_URI)
 
         @contextmanager
@@ -786,7 +786,7 @@ async def test_span_origin(sentry_init, capture_items):
     )
 
     items = capture_items("span")
-    with sentry_sdk.traces.start_span(name="test_segment"):
+    with sentry_sdk.start_span(name="test_segment"):
         conn: Connection = await connect(PG_CONNECTION_URI)
 
         await conn.execute("SELECT 1")
@@ -825,7 +825,7 @@ async def test_multiline_query_description_normalized(
     )
 
     items = capture_items("span")
-    with sentry_sdk.traces.start_span(name="test_segment"):
+    with sentry_sdk.start_span(name="test_segment"):
         conn: Connection = await connect(PG_CONNECTION_URI)
         await conn.execute(
             """
@@ -886,7 +886,7 @@ async def test_query_source_execute(
     )
 
     items = capture_items("span")
-    with sentry_sdk.traces.start_span(name="test_segment"):
+    with sentry_sdk.start_span(name="test_segment"):
         conn: Connection = await connect(PG_CONNECTION_URI)
         await conn.execute(
             "INSERT INTO users(name, password, dob) VALUES($1, $2, $3)",
@@ -925,7 +925,7 @@ async def test_query_source_executemany(
     )
 
     items = capture_items("span")
-    with sentry_sdk.traces.start_span(name="test_segment"):
+    with sentry_sdk.start_span(name="test_segment"):
         conn: Connection = await connect(PG_CONNECTION_URI)
         await conn.executemany(
             "INSERT INTO users(name, password, dob) VALUES($1, $2, $3)",
@@ -961,7 +961,7 @@ async def test_query_source_prepare(
     )
 
     items = capture_items("span")
-    with sentry_sdk.traces.start_span(name="test_segment"):
+    with sentry_sdk.start_span(name="test_segment"):
         conn: Connection = await connect(PG_CONNECTION_URI)
         await conn.prepare("SELECT * FROM users WHERE name = $1")
         await conn.close()
@@ -1009,7 +1009,7 @@ async def test_cursor_iteration_creates_db_cursor_iter_spans(
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="test_segment"):
+    with sentry_sdk.start_span(name="test_segment"):
         conn: Connection = await connect(PG_CONNECTION_URI)
 
         await conn.executemany(
@@ -1051,7 +1051,7 @@ async def test_cursor_fetch_methods_create_spans(
 
     items = capture_items()
 
-    with sentry_sdk.traces.start_span(name="test_segment"):
+    with sentry_sdk.start_span(name="test_segment"):
         conn: Connection = await connect(PG_CONNECTION_URI)
 
         await conn.executemany(

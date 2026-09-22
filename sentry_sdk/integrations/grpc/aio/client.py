@@ -55,7 +55,7 @@ class SentryUnaryUnaryClientInterceptor(ClientInterceptor, UnaryUnaryClientInter
             )
             return await continuation(client_call_details, request)
 
-        with sentry_sdk.traces.start_span(
+        with sentry_sdk.start_span(
             name="unary unary call to %s" % method.decode(),
             attributes={
                 "sentry.op": OP.GRPC_CLIENT,
@@ -92,7 +92,7 @@ class SentryUnaryStreamClientInterceptor(
             )
             return await continuation(client_call_details, request)
 
-        with sentry_sdk.traces.start_span(
+        with sentry_sdk.start_span(
             name="unary stream call to %s" % method.decode(),
             attributes={
                 "sentry.op": OP.GRPC_CLIENT,

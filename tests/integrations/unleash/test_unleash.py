@@ -181,7 +181,7 @@ def test_unleash_span_integration(
         client = UnleashClient()  # type: ignore[arg-type]
 
         items = capture_items("span")
-        with sentry_sdk.traces.start_span(name="bar"):
+        with sentry_sdk.start_span(name="bar"):
             client.is_enabled("hello")
             client.is_enabled("other")
 

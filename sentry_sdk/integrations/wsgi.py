@@ -144,7 +144,7 @@ class SentryWsgiMiddleware:
                             if client_ip:
                                 scope.set_attribute(SPANDATA.USER_IP_ADDRESS, client_ip)
 
-                        span_ctx = sentry_sdk.traces.start_span(
+                        span_ctx = sentry_sdk.start_span(
                             name=_DEFAULT_TRANSACTION_NAME,
                             attributes={
                                 "sentry.segment.name.source": SegmentNameSource.ROUTE,

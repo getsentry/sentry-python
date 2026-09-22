@@ -80,7 +80,7 @@ def patch_enqueue_job() -> None:
         if sentry_sdk.traces.get_current_span() is None:
             return await old_enqueue_job(self, function, *args, **kwargs)
 
-        with sentry_sdk.traces.start_span(
+        with sentry_sdk.start_span(
             name=function,
             attributes={
                 "sentry.op": OP.QUEUE_SUBMIT_ARQ,
@@ -105,7 +105,7 @@ def patch_run_job() -> None:
             scope._name = "arq"
             scope.clear_breadcrumbs()
 
-            with sentry_sdk.traces.start_span(
+            with sentry_sdk.start_span(
                 name="unknown arq task",
                 attributes={
                     "sentry.op": OP.QUEUE_TASK_ARQ,

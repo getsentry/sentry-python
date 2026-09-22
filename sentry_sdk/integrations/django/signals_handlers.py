@@ -66,7 +66,7 @@ def patch_signals() -> None:
                 if sentry_sdk.traces.get_current_span() is None:
                     return receiver(*args, **kwargs)
 
-                with sentry_sdk.traces.start_span(
+                with sentry_sdk.start_span(
                     name=signal_name,
                     attributes={
                         "sentry.op": OP.EVENT_DJANGO,

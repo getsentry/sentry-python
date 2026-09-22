@@ -178,7 +178,7 @@ class SentryAsyncExtension(SchemaExtension):
         if operation_name:
             additional_attributes["graphql.operation.name"] = operation_name
 
-        graphql_span = sentry_sdk.traces.start_span(
+        graphql_span = sentry_sdk.start_span(
             name=description,
             attributes={
                 "sentry.origin": StrawberryIntegration.origin,
@@ -205,7 +205,7 @@ class SentryAsyncExtension(SchemaExtension):
             yield
             return
 
-        validation_span = sentry_sdk.traces.start_span(
+        validation_span = sentry_sdk.start_span(
             name="validation",
             attributes={
                 "sentry.op": OP.GRAPHQL_VALIDATE,
@@ -224,7 +224,7 @@ class SentryAsyncExtension(SchemaExtension):
             yield
             return
 
-        parsing_span = sentry_sdk.traces.start_span(
+        parsing_span = sentry_sdk.start_span(
             name="parsing",
             attributes={
                 "sentry.op": OP.GRAPHQL_PARSE,
@@ -276,7 +276,7 @@ class SentryAsyncExtension(SchemaExtension):
         if sentry_sdk.traces.get_current_span() is None:
             return await self._resolve(_next, root, info, *args, **kwargs)
 
-        with sentry_sdk.traces.start_span(
+        with sentry_sdk.start_span(
             name=f"resolving {field_path}",
             attributes={
                 "sentry.origin": StrawberryIntegration.origin,
@@ -303,7 +303,7 @@ class SentrySyncExtension(SentryAsyncExtension):
         if sentry_sdk.traces.get_current_span() is None:
             return _next(root, info, *args, **kwargs)
 
-        with sentry_sdk.traces.start_span(
+        with sentry_sdk.start_span(
             name=f"resolving {field_path}",
             attributes={
                 "sentry.origin": StrawberryIntegration.origin,

@@ -257,7 +257,7 @@ class SentryLangchainCallback(BaseCallbackHandler):
                 self.span_map.get(parent_id)
             )
             if parent:
-                span = sentry_sdk.traces.start_span(
+                span = sentry_sdk.start_span(
                     parent_span=parent.span
                     if isinstance(parent, _AgentFrameworkChatGenerationContext)
                     else parent,
@@ -269,7 +269,7 @@ class SentryLangchainCallback(BaseCallbackHandler):
                 )
 
         if span is None:
-            span = sentry_sdk.traces.start_span(
+            span = sentry_sdk.start_span(
                 name=name,
                 attributes={
                     "sentry.op": op,
@@ -1123,7 +1123,7 @@ def _wrap_agent_executor_invoke(f: "Callable[..., Any]") -> "Callable[..., Any]"
             record_inputs = True
             record_outputs = True
 
-        with sentry_sdk.traces.start_span(
+        with sentry_sdk.start_span(
             name=f"invoke_agent {run_name}" if run_name else "invoke_agent",
             attributes={
                 "sentry.op": OP.GEN_AI_INVOKE_AGENT,
@@ -1179,7 +1179,7 @@ def _wrap_agent_executor_stream(f: "Callable[..., Any]") -> "Callable[..., Any]"
             record_inputs = True
             record_outputs = True
 
-        span = sentry_sdk.traces.start_span(
+        span = sentry_sdk.start_span(
             name=f"invoke_agent {run_name}" if run_name else "invoke_agent",
             attributes={
                 "sentry.op": OP.GEN_AI_INVOKE_AGENT,

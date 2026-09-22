@@ -75,7 +75,7 @@ def test_trace_decorator_inactive(sentry_init, capture_items):
 
     @sentry_sdk.traces.trace(name="outer", active=False)
     def traced_function():
-        with sentry_sdk.traces.start_span(name="inner"):
+        with sentry_sdk.start_span(name="inner"):
             return "ok"
 
     result = traced_function()
@@ -159,7 +159,7 @@ async def test_trace_decorator_async_inactive(sentry_init, capture_items):
 
     @sentry_sdk.traces.trace(name="outer", active=False)
     async def traced_function():
-        with sentry_sdk.traces.start_span(name="inner"):
+        with sentry_sdk.start_span(name="inner"):
             return "ok"
 
     result = await traced_function()
@@ -189,7 +189,7 @@ def test_trace_decorator_child(sentry_init, capture_items):
     def _some_function_traced_stream(a, b, c):
         return True
 
-    with sentry_sdk.traces.start_span(name="segment") as segment:
+    with sentry_sdk.start_span(name="segment") as segment:
         result = _some_function_traced_stream(1, 2, 3)
 
     assert result is True
@@ -221,7 +221,7 @@ async def test_trace_decorator_async_child(sentry_init, capture_items):
     async def _some_function_traced_stream(a, b, c):
         return True
 
-    with sentry_sdk.traces.start_span(name="segment") as segment:
+    with sentry_sdk.start_span(name="segment") as segment:
         result = await _some_function_traced_stream(1, 2, 3)
 
     assert result is True

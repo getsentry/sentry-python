@@ -168,7 +168,7 @@ def test_task_transaction(
 def test_dramatiq_propagate_trace(broker, worker, capture_items):
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="outer") as outer_span:
+    with sentry_sdk.start_span(name="outer") as outer_span:
 
         @dramatiq.actor(max_retries=0)
         def propagated_trace_task():

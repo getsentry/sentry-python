@@ -92,7 +92,7 @@ def _patch_ray_remote() -> None:
                 sentry_sdk.traces.continue_trace(_sentry_tracing or {})
 
                 function_name = qualname_from_function(user_f)
-                with sentry_sdk.traces.start_span(
+                with sentry_sdk.start_span(
                     name="unknown Ray task" if function_name is None else function_name,
                     attributes={
                         "sentry.op": OP.QUEUE_TASK_RAY,
@@ -142,7 +142,7 @@ def _patch_ray_remote() -> None:
 
                     return result
 
-                with sentry_sdk.traces.start_span(
+                with sentry_sdk.start_span(
                     name="unknown Ray task" if function_name is None else function_name,
                     attributes={
                         "sentry.op": OP.QUEUE_SUBMIT_RAY,

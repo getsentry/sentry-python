@@ -93,7 +93,7 @@ def patch_enqueue() -> None:
                 }
             return old_enqueue(self, item)
 
-        with sentry_sdk.traces.start_span(
+        with sentry_sdk.start_span(
             name=span_name,
             attributes={
                 "sentry.op": OP.QUEUE_SUBMIT_HUEY,
@@ -199,7 +199,7 @@ def patch_execute() -> None:
             sentry_headers = task.kwargs.pop("sentry_headers", None)
             headers = sentry_headers or {}
             sentry_sdk.traces.continue_trace(headers)
-            span_ctx = sentry_sdk.traces.start_span(
+            span_ctx = sentry_sdk.start_span(
                 name=task.name,
                 attributes={
                     "sentry.op": OP.QUEUE_TASK_HUEY,

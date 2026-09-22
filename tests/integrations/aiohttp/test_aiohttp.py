@@ -740,7 +740,7 @@ async def test_outgoing_trace_headers_adds_missing_unsigned_propagation_headers(
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(
+    with sentry_sdk.start_span(
         name="/interactions/other-dogs/new-dog",
         attributes={
             "sentry.op": "greeting.sniff",
@@ -781,7 +781,7 @@ async def test_outgoing_trace_headers_appends_baggage_but_preserves_sentry_trace
     raw_server = await aiohttp_raw_server(handler)
 
     with mock.patch("sentry_sdk.tracing_utils.Random.randrange", return_value=500000):
-        with sentry_sdk.traces.start_span(
+        with sentry_sdk.start_span(
             name="/interactions/other-dogs/new-dog",
         ):
             client = await aiohttp_client(raw_server)
@@ -820,7 +820,7 @@ async def test_outgoing_trace_headers_preserves_signed_propagation_headers(
         "Signature=sixtyseven"
     )
 
-    with sentry_sdk.traces.start_span(name="test"):
+    with sentry_sdk.start_span(name="test"):
         client = await aiohttp_client(raw_server)
         resp = await client.get(
             "/",
@@ -862,7 +862,7 @@ async def test_outgoing_trace_headers_preserves_query_signed_baggage(
         "&X-Amz-Signature=sixtyseven"
     )
 
-    with sentry_sdk.traces.start_span(name="test"):
+    with sentry_sdk.start_span(name="test"):
         client = await aiohttp_client(raw_server)
         resp = await client.get(path, headers={"baggage": "vendor=value"})
 
@@ -2013,7 +2013,7 @@ async def test_user_ip_address_on_all_spans(
     )
 
     async def hello(request):
-        with sentry_sdk.traces.start_span(name="child-span"):
+        with sentry_sdk.start_span(name="child-span"):
             pass
         return web.Response(text="hello")
 

@@ -140,7 +140,7 @@ def _wrap_func(func: "F") -> "F":
             sentry_sdk.traces.continue_trace(headers)
             Scope.set_custom_sampling_context(sampling_context)
 
-            with sentry_sdk.traces.start_span(
+            with sentry_sdk.start_span(
                 name=function_name,
                 parent_span=None,
                 attributes={

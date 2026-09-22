@@ -197,7 +197,7 @@ class AioHttpIntegration(Integration):
                                 SPANDATA.USER_IP_ADDRESS, request.remote
                             )
 
-                    span = sentry_sdk.traces.start_span(
+                    span = sentry_sdk.start_span(
                         # If this name makes it to the UI, AIOHTTP's URL
                         # resolver did not find a route or died trying.
                         name="generic AIOHTTP request",
@@ -386,7 +386,7 @@ def create_trace_config() -> "TraceConfig":
                 breadcrumb["url"] = url_full
 
         if sentry_sdk.traces.get_current_span() is not None:
-            span = sentry_sdk.traces.start_span(name=span_name, attributes=attributes)
+            span = sentry_sdk.start_span(name=span_name, attributes=attributes)
 
         if should_propagate_trace(client, str(params.url)):
             # existing `sentry-trace`: skip so it is not duplicated.

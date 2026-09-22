@@ -699,7 +699,7 @@ async def test_query_source_disabled(sentry_init, capture_items):
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="test_segment"):
+    with sentry_sdk.start_span(name="test_segment"):
         conn = await aiomysql.connect(**_connect_args())
 
         async with conn.cursor() as cur:
@@ -746,7 +746,7 @@ async def test_query_source_enabled(sentry_init, capture_items, enable_db_query_
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="test_segment"):
+    with sentry_sdk.start_span(name="test_segment"):
         conn = await aiomysql.connect(**_connect_args())
 
         async with conn.cursor() as cur:
@@ -789,7 +789,7 @@ async def test_query_source(sentry_init, capture_items):
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="test_segment"):
+    with sentry_sdk.start_span(name="test_segment"):
         conn = await aiomysql.connect(**_connect_args())
 
         async with conn.cursor() as cur:
@@ -852,7 +852,7 @@ async def test_no_query_source_if_duration_too_short(sentry_init, capture_items)
         span._end_timestamp = datetime.datetime(2024, 1, 1, microsecond=99999)
         yield span
 
-    with sentry_sdk.traces.start_span(name="test_segment"):
+    with sentry_sdk.start_span(name="test_segment"):
         conn = await aiomysql.connect(**_connect_args())
 
         async with conn.cursor() as cur:
@@ -906,7 +906,7 @@ async def test_query_source_if_duration_over_threshold(sentry_init, capture_item
             )
             yield span
 
-    with sentry_sdk.traces.start_span(name="test_segment"):
+    with sentry_sdk.start_span(name="test_segment"):
         conn = await aiomysql.connect(**_connect_args())
 
         async with conn.cursor() as cur:
@@ -963,7 +963,7 @@ async def test_span_origin(sentry_init, capture_items):
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="test_segment"):
+    with sentry_sdk.start_span(name="test_segment"):
         conn = await aiomysql.connect(**_connect_args())
 
         async with conn.cursor() as cur:
@@ -996,7 +996,7 @@ async def test_multiline_query_description_normalized(sentry_init, capture_items
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="test_segment"):
+    with sentry_sdk.start_span(name="test_segment"):
         conn = await aiomysql.connect(**_connect_args())
 
         async with conn.cursor() as cur:
@@ -1035,7 +1035,7 @@ async def test_db_data_on_spans(sentry_init, capture_items):
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="test_segment"):
+    with sentry_sdk.start_span(name="test_segment"):
         conn = await aiomysql.connect(**_connect_args())
 
         async with conn.cursor() as cur:

@@ -313,7 +313,7 @@ def test_outgoing_trace_headers(
     items = capture_items("span")
     sentry_sdk.traces.continue_trace(headers)
 
-    with sentry_sdk.traces.start_span(
+    with sentry_sdk.start_span(
         name="/interactions/other-dogs/new-dog",
         attributes={
             "sentry.op": "greeting.sniff",
@@ -377,7 +377,7 @@ def test_outgoing_trace_headers_head_sdk(
     sentry_sdk.traces.continue_trace({})
 
     with mock.patch("sentry_sdk.tracing_utils.Random.randrange", return_value=250000):
-        with sentry_sdk.traces.start_span(name="Head SDK tx"):
+        with sentry_sdk.start_span(name="Head SDK tx"):
             connection = HTTPSConnectionRecordingRequestHeaders("localhost", port=PORT)
             connection.request("GET", "/top-chasers")
             connection.getresponse()
@@ -570,7 +570,7 @@ def test_option_trace_propagation_targets(
     }
     sentry_sdk.traces.continue_trace(headers)
 
-    with sentry_sdk.traces.start_span(
+    with sentry_sdk.start_span(
         name="/interactions/other-dogs/new-dog",
         attributes={
             "sentry.op": "greeting.sniff",
@@ -603,7 +603,7 @@ def test_request_source_disabled(
     )
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         conn = HTTPConnection("localhost", port=PORT)
         conn.request("GET", "/foo")
         conn.getresponse()
@@ -639,7 +639,7 @@ def test_request_source_enabled(
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         conn = HTTPConnection("localhost", port=PORT)
         conn.request("GET", "/foo")
         conn.getresponse()
@@ -667,7 +667,7 @@ def test_request_source(
     )
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         conn = HTTPConnection("localhost", port=PORT)
         conn.request("GET", "/foo")
         conn.getresponse()
@@ -713,7 +713,7 @@ def test_request_source_with_module_in_search_path(
     )
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         from httplib_helpers.helpers import get_request_with_connection
 
         conn = HTTPConnection("localhost", port=PORT)
@@ -765,7 +765,7 @@ def test_no_request_source_if_duration_too_short(
         "sentry_sdk.integrations.stdlib.add_http_request_source",
         add_http_request_source_with_pinned_timestamps,
     ):
-        with sentry_sdk.traces.start_span(name="foo"):
+        with sentry_sdk.start_span(name="foo"):
             conn = HTTPConnection("localhost", port=PORT)
             conn.request("GET", "/foo")
             conn.getresponse()
@@ -807,7 +807,7 @@ def test_request_source_if_duration_over_threshold(
         "sentry_sdk.integrations.stdlib.add_http_request_source",
         add_http_request_source_with_pinned_timestamps,
     ):
-        with sentry_sdk.traces.start_span(name="foo"):
+        with sentry_sdk.start_span(name="foo"):
             conn = HTTPConnection("localhost", port=PORT)
             conn.request("GET", "/foo")
             conn.getresponse()
@@ -852,7 +852,7 @@ def test_span_origin(
     )
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         conn = HTTPConnection("localhost", port=PORT)
         conn.request("GET", "/foo")
         conn.getresponse()
@@ -880,7 +880,7 @@ def test_http_timeout(
     items = capture_items("span")
 
     with pytest.raises(TimeoutError):
-        with sentry_sdk.traces.start_span(
+        with sentry_sdk.start_span(
             name="name",
             attributes={
                 "sentry.op": "op",
@@ -912,7 +912,7 @@ def test_proxy_http_tunnel(
     )
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         conn = HTTPConnection("localhost", PROXY_PORT)
         conn.set_tunnel("api.example.com", tunnel_port)
         conn.request("GET", "/foo?bar=1")
@@ -954,7 +954,7 @@ def test_chunked_response_span_covers_body_read(
     min_expected_duration = CHUNK_DELAY * NUM_CHUNKS
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         conn = HTTPConnection("localhost", CHUNKED_PORT)
         conn.request("GET", "/chunked")
         response = conn.getresponse()
@@ -1055,7 +1055,7 @@ def test_url_query_data_collection(
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         conn = HTTPConnection("localhost", PORT)
         conn.request(
             "GET", "/some/random/url?toy=tennisball&color=red&auth=secret#frag"
@@ -1111,7 +1111,7 @@ def test_url_full_reassembly(sentry_init, capture_items, init_kwargs, expected_s
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         conn = HTTPConnection("localhost", PORT)
         conn.request(
             "GET", "/some/random/url?toy=tennisball&color=red&auth=secret#frag"

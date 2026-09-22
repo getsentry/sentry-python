@@ -33,7 +33,7 @@ def test_basic(
     bucket = s3.Bucket("bucket")
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent") as span, MockResponse(
+    with sentry_sdk.start_span(name="custom parent") as span, MockResponse(
         s3.meta.client, 200, {}, read_fixture("s3_list.xml")
     ):
         objects = [obj for obj in bucket.objects.all()]
@@ -68,7 +68,7 @@ def test_streaming(
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent") as span, MockResponse(
+    with sentry_sdk.start_span(name="custom parent") as span, MockResponse(
         s3.meta.client, 200, {}, b"hello"
     ):
         body = obj.get()["Body"]
@@ -131,7 +131,7 @@ def test_streaming_close(
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent") as span, MockResponse(
+    with sentry_sdk.start_span(name="custom parent") as span, MockResponse(
         s3.meta.client, 200, {}, b"hello"
     ):
         body = obj.get()["Body"]
@@ -169,7 +169,7 @@ def test_omit_url_data_if_parsing_fails(
         "sentry_sdk.integrations.boto3.parse_url",
         side_effect=ValueError,
     ):
-        with sentry_sdk.traces.start_span(name="custom parent") as span, MockResponse(
+        with sentry_sdk.start_span(name="custom parent") as span, MockResponse(
             s3.meta.client, 200, {}, read_fixture("s3_list.xml")
         ):
             objects = [obj for obj in bucket.objects.all()]
@@ -216,7 +216,7 @@ def test_span_origin(
     bucket = s3.Bucket("bucket")
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"), MockResponse(
+    with sentry_sdk.start_span(name="custom parent"), MockResponse(
         s3.meta.client, 200, {}, read_fixture("s3_list.xml")
     ):
         _ = [obj for obj in bucket.objects.all()]
@@ -241,7 +241,7 @@ def test_breadcrumb(sentry_init, capture_events, send_default_pii):
 
     events = capture_events()
 
-    with sentry_sdk.traces.start_span(name="custom parent"), MockResponse(
+    with sentry_sdk.start_span(name="custom parent"), MockResponse(
         s3.meta.client, 200, {}, read_fixture("s3_list.xml")
     ):
         _ = [obj for obj in bucket.objects.all()]
@@ -366,7 +366,7 @@ def test_url_query_data_collection(
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"), MockResponse(
+    with sentry_sdk.start_span(name="custom parent"), MockResponse(
         client, 200, {}, read_fixture("s3_list.xml")
     ):
         client.list_objects_v2(Bucket="bucket", Prefix="foo", ContinuationToken="abc")
@@ -406,7 +406,7 @@ def test_url_query_data_collection_breadcrumb(
 
     events = capture_events()
 
-    with sentry_sdk.traces.start_span(name="custom parent"), MockResponse(
+    with sentry_sdk.start_span(name="custom parent"), MockResponse(
         client, 200, {}, read_fixture("s3_list.xml")
     ):
         client.list_objects_v2(Bucket="bucket", Prefix="foo", ContinuationToken="abc")

@@ -31,7 +31,7 @@ def test_dsc_head_of_trace(sentry_init, capture_envelopes):
     envelopes = capture_envelopes()
 
     # We start a new segment
-    with sentry_sdk.traces.start_span(name="foo"):
+    with sentry_sdk.start_span(name="foo"):
         pass
 
     sentry_sdk.flush()
@@ -89,7 +89,7 @@ def test_dsc_head_of_trace_uses_custom_org_id(sentry_init, capture_envelopes):
     envelopes = capture_envelopes()
 
     # We start a new segment
-    with sentry_sdk.traces.start_span(name="foo"):
+    with sentry_sdk.start_span(name="foo"):
         pass
 
     sentry_sdk.flush()
@@ -138,7 +138,7 @@ def test_dsc_continuation_of_trace(sentry_init, capture_envelopes):
 
     # We continue the incoming trace and start a new segment
     sentry_sdk.traces.continue_trace(incoming_http_headers)
-    with sentry_sdk.traces.start_span(name="foo"):
+    with sentry_sdk.start_span(name="foo"):
         pass
 
     sentry_sdk.flush()
@@ -219,7 +219,7 @@ def test_dsc_continuation_of_trace_sample_rate_changed_in_traces_sampler(
     # We continue the incoming trace and start a new segment
     with mock.patch("sentry_sdk.tracing_utils.Random.randrange", return_value=125000):
         sentry_sdk.traces.continue_trace(incoming_http_headers)
-        with sentry_sdk.traces.start_span(name="foo"):
+        with sentry_sdk.start_span(name="foo"):
             pass
 
     sentry_sdk.flush()
@@ -323,7 +323,7 @@ def test_dsc_issue_with_tracing(sentry_init, capture_envelopes):
     envelopes = capture_envelopes()
 
     # We start a new segment and an error occurs
-    with sentry_sdk.traces.start_span(name="foo"):
+    with sentry_sdk.start_span(name="foo"):
         try:
             1 / 0
         except ZeroDivisionError as exp:

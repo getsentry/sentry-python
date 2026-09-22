@@ -1591,7 +1591,7 @@ async def test_update_invoke_agent_span_with_none_output(
         send_default_pii=True,
     )
 
-    span = sentry_sdk.traces.start_span(name="test_span")
+    span = sentry_sdk.start_span(name="test_span")
 
     # Update with None output - should not raise
     update_invoke_agent_span(span, None)
@@ -1616,7 +1616,7 @@ async def test_update_ai_client_span_with_none_response(
         traces_sample_rate=1.0,
     )
 
-    span = sentry_sdk.traces.start_span(name="test_span")
+    span = sentry_sdk.start_span(name="test_span")
 
     # Update with None response - should not raise
     update_ai_client_span(span, None)
@@ -1664,7 +1664,7 @@ async def test_input_messages_error_handling(
         send_default_pii=True,
     )
 
-    span = sentry_sdk.traces.start_span(name="test_span")
+    span = sentry_sdk.start_span(name="test_span")
 
     # Pass invalid messages that would cause an error
     invalid_messages = [object()]  # Plain object without expected attributes
@@ -1692,7 +1692,7 @@ async def test_available_tools_error_handling(
         traces_sample_rate=1.0,
     )
 
-    span = sentry_sdk.traces.start_span(name="test_span")
+    span = sentry_sdk.start_span(name="test_span")
 
     # Create mock agent with invalid toolset
     mock_agent = MagicMock()
@@ -1719,7 +1719,7 @@ async def test_set_usage_data_with_none_usage(
         traces_sample_rate=1.0,
     )
 
-    span = sentry_sdk.traces.start_span(name="test_span")
+    span = sentry_sdk.start_span(name="test_span")
 
     # Pass None usage - should not raise
     _set_usage_data(span, None)
@@ -1744,7 +1744,7 @@ async def test_set_usage_data_with_partial_fields(
         traces_sample_rate=1.0,
     )
 
-    span = sentry_sdk.traces.start_span(name="test_span")
+    span = sentry_sdk.start_span(name="test_span")
 
     # Create usage object with only some fields
     mock_usage = MagicMock()
@@ -1816,7 +1816,7 @@ async def test_message_parts_with_list_content(
         send_default_pii=True,
     )
 
-    span = sentry_sdk.traces.start_span(name="test_span")
+    span = sentry_sdk.start_span(name="test_span")
 
     # Create message with list content
     mock_msg = MagicMock()
@@ -1927,7 +1927,7 @@ async def test_output_data_error_handling(
         send_default_pii=True,
     )
 
-    span = sentry_sdk.traces.start_span(name="test_span")
+    span = sentry_sdk.start_span(name="test_span")
 
     # Create mock response that will cause error
     mock_response = MagicMock()
@@ -1959,7 +1959,7 @@ async def test_message_with_system_prompt_part(
         send_default_pii=True,
     )
 
-    span = sentry_sdk.traces.start_span(name="test_span")
+    span = sentry_sdk.start_span(name="test_span")
 
     # Create message with SystemPromptPart
     system_part = messages.SystemPromptPart(content="You are a helpful assistant")
@@ -1993,7 +1993,7 @@ async def test_message_with_instructions(
         send_default_pii=True,
     )
 
-    span = sentry_sdk.traces.start_span(name="test_span")
+    span = sentry_sdk.start_span(name="test_span")
 
     # Create message with instructions
     mock_msg = MagicMock()
@@ -2025,7 +2025,7 @@ async def test_set_input_messages_without_prompts(
         send_default_pii=True,
     )
 
-    span = sentry_sdk.traces.start_span(name="test_span")
+    span = sentry_sdk.start_span(name="test_span")
 
     # Even with messages, should not set them
     messages = ["test"]
@@ -2143,7 +2143,7 @@ async def test_set_available_tools_without_toolset(
         traces_sample_rate=1.0,
     )
 
-    span = sentry_sdk.traces.start_span(name="test_span")
+    span = sentry_sdk.start_span(name="test_span")
 
     # Create agent without _function_toolset
     mock_agent = MagicMock()
@@ -2172,7 +2172,7 @@ async def test_set_available_tools_with_schema(
         traces_sample_rate=1.0,
     )
 
-    span = sentry_sdk.traces.start_span(name="test_span")
+    span = sentry_sdk.start_span(name="test_span")
 
     # Create agent with toolset containing schema
     mock_agent = MagicMock()
@@ -2507,7 +2507,7 @@ async def test_binary_content_encoding_image(
     )
     items = capture_items("span")
 
-    span = sentry_sdk.traces.start_span(
+    span = sentry_sdk.start_span(
         name="custom span", attributes={"sentry.op": "test_span"}
     )
     binary_content = BinaryContent(
@@ -2542,7 +2542,7 @@ async def test_binary_content_encoding_mixed_content(
     )
     items = capture_items("span")
 
-    span = sentry_sdk.traces.start_span(
+    span = sentry_sdk.start_span(
         name="custom span", attributes={"sentry.op": "test_span"}
     )
     binary_content = BinaryContent(data=b"fake_image_bytes", media_type="image/jpeg")
@@ -2620,7 +2620,7 @@ async def test_set_usage_data_with_cache_tokens(
     )
     items = capture_items("span")
 
-    span = sentry_sdk.traces.start_span(
+    span = sentry_sdk.start_span(
         name="custom span", attributes={"sentry.op": "test_span"}
     )
     usage = RequestUsage(

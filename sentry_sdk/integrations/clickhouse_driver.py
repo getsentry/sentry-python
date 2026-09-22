@@ -81,7 +81,7 @@ def _wrap_start(f: "Callable[P, T]") -> "Callable[P, T]":
 
         span = None
         if sentry_sdk.traces.get_current_span() is not None:
-            span = sentry_sdk.traces.start_span(
+            span = sentry_sdk.start_span(
                 name=query,  # type: ignore
                 attributes={
                     "sentry.op": OP.DB,
