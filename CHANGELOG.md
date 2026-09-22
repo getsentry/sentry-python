@@ -21,6 +21,44 @@ sentry_sdk.init(
 )
 ```
 
+- **New option:** A fine-grained way to configure what data should be sent from the SDK.
+
+  Offers much more flexibility than `send_default_pii`, allowing you to specify what
+  data should be collected. If `data_collection` is defined, it takes precedence over
+  `send_default_pii`.
+  
+  See https://docs.sentry.io/platforms/python/configuration/options/#data_collection
+  for the available configuration options.
+
+```python
+import sentry_sdk
+
+sentry_sdk.init(
+    data_collection={
+        "user_info": False,
+        "gen_ai": {"inputs": False, "outputs": False},
+        "graphql": {"document": False, "variables": False},
+        "database_query_data": False,
+        "queues": False,
+        "http_bodies": [],
+        "cookies": {
+            "mode": "denylist",
+            "terms": ["forwarded", "-ip", "remote-", "via", "-user"],
+        },
+        "http_headers": {
+            "request": {
+                "mode": "denylist",
+                "terms": ["forwarded", "-ip", "remote-", "via", "-user"],
+            },
+        },
+        "url_query_params": {
+            "mode": "denylist",
+            "terms": ["forwarded", "-ip", "remote-", "via", "-user"],
+        },
+    }
+)
+```
+
 #### Mistral
 
 - Record `gen_ai.output.messages` by @alexander-alderman-webb in [#7549](https://github.com/getsentry/sentry-python/pull/7549)
