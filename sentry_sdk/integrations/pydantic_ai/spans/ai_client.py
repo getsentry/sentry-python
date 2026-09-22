@@ -7,7 +7,7 @@ from sentry_sdk.ai.utils import (
     set_data_normalized,
     truncate_and_annotate_messages,
 )
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.consts import GENAIOPERATION, OP, SPANDATA
 from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing_utils import (
     has_span_streaming_enabled,
@@ -316,7 +316,7 @@ def ai_client_span(
             attributes={
                 "sentry.op": OP.GEN_AI_CHAT,
                 "sentry.origin": SPAN_ORIGIN,
-                SPANDATA.GEN_AI_OPERATION_NAME: "chat",
+                SPANDATA.GEN_AI_OPERATION_NAME: GENAIOPERATION.CHAT,
                 SPANDATA.GEN_AI_RESPONSE_STREAMING: get_is_streaming(),
             },
         )
@@ -327,7 +327,7 @@ def ai_client_span(
             origin=SPAN_ORIGIN,
         )
 
-        span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "chat")
+        span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, GENAIOPERATION.CHAT)
         # Set streaming flag from contextvar
         span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, get_is_streaming())
 

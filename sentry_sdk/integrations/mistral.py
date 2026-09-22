@@ -7,7 +7,7 @@ import sentry_sdk
 from sentry_sdk.ai.utils import (
     get_start_span_function,
 )
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.consts import GENAIOPERATION, OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.tracing_utils import (
@@ -243,7 +243,7 @@ def _wrap_complete(f: "Callable[..., Any]") -> "Callable[..., Any]":
                     "sentry.op": OP.GEN_AI_CHAT,
                     "sentry.origin": MistralIntegration.origin,
                     SPANDATA.GEN_AI_PROVIDER_NAME: "mistral",
-                    SPANDATA.GEN_AI_OPERATION_NAME: "chat",
+                    SPANDATA.GEN_AI_OPERATION_NAME: GENAIOPERATION.CHAT,
                 },
             )
 
@@ -255,7 +255,7 @@ def _wrap_complete(f: "Callable[..., Any]") -> "Callable[..., Any]":
                 origin=MistralIntegration.origin,
             )
             span.set_data(SPANDATA.GEN_AI_PROVIDER_NAME, "mistral")
-            span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "chat")
+            span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, GENAIOPERATION.CHAT)
 
             set_on_span = span.set_data
 
@@ -382,7 +382,7 @@ def _wrap_complete_async(f: "Callable[..., Any]") -> "Callable[..., Any]":
                     "sentry.op": OP.GEN_AI_CHAT,
                     "sentry.origin": MistralIntegration.origin,
                     SPANDATA.GEN_AI_PROVIDER_NAME: "mistral",
-                    SPANDATA.GEN_AI_OPERATION_NAME: "chat",
+                    SPANDATA.GEN_AI_OPERATION_NAME: GENAIOPERATION.CHAT,
                 },
             )
 
@@ -394,7 +394,7 @@ def _wrap_complete_async(f: "Callable[..., Any]") -> "Callable[..., Any]":
                 origin=MistralIntegration.origin,
             )
             span.set_data(SPANDATA.GEN_AI_PROVIDER_NAME, "mistral")
-            span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "chat")
+            span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, GENAIOPERATION.CHAT)
 
             set_on_span = span.set_data
 

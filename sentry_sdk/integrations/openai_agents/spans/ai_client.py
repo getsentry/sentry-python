@@ -2,7 +2,7 @@ import json
 from typing import TYPE_CHECKING
 
 import sentry_sdk
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.consts import GENAIOPERATION, OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
@@ -216,7 +216,7 @@ def ai_client_span(
             attributes={
                 "sentry.op": OP.GEN_AI_CHAT,
                 "sentry.origin": SPAN_ORIGIN,
-                SPANDATA.GEN_AI_OPERATION_NAME: "chat",
+                SPANDATA.GEN_AI_OPERATION_NAME: GENAIOPERATION.CHAT,
             },
         )
 
@@ -228,7 +228,7 @@ def ai_client_span(
             origin=SPAN_ORIGIN,
         )
         # TODO-anton: remove hardcoded stuff and replace something that also works for embedding and so on
-        span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "chat")
+        span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, GENAIOPERATION.CHAT)
 
         set_on_span = span.set_data
 

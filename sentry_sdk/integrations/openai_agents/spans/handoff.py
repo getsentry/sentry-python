@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING
 
 import sentry_sdk
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.consts import GENAIOPERATION, OP, SPANDATA
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
 
 from ..consts import SPAN_ORIGIN
@@ -24,7 +24,7 @@ def handoff_span(
             attributes={
                 "sentry.op": OP.GEN_AI_HANDOFF,
                 "sentry.origin": SPAN_ORIGIN,
-                SPANDATA.GEN_AI_OPERATION_NAME: "handoff",
+                SPANDATA.GEN_AI_OPERATION_NAME: GENAIOPERATION.HANDOFF,
             },
         ) as span:
             # Add conversation ID from agent
@@ -37,7 +37,7 @@ def handoff_span(
             name=f"handoff from {from_agent.name} to {to_agent_name}",  # type: ignore[union-attr]
             origin=SPAN_ORIGIN,
         ) as span:
-            span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "handoff")
+            span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, GENAIOPERATION.HANDOFF)
 
             # Add conversation ID from agent
             conv_id = getattr(from_agent, "_sentry_conversation_id", None)

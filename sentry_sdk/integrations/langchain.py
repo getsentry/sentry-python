@@ -15,7 +15,7 @@ from sentry_sdk.ai.utils import (
     transform_content_part,
     truncate_and_annotate_messages,
 )
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.consts import GENAIOPERATION, OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import StreamedSpan
@@ -408,7 +408,7 @@ class SentryLangchainCallback(BaseCallbackHandler):
             set_on_span = (
                 span.set_attribute if isinstance(span, StreamedSpan) else span.set_data
             )
-            set_on_span(SPANDATA.GEN_AI_OPERATION_NAME, "text_completion")
+            set_on_span(SPANDATA.GEN_AI_OPERATION_NAME, GENAIOPERATION.TEXT_COMPLETION)
 
             run_name = kwargs.get("name")
             if run_name:
@@ -509,7 +509,7 @@ class SentryLangchainCallback(BaseCallbackHandler):
             set_on_span = (
                 span.set_attribute if isinstance(span, StreamedSpan) else span.set_data
             )
-            set_on_span(SPANDATA.GEN_AI_OPERATION_NAME, "chat")
+            set_on_span(SPANDATA.GEN_AI_OPERATION_NAME, GENAIOPERATION.CHAT)
             if model:
                 set_on_span(SPANDATA.GEN_AI_REQUEST_MODEL, model)
 
@@ -733,7 +733,7 @@ class SentryLangchainCallback(BaseCallbackHandler):
                 span.set_attribute if isinstance(span, StreamedSpan) else span.set_data
             )
 
-            set_on_span(SPANDATA.GEN_AI_OPERATION_NAME, "execute_tool")
+            set_on_span(SPANDATA.GEN_AI_OPERATION_NAME, GENAIOPERATION.EXECUTE_TOOL)
             set_on_span(SPANDATA.GEN_AI_TOOL_NAME, tool_name)
 
             tool_description = serialized.get("description")
@@ -1191,7 +1191,7 @@ def _wrap_agent_executor_invoke(f: "Callable[..., Any]") -> "Callable[..., Any]"
                 attributes={
                     "sentry.op": OP.GEN_AI_INVOKE_AGENT,
                     "sentry.origin": LangchainIntegration.origin,
-                    SPANDATA.GEN_AI_OPERATION_NAME: "invoke_agent",
+                    SPANDATA.GEN_AI_OPERATION_NAME: GENAIOPERATION.INVOKE_AGENT,
                     SPANDATA.GEN_AI_RESPONSE_STREAMING: False,
                 },
             ) as span:
@@ -1237,7 +1237,9 @@ def _wrap_agent_executor_invoke(f: "Callable[..., Any]") -> "Callable[..., Any]"
                 if run_name:
                     span.set_data(SPANDATA.GEN_AI_FUNCTION_ID, run_name)
 
-                span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "invoke_agent")
+                span.set_data(
+                    SPANDATA.GEN_AI_OPERATION_NAME, GENAIOPERATION.INVOKE_AGENT
+                )
                 span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, False)
 
                 _set_tools_on_span(span, tools)
@@ -1298,7 +1300,7 @@ def _wrap_agent_executor_stream(f: "Callable[..., Any]") -> "Callable[..., Any]"
                 attributes={
                     "sentry.op": OP.GEN_AI_INVOKE_AGENT,
                     "sentry.origin": LangchainIntegration.origin,
-                    SPANDATA.GEN_AI_OPERATION_NAME: "invoke_agent",
+                    SPANDATA.GEN_AI_OPERATION_NAME: GENAIOPERATION.INVOKE_AGENT,
                     SPANDATA.GEN_AI_RESPONSE_STREAMING: True,
                 },
             )
@@ -1315,7 +1317,7 @@ def _wrap_agent_executor_stream(f: "Callable[..., Any]") -> "Callable[..., Any]"
             )
             span.__enter__()
 
-            span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "invoke_agent")
+            span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, GENAIOPERATION.INVOKE_AGENT)
             span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, True)
 
             if run_name:
@@ -1444,7 +1446,7 @@ def _wrap_embedding_method(f: "Callable[..., Any]") -> "Callable[..., Any]":
                 attributes={
                     "sentry.op": OP.GEN_AI_EMBEDDINGS,
                     "sentry.origin": LangchainIntegration.origin,
-                    SPANDATA.GEN_AI_OPERATION_NAME: "embeddings",
+                    SPANDATA.GEN_AI_OPERATION_NAME: GENAIOPERATION.EMBEDDINGS,
                 },
             ) as span:
                 if model_name:
@@ -1466,7 +1468,7 @@ def _wrap_embedding_method(f: "Callable[..., Any]") -> "Callable[..., Any]":
                 name=f"embeddings {model_name}" if model_name else "embeddings",
                 origin=LangchainIntegration.origin,
             ) as span:
-                span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "embeddings")
+                span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, GENAIOPERATION.EMBEDDINGS)
                 if model_name:
                     span.set_data(SPANDATA.GEN_AI_REQUEST_MODEL, model_name)
 
@@ -1511,7 +1513,7 @@ def _wrap_async_embedding_method(f: "Callable[..., Any]") -> "Callable[..., Any]
                 attributes={
                     "sentry.op": OP.GEN_AI_EMBEDDINGS,
                     "sentry.origin": LangchainIntegration.origin,
-                    SPANDATA.GEN_AI_OPERATION_NAME: "embeddings",
+                    SPANDATA.GEN_AI_OPERATION_NAME: GENAIOPERATION.EMBEDDINGS,
                 },
             ) as span:
                 if model_name:
@@ -1533,7 +1535,7 @@ def _wrap_async_embedding_method(f: "Callable[..., Any]") -> "Callable[..., Any]
                 name=f"embeddings {model_name}" if model_name else "embeddings",
                 origin=LangchainIntegration.origin,
             ) as span:
-                span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "embeddings")
+                span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, GENAIOPERATION.EMBEDDINGS)
                 if model_name:
                     span.set_data(SPANDATA.GEN_AI_REQUEST_MODEL, model_name)
 

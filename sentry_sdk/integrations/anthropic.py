@@ -14,7 +14,7 @@ from sentry_sdk.ai.utils import (
     transform_anthropic_content_part,
     truncate_and_annotate_messages,
 )
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.consts import GENAIOPERATION, OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import StreamedSpan
@@ -465,7 +465,7 @@ def _set_common_input_data(
         span.set_attribute if isinstance(span, StreamedSpan) else span.set_data
     )
     set_on_span(SPANDATA.GEN_AI_SYSTEM, "anthropic")
-    set_on_span(SPANDATA.GEN_AI_OPERATION_NAME, "chat")
+    set_on_span(SPANDATA.GEN_AI_OPERATION_NAME, GENAIOPERATION.CHAT)
 
     if max_tokens is not None and _is_given(max_tokens):
         set_on_span(SPANDATA.GEN_AI_REQUEST_MAX_TOKENS, max_tokens)

@@ -8,7 +8,7 @@ from sentry_sdk.ai.utils import (
     set_data_normalized,
     truncate_and_annotate_messages,
 )
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.consts import GENAIOPERATION, OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration
 
 # This is fine because langgraph depends on langchain-base, and LangchainIntegration only imports from langchain-base.
@@ -147,7 +147,7 @@ def _wrap_state_graph_compile(f: "Callable[..., Any]") -> "Callable[..., Any]":
             compiled_graph = f(self, *args, **kwargs)
 
             compiled_graph_name = getattr(compiled_graph, "name", None)
-            span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "create_agent")
+            span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, GENAIOPERATION.CREATE_AGENT)
             span.set_data(SPANDATA.GEN_AI_AGENT_NAME, compiled_graph_name)
 
             if compiled_graph_name:
@@ -203,7 +203,7 @@ def _wrap_pregel_invoke(f: "Callable[..., Any]") -> "Callable[..., Any]":
                 attributes={
                     "sentry.op": OP.GEN_AI_INVOKE_AGENT,
                     "sentry.origin": LanggraphIntegration.origin,
-                    SPANDATA.GEN_AI_OPERATION_NAME: "invoke_agent",
+                    SPANDATA.GEN_AI_OPERATION_NAME: GENAIOPERATION.INVOKE_AGENT,
                 },
             ) as span:
                 if graph_name:
@@ -250,7 +250,9 @@ def _wrap_pregel_invoke(f: "Callable[..., Any]") -> "Callable[..., Any]":
                     span.set_data(SPANDATA.GEN_AI_PIPELINE_NAME, graph_name)
                     span.set_data(SPANDATA.GEN_AI_AGENT_NAME, graph_name)
 
-                span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "invoke_agent")
+                span.set_data(
+                    SPANDATA.GEN_AI_OPERATION_NAME, GENAIOPERATION.INVOKE_AGENT
+                )
 
                 # Store input messages to later compare with output
                 input_messages = None
@@ -305,7 +307,7 @@ def _wrap_pregel_ainvoke(f: "Callable[..., Any]") -> "Callable[..., Any]":
                 attributes={
                     "sentry.op": OP.GEN_AI_INVOKE_AGENT,
                     "sentry.origin": LanggraphIntegration.origin,
-                    SPANDATA.GEN_AI_OPERATION_NAME: "invoke_agent",
+                    SPANDATA.GEN_AI_OPERATION_NAME: GENAIOPERATION.INVOKE_AGENT,
                 },
             ) as span:
                 if graph_name:
@@ -351,7 +353,7 @@ def _wrap_pregel_ainvoke(f: "Callable[..., Any]") -> "Callable[..., Any]":
                 span.set_data(SPANDATA.GEN_AI_PIPELINE_NAME, graph_name)
                 span.set_data(SPANDATA.GEN_AI_AGENT_NAME, graph_name)
 
-            span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "invoke_agent")
+            span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, GENAIOPERATION.INVOKE_AGENT)
 
             input_messages = None
             if len(args) > 0:

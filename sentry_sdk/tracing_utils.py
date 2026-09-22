@@ -20,7 +20,7 @@ except ImportError:
 from typing import TYPE_CHECKING
 
 import sentry_sdk
-from sentry_sdk.consts import OP, SPANDATA, SPANTEMPLATE
+from sentry_sdk.consts import GENAIOPERATION, OP, SPANDATA, SPANTEMPLATE
 from sentry_sdk.data_collection import (
     _apply_data_collection_filtering_to_query_string,
 )
@@ -1550,16 +1550,16 @@ def _set_input_attributes(
 
     if template == SPANTEMPLATE.AI_AGENT:
         attributes = {
-            SPANDATA.GEN_AI_OPERATION_NAME: "invoke_agent",
+            SPANDATA.GEN_AI_OPERATION_NAME: GENAIOPERATION.INVOKE_AGENT,
             SPANDATA.GEN_AI_AGENT_NAME: name,
         }
     elif template == SPANTEMPLATE.AI_CHAT:
         attributes = {
-            SPANDATA.GEN_AI_OPERATION_NAME: "chat",
+            SPANDATA.GEN_AI_OPERATION_NAME: GENAIOPERATION.CHAT,
         }
     elif template == SPANTEMPLATE.AI_TOOL:
         attributes = {
-            SPANDATA.GEN_AI_OPERATION_NAME: "execute_tool",
+            SPANDATA.GEN_AI_OPERATION_NAME: GENAIOPERATION.EXECUTE_TOOL,
             SPANDATA.GEN_AI_TOOL_NAME: name,
         }
 

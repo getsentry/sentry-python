@@ -93,9 +93,9 @@ def _input_callback(kwargs: "Dict[str, Any]") -> None:
 
     call_type = kwargs.get("call_type", None)
     if call_type == "embedding" or call_type == "aembedding":
-        operation = "embeddings"
+        operation = consts.GENAIOPERATION.EMBEDDINGS
     else:
-        operation = "chat"
+        operation = consts.GENAIOPERATION.CHAT
 
     # Start a new span/transaction
     if has_span_streaming_enabled(client.options):
@@ -104,7 +104,7 @@ def _input_callback(kwargs: "Dict[str, Any]") -> None:
             attributes={
                 "sentry.op": (
                     consts.OP.GEN_AI_CHAT
-                    if operation == "chat"
+                    if operation == consts.GENAIOPERATION.CHAT
                     else consts.OP.GEN_AI_EMBEDDINGS
                 ),
                 "sentry.origin": LiteLLMIntegration.origin,
@@ -114,7 +114,7 @@ def _input_callback(kwargs: "Dict[str, Any]") -> None:
         span = get_start_span_function()(
             op=(
                 consts.OP.GEN_AI_CHAT
-                if operation == "chat"
+                if operation == consts.GENAIOPERATION.CHAT
                 else consts.OP.GEN_AI_EMBEDDINGS
             ),
             name=f"{operation} {model}",
@@ -136,7 +136,7 @@ def _input_callback(kwargs: "Dict[str, Any]") -> None:
         record_inputs = True
 
     if record_inputs:
-        if operation == "embeddings":
+        if operation == consts.GENAIOPERATION.EMBEDDINGS:
             # For embeddings, look for the 'input' parameter
             embedding_input = kwargs.get("input")
             if embedding_input:

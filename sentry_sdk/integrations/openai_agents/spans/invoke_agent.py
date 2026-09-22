@@ -7,7 +7,7 @@ from sentry_sdk.ai.utils import (
     set_data_normalized,
     truncate_and_annotate_messages,
 )
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.consts import GENAIOPERATION, OP, SPANDATA
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing_utils import (
@@ -36,7 +36,7 @@ def invoke_agent_span(
             attributes={
                 "sentry.op": OP.GEN_AI_INVOKE_AGENT,
                 "sentry.origin": SPAN_ORIGIN,
-                SPANDATA.GEN_AI_OPERATION_NAME: "invoke_agent",
+                SPANDATA.GEN_AI_OPERATION_NAME: GENAIOPERATION.INVOKE_AGENT,
             },
         )
     else:
@@ -48,7 +48,7 @@ def invoke_agent_span(
         )
         span.__enter__()
 
-        span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "invoke_agent")
+        span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, GENAIOPERATION.INVOKE_AGENT)
 
     record_inputs = False
     if has_data_collection_enabled(client_options):

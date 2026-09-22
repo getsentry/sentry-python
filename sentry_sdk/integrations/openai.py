@@ -42,7 +42,7 @@ from sentry_sdk.ai.utils import (
     truncate_and_annotate_embedding_inputs,
     truncate_and_annotate_messages,
 )
-from sentry_sdk.consts import SPANDATA
+from sentry_sdk.consts import GENAIOPERATION, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import StreamedSpan
@@ -343,7 +343,7 @@ def _set_responses_api_input_data(
         span.set_attribute if isinstance(span, StreamedSpan) else span.set_data
     )
 
-    set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "responses")
+    set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, GENAIOPERATION.RESPONSES)
 
     model = kwargs.get("model")
     if model is not None:
@@ -490,7 +490,7 @@ def _set_completions_api_input_data(
         span.set_attribute if isinstance(span, StreamedSpan) else span.set_data
     )
 
-    set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "chat")
+    set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, GENAIOPERATION.CHAT)
 
     model = kwargs.get("model")
     if model is not None:
@@ -608,7 +608,7 @@ def _set_embeddings_input_data(
     integration: "OpenAIIntegration",
 ) -> None:
 
-    set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "embeddings")
+    set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, GENAIOPERATION.EMBEDDINGS)
 
     set_on_span = (
         span.set_attribute if isinstance(span, StreamedSpan) else span.set_data

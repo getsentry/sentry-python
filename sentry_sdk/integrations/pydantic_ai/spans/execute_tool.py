@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING
 
 import sentry_sdk
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.consts import GENAIOPERATION, OP, SPANDATA
 from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import safe_serialize
@@ -36,7 +36,7 @@ def execute_tool_span(
             attributes={
                 "sentry.op": OP.GEN_AI_EXECUTE_TOOL,
                 "sentry.origin": SPAN_ORIGIN,
-                SPANDATA.GEN_AI_OPERATION_NAME: "execute_tool",
+                SPANDATA.GEN_AI_OPERATION_NAME: GENAIOPERATION.EXECUTE_TOOL,
                 SPANDATA.GEN_AI_TOOL_NAME: tool_name,
             },
         )
@@ -49,7 +49,7 @@ def execute_tool_span(
             origin=SPAN_ORIGIN,
         )
 
-        span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "execute_tool")
+        span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, GENAIOPERATION.EXECUTE_TOOL)
         span.set_data(SPANDATA.GEN_AI_TOOL_NAME, tool_name)
 
         set_on_span = span.set_data

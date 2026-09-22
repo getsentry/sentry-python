@@ -117,6 +117,25 @@ class SPANTEMPLATE(str, Enum):
         return self.value
 
 
+class GENAIOPERATION(str, Enum):
+    """
+    Possible values for the ``gen_ai.operation.name`` span attribute, as
+    defined by the GenAI semantic conventions.
+    """
+
+    CHAT = "chat"
+    CREATE_AGENT = "create_agent"
+    EMBEDDINGS = "embeddings"
+    EXECUTE_TOOL = "execute_tool"
+    HANDOFF = "handoff"
+    INVOKE_AGENT = "invoke_agent"
+    RESPONSES = "responses"
+    TEXT_COMPLETION = "text_completion"
+
+    def __str__(self) -> str:
+        return self.value
+
+
 class INSTRUMENTER:
     SENTRY = "sentry"
     OTEL = "otel"
