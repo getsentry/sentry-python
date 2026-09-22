@@ -479,10 +479,9 @@ def _sentry_request_created(
         if span is None:
             return
 
-        # an ignored streamed span is not activated; avoid enriching its parent.
-        if isinstance(span, StreamedSpan):
-            if not (span.get_attributes().get(SPANDATA.SENTRY_ORIGIN) == ORIGIN):
-                return
+        # an ignored streamed span is not active; avoid enriching its parent.
+        if isinstance(span, StreamedSpan) and span.active:
+            return
 
         _set_request_attributes(span, request)
         # each attempt has a fresh `request.context`; carry the active client span.
