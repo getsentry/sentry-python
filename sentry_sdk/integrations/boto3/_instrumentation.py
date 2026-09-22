@@ -200,6 +200,8 @@ def _start_client_span(
     attributes: "Attributes" = {
         SPANDATA.RPC_METHOD: ctx.operation_name,
         SPANDATA.RPC_SYSTEM_NAME: _AWS_RPC_SYSTEM_NAME,
+        # all client call spans are by default "client" spans.
+        # https://opentelemetry.io/docs/specs/semconv/cloud-providers/aws-sdk/#aws-sdk-spans
         SPANDATA.SENTRY_KIND: "client",
     }
     with capture_internal_exceptions():
