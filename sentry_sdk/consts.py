@@ -89,6 +89,7 @@ if TYPE_CHECKING:
                 Callable[[SpanJSON, Hint], Optional[SpanJSON]]
             ],
             "suppress_asgi_chained_exceptions": Optional[bool],
+            "data_collection": Optional[DataCollectionUserOptions],
         },
         total=False,
     )

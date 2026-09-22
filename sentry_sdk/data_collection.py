@@ -298,7 +298,7 @@ def _resolve_data_collection(options: "Dict[str, Any]") -> "DataCollection":
     overwrites ``options["data_collection"]`` with the resolved result. Feeding an
     already-resolved dict back in would flip ``provided_by_user`` to ``True``.
     """
-    user_dc = options.get("data_collection")
+    user_dc = _get_data_collection(options)
     send_default_pii = options.get("send_default_pii")
 
     include_local_variables = (
@@ -335,3 +335,10 @@ def _resolve_data_collection(options: "Dict[str, Any]") -> "DataCollection":
         include_local_variables=include_local_variables,
         include_source_context=include_source_context,
     )
+
+
+def _get_data_collection(options: "dict[str, Any]") -> "Optional[DataCollection]":
+    dc = options.get("data_collection")
+    if dc is not None:
+        return dc
+    return options.get("_experiments", {}).get("data_collection")

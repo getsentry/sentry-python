@@ -431,3 +431,26 @@ def test_no_data_collection_values_fall_back_to_send_default_pii_configuration()
     assert dc["provided_by_user"] is False
     assert dc["user_info"] is True
     assert has_data_collection_enabled(client.options) is False
+
+
+def test_data_collection_via_experiments(sentry_init):
+    sentry_init(
+        _experiments={"data_collection": {"user_info": True}},
+    )
+
+    dc = sentry_sdk.get_client().options["data_collection"]
+    assert dc is not None
+    assert dc["provided_by_user"] is True
+    assert dc["user_info"] is True
+
+
+def test_top_level_takes_precedence_over_experiments(sentry_init):
+    sentry_init(
+        data_collection={"user_info": False},
+        _experiments={"data_collection": {"user_info": True}},
+    )
+
+    dc = sentry_sdk.get_client().options["data_collection"]
+    assert dc is not None
+    assert dc["provided_by_user"] is True
+    assert dc["user_info"] is False
