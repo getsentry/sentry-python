@@ -4,7 +4,6 @@ from typing import TYPE_CHECKING
 import sentry_sdk
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.integrations.boto3._context import AwsCallContext
-from sentry_sdk.integrations.boto3.consts import IDENTIFIER
 from sentry_sdk.integrations.boto3._instrumentation import (
     _finish_span,
     _get_error_attributes,
@@ -15,6 +14,7 @@ from sentry_sdk.integrations.boto3._instrumentation import (
     _set_span_attributes,
     _start_client_span,
 )
+from sentry_sdk.integrations.boto3.consts import IDENTIFIER
 from sentry_sdk.traces import NoOpStreamedSpan, StreamedSpan
 from sentry_sdk.utils import capture_internal_exceptions
 
