@@ -18,10 +18,7 @@ from functools import partial, partialmethod, wraps
 from numbers import Real
 from urllib.parse import parse_qs, unquote, urlencode, urlsplit, urlunsplit
 
-from sentry_sdk.data_collection import (
-    _apply_key_value_collection_filtering,
-    _get_data_collection,
-)
+from sentry_sdk.data_collection import _apply_key_value_collection_filtering
 
 try:
     # Python 3.11
@@ -2113,7 +2110,7 @@ def has_data_collection_enabled(options: "Optional[dict[str, Any]]") -> bool:
     if options is None:
         return False
 
-    data_collection: "Optional[DataCollection]" = _get_data_collection(options)
+    data_collection: "Optional[DataCollection]" = options.get("data_collection")
     # Client options are resolved as part of client initialization, so `data_collection`
     # being None could be that the user just didn't provide it.
     # `provided_by_user` is what actually records whether the user actually configured it.
