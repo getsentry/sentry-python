@@ -9,7 +9,7 @@ import sentry_sdk
 from sentry_sdk.consts import OP
 from sentry_sdk.data_collection import _apply_data_collection_filtering_to_query_string
 from sentry_sdk.integrations import Integration
-from sentry_sdk.integrations._wsgi_common import _filter_headers
+from sentry_sdk.integrations._wsgi_common import _filter_headers_legacy
 from sentry_sdk.integrations.cloud_resource_context import CLOUD_PROVIDER
 from sentry_sdk.scope import Scope, should_send_default_pii
 from sentry_sdk.traces import SegmentNameSource
@@ -86,7 +86,7 @@ def _wrap_func(func: "F") -> "F":
             header_attributes: "dict[str, Any]" = {}
             if hasattr(gcp_event, "headers"):
                 headers = gcp_event.headers
-                for header, header_value in _filter_headers(
+                for header, header_value in _filter_headers_legacy(
                     headers, use_annotated_value=False
                 ).items():
                     header_attributes[f"http.request.header.{header.lower()}"] = (
@@ -244,7 +244,7 @@ def _make_request_event_processor(
                 request["query_string"] = query_string
 
         if hasattr(gcp_event, "headers"):
-            request["headers"] = _filter_headers(gcp_event.headers)
+            request["headers"] = _filter_headers_legacy(gcp_event.headers)
 
         if hasattr(gcp_event, "data"):
             if has_data_collection_enabled(client_options):

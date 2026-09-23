@@ -10,7 +10,10 @@ from sentry_sdk.data_collection import (
     _apply_data_collection_filtering_to_query_string,
 )
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
-from sentry_sdk.integrations._wsgi_common import RequestExtractor, _filter_headers
+from sentry_sdk.integrations._wsgi_common import (
+    LegacyRequestExtractor,
+    _filter_headers_legacy,
+)
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import SegmentNameSource
 from sentry_sdk.utils import (
@@ -64,7 +67,7 @@ class SanicIntegration(Integration):
         _setup_sanic()
 
 
-class SanicRequestExtractor(RequestExtractor):
+class SanicRequestExtractor(LegacyRequestExtractor):
     def content_length(self) -> int:
         if self.request.body is None:
             return 0
@@ -251,7 +254,7 @@ def _get_request_attributes(request: "Request") -> "Dict[str, Any]":
     if request.method:
         attributes[SPANDATA.HTTP_REQUEST_METHOD] = request.method.upper()
 
-    headers = _filter_headers(dict(request.headers), use_annotated_value=False)
+    headers = _filter_headers_legacy(dict(request.headers), use_annotated_value=False)
     for header, value in headers.items():
         attributes[f"{SPANDATA.HTTP_REQUEST_HEADER}.{header.lower()}"] = value
 
@@ -340,7 +343,7 @@ def _make_request_processor(weak_request: "Callable[[], Request]") -> "EventProc
                 or client_options["data_collection"]["user_info"]
             ):
                 request_info["env"] = {"REMOTE_ADDR": request.remote_addr}
-            request_info["headers"] = _filter_headers(dict(request.headers))
+            request_info["headers"] = _filter_headers_legacy(dict(request.headers))
 
         return event
 

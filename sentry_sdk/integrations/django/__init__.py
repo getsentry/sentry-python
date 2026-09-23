@@ -15,7 +15,7 @@ from sentry_sdk.integrations import (
 )
 from sentry_sdk.integrations._wsgi_common import (
     DEFAULT_HTTP_METHODS_TO_CAPTURE,
-    RequestExtractor,
+    LegacyRequestExtractor,
 )
 from sentry_sdk.integrations.logging import ignore_logger_for_events
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
@@ -703,7 +703,7 @@ def _patch_response_for_exception() -> None:
     exception_handler.response_for_exception = sentry_patched_response_for_exception
 
 
-class DjangoRequestExtractor(RequestExtractor):
+class DjangoRequestExtractor(LegacyRequestExtractor):
     def __init__(self, request: "Union[WSGIRequest, ASGIRequest]") -> None:
         try:
             drf_request = request._sentry_drf_request_backref()
@@ -747,7 +747,7 @@ class DjangoRequestExtractor(RequestExtractor):
         try:
             return self.request.data
         except Exception:
-            return RequestExtractor.parsed_body(self)
+            return LegacyRequestExtractor.parsed_body(self)
 
 
 def _set_user_info(request: "WSGIRequest", event: "Event") -> None:

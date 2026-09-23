@@ -4,7 +4,8 @@ from copy import deepcopy
 import sentry_sdk
 from sentry_sdk._types import SENSITIVE_DATA_SUBSTITUTE
 from sentry_sdk.data_collection import _apply_key_value_collection_filtering
-from sentry_sdk.utils import AnnotatedValue
+from sentry_sdk.scope import should_send_default_pii
+from sentry_sdk.utils import AnnotatedValue, has_data_collection_enabled
 
 try:
     from django.http.request import RawPostDataException
@@ -32,6 +33,22 @@ DEFAULT_HTTP_METHODS_TO_CAPTURE = (
     "POST",
     "PUT",
     "TRACE",
+)
+
+SENSITIVE_ENV_KEYS = (
+    "REMOTE_ADDR",
+    "HTTP_X_FORWARDED_FOR",
+    "HTTP_SET_COOKIE",
+    "HTTP_COOKIE",
+    "HTTP_AUTHORIZATION",
+    "HTTP_PROXY_AUTHORIZATION",
+    "HTTP_X_API_KEY",
+    "HTTP_X_FORWARDED_FOR",
+    "HTTP_X_REAL_IP",
+)
+
+SENSITIVE_HEADERS = tuple(
+    x[len("HTTP_") :] for x in SENSITIVE_ENV_KEYS if x.startswith("HTTP_")
 )
 
 
@@ -185,6 +202,63 @@ class RequestExtractor:
         raise NotImplementedError()
 
 
+class LegacyRequestExtractor(RequestExtractor):
+    def extract_into_event(self, event: "Event") -> None:
+        client = sentry_sdk.get_client()
+        if not client.is_active():
+            return
+
+        data: "Optional[Union[AnnotatedValue, Dict[str, Any]]]" = None
+        content_length = self.content_length()
+        request_info = event.get("request", {})
+
+        # Prior to data collection being implemented we unconditionally attached
+        # the request body, which is why we default to True here.
+        attach_request_body = True
+        if has_data_collection_enabled(client.options):
+            cookies = _apply_key_value_collection_filtering(
+                items=dict(self.cookies()),
+                behaviour=client.options["data_collection"]["cookies"],
+            )
+            if cookies:
+                request_info["cookies"] = cookies
+
+            attach_request_body = (
+                "incoming_request" in client.options["data_collection"]["http_bodies"]
+            )
+        elif should_send_default_pii():
+            request_info["cookies"] = dict(self.cookies())
+
+        if attach_request_body:
+            if not request_body_within_bounds(client, content_length):
+                data = AnnotatedValue.removed_because_over_size_limit()
+            else:
+                # First read the raw body data
+                # It is important to read this first because if it is Django
+                # it will cache the body and then we can read the cached version
+                # again in parsed_body() (or json() or wherever).
+                raw_data = None
+                try:
+                    raw_data = self.raw_data()
+                except _RAW_DATA_EXCEPTIONS:
+                    # If DjangoRestFramework is used it already read the body for us
+                    # so reading it here will fail. We can ignore this.
+                    pass
+
+                parsed_body = self.parsed_body()
+                if parsed_body is not None:
+                    data = parsed_body
+                elif raw_data:
+                    data = AnnotatedValue.removed_because_raw_data()
+                else:
+                    data = None
+
+        if data is not None:
+            request_info["data"] = data
+
+        event["request"] = deepcopy(request_info)
+
+
 def _is_json_content_type(ct: "Optional[str]") -> bool:
     mt = (ct or "").split(";", 1)[0]
     return (
@@ -210,3 +284,42 @@ def _filter_headers(
             filtered[key] = SENSITIVE_DATA_SUBSTITUTE
 
     return filtered
+
+
+def _filter_headers_legacy(
+    headers: "Mapping[str, str]",
+    use_annotated_value: bool = True,
+) -> "Mapping[str, Union[AnnotatedValue, str]]":
+    client_options = sentry_sdk.get_client().options
+
+    if has_data_collection_enabled(client_options):
+        data_collection_configuration = client_options["data_collection"]
+        filtered = _apply_key_value_collection_filtering(
+            items=headers,
+            behaviour=data_collection_configuration["http_headers"]["request"],
+        )
+
+        for key in filtered:
+            if isinstance(key, str) and key.lower() in ("cookie", "set-cookie"):
+                filtered[key] = SENSITIVE_DATA_SUBSTITUTE
+
+        return filtered
+
+    else:
+        if should_send_default_pii():
+            return headers
+
+        substitute: "Union[AnnotatedValue, str]" = (
+            SENSITIVE_DATA_SUBSTITUTE
+            if not use_annotated_value
+            else AnnotatedValue.removed_because_over_size_limit()
+        )
+
+        return {
+            k: (
+                v
+                if k.upper().replace("-", "_") not in SENSITIVE_HEADERS
+                else substitute
+            )
+            for k, v in headers.items()
+        }

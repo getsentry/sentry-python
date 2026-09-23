@@ -8,7 +8,7 @@ import sentry_sdk
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.data_collection import _apply_data_collection_filtering_to_query_string
 from sentry_sdk.integrations import DidNotEnable, Integration
-from sentry_sdk.integrations._wsgi_common import _filter_headers
+from sentry_sdk.integrations._wsgi_common import _filter_headers_legacy
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import SOURCE_FOR_STYLE as SEGMENT_SOURCE_FOR_STYLE
@@ -187,7 +187,7 @@ async def _request_websocket_started(app: "Quart", **kwargs: "Any") -> None:
         segment.set_attribute("http.request.method", request_websocket.method)
         header_attributes: "dict[str, Any]" = {}
 
-        for header, header_value in _filter_headers(
+        for header, header_value in _filter_headers_legacy(
             dict(request_websocket.headers), use_annotated_value=False
         ).items():
             header_attributes[f"http.request.header.{header.lower()}"] = header_value
@@ -282,7 +282,7 @@ def _make_request_event_processor(
             request_info["url"] = request.url
             request_info["query_string"] = request.query_string
             request_info["method"] = request.method
-            request_info["headers"] = _filter_headers(dict(request.headers))
+            request_info["headers"] = _filter_headers_legacy(dict(request.headers))
 
             client_options = sentry_sdk.get_client().options
             if has_data_collection_enabled(client_options):
