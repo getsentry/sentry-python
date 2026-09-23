@@ -31,37 +31,37 @@ def test_get_current_span():
 def test_get_current_span_via_traces():
     fake_scope = mock.MagicMock()
     fake_scope.span = mock.MagicMock()
-    assert sentry_sdk.traces.get_current_span(fake_scope) == fake_scope.span
+    assert sentry_sdk.get_current_span(fake_scope) == fake_scope.span
 
     fake_scope.span = None
-    assert sentry_sdk.traces.get_current_span(fake_scope) is None
+    assert sentry_sdk.get_current_span(fake_scope) is None
 
 
 def test_get_current_span_current_scope_via_traces(sentry_init):
     sentry_init()
 
-    assert sentry_sdk.traces.get_current_span() is None
+    assert sentry_sdk.get_current_span() is None
 
     scope = get_current_scope()
     fake_span = Span(name="abc", scope=scope)
 
     assert scope.span == fake_span
-    assert sentry_sdk.traces.get_current_span() == fake_span
+    assert sentry_sdk.get_current_span() == fake_span
 
 
 def test_get_current_span_with_segment(sentry_init):
     sentry_init()
 
-    assert sentry_sdk.traces.get_current_span() is None
+    assert sentry_sdk.get_current_span() is None
 
-    with sentry_sdk.traces.start_span(name="segment") as new_segment:
-        assert sentry_sdk.traces.get_current_span() == new_segment
+    with sentry_sdk.start_span(name="segment") as new_segment:
+        assert sentry_sdk.get_current_span() == new_segment
 
 
 def test_traceparent_with_tracing_enabled(sentry_init):
     sentry_init(traces_sample_rate=1.0)
 
-    with sentry_sdk.traces.start_span(name="span") as segment:
+    with sentry_sdk.start_span(name="span") as segment:
         expected_traceparent = "%s-%s-1" % (
             segment.trace_id,
             segment.span_id,
@@ -97,7 +97,7 @@ def test_baggage_with_tracing_enabled(sentry_init):
         release="1.0.0",
         environment="dev",
     )
-    with sentry_sdk.traces.start_span(name="segment") as segment:
+    with sentry_sdk.start_span(name="segment") as segment:
         expected_baggage_re = r"^sentry-trace_id={},sentry-sample_rand=0\.\d{{6}},sentry-environment=dev,sentry-release=1\.0\.0,sentry-transaction=segment,sentry-sample_rate=1\.0,sentry-sampled={}$".format(
             segment.trace_id, "true" if segment.sampled else "false"
         )
@@ -112,7 +112,7 @@ def test_baggage_with_dsn(sentry_init):
         environment="dev",
         transport=TestTransportWithOptions,
     )
-    with sentry_sdk.traces.start_span(name="segment") as segment:
+    with sentry_sdk.start_span(name="segment") as segment:
         expected_baggage_re = r"^sentry-trace_id={},sentry-sample_rand=0\.\d{{6}},sentry-environment=dev,sentry-release=2\.0\.0,sentry-public_key=97333d956c9e40989a0139756c121c34,sentry-transaction=segment,sentry-sample_rate=1\.0,sentry-sampled={}$".format(
             segment.trace_id, "true" if segment.sampled else "false"
         )
@@ -125,13 +125,13 @@ def test_continue_trace(sentry_init):
     trace_id = "471a43a4192642f0b136d5159a501701"
     parent_span_id = "6e8f22c393e68f19"
     parent_sampled = 1
-    sentry_sdk.traces.continue_trace(
+    sentry_sdk.continue_trace(
         {
             "sentry-trace": "{}-{}-{}".format(trace_id, parent_span_id, parent_sampled),
             "baggage": "sentry-trace_id=566e3688a61d4bc888951642d6f14a19,sentry-sample_rand=0.123456",
         }
     )
-    with sentry_sdk.traces.start_span(name="some name") as segment:
+    with sentry_sdk.start_span(name="some name") as segment:
         assert segment.name == "some name"
 
         propagation_context = get_isolation_scope()._propagation_context

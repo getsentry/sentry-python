@@ -228,7 +228,7 @@ def test_tracing_enabled(
     worker = rq.SimpleWorker([queue], connection=queue.connection)
     items = capture_items("event", "span")
 
-    with sentry_sdk.traces.start_span(
+    with sentry_sdk.start_span(
         name="custom parent",
         attributes={
             "sentry.op": "rq transaction",

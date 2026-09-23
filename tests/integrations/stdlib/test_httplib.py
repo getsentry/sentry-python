@@ -311,9 +311,9 @@ def test_outgoing_trace_headers(
         ),
     }
     items = capture_items("span")
-    sentry_sdk.traces.continue_trace(headers)
+    sentry_sdk.continue_trace(headers)
 
-    with sentry_sdk.traces.start_span(
+    with sentry_sdk.start_span(
         name="/interactions/other-dogs/new-dog",
         attributes={
             "sentry.op": "greeting.sniff",
@@ -374,10 +374,10 @@ def test_outgoing_trace_headers_head_sdk(
 
     items = capture_items("span")
 
-    sentry_sdk.traces.continue_trace({})
+    sentry_sdk.continue_trace({})
 
     with mock.patch("sentry_sdk.tracing_utils.Random.randrange", return_value=250000):
-        with sentry_sdk.traces.start_span(name="Head SDK tx"):
+        with sentry_sdk.start_span(name="Head SDK tx"):
             connection = HTTPSConnectionRecordingRequestHeaders("localhost", port=PORT)
             connection.request("GET", "/top-chasers")
             connection.getresponse()
@@ -445,8 +445,8 @@ def test_outgoing_trace_headers_no_current_span(sentry_init):
     }
 
     # Seed the scope's propagation context, but do NOT start a span.
-    sentry_sdk.traces.continue_trace(headers)
-    assert sentry_sdk.traces.get_current_span() is None
+    sentry_sdk.continue_trace(headers)
+    assert sentry_sdk.get_current_span() is None
 
     connection = HTTPSConnectionRecordingRequestHeaders("localhost", port=PORT)
     connection.request("GET", "/top-chasers")
@@ -568,9 +568,9 @@ def test_option_trace_propagation_targets(
             "sentry-public_key=49d0f7386ad645858ae85020e393bef3, sentry-sample_rate=0.01337, "
         )
     }
-    sentry_sdk.traces.continue_trace(headers)
+    sentry_sdk.continue_trace(headers)
 
-    with sentry_sdk.traces.start_span(
+    with sentry_sdk.start_span(
         name="/interactions/other-dogs/new-dog",
         attributes={
             "sentry.op": "greeting.sniff",
@@ -603,7 +603,7 @@ def test_request_source_disabled(
     )
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         conn = HTTPConnection("localhost", port=PORT)
         conn.request("GET", "/foo")
         conn.getresponse()
@@ -639,7 +639,7 @@ def test_request_source_enabled(
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         conn = HTTPConnection("localhost", port=PORT)
         conn.request("GET", "/foo")
         conn.getresponse()
@@ -667,7 +667,7 @@ def test_request_source(
     )
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         conn = HTTPConnection("localhost", port=PORT)
         conn.request("GET", "/foo")
         conn.getresponse()
@@ -713,7 +713,7 @@ def test_request_source_with_module_in_search_path(
     )
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         from httplib_helpers.helpers import get_request_with_connection
 
         conn = HTTPConnection("localhost", port=PORT)
@@ -765,7 +765,7 @@ def test_no_request_source_if_duration_too_short(
         "sentry_sdk.integrations.stdlib.add_http_request_source",
         add_http_request_source_with_pinned_timestamps,
     ):
-        with sentry_sdk.traces.start_span(name="foo"):
+        with sentry_sdk.start_span(name="foo"):
             conn = HTTPConnection("localhost", port=PORT)
             conn.request("GET", "/foo")
             conn.getresponse()
@@ -807,7 +807,7 @@ def test_request_source_if_duration_over_threshold(
         "sentry_sdk.integrations.stdlib.add_http_request_source",
         add_http_request_source_with_pinned_timestamps,
     ):
-        with sentry_sdk.traces.start_span(name="foo"):
+        with sentry_sdk.start_span(name="foo"):
             conn = HTTPConnection("localhost", port=PORT)
             conn.request("GET", "/foo")
             conn.getresponse()
@@ -852,7 +852,7 @@ def test_span_origin(
     )
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         conn = HTTPConnection("localhost", port=PORT)
         conn.request("GET", "/foo")
         conn.getresponse()
@@ -880,7 +880,7 @@ def test_http_timeout(
     items = capture_items("span")
 
     with pytest.raises(TimeoutError):
-        with sentry_sdk.traces.start_span(
+        with sentry_sdk.start_span(
             name="name",
             attributes={
                 "sentry.op": "op",
@@ -912,7 +912,7 @@ def test_proxy_http_tunnel(
     )
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         conn = HTTPConnection("localhost", PROXY_PORT)
         conn.set_tunnel("api.example.com", tunnel_port)
         conn.request("GET", "/foo?bar=1")
@@ -954,7 +954,7 @@ def test_chunked_response_span_covers_body_read(
     min_expected_duration = CHUNK_DELAY * NUM_CHUNKS
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         conn = HTTPConnection("localhost", CHUNKED_PORT)
         conn.request("GET", "/chunked")
         response = conn.getresponse()
@@ -986,16 +986,14 @@ def test_chunked_response_span_covers_body_read(
             id="defaults",
         ),
         pytest.param(
-            {"_experiments": {"data_collection": {}}},
+            {"data_collection": {}},
             "toy=tennisball&color=red&auth=%5BFiltered%5D",
             id="data_collection_denylist_default",
         ),
         pytest.param(
             {
-                "_experiments": {
-                    "data_collection": {
-                        "url_query_params": {"mode": "denylist", "terms": ["toy"]}
-                    }
+                "data_collection": {
+                    "url_query_params": {"mode": "denylist", "terms": ["toy"]}
                 }
             },
             "toy=%5BFiltered%5D&color=red&auth=%5BFiltered%5D",
@@ -1003,10 +1001,8 @@ def test_chunked_response_span_covers_body_read(
         ),
         pytest.param(
             {
-                "_experiments": {
-                    "data_collection": {
-                        "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
-                    }
+                "data_collection": {
+                    "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
                 }
             },
             "toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D",
@@ -1014,30 +1010,22 @@ def test_chunked_response_span_covers_body_read(
         ),
         pytest.param(
             {
-                "_experiments": {
-                    "data_collection": {
-                        "url_query_params": {"mode": "allowlist", "terms": ["auth"]}
-                    }
+                "data_collection": {
+                    "url_query_params": {"mode": "allowlist", "terms": ["auth"]}
                 }
             },
             "toy=%5BFiltered%5D&color=%5BFiltered%5D&auth=%5BFiltered%5D",
             id="data_collection_allowlist_sensitive_term",
         ),
         pytest.param(
-            {
-                "_experiments": {
-                    "data_collection": {"url_query_params": {"mode": "off"}}
-                }
-            },
+            {"data_collection": {"url_query_params": {"mode": "off"}}},
             None,
             id="data_collection_off",
         ),
         pytest.param(
             {
                 "send_default_pii": True,
-                "_experiments": {
-                    "data_collection": {"url_query_params": {"mode": "off"}}
-                },
+                "data_collection": {"url_query_params": {"mode": "off"}},
             },
             None,
             id="data_collection_wins_over_send_default_pii",
@@ -1055,7 +1043,7 @@ def test_url_query_data_collection(
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         conn = HTTPConnection("localhost", PORT)
         conn.request(
             "GET", "/some/random/url?toy=tennisball&color=red&auth=secret#frag"
@@ -1080,16 +1068,14 @@ def test_url_query_data_collection(
     "init_kwargs, expected_suffix",
     [
         pytest.param(
-            {"_experiments": {"data_collection": {}}},
+            {"data_collection": {}},
             "?toy=tennisball&color=red&auth=%5BFiltered%5D#frag",
             id="data_collection_denylist_default",
         ),
         pytest.param(
             {
-                "_experiments": {
-                    "data_collection": {
-                        "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
-                    }
+                "data_collection": {
+                    "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
                 }
             },
             "?toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D#frag",
@@ -1111,7 +1097,7 @@ def test_url_full_reassembly(sentry_init, capture_items, init_kwargs, expected_s
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         conn = HTTPConnection("localhost", PORT)
         conn.request(
             "GET", "/some/random/url?toy=tennisball&color=red&auth=secret#frag"
@@ -1146,17 +1132,13 @@ def test_url_full_reassembly(sentry_init, capture_items, init_kwargs, expected_s
             id="defaults",
         ),
         pytest.param(
-            {"_experiments": {"data_collection": {}}},
+            {"data_collection": {}},
             "toy=tennisball&color=red&auth=%5BFiltered%5D",
             True,
             id="data_collection_denylist_default",
         ),
         pytest.param(
-            {
-                "_experiments": {
-                    "data_collection": {"url_query_params": {"mode": "off"}}
-                }
-            },
+            {"data_collection": {"url_query_params": {"mode": "off"}}},
             None,
             True,
             id="data_collection_off",

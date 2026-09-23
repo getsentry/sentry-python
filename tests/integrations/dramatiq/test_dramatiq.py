@@ -168,7 +168,7 @@ def test_task_transaction(
 def test_dramatiq_propagate_trace(broker, worker, capture_items):
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="outer") as outer_span:
+    with sentry_sdk.start_span(name="outer") as outer_span:
 
         @dramatiq.actor(max_retries=0)
         def propagated_trace_task():
@@ -396,16 +396,12 @@ def test_that_message_data_is_added_as_request(
     [
         pytest.param({}, True, id="data_collection_not_enabled"),
         pytest.param(
-            {
-                "_experiments": {
-                    "data_collection": {"http_bodies": ["incoming_request"]}
-                }
-            },
+            {"data_collection": {"http_bodies": ["incoming_request"]}},
             True,
             id="data_collection_http_bodies_incoming_request",
         ),
         pytest.param(
-            {"_experiments": {"data_collection": {"http_bodies": []}}},
+            {"data_collection": {"http_bodies": []}},
             False,
             id="data_collection_http_bodies_empty",
         ),
@@ -437,7 +433,7 @@ def test_that_message_data_is_gated_by_data_collection(
 
 @pytest.mark.parametrize(
     "broker",
-    [{"_experiments": {"data_collection": {"http_bodies": []}}}],
+    [{"data_collection": {"http_bodies": []}}],
     indirect=True,
 )
 def test_that_dramatiq_context_type_is_set_regardless_of_data_collection(

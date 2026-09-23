@@ -69,7 +69,7 @@ class HelloHandler(RequestHandler):
 
 class ChildSpanHandler(RequestHandler):
     def get(self):
-        with sentry_sdk.traces.start_span(name="child-span"):
+        with sentry_sdk.start_span(name="child-span"):
             pass
         self.write("ok")
 
@@ -107,12 +107,12 @@ COOKIE_HEADER = "jwt=tokenval; theme=dark; lang=en; identity=alice"
             id="defaults",
         ),
         pytest.param(
-            {"_experiments": {"data_collection": {"cookies": {"mode": "off"}}}},
+            {"data_collection": {"cookies": {"mode": "off"}}},
             None,
             id="data_collection_off",
         ),
         pytest.param(
-            {"_experiments": {"data_collection": {"cookies": {"mode": "denylist"}}}},
+            {"data_collection": {"cookies": {"mode": "denylist"}}},
             {
                 "jwt": SENSITIVE_DATA_SUBSTITUTE,
                 "theme": "dark",
@@ -122,13 +122,7 @@ COOKIE_HEADER = "jwt=tokenval; theme=dark; lang=en; identity=alice"
             id="data_collection_denylist_default",
         ),
         pytest.param(
-            {
-                "_experiments": {
-                    "data_collection": {
-                        "cookies": {"mode": "denylist", "terms": ["theme"]}
-                    }
-                }
-            },
+            {"data_collection": {"cookies": {"mode": "denylist", "terms": ["theme"]}}},
             {
                 "jwt": SENSITIVE_DATA_SUBSTITUTE,
                 "theme": SENSITIVE_DATA_SUBSTITUTE,
@@ -138,13 +132,7 @@ COOKIE_HEADER = "jwt=tokenval; theme=dark; lang=en; identity=alice"
             id="data_collection_denylist_custom_terms",
         ),
         pytest.param(
-            {
-                "_experiments": {
-                    "data_collection": {
-                        "cookies": {"mode": "allowlist", "terms": ["theme"]}
-                    }
-                }
-            },
+            {"data_collection": {"cookies": {"mode": "allowlist", "terms": ["theme"]}}},
             {
                 "jwt": SENSITIVE_DATA_SUBSTITUTE,
                 "theme": "dark",
@@ -155,10 +143,8 @@ COOKIE_HEADER = "jwt=tokenval; theme=dark; lang=en; identity=alice"
         ),
         pytest.param(
             {
-                "_experiments": {
-                    "data_collection": {
-                        "cookies": {"mode": "allowlist", "terms": ["identity"]}
-                    }
+                "data_collection": {
+                    "cookies": {"mode": "allowlist", "terms": ["identity"]}
                 }
             },
             {
@@ -172,7 +158,7 @@ COOKIE_HEADER = "jwt=tokenval; theme=dark; lang=en; identity=alice"
         pytest.param(
             {
                 "send_default_pii": False,
-                "_experiments": {"data_collection": {"cookies": {"mode": "denylist"}}},
+                "data_collection": {"cookies": {"mode": "denylist"}},
             },
             {
                 "jwt": SENSITIVE_DATA_SUBSTITUTE,
@@ -223,16 +209,14 @@ _QUERY_PARAM_DATA_COLLECTION_CASES = [
         id="defaults",
     ),
     pytest.param(
-        {"_experiments": {"data_collection": {}}},
+        {"data_collection": {}},
         "toy=tennisball&color=red&auth=%5BFiltered%5D",
         id="data_collection_denylist_default",
     ),
     pytest.param(
         {
-            "_experiments": {
-                "data_collection": {
-                    "url_query_params": {"mode": "denylist", "terms": ["toy"]}
-                }
+            "data_collection": {
+                "url_query_params": {"mode": "denylist", "terms": ["toy"]}
             }
         },
         "toy=%5BFiltered%5D&color=red&auth=%5BFiltered%5D",
@@ -240,10 +224,8 @@ _QUERY_PARAM_DATA_COLLECTION_CASES = [
     ),
     pytest.param(
         {
-            "_experiments": {
-                "data_collection": {
-                    "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
-                }
+            "data_collection": {
+                "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
             }
         },
         "toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D",
@@ -251,24 +233,22 @@ _QUERY_PARAM_DATA_COLLECTION_CASES = [
     ),
     pytest.param(
         {
-            "_experiments": {
-                "data_collection": {
-                    "url_query_params": {"mode": "allowlist", "terms": ["auth"]}
-                }
+            "data_collection": {
+                "url_query_params": {"mode": "allowlist", "terms": ["auth"]}
             }
         },
         "toy=%5BFiltered%5D&color=%5BFiltered%5D&auth=%5BFiltered%5D",
         id="data_collection_allowlist_sensitive_term",
     ),
     pytest.param(
-        {"_experiments": {"data_collection": {"url_query_params": {"mode": "off"}}}},
+        {"data_collection": {"url_query_params": {"mode": "off"}}},
         None,
         id="data_collection_off",
     ),
     pytest.param(
         {
             "send_default_pii": True,
-            "_experiments": {"data_collection": {"url_query_params": {"mode": "off"}}},
+            "data_collection": {"url_query_params": {"mode": "off"}},
         },
         None,
         id="data_collection_wins_over_send_default_pii",
@@ -299,7 +279,7 @@ def test_url_query_data_collection(
 
     (server_span,) = [item.payload for item in items]
 
-    data_collection_enabled = "data_collection" in init_kwargs.get("_experiments", {})
+    data_collection_enabled = "data_collection" in init_kwargs
     url_attrs_expected = data_collection_enabled or init_kwargs.get(
         "send_default_pii", False
     )
@@ -325,7 +305,7 @@ def test_url_query_data_collection_no_query_string(
     sentry_init(
         integrations=[TornadoIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"data_collection": {}},
+        data_collection={},
     )
 
     items = capture_items("span")
@@ -349,7 +329,7 @@ def test_url_query_data_collection_repeated_and_blank_params(
     sentry_init(
         integrations=[TornadoIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"data_collection": {}},
+        data_collection={},
     )
 
     items = capture_items("span")
@@ -390,7 +370,7 @@ def test_request_body_data_collection(
     sentry_init(
         integrations=[TornadoIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"data_collection": data_collection},
+        data_collection=data_collection,
     )
 
     items = capture_items("span")
@@ -420,7 +400,7 @@ def test_oversized_request_body_not_annotated_data_collection(
         integrations=[TornadoIntegration()],
         traces_sample_rate=1.0,
         max_request_body_size="small",
-        _experiments={"data_collection": {"http_bodies": []}},
+        data_collection={"http_bodies": []},
     )
 
     items = capture_items("span")
@@ -460,7 +440,7 @@ def test_request_body_data_collection_event_processor(
 ):
     sentry_init(
         integrations=[TornadoIntegration()],
-        _experiments={"data_collection": data_collection},
+        data_collection=data_collection,
     )
 
     events = capture_events()
@@ -512,7 +492,7 @@ def test_transactions(
 
     client = tornado_testcase(Application([(r"/hi", handler)]))
 
-    with sentry_sdk.traces.start_span(name="client") as span:
+    with sentry_sdk.start_span(name="client") as span:
         request_headers = dict(span._iter_headers())
 
     response = client.fetch(

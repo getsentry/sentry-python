@@ -5,8 +5,6 @@ docker run -d -p 18123:8123 -p9000:9000 --name clickhouse-test --ulimit nofile=2
 ```
 """
 
-from unittest import mock
-
 import clickhouse_driver
 from clickhouse_driver import Client, connect
 
@@ -23,6 +21,7 @@ if clickhouse_driver.VERSION < (0, 2, 6):
 def test_clickhouse_client_breadcrumbs(sentry_init, capture_events) -> None:
     sentry_init(
         integrations=[ClickhouseDriverIntegration()],
+        data_collection={},
         _experiments={"record_sql_params": True},
     )
     events = capture_events()
@@ -123,113 +122,12 @@ def test_clickhouse_client_breadcrumbs(sentry_init, capture_events) -> None:
     assert actual_query_breadcrumbs == expected_breadcrumbs
 
 
-def test_clickhouse_client_breadcrumbs_with_pii(sentry_init, capture_events) -> None:
-    sentry_init(
-        integrations=[ClickhouseDriverIntegration()],
-        send_default_pii=True,
-        _experiments={"record_sql_params": True},
-    )
-    events = capture_events()
-
-    client = Client("localhost")
-    client.execute("DROP TABLE IF EXISTS test")
-    client.execute("CREATE TABLE test (x Int32) ENGINE = Memory")
-    client.execute("INSERT INTO test (x) VALUES", [{"x": 100}])
-    client.execute("INSERT INTO test (x) VALUES", [[170], [200]])
-
-    res = client.execute("SELECT sum(x) FROM test WHERE x > %(minv)i", {"minv": 150})
-    assert res[0][0] == 370
-
-    capture_message("hi")
-
-    (event,) = events
-
-    expected_breadcrumbs = [
-        {
-            "category": "query",
-            "data": {
-                "db.system": "clickhouse",
-                "db.driver.name": "clickhouse-driver",
-                "db.name": "",
-                "db.user": "default",
-                "server.address": "localhost",
-                "server.port": 9000,
-                "db.result": [],
-            },
-            "message": "DROP TABLE IF EXISTS test",
-            "type": "default",
-        },
-        {
-            "category": "query",
-            "data": {
-                "db.system": "clickhouse",
-                "db.driver.name": "clickhouse-driver",
-                "db.name": "",
-                "db.user": "default",
-                "server.address": "localhost",
-                "server.port": 9000,
-                "db.result": [],
-            },
-            "message": "CREATE TABLE test (x Int32) ENGINE = Memory",
-            "type": "default",
-        },
-        {
-            "category": "query",
-            "data": {
-                "db.system": "clickhouse",
-                "db.driver.name": "clickhouse-driver",
-                "db.name": "",
-                "db.user": "default",
-                "server.address": "localhost",
-                "server.port": 9000,
-            },
-            "message": "INSERT INTO test (x) VALUES",
-            "type": "default",
-        },
-        {
-            "category": "query",
-            "data": {
-                "db.system": "clickhouse",
-                "db.driver.name": "clickhouse-driver",
-                "db.name": "",
-                "db.user": "default",
-                "server.address": "localhost",
-                "server.port": 9000,
-            },
-            "message": "INSERT INTO test (x) VALUES",
-            "type": "default",
-        },
-        {
-            "category": "query",
-            "data": {
-                "db.system": "clickhouse",
-                "db.driver.name": "clickhouse-driver",
-                "db.name": "",
-                "db.user": "default",
-                "server.address": "localhost",
-                "server.port": 9000,
-                "db.result": [[370]],
-            },
-            "message": "SELECT sum(x) FROM test WHERE x > 150",
-            "type": "default",
-        },
-    ]
-
-    for crumb in expected_breadcrumbs:
-        crumb["data"] = ApproxDict(crumb["data"])
-
-    for crumb in event["breadcrumbs"]["values"]:
-        crumb.pop("timestamp", None)
-
-    assert event["breadcrumbs"]["values"] == expected_breadcrumbs
-
-
 def test_clickhouse_client_breadcrumbs_with_data_collection(
     sentry_init, capture_events
 ) -> None:
     sentry_init(
         integrations=[ClickhouseDriverIntegration()],
-        _experiments={"data_collection": {"database_query_data": True}},
+        data_collection={"database_query_data": True},
     )
     events = capture_events()
 
@@ -331,107 +229,7 @@ def test_clickhouse_client_breadcrumbs_with_data_collection_disabled(
 ) -> None:
     sentry_init(
         integrations=[ClickhouseDriverIntegration()],
-        _experiments={"data_collection": {"database_query_data": False}},
-    )
-    events = capture_events()
-
-    client = Client("localhost")
-    client.execute("DROP TABLE IF EXISTS test")
-    client.execute("CREATE TABLE test (x Int32) ENGINE = Memory")
-    client.execute("INSERT INTO test (x) VALUES", [{"x": 100}])
-    client.execute("INSERT INTO test (x) VALUES", [[170], [200]])
-
-    res = client.execute("SELECT sum(x) FROM test WHERE x > %(minv)i", {"minv": 150})
-    assert res[0][0] == 370
-
-    capture_message("hi")
-
-    (event,) = events
-
-    expected_breadcrumbs = [
-        {
-            "category": "query",
-            "data": {
-                "db.system": "clickhouse",
-                "db.driver.name": "clickhouse-driver",
-                "db.name": "",
-                "db.user": "default",
-                "server.address": "localhost",
-                "server.port": 9000,
-            },
-            "message": "DROP TABLE IF EXISTS test",
-            "type": "default",
-        },
-        {
-            "category": "query",
-            "data": {
-                "db.system": "clickhouse",
-                "db.driver.name": "clickhouse-driver",
-                "db.name": "",
-                "db.user": "default",
-                "server.address": "localhost",
-                "server.port": 9000,
-            },
-            "message": "CREATE TABLE test (x Int32) ENGINE = Memory",
-            "type": "default",
-        },
-        {
-            "category": "query",
-            "data": {
-                "db.system": "clickhouse",
-                "db.driver.name": "clickhouse-driver",
-                "db.name": "",
-                "db.user": "default",
-                "server.address": "localhost",
-                "server.port": 9000,
-            },
-            "message": "INSERT INTO test (x) VALUES",
-            "type": "default",
-        },
-        {
-            "category": "query",
-            "data": {
-                "db.system": "clickhouse",
-                "db.driver.name": "clickhouse-driver",
-                "db.name": "",
-                "db.user": "default",
-                "server.address": "localhost",
-                "server.port": 9000,
-            },
-            "message": "INSERT INTO test (x) VALUES",
-            "type": "default",
-        },
-        {
-            "category": "query",
-            "data": {
-                "db.system": "clickhouse",
-                "db.driver.name": "clickhouse-driver",
-                "db.name": "",
-                "db.user": "default",
-                "server.address": "localhost",
-                "server.port": 9000,
-            },
-            "message": "SELECT sum(x) FROM test WHERE x > 150",
-            "type": "default",
-        },
-    ]
-
-    for crumb in expected_breadcrumbs:
-        crumb["data"] = ApproxDict(crumb["data"])
-
-    for crumb in event["breadcrumbs"]["values"]:
-        crumb.pop("timestamp", None)
-
-    assert event["breadcrumbs"]["values"] == expected_breadcrumbs
-
-
-def test_clickhouse_client_breadcrumbs_data_collection_overrides_pii(
-    sentry_init, capture_events
-) -> None:
-    sentry_init(
-        integrations=[ClickhouseDriverIntegration()],
-        send_default_pii=True,
-        _experiments={"data_collection": {"database_query_data": False}},
+        data_collection={"database_query_data": False},
     )
     events = capture_events()
 
@@ -530,7 +328,7 @@ def test_clickhouse_client_breadcrumbs_with_data_collection_default(
 ) -> None:
     sentry_init(
         integrations=[ClickhouseDriverIntegration()],
-        _experiments={"data_collection": {}},
+        data_collection={},
     )
     events = capture_events()
 
@@ -628,18 +426,14 @@ def test_clickhouse_client_breadcrumbs_with_data_collection_default(
 
 
 def test_clickhouse_client_with_data_collection(sentry_init, capture_items) -> None:
-    # Streamed spans never carry db.params/db.result, regardless of the
-    # data_collection configuration
     sentry_init(
         integrations=[ClickhouseDriverIntegration()],
         traces_sample_rate=1.0,
-        _experiments={
-            "data_collection": {"database_query_data": True},
-        },
+        data_collection={"database_query_data": True},
     )
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         client = Client("localhost")
         client.execute("DROP TABLE IF EXISTS test")
         client.execute("CREATE TABLE test (x Int32) ENGINE = Memory")
@@ -662,6 +456,66 @@ def test_clickhouse_client_with_data_collection(sentry_init, capture_items) -> N
         assert "db.result" not in attribute_keys
 
 
+def test_clickhouse_client_send_data_generator_with_data_collection(
+    sentry_init, capture_events
+) -> None:
+    sentry_init(
+        integrations=[ClickhouseDriverIntegration()],
+        data_collection={"database_query_data": True},
+    )
+    events = capture_events()
+
+    client = Client("localhost")
+    client.execute("DROP TABLE IF EXISTS test")
+    client.execute("CREATE TABLE test (x Int32) ENGINE = Memory")
+    client.execute("INSERT INTO test (x) VALUES", ((i,) for i in range(3)))
+
+    res = client.execute("SELECT sum(x) FROM test")
+    assert res[0][0] == 3
+
+    capture_message("hi")
+
+    (event,) = events
+
+    (insert_breadcrumb,) = [
+        crumb
+        for crumb in event["breadcrumbs"]["values"]
+        if crumb["message"] == "INSERT INTO test (x) VALUES"
+    ]
+
+    assert "db.params" not in insert_breadcrumb["data"]
+
+
+def test_clickhouse_client_send_data_generator_with_data_collection_disabled(
+    sentry_init, capture_events
+) -> None:
+    sentry_init(
+        integrations=[ClickhouseDriverIntegration()],
+        data_collection={"database_query_data": False},
+    )
+    events = capture_events()
+
+    client = Client("localhost")
+    client.execute("DROP TABLE IF EXISTS test")
+    client.execute("CREATE TABLE test (x Int32) ENGINE = Memory")
+    client.execute("INSERT INTO test (x) VALUES", ((i,) for i in range(3)))
+
+    res = client.execute("SELECT sum(x) FROM test")
+    assert res[0][0] == 3
+
+    capture_message("hi")
+
+    (event,) = events
+
+    (insert_breadcrumb,) = [
+        crumb
+        for crumb in event["breadcrumbs"]["values"]
+        if crumb["message"] == "INSERT INTO test (x) VALUES"
+    ]
+
+    assert "db.params" not in insert_breadcrumb["data"]
+
+
 def test_clickhouse_client_spans(
     sentry_init,
     capture_items,
@@ -672,13 +526,14 @@ def test_clickhouse_client_spans(
             "record_sql_params": True,
         },
         traces_sample_rate=1.0,
+        data_collection={},
     )
     items = capture_items("span")
 
     trace_id = None
     span_id = None
 
-    with sentry_sdk.traces.start_span(name="custom parent") as span:
+    with sentry_sdk.start_span(name="custom parent") as span:
         trace_id = span.trace_id
         span_id = span.span_id
 
@@ -771,134 +626,6 @@ def test_clickhouse_client_spans(
                 "sentry.op": "db",
                 "db.query.text": "SELECT sum(x) FROM test WHERE x > 150",
                 "sentry.origin": "auto.db.clickhouse_driver",
-                "server.address": "localhost",
-                "server.port": 9000,
-            },
-            "trace_id": trace_id,
-            "parent_span_id": span_id,
-        },
-        {
-            "name": "custom parent",
-            "attributes": [],
-            "trace_id": trace_id,
-        },
-    ]
-
-    for span in expected_spans:
-        span["attributes"] = ApproxDict(span["attributes"])
-
-    for span in spans:
-        span.pop("span_id", None)
-        span.pop("start_timestamp", None)
-        span.pop("end_timestamp", None)
-        span.pop("is_segment", None)
-        span.pop("status", None)
-
-    assert spans == expected_spans
-
-
-def test_clickhouse_client_spans_with_pii(
-    sentry_init,
-    capture_items,
-    capture_envelopes,
-):
-    sentry_init(
-        integrations=[ClickhouseDriverIntegration()],
-        _experiments={
-            "record_sql_params": True,
-        },
-        traces_sample_rate=1.0,
-        send_default_pii=True,
-    )
-    items = capture_items("span")
-
-    trace_id = None
-    span_id = None
-
-    with sentry_sdk.traces.start_span(name="custom parent") as span:
-        trace_id = span.trace_id
-        span_id = span.span_id
-
-        client = Client("localhost")
-        client.execute("DROP TABLE IF EXISTS test")
-        client.execute("CREATE TABLE test (x Int32) ENGINE = Memory")
-        client.execute("INSERT INTO test (x) VALUES", [{"x": 100}])
-        client.execute("INSERT INTO test (x) VALUES", [[170], [200]])
-
-        res = client.execute(
-            "SELECT sum(x) FROM test WHERE x > %(minv)i", {"minv": 150}
-        )
-        assert res[0][0] == 370
-
-    sentry_sdk.flush()
-    spans = [item.payload for item in items]
-
-    expected_spans = [
-        {
-            "name": "DROP TABLE IF EXISTS test",
-            "attributes": {
-                "db.system.name": "clickhouse",
-                "db.namespace": "",
-                "db.user": "default",
-                "db.query.text": "DROP TABLE IF EXISTS test",
-                "server.address": "localhost",
-                "server.port": 9000,
-                "thread.id": mock.ANY,
-                "thread.name": mock.ANY,
-            },
-            "trace_id": trace_id,
-            "parent_span_id": span_id,
-        },
-        {
-            "name": "CREATE TABLE test (x Int32) ENGINE = Memory",
-            "attributes": {
-                "db.system.name": "clickhouse",
-                "db.namespace": "",
-                "db.user": "default",
-                "db.query.text": "CREATE TABLE test (x Int32) ENGINE = Memory",
-                "server.address": "localhost",
-                "server.port": 9000,
-                "thread.id": mock.ANY,
-                "thread.name": mock.ANY,
-            },
-            "trace_id": trace_id,
-            "parent_span_id": span_id,
-        },
-        {
-            "name": "INSERT INTO test (x) VALUES",
-            "attributes": {
-                "db.system.name": "clickhouse",
-                "db.namespace": "",
-                "db.user": "default",
-                "db.query.text": "INSERT INTO test (x) VALUES",
-                "server.address": "localhost",
-                "server.port": 9000,
-                "thread.id": mock.ANY,
-                "thread.name": mock.ANY,
-            },
-            "trace_id": trace_id,
-            "parent_span_id": span_id,
-        },
-        {
-            "name": "INSERT INTO test (x) VALUES",
-            "attributes": {
-                "db.system.name": "clickhouse",
-                "db.namespace": "",
-                "db.user": "default",
-                "db.query.text": "INSERT INTO test (x) VALUES",
-                "server.address": "localhost",
-                "server.port": 9000,
-            },
-            "trace_id": trace_id,
-            "parent_span_id": span_id,
-        },
-        {
-            "name": "SELECT sum(x) FROM test WHERE x > 150",
-            "attributes": {
-                "db.system.name": "clickhouse",
-                "db.namespace": "",
-                "db.user": "default",
-                "db.query.text": "SELECT sum(x) FROM test WHERE x > 150",
                 "server.address": "localhost",
                 "server.port": 9000,
             },
@@ -928,6 +655,7 @@ def test_clickhouse_client_spans_with_pii(
 def test_clickhouse_dbapi_breadcrumbs(sentry_init, capture_events) -> None:
     sentry_init(
         integrations=[ClickhouseDriverIntegration()],
+        data_collection={},
     )
     events = capture_events()
 
@@ -1008,108 +736,6 @@ def test_clickhouse_dbapi_breadcrumbs(sentry_init, capture_events) -> None:
                 "db.user": "default",
                 "server.address": "localhost",
                 "server.port": 9000,
-            },
-            "message": "SELECT sum(x) FROM test WHERE x > 150",
-            "type": "default",
-        },
-    ]
-
-    for crumb in expected_breadcrumbs:
-        crumb["data"] = ApproxDict(crumb["data"])
-
-    for crumb in event["breadcrumbs"]["values"]:
-        crumb.pop("timestamp", None)
-
-    assert event["breadcrumbs"]["values"] == expected_breadcrumbs
-
-
-def test_clickhouse_dbapi_breadcrumbs_with_pii(sentry_init, capture_events) -> None:
-    sentry_init(
-        integrations=[ClickhouseDriverIntegration()],
-        send_default_pii=True,
-    )
-    events = capture_events()
-
-    conn = connect("clickhouse://localhost")
-    cursor = conn.cursor()
-    cursor.execute("DROP TABLE IF EXISTS test")
-    cursor.execute("CREATE TABLE test (x Int32) ENGINE = Memory")
-    cursor.executemany("INSERT INTO test (x) VALUES", [{"x": 100}])
-    cursor.executemany("INSERT INTO test (x) VALUES", [[170], [200]])
-    cursor.execute("SELECT sum(x) FROM test WHERE x > %(minv)i", {"minv": 150})
-    res = cursor.fetchall()
-
-    assert res[0][0] == 370
-
-    capture_message("hi")
-
-    (event,) = events
-
-    expected_breadcrumbs = [
-        {
-            "category": "query",
-            "data": {
-                "db.system": "clickhouse",
-                "db.driver.name": "clickhouse-driver",
-                "db.name": "",
-                "db.user": "default",
-                "server.address": "localhost",
-                "server.port": 9000,
-                "db.result": [[], []],
-            },
-            "message": "DROP TABLE IF EXISTS test",
-            "type": "default",
-        },
-        {
-            "category": "query",
-            "data": {
-                "db.system": "clickhouse",
-                "db.driver.name": "clickhouse-driver",
-                "db.name": "",
-                "db.user": "default",
-                "server.address": "localhost",
-                "server.port": 9000,
-                "db.result": [[], []],
-            },
-            "message": "CREATE TABLE test (x Int32) ENGINE = Memory",
-            "type": "default",
-        },
-        {
-            "category": "query",
-            "data": {
-                "db.system": "clickhouse",
-                "db.driver.name": "clickhouse-driver",
-                "db.name": "",
-                "db.user": "default",
-                "server.address": "localhost",
-                "server.port": 9000,
-            },
-            "message": "INSERT INTO test (x) VALUES",
-            "type": "default",
-        },
-        {
-            "category": "query",
-            "data": {
-                "db.system": "clickhouse",
-                "db.driver.name": "clickhouse-driver",
-                "db.name": "",
-                "db.user": "default",
-                "server.address": "localhost",
-                "server.port": 9000,
-            },
-            "message": "INSERT INTO test (x) VALUES",
-            "type": "default",
-        },
-        {
-            "category": "query",
-            "data": {
-                "db.system": "clickhouse",
-                "db.driver.name": "clickhouse-driver",
-                "db.name": "",
-                "db.user": "default",
-                "server.address": "localhost",
-                "server.port": 9000,
-                "db.result": [[["370"]], [["'sum(x)'", "'Int64'"]]],
             },
             "message": "SELECT sum(x) FROM test WHERE x > 150",
             "type": "default",
@@ -1136,13 +762,14 @@ def test_clickhouse_dbapi_spans(
             "record_sql_params": True,
         },
         traces_sample_rate=1.0,
+        data_collection={},
     )
     items = capture_items("span")
 
     trace_id = None
     span_id = None
 
-    with sentry_sdk.traces.start_span(name="custom parent") as span:
+    with sentry_sdk.start_span(name="custom parent") as span:
         trace_id = span.trace_id
         span_id = span.span_id
 
@@ -1258,150 +885,15 @@ def test_clickhouse_dbapi_spans(
     assert spans == expected_spans
 
 
-def test_clickhouse_dbapi_spans_with_pii(
-    sentry_init,
-    capture_items,
-    capture_envelopes,
-):
-    sentry_init(
-        integrations=[ClickhouseDriverIntegration()],
-        _experiments={
-            "record_sql_params": True,
-        },
-        traces_sample_rate=1.0,
-        send_default_pii=True,
-    )
-    items = capture_items("span")
-
-    trace_id = None
-    span_id = None
-
-    with sentry_sdk.traces.start_span(name="custom parent") as span:
-        trace_id = span.trace_id
-        span_id = span.span_id
-
-        conn = connect("clickhouse://localhost")
-        cursor = conn.cursor()
-        cursor.execute("DROP TABLE IF EXISTS test")
-        cursor.execute("CREATE TABLE test (x Int32) ENGINE = Memory")
-        cursor.executemany("INSERT INTO test (x) VALUES", [{"x": 100}])
-        cursor.executemany("INSERT INTO test (x) VALUES", [[170], [200]])
-        cursor.execute("SELECT sum(x) FROM test WHERE x > %(minv)i", {"minv": 150})
-        res = cursor.fetchall()
-
-    assert res[0][0] == 370
-
-    sentry_sdk.flush()
-    spans = [item.payload for item in items]
-
-    expected_spans = [
-        {
-            "name": "DROP TABLE IF EXISTS test",
-            "attributes": {
-                "db.system.name": "clickhouse",
-                "db.namespace": "",
-                "db.user": "default",
-                "db.query.text": "DROP TABLE IF EXISTS test",
-                "sentry.op": "db",
-                "sentry.origin": "auto.db.clickhouse_driver",
-                "server.address": "localhost",
-                "server.port": 9000,
-            },
-            "trace_id": trace_id,
-            "parent_span_id": span_id,
-        },
-        {
-            "name": "CREATE TABLE test (x Int32) ENGINE = Memory",
-            "attributes": {
-                "db.system.name": "clickhouse",
-                "db.namespace": "",
-                "db.user": "default",
-                "db.query.text": "CREATE TABLE test (x Int32) ENGINE = Memory",
-                "sentry.op": "db",
-                "sentry.origin": "auto.db.clickhouse_driver",
-                "server.address": "localhost",
-                "server.port": 9000,
-            },
-            "trace_id": trace_id,
-            "parent_span_id": span_id,
-        },
-        {
-            "name": "INSERT INTO test (x) VALUES",
-            "attributes": {
-                "db.system.name": "clickhouse",
-                "db.namespace": "",
-                "db.user": "default",
-                "db.query.text": "INSERT INTO test (x) VALUES",
-                "sentry.op": "db",
-                "sentry.origin": "auto.db.clickhouse_driver",
-                "server.address": "localhost",
-                "server.port": 9000,
-            },
-            "trace_id": trace_id,
-            "parent_span_id": span_id,
-        },
-        {
-            "name": "INSERT INTO test (x) VALUES",
-            "attributes": {
-                "db.system.name": "clickhouse",
-                "db.namespace": "",
-                "db.user": "default",
-                "db.query.text": "INSERT INTO test (x) VALUES",
-                "sentry.op": "db",
-                "sentry.origin": "auto.db.clickhouse_driver",
-                "server.address": "localhost",
-                "server.port": 9000,
-            },
-            "trace_id": trace_id,
-            "parent_span_id": span_id,
-        },
-        {
-            "name": "SELECT sum(x) FROM test WHERE x > 150",
-            "attributes": {
-                "db.system.name": "clickhouse",
-                "db.namespace": "",
-                "db.user": "default",
-                "db.query.text": "SELECT sum(x) FROM test WHERE x > 150",
-                "sentry.op": "db",
-                "sentry.origin": "auto.db.clickhouse_driver",
-                "server.address": "localhost",
-                "server.port": 9000,
-            },
-            "trace_id": trace_id,
-            "parent_span_id": span_id,
-        },
-        {
-            "name": "custom parent",
-            "attributes": [],
-            "trace_id": trace_id,
-        },
-    ]
-
-    for span in expected_spans:
-        span["attributes"] = ApproxDict(span["attributes"])
-
-    for span in spans:
-        span.pop("span_id", None)
-        span.pop("start_timestamp", None)
-        span.pop("end_timestamp", None)
-        span.pop("is_segment", None)
-        span.pop("status", None)
-
-    assert spans == expected_spans
-
-
-def test_span_origin(
-    sentry_init,
-    capture_items,
-    capture_envelopes,
-):
+def test_span_origin(sentry_init, capture_items, capture_envelopes):
     sentry_init(
         integrations=[ClickhouseDriverIntegration()],
         traces_sample_rate=1.0,
+        data_collection={},
     )
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         conn = connect("clickhouse://localhost")
         cursor = conn.cursor()
         cursor.execute("SELECT 1")

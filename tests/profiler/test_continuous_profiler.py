@@ -297,8 +297,8 @@ def test_continuous_profiler_auto_start_and_manual_stop(
 
     thread = threading.current_thread()
 
-    with sentry_sdk.traces.start_span(name="profiling"):
-        with sentry_sdk.traces.start_span(name="op"):
+    with sentry_sdk.start_span(name="profiling"):
+        with sentry_sdk.start_span(name="op"):
             pass
 
     for _ in range(3):
@@ -309,8 +309,8 @@ def test_continuous_profiler_auto_start_and_manual_stop(
 
         envelopes.clear()
 
-        with sentry_sdk.traces.start_span(name="profiling"):
-            with sentry_sdk.traces.start_span(name="op"):
+        with sentry_sdk.start_span(name="profiling"):
+            with sentry_sdk.start_span(name="op"):
                 time.sleep(0.05)
 
         sentry_sdk.flush()
@@ -320,8 +320,8 @@ def test_continuous_profiler_auto_start_and_manual_stop(
 
         envelopes.clear()
 
-        with sentry_sdk.traces.start_span(name="profiling"):
-            with sentry_sdk.traces.start_span(name="op"):
+        with sentry_sdk.start_span(name="profiling"):
+            with sentry_sdk.start_span(name="op"):
                 pass
 
     stop_profiler()
@@ -361,9 +361,9 @@ def test_continuous_profiler_manual_start_and_stop_sampled(
 
         envelopes.clear()
 
-        with sentry_sdk.traces.start_span(name="profiling"):
+        with sentry_sdk.start_span(name="profiling"):
             assert get_profiler_id() is not None, "profiler should be running"
-            with sentry_sdk.traces.start_span(name="op"):
+            with sentry_sdk.start_span(name="op"):
                 time.sleep(0.1)
             assert get_profiler_id() is not None, "profiler should be running"
 
@@ -379,9 +379,9 @@ def test_continuous_profiler_manual_start_and_stop_sampled(
 
         envelopes.clear()
 
-        with sentry_sdk.traces.start_span(name="profiling"):
+        with sentry_sdk.start_span(name="profiling"):
             assert get_profiler_id() is None, "profiler should not be running"
-            with sentry_sdk.traces.start_span(name="op"):
+            with sentry_sdk.start_span(name="op"):
                 time.sleep(0.1)
             assert get_profiler_id() is None, "profiler should not be running"
 
@@ -414,8 +414,8 @@ def test_continuous_profiler_manual_start_and_stop_unsampled(
 
     start_profiler()
 
-    with sentry_sdk.traces.start_span(name="profiling"):
-        with sentry_sdk.traces.start_span(name="op"):
+    with sentry_sdk.start_span(name="profiling"):
+        with sentry_sdk.start_span(name="op"):
             pass
 
     stop_profiler()
@@ -457,11 +457,11 @@ def test_continuous_profiler_auto_start_and_stop_sampled(
 
         profiler_ids = set()
 
-        with sentry_sdk.traces.start_span(name="profiling 1"):
+        with sentry_sdk.start_span(name="profiling 1"):
             profiler_id = get_profiler_id()
             assert profiler_id is not None, "profiler should be running"
             profiler_ids.add(profiler_id)
-            with sentry_sdk.traces.start_span(name="op"):
+            with sentry_sdk.start_span(name="op"):
                 time.sleep(0.1)
             profiler_id = get_profiler_id()
             assert profiler_id is not None, "profiler should be running"
@@ -475,11 +475,11 @@ def test_continuous_profiler_auto_start_and_stop_sampled(
         assert profiler_id is not None, "profiler should be running"
         profiler_ids.add(profiler_id)
 
-        with sentry_sdk.traces.start_span(name="profiling 2"):
+        with sentry_sdk.start_span(name="profiling 2"):
             profiler_id = get_profiler_id()
             assert profiler_id is not None, "profiler should be running"
             profiler_ids.add(profiler_id)
-            with sentry_sdk.traces.start_span(name="op"):
+            with sentry_sdk.start_span(name="op"):
                 time.sleep(0.1)
             profiler_id = get_profiler_id()
             assert profiler_id is not None, "profiler should be running"
@@ -525,9 +525,9 @@ def test_continuous_profiler_auto_start_and_stop_unsampled(
     for _ in range(3):
         envelopes.clear()
 
-        with sentry_sdk.traces.start_span(name="profiling"):
+        with sentry_sdk.start_span(name="profiling"):
             assert get_profiler_id() is None, "profiler should not be running"
-            with sentry_sdk.traces.start_span(name="op"):
+            with sentry_sdk.start_span(name="op"):
                 time.sleep(0.05)
             assert get_profiler_id() is None, "profiler should not be running"
 
@@ -608,8 +608,8 @@ def test_continuous_profiler_run_does_not_null_buffer(
     # Start and verify profiler works
     start_profiler()
     envelopes.clear()
-    with sentry_sdk.traces.start_span(name="profiling"):
-        with sentry_sdk.traces.start_span(name="op"):
+    with sentry_sdk.start_span(name="profiling"):
+        with sentry_sdk.start_span(name="op"):
             pass
 
     # Get the scheduler and create a sentinel buffer.

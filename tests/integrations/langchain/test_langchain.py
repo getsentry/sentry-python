@@ -288,11 +288,7 @@ def test_langchain_text_completion(
     get_model_response,
 ):
     sentry_init(
-        integrations=[
-            LangchainIntegration(
-                include_prompts=True,
-            )
-        ],
+        integrations=[LangchainIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
@@ -366,11 +362,7 @@ def test_langchain_chat_with_run_name(
     nonstreaming_chat_completions_model_response,
 ):
     sentry_init(
-        integrations=[
-            LangchainIntegration(
-                include_prompts=True,
-            )
-        ],
+        integrations=[LangchainIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
@@ -434,11 +426,7 @@ def test_langchain_multi_choice_response(
     nonstreaming_multi_candidate_google_genai_model_response,
 ):
     sentry_init(
-        integrations=[
-            LangchainIntegration(
-                include_prompts=True,
-            )
-        ],
+        integrations=[LangchainIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
@@ -484,11 +472,7 @@ def test_langchain_tool_call_with_run_name(
     capture_items,
 ):
     sentry_init(
-        integrations=[
-            LangchainIntegration(
-                include_prompts=True,
-            )
-        ],
+        integrations=[LangchainIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
@@ -516,13 +500,8 @@ def test_langchain_tool_call_with_run_name(
     reason="LangChain 1.0+ required (ONE AGENT refactor)",
 )
 @pytest.mark.parametrize(
-    "send_default_pii, include_prompts",
-    [
-        (True, True),
-        (True, False),
-        (False, True),
-        (False, False),
-    ],
+    "send_default_pii",
+    [True, False],
 )
 @pytest.mark.parametrize(
     "system_instructions_content,expected_system_instructions",
@@ -558,18 +537,13 @@ def test_langchain_create_agent(
     sentry_init,
     capture_items,
     send_default_pii,
-    include_prompts,
     system_instructions_content,
     expected_system_instructions,
     get_model_response,
     nonstreaming_responses_model_response,
 ):
     sentry_init(
-        integrations=[
-            LangchainIntegration(
-                include_prompts=include_prompts,
-            )
-        ],
+        integrations=[LangchainIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
@@ -643,7 +617,7 @@ def test_langchain_create_agent(
     if LANGCHAIN_OPENAI_VERSION >= (0, 3, 13):
         assert chat_spans[0]["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "gpt-4"
 
-    if send_default_pii and include_prompts:
+    if send_default_pii:
         assert (
             chat_spans[0]["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
             == "Hello, how can I help you?"
@@ -680,28 +654,18 @@ def test_langchain_create_agent(
     reason="LangChain 1.0+ required (ONE AGENT refactor)",
 )
 @pytest.mark.parametrize(
-    "send_default_pii, include_prompts",
-    [
-        (True, True),
-        (True, False),
-        (False, True),
-        (False, False),
-    ],
+    "send_default_pii",
+    [True, False],
 )
 def test_tool_execution_span(
     sentry_init,
     capture_items,
     send_default_pii,
-    include_prompts,
     get_model_response,
     nonstreaming_responses_tool_call_model_responses,
 ):
     sentry_init(
-        integrations=[
-            LangchainIntegration(
-                include_prompts=include_prompts,
-            )
-        ],
+        integrations=[LangchainIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
@@ -842,7 +806,7 @@ def test_tool_execution_span(
             chat_spans[1]["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "gpt-4-0613"
         )
 
-    if send_default_pii and include_prompts:
+    if send_default_pii:
         assert "word" in tool_exec_span["attributes"][SPANDATA.GEN_AI_TOOL_INPUT]
 
         assert "5" in chat_spans[1]["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
@@ -850,9 +814,7 @@ def test_tool_execution_span(
         # Verify tool calls are recorded when PII is enabled
         assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS in chat_spans[0].get(
             "attributes", {}
-        ), (
-            "Tool calls should be recorded when send_default_pii=True and include_prompts=True"
-        )
+        ), "Tool calls should be recorded when send_default_pii=True"
         tool_calls_data = chat_spans[0]["attributes"][
             SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS
         ]
@@ -873,16 +835,10 @@ def test_tool_execution_span(
         # Verify tool calls are NOT recorded when PII is disabled
         assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in chat_spans[0].get(
             "attributes", {}
-        ), (
-            f"Tool calls should NOT be recorded when send_default_pii={send_default_pii} "
-            f"and include_prompts={include_prompts}"
-        )
+        ), f"Tool calls should NOT be recorded when send_default_pii={send_default_pii}"
         assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in chat_spans[1].get(
             "attributes", {}
-        ), (
-            f"Tool calls should NOT be recorded when send_default_pii={send_default_pii} "
-            f"and include_prompts={include_prompts}"
-        )
+        ), f"Tool calls should NOT be recorded when send_default_pii={send_default_pii}"
 
     # Verify that available tools are always recorded regardless of PII settings
     for chat_span in chat_spans:
@@ -890,32 +846,18 @@ def test_tool_execution_span(
         assert "get_word_length" in tools_data
 
 
-@pytest.mark.parametrize(
-    "send_default_pii, include_prompts",
-    [
-        (True, False),
-        (False, True),
-        (False, False),
-    ],
-)
-def test_langchain_openai_tools_agent_no_prompts(
+def test_langchain_openai_tools_agent_no_sensitive_data(
     sentry_init,
     capture_items,
-    send_default_pii,
-    include_prompts,
     get_model_response,
     server_side_event_chunks,
     streaming_chat_completions_model_responses,
 ):
     sentry_init(
-        integrations=[
-            LangchainIntegration(
-                include_prompts=include_prompts,
-            )
-        ],
+        integrations=[LangchainIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        send_default_pii=send_default_pii,
+        send_default_pii=False,
     )
 
     prompt = ChatPromptTemplate.from_messages(
@@ -1032,16 +974,10 @@ def test_langchain_openai_tools_agent_no_prompts(
     # Verify tool calls are NOT recorded when PII is disabled
     assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in chat_spans[0].get(
         "attributes", {}
-    ), (
-        f"Tool calls should NOT be recorded when send_default_pii={send_default_pii} "
-        f"and include_prompts={include_prompts}"
-    )
+    ), "Tool calls should NOT be recorded when send_default_pii=False"
     assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in chat_spans[1].get(
         "attributes", {}
-    ), (
-        f"Tool calls should NOT be recorded when send_default_pii={send_default_pii} "
-        f"and include_prompts={include_prompts}"
-    )
+    ), "Tool calls should NOT be recorded when send_default_pii=False"
 
     # Verify finish_reasons is always an array of strings
     assert chat_spans[0]["attributes"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == [
@@ -1113,11 +1049,7 @@ def test_langchain_openai_tools_agent(
     streaming_chat_completions_model_responses,
 ):
     sentry_init(
-        integrations=[
-            LangchainIntegration(
-                include_prompts=True,
-            )
-        ],
+        integrations=[LangchainIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
@@ -1244,7 +1176,7 @@ def test_langchain_openai_tools_agent(
 
     # Verify tool calls are recorded when PII is enabled
     assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS in chat_spans[0].get("attributes", {}), (
-        "Tool calls should be recorded when send_default_pii=True and include_prompts=True"
+        "Tool calls should be recorded when send_default_pii=True"
     )
     tool_calls_data = chat_spans[0]["attributes"][SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS]
 
@@ -1281,11 +1213,7 @@ def test_langchain_openai_tools_agent_with_config(
     streaming_chat_completions_model_responses,
 ):
     sentry_init(
-        integrations=[
-            LangchainIntegration(
-                include_prompts=True,
-            )
-        ],
+        integrations=[LangchainIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
@@ -1349,32 +1277,18 @@ def test_langchain_openai_tools_agent_with_config(
     assert invoke_agent_span["attributes"]["gen_ai.function_id"] == "my-snazzy-pipeline"
 
 
-@pytest.mark.parametrize(
-    "send_default_pii, include_prompts",
-    [
-        (True, False),
-        (False, True),
-        (False, False),
-    ],
-)
-def test_langchain_openai_tools_agent_stream_no_prompts(
+def test_langchain_openai_tools_agent_stream_no_sensitive_data(
     sentry_init,
     capture_items,
-    send_default_pii,
-    include_prompts,
     get_model_response,
     server_side_event_chunks,
     streaming_chat_completions_model_responses,
 ):
     sentry_init(
-        integrations=[
-            LangchainIntegration(
-                include_prompts=include_prompts,
-            )
-        ],
+        integrations=[LangchainIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        send_default_pii=send_default_pii,
+        send_default_pii=False,
     )
 
     prompt = ChatPromptTemplate.from_messages(
@@ -1493,16 +1407,10 @@ def test_langchain_openai_tools_agent_stream_no_prompts(
     # Verify tool calls are NOT recorded when PII is disabled
     assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in chat_spans[0].get(
         "attributes", {}
-    ), (
-        f"Tool calls should NOT be recorded when send_default_pii={send_default_pii} "
-        f"and include_prompts={include_prompts}"
-    )
+    ), "Tool calls should NOT be recorded when send_default_pii=False"
     assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in chat_spans[1].get(
         "attributes", {}
-    ), (
-        f"Tool calls should NOT be recorded when send_default_pii={send_default_pii} "
-        f"and include_prompts={include_prompts}"
-    )
+    ), "Tool calls should NOT be recorded when send_default_pii=False"
 
     # Verify finish_reasons is always an array of strings
     assert chat_spans[0]["attributes"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == [
@@ -1576,11 +1484,7 @@ def test_langchain_openai_tools_agent_stream(
     streaming_chat_completions_model_responses,
 ):
     sentry_init(
-        integrations=[
-            LangchainIntegration(
-                include_prompts=True,
-            )
-        ],
+        integrations=[LangchainIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
@@ -1710,7 +1614,7 @@ def test_langchain_openai_tools_agent_stream(
 
     # Verify tool calls are recorded when PII is enabled
     assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS in chat_spans[0].get("attributes", {}), (
-        "Tool calls should be recorded when send_default_pii=True and include_prompts=True"
+        "Tool calls should be recorded when send_default_pii=True"
     )
     tool_calls_data = chat_spans[0]["attributes"][SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS]
 
@@ -1747,11 +1651,7 @@ def test_langchain_openai_tools_agent_stream_with_config(
     streaming_chat_completions_model_responses,
 ):
     sentry_init(
-        integrations=[
-            LangchainIntegration(
-                include_prompts=True,
-            )
-        ],
+        integrations=[LangchainIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
@@ -1837,7 +1737,7 @@ def test_langchain_error(
             return "acme-llm"
 
     sentry_init(
-        integrations=[LangchainIntegration(include_prompts=True)],
+        integrations=[LangchainIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
@@ -1894,7 +1794,7 @@ def test_span_status_error(
             return "acme-llm"
 
     sentry_init(
-        integrations=[LangchainIntegration(include_prompts=True)],
+        integrations=[LangchainIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
     )
@@ -1948,7 +1848,7 @@ def test_langchain_tool_error(
     nonstreaming_responses_tool_call_model_responses,
 ):
     sentry_init(
-        integrations=[LangchainIntegration(include_prompts=True)],
+        integrations=[LangchainIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
     )
@@ -2057,7 +1957,7 @@ def test_manual_callback_no_duplication(sentry_init):
     )
 
     # Create a manual SentryLangchainCallback
-    manual_callback = SentryLangchainCallback(include_prompts=False)
+    manual_callback = SentryLangchainCallback()
 
     # Create RunnableConfig with the manual callback
     config = RunnableConfig(callbacks=[manual_callback])
@@ -2080,8 +1980,8 @@ def test_manual_callback_no_duplication(sentry_init):
 def test_span_map_is_instance_variable():
     """Test that each SentryLangchainCallback instance has its own span_map."""
     # Create two separate callback instances
-    callback1 = SentryLangchainCallback(include_prompts=True)
-    callback2 = SentryLangchainCallback(include_prompts=True)
+    callback1 = SentryLangchainCallback()
+    callback2 = SentryLangchainCallback()
 
     # Verify they have different span_map instances
     assert callback1.span_map is not callback2.span_map, (
@@ -2128,7 +2028,7 @@ def test_langchain_callback_manager_with_sentry_callback(sentry_init):
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
     )
-    sentry_callback = SentryLangchainCallback(False)
+    sentry_callback = SentryLangchainCallback()
     local_manager = BaseCallbackManager(handlers=[sentry_callback])
 
     with mock.patch("sentry_sdk.integrations.langchain.manager") as mock_manager_module:
@@ -2194,7 +2094,7 @@ def test_langchain_callback_list_existing_callback(sentry_init):
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
     )
-    sentry_callback = SentryLangchainCallback(False)
+    sentry_callback = SentryLangchainCallback()
     local_callbacks = [sentry_callback]
 
     with mock.patch("sentry_sdk.integrations.langchain.manager") as mock_manager_module:
@@ -2254,7 +2154,7 @@ def test_langchain_message_role_mapping(
             return "openai-chat"
 
     sentry_init(
-        integrations=[LangchainIntegration(include_prompts=True)],
+        integrations=[LangchainIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
@@ -2643,7 +2543,7 @@ def test_langchain_ai_system_detection(
         traces_sample_rate=1.0,
     )
 
-    callback = SentryLangchainCallback(include_prompts=True)
+    callback = SentryLangchainCallback()
 
     run_id = "test-ai-system-uuid"
     serialized = {"_type": ai_type} if ai_type is not None else {}
@@ -2795,11 +2695,10 @@ class TestTransformLangchainMessageContent:
 
 
 @pytest.mark.parametrize(
-    "data_collection,send_default_pii,include_prompts,expected_present,expected_absent",
+    "data_collection,send_default_pii,expected_present,expected_absent",
     [
         pytest.param(
             {"gen_ai": {"inputs": True, "outputs": True}},
-            False,
             False,
             {
                 SPANDATA.GEN_AI_REQUEST_MESSAGES: [
@@ -2816,7 +2715,6 @@ class TestTransformLangchainMessageContent:
         pytest.param(
             {"gen_ai": {"inputs": False, "outputs": False}},
             True,
-            True,
             {},
             [
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
@@ -2827,7 +2725,6 @@ class TestTransformLangchainMessageContent:
         ),
         pytest.param(
             {"gen_ai": {"inputs": True, "outputs": False}},
-            False,
             False,
             {
                 SPANDATA.GEN_AI_REQUEST_MESSAGES: [
@@ -2843,7 +2740,6 @@ class TestTransformLangchainMessageContent:
         pytest.param(
             {"gen_ai": {"inputs": False, "outputs": True}},
             False,
-            False,
             {SPANDATA.GEN_AI_RESPONSE_TEXT: "the model response"},
             [
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
@@ -2853,7 +2749,6 @@ class TestTransformLangchainMessageContent:
         ),
         pytest.param(
             {"gen_ai": {}},
-            False,
             False,
             {
                 SPANDATA.GEN_AI_REQUEST_MESSAGES: [
@@ -2870,7 +2765,6 @@ class TestTransformLangchainMessageContent:
         pytest.param(
             None,
             True,
-            True,
             {
                 SPANDATA.GEN_AI_REQUEST_MESSAGES: [
                     {"role": "user", "content": "How many letters in the word eudca"}
@@ -2886,7 +2780,6 @@ class TestTransformLangchainMessageContent:
         pytest.param(
             None,
             False,
-            True,
             {},
             [
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
@@ -2905,18 +2798,17 @@ def test_langchain_chat_data_collection(
     nonstreaming_chat_completions_model_response,
     data_collection,
     send_default_pii,
-    include_prompts,
     expected_present,
     expected_absent,
 ):
     sentry_init_kwargs = dict(
-        integrations=[LangchainIntegration(include_prompts=include_prompts)],
+        integrations=[LangchainIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
     )
     if data_collection is not None:
-        sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
+        sentry_init_kwargs["data_collection"] = data_collection
 
     sentry_init(**sentry_init_kwargs)
 
@@ -2983,11 +2875,10 @@ def test_langchain_chat_data_collection(
 
 
 @pytest.mark.parametrize(
-    "data_collection,send_default_pii,include_prompts,expected_present,expected_absent",
+    "data_collection,send_default_pii,expected_present,expected_absent",
     [
         pytest.param(
             {"gen_ai": {"inputs": True, "outputs": True}},
-            False,
             False,
             {
                 SPANDATA.GEN_AI_REQUEST_MESSAGES: [
@@ -3007,7 +2898,6 @@ def test_langchain_chat_data_collection(
         pytest.param(
             {"gen_ai": {"inputs": False, "outputs": False}},
             True,
-            True,
             {},
             [
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
@@ -3017,7 +2907,6 @@ def test_langchain_chat_data_collection(
         ),
         pytest.param(
             {"gen_ai": {"inputs": True, "outputs": False}},
-            False,
             False,
             {
                 SPANDATA.GEN_AI_REQUEST_MESSAGES: [
@@ -3036,14 +2925,12 @@ def test_langchain_chat_data_collection(
         pytest.param(
             {"gen_ai": {"inputs": False, "outputs": True}},
             False,
-            False,
             {SPANDATA.GEN_AI_RESPONSE_TEXT: "The capital of France is Paris."},
             [SPANDATA.GEN_AI_REQUEST_MESSAGES],
             id="gen-ai-outputs-enabled-inputs-disabled",
         ),
         pytest.param(
             {"gen_ai": {}},
-            False,
             False,
             {
                 SPANDATA.GEN_AI_REQUEST_MESSAGES: [
@@ -3063,7 +2950,6 @@ def test_langchain_chat_data_collection(
         pytest.param(
             None,
             True,
-            True,
             {
                 SPANDATA.GEN_AI_REQUEST_MESSAGES: [
                     {
@@ -3082,7 +2968,6 @@ def test_langchain_chat_data_collection(
         pytest.param(
             None,
             False,
-            True,
             {},
             [
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
@@ -3099,18 +2984,17 @@ def test_langchain_text_completion_data_collection(
     get_model_response,
     data_collection,
     send_default_pii,
-    include_prompts,
     expected_present,
     expected_absent,
 ):
     sentry_init_kwargs = dict(
-        integrations=[LangchainIntegration(include_prompts=include_prompts)],
+        integrations=[LangchainIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
     )
     if data_collection is not None:
-        sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
+        sentry_init_kwargs["data_collection"] = data_collection
 
     sentry_init(**sentry_init_kwargs)
 
@@ -3177,11 +3061,10 @@ def test_langchain_text_completion_data_collection(
 
 
 @pytest.mark.parametrize(
-    "data_collection,send_default_pii,include_prompts,expected_present,expected_absent",
+    "data_collection,send_default_pii,expected_present,expected_absent",
     [
         pytest.param(
             {"gen_ai": {"inputs": True, "outputs": True}},
-            False,
             False,
             [
                 SPANDATA.GEN_AI_TOOL_DEFINITIONS,
@@ -3192,7 +3075,6 @@ def test_langchain_text_completion_data_collection(
         ),
         pytest.param(
             {"gen_ai": {"inputs": False, "outputs": False}},
-            True,
             True,
             [],
             [
@@ -3205,7 +3087,6 @@ def test_langchain_text_completion_data_collection(
         pytest.param(
             {"gen_ai": {"inputs": True, "outputs": False}},
             False,
-            False,
             [SPANDATA.GEN_AI_TOOL_DEFINITIONS],
             [
                 # REQUEST_AVAILABLE_TOOLS is the legacy value set when data collection is not enabled
@@ -3217,7 +3098,6 @@ def test_langchain_text_completion_data_collection(
         pytest.param(
             {"gen_ai": {"inputs": False, "outputs": True}},
             True,
-            True,
             [SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS],
             [
                 SPANDATA.GEN_AI_TOOL_DEFINITIONS,
@@ -3227,7 +3107,6 @@ def test_langchain_text_completion_data_collection(
         ),
         pytest.param(
             {"gen_ai": {}},
-            False,
             False,
             [
                 SPANDATA.GEN_AI_TOOL_DEFINITIONS,
@@ -3239,7 +3118,6 @@ def test_langchain_text_completion_data_collection(
         pytest.param(
             None,
             True,
-            True,
             [
                 SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
                 SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
@@ -3249,7 +3127,6 @@ def test_langchain_text_completion_data_collection(
         ),
         pytest.param(
             None,
-            False,
             False,
             [SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS],
             [
@@ -3269,18 +3146,17 @@ def test_langchain_data_collection_tools(
     streaming_chat_completions_model_responses,
     data_collection,
     send_default_pii,
-    include_prompts,
     expected_present,
     expected_absent,
 ):
     sentry_init_kwargs = dict(
-        integrations=[LangchainIntegration(include_prompts=include_prompts)],
+        integrations=[LangchainIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
     )
     if data_collection is not None:
-        sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
+        sentry_init_kwargs["data_collection"] = data_collection
 
     sentry_init(**sentry_init_kwargs)
 
@@ -3328,11 +3204,6 @@ def test_langchain_data_collection_tools(
         for s in spans
         if s["attributes"].get("sentry.op") == "gen_ai.chat"
     ]
-    invoke_agent_span = next(
-        s["attributes"]
-        for s in spans
-        if s["attributes"].get("sentry.op") == "gen_ai.invoke_agent"
-    )
 
     assert len(chat_spans) == 2
 
@@ -3351,7 +3222,6 @@ def test_langchain_data_collection_tools(
     ):
         collected = key in expected_present
         assert (key in chat_spans[1]) is collected
-        assert (key in invoke_agent_span) is collected
 
 
 @pytest.mark.parametrize("send_default_pii", [True, False])
@@ -3389,17 +3259,17 @@ def test_langchain_data_collection_request_tool_call_params(
     tool_calls_collected,
 ):
     sentry_init_kwargs = dict(
-        integrations=[LangchainIntegration(include_prompts=False)],
+        integrations=[LangchainIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
     )
     if data_collection is not None:
-        sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
+        sentry_init_kwargs["data_collection"] = data_collection
 
     sentry_init(**sentry_init_kwargs)
 
-    callback = SentryLangchainCallback(include_prompts=False)
+    callback = SentryLangchainCallback()
 
     captured = capture_items("span")
 
@@ -3435,11 +3305,10 @@ def test_langchain_data_collection_request_tool_call_params(
 
 
 @pytest.mark.parametrize(
-    "data_collection,send_default_pii,include_prompts,expected_present,expected_absent",
+    "data_collection,send_default_pii,expected_present,expected_absent",
     [
         pytest.param(
             {"gen_ai": {"inputs": True, "outputs": True}},
-            False,
             False,
             {
                 SPANDATA.GEN_AI_TOOL_INPUT: {"word": "eudca"},
@@ -3451,14 +3320,12 @@ def test_langchain_data_collection_request_tool_call_params(
         pytest.param(
             {"gen_ai": {"inputs": False, "outputs": False}},
             True,
-            True,
             {},
             [SPANDATA.GEN_AI_TOOL_INPUT, SPANDATA.GEN_AI_TOOL_OUTPUT],
             id="gen-ai-inputs-and-outputs-disabled-override-legacy-on",
         ),
         pytest.param(
             {"gen_ai": {"inputs": True, "outputs": False}},
-            False,
             False,
             {SPANDATA.GEN_AI_TOOL_INPUT: {"word": "eudca"}},
             [SPANDATA.GEN_AI_TOOL_OUTPUT],
@@ -3467,14 +3334,12 @@ def test_langchain_data_collection_request_tool_call_params(
         pytest.param(
             {"gen_ai": {"inputs": False, "outputs": True}},
             False,
-            False,
             {SPANDATA.GEN_AI_TOOL_OUTPUT: 5},
             [SPANDATA.GEN_AI_TOOL_INPUT],
             id="gen-ai-outputs-enabled-inputs-disabled",
         ),
         pytest.param(
             {"gen_ai": {}},
-            False,
             False,
             {
                 SPANDATA.GEN_AI_TOOL_INPUT: {"word": "eudca"},
@@ -3486,7 +3351,6 @@ def test_langchain_data_collection_request_tool_call_params(
         pytest.param(
             None,
             True,
-            True,
             {
                 SPANDATA.GEN_AI_TOOL_INPUT: {"word": "eudca"},
                 SPANDATA.GEN_AI_TOOL_OUTPUT: 5,
@@ -3497,7 +3361,6 @@ def test_langchain_data_collection_request_tool_call_params(
         pytest.param(
             None,
             False,
-            True,
             {},
             [SPANDATA.GEN_AI_TOOL_INPUT, SPANDATA.GEN_AI_TOOL_OUTPUT],
             id="no-gen-ai-config-legacy-pii-disabled",
@@ -3513,18 +3376,17 @@ def test_langchain_tool_execution_data_collection(
     streaming_chat_completions_model_responses,
     data_collection,
     send_default_pii,
-    include_prompts,
     expected_present,
     expected_absent,
 ):
     sentry_init_kwargs = dict(
-        integrations=[LangchainIntegration(include_prompts=include_prompts)],
+        integrations=[LangchainIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
     )
     if data_collection is not None:
-        sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
+        sentry_init_kwargs["data_collection"] = data_collection
 
     sentry_init(**sentry_init_kwargs)
 
@@ -3590,11 +3452,10 @@ def test_langchain_tool_execution_data_collection(
 
 @pytest.mark.parametrize("agent_method", ["invoke", "stream"])
 @pytest.mark.parametrize(
-    "data_collection,send_default_pii,include_prompts,expected_present,expected_absent",
+    "data_collection,send_default_pii,expected_present,expected_absent",
     [
         pytest.param(
             {"gen_ai": {"inputs": True, "outputs": True}},
-            False,
             False,
             {
                 SPANDATA.GEN_AI_REQUEST_MESSAGES: [
@@ -3608,14 +3469,12 @@ def test_langchain_tool_execution_data_collection(
         pytest.param(
             {"gen_ai": {"inputs": False, "outputs": False}},
             True,
-            True,
             {},
             [SPANDATA.GEN_AI_REQUEST_MESSAGES, SPANDATA.GEN_AI_RESPONSE_TEXT],
             id="gen-ai-inputs-and-outputs-disabled-override-legacy-on",
         ),
         pytest.param(
             {"gen_ai": {"inputs": True, "outputs": False}},
-            False,
             False,
             {SPANDATA.GEN_AI_REQUEST_MESSAGES: ["How many letters in the word eudca"]},
             [SPANDATA.GEN_AI_RESPONSE_TEXT],
@@ -3624,14 +3483,12 @@ def test_langchain_tool_execution_data_collection(
         pytest.param(
             {"gen_ai": {"inputs": False, "outputs": True}},
             False,
-            False,
             {SPANDATA.GEN_AI_RESPONSE_TEXT: "The word eudca has 5 letters."},
             [SPANDATA.GEN_AI_REQUEST_MESSAGES],
             id="gen-ai-outputs-enabled-inputs-disabled",
         ),
         pytest.param(
             {"gen_ai": {}},
-            False,
             False,
             {
                 SPANDATA.GEN_AI_REQUEST_MESSAGES: [
@@ -3645,7 +3502,6 @@ def test_langchain_tool_execution_data_collection(
         pytest.param(
             None,
             True,
-            True,
             {
                 SPANDATA.GEN_AI_REQUEST_MESSAGES: [
                     "How many letters in the word eudca"
@@ -3658,7 +3514,6 @@ def test_langchain_tool_execution_data_collection(
         pytest.param(
             None,
             False,
-            True,
             {},
             [SPANDATA.GEN_AI_REQUEST_MESSAGES, SPANDATA.GEN_AI_RESPONSE_TEXT],
             id="no-gen-ai-config-legacy-pii-disabled",
@@ -3674,19 +3529,18 @@ def test_langchain_agent_executor_data_collection(
     streaming_chat_completions_model_responses,
     data_collection,
     send_default_pii,
-    include_prompts,
     expected_present,
     expected_absent,
     agent_method,
 ):
     sentry_init_kwargs = dict(
-        integrations=[LangchainIntegration(include_prompts=include_prompts)],
+        integrations=[LangchainIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
     )
     if data_collection is not None:
-        sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
+        sentry_init_kwargs["data_collection"] = data_collection
 
     sentry_init(**sentry_init_kwargs)
 

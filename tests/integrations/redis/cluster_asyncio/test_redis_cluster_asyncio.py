@@ -86,7 +86,7 @@ async def test_async_basic(
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         await connection.set("bar", 1)
 
     sentry_sdk.flush()
@@ -130,7 +130,7 @@ async def test_async_redis_pipeline(
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         pipeline = connection.pipeline()
         pipeline.get("foo")
         pipeline.set("bar", 1)
@@ -163,7 +163,7 @@ async def test_async_span_origin(sentry_init, capture_items):
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         # default case
         await connection.set("somekey", "somevalue")
 

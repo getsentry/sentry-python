@@ -127,7 +127,7 @@ async def test_grpc_server_continues_transaction(
     stub = gRPCTestServiceStub(channel)
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent") as segment_span:
+    with sentry_sdk.start_span(name="custom parent") as segment_span:
         metadata = (
             (
                 "baggage",
@@ -213,7 +213,7 @@ async def test_grpc_client_starts_span(
     stub = gRPCTestServiceStub(channel)
     items = capture_items_forksafe("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent") as span:
+    with sentry_sdk.start_span(name="custom parent") as span:
         await stub.TestServe(gRPCTestMessage(text="test"))
 
     sentry_sdk.flush()
@@ -258,7 +258,7 @@ async def test_grpc_client_unary_stream_starts_span(
     stub = gRPCTestServiceStub(channel)
     items = capture_items_forksafe("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         response = stub.TestUnaryStream(gRPCTestMessage(text="test"))
         [_ async for _ in response]
 
@@ -332,7 +332,7 @@ async def test_span_origin(
     stub = gRPCTestServiceStub(channel)
     items = capture_items_forksafe("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         await stub.TestServe(gRPCTestMessage(text="test"))
 
     sentry_sdk.flush()
@@ -359,7 +359,7 @@ class TestService(gRPCTestServiceServicer):
 
     @classmethod
     async def TestServe(cls, request, context):  # noqa: N802
-        with sentry_sdk.traces.start_span(
+        with sentry_sdk.start_span(
             name="test",
             attributes={
                 "sentry.op": "test",

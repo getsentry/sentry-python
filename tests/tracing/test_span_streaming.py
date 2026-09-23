@@ -25,9 +25,9 @@ def test_start_span(sentry_init, capture_items):
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="segment") as segment:
+    with sentry_sdk.start_span(name="segment") as segment:
         assert segment._is_segment() is True
-        with sentry_sdk.traces.start_span(name="child") as child:
+        with sentry_sdk.start_span(name="child") as child:
             assert child._is_segment() is False
             assert child._segment == segment
 
@@ -64,8 +64,8 @@ def test_start_span_no_context_manager(sentry_init, capture_items):
 
     items = capture_items("span")
 
-    segment = sentry_sdk.traces.start_span(name="segment")
-    child = sentry_sdk.traces.start_span(name="child")
+    segment = sentry_sdk.start_span(name="segment")
+    child = sentry_sdk.start_span(name="child")
     assert child._segment == segment
     child.end()
     segment.end()
@@ -111,7 +111,7 @@ def test_span_sampled_when_created(sentry_init, capture_items):
 
     items = capture_items("span")
 
-    segment = sentry_sdk.traces.start_span(name="segment")
+    segment = sentry_sdk.start_span(name="segment")
     segment.set_attribute("delayed_attribute", 12)
     segment.end()
 
@@ -132,9 +132,7 @@ def test_start_span_attributes(sentry_init, capture_items):
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(
-        name="segment", attributes={"my_attribute": "my_value"}
-    ):
+    with sentry_sdk.start_span(name="segment", attributes={"my_attribute": "my_value"}):
         ...
 
     sentry_sdk.get_client().flush()
@@ -163,9 +161,7 @@ def test_start_span_attributes_in_traces_sampler(sentry_init, capture_items):
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(
-        name="segment", attributes={"my_attribute": "my_value"}
-    ):
+    with sentry_sdk.start_span(name="segment", attributes={"my_attribute": "my_value"}):
         ...
 
     sentry_sdk.get_client().flush()
@@ -203,7 +199,7 @@ def test_sampling_context(sentry_init, capture_items):
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="span") as span:
+    with sentry_sdk.start_span(name="span") as span:
         trace_id = span._trace_id
 
     assert received_trace_id == trace_id
@@ -232,7 +228,7 @@ def test_before_send_span_basic(sentry_init, capture_items):
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(
+    with sentry_sdk.start_span(
         name="span",
         attributes={
             "drop": True,
@@ -272,7 +268,7 @@ def test_before_send_span_invalid_return_value(
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="span"):
+    with sentry_sdk.start_span(name="span"):
         ...
 
     sentry_sdk.get_client().flush()
@@ -298,7 +294,7 @@ def test_before_send_span_unsupported_edit(sentry_init, capture_items):
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="span"):
+    with sentry_sdk.start_span(name="span"):
         ...
 
     sentry_sdk.get_client().flush()
@@ -329,7 +325,7 @@ def test_before_send_span_doesnt_receive_ignored_spans(sentry_init, capture_item
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="ignored"):
+    with sentry_sdk.start_span(name="ignored"):
         ...
 
     sentry_sdk.get_client().flush()
@@ -355,7 +351,7 @@ def test_before_send_span_raises_does_not_crash_application(sentry_init, capture
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="span", attributes={"original": "value"}):
+    with sentry_sdk.start_span(name="span", attributes={"original": "value"}):
         ...
 
     sentry_sdk.get_client().flush()
@@ -378,7 +374,7 @@ def test_span_attributes(sentry_init, capture_items):
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(
+    with sentry_sdk.start_span(
         name="segment", attributes={"attribute1": "value"}
     ) as span:
         assert span.get_attributes()["attribute1"] == "value"
@@ -414,7 +410,7 @@ def test_span_attributes_serialize_early(sentry_init, capture_items):
     class Class:
         pass
 
-    with sentry_sdk.traces.start_span(name="span") as span:
+    with sentry_sdk.start_span(name="span") as span:
         span.set_attributes(
             {
                 # arrays of different types will be serialized
@@ -455,9 +451,9 @@ def test_traces_sampler_drops_span(sentry_init, capture_items):
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="dropped", attributes={"drop": True}):
+    with sentry_sdk.start_span(name="dropped", attributes={"drop": True}):
         ...
-    with sentry_sdk.traces.start_span(name="retained", attributes={"drop": False}):
+    with sentry_sdk.start_span(name="retained", attributes={"drop": False}):
         ...
 
     sentry_sdk.get_client().flush()
@@ -484,11 +480,11 @@ def test_traces_sampler_called_once_per_segment(sentry_init):
         traces_sampler=traces_sampler,
     )
 
-    with sentry_sdk.traces.start_span(name="segment") as segment:
-        with sentry_sdk.traces.start_span(name="child1"):
+    with sentry_sdk.start_span(name="segment") as segment:
+        with sentry_sdk.start_span(name="child1"):
             ...
-        with sentry_sdk.traces.start_span(name="child2"):
-            with sentry_sdk.traces.start_span(name="child3"):
+        with sentry_sdk.start_span(name="child2"):
+            with sentry_sdk.start_span(name="child3"):
                 ...
 
     assert traces_sampler_called == 1
@@ -502,9 +498,9 @@ def test_start_inactive_span(sentry_init, capture_items):
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="segment") as segment:
-        with sentry_sdk.traces.start_span(name="child1", active=False):
-            with sentry_sdk.traces.start_span(name="child2"):
+    with sentry_sdk.start_span(name="segment") as segment:
+        with sentry_sdk.start_span(name="child1", active=False):
+            with sentry_sdk.start_span(name="child2"):
                 # Should have segment as parent since child1 is inactive
                 pass
 
@@ -538,9 +534,9 @@ def test_start_span_override_parent(sentry_init, capture_items):
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="segment") as segment:
-        with sentry_sdk.traces.start_span(name="child1"):
-            with sentry_sdk.traces.start_span(name="child2", parent_span=segment):
+    with sentry_sdk.start_span(name="segment") as segment:
+        with sentry_sdk.start_span(name="child1"):
+            with sentry_sdk.start_span(name="child2", parent_span=segment):
                 pass
 
     sentry_sdk.get_client().flush()
@@ -576,10 +572,10 @@ def test_sibling_segments(sentry_init, capture_items):
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="segment1"):
+    with sentry_sdk.start_span(name="segment1"):
         ...
 
-    with sentry_sdk.traces.start_span(name="segment2"):
+    with sentry_sdk.start_span(name="segment2"):
         ...
 
     sentry_sdk.get_client().flush()
@@ -608,12 +604,12 @@ def test_sibling_segments_new_trace(sentry_init, capture_items):
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="segment1"):
+    with sentry_sdk.start_span(name="segment1"):
         ...
 
-    sentry_sdk.traces.new_trace()
+    sentry_sdk.new_trace()
 
-    with sentry_sdk.traces.start_span(name="segment2"):
+    with sentry_sdk.start_span(name="segment2"):
         ...
 
     sentry_sdk.get_client().flush()
@@ -647,14 +643,14 @@ def test_continue_trace_sampled(sentry_init, capture_items):
     sample_rand = "0.222222"
     sampled = "1"
 
-    sentry_sdk.traces.continue_trace(
+    sentry_sdk.continue_trace(
         {
             "sentry-trace": f"{trace_id}-{parent_span_id}-{sampled}",
             "baggage": f"sentry-trace_id={trace_id},sentry-sample_rate=0.5,sentry-sample_rand={sample_rand}",
         }
     )
 
-    with sentry_sdk.traces.start_span(name="segment") as span:
+    with sentry_sdk.start_span(name="segment") as span:
         ...
 
     assert span.sampled is True
@@ -686,14 +682,14 @@ def test_continue_trace_unsampled(sentry_init, capture_items):
     sample_rand = "0.999999"
     sampled = "0"
 
-    sentry_sdk.traces.continue_trace(
+    sentry_sdk.continue_trace(
         {
             "sentry-trace": f"{trace_id}-{parent_span_id}-{sampled}",
             "baggage": f"sentry-trace_id={trace_id},sentry-sample_rate=0.5,sentry-sample_rand={sample_rand}",
         }
     )
 
-    with sentry_sdk.traces.start_span(name="segment") as span:
+    with sentry_sdk.start_span(name="segment") as span:
         ...
 
     assert span.sampled is False
@@ -739,14 +735,14 @@ def test_backpressure_outcome(
     trace_id = "0af7651916cd43dd8448eb211c80319c"
     parent_span_id = "b7ad6b7169203331"
 
-    sentry_sdk.traces.continue_trace(
+    sentry_sdk.continue_trace(
         {
             "sentry-trace": f"{trace_id}-{parent_span_id}",
             "baggage": f"sentry-trace_id={trace_id},sentry-sample_rand={sample_rand}",
         }
     )
 
-    with sentry_sdk.traces.start_span(name="span") as span:
+    with sentry_sdk.start_span(name="span") as span:
         pass
 
     sentry_sdk.get_client().flush()
@@ -781,14 +777,14 @@ def test_continue_trace_no_sample_rand(sentry_init, capture_items):
     parent_span_id = "b7ad6b7169203331"
     sampled = "1"
 
-    sentry_sdk.traces.continue_trace(
+    sentry_sdk.continue_trace(
         {
             "sentry-trace": f"{trace_id}-{parent_span_id}-{sampled}",
             "baggage": f"sentry-trace_id={trace_id},sentry-sample_rate=0.5",
         }
     )
 
-    with sentry_sdk.traces.start_span(name="segment") as span:
+    with sentry_sdk.start_span(name="segment") as span:
         ...
 
     assert span.sampled is True
@@ -829,9 +825,9 @@ def test_outgoing_traceparent_and_baggage_head_sdk(sentry_init, traces_sample_ra
         traces_sample_rate=traces_sample_rate,
     )
 
-    sentry_sdk.traces.new_trace()
+    sentry_sdk.new_trace()
 
-    with sentry_sdk.traces.start_span(name="span") as span:
+    with sentry_sdk.start_span(name="span") as span:
         assert span.sampled is expected_sampled
 
         trace_id = span.trace_id
@@ -921,7 +917,7 @@ def test_outgoing_traceparent_and_baggage_incoming_trace(
             }
         )
 
-    sentry_sdk.traces.continue_trace(
+    sentry_sdk.continue_trace(
         {
             "sentry-trace": incoming_sentry_trace,
             "baggage": ",".join(
@@ -930,7 +926,7 @@ def test_outgoing_traceparent_and_baggage_incoming_trace(
         }
     )
 
-    with sentry_sdk.traces.start_span(name="span") as span:
+    with sentry_sdk.start_span(name="span") as span:
         assert span.sampled is parent_sampled
 
         traceparent = sentry_sdk.get_traceparent()
@@ -987,7 +983,7 @@ def test_outgoing_traceparent_and_baggage_inconsistent_incoming_trace(
         "sentry-sampled": "true",
     }
 
-    sentry_sdk.traces.continue_trace(
+    sentry_sdk.continue_trace(
         {
             "sentry-trace": incoming_sentry_trace,
             "baggage": ",".join(
@@ -996,7 +992,7 @@ def test_outgoing_traceparent_and_baggage_inconsistent_incoming_trace(
         }
     )
 
-    with sentry_sdk.traces.start_span(name="span") as span:
+    with sentry_sdk.start_span(name="span") as span:
         assert span.sampled is False
 
         traceparent = sentry_sdk.get_traceparent()
@@ -1043,7 +1039,7 @@ def test_outgoing_traceparent_and_baggage_incoming_trace_deferred(
 
     incoming_baggage = {"sentry-trace_id": trace_id, "sentry-sample_rand": "0.500000"}
 
-    sentry_sdk.traces.continue_trace(
+    sentry_sdk.continue_trace(
         {
             "sentry-trace": f"{trace_id}-{parent_span_id}-",
             "baggage": ",".join(
@@ -1052,7 +1048,7 @@ def test_outgoing_traceparent_and_baggage_incoming_trace_deferred(
         }
     )
 
-    with sentry_sdk.traces.start_span(name="span") as span:
+    with sentry_sdk.start_span(name="span") as span:
         assert span.sampled is expected_sampled
 
         traceparent = sentry_sdk.get_traceparent()
@@ -1099,7 +1095,7 @@ def test_outgoing_traceparent_and_baggage_ignored_segment(sentry_init):
         "sentry-sample_rate": "1.0",
     }
 
-    sentry_sdk.traces.continue_trace(
+    sentry_sdk.continue_trace(
         {
             "sentry-trace": f"{trace_id}-{parent_span_id}-1",
             "baggage": ",".join(
@@ -1108,7 +1104,7 @@ def test_outgoing_traceparent_and_baggage_ignored_segment(sentry_init):
         }
     )
 
-    with sentry_sdk.traces.start_span(name="ignored") as span:
+    with sentry_sdk.start_span(name="ignored") as span:
         assert span.sampled is False
 
         traceparent = sentry_sdk.get_traceparent()
@@ -1136,7 +1132,7 @@ def test_outgoing_traceparent_and_baggage_ignored_child_span(sentry_init):
         "sentry-sample_rate": "1.0",
     }
 
-    sentry_sdk.traces.continue_trace(
+    sentry_sdk.continue_trace(
         {
             "sentry-trace": f"{trace_id}-{parent_span_id}-1",
             "baggage": ",".join(
@@ -1145,10 +1141,10 @@ def test_outgoing_traceparent_and_baggage_ignored_child_span(sentry_init):
         }
     )
 
-    with sentry_sdk.traces.start_span(name="span") as segment:
+    with sentry_sdk.start_span(name="span") as segment:
         assert segment.sampled is True
 
-        with sentry_sdk.traces.start_span(name="ignored") as child:
+        with sentry_sdk.start_span(name="ignored") as child:
             assert child.sampled is False
 
             traceparent = sentry_sdk.get_traceparent()
@@ -1170,10 +1166,10 @@ def test_set_span_status(sentry_init, capture_items):
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="span") as span:
+    with sentry_sdk.start_span(name="span") as span:
         span.status = SpanStatus.ERROR
 
-    with sentry_sdk.traces.start_span(name="span") as span:
+    with sentry_sdk.start_span(name="span") as span:
         span.status = "error"
 
     sentry_sdk.get_client().flush()
@@ -1194,7 +1190,7 @@ def test_set_span_status_on_error(sentry_init, capture_items):
     items = capture_items("span")
 
     with pytest.raises(ValueError):
-        with sentry_sdk.traces.start_span(name="span") as span:
+        with sentry_sdk.start_span(name="span") as span:
             raise ValueError("oh no!")
 
     sentry_sdk.get_client().flush()
@@ -1214,7 +1210,7 @@ def test_set_span_status_on_ignored_span(sentry_init, capture_items):
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="ignored") as span:
+    with sentry_sdk.start_span(name="ignored") as span:
         span.status = "error"
 
     sentry_sdk.get_client().flush()
@@ -1312,10 +1308,10 @@ def test_ignore_spans_basic(
     items = capture_items("span")
     lost_event_calls = capture_record_lost_event_calls()
 
-    with sentry_sdk.traces.start_span(name="ignored") as ignored_span:
+    with sentry_sdk.start_span(name="ignored") as ignored_span:
         assert ignored_span.sampled is False
 
-    with sentry_sdk.traces.start_span(name="not ignored") as span:
+    with sentry_sdk.start_span(name="not ignored") as span:
         assert span.sampled is True
 
     sentry_sdk.get_client().flush()
@@ -1343,15 +1339,15 @@ def test_ignore_spans_ignored_segment_drops_whole_tree(
     items = capture_items("span")
     lost_event_calls = capture_record_lost_event_calls()
 
-    with sentry_sdk.traces.start_span(name="ignored") as ignored_span:
+    with sentry_sdk.start_span(name="ignored") as ignored_span:
         assert ignored_span.sampled is False
         assert isinstance(ignored_span, NoOpSpan)
 
-        with sentry_sdk.traces.start_span(name="not ignored") as span1:
+        with sentry_sdk.start_span(name="not ignored") as span1:
             assert span1.sampled is False
             assert isinstance(span1, NoOpSpan)
 
-            with sentry_sdk.traces.start_span(name="not ignored") as span2:
+            with sentry_sdk.start_span(name="not ignored") as span2:
                 assert span2.sampled is False
                 assert isinstance(span2, NoOpSpan)
 
@@ -1377,15 +1373,15 @@ def test_ignore_spans_ignored_segment_drops_whole_tree_explicit_parent_span(
     items = capture_items("span")
     lost_event_calls = capture_record_lost_event_calls()
 
-    ignored_span = sentry_sdk.traces.start_span(name="ignored")
+    ignored_span = sentry_sdk.start_span(name="ignored")
     assert isinstance(ignored_span, NoOpSpan)
     assert ignored_span.sampled is False
 
-    span1 = sentry_sdk.traces.start_span(name="not ignored 1", parent_span=ignored_span)
+    span1 = sentry_sdk.start_span(name="not ignored 1", parent_span=ignored_span)
     assert isinstance(span1, NoOpSpan)
     assert span1.sampled is False
 
-    span2 = sentry_sdk.traces.start_span(name="not ignored 2", parent_span=ignored_span)
+    span2 = sentry_sdk.start_span(name="not ignored 2", parent_span=ignored_span)
     assert isinstance(span2, NoOpSpan)
     assert span2.sampled is False
 
@@ -1416,16 +1412,16 @@ def test_ignore_spans_set_ignored_child_span_as_parent(
     items = capture_items("span")
     lost_event_calls = capture_record_lost_event_calls()
 
-    with sentry_sdk.traces.start_span(name="segment") as segment:
+    with sentry_sdk.start_span(name="segment") as segment:
         assert segment.sampled is True
 
-        with sentry_sdk.traces.start_span(name="ignored") as ignored_span1:
+        with sentry_sdk.start_span(name="ignored") as ignored_span1:
             assert ignored_span1.sampled is False
 
-            with sentry_sdk.traces.start_span(name="ignored") as ignored_span2:
+            with sentry_sdk.start_span(name="ignored") as ignored_span2:
                 assert ignored_span2.sampled is False
 
-                with sentry_sdk.traces.start_span(name="child") as span:
+                with sentry_sdk.start_span(name="child") as span:
                     assert span.sampled is True
                     assert span._parent_span_id == segment.span_id
 
@@ -1455,22 +1451,20 @@ def test_ignore_spans_set_ignored_child_span_as_parent_explicit_parent_span(
     items = capture_items("span")
     lost_event_calls = capture_record_lost_event_calls()
 
-    segment = sentry_sdk.traces.start_span(name="segment")
+    segment = sentry_sdk.start_span(name="segment")
     assert not isinstance(segment, NoOpSpan)
     assert segment.sampled is True
     assert segment._parent_span_id is None
 
-    ignored_span1 = sentry_sdk.traces.start_span(name="ignored", parent_span=segment)
+    ignored_span1 = sentry_sdk.start_span(name="ignored", parent_span=segment)
     assert isinstance(ignored_span1, NoOpSpan)
     assert ignored_span1.sampled is False
 
-    ignored_span2 = sentry_sdk.traces.start_span(
-        name="ignored", parent_span=ignored_span1
-    )
+    ignored_span2 = sentry_sdk.start_span(name="ignored", parent_span=ignored_span1)
     assert isinstance(ignored_span2, NoOpSpan)
     assert ignored_span2.sampled is False
 
-    span = sentry_sdk.traces.start_span(name="child", parent_span=ignored_span2)
+    span = sentry_sdk.start_span(name="child", parent_span=ignored_span2)
     assert not isinstance(span, NoOpSpan)
     assert span.sampled is True
     assert span._parent_span_id == segment.span_id
@@ -1502,21 +1496,21 @@ def test_ignore_spans_reparenting(sentry_init, capture_items):
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="segment") as span1:
+    with sentry_sdk.start_span(name="segment") as span1:
         assert span1.sampled is True
         assert span1._parent_span_id is None
 
-        with sentry_sdk.traces.start_span(name="ignored") as span2:
+        with sentry_sdk.start_span(name="ignored") as span2:
             assert span2.sampled is False
 
-            with sentry_sdk.traces.start_span(name="child 1") as span3:
+            with sentry_sdk.start_span(name="child 1") as span3:
                 assert span3.sampled is True
                 assert span3._parent_span_id == span1.span_id
 
-                with sentry_sdk.traces.start_span(name="ignored") as span4:
+                with sentry_sdk.start_span(name="ignored") as span4:
                     assert span4.sampled is False
 
-                    with sentry_sdk.traces.start_span(name="child 2") as span5:
+                    with sentry_sdk.start_span(name="child 2") as span5:
                         assert span5.sampled is True
                         assert span5._parent_span_id == span3.span_id
 
@@ -1543,10 +1537,10 @@ def test_ignored_spans_produce_client_report(
     items = capture_items("span")
     record_lost_event_calls = capture_record_lost_event_calls()
 
-    with sentry_sdk.traces.start_span(name="ignored"):
-        with sentry_sdk.traces.start_span(name="span1"):
+    with sentry_sdk.start_span(name="ignored"):
+        with sentry_sdk.start_span(name="span1"):
             pass
-        with sentry_sdk.traces.start_span(name="span2"):
+        with sentry_sdk.start_span(name="span2"):
             pass
 
     sentry_sdk.get_client().flush()
@@ -1578,7 +1572,7 @@ def test_segment_span_has_profiler_id(
     items = capture_items("span")
     envelopes = capture_envelopes()
 
-    with sentry_sdk.traces.start_span(name="profiled segment"):
+    with sentry_sdk.start_span(name="profiled segment"):
         time.sleep(0.1)
 
     sentry_sdk.get_client().flush()
@@ -1612,7 +1606,7 @@ def test_segment_span_no_profiler_id_when_unsampled(
     items = capture_items("span")
     envelopes = capture_envelopes()
 
-    with sentry_sdk.traces.start_span(name="segment"):
+    with sentry_sdk.start_span(name="segment"):
         time.sleep(0.05)
 
     sentry_sdk.get_client().flush()
@@ -1646,7 +1640,7 @@ def test_profile_stops_when_segment_ends(
     )
     capture_envelopes()
 
-    with sentry_sdk.traces.start_span(name="segment") as span:
+    with sentry_sdk.start_span(name="segment") as span:
         time.sleep(0.1)
         assert span._continuous_profile is not None
         assert span._continuous_profile.active is True
@@ -1667,7 +1661,7 @@ def test_default_attributes(sentry_init, capture_envelopes):
 
     envelopes = capture_envelopes()
 
-    with sentry_sdk.traces.start_span(name="test"):
+    with sentry_sdk.start_span(name="test"):
         ...
 
     sentry_sdk.get_client().flush()
@@ -1723,7 +1717,7 @@ def test_ignore_spans_top_level(
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name=name, attributes=attributes) as span:
+    with sentry_sdk.start_span(name=name, attributes=attributes) as span:
         if ignored:
             assert span.sampled is False
             assert isinstance(span, NoOpSpan)

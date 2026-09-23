@@ -60,7 +60,7 @@ async def test_async_redis_pipeline(
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         pipeline = connection.pipeline(transaction=is_transaction)
         pipeline.get("foo")
         pipeline.set("bar", 1)
@@ -95,7 +95,7 @@ async def test_async_span_origin(sentry_init, capture_events, capture_items):
     connection = FakeRedis()
 
     items = capture_items("span")
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         # default case
         await connection.set("somekey", "somevalue")
 

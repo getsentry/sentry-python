@@ -95,7 +95,7 @@ def _handle_request_impl(self: "RequestHandler") -> "Generator[None, None, None]
         processor = _make_event_processor(weak_handler)
         scope.add_event_processor(processor)
 
-        sentry_sdk.traces.continue_trace(dict(headers))
+        sentry_sdk.continue_trace(dict(headers))
         scope.set_custom_sampling_context({"tornado_request": self.request})
 
         if self.request.remote_ip:
@@ -107,7 +107,7 @@ def _handle_request_impl(self: "RequestHandler") -> "Generator[None, None, None]
             elif should_send_default_pii():
                 scope.set_attribute(SPANDATA.USER_IP_ADDRESS, self.request.remote_ip)
 
-        with sentry_sdk.traces.start_span(
+        with sentry_sdk.start_span(
             name=_DEFAULT_ROOT_SPAN_NAME,
             attributes={
                 "sentry.op": OP.HTTP_SERVER,

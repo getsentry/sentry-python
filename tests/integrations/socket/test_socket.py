@@ -15,7 +15,7 @@ def test_getaddrinfo_trace(sentry_init, capture_items):
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="root"):
+    with sentry_sdk.start_span(name="root"):
         socket.getaddrinfo("localhost", PORT)
 
     sentry_sdk.flush()
@@ -40,7 +40,7 @@ def test_create_connection_trace(sentry_init, capture_items):
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="root"):
+    with sentry_sdk.start_span(name="root"):
         socket.create_connection(("localhost", PORT), timeout, None)
 
     sentry_sdk.flush()
@@ -69,7 +69,7 @@ def test_span_origin(sentry_init, capture_items):
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="foo"):
+    with sentry_sdk.start_span(name="foo"):
         socket.create_connection(("localhost", PORT), 1, None)
 
     sentry_sdk.flush()

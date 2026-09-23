@@ -493,24 +493,24 @@ async def test_agent_invocation_span_no_pii(
     "init_kwargs,expect_messages",
     [
         pytest.param(
-            {"_experiments": {"data_collection": {"gen_ai": {"inputs": True}}}},
+            {"data_collection": {"gen_ai": {"inputs": True}}},
             True,
             id="gen_ai_inputs_true",
         ),
         pytest.param(
-            {"_experiments": {"data_collection": {"gen_ai": {"inputs": False}}}},
+            {"data_collection": {"gen_ai": {"inputs": False}}},
             False,
             id="gen_ai_inputs_false",
         ),
         pytest.param(
-            {"_experiments": {"data_collection": {}}},
+            {"data_collection": {}},
             True,
             id="data_collection_defaults_to_enabled",
         ),
         pytest.param(
             {
                 "send_default_pii": True,
-                "_experiments": {"data_collection": {"gen_ai": {"inputs": False}}},
+                "data_collection": {"gen_ai": {"inputs": False}},
             },
             False,
             id="data_collection_wins_over_send_default_pii_true",
@@ -518,7 +518,7 @@ async def test_agent_invocation_span_no_pii(
         pytest.param(
             {
                 "send_default_pii": False,
-                "_experiments": {"data_collection": {"gen_ai": {"inputs": True}}},
+                "data_collection": {"gen_ai": {"inputs": True}},
             },
             True,
             id="data_collection_wins_over_send_default_pii_false",
@@ -603,24 +603,24 @@ async def test_invoke_agent_span_data_collection_inputs(
     "init_kwargs,expect_response_text",
     [
         pytest.param(
-            {"_experiments": {"data_collection": {"gen_ai": {"outputs": True}}}},
+            {"data_collection": {"gen_ai": {"outputs": True}}},
             True,
             id="gen_ai_outputs_true",
         ),
         pytest.param(
-            {"_experiments": {"data_collection": {"gen_ai": {"outputs": False}}}},
+            {"data_collection": {"gen_ai": {"outputs": False}}},
             False,
             id="gen_ai_outputs_false",
         ),
         pytest.param(
-            {"_experiments": {"data_collection": {}}},
+            {"data_collection": {}},
             True,
             id="data_collection_defaults_to_enabled",
         ),
         pytest.param(
             {
                 "send_default_pii": True,
-                "_experiments": {"data_collection": {"gen_ai": {"outputs": False}}},
+                "data_collection": {"gen_ai": {"outputs": False}},
             },
             False,
             id="data_collection_wins_over_send_default_pii_true",
@@ -628,7 +628,7 @@ async def test_invoke_agent_span_data_collection_inputs(
         pytest.param(
             {
                 "send_default_pii": False,
-                "_experiments": {"data_collection": {"gen_ai": {"outputs": True}}},
+                "data_collection": {"gen_ai": {"outputs": True}},
             },
             True,
             id="data_collection_wins_over_send_default_pii_false",
@@ -771,7 +771,7 @@ async def test_data_collection_inputs(
     }
     init_kwargs["disabled_integrations"] = [StdlibIntegration]
     if data_collection is not None:
-        init_kwargs["_experiments"] = {"data_collection": data_collection}
+        init_kwargs["data_collection"] = data_collection
 
     with patch.object(
         agent.model._client._client,
@@ -907,7 +907,7 @@ async def test_data_collection_outputs(
     }
     init_kwargs["disabled_integrations"] = [StdlibIntegration]
     if data_collection is not None:
-        init_kwargs["_experiments"] = {"data_collection": data_collection}
+        init_kwargs["data_collection"] = data_collection
 
     with patch.object(
         agent_with_tool.model._client._client,
@@ -2461,7 +2461,7 @@ async def test_tool_execution_span_data_collection(
         "send_default_pii": send_default_pii,
     }
     if data_collection is not None:
-        init_kwargs["_experiments"] = {"data_collection": data_collection}
+        init_kwargs["data_collection"] = data_collection
 
     _, tool_span_data = await run_tool_agent(
         simple_test_tool,
@@ -2492,7 +2492,7 @@ async def test_tool_execution_error_data_collection(
 
     tool_span, tool_span_data = await run_tool_agent(
         failing_tool,
-        _experiments={"data_collection": {"gen_ai": {"outputs": False}}},
+        data_collection={"gen_ai": {"outputs": False}},
     )
 
     assert tool_span_data[SPANDATA.GEN_AI_TOOL_NAME] == "failing_tool"
@@ -2508,9 +2508,7 @@ async def test_tool_execution_span_non_pii_data_always_set(
     _, tool_span_data = await run_tool_agent(
         simple_test_tool,
         run_kwargs={"conversation_id": "conv_tool_test_456"},
-        _experiments={
-            "data_collection": {"gen_ai": {"inputs": False, "outputs": False}}
-        },
+        data_collection={"gen_ai": {"inputs": False, "outputs": False}},
     )
 
     assert tool_span_data[SPANDATA.GEN_AI_TOOL_NAME] == "simple_test_tool"
@@ -2632,11 +2630,11 @@ async def test_hosted_mcp_tool_propagation_header_streamed(
     ) as create, mock.patch(
         "sentry_sdk.tracing_utils.Random.randrange", return_value=500000
     ):
-        sentry_sdk.traces.continue_trace(
+        sentry_sdk.continue_trace(
             {"sentry-trace": "01234567890123456789012345678901-0000000000000000"}
         )
 
-        with sentry_sdk.traces.start_span(
+        with sentry_sdk.start_span(
             name="/interactions/other-dogs/new-dog",
             attributes={
                 "sentry.op": "greeting.sniff",
@@ -2734,11 +2732,11 @@ async def test_hosted_mcp_tool_propagation_headers(
     ) as send, mock.patch(
         "sentry_sdk.tracing_utils.Random.randrange", return_value=500000
     ):
-        sentry_sdk.traces.continue_trace(
+        sentry_sdk.continue_trace(
             {"sentry-trace": "01234567890123456789012345678901-0000000000000000"}
         )
 
-        with sentry_sdk.traces.start_span(
+        with sentry_sdk.start_span(
             name="/interactions/other-dogs/new-dog",
             attributes={
                 "sentry.op": "greeting.sniff",
@@ -3077,7 +3075,7 @@ def test_openai_agents_message_role_mapping(sentry_init, test_message, expected_
 
     get_response_kwargs = {"input": [test_message]}
 
-    with sentry_sdk.traces.start_span(name="test") as span:
+    with sentry_sdk.start_span(name="test") as span:
         _set_input_data(span, get_response_kwargs)
 
     # Verify that messages were processed and roles were mapped
@@ -3635,7 +3633,7 @@ async def test_streaming_span_update_captures_response_data(
     ]
 
     # Test the unified update function (works for both streaming and non-streaming)
-    with sentry_sdk.traces.start_span(
+    with sentry_sdk.start_span(
         attributes={"sentry.op": "gen_ai.chat"}, name="test chat"
     ) as span:
         update_ai_client_span(span, mock_streaming_response)

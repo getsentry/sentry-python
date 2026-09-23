@@ -14,7 +14,7 @@ def test_finds_segment_on_scope(sentry_init):
         traces_sample_rate=1.0,
     )
 
-    with sentry_sdk.traces.start_span(name="dogpark"):
+    with sentry_sdk.start_span(name="dogpark"):
         scope = sentry_sdk.get_current_scope()
         assert scope.span is not None
         assert isinstance(scope.span, Span)
@@ -30,8 +30,8 @@ def test_finds_span_on_scope(sentry_init):
         traces_sample_rate=1.0,
     )
 
-    segment = sentry_sdk.traces.start_span(name="dogpark")
-    sentry_sdk.traces.start_span(name="sniffing", parent_span=segment)
+    segment = sentry_sdk.start_span(name="dogpark")
+    sentry_sdk.start_span(name="sniffing", parent_span=segment)
 
     scope = sentry_sdk.get_current_scope()
 
@@ -120,7 +120,7 @@ def test_start_span_segment_updates_scope_name(sentry_init):
 
     scope = sentry_sdk.get_current_scope()
 
-    with sentry_sdk.traces.start_span(
+    with sentry_sdk.start_span(
         name="foobar", attributes={"sentry.segment.name.source": "test"}
     ):
         assert scope._transaction == "foobar"

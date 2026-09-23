@@ -7,18 +7,14 @@ from sentry_sdk.data_collection import _ALL_HTTP_BODY_TYPES
 from sentry_sdk.utils import has_data_collection_enabled
 
 
-def test_kvcb_invalid_mode():
+def test_kvcb_invalid_mode(sentry_init):
     with pytest.raises(ValueError):
-        sentry_sdk.init(_experiments={"data_collection": {"cookies": {"mode": "nope"}}})  # type: ignore Purposely ignoring to test invalid option
+        sentry_init(data_collection={"cookies": {"mode": "nope"}})  # type: ignore Purposely ignoring to test invalid option
 
 
-def test_stack_frame_variables_invalid_mode():
+def test_stack_frame_variables_invalid_mode(sentry_init):
     with pytest.raises(ValueError):
-        sentry_sdk.init(
-            _experiments={
-                "data_collection": {"stack_frame_variables": {"mode": "nope"}}
-            }
-        )
+        sentry_init(data_collection={"stack_frame_variables": {"mode": "nope"}})
 
 
 @pytest.mark.parametrize(
@@ -31,19 +27,13 @@ def test_stack_frame_variables_invalid_mode():
         "frame_context_lines_float",
     ],
 )
-def test_frame_context_lines_invalid_value(value):
+def test_frame_context_lines_invalid_value(sentry_init, value):
     with pytest.raises(ValueError):
-        sentry_sdk.init(
-            _experiments={"data_collection": {"frame_context_lines": value}}
-        )
+        sentry_init(data_collection={"frame_context_lines": value})
 
 
-def test_kvcb_from_dict_defaults_mode():
-    sentry_sdk.init(
-        _experiments={
-            "data_collection": {"cookies": {"mode": "denylist", "terms": ["x"]}}
-        }
-    )
+def test_kvcb_from_dict_defaults_mode(sentry_init):
+    sentry_init(data_collection={"cookies": {"mode": "denylist", "terms": ["x"]}})
     client = sentry_sdk.get_client()
     assert client.options["data_collection"]["cookies"] == {
         "mode": "denylist",
@@ -51,22 +41,22 @@ def test_kvcb_from_dict_defaults_mode():
     }
 
 
-def test_http_headers_collection_defaults():
+def test_http_headers_collection_defaults(sentry_init):
     default_terms = ["forwarded", "-ip", "remote-", "via", "-user"]
 
-    sentry_sdk.init(_experiments={"data_collection": {"http_headers": {}}})  # type: ignore Purposely ignoring to test invalid option
+    sentry_init(data_collection={"http_headers": {}})  # type: ignore Purposely ignoring to test invalid option
     client = sentry_sdk.get_client()
     assert client.options["data_collection"]["http_headers"]["request"] == {
         "mode": "denylist"
     }
 
-    sentry_sdk.init(_experiments={"data_collection": {"http_headers": "off"}})  # type: ignore Purposely ignoring to test invalid option
+    sentry_init(data_collection={"http_headers": "off"})  # type: ignore Purposely ignoring to test invalid option
     client = sentry_sdk.get_client()
     assert client.options["data_collection"]["http_headers"]["request"] == {
         "mode": "denylist"
     }
 
-    sentry_sdk.init()
+    sentry_init()
     client = sentry_sdk.get_client()
     assert client.options["data_collection"]["http_headers"]["request"] == {
         "mode": "denylist",
@@ -74,13 +64,11 @@ def test_http_headers_collection_defaults():
     }
 
 
-def test_http_headers_use_default_in_setting_with_missing_config():
-    sentry_sdk.init(
-        _experiments={
-            "data_collection": {
-                "http_headers": {
-                    "request": {"mode": "allowlist", "terms": ["x-id"]},
-                }
+def test_http_headers_use_default_in_setting_with_missing_config(sentry_init):
+    sentry_init(
+        data_collection={
+            "http_headers": {
+                "request": {"mode": "allowlist", "terms": ["x-id"]},
             }
         }
     )
@@ -93,8 +81,8 @@ def test_http_headers_use_default_in_setting_with_missing_config():
     }
 
 
-def _initialize_client_with_config(**options):
-    sentry_sdk.init(**options)
+def _initialize_client_with_config(sentry_init, **options):
+    sentry_init(**options)
     return sentry_sdk.get_client().options["data_collection"]
 
 
@@ -141,7 +129,7 @@ def _get(dc, path):
             id="send_default_pii_false_collects_no_pii",
         ),
         pytest.param(
-            {"_experiments": {"data_collection": {}}},
+            {"data_collection": {}},
             {
                 "user_info": True,
                 "gen_ai.inputs": True,
@@ -154,11 +142,7 @@ def _get(dc, path):
             id="explicit_data_collection_uses_spec_defaults",
         ),
         pytest.param(
-            {
-                "_experiments": {
-                    "data_collection": {"user_info": False, "http_bodies": []}
-                }
-            },
+            {"data_collection": {"user_info": False, "http_bodies": []}},
             {
                 "user_info": False,
                 "http_bodies": [],
@@ -169,7 +153,7 @@ def _get(dc, path):
         ),
         pytest.param(
             {
-                "_experiments": {"data_collection": {}},
+                "data_collection": {},
                 "include_local_variables": False,
                 "include_source_context": False,
             },
@@ -178,13 +162,11 @@ def _get(dc, path):
         ),
         pytest.param(
             {
-                "_experiments": {
-                    "data_collection": {
-                        "cookies": {"mode": "off"},
-                        "url_query_params": {"mode": "allowlist", "terms": ["page"]},
-                        "http_headers": {"request": {"mode": "off"}},
-                        "gen_ai": {"inputs": False, "outputs": True},
-                    }
+                "data_collection": {
+                    "cookies": {"mode": "off"},
+                    "url_query_params": {"mode": "allowlist", "terms": ["page"]},
+                    "http_headers": {"request": {"mode": "off"}},
+                    "gen_ai": {"inputs": False, "outputs": True},
                 }
             },
             {
@@ -199,14 +181,12 @@ def _get(dc, path):
         ),
         pytest.param(
             {
-                "_experiments": {
-                    "data_collection": {
-                        "cookies": None,
-                        "http_headers": None,
-                        "url_query_params": None,
-                        "graphql": None,
-                        "gen_ai": None,
-                    }
+                "data_collection": {
+                    "cookies": None,
+                    "http_headers": None,
+                    "url_query_params": None,
+                    "graphql": None,
+                    "gen_ai": None,
                 }
             },
             {
@@ -221,7 +201,7 @@ def _get(dc, path):
             id="none_values_fall_back_to_spec_defaults",
         ),
         pytest.param(
-            {"_experiments": {"data_collection": {}}},
+            {"data_collection": {}},
             {
                 "graphql.document": True,
                 "graphql.variables": True,
@@ -250,48 +230,46 @@ def _get(dc, path):
             id="legacy_pii_on_collects_graphql_database_and_queues",
         ),
         pytest.param(
-            {"_experiments": {"data_collection": {"graphql": {"variables": False}}}},
+            {"data_collection": {"graphql": {"variables": False}}},
             {"graphql.document": True, "graphql.variables": False},
             id="explicit_partial_graphql_fills_omitted",
         ),
         pytest.param(
-            {"_experiments": {"data_collection": {"frame_context_lines": True}}},
+            {"data_collection": {"frame_context_lines": True}},
             {"frame_context_lines": 5},
             id="frame_context_lines_bool_fallback_true",
         ),
         pytest.param(
-            {"_experiments": {"data_collection": {"frame_context_lines": False}}},
+            {"data_collection": {"frame_context_lines": False}},
             {"frame_context_lines": 0},
             id="frame_context_lines_bool_fallback_false",
         ),
         pytest.param(
-            {"_experiments": {"data_collection": {"frame_context_lines": 3}}},
+            {"data_collection": {"frame_context_lines": 3}},
             {"frame_context_lines": 3},
             id="frame_context_lines_bool_fallback_3",
         ),
         pytest.param(
-            {"_experiments": {"data_collection": {"frame_context_lines": 0}}},
+            {"data_collection": {"frame_context_lines": 0}},
             {"frame_context_lines": 0},
             id="frame_context_lines_bool_fallback_0",
         ),
         pytest.param(
-            {"_experiments": {"data_collection": {"stack_frame_variables": True}}},
+            {"data_collection": {"stack_frame_variables": True}},
             {"stack_frame_variables": True},
             id="stack_frame_variables_explicit_true",
         ),
         pytest.param(
-            {"_experiments": {"data_collection": {"stack_frame_variables": False}}},
+            {"data_collection": {"stack_frame_variables": False}},
             {"stack_frame_variables": False},
             id="stack_frame_variables_explicit_false",
         ),
         pytest.param(
             {
-                "_experiments": {
-                    "data_collection": {
-                        "stack_frame_variables": {
-                            "mode": "allowlist",
-                            "terms": ["order_id"],
-                        }
+                "data_collection": {
+                    "stack_frame_variables": {
+                        "mode": "allowlist",
+                        "terms": ["order_id"],
                     }
                 }
             },
@@ -304,13 +282,7 @@ def _get(dc, path):
             id="stack_frame_variables_allowlist_dict",
         ),
         pytest.param(
-            {
-                "_experiments": {
-                    "data_collection": {
-                        "stack_frame_variables": {"terms": ["order_id"]}
-                    }
-                }
-            },
+            {"data_collection": {"stack_frame_variables": {"terms": ["order_id"]}}},
             {
                 "stack_frame_variables": {
                     "mode": "denylist",
@@ -320,26 +292,22 @@ def _get(dc, path):
             id="stack_frame_variables_dict_defaults_mode_to_denylist",
         ),
         pytest.param(
-            {
-                "_experiments": {
-                    "data_collection": {"stack_frame_variables": {"mode": "off"}}
-                }
-            },
+            {"data_collection": {"stack_frame_variables": {"mode": "off"}}},
             {"stack_frame_variables": {"mode": "off"}},
             id="stack_frame_variables_off_dict_omits_terms",
         ),
         pytest.param(
-            {"_experiments": {"data_collection": {"stack_frame_variables": "yes"}}},
+            {"data_collection": {"stack_frame_variables": "yes"}},
             {"stack_frame_variables": True},
             id="stack_frame_variables_non_bool_truthy_coerces_to_true",
         ),
         pytest.param(
-            {"_experiments": {"data_collection": {"stack_frame_variables": ""}}},
+            {"data_collection": {"stack_frame_variables": ""}},
             {"stack_frame_variables": False},
             id="stack_frame_variables_non_bool_falsy_coerces_to_false",
         ),
         pytest.param(
-            {"_experiments": {"data_collection": {"frame_context_lines": None}}},
+            {"data_collection": {"frame_context_lines": None}},
             {"frame_context_lines": 5},
             id="frame_context_lines_none_falls_back_to_spec_default",
         ),
@@ -355,18 +323,21 @@ def _get(dc, path):
         ),
     ],
 )
-def test_initialize_client_data_collection(options, expected):
-    dc = _initialize_client_with_config(**options)
+def test_initialize_client_data_collection(sentry_init, options, expected):
+    dc = _initialize_client_with_config(sentry_init, **options)
     for path, value in expected.items():
         assert _get(dc, path) == value, f"{path} != {value!r}"
 
 
-def test_initialize_client_data_collection_overrides_send_default_pii_and_warns():
+def test_initialize_client_data_collection_overrides_send_default_pii_and_warns(
+    sentry_init,
+):
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
         dc = _initialize_client_with_config(
+            sentry_init,
             send_default_pii=True,
-            _experiments={"data_collection": {"user_info": False}},
+            data_collection={"user_info": False},
         )
     assert dc["user_info"] is False  # data_collection wins
     assert any(issubclass(w.category, DeprecationWarning) for w in caught)
@@ -390,7 +361,7 @@ def test_initialize_client_data_collection_overrides_send_default_pii_and_warns(
             id="send_default_pii_enables_user_info",
         ),
         pytest.param(
-            {"_experiments": {"data_collection": {"user_info": False}}},
+            {"data_collection": {"user_info": False}},
             {"user_info": False, "provided_by_user": True},
             id="explicit_data_collection_overrides_user_info",
         ),
@@ -402,15 +373,15 @@ def test_initialize_client_data_collection_overrides_send_default_pii_and_warns(
         pytest.param(
             {
                 "spotlight": True,
-                "_experiments": {"data_collection": {"user_info": False}},
+                "data_collection": {"user_info": False},
             },
             {"provided_by_user": True, "user_info": False},
             id="dsnless_spotlight_respects_explicit_data_collection",
         ),
     ],
 )
-def test_client_data_collection_settings(init_kwargs, expected):
-    sentry_sdk.init(**init_kwargs)
+def test_client_data_collection_settings(sentry_init, init_kwargs, expected):
+    sentry_init(**init_kwargs)
     client = sentry_sdk.get_client()
     for key, value in expected.items():
         if key == "should_send_default_pii":
@@ -419,21 +390,74 @@ def test_client_data_collection_settings(init_kwargs, expected):
             assert client.options["data_collection"][key] is value
 
 
-def test_has_data_collection_enabled_gates_on_presence():
+def test_has_data_collection_enabled_gates_on_user_provided_config():
     assert has_data_collection_enabled(None) is False
-    assert has_data_collection_enabled({"_experiments": {}}) is False
+    assert has_data_collection_enabled({}) is False
+    # An unset/None option is "not provided by the user".
+    assert has_data_collection_enabled({"data_collection": None}) is False
+    # Every SDK call site passes post-resolution client options, where
+    # `data_collection` is always a fully-resolved dict carrying
+    # `provided_by_user`. That flag -- not the key's presence -- is the gate.
     assert (
-        has_data_collection_enabled({"_experiments": {"data_collection": {}}}) is True
+        has_data_collection_enabled({"data_collection": {"provided_by_user": False}})
+        is False
     )
     assert (
-        has_data_collection_enabled({"_experiments": {"data_collection": None}}) is True
+        has_data_collection_enabled({"data_collection": {"provided_by_user": True}})
+        is True
     )
 
 
-def test_no_experiments_data_collection_values_fall_back_to_send_default_pii_configuration():
-    sentry_sdk.init(send_default_pii=True)
+@pytest.mark.parametrize(
+    "init_kwargs, expected",
+    [
+        pytest.param({}, False, id="no_config"),
+        pytest.param({"send_default_pii": True}, False, id="send_default_pii_true"),
+        pytest.param({"send_default_pii": False}, False, id="send_default_pii_false"),
+        pytest.param({"data_collection": {}}, True, id="empty_data_collection"),
+        pytest.param(
+            {"data_collection": {"user_info": False}},
+            True,
+            id="partial_data_collection",
+        ),
+    ],
+)
+def test_has_data_collection_enabled_after_resolution(
+    sentry_init, init_kwargs, expected
+):
+    sentry_init(**init_kwargs)
+    assert has_data_collection_enabled(sentry_sdk.get_client().options) is expected
+
+
+def test_no_data_collection_values_fall_back_to_send_default_pii_configuration(
+    sentry_init,
+):
+    sentry_init(send_default_pii=True)
     client = sentry_sdk.get_client()
     dc = client.options["data_collection"]
     assert dc["provided_by_user"] is False
     assert dc["user_info"] is True
     assert has_data_collection_enabled(client.options) is False
+
+
+def test_data_collection_via_experiments(sentry_init):
+    sentry_init(
+        _experiments={"data_collection": {"user_info": True}},
+    )
+
+    dc = sentry_sdk.get_client().options["data_collection"]
+    assert dc is not None
+    assert dc["provided_by_user"] is True
+    assert dc["user_info"] is True
+
+
+def test_top_level_takes_precedence_over_experiments(sentry_init):
+    sentry_init(
+        data_collection={"user_info": False},
+        _experiments={"data_collection": {"user_info": True}},
+    )
+
+    dc = sentry_sdk.get_client().options["data_collection"]
+    assert dc is not None
+    assert dc["provided_by_user"] is True
+    assert dc["user_info"] is False

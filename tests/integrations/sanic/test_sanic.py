@@ -500,7 +500,7 @@ def test_user_ip_address_on_all_spans(
 
     @app.route("/child-span")
     def child_span_handler(request):
-        with sentry_sdk.traces.start_span(name="child-span"):
+        with sentry_sdk.start_span(name="child-span"):
             pass
         return response.text("ok")
 
@@ -585,16 +585,14 @@ _QUERY_PARAM_DATA_COLLECTION_CASES = [
         id="defaults",
     ),
     pytest.param(
-        {"_experiments": {"data_collection": {}}},
+        {"data_collection": {}},
         "toy=tennisball&color=red&auth=%5BFiltered%5D",
         id="data_collection_denylist_default",
     ),
     pytest.param(
         {
-            "_experiments": {
-                "data_collection": {
-                    "url_query_params": {"mode": "denylist", "terms": ["toy"]}
-                }
+            "data_collection": {
+                "url_query_params": {"mode": "denylist", "terms": ["toy"]}
             }
         },
         "toy=%5BFiltered%5D&color=red&auth=%5BFiltered%5D",
@@ -602,10 +600,8 @@ _QUERY_PARAM_DATA_COLLECTION_CASES = [
     ),
     pytest.param(
         {
-            "_experiments": {
-                "data_collection": {
-                    "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
-                }
+            "data_collection": {
+                "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
             }
         },
         "toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D",
@@ -613,24 +609,22 @@ _QUERY_PARAM_DATA_COLLECTION_CASES = [
     ),
     pytest.param(
         {
-            "_experiments": {
-                "data_collection": {
-                    "url_query_params": {"mode": "allowlist", "terms": ["auth"]}
-                }
+            "data_collection": {
+                "url_query_params": {"mode": "allowlist", "terms": ["auth"]}
             }
         },
         "toy=%5BFiltered%5D&color=%5BFiltered%5D&auth=%5BFiltered%5D",
         id="data_collection_allowlist_sensitive_term",
     ),
     pytest.param(
-        {"_experiments": {"data_collection": {"url_query_params": {"mode": "off"}}}},
+        {"data_collection": {"url_query_params": {"mode": "off"}}},
         None,
         id="data_collection_off",
     ),
     pytest.param(
         {
             "send_default_pii": True,
-            "_experiments": {"data_collection": {"url_query_params": {"mode": "off"}}},
+            "data_collection": {"url_query_params": {"mode": "off"}},
         },
         None,
         id="data_collection_wins_over_send_default_pii",
@@ -644,7 +638,6 @@ _QUERY_PARAM_DATA_COLLECTION_CASES = [
 def test_url_query_data_collection(
     sentry_init, app, capture_items, init_kwargs, expected_query
 ):
-    init_kwargs = dict(init_kwargs)
     sentry_init(
         integrations=[SanicIntegration()],
         traces_sample_rate=1.0,
@@ -667,9 +660,7 @@ def test_url_query_data_collection(
         and i.payload["is_segment"]
     ]
 
-    data_collection_enabled = "data_collection" in (
-        init_kwargs.get("_experiments") or {}
-    )
+    data_collection_enabled = "data_collection" in init_kwargs
     url_attrs_expected = data_collection_enabled or init_kwargs.get(
         "send_default_pii", False
     )
@@ -709,7 +700,7 @@ def test_url_query_data_collection_event_processor(
 
     assert event["request"]["url"].endswith("/message")
     assert event["request"]["method"] == "GET"
-    if "data_collection" not in init_kwargs.get("_experiments", {}):
+    if "data_collection" not in init_kwargs:
         assert (
             event["request"]["query_string"] == "toy=tennisball&color=red&auth=secret"
         )
@@ -743,7 +734,7 @@ def test_request_body_data_collection_event_processor(
 ):
     sentry_init(
         integrations=[SanicIntegration()],
-        _experiments={"data_collection": data_collection},
+        data_collection=data_collection,
     )
 
     data = {"hey": 42}
@@ -778,7 +769,7 @@ def test_oversized_request_body_not_annotated_data_collection(
     sentry_init(
         integrations=[SanicIntegration()],
         max_request_body_size="small",
-        _experiments={"data_collection": {"http_bodies": []}},
+        data_collection={"http_bodies": []},
     )
 
     @app.route("/oversized", methods=["POST"])

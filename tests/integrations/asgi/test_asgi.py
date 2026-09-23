@@ -684,10 +684,8 @@ async def test_get_request_attributes_url_with_filtered_host(
     sentry_init(
         send_default_pii=True,
         traces_sample_rate=1.0,
-        _experiments={
-            "data_collection": {
-                "http_headers": {"request": {"mode": "allowlist", "terms": []}}
-            },
+        data_collection={
+            "http_headers": {"request": {"mode": "allowlist", "terms": []}}
         },
     )
     app = SentryAsgiMiddleware(asgi3_app)
@@ -715,9 +713,7 @@ async def test_get_request_attributes_url_with_headers_off(
     sentry_init(
         send_default_pii=True,
         traces_sample_rate=1.0,
-        _experiments={
-            "data_collection": {"http_headers": {"request": {"mode": "off"}}},
-        },
+        data_collection={"http_headers": {"request": {"mode": "off"}}},
     )
     app = SentryAsgiMiddleware(asgi3_app)
 
@@ -768,7 +764,7 @@ def _http_scope():
             id="defaults",
         ),
         pytest.param(
-            {"_experiments": {"data_collection": {}}},
+            {"data_collection": {}},
             "/foo?" + QUERY_STRING,
             "token=%5BFiltered%5D&theme=dark&lang=en&session=%5BFiltered%5D",
             "http://example.com/foo?token=%5BFiltered%5D&theme=dark&lang=en&session=%5BFiltered%5D",
@@ -776,10 +772,8 @@ def _http_scope():
         ),
         pytest.param(
             {
-                "_experiments": {
-                    "data_collection": {
-                        "url_query_params": {"mode": "allowlist", "terms": ["theme"]}
-                    }
+                "data_collection": {
+                    "url_query_params": {"mode": "allowlist", "terms": ["theme"]}
                 }
             },
             "/foo?" + QUERY_STRING,
@@ -788,11 +782,7 @@ def _http_scope():
             id="data_collection_allowlist",
         ),
         pytest.param(
-            {
-                "_experiments": {
-                    "data_collection": {"url_query_params": {"mode": "off"}}
-                }
-            },
+            {"data_collection": {"url_query_params": {"mode": "off"}}},
             "/foo?" + QUERY_STRING,
             None,
             "http://example.com/foo",
@@ -801,9 +791,7 @@ def _http_scope():
         pytest.param(
             {
                 "send_default_pii": True,
-                "_experiments": {
-                    "data_collection": {"url_query_params": {"mode": "off"}}
-                },
+                "data_collection": {"url_query_params": {"mode": "off"}},
             },
             "/foo?" + QUERY_STRING,
             None,
@@ -858,13 +846,13 @@ async def test_get_request_attributes_query_data_collection(
 
 USER_INFO_CASES = [
     pytest.param(
-        {"_experiments": {"data_collection": {"user_info": False}}},
+        {"data_collection": {"user_info": False}},
         True,
         False,
         id="dc_user_info_false",
     ),
     pytest.param(
-        {"_experiments": {"data_collection": {}}},
+        {"data_collection": {}},
         True,
         True,
         id="dc_default_user_info",
@@ -872,7 +860,7 @@ USER_INFO_CASES = [
     pytest.param(
         {
             "send_default_pii": True,
-            "_experiments": {"data_collection": {"user_info": False}},
+            "data_collection": {"user_info": False},
         },
         True,
         False,
@@ -891,7 +879,7 @@ USER_INFO_CASES = [
         id="legacy_pii_false",
     ),
     pytest.param(
-        {"_experiments": {"data_collection": {}}},
+        {"data_collection": {}},
         False,
         False,
         id="no_client",
@@ -1064,24 +1052,24 @@ async def test_custom_transaction_name(
         pytest.param({"send_default_pii": True}, True, id="legacy_pii_true"),
         pytest.param({"send_default_pii": False}, False, id="legacy_pii_false"),
         pytest.param(
-            {"_experiments": {"data_collection": {}}},
+            {"data_collection": {}},
             True,
             id="dc_default_user_info",
         ),
         pytest.param(
-            {"_experiments": {"data_collection": {"user_info": True}}},
+            {"data_collection": {"user_info": True}},
             True,
             id="dc_user_info_true",
         ),
         pytest.param(
-            {"_experiments": {"data_collection": {"user_info": False}}},
+            {"data_collection": {"user_info": False}},
             False,
             id="dc_user_info_false",
         ),
         pytest.param(
             {
                 "send_default_pii": True,
-                "_experiments": {"data_collection": {"user_info": False}},
+                "data_collection": {"user_info": False},
             },
             False,
             id="dc_wins_over_pii",
@@ -1104,7 +1092,7 @@ async def test_user_ip_address_on_all_spans(
                     await send({"type": "lifespan.shutdown.complete"})
                     return
 
-        with sentry_sdk.traces.start_span(name="child-span"):
+        with sentry_sdk.start_span(name="child-span"):
             pass
 
         await send(

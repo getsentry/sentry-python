@@ -180,24 +180,24 @@ def test_real_gql_request_with_error_with_pii(
         pytest.param({}, False, id="no_pii_no_data_collection"),
         pytest.param({"send_default_pii": True}, True, id="legacy_pii_on"),
         pytest.param(
-            {"_experiments": {"data_collection": {}}},
+            {"data_collection": {}},
             True,
             id="data_collection_defaults",
         ),
         pytest.param(
-            {"_experiments": {"data_collection": {"graphql": {"document": True}}}},
+            {"data_collection": {"graphql": {"document": True}}},
             True,
             id="data_collection_document_on",
         ),
         pytest.param(
-            {"_experiments": {"data_collection": {"graphql": {"document": False}}}},
+            {"data_collection": {"graphql": {"document": False}}},
             False,
             id="data_collection_document_off",
         ),
         pytest.param(
             {
                 "send_default_pii": True,
-                "_experiments": {"data_collection": {"graphql": {"document": False}}},
+                "data_collection": {"graphql": {"document": False}},
             },
             False,
             id="data_collection_takes_precedence_over_send_default_pii_on",
@@ -205,7 +205,7 @@ def test_real_gql_request_with_error_with_pii(
         pytest.param(
             {
                 "send_default_pii": False,
-                "_experiments": {"data_collection": {"graphql": {"document": True}}},
+                "data_collection": {"graphql": {"document": True}},
             },
             True,
             id="data_collection_takes_precedence_over_send_default_pii_off",
@@ -238,17 +238,17 @@ def test_real_gql_request_with_error_data_collection(
     [
         pytest.param({"send_default_pii": True}, True, id="legacy_pii_on"),
         pytest.param(
-            {"_experiments": {"data_collection": {}}},
+            {"data_collection": {}},
             True,
             id="data_collection_defaults",
         ),
         pytest.param(
-            {"_experiments": {"data_collection": {"graphql": {"variables": True}}}},
+            {"data_collection": {"graphql": {"variables": True}}},
             True,
             id="data_collection_variables_on",
         ),
         pytest.param(
-            {"_experiments": {"data_collection": {"graphql": {"variables": False}}}},
+            {"data_collection": {"graphql": {"variables": False}}},
             False,
             id="data_collection_variables_off",
         ),
