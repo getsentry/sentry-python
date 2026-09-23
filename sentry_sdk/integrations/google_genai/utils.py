@@ -940,7 +940,7 @@ def set_span_data_for_request(
     if has_data_collection_enabled(client.options):
         if client.options["data_collection"]["gen_ai"]["inputs"]:
             record_inputs = True
-    elif should_send_default_pii() and integration.include_prompts:
+    elif should_send_default_pii():
         record_inputs = True
 
     if record_inputs:
@@ -1061,7 +1061,7 @@ def set_span_data_for_response(
                 span.set_attribute(
                     SPANDATA.GEN_AI_RESPONSE_TEXT, safe_serialize(response_texts)
                 )
-    elif should_send_default_pii() and integration.include_prompts:
+    elif should_send_default_pii():
         # TODO: Delete this block once data collection has been completely rolled out
         response_texts = _extract_response_text(response)
         if response_texts:
@@ -1115,7 +1115,7 @@ def set_span_data_for_embed_request(
     if has_data_collection_enabled(client.options):
         if client.options["data_collection"]["gen_ai"]["inputs"]:
             record_inputs = True
-    elif should_send_default_pii() and integration.include_prompts:
+    elif should_send_default_pii():
         record_inputs = True
 
     if record_inputs:

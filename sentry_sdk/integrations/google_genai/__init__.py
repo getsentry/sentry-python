@@ -40,9 +40,6 @@ class GoogleGenAIIntegration(Integration):
     identifier = IDENTIFIER
     origin = ORIGIN
 
-    def __init__(self: "GoogleGenAIIntegration", include_prompts: bool = True) -> None:
-        self.include_prompts = include_prompts
-
     @staticmethod
     def setup_once() -> None:
         version = parse_version(GOOGLE_GENAI_VERSION)

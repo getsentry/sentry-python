@@ -115,23 +115,17 @@ def create_test_config(
 
 
 @pytest.mark.parametrize(
-    "send_default_pii, include_prompts",
-    [
-        (True, True),
-        (True, False),
-        (False, True),
-        (False, False),
-    ],
+    "send_default_pii",
+    [True, False],
 )
 def test_nonstreaming_generate_content(
     sentry_init,
     capture_items,
     send_default_pii,
-    include_prompts,
     mock_genai_client,
 ):
     sentry_init(
-        integrations=[GoogleGenAIIntegration(include_prompts=include_prompts)],
+        integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
     )
@@ -167,7 +161,7 @@ def test_nonstreaming_generate_content(
     assert chat_span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "gcp.gemini"
     assert chat_span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "gemini-1.5-flash"
 
-    if send_default_pii and include_prompts:
+    if send_default_pii:
         assert json.loads(
             chat_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
         ) == [
@@ -241,7 +235,7 @@ def test_generate_content_with_system_instruction(
     expected_texts,
 ):
     sentry_init(
-        integrations=[GoogleGenAIIntegration(include_prompts=True)],
+        integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
     )
@@ -273,7 +267,6 @@ def test_generate_content_with_system_instruction(
         assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in invoke_span["attributes"]
         return
 
-    # (PII is enabled and include_prompts is True in this test)
     system_instructions = json.loads(
         invoke_span["attributes"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
     )
@@ -373,7 +366,7 @@ def test_tool_execution(
     capture_items,
 ):
     sentry_init(
-        integrations=[GoogleGenAIIntegration(include_prompts=True)],
+        integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
     )
@@ -445,7 +438,7 @@ def test_streaming_generate_content(
 ):
     """Test streaming with generate_content_stream, verifying chunk accumulation."""
     sentry_init(
-        integrations=[GoogleGenAIIntegration(include_prompts=True)],
+        integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
     )
@@ -661,7 +654,7 @@ def test_multiple_candidates(
 ):
     """Test handling of multiple response candidates"""
     sentry_init(
-        integrations=[GoogleGenAIIntegration(include_prompts=True)],
+        integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
     )
@@ -874,7 +867,7 @@ def test_contents_as_none(
 ):
     """Test handling when contents parameter is None"""
     sentry_init(
-        integrations=[GoogleGenAIIntegration(include_prompts=True)],
+        integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
     )
@@ -1011,23 +1004,17 @@ EXAMPLE_EMBED_RESPONSE_JSON = {
 
 
 @pytest.mark.parametrize(
-    "send_default_pii, include_prompts",
-    [
-        (True, True),
-        (True, False),
-        (False, True),
-        (False, False),
-    ],
+    "send_default_pii",
+    [True, False],
 )
 def test_embed_content(
     sentry_init,
     capture_items,
     send_default_pii,
-    include_prompts,
     mock_genai_client,
 ):
     sentry_init(
-        integrations=[GoogleGenAIIntegration(include_prompts=include_prompts)],
+        integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
     )
@@ -1065,7 +1052,7 @@ def test_embed_content(
     )
 
     # Check input texts if PII is allowed
-    if send_default_pii and include_prompts:
+    if send_default_pii:
         input_texts = json.loads(
             embed_span["attributes"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT]
         )
@@ -1089,7 +1076,7 @@ def test_embed_content_string_input(
 ):
     """Test embed_content with a single string instead of list."""
     sentry_init(
-        integrations=[GoogleGenAIIntegration(include_prompts=True)],
+        integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
     )
@@ -1237,24 +1224,18 @@ def test_embed_content_span_origin(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "send_default_pii, include_prompts",
-    [
-        (True, True),
-        (True, False),
-        (False, True),
-        (False, False),
-    ],
+    "send_default_pii",
+    [True, False],
 )
 async def test_async_embed_content(
     sentry_init,
     capture_items,
     send_default_pii,
-    include_prompts,
     mock_genai_client,
 ):
     """Test async embed_content method."""
     sentry_init(
-        integrations=[GoogleGenAIIntegration(include_prompts=include_prompts)],
+        integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
     )
@@ -1292,7 +1273,7 @@ async def test_async_embed_content(
     )
 
     # Check input texts if PII is allowed
-    if send_default_pii and include_prompts:
+    if send_default_pii:
         input_texts = json.loads(
             embed_span["attributes"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT]
         )
@@ -1317,7 +1298,7 @@ async def test_async_embed_content_string_input(
 ):
     """Test async embed_content with a single string instead of list."""
     sentry_init(
-        integrations=[GoogleGenAIIntegration(include_prompts=True)],
+        integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
     )
@@ -1480,7 +1461,7 @@ def test_generate_content_with_content_object(
 ):
     """Test generate_content with Content object input."""
     sentry_init(
-        integrations=[GoogleGenAIIntegration(include_prompts=True)],
+        integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
     )
@@ -1519,7 +1500,7 @@ def test_generate_content_with_dict_format(
 ):
     """Test generate_content with dict format input (ContentDict)."""
     sentry_init(
-        integrations=[GoogleGenAIIntegration(include_prompts=True)],
+        integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
     )
@@ -1556,7 +1537,7 @@ def test_generate_content_with_file_data(
 ):
     """Test generate_content with file_data (external file reference)."""
     sentry_init(
-        integrations=[GoogleGenAIIntegration(include_prompts=True)],
+        integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
     )
@@ -1608,7 +1589,7 @@ def test_generate_content_with_inline_data(
 ):
     """Test generate_content with inline_data (binary data)."""
     sentry_init(
-        integrations=[GoogleGenAIIntegration(include_prompts=True)],
+        integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
     )
@@ -1654,7 +1635,7 @@ def test_generate_content_with_function_response(
 ):
     """Test generate_content with function_response (tool result)."""
     sentry_init(
-        integrations=[GoogleGenAIIntegration(include_prompts=True)],
+        integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
     )
@@ -1712,7 +1693,7 @@ def test_generate_content_with_mixed_string_and_content(
 ):
     """Test generate_content with mixed string and Content objects in list."""
     sentry_init(
-        integrations=[GoogleGenAIIntegration(include_prompts=True)],
+        integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
     )
@@ -1759,7 +1740,7 @@ def test_generate_content_with_part_object_directly(
 ):
     """Test generate_content with Part object directly (not wrapped in Content)."""
     sentry_init(
-        integrations=[GoogleGenAIIntegration(include_prompts=True)],
+        integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
     )
@@ -1798,7 +1779,7 @@ def test_generate_content_with_list_of_dicts(
     would be present.
     """
     sentry_init(
-        integrations=[GoogleGenAIIntegration(include_prompts=True)],
+        integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
     )
@@ -1838,7 +1819,7 @@ def test_generate_content_with_dict_inline_data(
 ):
     """Test generate_content with dict format containing inline_data."""
     sentry_init(
-        integrations=[GoogleGenAIIntegration(include_prompts=True)],
+        integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
     )
@@ -1885,7 +1866,7 @@ def test_generate_content_without_parts_property_inline_data(
     mock_genai_client,
 ):
     sentry_init(
-        integrations=[GoogleGenAIIntegration(include_prompts=True)],
+        integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
     )
@@ -1930,7 +1911,7 @@ def test_generate_content_without_parts_property_inline_data_and_binary_data_wit
     mock_genai_client,
 ):
     sentry_init(
-        integrations=[GoogleGenAIIntegration(include_prompts=True)],
+        integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
     )
@@ -2312,11 +2293,10 @@ DATA_COLLECTION_EMBED_EXPECTED_VALUES = {
 
 
 @pytest.mark.parametrize(
-    "data_collection,send_default_pii,include_prompts,expected_present,expected_absent",
+    "data_collection,send_default_pii,expected_present,expected_absent",
     [
         pytest.param(
             {"gen_ai": {"inputs": True, "outputs": True}},
-            False,
             False,
             [
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
@@ -2329,7 +2309,6 @@ DATA_COLLECTION_EMBED_EXPECTED_VALUES = {
         pytest.param(
             {"gen_ai": {"inputs": False, "outputs": False}},
             True,
-            True,
             [],
             [
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
@@ -2340,7 +2319,6 @@ DATA_COLLECTION_EMBED_EXPECTED_VALUES = {
         ),
         pytest.param(
             {"gen_ai": {"inputs": True, "outputs": False}},
-            False,
             False,
             [
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
@@ -2354,7 +2332,6 @@ DATA_COLLECTION_EMBED_EXPECTED_VALUES = {
         pytest.param(
             {"gen_ai": {"inputs": False, "outputs": True}},
             False,
-            False,
             [
                 SPANDATA.GEN_AI_RESPONSE_TEXT,
             ],
@@ -2367,7 +2344,6 @@ DATA_COLLECTION_EMBED_EXPECTED_VALUES = {
         pytest.param(
             {"gen_ai": {}},
             False,
-            False,
             [
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
                 SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
@@ -2379,19 +2355,17 @@ DATA_COLLECTION_EMBED_EXPECTED_VALUES = {
         pytest.param(
             None,
             True,
-            True,
             [
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
                 SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
                 SPANDATA.GEN_AI_RESPONSE_TEXT,
             ],
             [],
-            id="no-gen-ai-config-legacy-pii-and-include-prompts-enabled",
+            id="no-gen-ai-config-legacy-pii",
         ),
         pytest.param(
             None,
             False,
-            True,
             [],
             [
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
@@ -2408,12 +2382,11 @@ def test_generate_content_data_collection(
     mock_genai_client,
     data_collection,
     send_default_pii,
-    include_prompts,
     expected_present,
     expected_absent,
 ):
     sentry_init_kwargs = dict(
-        integrations=[GoogleGenAIIntegration(include_prompts=include_prompts)],
+        integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
     )
@@ -2525,7 +2498,7 @@ def test_generate_content_data_collection_tools(
     expected_absent,
 ):
     sentry_init_kwargs = dict(
-        integrations=[GoogleGenAIIntegration(include_prompts=False)],
+        integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
     )
@@ -2605,11 +2578,10 @@ def test_generate_content_data_collection_tools(
 
 
 @pytest.mark.parametrize(
-    "data_collection,send_default_pii,include_prompts,expected_present,expected_absent",
+    "data_collection,send_default_pii,expected_present,expected_absent",
     [
         pytest.param(
             {"gen_ai": {"inputs": True, "outputs": True}},
-            False,
             False,
             [
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
@@ -2622,7 +2594,6 @@ def test_generate_content_data_collection_tools(
         pytest.param(
             {"gen_ai": {"inputs": False, "outputs": False}},
             True,
-            True,
             [],
             [
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
@@ -2633,7 +2604,6 @@ def test_generate_content_data_collection_tools(
         ),
         pytest.param(
             {"gen_ai": {"inputs": True, "outputs": False}},
-            False,
             False,
             [
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
@@ -2647,7 +2617,6 @@ def test_generate_content_data_collection_tools(
         pytest.param(
             {"gen_ai": {"inputs": False, "outputs": True}},
             False,
-            False,
             [
                 SPANDATA.GEN_AI_RESPONSE_TEXT,
             ],
@@ -2660,7 +2629,6 @@ def test_generate_content_data_collection_tools(
         pytest.param(
             {"gen_ai": {}},
             False,
-            False,
             [
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
                 SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
@@ -2672,19 +2640,17 @@ def test_generate_content_data_collection_tools(
         pytest.param(
             None,
             True,
-            True,
             [
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
                 SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
                 SPANDATA.GEN_AI_RESPONSE_TEXT,
             ],
             [],
-            id="no-gen-ai-config-legacy-pii-and-include-prompts-enabled",
+            id="no-gen-ai-config-legacy-pii",
         ),
         pytest.param(
             None,
             False,
-            True,
             [],
             [
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
@@ -2701,12 +2667,11 @@ def test_streaming_generate_content_data_collection(
     mock_genai_client,
     data_collection,
     send_default_pii,
-    include_prompts,
     expected_present,
     expected_absent,
 ):
     sentry_init_kwargs = dict(
-        integrations=[GoogleGenAIIntegration(include_prompts=include_prompts)],
+        integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
     )
@@ -2849,7 +2814,7 @@ def test_streaming_generate_content_data_collection_tools(
     expected_absent,
 ):
     sentry_init_kwargs = dict(
-        integrations=[GoogleGenAIIntegration(include_prompts=False)],
+        integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
     )
@@ -2934,11 +2899,10 @@ def test_streaming_generate_content_data_collection_tools(
 
 
 @pytest.mark.parametrize(
-    "data_collection,send_default_pii,include_prompts,expected_present,expected_absent",
+    "data_collection,send_default_pii,expected_present,expected_absent",
     [
         pytest.param(
             {"gen_ai": {"inputs": True, "outputs": True}},
-            False,
             False,
             [
                 SPANDATA.GEN_AI_EMBEDDINGS_INPUT,
@@ -2949,7 +2913,6 @@ def test_streaming_generate_content_data_collection_tools(
         pytest.param(
             {"gen_ai": {"inputs": False, "outputs": False}},
             True,
-            True,
             [],
             [
                 SPANDATA.GEN_AI_EMBEDDINGS_INPUT,
@@ -2958,7 +2921,6 @@ def test_streaming_generate_content_data_collection_tools(
         ),
         pytest.param(
             {"gen_ai": {"inputs": True, "outputs": False}},
-            False,
             False,
             [
                 SPANDATA.GEN_AI_EMBEDDINGS_INPUT,
@@ -2969,7 +2931,6 @@ def test_streaming_generate_content_data_collection_tools(
         pytest.param(
             {"gen_ai": {"inputs": False, "outputs": True}},
             False,
-            False,
             [],
             [
                 SPANDATA.GEN_AI_EMBEDDINGS_INPUT,
@@ -2978,7 +2939,6 @@ def test_streaming_generate_content_data_collection_tools(
         ),
         pytest.param(
             {"gen_ai": {}},
-            False,
             False,
             [
                 SPANDATA.GEN_AI_EMBEDDINGS_INPUT,
@@ -2989,17 +2949,15 @@ def test_streaming_generate_content_data_collection_tools(
         pytest.param(
             None,
             True,
-            True,
             [
                 SPANDATA.GEN_AI_EMBEDDINGS_INPUT,
             ],
             [],
-            id="no-gen-ai-config-legacy-pii-and-include-prompts-enabled",
+            id="no-gen-ai-config-legacy-pii",
         ),
         pytest.param(
             None,
             False,
-            True,
             [],
             [
                 SPANDATA.GEN_AI_EMBEDDINGS_INPUT,
@@ -3014,12 +2972,11 @@ def test_embed_content_data_collection(
     mock_genai_client,
     data_collection,
     send_default_pii,
-    include_prompts,
     expected_present,
     expected_absent,
 ):
     sentry_init_kwargs = dict(
-        integrations=[GoogleGenAIIntegration(include_prompts=include_prompts)],
+        integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
     )
@@ -3059,11 +3016,10 @@ def test_embed_content_data_collection(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "data_collection,send_default_pii,include_prompts,expected_present,expected_absent",
+    "data_collection,send_default_pii,expected_present,expected_absent",
     [
         pytest.param(
             {"gen_ai": {"inputs": True, "outputs": True}},
-            False,
             False,
             [
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
@@ -3076,7 +3032,6 @@ def test_embed_content_data_collection(
         pytest.param(
             {"gen_ai": {"inputs": False, "outputs": False}},
             True,
-            True,
             [],
             [
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
@@ -3087,7 +3042,6 @@ def test_embed_content_data_collection(
         ),
         pytest.param(
             {"gen_ai": {"inputs": True, "outputs": False}},
-            False,
             False,
             [
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
@@ -3101,7 +3055,6 @@ def test_embed_content_data_collection(
         pytest.param(
             {"gen_ai": {"inputs": False, "outputs": True}},
             False,
-            False,
             [
                 SPANDATA.GEN_AI_RESPONSE_TEXT,
             ],
@@ -3114,7 +3067,6 @@ def test_embed_content_data_collection(
         pytest.param(
             {"gen_ai": {}},
             False,
-            False,
             [
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
                 SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
@@ -3126,19 +3078,17 @@ def test_embed_content_data_collection(
         pytest.param(
             None,
             True,
-            True,
             [
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
                 SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
                 SPANDATA.GEN_AI_RESPONSE_TEXT,
             ],
             [],
-            id="no-gen-ai-config-legacy-pii-and-include-prompts-enabled",
+            id="no-gen-ai-config-legacy-pii",
         ),
         pytest.param(
             None,
             False,
-            True,
             [],
             [
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
@@ -3155,12 +3105,11 @@ async def test_async_generate_content_data_collection(
     mock_genai_client,
     data_collection,
     send_default_pii,
-    include_prompts,
     expected_present,
     expected_absent,
 ):
     sentry_init_kwargs = dict(
-        integrations=[GoogleGenAIIntegration(include_prompts=include_prompts)],
+        integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
     )
@@ -3201,11 +3150,10 @@ async def test_async_generate_content_data_collection(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "data_collection,send_default_pii,include_prompts,expected_present,expected_absent",
+    "data_collection,send_default_pii,expected_present,expected_absent",
     [
         pytest.param(
             {"gen_ai": {"inputs": True, "outputs": True}},
-            False,
             False,
             [
                 SPANDATA.GEN_AI_EMBEDDINGS_INPUT,
@@ -3216,7 +3164,6 @@ async def test_async_generate_content_data_collection(
         pytest.param(
             {"gen_ai": {"inputs": False, "outputs": False}},
             True,
-            True,
             [],
             [
                 SPANDATA.GEN_AI_EMBEDDINGS_INPUT,
@@ -3225,7 +3172,6 @@ async def test_async_generate_content_data_collection(
         ),
         pytest.param(
             {"gen_ai": {"inputs": True, "outputs": False}},
-            False,
             False,
             [
                 SPANDATA.GEN_AI_EMBEDDINGS_INPUT,
@@ -3236,7 +3182,6 @@ async def test_async_generate_content_data_collection(
         pytest.param(
             {"gen_ai": {"inputs": False, "outputs": True}},
             False,
-            False,
             [],
             [
                 SPANDATA.GEN_AI_EMBEDDINGS_INPUT,
@@ -3245,7 +3190,6 @@ async def test_async_generate_content_data_collection(
         ),
         pytest.param(
             {"gen_ai": {}},
-            False,
             False,
             [
                 SPANDATA.GEN_AI_EMBEDDINGS_INPUT,
@@ -3256,17 +3200,15 @@ async def test_async_generate_content_data_collection(
         pytest.param(
             None,
             True,
-            True,
             [
                 SPANDATA.GEN_AI_EMBEDDINGS_INPUT,
             ],
             [],
-            id="no-gen-ai-config-legacy-pii-and-include-prompts-enabled",
+            id="no-gen-ai-config-legacy-pii",
         ),
         pytest.param(
             None,
             False,
-            True,
             [],
             [
                 SPANDATA.GEN_AI_EMBEDDINGS_INPUT,
@@ -3281,12 +3223,11 @@ async def test_async_embed_content_data_collection(
     mock_genai_client,
     data_collection,
     send_default_pii,
-    include_prompts,
     expected_present,
     expected_absent,
 ):
     sentry_init_kwargs = dict(
-        integrations=[GoogleGenAIIntegration(include_prompts=include_prompts)],
+        integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
     )
