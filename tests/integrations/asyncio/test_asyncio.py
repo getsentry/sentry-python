@@ -69,10 +69,8 @@ async def test_create_task(
 ):
     sentry_init(
         traces_sample_rate=1.0,
-        send_default_pii=True,
-        integrations=[
-            AsyncioIntegration(),
-        ],
+        data_collection={},
+        integrations=[AsyncioIntegration()],
     )
 
     items = capture_items("span")
@@ -120,10 +118,8 @@ async def test_gather(
 ):
     sentry_init(
         traces_sample_rate=1.0,
-        send_default_pii=True,
-        integrations=[
-            AsyncioIntegration(),
-        ],
+        data_collection={},
+        integrations=[AsyncioIntegration()],
     )
 
     items = capture_items("span")
@@ -160,10 +156,8 @@ async def test_exception(
 ):
     sentry_init(
         traces_sample_rate=1.0,
-        send_default_pii=True,
-        integrations=[
-            AsyncioIntegration(),
-        ],
+        data_collection={},
+        integrations=[AsyncioIntegration()],
     )
 
     events = capture_events()
@@ -189,9 +183,8 @@ async def test_exception(
 @pytest.mark.asyncio(loop_scope="module")
 async def test_task_result(sentry_init):
     sentry_init(
-        integrations=[
-            AsyncioIntegration(),
-        ],
+        integrations=[AsyncioIntegration()],
+        data_collection={},
     )
 
     async def add(a, b):
@@ -208,9 +201,8 @@ async def test_task_with_context(sentry_init):
     Integration test to ensure working context parameter in Python 3.11+
     """
     sentry_init(
-        integrations=[
-            AsyncioIntegration(),
-        ],
+        integrations=[AsyncioIntegration()],
+        data_collection={},
     )
 
     var = ContextVar("var")
@@ -382,6 +374,7 @@ async def test_span_origin(
     sentry_init(
         integrations=[AsyncioIntegration()],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     items = capture_items("span")
@@ -414,9 +407,8 @@ async def test_task_spans_false(
 
     sentry_init(
         traces_sample_rate=1.0,
-        integrations=[
-            AsyncioIntegration(task_spans=False),
-        ],
+        integrations=[AsyncioIntegration(task_spans=False)],
+        data_collection={},
     )
 
     items = capture_items("span")
@@ -447,7 +439,10 @@ async def test_enable_asyncio_integration_with_task_spans_false(
     """
     uninstall_integration("asyncio")
 
-    sentry_init(traces_sample_rate=1.0)
+    sentry_init(
+        traces_sample_rate=1.0,
+        data_collection={},
+    )
 
     assert "asyncio" not in sentry_sdk.get_client().integrations
 
@@ -478,6 +473,7 @@ async def test_delayed_enable_integration(
 ):
     sentry_init(
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     assert "asyncio" not in sentry_sdk.get_client().integrations
@@ -516,7 +512,10 @@ async def test_delayed_enable_integration(
 @minimum_python_38
 @pytest.mark.asyncio
 async def test_delayed_enable_integration_with_options(sentry_init, capture_events):
-    sentry_init(traces_sample_rate=1.0)
+    sentry_init(
+        traces_sample_rate=1.0,
+        data_collection={},
+    )
 
     assert "asyncio" not in sentry_sdk.get_client().integrations
 
@@ -543,7 +542,11 @@ async def test_delayed_enable_enabled_integration(sentry_init, uninstall_integra
     uninstall_integration("asyncio")
 
     integration = AsyncioIntegration()
-    sentry_init(integrations=[integration], traces_sample_rate=1.0)
+    sentry_init(
+        integrations=[integration],
+        traces_sample_rate=1.0,
+        data_collection={},
+    )
 
     assert "asyncio" in sentry_sdk.get_client().integrations
 
@@ -570,6 +573,7 @@ async def test_delayed_enable_integration_after_disabling(
     sentry_init(
         disabled_integrations=[AsyncioIntegration()],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     assert "asyncio" not in sentry_sdk.get_client().integrations
@@ -616,6 +620,7 @@ async def test_internal_tasks_not_wrapped(
     sentry_init(
         integrations=[AsyncioIntegration()],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     async def user_task():
@@ -655,7 +660,10 @@ async def test_internal_tasks_not_wrapped(
 
 @minimum_python_38
 def test_loop_close_patching(sentry_init):
-    sentry_init(integrations=[AsyncioIntegration()])
+    sentry_init(
+        integrations=[AsyncioIntegration()],
+        data_collection={},
+    )
 
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
@@ -679,7 +687,10 @@ def test_loop_close_flushes_async_transport(sentry_init):
     if not ASYNC_TRANSPORT_AVAILABLE:
         pytest.skip("httpcore[asyncio] not installed")
 
-    sentry_init(integrations=[AsyncioIntegration()])
+    sentry_init(
+        integrations=[AsyncioIntegration()],
+        data_collection={},
+    )
 
     # Save the current event loop to restore it later
     try:
