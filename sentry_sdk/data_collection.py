@@ -304,6 +304,8 @@ def _resolve_data_collection(options: "Dict[str, Any]") -> "DataCollection":
         user_dc = options.get("_experiments", {}).get("data_collection")
 
     send_default_pii = options.get("send_default_pii")
+    if send_default_pii is None:
+        user_dc = {}
 
     include_local_variables = (
         bool(options.get("include_local_variables"))
