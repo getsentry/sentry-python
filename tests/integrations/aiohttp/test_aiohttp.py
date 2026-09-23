@@ -33,7 +33,7 @@ from tests.integrations.utils import (
 
 @pytest.mark.asyncio
 async def test_basic(sentry_init, aiohttp_client, capture_events):
-    sentry_init(integrations=[AioHttpIntegration()])
+    sentry_init(integrations=[AioHttpIntegration()], data_collection={})
 
     async def hello(request):
         1 / 0
@@ -77,7 +77,7 @@ async def test_basic(sentry_init, aiohttp_client, capture_events):
 async def test_post_body_not_read(sentry_init, aiohttp_client, capture_events):
     from sentry_sdk.integrations.aiohttp import BODY_NOT_READ_MESSAGE
 
-    sentry_init(integrations=[AioHttpIntegration()])
+    sentry_init(integrations=[AioHttpIntegration()], data_collection={})
 
     body = {"some": "value"}
 
@@ -98,13 +98,14 @@ async def test_post_body_not_read(sentry_init, aiohttp_client, capture_events):
     assert exception["type"] == "ZeroDivisionError"
     request = event["request"]
 
+    assert request["env"] == {"REMOTE_ADDR": "127.0.0.1"}
     assert request["method"] == "POST"
     assert request["data"] == BODY_NOT_READ_MESSAGE
 
 
 @pytest.mark.asyncio
 async def test_post_body_read(sentry_init, aiohttp_client, capture_events):
-    sentry_init(integrations=[AioHttpIntegration()])
+    sentry_init(integrations=[AioHttpIntegration()], data_collection={})
 
     body = {"some": "value"}
 
@@ -126,6 +127,7 @@ async def test_post_body_read(sentry_init, aiohttp_client, capture_events):
     assert exception["type"] == "ZeroDivisionError"
     request = event["request"]
 
+    assert request["env"] == {"REMOTE_ADDR": "127.0.0.1"}
     assert request["method"] == "POST"
     assert request["data"] == json.dumps(body)
 
@@ -233,7 +235,7 @@ async def test_aiohttp_oversized_request_body_data_collection(
 
 @pytest.mark.asyncio
 async def test_403_not_captured(sentry_init, aiohttp_client, capture_events):
-    sentry_init(integrations=[AioHttpIntegration()])
+    sentry_init(integrations=[AioHttpIntegration()], data_collection={})
 
     async def hello(request):
         raise web.HTTPForbidden()
@@ -254,7 +256,7 @@ async def test_403_not_captured(sentry_init, aiohttp_client, capture_events):
 async def test_cancelled_error_not_captured(
     sentry_init, aiohttp_client, capture_events
 ):
-    sentry_init(integrations=[AioHttpIntegration()])
+    sentry_init(integrations=[AioHttpIntegration()], data_collection={})
 
     async def hello(request):
         raise asyncio.CancelledError()
@@ -275,8 +277,7 @@ async def test_cancelled_error_not_captured(
 
 @pytest.mark.asyncio
 async def test_half_initialized(sentry_init, aiohttp_client, capture_events):
-    sentry_init(integrations=[AioHttpIntegration()])
-    sentry_init()
+    sentry_init(integrations=[AioHttpIntegration()], data_collection={})
 
     async def hello(request):
         return web.Response(text="hello")
@@ -299,6 +300,7 @@ async def test_tracing_unparseable_url(sentry_init, aiohttp_client, capture_item
     sentry_init(
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     async def hello(request):
@@ -338,6 +340,7 @@ async def test_traces_sampler_gets_request_object_in_sampling_context(
     sentry_init(
         integrations=[AioHttpIntegration()],
         traces_sampler=traces_sampler,
+        data_collection={},
     )
 
     async def kangaroo_handler(request):
@@ -367,6 +370,7 @@ async def test_has_trace_if_performance_enabled(
     sentry_init(
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     async def hello(request):
@@ -417,7 +421,7 @@ async def test_has_trace_if_performance_enabled(
 async def test_has_trace_if_performance_disabled(
     sentry_init, aiohttp_client, capture_events
 ):
-    sentry_init(integrations=[AioHttpIntegration()])
+    sentry_init(integrations=[AioHttpIntegration()], data_collection={})
 
     async def hello(request):
         capture_message("It's a good day to try dividing by 0")
@@ -453,6 +457,7 @@ async def test_trace_from_headers_if_performance_enabled(
     sentry_init(
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     async def hello(request):
@@ -506,7 +511,7 @@ async def test_trace_from_headers_if_performance_enabled(
 async def test_trace_from_headers_if_performance_disabled(
     sentry_init, aiohttp_client, capture_events
 ):
-    sentry_init(integrations=[AioHttpIntegration()])
+    sentry_init(integrations=[AioHttpIntegration()], data_collection={})
 
     async def hello(request):
         capture_message("It's a good day to try dividing by 0")
@@ -716,6 +721,7 @@ async def test_outgoing_trace_headers_adds_missing_unsigned_propagation_headers(
     sentry_init(
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     async def handler(request):
@@ -758,6 +764,7 @@ async def test_outgoing_trace_headers_appends_baggage_but_preserves_sentry_trace
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
         release="d08ebdb9309e1b004c6f52202de58a09c2268e42",
+        data_collection={},
     )
 
     async def handler(request):
@@ -791,6 +798,7 @@ async def test_outgoing_trace_headers_preserves_signed_propagation_headers(
     sentry_init(
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     async def handler(request):
@@ -830,6 +838,7 @@ async def test_outgoing_trace_headers_preserves_query_signed_baggage(
     sentry_init(
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     async def handler(request):
@@ -870,6 +879,7 @@ async def test_request_source_disabled(
         traces_sample_rate=1.0,
         enable_http_request_source=False,
         http_request_source_threshold_ms=0,
+        data_collection={},
     )
 
     # server for making span request
@@ -920,6 +930,7 @@ async def test_request_source_enabled(
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
         http_request_source_threshold_ms=0,
+        data_collection={},
         **extra_options,
     )
 
@@ -963,6 +974,7 @@ async def test_request_source(
         traces_sample_rate=1.0,
         enable_http_request_source=True,
         http_request_source_threshold_ms=0,
+        data_collection={},
     )
 
     # server for making span request
@@ -1023,6 +1035,7 @@ async def test_request_source_with_module_in_search_path(
         traces_sample_rate=1.0,
         enable_http_request_source=True,
         http_request_source_threshold_ms=0,
+        data_collection={},
     )
 
     # server for making span request
@@ -1077,6 +1090,7 @@ async def test_no_request_source_if_duration_too_short(
         traces_sample_rate=1.0,
         enable_http_request_source=True,
         http_request_source_threshold_ms=10**10,
+        data_collection={},
     )
 
     # server for making span request
@@ -1122,6 +1136,7 @@ async def test_request_source_if_duration_over_threshold(
         traces_sample_rate=1.0,
         enable_http_request_source=True,
         http_request_source_threshold_ms=0,
+        data_collection={},
     )
 
     # server for making span request
@@ -1180,6 +1195,7 @@ async def test_span_origin(
     sentry_init(
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     # server for making span request
@@ -1248,7 +1264,9 @@ async def test_failed_request_status_codes(
     exception_to_raise,
     should_capture,
 ):
-    sentry_init(integrations=[AioHttpIntegration(**integration_kwargs)])
+    sentry_init(
+        integrations=[AioHttpIntegration(**integration_kwargs)], data_collection={}
+    )
     events = capture_events()
 
     async def handle(_):
@@ -1282,7 +1300,10 @@ async def test_failed_request_status_codes_with_returned_status(
     """
     Returning a web.Response with a failed_request_status_code should not be reported to Sentry.
     """
-    sentry_init(integrations=[AioHttpIntegration(failed_request_status_codes={500})])
+    sentry_init(
+        integrations=[AioHttpIntegration(failed_request_status_codes={500})],
+        data_collection={},
+    )
     events = capture_events()
 
     async def handle(_):
@@ -1306,7 +1327,10 @@ async def test_failed_request_status_codes_non_http_exception(
     If an exception, which is not an instance of HTTPException, is raised, it should be captured, even if
     failed_request_status_codes is empty.
     """
-    sentry_init(integrations=[AioHttpIntegration(failed_request_status_codes=set())])
+    sentry_init(
+        integrations=[AioHttpIntegration(failed_request_status_codes=set())],
+        data_collection={},
+    )
     events = capture_events()
 
     async def handle(_):
@@ -1433,6 +1457,7 @@ async def test_sensitive_header_scrubbing(sentry_init, aiohttp_client, capture_i
     sentry_init(
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     async def hello(request):
@@ -1649,6 +1674,7 @@ async def test_transaction_style(
     sentry_init(
         integrations=[AioHttpIntegration(transaction_style=transaction_style)],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     async def hello(request):
@@ -1690,6 +1716,7 @@ async def test_http_route(
     sentry_init(
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     async def hello(request):
@@ -1713,6 +1740,7 @@ async def test_server_error(sentry_init, aiohttp_client, capture_items):
     sentry_init(
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     async def hello(request):
@@ -1751,6 +1779,7 @@ async def test_http_exception(sentry_init, aiohttp_client, capture_items):
     sentry_init(
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     async def hello(request):
@@ -1782,6 +1811,7 @@ async def test_http_exception_ok_status_not_overridden(
     sentry_init(
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     async def hello(request):
@@ -1873,6 +1903,7 @@ async def test_outgoing_trace_headers(
     sentry_init(
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     async def handler(request):
