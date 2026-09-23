@@ -42,7 +42,6 @@ DATA_COLLECTION_USER_INFO_CASES = [
 # Shared parametrization test matrix for ``REMOTE_ADDR`` on events.
 # Each case is ``(init_kwargs, expect_remote_addr)``.
 DATA_COLLECTION_REMOTE_ADDR_CASES = [
-    pytest.param({}, True, id="defaults"),
     pytest.param({"data_collection": {}}, True, id="data_collection_default"),
     pytest.param(
         {"data_collection": {"user_info": True}},

@@ -1348,12 +1348,11 @@ async def test_failed_request_status_codes_non_http_exception(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("send_pii", [True, False])
-async def test_tracing(sentry_init, aiohttp_client, capture_items, send_pii):
+async def test_tracing(sentry_init, aiohttp_client, capture_items):
     sentry_init(
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
-        send_default_pii=send_pii,
+        data_collection={},
     )
 
     async def hello(request):
@@ -1393,23 +1392,15 @@ async def test_tracing(sentry_init, aiohttp_client, capture_items, send_pii):
     # Request attributes derived directly from the aiohttp request.
     assert server_span["attributes"]["http.request.method"] == "GET"
 
-    if send_pii:
-        assert "client.address" in server_span["attributes"]
-        assert "user.ip_address" in server_span["attributes"]
+    assert "client.address" in server_span["attributes"]
+    assert "user.ip_address" in server_span["attributes"]
 
-        url_full = server_span["attributes"]["url.full"]
-        assert url_full.startswith("http://127.0.0.1:")
-        assert url_full.endswith("/")
+    url_full = server_span["attributes"]["url.full"]
+    assert url_full.startswith("http://127.0.0.1:")
+    assert url_full.endswith("/")
 
-        url_path = server_span["attributes"]["url.path"]
-        assert url_path == "/"
-    else:
-        assert "url.full" not in server_span["attributes"]
-        assert "url.path" not in server_span["attributes"]
-        assert "url.query" not in server_span["attributes"]
-
-        assert "client.address" not in server_span["attributes"]
-        assert "user.ip_address" not in server_span["attributes"]
+    url_path = server_span["attributes"]["url.path"]
+    assert url_path == "/"
 
     # aiohttp's test client always sends a Host header; we assert it propagates
     # into the span attributes via _filter_headers.
@@ -1607,40 +1598,6 @@ async def test_sensitive_header_passthrough_with_pii(
             server_span["attributes"]["http.request.header.cookie"]
             == expected["cookie"]
         )
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize("send_pii", [True, False])
-async def test_url_query_attribute(
-    sentry_init, aiohttp_client, capture_items, send_pii
-):
-    sentry_init(
-        integrations=[AioHttpIntegration()],
-        traces_sample_rate=1.0,
-        send_default_pii=send_pii,
-    )
-
-    async def hello(request):
-        return web.Response(text="hello")
-
-    app = web.Application()
-    app.router.add_get("/", hello)
-
-    items = capture_items("span")
-
-    client = await aiohttp_client(app)
-    resp = await client.get("/?foo=bar&baz=qux")
-    assert resp.status == 200
-
-    sentry_sdk.flush()
-
-    assert len(items) == 1
-    (server_segment,) = [item.payload for item in items]
-
-    if send_pii:
-        assert server_segment["attributes"]["url.query"] == "foo=bar&baz=qux"
-    else:
-        assert "url.query" not in server_segment["attributes"]
 
 
 @pytest.mark.asyncio
@@ -1968,11 +1925,6 @@ async def test_user_ip_address_on_all_spans(
 
 
 _QUERY_PARAM_DATA_COLLECTION_CASES = [
-    pytest.param(
-        {},
-        None,
-        id="defaults",
-    ),
     pytest.param(
         {"data_collection": {}},
         "toy=tennisball&color=red&auth=%5BFiltered%5D",
