@@ -18,7 +18,7 @@ from sentry_sdk.integrations._wsgi_common import (
     request_body_within_bounds,
 )
 from sentry_sdk.integrations.logging import ignore_logger_for_events
-from sentry_sdk.scope import Scope, should_send_default_pii
+from sentry_sdk.scope import Scope
 from sentry_sdk.sessions import track_session
 from sentry_sdk.traces import (
     BAGGAGE_HEADER_NAME,
@@ -42,7 +42,6 @@ from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
     event_from_exception,
-    has_data_collection_enabled,
     logger,
     parse_url,
     parse_version,
@@ -146,52 +145,28 @@ class AioHttpIntegration(Integration):
                     url_attributes = {}
                     client_address_attributes = {}
 
-                    if has_data_collection_enabled(client.options):
-                        url_attributes["url.full"] = "%s://%s%s" % (
-                            request.scheme,
-                            request.host,
-                            request.path,
-                        )
-                        url_attributes["url.path"] = request.path
+                    url_attributes["url.full"] = "%s://%s%s" % (
+                        request.scheme,
+                        request.host,
+                        request.path,
+                    )
+                    url_attributes["url.path"] = request.path
 
-                        if request.query_string:
-                            filtered_query_string = (
-                                _apply_data_collection_filtering_to_query_string(
-                                    query_string=request.query_string,
-                                    behaviour=client.options["data_collection"][
-                                        "url_query_params"
-                                    ],
-                                )
+                    if request.query_string:
+                        filtered_query_string = (
+                            _apply_data_collection_filtering_to_query_string(
+                                query_string=request.query_string,
+                                behaviour=client.options["data_collection"][
+                                    "url_query_params"
+                                ],
                             )
-                            if filtered_query_string:
-                                url_attributes["url.query"] = filtered_query_string
-                                url_attributes["url.full"] += (
-                                    "?" + filtered_query_string
-                                )
-
-                        if request.remote:
-                            if client.options["data_collection"]["user_info"]:
-                                client_address_attributes["client.address"] = (
-                                    request.remote
-                                )
-                                scope.set_attribute(
-                                    SPANDATA.USER_IP_ADDRESS, request.remote
-                                )
-
-                    elif should_send_default_pii():
-                        url_full = "%s://%s%s" % (
-                            request.scheme,
-                            request.host,
-                            request.path,
                         )
-                        if request.query_string:
-                            url_full += "?" + request.query_string
-                            url_attributes["url.query"] = request.query_string
+                        if filtered_query_string:
+                            url_attributes["url.query"] = filtered_query_string
+                            url_attributes["url.full"] += "?" + filtered_query_string
 
-                        url_attributes["url.full"] = url_full
-                        url_attributes["url.path"] = request.path
-
-                        if request.remote:
+                    if request.remote:
+                        if client.options["data_collection"]["user_info"]:
                             client_address_attributes["client.address"] = request.remote
                             scope.set_attribute(
                                 SPANDATA.USER_IP_ADDRESS, request.remote
@@ -347,43 +322,26 @@ def create_trace_config() -> "TraceConfig":
             "http.request.method": method,
         }
         if parsed_url is not None:
-            if has_data_collection_enabled(client.options):
-                url_full = parsed_url.url
-                attributes["url.path"] = params.url.path
+            url_full = parsed_url.url
+            attributes["url.path"] = params.url.path
 
-                if parsed_url.query:
-                    filtered_query = _apply_data_collection_filtering_to_query_string(
-                        query_string=parsed_url.query,
-                        behaviour=client.options["data_collection"]["url_query_params"],
-                    )
-                    if filtered_query:
-                        attributes["url.query"] = filtered_query
-                        url_full += "?" + filtered_query
-                        breadcrumb[SPANDATA.HTTP_QUERY] = filtered_query
+            if parsed_url.query:
+                filtered_query = _apply_data_collection_filtering_to_query_string(
+                    query_string=parsed_url.query,
+                    behaviour=client.options["data_collection"]["url_query_params"],
+                )
+                if filtered_query:
+                    attributes["url.query"] = filtered_query
+                    url_full += "?" + filtered_query
+                    breadcrumb[SPANDATA.HTTP_QUERY] = filtered_query
 
-                if parsed_url.fragment:
-                    attributes["url.fragment"] = parsed_url.fragment
-                    url_full += "#" + parsed_url.fragment
-                    breadcrumb[SPANDATA.HTTP_FRAGMENT] = parsed_url.fragment
+            if parsed_url.fragment:
+                attributes["url.fragment"] = parsed_url.fragment
+                url_full += "#" + parsed_url.fragment
+                breadcrumb[SPANDATA.HTTP_FRAGMENT] = parsed_url.fragment
 
-                attributes["url.full"] = url_full
-                breadcrumb["url"] = url_full
-
-            elif should_send_default_pii():
-                url_full = parsed_url.url
-                attributes["url.path"] = params.url.path
-
-                if parsed_url.query:
-                    url_full += "?" + parsed_url.query
-                    attributes["url.query"] = parsed_url.query
-                    breadcrumb[SPANDATA.HTTP_QUERY] = parsed_url.query
-                if parsed_url.fragment:
-                    url_full += "#" + parsed_url.fragment
-                    attributes["url.fragment"] = parsed_url.fragment
-                    breadcrumb[SPANDATA.HTTP_FRAGMENT] = parsed_url.fragment
-
-                attributes["url.full"] = url_full
-                breadcrumb["url"] = url_full
+            attributes["url.full"] = url_full
+            breadcrumb["url"] = url_full
 
         if sentry_sdk.get_current_span() is not None:
             span = sentry_sdk.start_span(name=span_name, attributes=attributes)
@@ -480,6 +438,7 @@ def create_trace_config() -> "TraceConfig":
 
         with capture_internal_exceptions():
             add_http_request_source(span)
+
         span.end()
 
     trace_config = TraceConfig()
@@ -511,44 +470,26 @@ def _make_request_processor(
                 request.path,
             )
 
-            if has_data_collection_enabled(client_options):
-                if request.query_string:
-                    filtered_query_string = (
-                        _apply_data_collection_filtering_to_query_string(
-                            query_string=request.query_string,
-                            behaviour=client_options["data_collection"][
-                                "url_query_params"
-                            ],
-                        )
+            if request.query_string:
+                filtered_query_string = (
+                    _apply_data_collection_filtering_to_query_string(
+                        query_string=request.query_string,
+                        behaviour=client_options["data_collection"]["url_query_params"],
                     )
-                    if filtered_query_string:
-                        request_info["query_string"] = filtered_query_string
-            else:
-                request_info["query_string"] = request.query_string
+                )
+                if filtered_query_string:
+                    request_info["query_string"] = filtered_query_string
 
             request_info["method"] = request.method
-
-            # REMOTE_ADDR was unconditionally set pre-data collection, so it
-            # continues to be set when data collection is not enabled.
-            if (
-                not has_data_collection_enabled(client_options)
-                or client_options["data_collection"]["user_info"]
-            ):
-                request_info["env"] = {"REMOTE_ADDR": request.remote}
             request_info["headers"] = _filter_headers(dict(request.headers))
+
+            if client_options["data_collection"]["user_info"]:
+                request_info["env"] = {"REMOTE_ADDR": request.remote}
 
             # Just attach raw data here if it is within bounds, if available.
             # Unfortunately there's no way to get structured data from aiohttp
             # without awaiting on some coroutine.
-            if has_data_collection_enabled(client_options):
-                if (
-                    "incoming_request"
-                    in client_options["data_collection"]["http_bodies"]
-                ):
-                    request_info["data"] = get_aiohttp_request_data(request)
-            else:
-                # We never gated this prior to data collection, so it should be attached
-                # when data collection is not enabled.
+            if "incoming_request" in client_options["data_collection"]["http_bodies"]:
                 request_info["data"] = get_aiohttp_request_data(request)
 
         return event

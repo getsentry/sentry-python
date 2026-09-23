@@ -216,9 +216,6 @@ class AnthropicIntegration(Integration):
     identifier = "anthropic"
     origin = f"auto.ai.{identifier}"
 
-    def __init__(self: "AnthropicIntegration", include_prompts: bool = True) -> None:
-        self.include_prompts = include_prompts
-
     @staticmethod
     def setup_once() -> None:
         version = parse_version(ANTHROPIC_VERSION)
@@ -492,7 +489,7 @@ def _set_common_input_data(
     if has_data_collection_enabled(client.options):
         if client.options["data_collection"]["gen_ai"]["inputs"]:
             record_inputs = True
-    elif should_send_default_pii() and integration.include_prompts:
+    elif should_send_default_pii():
         record_inputs = True
 
     if record_inputs:
@@ -664,7 +661,7 @@ def _set_output_data(
     record_outputs = False
     if has_data_collection_enabled(client.options):
         record_outputs = client.options["data_collection"]["gen_ai"]["outputs"]
-    elif should_send_default_pii() and integration.include_prompts:
+    elif should_send_default_pii():
         record_outputs = True
 
     if record_outputs:

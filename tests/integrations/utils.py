@@ -37,15 +37,9 @@ DATA_COLLECTION_USER_INFO_CASES = [
     ),
 ]
 
-# Shared parametrization test matrix for ``REMOTE_ADDR`` on events in
-# integrations that set it unconditionally pre-data collection (tornado, sanic,
-# aiohttp). Each case is ``(init_kwargs, expect_remote_addr)``: the address is
-# only gated once ``data_collection`` is enabled, so the legacy
-# ``send_default_pii`` cases still expect it to be collected.
+# Shared parametrization test matrix for ``REMOTE_ADDR`` on events.
+# Each case is ``(init_kwargs, expect_remote_addr)``.
 DATA_COLLECTION_REMOTE_ADDR_CASES = [
-    pytest.param({}, True, id="defaults"),
-    pytest.param({"send_default_pii": True}, True, id="send_default_pii_true"),
-    pytest.param({"send_default_pii": False}, True, id="send_default_pii_false"),
     pytest.param({"data_collection": {}}, True, id="data_collection_default"),
     pytest.param(
         {"data_collection": {"user_info": True}},
@@ -56,14 +50,6 @@ DATA_COLLECTION_REMOTE_ADDR_CASES = [
         {"data_collection": {"user_info": False}},
         False,
         id="data_collection_user_info_false",
-    ),
-    pytest.param(
-        {
-            "send_default_pii": True,
-            "data_collection": {"user_info": False},
-        },
-        False,
-        id="data_collection_wins_over_send_default_pii",
     ),
 ]
 

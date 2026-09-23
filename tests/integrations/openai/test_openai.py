@@ -254,26 +254,16 @@ def test_chat_completion_tool_definitions(
     ]
 
 
-@pytest.mark.parametrize(
-    "send_default_pii, include_prompts",
-    [
-        (True, False),
-        (False, True),
-        (False, False),
-    ],
-)
-def test_nonstreaming_chat_completion_no_prompts(
+def test_nonstreaming_chat_completion_no_sensitive_data(
     sentry_init,
     capture_items,
-    send_default_pii,
-    include_prompts,
     nonstreaming_chat_completions_model_response,
 ):
     sentry_init(
-        integrations=[OpenAIIntegration(include_prompts=include_prompts)],
+        integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        send_default_pii=send_default_pii,
+        send_default_pii=False,
     )
 
     client = OpenAI(api_key="z")
@@ -418,7 +408,7 @@ def test_nonstreaming_chat_completion(
     nonstreaming_chat_completions_model_response,
 ):
     sentry_init(
-        integrations=[OpenAIIntegration(include_prompts=True)],
+        integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
@@ -998,26 +988,16 @@ async def test_streaming_chat_completion_data_collection_outputs_async(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "send_default_pii, include_prompts",
-    [
-        (True, False),
-        (False, True),
-        (False, False),
-    ],
-)
-async def test_nonstreaming_chat_completion_async_no_prompts(
+async def test_nonstreaming_chat_completion_async_no_sensitive_data(
     sentry_init,
     capture_items,
-    send_default_pii,
-    include_prompts,
     nonstreaming_chat_completions_model_response,
 ):
     sentry_init(
-        integrations=[OpenAIIntegration(include_prompts=include_prompts)],
+        integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        send_default_pii=send_default_pii,
+        send_default_pii=False,
     )
 
     client = AsyncOpenAI(api_key="z")
@@ -1160,7 +1140,7 @@ async def test_nonstreaming_chat_completion_async(
     nonstreaming_chat_completions_model_response,
 ):
     sentry_init(
-        integrations=[OpenAIIntegration(include_prompts=True)],
+        integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
@@ -1234,32 +1214,21 @@ def tiktoken_encoding_if_installed():
 
 
 # noinspection PyTypeChecker
-@pytest.mark.parametrize(
-    "send_default_pii, include_prompts",
-    [
-        (True, False),
-        (False, True),
-        (False, False),
-    ],
-)
-def test_streaming_chat_completion_no_prompts(
+def test_streaming_chat_completion_no_sensitive_data(
     sentry_init,
     capture_items,
-    send_default_pii,
-    include_prompts,
     get_model_response,
     server_side_event_chunks,
 ):
     sentry_init(
         integrations=[
             OpenAIIntegration(
-                include_prompts=include_prompts,
                 tiktoken_encoding_name=tiktoken_encoding_if_installed(),
             )
         ],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        send_default_pii=send_default_pii,
+        send_default_pii=False,
     )
 
     client = OpenAI(api_key="z")
@@ -1375,7 +1344,7 @@ def test_streaming_chat_completion_with_usage_in_stream(
 ):
     """When stream_options=include_usage is set, token usage comes from the final chunk's usage field."""
     sentry_init(
-        integrations=[OpenAIIntegration(include_prompts=False)],
+        integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=False,
@@ -1456,7 +1425,7 @@ def test_streaming_chat_completion_empty_content_preserves_token_usage(
 ):
     """Token usage from the stream is recorded even when no content is produced (e.g. content filter)."""
     sentry_init(
-        integrations=[OpenAIIntegration(include_prompts=False)],
+        integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=False,
@@ -1520,7 +1489,7 @@ async def test_streaming_chat_completion_empty_content_preserves_token_usage_asy
 ):
     """Token usage from the stream is recorded even when no content is produced - async variant."""
     sentry_init(
-        integrations=[OpenAIIntegration(include_prompts=False)],
+        integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=False,
@@ -1586,7 +1555,7 @@ async def test_streaming_chat_completion_async_with_usage_in_stream(
 ):
     """When stream_options=include_usage is set, token usage comes from the final chunk's usage field (async)."""
     sentry_init(
-        integrations=[OpenAIIntegration(include_prompts=False)],
+        integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=False,
@@ -1755,7 +1724,6 @@ def test_streaming_chat_completion(
     sentry_init(
         integrations=[
             OpenAIIntegration(
-                include_prompts=True,
                 tiktoken_encoding_name=tiktoken_encoding_if_installed(),
             )
         ],
@@ -1877,19 +1845,9 @@ def test_streaming_chat_completion(
 
 # noinspection PyTypeChecker
 @pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "send_default_pii, include_prompts",
-    [
-        (True, False),
-        (False, True),
-        (False, False),
-    ],
-)
-async def test_streaming_chat_completion_async_no_prompts(
+async def test_streaming_chat_completion_async_no_sensitive_data(
     sentry_init,
     capture_items,
-    send_default_pii,
-    include_prompts,
     get_model_response,
     async_iterator,
     server_side_event_chunks,
@@ -1897,13 +1855,12 @@ async def test_streaming_chat_completion_async_no_prompts(
     sentry_init(
         integrations=[
             OpenAIIntegration(
-                include_prompts=include_prompts,
                 tiktoken_encoding_name=tiktoken_encoding_if_installed(),
             )
         ],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        send_default_pii=send_default_pii,
+        send_default_pii=False,
     )
 
     client = AsyncOpenAI(api_key="z")
@@ -2111,7 +2068,6 @@ async def test_streaming_chat_completion_async(
     sentry_init(
         integrations=[
             OpenAIIntegration(
-                include_prompts=True,
                 tiktoken_encoding_name=tiktoken_encoding_if_installed(),
             )
         ],
@@ -2322,25 +2278,15 @@ async def test_bad_chat_completion_async(
     assert span["status"] == "error"
 
 
-@pytest.mark.parametrize(
-    "send_default_pii, include_prompts",
-    [
-        (True, False),
-        (False, True),
-        (False, False),
-    ],
-)
-def test_embeddings_create_no_pii(
+def test_embeddings_create_no_sensitive_data(
     sentry_init,
     capture_items,
-    send_default_pii,
-    include_prompts,
 ):
     sentry_init(
-        integrations=[OpenAIIntegration(include_prompts=include_prompts)],
+        integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        send_default_pii=send_default_pii,
+        send_default_pii=False,
     )
 
     client = OpenAI(api_key="z")
@@ -2450,7 +2396,7 @@ def test_embeddings_create(
     expected_embeddings_input,
 ):
     sentry_init(
-        integrations=[OpenAIIntegration(include_prompts=True)],
+        integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
@@ -2609,7 +2555,7 @@ def test_embeddings_create_data_collection_inputs_disabled_input_shapes(
     get_input,
 ):
     sentry_init(
-        integrations=[OpenAIIntegration(include_prompts=True)],
+        integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
@@ -2643,25 +2589,15 @@ def test_embeddings_create_data_collection_inputs_disabled_input_shapes(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "send_default_pii, include_prompts",
-    [
-        (True, False),
-        (False, True),
-        (False, False),
-    ],
-)
-async def test_embeddings_create_async_no_pii(
+async def test_embeddings_create_async_no_sensitive_data(
     sentry_init,
     capture_items,
-    send_default_pii,
-    include_prompts,
 ):
     sentry_init(
-        integrations=[OpenAIIntegration(include_prompts=include_prompts)],
+        integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        send_default_pii=send_default_pii,
+        send_default_pii=False,
     )
 
     client = AsyncOpenAI(api_key="z")
@@ -2774,7 +2710,7 @@ async def test_embeddings_create_async(
     expected_embeddings_input,
 ):
     sentry_init(
-        integrations=[OpenAIIntegration(include_prompts=True)],
+        integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
@@ -2906,17 +2842,16 @@ async def test_embeddings_create_async_data_collection(
 
 
 @pytest.mark.parametrize(
-    "send_default_pii, include_prompts",
-    [(True, True), (True, False), (False, True), (False, False)],
+    "send_default_pii",
+    [True, False],
 )
 def test_embeddings_create_raises_error(
     sentry_init,
     capture_items,
     send_default_pii,
-    include_prompts,
 ):
     sentry_init(
-        integrations=[OpenAIIntegration(include_prompts=include_prompts)],
+        integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
@@ -2941,17 +2876,16 @@ def test_embeddings_create_raises_error(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "send_default_pii, include_prompts",
-    [(True, True), (True, False), (False, True), (False, False)],
+    "send_default_pii",
+    [True, False],
 )
 async def test_embeddings_create_raises_error_async(
     sentry_init,
     capture_items,
     send_default_pii,
-    include_prompts,
 ):
     sentry_init(
-        integrations=[OpenAIIntegration(include_prompts=include_prompts)],
+        integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
@@ -3605,7 +3539,7 @@ def test_responses_token_usage_manual_output_counting_response_output():
 
 
 @pytest.mark.skipif(SKIP_RESPONSES_TESTS, reason="Responses API not available")
-def test_ai_client_span_responses_api_no_pii(
+def test_ai_client_span_responses_api_no_sensitive_data(
     sentry_init,
     capture_items,
 ):
@@ -3880,7 +3814,7 @@ def test_ai_client_span_responses_api(
     expected_request_messages,
 ):
     sentry_init(
-        integrations=[OpenAIIntegration(include_prompts=True)],
+        integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
@@ -3936,7 +3870,7 @@ def test_ai_client_span_responses_api(
 
 
 @pytest.mark.parametrize(
-    "data_collection,extra_kwargs,expected_present,expected_absent,include_prompts",
+    "data_collection,extra_kwargs,expected_present,expected_absent",
     [
         pytest.param(
             {"gen_ai": {"inputs": True}},
@@ -3960,7 +3894,6 @@ def test_ai_client_span_responses_api(
                 SPANDATA.GEN_AI_TOOL_DEFINITIONS: safe_serialize(EXAMPLE_TOOLS),
             },
             [],
-            True,
             id="gen-ai-inputs-enabled-string-input",
         ),
         pytest.param(
@@ -3982,7 +3915,6 @@ def test_ai_client_span_responses_api(
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
                 SPANDATA.GEN_AI_TOOL_DEFINITIONS,
             ],
-            True,
             id="gen-ai-inputs-enabled-instructions-only",
         ),
         pytest.param(
@@ -4009,7 +3941,6 @@ def test_ai_client_span_responses_api(
                 ),
             },
             [SPANDATA.GEN_AI_TOOL_DEFINITIONS],
-            True,
             id="gen-ai-inputs-enabled-list-input-with-system-message",
         ),
         pytest.param(
@@ -4025,7 +3956,6 @@ def test_ai_client_span_responses_api(
                 SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
                 SPANDATA.GEN_AI_TOOL_DEFINITIONS,
             ],
-            True,
             id="gen-ai-inputs-disabled",
         ),
         pytest.param(
@@ -4041,7 +3971,6 @@ def test_ai_client_span_responses_api(
                 SPANDATA.GEN_AI_TOOL_DEFINITIONS: safe_serialize(EXAMPLE_TOOLS),
             },
             [SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS],
-            True,
             id="gen-ai-omitted-defaults-to-enabled",
         ),
         pytest.param(
@@ -4053,7 +3982,6 @@ def test_ai_client_span_responses_api(
                 SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
                 SPANDATA.GEN_AI_TOOL_DEFINITIONS,
             ],
-            True,
             id="gen-ai-inputs-enabled-no-input-provided",
         ),
     ],
@@ -4066,10 +3994,9 @@ def test_responses_api_data_collection(
     extra_kwargs,
     expected_present,
     expected_absent,
-    include_prompts,
 ):
     sentry_init(
-        integrations=[OpenAIIntegration(include_prompts=include_prompts)],
+        integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         data_collection=data_collection,
@@ -4494,7 +4421,7 @@ def test_error_in_responses_api(
     capture_items,
 ):
     sentry_init(
-        integrations=[OpenAIIntegration(include_prompts=True)],
+        integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
@@ -4680,7 +4607,7 @@ async def test_ai_client_span_responses_async_api(
     expected_request_messages,
 ):
     sentry_init(
-        integrations=[OpenAIIntegration(include_prompts=True)],
+        integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
@@ -4892,7 +4819,7 @@ async def test_ai_client_span_streaming_responses_async_api(
     server_side_event_chunks,
 ):
     sentry_init(
-        integrations=[OpenAIIntegration(include_prompts=True)],
+        integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
@@ -4971,7 +4898,7 @@ async def test_error_in_responses_async_api(
     capture_items,
 ):
     sentry_init(
-        integrations=[OpenAIIntegration(include_prompts=True)],
+        integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
@@ -5078,24 +5005,19 @@ else:
 
 
 @pytest.mark.parametrize(
-    "send_default_pii, include_prompts",
-    [(True, True), (True, False), (False, True), (False, False)],
+    "send_default_pii",
+    [True, False],
 )
 @pytest.mark.skipif(SKIP_RESPONSES_TESTS, reason="Responses API not available")
 def test_streaming_responses_api(
     sentry_init,
     capture_items,
     send_default_pii,
-    include_prompts,
     get_model_response,
     server_side_event_chunks,
 ):
     sentry_init(
-        integrations=[
-            OpenAIIntegration(
-                include_prompts=include_prompts,
-            )
-        ],
+        integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
@@ -5142,7 +5064,7 @@ def test_streaming_responses_api(
 
     assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "response-model-id"
 
-    if send_default_pii and include_prompts:
+    if send_default_pii:
         assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES] == '["hello"]'
         assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "hello world"
     else:
@@ -5156,25 +5078,20 @@ def test_streaming_responses_api(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "send_default_pii, include_prompts",
-    [(True, True), (True, False), (False, True), (False, False)],
+    "send_default_pii",
+    [True, False],
 )
 @pytest.mark.skipif(SKIP_RESPONSES_TESTS, reason="Responses API not available")
 async def test_streaming_responses_api_async(
     sentry_init,
     capture_items,
     send_default_pii,
-    include_prompts,
     get_model_response,
     async_iterator,
     server_side_event_chunks,
 ):
     sentry_init(
-        integrations=[
-            OpenAIIntegration(
-                include_prompts=include_prompts,
-            )
-        ],
+        integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
@@ -5219,7 +5136,7 @@ async def test_streaming_responses_api_async(
 
     assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "response-model-id"
 
-    if send_default_pii and include_prompts:
+    if send_default_pii:
         assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES] == '["hello"]'
         assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "hello world"
     else:
@@ -5317,7 +5234,7 @@ def test_openai_message_role_mapping(
     """Test that OpenAI integration properly maps message roles like 'ai' to 'assistant'"""
 
     sentry_init(
-        integrations=[OpenAIIntegration(include_prompts=True)],
+        integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
