@@ -7,7 +7,6 @@ from sentry_sdk.traces import Span
 from sentry_sdk.utils import capture_internal_exceptions, reraise
 
 from ..spans import (
-    handoff_span,
     invoke_agent_span,
     update_invoke_agent_span,
 )
@@ -212,15 +211,8 @@ async def _execute_handoffs(
     context_wrapper: "Optional[agents.RunContextWrapper]" = kwargs.get(
         "context_wrapper"
     )
-    run_handoffs = kwargs.get("run_handoffs")
     # openai-agents >= 0.14 renamed `agent` to `public_agent`.
     agent: "Optional[agents.Agent]" = kwargs.get("public_agent", kwargs.get("agent"))
-
-    # Create Sentry handoff span for the first handoff (agents library only processes the first one)
-    if run_handoffs:
-        first_handoff = run_handoffs[0]
-        handoff_agent_name = first_handoff.handoff.agent_name
-        handoff_span(context_wrapper, agent, handoff_agent_name)
 
     # Call original method with all parameters
     try:
