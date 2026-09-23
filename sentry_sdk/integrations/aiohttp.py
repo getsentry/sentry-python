@@ -483,6 +483,9 @@ def _make_request_processor(
             request_info["method"] = request.method
             request_info["headers"] = _filter_headers(dict(request.headers))
 
+            if client_options["data_collection"]["user_info"]:
+                request_info["env"] = {"REMOTE_ADDR": request.remote}
+
             # Just attach raw data here if it is within bounds, if available.
             # Unfortunately there's no way to get structured data from aiohttp
             # without awaiting on some coroutine.

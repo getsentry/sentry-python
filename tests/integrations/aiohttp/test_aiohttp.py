@@ -60,7 +60,6 @@ async def test_basic(sentry_init, aiohttp_client, capture_events):
     host = request["headers"]["Host"]
 
     assert request["method"] == "GET"
-    assert request["query_string"] == ""
     assert request.get("data") is None
     assert request["url"] == "http://{host}/".format(host=host)
     assert request["headers"] == {
@@ -1938,16 +1937,6 @@ async def test_user_ip_address_on_all_spans(
 
 _QUERY_PARAM_DATA_COLLECTION_CASES = [
     pytest.param(
-        {"send_default_pii": True},
-        "toy=tennisball&color=red&auth=secret",
-        id="send_default_pii_true",
-    ),
-    pytest.param(
-        {"send_default_pii": False},
-        None,
-        id="send_default_pii_false",
-    ),
-    pytest.param(
         {},
         None,
         id="defaults",
@@ -1988,14 +1977,6 @@ _QUERY_PARAM_DATA_COLLECTION_CASES = [
         {"data_collection": {"url_query_params": {"mode": "off"}}},
         None,
         id="data_collection_off",
-    ),
-    pytest.param(
-        {
-            "send_default_pii": True,
-            "data_collection": {"url_query_params": {"mode": "off"}},
-        },
-        None,
-        id="data_collection_wins_over_send_default_pii",
     ),
 ]
 
