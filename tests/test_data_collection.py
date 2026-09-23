@@ -7,14 +7,14 @@ from sentry_sdk.data_collection import _ALL_HTTP_BODY_TYPES
 from sentry_sdk.utils import has_data_collection_enabled
 
 
-def test_kvcb_invalid_mode():
+def test_kvcb_invalid_mode(sentry_init):
     with pytest.raises(ValueError):
-        sentry_sdk.init(data_collection={"cookies": {"mode": "nope"}})  # type: ignore Purposely ignoring to test invalid option
+        sentry_init(data_collection={"cookies": {"mode": "nope"}})  # type: ignore Purposely ignoring to test invalid option
 
 
-def test_stack_frame_variables_invalid_mode():
+def test_stack_frame_variables_invalid_mode(sentry_init):
     with pytest.raises(ValueError):
-        sentry_sdk.init(data_collection={"stack_frame_variables": {"mode": "nope"}})
+        sentry_init(data_collection={"stack_frame_variables": {"mode": "nope"}})
 
 
 @pytest.mark.parametrize(
@@ -27,13 +27,13 @@ def test_stack_frame_variables_invalid_mode():
         "frame_context_lines_float",
     ],
 )
-def test_frame_context_lines_invalid_value(value):
+def test_frame_context_lines_invalid_value(sentry_init, value):
     with pytest.raises(ValueError):
-        sentry_sdk.init(data_collection={"frame_context_lines": value})
+        sentry_init(data_collection={"frame_context_lines": value})
 
 
-def test_kvcb_from_dict_defaults_mode():
-    sentry_sdk.init(data_collection={"cookies": {"mode": "denylist", "terms": ["x"]}})
+def test_kvcb_from_dict_defaults_mode(sentry_init):
+    sentry_init(data_collection={"cookies": {"mode": "denylist", "terms": ["x"]}})
     client = sentry_sdk.get_client()
     assert client.options["data_collection"]["cookies"] == {
         "mode": "denylist",
@@ -41,22 +41,22 @@ def test_kvcb_from_dict_defaults_mode():
     }
 
 
-def test_http_headers_collection_defaults():
+def test_http_headers_collection_defaults(sentry_init):
     default_terms = ["forwarded", "-ip", "remote-", "via", "-user"]
 
-    sentry_sdk.init(data_collection={"http_headers": {}})  # type: ignore Purposely ignoring to test invalid option
+    sentry_init(data_collection={"http_headers": {}})  # type: ignore Purposely ignoring to test invalid option
     client = sentry_sdk.get_client()
     assert client.options["data_collection"]["http_headers"]["request"] == {
         "mode": "denylist"
     }
 
-    sentry_sdk.init(data_collection={"http_headers": "off"})  # type: ignore Purposely ignoring to test invalid option
+    sentry_init(data_collection={"http_headers": "off"})  # type: ignore Purposely ignoring to test invalid option
     client = sentry_sdk.get_client()
     assert client.options["data_collection"]["http_headers"]["request"] == {
         "mode": "denylist"
     }
 
-    sentry_sdk.init()
+    sentry_init()
     client = sentry_sdk.get_client()
     assert client.options["data_collection"]["http_headers"]["request"] == {
         "mode": "denylist",
@@ -64,8 +64,8 @@ def test_http_headers_collection_defaults():
     }
 
 
-def test_http_headers_use_default_in_setting_with_missing_config():
-    sentry_sdk.init(
+def test_http_headers_use_default_in_setting_with_missing_config(sentry_init):
+    sentry_init(
         data_collection={
             "http_headers": {
                 "request": {"mode": "allowlist", "terms": ["x-id"]},
@@ -81,8 +81,8 @@ def test_http_headers_use_default_in_setting_with_missing_config():
     }
 
 
-def _initialize_client_with_config(**options):
-    sentry_sdk.init(**options)
+def _initialize_client_with_config(sentry_init, **options):
+    sentry_init(**options)
     return sentry_sdk.get_client().options["data_collection"]
 
 
@@ -323,16 +323,19 @@ def _get(dc, path):
         ),
     ],
 )
-def test_initialize_client_data_collection(options, expected):
-    dc = _initialize_client_with_config(**options)
+def test_initialize_client_data_collection(sentry_init, options, expected):
+    dc = _initialize_client_with_config(sentry_init, **options)
     for path, value in expected.items():
         assert _get(dc, path) == value, f"{path} != {value!r}"
 
 
-def test_initialize_client_data_collection_overrides_send_default_pii_and_warns():
+def test_initialize_client_data_collection_overrides_send_default_pii_and_warns(
+    sentry_init,
+):
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
         dc = _initialize_client_with_config(
+            sentry_init,
             send_default_pii=True,
             data_collection={"user_info": False},
         )
@@ -377,8 +380,8 @@ def test_initialize_client_data_collection_overrides_send_default_pii_and_warns(
         ),
     ],
 )
-def test_client_data_collection_settings(init_kwargs, expected):
-    sentry_sdk.init(**init_kwargs)
+def test_client_data_collection_settings(sentry_init, init_kwargs, expected):
+    sentry_init(**init_kwargs)
     client = sentry_sdk.get_client()
     for key, value in expected.items():
         if key == "should_send_default_pii":
@@ -419,13 +422,17 @@ def test_has_data_collection_enabled_gates_on_user_provided_config():
         ),
     ],
 )
-def test_has_data_collection_enabled_after_resolution(init_kwargs, expected):
-    sentry_sdk.init(**init_kwargs)
+def test_has_data_collection_enabled_after_resolution(
+    sentry_init, init_kwargs, expected
+):
+    sentry_init(**init_kwargs)
     assert has_data_collection_enabled(sentry_sdk.get_client().options) is expected
 
 
-def test_no_data_collection_values_fall_back_to_send_default_pii_configuration():
-    sentry_sdk.init(send_default_pii=True)
+def test_no_data_collection_values_fall_back_to_send_default_pii_configuration(
+    sentry_init,
+):
+    sentry_init(send_default_pii=True)
     client = sentry_sdk.get_client()
     dc = client.options["data_collection"]
     assert dc["provided_by_user"] is False

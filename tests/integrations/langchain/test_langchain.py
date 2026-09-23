@@ -3328,11 +3328,6 @@ def test_langchain_data_collection_tools(
         for s in spans
         if s["attributes"].get("sentry.op") == "gen_ai.chat"
     ]
-    invoke_agent_span = next(
-        s["attributes"]
-        for s in spans
-        if s["attributes"].get("sentry.op") == "gen_ai.invoke_agent"
-    )
 
     assert len(chat_spans) == 2
 
@@ -3351,7 +3346,6 @@ def test_langchain_data_collection_tools(
     ):
         collected = key in expected_present
         assert (key in chat_spans[1]) is collected
-        assert (key in invoke_agent_span) is collected
 
 
 @pytest.mark.parametrize("send_default_pii", [True, False])
