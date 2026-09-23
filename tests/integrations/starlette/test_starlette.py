@@ -424,7 +424,7 @@ async def test_formdata_request_body_data_collection_http_bodies_empty(
         traces_sample_rate=1.0,
         max_request_body_size="always",
         integrations=[StarletteIntegration()],
-        _experiments={"data_collection": {"http_bodies": []}},
+        data_collection={"http_bodies": []},
     )
 
     starlette_app = starlette_app_factory()
@@ -472,9 +472,7 @@ async def test_request_body_data_collection(
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[StarletteIntegration()],
-        _experiments=(
-            {} if data_collection is None else {"data_collection": data_collection}
-        ),
+        data_collection=data_collection,
     )
 
     starlette_app = starlette_app_factory()
@@ -564,12 +562,12 @@ async def test_request_info_no_pii(sentry_init, capture_items):
             id="defaults",
         ),
         pytest.param(
-            {"_experiments": {"data_collection": {"cookies": {"mode": "off"}}}},
+            {"data_collection": {"cookies": {"mode": "off"}}},
             None,
             id="data_collection_off",
         ),
         pytest.param(
-            {"_experiments": {"data_collection": {"cookies": {"mode": "denylist"}}}},
+            {"data_collection": {"cookies": {"mode": "denylist"}}},
             {
                 "jwt": SENSITIVE_DATA_SUBSTITUTE,
                 "theme": "dark",
@@ -579,13 +577,7 @@ async def test_request_info_no_pii(sentry_init, capture_items):
             id="data_collection_denylist_default",
         ),
         pytest.param(
-            {
-                "_experiments": {
-                    "data_collection": {
-                        "cookies": {"mode": "denylist", "terms": ["theme"]}
-                    }
-                }
-            },
+            {"data_collection": {"cookies": {"mode": "denylist", "terms": ["theme"]}}},
             {
                 "jwt": SENSITIVE_DATA_SUBSTITUTE,
                 "theme": SENSITIVE_DATA_SUBSTITUTE,
@@ -595,13 +587,7 @@ async def test_request_info_no_pii(sentry_init, capture_items):
             id="data_collection_denylist_custom_terms",
         ),
         pytest.param(
-            {
-                "_experiments": {
-                    "data_collection": {
-                        "cookies": {"mode": "allowlist", "terms": ["theme"]}
-                    }
-                }
-            },
+            {"data_collection": {"cookies": {"mode": "allowlist", "terms": ["theme"]}}},
             {
                 "jwt": SENSITIVE_DATA_SUBSTITUTE,
                 "theme": "dark",
@@ -612,10 +598,8 @@ async def test_request_info_no_pii(sentry_init, capture_items):
         ),
         pytest.param(
             {
-                "_experiments": {
-                    "data_collection": {
-                        "cookies": {"mode": "allowlist", "terms": ["identity"]}
-                    }
+                "data_collection": {
+                    "cookies": {"mode": "allowlist", "terms": ["identity"]}
                 }
             },
             {
@@ -629,7 +613,7 @@ async def test_request_info_no_pii(sentry_init, capture_items):
         pytest.param(
             {
                 "send_default_pii": False,
-                "_experiments": {"data_collection": {"cookies": {"mode": "denylist"}}},
+                "data_collection": {"cookies": {"mode": "denylist"}},
             },
             {
                 "jwt": SENSITIVE_DATA_SUBSTITUTE,
@@ -673,27 +657,21 @@ async def test_cookie_data_collection(
             id="legacy_send_default_pii_true",
         ),
         pytest.param(
-            {"_experiments": {"data_collection": {}}},
+            {"data_collection": {}},
             "toy=tennisball&color=red&auth=%5BFiltered%5D",
             id="data_collection_denylist_default",
         ),
         pytest.param(
             {
-                "_experiments": {
-                    "data_collection": {
-                        "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
-                    }
+                "data_collection": {
+                    "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
                 }
             },
             "toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D",
             id="data_collection_allowlist",
         ),
         pytest.param(
-            {
-                "_experiments": {
-                    "data_collection": {"url_query_params": {"mode": "off"}}
-                }
-            },
+            {"data_collection": {"url_query_params": {"mode": "off"}}},
             None,
             id="data_collection_off",
         ),
@@ -744,17 +722,13 @@ def test_query_string_data_collection(
             id="legacy_send_default_pii_true",
         ),
         pytest.param(
-            {"_experiments": {"data_collection": {}}},
+            {"data_collection": {}},
             "toy=tennisball&color=red&auth=%5BFiltered%5D",
             "http://testserver/message?toy=tennisball&color=red&auth=%5BFiltered%5D",
             id="data_collection_denylist_default",
         ),
         pytest.param(
-            {
-                "_experiments": {
-                    "data_collection": {"url_query_params": {"mode": "off"}}
-                }
-            },
+            {"data_collection": {"url_query_params": {"mode": "off"}}},
             None,
             "http://testserver/message",
             id="data_collection_off",
@@ -813,24 +787,24 @@ USER_INFO_CASES = [
         id="legacy_send_default_pii_false",
     ),
     pytest.param(
-        {"_experiments": {"data_collection": {}}},
+        {"data_collection": {}},
         TESTCLIENT_IP,
         id="data_collection_default_user_info_true",
     ),
     pytest.param(
-        {"_experiments": {"data_collection": {"user_info": True}}},
+        {"data_collection": {"user_info": True}},
         TESTCLIENT_IP,
         id="data_collection_user_info_true",
     ),
     pytest.param(
-        {"_experiments": {"data_collection": {"user_info": False}}},
+        {"data_collection": {"user_info": False}},
         NO_USER_INFO,
         id="data_collection_user_info_false",
     ),
     pytest.param(
         {
             "send_default_pii": True,
-            "_experiments": {"data_collection": {"user_info": False}},
+            "data_collection": {"user_info": False},
         },
         NO_USER_INFO,
         id="data_collection_wins_over_send_default_pii",
@@ -994,24 +968,24 @@ USER_AUTH_CASES = [
     pytest.param({"send_default_pii": True}, True, id="legacy_pii_true"),
     pytest.param({"send_default_pii": False}, False, id="legacy_pii_false"),
     pytest.param(
-        {"_experiments": {"data_collection": {}}},
+        {"data_collection": {}},
         True,
         id="dc_default_user_info",
     ),
     pytest.param(
-        {"_experiments": {"data_collection": {"user_info": True}}},
+        {"data_collection": {"user_info": True}},
         True,
         id="dc_user_info_true",
     ),
     pytest.param(
-        {"_experiments": {"data_collection": {"user_info": False}}},
+        {"data_collection": {"user_info": False}},
         False,
         id="dc_user_info_false",
     ),
     pytest.param(
         {
             "send_default_pii": True,
-            "_experiments": {"data_collection": {"user_info": False}},
+            "data_collection": {"user_info": False},
         },
         False,
         id="dc_wins_over_pii",

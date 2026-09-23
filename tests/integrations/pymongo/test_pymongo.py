@@ -27,24 +27,24 @@ def mongo_server():
 
 DATA_COLLECTION_DATABASE_QUERY_DATA_USE_CASES = [
     pytest.param(
-        {"_experiments": {"data_collection": {"database_query_data": True}}},
+        {"data_collection": {"database_query_data": True}},
         True,
         id="query_data_enabled",
     ),
     pytest.param(
-        {"_experiments": {"data_collection": {"database_query_data": False}}},
+        {"data_collection": {"database_query_data": False}},
         False,
         id="query_data_disabled",
     ),
     pytest.param(
-        {"_experiments": {"data_collection": {}}},
+        {"data_collection": {}},
         True,
         id="query_data_default",
     ),
     pytest.param(
         {
             "send_default_pii": False,
-            "_experiments": {"data_collection": {"database_query_data": True}},
+            "data_collection": {"database_query_data": True},
         },
         True,
         id="data_collection_overrides_pii_off",
@@ -52,7 +52,7 @@ DATA_COLLECTION_DATABASE_QUERY_DATA_USE_CASES = [
     pytest.param(
         {
             "send_default_pii": True,
-            "_experiments": {"data_collection": {"database_query_data": False}},
+            "data_collection": {"database_query_data": False},
         },
         False,
         id="data_collection_overrides_pii_on",
@@ -71,7 +71,7 @@ def test_segment(sentry_init, capture_items, mongo_server, with_pii):
 
     connection = MongoClient(mongo_server.uri)
 
-    with sentry_sdk.traces.start_span(name="test_segment"):
+    with sentry_sdk.start_span(name="test_segment"):
         list(
             connection["test_db"]["test_collection"].find({"foobar": 1})
         )  # force query execution
@@ -144,7 +144,7 @@ def test_segment_with_data_collection(
 
     connection = MongoClient(mongo_server.uri)
 
-    with sentry_sdk.traces.start_span(name="test_segment"):
+    with sentry_sdk.start_span(name="test_segment"):
         list(
             connection["test_db"]["test_collection"].find({"foobar": 1})
         )  # force query execution
@@ -557,7 +557,7 @@ def test_span_origin(sentry_init, capture_items, mongo_server):
 
     connection = MongoClient(mongo_server.uri)
 
-    with sentry_sdk.traces.start_span(name="test_segment"):
+    with sentry_sdk.start_span(name="test_segment"):
         list(
             connection["test_db"]["test_collection"].find({"foobar": 1})
         )  # force query execution
@@ -579,7 +579,7 @@ def test_status_on_success(sentry_init, capture_items, mongo_server):
 
     connection = MongoClient(mongo_server.uri)
 
-    with sentry_sdk.traces.start_span(name="test_segment"):
+    with sentry_sdk.start_span(name="test_segment"):
         connection["test_db"]["test_collection"].insert_one({"foo": 1})
     sentry_sdk.flush()
 
@@ -599,7 +599,7 @@ def test_status_on_failure(sentry_init, capture_items, mongo_server):
 
     connection = MongoClient(mongo_server.uri)
 
-    with sentry_sdk.traces.start_span(name="test_segment"):
+    with sentry_sdk.start_span(name="test_segment"):
         try:
             connection["test_db"]["erroneous"].insert_many([{"bar": 3}])
             pytest.fail("Request should raise")

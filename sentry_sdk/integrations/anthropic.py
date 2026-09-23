@@ -216,9 +216,6 @@ class AnthropicIntegration(Integration):
     identifier = "anthropic"
     origin = f"auto.ai.{identifier}"
 
-    def __init__(self: "AnthropicIntegration", include_prompts: bool = True) -> None:
-        self.include_prompts = include_prompts
-
     @staticmethod
     def setup_once() -> None:
         version = parse_version(ANTHROPIC_VERSION)
@@ -492,7 +489,7 @@ def _set_common_input_data(
     if has_data_collection_enabled(client.options):
         if client.options["data_collection"]["gen_ai"]["inputs"]:
             record_inputs = True
-    elif should_send_default_pii() and integration.include_prompts:
+    elif should_send_default_pii():
         record_inputs = True
 
     if record_inputs:
@@ -664,7 +661,7 @@ def _set_output_data(
     record_outputs = False
     if has_data_collection_enabled(client.options):
         record_outputs = client.options["data_collection"]["gen_ai"]["outputs"]
-    elif should_send_default_pii() and integration.include_prompts:
+    elif should_send_default_pii():
         record_outputs = True
 
     if record_outputs:
@@ -722,7 +719,7 @@ def _sentry_patched_create_sync(f: "Any", *args: "Any", **kwargs: "Any") -> "Any
 
     model = kwargs.get("model", "")
 
-    span = sentry_sdk.traces.start_span(
+    span = sentry_sdk.start_span(
         name=f"chat {model}".strip(),
         attributes={
             "sentry.op": OP.GEN_AI_CHAT,
@@ -812,7 +809,7 @@ async def _sentry_patched_create_async(
 
     model = kwargs.get("model", "")
 
-    span = sentry_sdk.traces.start_span(
+    span = sentry_sdk.start_span(
         name=f"chat {model}".strip(),
         attributes={
             "sentry.op": OP.GEN_AI_CHAT,
@@ -1053,7 +1050,7 @@ def _wrap_message_stream_manager_enter(f: "Any") -> "Any":
         except TypeError:
             return f(self)
 
-        span = sentry_sdk.traces.start_span(
+        span = sentry_sdk.start_span(
             name="chat"
             if patched_self._model is None
             else f"chat {patched_self._model}".strip(),
@@ -1157,7 +1154,7 @@ def _wrap_async_message_stream_manager_aenter(f: "Any") -> "Any":
         except TypeError:
             return await f(self)
 
-        span = sentry_sdk.traces.start_span(
+        span = sentry_sdk.start_span(
             name="chat"
             if patched_self._model is None
             else f"chat {patched_self._model}".strip(),

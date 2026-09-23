@@ -56,7 +56,7 @@ def test_aws_http_connection_adds_missing_unsigned_propagation_headers(
         integrations=[StdlibIntegration()],
     )
     server, requests = local_http_server
-    with sentry_sdk.traces.start_span(name="test"):  # type: ignore[attr-defined]
+    with sentry_sdk.start_span(name="test"):  # type: ignore[attr-defined]
         _request(server, [])
 
     headers: HTTPMessage = requests[0]
@@ -83,7 +83,7 @@ def test_aws_http_connection_appends_baggage_but_preserves_sentry_trace(
         integrations=[StdlibIntegration()],
     )
     server, requests = local_http_server
-    with sentry_sdk.traces.start_span(name="test"):  # type: ignore[attr-defined]
+    with sentry_sdk.start_span(name="test"):  # type: ignore[attr-defined]
         _request(
             server,
             [
@@ -124,7 +124,7 @@ def test_aws_http_connection_preserves_signed_propagation_headers(
         "SignedHeaders=baggage;host;sentry-trace, "
         "Signature=sixtyseven"
     )
-    with sentry_sdk.traces.start_span(name="test"):  # type: ignore[attr-defined]
+    with sentry_sdk.start_span(name="test"):  # type: ignore[attr-defined]
         _request(
             server,
             [
@@ -170,7 +170,7 @@ def test_aws_http_connection_preserves_query_signed_baggage(
         "&X-Amz-SignedHeaders=baggage%3Bhost"
         "&X-Amz-Signature=sixtyseven"
     )
-    with sentry_sdk.traces.start_span(name="test"):  # type: ignore[attr-defined]
+    with sentry_sdk.start_span(name="test"):  # type: ignore[attr-defined]
         _request(
             server,
             [("baggage", "vendor=value")],

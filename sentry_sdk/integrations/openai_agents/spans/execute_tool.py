@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 def execute_tool_span(
     tool: "agents.FunctionTool", *args: "Any", **kwargs: "Any"
 ) -> "Span":
-    return sentry_sdk.traces.start_span(
+    return sentry_sdk.start_span(
         name=f"execute_tool {tool.name}",
         attributes={
             "sentry.op": OP.GEN_AI_EXECUTE_TOOL,

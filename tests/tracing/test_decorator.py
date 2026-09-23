@@ -20,7 +20,7 @@ def test_trace_decorator(sentry_init, capture_items):
 
     items = capture_items("span")
 
-    @sentry_sdk.traces.trace
+    @sentry_sdk.trace
     def traced_function():
         return "ok"
 
@@ -47,7 +47,7 @@ def test_trace_decorator_arguments(sentry_init, capture_items):
 
     items = capture_items("span")
 
-    @sentry_sdk.traces.trace(name="traced", attributes={"traced.attribute": 123})
+    @sentry_sdk.trace(name="traced", attributes={"traced.attribute": 123})
     def traced_function():
         return "ok"
 
@@ -73,9 +73,9 @@ def test_trace_decorator_inactive(sentry_init, capture_items):
 
     items = capture_items("span")
 
-    @sentry_sdk.traces.trace(name="outer", active=False)
+    @sentry_sdk.trace(name="outer", active=False)
     def traced_function():
-        with sentry_sdk.traces.start_span(name="inner"):
+        with sentry_sdk.start_span(name="inner"):
             return "ok"
 
     result = traced_function()
@@ -101,7 +101,7 @@ async def test_trace_decorator_async(sentry_init, capture_items):
 
     items = capture_items("span")
 
-    @sentry_sdk.traces.trace
+    @sentry_sdk.trace
     async def traced_function():
         return "ok"
 
@@ -130,7 +130,7 @@ async def test_trace_decorator_async_arguments(sentry_init, capture_items):
 
     items = capture_items("span")
 
-    @sentry_sdk.traces.trace(name="traced", attributes={"traced.attribute": 123})
+    @sentry_sdk.trace(name="traced", attributes={"traced.attribute": 123})
     async def traced_function():
         return "ok"
 
@@ -157,9 +157,9 @@ async def test_trace_decorator_async_inactive(sentry_init, capture_items):
 
     items = capture_items("span")
 
-    @sentry_sdk.traces.trace(name="outer", active=False)
+    @sentry_sdk.trace(name="outer", active=False)
     async def traced_function():
-        with sentry_sdk.traces.start_span(name="inner"):
+        with sentry_sdk.start_span(name="inner"):
             return "ok"
 
     result = await traced_function()
@@ -185,11 +185,11 @@ def test_trace_decorator_child(sentry_init, capture_items):
 
     items = capture_items("span")
 
-    @sentry_sdk.traces.trace
+    @sentry_sdk.trace
     def _some_function_traced_stream(a, b, c):
         return True
 
-    with sentry_sdk.traces.start_span(name="segment") as segment:
+    with sentry_sdk.start_span(name="segment") as segment:
         result = _some_function_traced_stream(1, 2, 3)
 
     assert result is True
@@ -217,11 +217,11 @@ async def test_trace_decorator_async_child(sentry_init, capture_items):
 
     items = capture_items("span")
 
-    @sentry_sdk.traces.trace
+    @sentry_sdk.trace
     async def _some_function_traced_stream(a, b, c):
         return True
 
-    with sentry_sdk.traces.start_span(name="segment") as segment:
+    with sentry_sdk.start_span(name="segment") as segment:
         result = await _some_function_traced_stream(1, 2, 3)
 
     assert result is True
@@ -248,7 +248,7 @@ def test_functions_to_trace_signature_unchanged_sync(sentry_init):
     def _some_function(a, b, c):
         pass
 
-    @sentry_sdk.traces.trace
+    @sentry_sdk.trace
     def _some_function_traced_stream(a, b, c):
         pass
 
@@ -266,7 +266,7 @@ async def test_functions_to_trace_signature_unchanged_async(sentry_init):
     async def _some_function(a, b, c):
         pass
 
-    @sentry_sdk.traces.trace
+    @sentry_sdk.trace
     async def _some_function_traced_stream(a, b, c):
         pass
 

@@ -63,7 +63,7 @@ def test_subprocess_basic(
     )
     items = capture_items("event", "span")
 
-    with sentry_sdk.traces.start_span(name="custom parent") as span:
+    with sentry_sdk.start_span(name="custom parent") as span:
         args = [
             sys.executable,
             "-c",
@@ -172,7 +172,7 @@ def test_subprocess_empty_env(
         integrations=[StdlibIntegration()],
         traces_sample_rate=1.0,
     )
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         args = [
             sys.executable,
             "-c",
@@ -206,7 +206,7 @@ def test_subprocess_span_origin(
     )
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         args = [
             sys.executable,
             "-c",

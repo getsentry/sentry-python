@@ -11,8 +11,8 @@ def test_conversation_id_propagates_to_span_with_gen_ai_operation_name(
     scope = sentry_sdk.get_current_scope()
     scope.set_conversation_id("conv-op-name-test")
 
-    with sentry_sdk.traces.start_span(name="test-sg"):
-        with sentry_sdk.traces.start_span(
+    with sentry_sdk.start_span(name="test-sg"):
+        with sentry_sdk.start_span(
             name="client", attributes={"sentry.op": "http.client"}
         ) as span:
             span.set_attribute("gen_ai.operation.name", "chat")
@@ -35,8 +35,8 @@ def test_conversation_id_propagates_to_span_with_ai_op(sentry_init, capture_item
     scope = sentry_sdk.get_current_scope()
     scope.set_conversation_id("conv-ai-op-test")
 
-    with sentry_sdk.traces.start_span(name="test-tx"):
-        with sentry_sdk.traces.start_span(
+    with sentry_sdk.start_span(name="test-tx"):
+        with sentry_sdk.start_span(
             name="completion", attributes={"sentry.op": "ai.chat.completions"}
         ):
             pass
@@ -65,8 +65,8 @@ def test_conversation_id_propagates_to_span_with_gen_ai_op(
     scope = sentry_sdk.get_current_scope()
     scope.set_conversation_id("conv-gen-ai-op-test")
 
-    with sentry_sdk.traces.start_span(name="test-tx"):
-        with sentry_sdk.traces.start_span(
+    with sentry_sdk.start_span(name="test-tx"):
+        with sentry_sdk.start_span(
             name="invoke", attributes={"sentry.op": "gen_ai.invoke_agent"}
         ):
             pass
@@ -87,8 +87,8 @@ def test_conversation_id_not_propagated_to_non_ai_span(sentry_init, capture_item
     scope = sentry_sdk.get_current_scope()
     scope.set_conversation_id("conv-should-not-appear")
 
-    with sentry_sdk.traces.start_span(name="test-sg"):
-        with sentry_sdk.traces.start_span(
+    with sentry_sdk.start_span(name="test-sg"):
+        with sentry_sdk.start_span(
             name="client", attributes={"sentry.op": "http.client"}
         ) as span:
             span.set_attribute("some.other.data", "value")
@@ -111,8 +111,8 @@ def test_conversation_id_not_propagated_when_not_set(sentry_init, capture_items)
     scope = sentry_sdk.get_current_scope()
     scope.remove_conversation_id()
 
-    with sentry_sdk.traces.start_span(name="test-sg"):
-        with sentry_sdk.traces.start_span(
+    with sentry_sdk.start_span(name="test-sg"):
+        with sentry_sdk.start_span(
             name="completion", attributes={"sentry.op": "ai.chat.completions"}
         ):
             pass
@@ -135,8 +135,8 @@ def test_conversation_id_not_propagated_to_span_without_op(sentry_init, capture_
     scope = sentry_sdk.get_current_scope()
     scope.set_conversation_id("conv-no-op-test")
 
-    with sentry_sdk.traces.start_span(name="test-sg"):
-        with sentry_sdk.traces.start_span(name="unnamed-span") as span:
+    with sentry_sdk.start_span(name="test-sg"):
+        with sentry_sdk.start_span(name="unnamed-span") as span:
             span.set_attribute("regular.data", "value")
 
     sentry_sdk.flush()
@@ -159,8 +159,8 @@ def test_conversation_id_propagates_with_gen_ai_operation_name_no_op(
     scope = sentry_sdk.get_current_scope()
     scope.set_conversation_id("conv-no-op-but-data-test")
 
-    with sentry_sdk.traces.start_span(name="test-sg"):
-        with sentry_sdk.traces.start_span(name="unnamed-span") as span:
+    with sentry_sdk.start_span(name="test-sg"):
+        with sentry_sdk.start_span(name="unnamed-span") as span:
             span.set_attribute("gen_ai.operation.name", "embedding")
 
     sentry_sdk.flush()
@@ -183,7 +183,7 @@ def test_conversation_id_propagates_to_segment_with_ai_op(sentry_init, capture_i
     scope = sentry_sdk.get_current_scope()
     scope.set_conversation_id("conv-tx-ai-op-test")
 
-    with sentry_sdk.traces.start_span(
+    with sentry_sdk.start_span(
         name="AI Workflow", attributes={"sentry.op": "ai.workflow"}
     ):
         pass
@@ -202,7 +202,7 @@ def test_conversation_id_not_propagated_to_non_ai_segment(sentry_init, capture_i
     scope = sentry_sdk.get_current_scope()
     scope.set_conversation_id("conv-tx-should-not-appear")
 
-    with sentry_sdk.traces.start_span(
+    with sentry_sdk.start_span(
         name="HTTP Request", attributes={"sentry.op": "http.server"}
     ):
         pass

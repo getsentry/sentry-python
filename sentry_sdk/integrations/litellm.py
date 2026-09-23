@@ -95,7 +95,7 @@ def _input_callback(kwargs: "Dict[str, Any]") -> None:
         operation = "chat"
 
     # Start a new span/transaction
-    span = sentry_sdk.traces.start_span(
+    span = sentry_sdk.start_span(
         name=f"{operation} {model}",
         attributes={
             "sentry.op": (
@@ -117,7 +117,7 @@ def _input_callback(kwargs: "Dict[str, Any]") -> None:
     record_inputs = False
     if has_data_collection_enabled(client.options):
         record_inputs = client.options["data_collection"]["gen_ai"]["inputs"]
-    elif should_send_default_pii() and integration.include_prompts:
+    elif should_send_default_pii():
         record_inputs = True
 
     if record_inputs:
@@ -198,7 +198,7 @@ def _success_callback(
         record_outputs = False
         if has_data_collection_enabled(client.options):
             record_outputs = client.options["data_collection"]["gen_ai"]["outputs"]
-        elif should_send_default_pii() and integration.include_prompts:
+        elif should_send_default_pii():
             record_outputs = True
 
         if record_outputs:
@@ -335,9 +335,6 @@ class LiteLLMIntegration(Integration):
 
     identifier = "litellm"
     origin = f"auto.ai.{identifier}"
-
-    def __init__(self: "LiteLLMIntegration", include_prompts: bool = True) -> None:
-        self.include_prompts = include_prompts
 
     @staticmethod
     def setup_once() -> None:

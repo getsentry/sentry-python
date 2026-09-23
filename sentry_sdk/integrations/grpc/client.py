@@ -30,12 +30,12 @@ class ClientInterceptor(
     ) -> "_UnaryOutcome":
         method = client_call_details.method
 
-        if sentry_sdk.traces.get_current_span() is None:
+        if sentry_sdk.get_current_span() is None:
             client_call_details = self._update_client_call_details_metadata_from_scope(
                 client_call_details
             )
             return continuation(client_call_details, request)
-        with sentry_sdk.traces.start_span(
+        with sentry_sdk.start_span(
             name="unary unary call to %s" % method,
             attributes={
                 "sentry.op": OP.GRPC_CLIENT,
@@ -60,13 +60,13 @@ class ClientInterceptor(
     ) -> "Union[Iterator[Message], Call]":
         method = client_call_details.method
 
-        if sentry_sdk.traces.get_current_span() is None:
+        if sentry_sdk.get_current_span() is None:
             client_call_details = self._update_client_call_details_metadata_from_scope(
                 client_call_details
             )
             return continuation(client_call_details, request)
 
-        with sentry_sdk.traces.start_span(
+        with sentry_sdk.start_span(
             name="unary stream call to %s" % method,
             attributes={
                 "sentry.op": OP.GRPC_CLIENT,

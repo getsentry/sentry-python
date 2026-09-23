@@ -247,19 +247,18 @@ async def test_wrapping_handler_is_idempotent(sentry_init, capture_items, stdio)
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "send_default_pii, include_prompts",
-    [(True, True), (True, False), (False, True), (False, False)],
+    "send_default_pii",
+    [True, False],
 )
 async def test_tool_handler_stdio(
     sentry_init,
     capture_items,
     send_default_pii,
-    include_prompts,
     stdio,
 ):
     """Test that synchronous tool handlers create proper spans"""
     sentry_init(
-        integrations=[MCPIntegration(include_prompts=include_prompts)],
+        integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
     )
@@ -314,7 +313,7 @@ async def test_tool_handler_stdio(
     assert data["mcp.request.argument.y"] == "5"
 
     # Check PII-sensitive data is only present when both flags are True
-    if send_default_pii and include_prompts:
+    if send_default_pii:
         assert data[SPANDATA.MCP_TOOL_RESULT_CONTENT] == json.dumps(
             {
                 "result": "success",
@@ -329,15 +328,15 @@ async def test_tool_handler_stdio(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "send_default_pii, include_prompts",
-    [(True, True), (True, False), (False, True), (False, False)],
+    "send_default_pii",
+    [True, False],
 )
 async def test_tool_handler_streamable_http(
-    sentry_init, capture_items, send_default_pii, include_prompts, json_rpc
+    sentry_init, capture_items, send_default_pii, json_rpc
 ):
     """Test that async tool handlers create proper spans"""
     sentry_init(
-        integrations=[MCPIntegration(include_prompts=include_prompts)],
+        integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
     )
@@ -401,7 +400,7 @@ async def test_tool_handler_streamable_http(
     assert data["mcp.request.argument.data"] == "test"
 
     # Check PII-sensitive data
-    if send_default_pii and include_prompts:
+    if send_default_pii:
         assert data[SPANDATA.MCP_TOOL_RESULT_CONTENT] == json.dumps(
             {"status": "completed"}
         )
@@ -509,19 +508,18 @@ async def test_tool_handler_with_error(sentry_init, capture_items, stdio):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "send_default_pii, include_prompts",
-    [(True, True), (True, False), (False, True), (False, False)],
+    "send_default_pii",
+    [True, False],
 )
 async def test_prompt_handler_stdio(
     sentry_init,
     capture_items,
     send_default_pii,
-    include_prompts,
     stdio,
 ):
     """Test that synchronous prompt handlers create proper spans"""
     sentry_init(
-        integrations=[MCPIntegration(include_prompts=include_prompts)],
+        integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
     )
@@ -578,7 +576,7 @@ async def test_prompt_handler_stdio(
     assert data[SPANDATA.MCP_PROMPT_RESULT_MESSAGE_COUNT] == 1
 
     # For single message prompts, role and content should be captured only with PII
-    if send_default_pii and include_prompts:
+    if send_default_pii:
         assert data[SPANDATA.MCP_PROMPT_RESULT_MESSAGE_ROLE] == "user"
         assert (
             data[SPANDATA.MCP_PROMPT_RESULT_MESSAGE_CONTENT] == "Tell me about Python"
@@ -590,15 +588,15 @@ async def test_prompt_handler_stdio(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "send_default_pii, include_prompts",
-    [(True, True), (True, False), (False, True), (False, False)],
+    "send_default_pii",
+    [True, False],
 )
 async def test_prompt_handler_streamable_http(
-    sentry_init, capture_items, send_default_pii, include_prompts, json_rpc
+    sentry_init, capture_items, send_default_pii, json_rpc
 ):
     """Test that async prompt handlers create proper spans"""
     sentry_init(
-        integrations=[MCPIntegration(include_prompts=include_prompts)],
+        integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
     )
@@ -860,19 +858,18 @@ async def test_resource_handler_with_error(sentry_init, capture_items, stdio):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "send_default_pii, include_prompts",
-    [(True, True), (False, False)],
+    "send_default_pii",
+    [True, False],
 )
 async def test_tool_result_extraction_tuple(
     sentry_init,
     capture_items,
     send_default_pii,
-    include_prompts,
     stdio,
 ):
     """Test extraction of tool results from tuple format (UnstructuredContent, StructuredContent)"""
     sentry_init(
-        integrations=[MCPIntegration(include_prompts=include_prompts)],
+        integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
     )
@@ -903,7 +900,7 @@ async def test_tool_result_extraction_tuple(
     assert span is not None
     data = span["attributes"]
 
-    if send_default_pii and include_prompts:
+    if send_default_pii:
         assert data[SPANDATA.MCP_TOOL_RESULT_CONTENT] == json.dumps(
             {
                 "key": "value",
@@ -918,19 +915,18 @@ async def test_tool_result_extraction_tuple(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "send_default_pii, include_prompts",
-    [(True, True), (False, False)],
+    "send_default_pii",
+    [True, False],
 )
 async def test_tool_result_extraction_unstructured(
     sentry_init,
     capture_items,
     send_default_pii,
-    include_prompts,
     stdio,
 ):
     """Test extraction of tool results from UnstructuredContent (list of content blocks)"""
     sentry_init(
-        integrations=[MCPIntegration(include_prompts=include_prompts)],
+        integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
     )
@@ -966,7 +962,7 @@ async def test_tool_result_extraction_unstructured(
     data = span["attributes"]
 
     # Should extract and join text from content blocks only with PII
-    if send_default_pii and include_prompts:
+    if send_default_pii:
         assert data[SPANDATA.MCP_TOOL_RESULT_CONTENT] == "First part Second part"
     else:
         assert SPANDATA.MCP_TOOL_RESULT_CONTENT not in data
@@ -1007,7 +1003,7 @@ async def test_multiple_handlers(sentry_init, capture_items, stdio):
     server.add_request_handler("prompts/get", GetPromptRequestParams, prompt_handler)
 
     items = capture_items("span")
-    tx_ctx = sentry_sdk.traces.start_span(name="mcp tx")
+    tx_ctx = sentry_sdk.start_span(name="mcp tx")
 
     with tx_ctx:
         await stdio(
@@ -1056,19 +1052,18 @@ async def test_multiple_handlers(sentry_init, capture_items, stdio):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "send_default_pii, include_prompts",
-    [(True, True), (False, False)],
+    "send_default_pii",
+    [True, False],
 )
 async def test_prompt_with_dict_result(
     sentry_init,
     capture_items,
     send_default_pii,
-    include_prompts,
     stdio,
 ):
     """Test prompt handler with dict result instead of GetPromptResult object"""
     sentry_init(
-        integrations=[MCPIntegration(include_prompts=include_prompts)],
+        integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
     )
@@ -1107,7 +1102,7 @@ async def test_prompt_with_dict_result(
     assert data[SPANDATA.MCP_PROMPT_RESULT_MESSAGE_COUNT] == 1
 
     # Role and content only captured with PII
-    if send_default_pii and include_prompts:
+    if send_default_pii:
         assert data[SPANDATA.MCP_PROMPT_RESULT_MESSAGE_ROLE] == "user"
         assert data[SPANDATA.MCP_PROMPT_RESULT_MESSAGE_CONTENT] == "Hello from dict"
     else:
@@ -1351,7 +1346,7 @@ async def test_tool_data_collection_inputs(
         "send_default_pii": send_default_pii,
     }
     if data_collection is not None:
-        init_kwargs["_experiments"] = {"data_collection": data_collection}
+        init_kwargs["data_collection"] = data_collection
 
     sentry_init(**init_kwargs)
 
@@ -1449,7 +1444,7 @@ async def test_tool_data_collection_outputs(
         "send_default_pii": send_default_pii,
     }
     if data_collection is not None:
-        init_kwargs["_experiments"] = {"data_collection": data_collection}
+        init_kwargs["data_collection"] = data_collection
 
     sentry_init(**init_kwargs)
 
@@ -1550,7 +1545,7 @@ async def test_prompt_data_collection_inputs(
         "send_default_pii": send_default_pii,
     }
     if data_collection is not None:
-        init_kwargs["_experiments"] = {"data_collection": data_collection}
+        init_kwargs["data_collection"] = data_collection
 
     sentry_init(**init_kwargs)
 
@@ -1600,38 +1595,3 @@ async def test_prompt_data_collection_inputs(
 
     # The message count carries no prompt content, so it is never gated
     assert data[SPANDATA.MCP_PROMPT_RESULT_MESSAGE_COUNT] == 1
-
-
-@pytest.mark.asyncio
-async def test_include_prompts_ignored_when_data_collection_set(
-    sentry_init,
-    capture_items,
-    stdio,
-):
-    sentry_init(
-        integrations=[MCPIntegration(include_prompts=False)],
-        traces_sample_rate=1.0,
-        send_default_pii=True,
-        _experiments={"data_collection": {"gen_ai": {"outputs": True}}},
-    )
-
-    server = Server("test-server")
-
-    async def test_tool(ctx, params):
-        return CallToolResult(
-            content=[TextContent(type="text", text=json.dumps({"value": 42}))],
-            structured_content={"value": 42},
-        )
-
-    server.add_request_handler("tools/call", CallToolRequestParams, test_tool)
-
-    params = {"name": "calculate", "arguments": {"x": 10}}
-    items = capture_items("span")
-    await stdio(server, method="tools/call", params=params, request_id="req-1")
-    sentry_sdk.flush()
-    span = _find_mcp_span(items, method_name="tools/call")
-    assert span is not None
-    data = span["attributes"]
-
-    assert data[SPANDATA.MCP_TOOL_RESULT_CONTENT] == json.dumps({"value": 42})
-    assert data[SPANDATA.MCP_TOOL_RESULT_CONTENT_COUNT] == 1

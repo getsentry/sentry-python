@@ -105,7 +105,7 @@ def test_metrics_with_span(sentry_init, capture_items):
     sentry_init(traces_sample_rate=1.0)
     items = capture_items("trace_metric")
 
-    with sentry_sdk.traces.start_span(name="test-span") as segment:
+    with sentry_sdk.start_span(name="test-span") as segment:
         sentry_sdk.metrics.count("test.span.counter", 1)
 
     sentry_sdk.flush()

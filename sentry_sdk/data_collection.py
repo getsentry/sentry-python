@@ -292,10 +292,17 @@ def _resolve_data_collection(options: "Dict[str, Any]") -> "DataCollection":
     concrete values for every field.
 
     ``data_collection`` must be a plain ``dict``.
+
+    Must be called exactly once per options dict, before ``client._get_options``
+    overwrites ``options["data_collection"]`` with the resolved result. Feeding an
+    already-resolved dict back in would flip ``provided_by_user`` to ``True``.
     """
     from sentry_sdk.utils import deprecation_warning
 
-    user_dc = options.get("_experiments", {}).get("data_collection")
+    user_dc = options.get("data_collection")
+    if user_dc is None:
+        user_dc = options.get("_experiments", {}).get("data_collection")
+
     send_default_pii = options.get("send_default_pii")
 
     include_local_variables = (

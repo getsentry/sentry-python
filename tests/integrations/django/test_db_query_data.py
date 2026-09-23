@@ -576,7 +576,7 @@ def test_db_span_origin_executemany(
         pytest.skip("postgres tests disabled")
 
     items = capture_items("span")
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         from django.db import connection, transaction
 
         cursor = connection.cursor()

@@ -13,7 +13,6 @@ from sentry_sdk.integrations.celery import (
     _wrap_task_run,
 )
 from sentry_sdk.integrations.celery.beat import _get_headers
-from sentry_sdk.utils import SENSITIVE_DATA_SUBSTITUTE
 
 
 @pytest.fixture
@@ -118,16 +117,14 @@ def celery_invocation(request):
     return request.param
 
 
-@pytest.mark.parametrize("send_default_pii", [True, False])
 def test_simple_with_performance(
     capture_items,
     init_celery,
     celery_invocation,
-    send_default_pii,
 ):
     celery = init_celery(
         traces_sample_rate=1.0,
-        send_default_pii=send_default_pii,
+        data_collection={},
     )
 
     @celery.task(name="dummy_task")
@@ -137,7 +134,7 @@ def test_simple_with_performance(
 
     items = capture_items("event", "span")
 
-    with sentry_sdk.traces.start_span(name="span") as span:
+    with sentry_sdk.start_span(name="span") as span:
         celery_invocation(dummy_task, 1, 2)
         _, expected_context = celery_invocation(dummy_task, 1, 0)
 
@@ -150,16 +147,9 @@ def test_simple_with_performance(
 
     assert error_event["transaction"] == "dummy_task"
     assert "celery_task_id" in error_event["tags"]
-    if send_default_pii:
-        assert error_event["extra"]["celery-job"] == dict(
-            task_name="dummy_task", **expected_context
-        )
-    else:
-        assert error_event["extra"]["celery-job"] == {
-            "task_name": "dummy_task",
-            "args": SENSITIVE_DATA_SUBSTITUTE,
-            "kwargs": SENSITIVE_DATA_SUBSTITUTE,
-        }
+    assert error_event["extra"]["celery-job"] == dict(
+        task_name="dummy_task", **expected_context
+    )
 
     (exception,) = error_event["exception"]["values"]
     assert exception["type"] == "ZeroDivisionError"
@@ -167,13 +157,10 @@ def test_simple_with_performance(
     assert exception["stacktrace"]["frames"][0]["vars"]["foo"] == "42"
 
 
-@pytest.mark.parametrize("send_default_pii", [True, False])
-def test_simple_without_performance(
-    capture_events, init_celery, celery_invocation, send_default_pii
-):
+def test_simple_without_performance(capture_events, init_celery, celery_invocation):
     celery = init_celery(
         traces_sample_rate=None,
-        send_default_pii=send_default_pii,
+        data_collection={},
     )
     events = capture_events()
 
@@ -199,16 +186,9 @@ def test_simple_without_performance(
     )
     assert error_event["transaction"] == "dummy_task"
     assert "celery_task_id" in error_event["tags"]
-    if send_default_pii:
-        assert error_event["extra"]["celery-job"] == dict(
-            task_name="dummy_task", **expected_context
-        )
-    else:
-        assert error_event["extra"]["celery-job"] == {
-            "task_name": "dummy_task",
-            "args": SENSITIVE_DATA_SUBSTITUTE,
-            "kwargs": SENSITIVE_DATA_SUBSTITUTE,
-        }
+    assert error_event["extra"]["celery-job"] == dict(
+        task_name="dummy_task", **expected_context
+    )
 
     (exception,) = error_event["exception"]["values"]
     assert exception["type"] == "ZeroDivisionError"
@@ -217,49 +197,25 @@ def test_simple_without_performance(
 
 
 @pytest.mark.parametrize(
-    "init_kwargs,expected_args,expected_kwargs",
+    "data_collection,expected_args,expected_kwargs",
     [
         pytest.param(
-            {"_experiments": {"data_collection": {}}},
+            {},
             "included",
             "included",
             id="data_collection_default",
         ),
         pytest.param(
-            {"_experiments": {"data_collection": {"queues": True}}},
+            {"queues": True},
             "included",
             "included",
             id="data_collection_queues_on",
         ),
         pytest.param(
-            {"_experiments": {"data_collection": {"queues": False}}},
+            {"queues": False},
             None,
             None,
             id="data_collection_queues_off",
-        ),
-        pytest.param(
-            {"send_default_pii": False},
-            SENSITIVE_DATA_SUBSTITUTE,
-            SENSITIVE_DATA_SUBSTITUTE,
-            id="no_pii",
-        ),
-        pytest.param(
-            {
-                "_experiments": {"data_collection": {"queues": False}},
-                "send_default_pii": False,
-            },
-            None,
-            None,
-            id="data_collection_queues_off_with_no_pii",
-        ),
-        pytest.param(
-            {
-                "_experiments": {"data_collection": {"queues": True}},
-                "send_default_pii": False,
-            },
-            "included",
-            "included",
-            id="data_collection_queues_on_with_no_pii",
         ),
     ],
 )
@@ -276,14 +232,11 @@ def test_task_args_kwargs_data_collection(
     invocation_style,
     task_args,
     task_kwargs,
-    init_kwargs,
+    data_collection,
     expected_args,
     expected_kwargs,
 ):
-    init_dict = {"send_default_pii": True, **init_kwargs}
-    celery = init_celery(
-        **init_dict,
-    )
+    celery = init_celery(data_collection=data_collection)
 
     @celery.task(name="dummy_task")
     def dummy_task(x, y):
@@ -307,9 +260,6 @@ def test_task_args_kwargs_data_collection(
     elif expected_args == "included":
         assert celery_job["args"] == task_args
         assert celery_job["kwargs"] == task_kwargs
-    else:
-        assert celery_job["args"] == SENSITIVE_DATA_SUBSTITUTE
-        assert celery_job["kwargs"] == SENSITIVE_DATA_SUBSTITUTE
 
 
 @pytest.mark.parametrize("task_fails", [True, False], ids=["error", "success"])
@@ -321,6 +271,7 @@ def test_transaction_events(
 ):
     celery = init_celery(
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     @celery.task(name="dummy_task")
@@ -333,7 +284,7 @@ def test_transaction_events(
 
     items = capture_items("event", "span")
 
-    with sentry_sdk.traces.start_span(name="submission") as span:
+    with sentry_sdk.start_span(name="submission") as span:
         celery_invocation(dummy_task, 1, 0 if task_fails else 1)
 
     sentry_sdk.flush()
@@ -402,14 +353,14 @@ def test_no_double_patching(celery):
 
 
 def test_simple_no_propagation(capture_events, init_celery):
-    celery = init_celery(propagate_traces=False)
+    celery = init_celery(propagate_traces=False, data_collection={})
     events = capture_events()
 
     @celery.task(name="dummy_task")
     def dummy_task():
         1 / 0
 
-    with sentry_sdk.traces.start_span(name="segment") as segment:
+    with sentry_sdk.start_span(name="segment") as segment:
         dummy_task.delay()
 
     (event,) = events
@@ -514,9 +465,7 @@ def test_traces_sampler_gets_task_info_in_sampling_context(
     DictionaryContaining,  # noqa:N803
 ):
     traces_sampler = mock.Mock(return_value=1.0)
-    celery = init_celery(
-        traces_sampler=traces_sampler,
-    )
+    celery = init_celery(traces_sampler=traces_sampler, data_collection={})
 
     @celery.task(name="dog_walk")
     def walk_dogs(x, y):
@@ -553,7 +502,7 @@ def test_abstract_task(init_celery, capture_events, celery, celery_invocation):
     def dummy_task(x, y):
         return x / y
 
-    with sentry_sdk.traces.start_span(name="task"):
+    with sentry_sdk.start_span(name="task"):
         celery_invocation(dummy_task, 1, 0)
 
     assert not events
@@ -588,7 +537,7 @@ def test_task_headers(celery):
 
 
 def test_baggage_propagation(init_celery):
-    celery = init_celery(traces_sample_rate=1.0, release="abcdef")
+    celery = init_celery(traces_sample_rate=1.0, release="abcdef", data_collection={})
 
     @celery.task(name="dummy_task", bind=True)
     def dummy_task(self, x, y):
@@ -596,7 +545,7 @@ def test_baggage_propagation(init_celery):
 
     # patch random.randrange to return a predictable sample_rand value
     with mock.patch("sentry_sdk.tracing_utils.Random.randrange", return_value=500000):
-        with sentry_sdk.traces.start_span(name="segment") as segment:
+        with sentry_sdk.start_span(name="segment") as segment:
             result = dummy_task.apply_async(
                 args=(1, 0),
                 headers={"baggage": "custom=value"},
@@ -625,14 +574,15 @@ def test_sentry_propagate_traces_override(init_celery):
         propagate_traces=True,
         traces_sample_rate=1.0,
         release="abcdef",
+        data_collection={},
     )
 
     @celery.task(name="dummy_task", bind=True)
     def dummy_task(self, message):
-        trace_id = sentry_sdk.traces.get_current_span().trace_id
+        trace_id = sentry_sdk.get_current_span().trace_id
         return trace_id
 
-    with sentry_sdk.traces.start_span(name="parent") as span:
+    with sentry_sdk.start_span(name="parent") as span:
         parent_trace_id = span.trace_id
 
         # should propagate trace
@@ -652,6 +602,7 @@ def test_sentry_propagate_traces_override(init_celery):
 def test_apply_async_manually_span(sentry_init):
     sentry_init(
         integrations=[CeleryIntegration()],
+        data_collection={},
     )
 
     def dummy_function(*args, **kwargs):
@@ -664,7 +615,7 @@ def test_apply_async_manually_span(sentry_init):
 
 
 def test_apply_async_no_args(init_celery):
-    celery = init_celery()
+    celery = init_celery(data_collection={})
 
     @celery.task
     def example_task():
@@ -688,6 +639,7 @@ def test_messaging_destination_name_default_exchange(
 ):
     celery_app = init_celery(
         traces_sample_rate=1.0,
+        data_collection={},
     )
     mock_request.delivery_info = {"routing_key": routing_key, "exchange": ""}
 
@@ -696,7 +648,9 @@ def test_messaging_destination_name_default_exchange(
 
     items = capture_items("span")
     task.apply_async()
+
     sentry_sdk.flush()
+
     process_span, _execution_span = items
     assert (
         process_span.payload["attributes"]["messaging.destination.name"] == routing_key
@@ -715,6 +669,7 @@ def test_messaging_destination_name_nondefault_exchange(
     """
     celery_app = init_celery(
         traces_sample_rate=1.0,
+        data_collection={},
     )
     mock_request.delivery_info = {"routing_key": "celery", "exchange": "custom"}
 
@@ -722,8 +677,11 @@ def test_messaging_destination_name_nondefault_exchange(
     def task(): ...
 
     items = capture_items("span")
+
     task.apply_async()
+
     sentry_sdk.flush()
+
     process_span, _execution_span = items
     assert "messaging.destination.name" not in process_span.payload["attributes"]
 
@@ -731,14 +689,18 @@ def test_messaging_destination_name_nondefault_exchange(
 def test_messaging_id(init_celery, capture_items):
     celery = init_celery(
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     @celery.task
     def example_task(): ...
 
     items = capture_items("span")
+
     example_task.apply_async()
+
     sentry_sdk.flush()
+
     process_span, _execution_span = items
     assert "messaging.message.id" in process_span.payload["attributes"]
 
@@ -746,14 +708,18 @@ def test_messaging_id(init_celery, capture_items):
 def test_retry_count_zero(init_celery, capture_items):
     celery = init_celery(
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     @celery.task()
     def task(): ...
 
     items = capture_items("span")
+
     task.apply_async()
+
     sentry_sdk.flush()
+
     process_span, _execution_span = items
     assert process_span.payload["attributes"]["messaging.message.retry.count"] == 0
 
@@ -764,14 +730,18 @@ def test_retry_count_nonzero(mock_request, init_celery, capture_items):
 
     celery = init_celery(
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     @celery.task()
     def task(): ...
 
     items = capture_items("span")
+
     task.apply_async()
+
     sentry_sdk.flush()
+
     process_span, _execution_span = items
     assert process_span.payload["attributes"]["messaging.message.retry.count"] == 3
 
@@ -780,6 +750,7 @@ def test_retry_count_nonzero(mock_request, init_celery, capture_items):
 def test_messaging_system(system, init_celery, capture_items):
     celery = init_celery(
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     # Does not need to be a real URL, since we use always eager
@@ -789,8 +760,11 @@ def test_messaging_system(system, init_celery, capture_items):
     def task(): ...
 
     items = capture_items("span")
+
     task.apply_async()
+
     sentry_sdk.flush()
+
     process_span, _execution_span = items
     assert process_span.payload["attributes"]["messaging.system"] == system
 
@@ -807,6 +781,7 @@ def test_producer_span_data(system, monkeypatch, sentry_init, capture_items):
     sentry_init(
         integrations=[CeleryIntegration()],
         traces_sample_rate=1.0,
+        data_collection={},
     )
     celery = Celery(__name__, broker=f"{system}://example.com")  # noqa: E231
 
@@ -815,7 +790,7 @@ def test_producer_span_data(system, monkeypatch, sentry_init, capture_items):
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="producer test"):
+    with sentry_sdk.start_span(name="producer test"):
         task.apply_async()
 
     sentry_sdk.flush()
@@ -836,14 +811,18 @@ def test_producer_span_data(system, monkeypatch, sentry_init, capture_items):
 def test_receive_latency(init_celery, capture_items):
     celery = init_celery(
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     @celery.task()
     def task(): ...
 
     items = capture_items("span")
+
     task.apply_async()
+
     sentry_sdk.flush()
+
     process_span, _execution_span = items
     assert "messaging.message.receive.latency" in process_span.payload["attributes"]
     assert process_span.payload["attributes"]["messaging.message.receive.latency"] > 0
@@ -852,6 +831,7 @@ def test_receive_latency(init_celery, capture_items):
 def tests_span_origin_consumer(init_celery, capture_items):
     celery = init_celery(
         traces_sample_rate=1.0,
+        data_collection={},
     )
     celery.conf.broker_url = "redis://example.com"  # noqa: E231
 
@@ -859,8 +839,11 @@ def tests_span_origin_consumer(init_celery, capture_items):
     def task(): ...
 
     items = capture_items("span")
+
     task.apply_async()
+
     sentry_sdk.flush()
+
     process_span, execution_span = items
     assert execution_span.payload["attributes"]["sentry.origin"] == "auto.queue.celery"
     assert process_span.payload["attributes"]["sentry.origin"] == "auto.queue.celery"
@@ -877,6 +860,7 @@ def tests_span_origin_producer(monkeypatch, sentry_init, capture_items):
     sentry_init(
         integrations=[CeleryIntegration()],
         traces_sample_rate=1.0,
+        data_collection={},
     )
     celery = Celery(__name__, broker="redis://example.com")  # noqa: E231
 
@@ -885,7 +869,7 @@ def tests_span_origin_producer(monkeypatch, sentry_init, capture_items):
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         task.apply_async()
 
     sentry_sdk.flush()
@@ -911,12 +895,14 @@ def test_send_task_wrapped(
     sentry_init(
         integrations=[CeleryIntegration()],
         traces_sample_rate=1.0,
+        data_collection={},
     )
     celery = Celery(__name__, broker="redis://example.com")  # noqa: E231
 
     items = capture_items("span")
-    with sentry_sdk.traces.start_span(name="custom parent") as outer_span:
+    with sentry_sdk.start_span(name="custom parent") as outer_span:
         celery.send_task("very_creative_task_name", args=(1, 2), kwargs={"foo": "bar"})
+
     sentry_sdk.flush()
 
     (call,) = patched_send_task.call_args_list  # We should have exactly one call
@@ -961,6 +947,7 @@ def test_user_custom_headers_accessible_in_task(init_celery):
     """
     celery = init_celery(
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     @celery.task(name="custom_headers_task", bind=True)
@@ -973,7 +960,7 @@ def test_user_custom_headers_accessible_in_task(init_celery):
         "tenant_id": "tenant-42",
     }
 
-    with sentry_sdk.traces.start_span(name="test"):
+    with sentry_sdk.start_span(name="test"):
         result = custom_headers_task.apply_async(headers=custom_headers)
 
     received_headers = result.get()

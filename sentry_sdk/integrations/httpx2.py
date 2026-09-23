@@ -61,10 +61,10 @@ def _install_httpx2_client() -> None:
 
         url_attributes = get_url_attributes(client, parsed_url)
 
-        if sentry_sdk.traces.get_current_span() is None:
+        if sentry_sdk.get_current_span() is None:
             span_ctx = nullcontext()
         else:
-            span_ctx = sentry_sdk.traces.start_span(
+            span_ctx = sentry_sdk.start_span(
                 name="%s %s"
                 % (
                     request.method,
@@ -132,10 +132,10 @@ def _install_httpx2_async_client() -> None:
         with capture_internal_exceptions():
             parsed_url = parse_url(str(request.url), sanitize=False)
 
-        if sentry_sdk.traces.get_current_span() is None:
+        if sentry_sdk.get_current_span() is None:
             span_ctx = nullcontext()
         else:
-            span_ctx = sentry_sdk.traces.start_span(
+            span_ctx = sentry_sdk.start_span(
                 name="%s %s"
                 % (
                     request.method,

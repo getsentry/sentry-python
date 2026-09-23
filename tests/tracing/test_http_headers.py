@@ -13,7 +13,7 @@ def test_to_traceparent(sentry_init, traces_sample_rate):
         traces_sample_rate=traces_sample_rate,
     )
 
-    with sentry_sdk.traces.start_span(name="/interactions/other-dogs/new-dog") as span:
+    with sentry_sdk.start_span(name="/interactions/other-dogs/new-dog") as span:
         traceparent = sentry_sdk.get_traceparent()
 
         parts = traceparent.split("-")
@@ -76,7 +76,7 @@ def test_iter_headers(sentry_init, monkeypatch):
         mock.Mock(return_value="12312012123120121231201212312012-0415201309082013-0"),
     )
 
-    with sentry_sdk.traces.start_span(name="/interactions/other-dogs/new-dog") as span:
+    with sentry_sdk.start_span(name="/interactions/other-dogs/new-dog") as span:
         headers = dict(span._iter_headers())
         assert (
             headers["sentry-trace"]

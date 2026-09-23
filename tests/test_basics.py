@@ -754,7 +754,7 @@ def test_functions_to_trace(sentry_init, capture_items):
 
         items = capture_items("span")
 
-        with sentry_sdk.traces.start_span(name="something"):
+        with sentry_sdk.start_span(name="something"):
             time.sleep(0)
 
             for word in ["World", "You"]:
@@ -797,7 +797,7 @@ def test_functions_to_trace_with_class(sentry_init, capture_items):
 
         items = capture_items("span")
 
-        with sentry_sdk.traces.start_span(name="something"):
+        with sentry_sdk.start_span(name="something"):
             wg = WorldGreeter("World")
             wg.greet()
             wg.greet("You")
@@ -845,7 +845,7 @@ def test_staticmethod_class_tracing(sentry_init, capture_items):
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="test"):
+    with sentry_sdk.start_span(name="test"):
         assert TracingTestClass.static(1) == 1
 
     sentry_sdk.flush()
@@ -870,7 +870,7 @@ def test_staticmethod_instance_tracing(sentry_init, capture_items):
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="test"):
+    with sentry_sdk.start_span(name="test"):
         assert TracingTestClass().static(1) == 1
 
     sentry_sdk.flush()
@@ -894,7 +894,7 @@ def test_classmethod_class_tracing(sentry_init, capture_items):
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="test"):
+    with sentry_sdk.start_span(name="test"):
         assert TracingTestClass.class_(1) == (TracingTestClass, 1)
 
     sentry_sdk.flush()
@@ -918,7 +918,7 @@ def test_classmethod_instance_tracing(sentry_init, capture_items):
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="test"):
+    with sentry_sdk.start_span(name="test"):
         assert TracingTestClass().class_(1) == (TracingTestClass, 1)
 
     sentry_sdk.flush()

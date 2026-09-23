@@ -73,9 +73,7 @@ class RqIntegration(Integration):
                 scope.clear_breadcrumbs()
                 scope.add_event_processor(_make_event_processor(weakref.ref(job)))
 
-                sentry_sdk.traces.continue_trace(
-                    job.meta.get("_sentry_trace_headers") or {}
-                )
+                sentry_sdk.continue_trace(job.meta.get("_sentry_trace_headers") or {})
 
                 Scope.set_custom_sampling_context({"rq_job": job})
 
@@ -83,7 +81,7 @@ class RqIntegration(Integration):
                 with capture_internal_exceptions():
                     func_name = job.func_name
 
-                with sentry_sdk.traces.start_span(
+                with sentry_sdk.start_span(
                     name="unknown RQ task" if func_name is None else func_name,
                     attributes={
                         "sentry.op": OP.QUEUE_TASK_RQ,

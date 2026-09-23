@@ -4,8 +4,8 @@ import sentry_sdk
 def test_span_in_segment(sentry_init):
     sentry_init(traces_sample_rate=1.0)
 
-    with sentry_sdk.traces.start_span(name="test"):
-        with sentry_sdk.traces.start_span(name="test2") as span:
+    with sentry_sdk.start_span(name="test"):
+        with sentry_sdk.start_span(name="test2") as span:
             # Ensure the headers are there
             next(span._iter_headers())
 
@@ -13,8 +13,8 @@ def test_span_in_segment(sentry_init):
 def test_span_in_span_in_segment(sentry_init):
     sentry_init(traces_sample_rate=1.0)
 
-    with sentry_sdk.traces.start_span(name="test"):
-        with sentry_sdk.traces.start_span(name="test2"):
-            with sentry_sdk.traces.start_span(name="test3") as span_inner:
+    with sentry_sdk.start_span(name="test"):
+        with sentry_sdk.start_span(name="test2"):
+            with sentry_sdk.start_span(name="test3") as span_inner:
                 # Ensure the headers are there
                 next(span_inner._iter_headers())

@@ -30,6 +30,7 @@ def trace_sampler(sampling_context):
 
 sentry_sdk.init(
     dsn=os.environ.get("SENTRY_DSN"),
+    data_collection={},
     traces_sample_rate=1.0,
     traces_sampler=trace_sampler,
     integrations=[AwsLambdaIntegration()],
