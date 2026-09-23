@@ -412,11 +412,10 @@ def _make_request_event_processor(
         if "incoming_request" in data_collection["http_bodies"]:
             if "body" in aws_event:
                 request["data"] = aws_event.get("body", "")
-        else:
-            if aws_event.get("body", None):
-                # Unfortunately couldn't find a way to get structured body from AWS
-                # event. Meaning every body is unstructured to us.
-                request["data"] = AnnotatedValue.removed_because_raw_data()
+        elif aws_event.get("body", None):
+            # Unfortunately couldn't find a way to get structured body from AWS
+            # event. Meaning every body is unstructured to us.
+            request["data"] = AnnotatedValue.removed_because_raw_data()
 
         sentry_event["request"] = deepcopy(request)
 
