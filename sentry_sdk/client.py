@@ -358,7 +358,8 @@ def _get_options(*args: "Optional[str]", **kwargs: "Any") -> "Dict[str, Any]":
         rv["event_scrubber"] = EventScrubber(
             send_default_pii=False
             if rv["send_default_pii"] is None
-            else rv["send_default_pii"]
+            else rv["send_default_pii"],
+            recursive=True,
         )
     elif has_data_collection_enabled(rv) and rv["event_scrubber"]:
         warnings.warn(

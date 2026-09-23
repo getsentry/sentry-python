@@ -283,3 +283,20 @@ def test_recursive_scrubber_does_not_override_original(sentry_init, capture_even
     (frame,) = frames
     assert data["csrf"] == "secret"
     assert frame["vars"]["data"]["csrf"] == "[Filtered]"
+
+
+def test_default_scrubber_scrubs_nested_secret(sentry_init, capture_events):
+    sentry_init()
+    events = capture_events()
+
+    try:
+        1 / 0
+    except ZeroDivisionError:
+        ev, _hint = event_from_exception(sys.exc_info())
+        ev["extra"] = {"user": {"password": "secret", "name": "ada"}}
+        capture_event(ev)
+
+    (event,) = events
+    assert event["extra"]["user"]["password"] == "[Filtered]"
+    assert event["extra"]["user"]["name"] == "ada"
+
