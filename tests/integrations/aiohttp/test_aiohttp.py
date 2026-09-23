@@ -277,6 +277,8 @@ async def test_cancelled_error_not_captured(
 
 @pytest.mark.asyncio
 async def test_half_initialized(sentry_init, aiohttp_client, capture_events):
+    # Note: the first sentry_init is intentional
+    sentry_init()
     sentry_init(integrations=[AioHttpIntegration()], data_collection={})
 
     async def hello(request):
