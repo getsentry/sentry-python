@@ -1120,7 +1120,6 @@ def _wrap_agent_executor_invoke(f: "Callable[..., Any]") -> "Callable[..., Any]"
                 "sentry.op": OP.GEN_AI_INVOKE_AGENT,
                 "sentry.origin": LangchainIntegration.origin,
                 SPANDATA.GEN_AI_OPERATION_NAME: "invoke_agent",
-                SPANDATA.GEN_AI_RESPONSE_STREAMING: False,
             },
         ) as span:
             if run_name:
@@ -1174,7 +1173,6 @@ def _wrap_agent_executor_stream(f: "Callable[..., Any]") -> "Callable[..., Any]"
                 "sentry.op": OP.GEN_AI_INVOKE_AGENT,
                 "sentry.origin": LangchainIntegration.origin,
                 SPANDATA.GEN_AI_OPERATION_NAME: "invoke_agent",
-                SPANDATA.GEN_AI_RESPONSE_STREAMING: True,
             },
         )
 
