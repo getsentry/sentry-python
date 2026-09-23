@@ -4,9 +4,7 @@ from typing import TYPE_CHECKING, TypeVar
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
-from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import Span
-from sentry_sdk.utils import has_data_collection_enabled
 
 # Hack to get new Python features working in older versions
 # without introducing a hard dependency on `typing_extensions`
@@ -125,13 +123,7 @@ def _wrap_end(f: "Callable[P, T]") -> "Callable[P, T]":
 
         if query is not None and breadcrumb_data is not None:
             client_options = sentry_sdk.get_client().options
-            if (
-                has_data_collection_enabled(client_options)
-                and client_options["data_collection"]["database_query_data"]
-            ) or (
-                not has_data_collection_enabled(client_options)
-                and should_send_default_pii()
-            ):
+            if client_options["data_collection"]["database_query_data"]:
                 breadcrumb_data = {"db.result": res, **breadcrumb_data}
 
             sentry_sdk.get_isolation_scope().add_breadcrumb(
