@@ -4,7 +4,6 @@ import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.integrations.logging import ignore_logger_for_events
-from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import SegmentNameSource
 from sentry_sdk.utils import (
     SENSITIVE_DATA_SUBSTITUTE,
@@ -156,9 +155,6 @@ def _make_event_processor(
                 if client_options["data_collection"]["queues"]:
                     arq_job_dict["args"] = args
                     arq_job_dict["kwargs"] = kwargs
-            elif should_send_default_pii():
-                arq_job_dict["args"] = args
-                arq_job_dict["kwargs"] = kwargs
             else:
                 arq_job_dict["args"] = SENSITIVE_DATA_SUBSTITUTE
                 arq_job_dict["kwargs"] = SENSITIVE_DATA_SUBSTITUTE
