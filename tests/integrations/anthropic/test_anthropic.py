@@ -136,22 +136,16 @@ def data_collection_tool_use_message():
 
 
 @pytest.mark.parametrize(
-    "send_default_pii, include_prompts",
-    [
-        (True, True),
-        (True, False),
-        (False, True),
-        (False, False),
-    ],
+    "send_default_pii",
+    [True, False],
 )
 def test_nonstreaming_create_message(
     sentry_init,
     capture_items,
     send_default_pii,
-    include_prompts,
 ):
     sentry_init(
-        integrations=[AnthropicIntegration(include_prompts=include_prompts)],
+        integrations=[AnthropicIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
@@ -192,7 +186,7 @@ def test_nonstreaming_create_message(
     assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
     assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
-    if send_default_pii and include_prompts:
+    if send_default_pii:
         assert json.loads(span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]) == [
             {
                 "role": "user",
@@ -220,27 +214,24 @@ def test_nonstreaming_create_message(
 
 
 @pytest.mark.parametrize(
-    "data_collection,send_default_pii,include_prompts,expected_present,expected_absent",
+    "data_collection,send_default_pii,expected_present,expected_absent",
     [
         pytest.param(
             {"gen_ai": {"inputs": True}},
             False,
-            False,
             DATA_COLLECTION_EXPECTED_INPUT_DATA,
             [],
-            id="gen-ai-inputs-enabled-overrides-pii-and-include-prompts",
+            id="gen-ai-inputs-enabled-overrides-pii",
         ),
         pytest.param(
             {"gen_ai": {"inputs": False}},
             True,
-            True,
             {},
             DATA_COLLECTION_INPUT_DATA_KEYS,
-            id="gen-ai-inputs-disabled-overrides-pii-and-include-prompts",
+            id="gen-ai-inputs-disabled-overrides-pii",
         ),
         pytest.param(
             {"gen_ai": {}},
-            True,
             True,
             DATA_COLLECTION_EXPECTED_INPUT_DATA,
             [],
@@ -249,10 +240,9 @@ def test_nonstreaming_create_message(
         pytest.param(
             None,
             True,
-            True,
             DATA_COLLECTION_EXPECTED_INPUT_DATA,
             [],
-            id="legacy-pii-and-include-prompts-enabled",
+            id="legacy-pii",
         ),
     ],
 )
@@ -261,12 +251,11 @@ def test_nonstreaming_create_message_data_collection(
     capture_items,
     data_collection,
     send_default_pii,
-    include_prompts,
     expected_present,
     expected_absent,
 ):
     sentry_init_kwargs = dict(
-        integrations=[AnthropicIntegration(include_prompts=include_prompts)],
+        integrations=[AnthropicIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
@@ -336,7 +325,7 @@ def test_nonstreaming_create_message_data_collection_tools(
     tools_collected,
 ):
     sentry_init_kwargs = dict(
-        integrations=[AnthropicIntegration(include_prompts=False)],
+        integrations=[AnthropicIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=False,
@@ -374,31 +363,28 @@ def test_nonstreaming_create_message_data_collection_tools(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "data_collection,send_default_pii,include_prompts,expected_present,expected_absent",
+    "data_collection,send_default_pii,expected_present,expected_absent",
     [
         pytest.param(
             {"gen_ai": {"inputs": True}},
             False,
-            False,
             DATA_COLLECTION_EXPECTED_INPUT_DATA,
             [],
-            id="gen-ai-inputs-enabled-overrides-pii-and-include-prompts",
+            id="gen-ai-inputs-enabled-overrides-pii",
         ),
         pytest.param(
             {"gen_ai": {"inputs": False}},
             True,
-            True,
             {},
             DATA_COLLECTION_INPUT_DATA_KEYS,
-            id="gen-ai-inputs-disabled-overrides-pii-and-include-prompts",
+            id="gen-ai-inputs-disabled-overrides-pii",
         ),
         pytest.param(
             None,
             True,
-            True,
             DATA_COLLECTION_EXPECTED_INPUT_DATA,
             [],
-            id="legacy-pii-and-include-prompts-enabled",
+            id="legacy-pii",
         ),
     ],
 )
@@ -407,12 +393,11 @@ async def test_nonstreaming_create_message_data_collection_async(
     capture_items,
     data_collection,
     send_default_pii,
-    include_prompts,
     expected_present,
     expected_absent,
 ):
     sentry_init_kwargs = dict(
-        integrations=[AnthropicIntegration(include_prompts=include_prompts)],
+        integrations=[AnthropicIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
@@ -456,32 +441,28 @@ async def test_nonstreaming_create_message_data_collection_async(
     reason="anthropic.types.ToolUseBlock was added in 0.27.0. Before that, tool use was only available under the beta namespace and could not appear in a standard Message.",
 )
 @pytest.mark.parametrize(
-    "data_collection,send_default_pii,include_prompts,outputs_collected",
+    "data_collection,send_default_pii,outputs_collected",
     [
         pytest.param(
             {"gen_ai": {"outputs": True}},
             False,
-            False,
             True,
-            id="gen-ai-outputs-enabled-overrides-pii-and-include-prompts",
+            id="gen-ai-outputs-enabled-overrides-pii",
         ),
         pytest.param(
             {"gen_ai": {"outputs": False}},
             True,
-            True,
             False,
-            id="gen-ai-outputs-disabled-overrides-pii-and-include-prompts",
+            id="gen-ai-outputs-disabled-overrides-pii",
         ),
         pytest.param(
             {"gen_ai": {"inputs": False, "outputs": False}},
             True,
-            True,
             False,
-            id="gen-ai-inputs-and-outputs-disabled-overrides-pii-and-include-prompts",
+            id="gen-ai-inputs-and-outputs-disabled-overrides-pii",
         ),
         pytest.param(
             {"gen_ai": {}},
-            False,
             False,
             True,
             id="gen-ai-inputs-and-outputs-omitted-defaults-to-enabled",
@@ -490,13 +471,11 @@ async def test_nonstreaming_create_message_data_collection_async(
             None,
             True,
             True,
-            True,
-            id="legacy-pii-and-include-prompts-enabled",
+            id="legacy-pii",
         ),
         pytest.param(
             None,
             False,
-            True,
             False,
             id="legacy-pii-disabled",
         ),
@@ -507,11 +486,10 @@ def test_nonstreaming_create_message_data_collection_outputs(
     capture_items,
     data_collection,
     send_default_pii,
-    include_prompts,
     outputs_collected,
 ):
     sentry_init_kwargs = dict(
-        integrations=[AnthropicIntegration(include_prompts=include_prompts)],
+        integrations=[AnthropicIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
@@ -565,32 +543,28 @@ def test_nonstreaming_create_message_data_collection_outputs(
 )
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "data_collection,send_default_pii,include_prompts,outputs_collected",
+    "data_collection,send_default_pii,outputs_collected",
     [
         pytest.param(
             {"gen_ai": {"outputs": True}},
             False,
-            False,
             True,
-            id="gen-ai-outputs-enabled-overrides-pii-and-include-prompts",
+            id="gen-ai-outputs-enabled-overrides-pii",
         ),
         pytest.param(
             {"gen_ai": {"outputs": False}},
             True,
-            True,
             False,
-            id="gen-ai-outputs-disabled-overrides-pii-and-include-prompts",
+            id="gen-ai-outputs-disabled-overrides-pii",
         ),
         pytest.param(
             {"gen_ai": {"inputs": False, "outputs": False}},
             True,
-            True,
             False,
-            id="gen-ai-inputs-and-outputs-disabled-overrides-pii-and-include-prompts",
+            id="gen-ai-inputs-and-outputs-disabled-overrides-pii",
         ),
         pytest.param(
             {"gen_ai": {}},
-            False,
             False,
             True,
             id="gen-ai-inputs-and-outputs-omitted-defaults-to-enabled",
@@ -599,13 +573,11 @@ def test_nonstreaming_create_message_data_collection_outputs(
             None,
             True,
             True,
-            True,
-            id="legacy-pii-and-include-prompts-enabled",
+            id="legacy-pii",
         ),
         pytest.param(
             None,
             False,
-            True,
             False,
             id="legacy-pii-disabled",
         ),
@@ -616,11 +588,10 @@ async def test_nonstreaming_create_message_data_collection_outputs_async(
     capture_items,
     data_collection,
     send_default_pii,
-    include_prompts,
     outputs_collected,
 ):
     sentry_init_kwargs = dict(
-        integrations=[AnthropicIntegration(include_prompts=include_prompts)],
+        integrations=[AnthropicIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
@@ -670,22 +641,16 @@ async def test_nonstreaming_create_message_data_collection_outputs_async(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "send_default_pii, include_prompts",
-    [
-        (True, True),
-        (True, False),
-        (False, True),
-        (False, False),
-    ],
+    "send_default_pii",
+    [True, False],
 )
 async def test_nonstreaming_create_message_async(
     sentry_init,
     capture_items,
     send_default_pii,
-    include_prompts,
 ):
     sentry_init(
-        integrations=[AnthropicIntegration(include_prompts=include_prompts)],
+        integrations=[AnthropicIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
@@ -728,7 +693,7 @@ async def test_nonstreaming_create_message_async(
     assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
     assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
-    if send_default_pii and include_prompts:
+    if send_default_pii:
         assert json.loads(span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]) == [
             {
                 "role": "user",
@@ -755,19 +720,13 @@ async def test_nonstreaming_create_message_async(
 
 
 @pytest.mark.parametrize(
-    "send_default_pii, include_prompts",
-    [
-        (True, True),
-        (True, False),
-        (False, True),
-        (False, False),
-    ],
+    "send_default_pii",
+    [True, False],
 )
 def test_streaming_create_message(
     sentry_init,
     capture_items,
     send_default_pii,
-    include_prompts,
     get_model_response,
     server_side_event_chunks,
 ):
@@ -811,7 +770,7 @@ def test_streaming_create_message(
     )
 
     sentry_init(
-        integrations=[AnthropicIntegration(include_prompts=include_prompts)],
+        integrations=[AnthropicIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
@@ -853,7 +812,7 @@ def test_streaming_create_message(
     assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
     assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
-    if send_default_pii and include_prompts:
+    if send_default_pii:
         assert json.loads(span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]) == [
             {
                 "role": "user",
@@ -882,31 +841,28 @@ def test_streaming_create_message(
 
 
 @pytest.mark.parametrize(
-    "data_collection,send_default_pii,include_prompts,expected_present,expected_absent",
+    "data_collection,send_default_pii,expected_present,expected_absent",
     [
         pytest.param(
             {"gen_ai": {"inputs": True}},
             False,
-            False,
             DATA_COLLECTION_EXPECTED_INPUT_DATA,
             [],
-            id="gen-ai-inputs-enabled-overrides-pii-and-include-prompts",
+            id="gen-ai-inputs-enabled-overrides-pii",
         ),
         pytest.param(
             {"gen_ai": {"inputs": False}},
             True,
-            True,
             {},
             DATA_COLLECTION_INPUT_DATA_KEYS,
-            id="gen-ai-inputs-disabled-overrides-pii-and-include-prompts",
+            id="gen-ai-inputs-disabled-overrides-pii",
         ),
         pytest.param(
             None,
             True,
-            True,
             DATA_COLLECTION_EXPECTED_INPUT_DATA,
             [],
-            id="legacy-pii-and-include-prompts-enabled",
+            id="legacy-pii",
         ),
     ],
 )
@@ -915,14 +871,13 @@ def test_streaming_create_message_data_collection(
     capture_items,
     data_collection,
     send_default_pii,
-    include_prompts,
     expected_present,
     expected_absent,
     get_model_response,
     server_side_event_chunks,
 ):
     sentry_init_kwargs = dict(
-        integrations=[AnthropicIntegration(include_prompts=include_prompts)],
+        integrations=[AnthropicIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
@@ -997,25 +952,22 @@ def test_streaming_create_message_data_collection(
 
 
 @pytest.mark.parametrize(
-    "data_collection,send_default_pii,include_prompts,outputs_collected",
+    "data_collection,send_default_pii,outputs_collected",
     [
         pytest.param(
             {"gen_ai": {"outputs": True}},
             False,
-            False,
             True,
-            id="gen-ai-outputs-enabled-overrides-pii-and-include-prompts",
+            id="gen-ai-outputs-enabled-overrides-pii",
         ),
         pytest.param(
             {"gen_ai": {"outputs": False}},
             True,
-            True,
             False,
-            id="gen-ai-outputs-disabled-overrides-pii-and-include-prompts",
+            id="gen-ai-outputs-disabled-overrides-pii",
         ),
         pytest.param(
             {"gen_ai": {}},
-            False,
             False,
             True,
             id="gen-ai-outputs-omitted-defaults-to-enabled",
@@ -1024,13 +976,11 @@ def test_streaming_create_message_data_collection(
             None,
             True,
             True,
-            True,
-            id="legacy-pii-and-include-prompts-enabled",
+            id="legacy-pii",
         ),
         pytest.param(
             None,
             False,
-            True,
             False,
             id="legacy-pii-disabled",
         ),
@@ -1041,13 +991,12 @@ def test_streaming_create_message_data_collection_outputs(
     capture_items,
     data_collection,
     send_default_pii,
-    include_prompts,
     outputs_collected,
     get_model_response,
     server_side_event_chunks,
 ):
     sentry_init_kwargs = dict(
-        integrations=[AnthropicIntegration(include_prompts=include_prompts)],
+        integrations=[AnthropicIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
@@ -1171,7 +1120,7 @@ def test_streaming_create_message_close(
     )
 
     sentry_init(
-        integrations=[AnthropicIntegration(include_prompts=True)],
+        integrations=[AnthropicIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
@@ -1272,7 +1221,7 @@ def test_streaming_create_message_api_error(
     )
 
     sentry_init(
-        integrations=[AnthropicIntegration(include_prompts=True)],
+        integrations=[AnthropicIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
@@ -1329,19 +1278,13 @@ def test_streaming_create_message_api_error(
 
 
 @pytest.mark.parametrize(
-    "send_default_pii, include_prompts",
-    [
-        (True, True),
-        (True, False),
-        (False, True),
-        (False, False),
-    ],
+    "send_default_pii",
+    [True, False],
 )
 def test_stream_messages(
     sentry_init,
     capture_items,
     send_default_pii,
-    include_prompts,
     get_model_response,
     server_side_event_chunks,
 ):
@@ -1385,7 +1328,7 @@ def test_stream_messages(
     )
 
     sentry_init(
-        integrations=[AnthropicIntegration(include_prompts=include_prompts)],
+        integrations=[AnthropicIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
@@ -1427,7 +1370,7 @@ def test_stream_messages(
     assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
     assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
-    if send_default_pii and include_prompts:
+    if send_default_pii:
         assert json.loads(span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]) == [
             {
                 "role": "user",
@@ -1456,25 +1399,22 @@ def test_stream_messages(
 
 
 @pytest.mark.parametrize(
-    "data_collection,send_default_pii,include_prompts,outputs_collected",
+    "data_collection,send_default_pii,outputs_collected",
     [
         pytest.param(
             {"gen_ai": {"outputs": True}},
             False,
-            False,
             True,
-            id="gen-ai-outputs-enabled-overrides-pii-and-include-prompts",
+            id="gen-ai-outputs-enabled-overrides-pii",
         ),
         pytest.param(
             {"gen_ai": {"outputs": False}},
             True,
-            True,
             False,
-            id="gen-ai-outputs-disabled-overrides-pii-and-include-prompts",
+            id="gen-ai-outputs-disabled-overrides-pii",
         ),
         pytest.param(
             {"gen_ai": {}},
-            False,
             False,
             True,
             id="gen-ai-outputs-omitted-defaults-to-enabled",
@@ -1483,13 +1423,11 @@ def test_stream_messages(
             None,
             True,
             True,
-            True,
-            id="legacy-pii-and-include-prompts-enabled",
+            id="legacy-pii",
         ),
         pytest.param(
             None,
             False,
-            True,
             False,
             id="legacy-pii-disabled",
         ),
@@ -1500,13 +1438,12 @@ def test_stream_messages_data_collection_outputs(
     capture_items,
     data_collection,
     send_default_pii,
-    include_prompts,
     outputs_collected,
     get_model_response,
     server_side_event_chunks,
 ):
     sentry_init_kwargs = dict(
-        integrations=[AnthropicIntegration(include_prompts=include_prompts)],
+        integrations=[AnthropicIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
@@ -1628,7 +1565,7 @@ def test_stream_messages_close(
     )
 
     sentry_init(
-        integrations=[AnthropicIntegration(include_prompts=True)],
+        integrations=[AnthropicIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
@@ -1733,7 +1670,7 @@ def test_stream_messages_api_error(
     )
 
     sentry_init(
-        integrations=[AnthropicIntegration(include_prompts=True)],
+        integrations=[AnthropicIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
@@ -1791,19 +1728,13 @@ def test_stream_messages_api_error(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "send_default_pii, include_prompts",
-    [
-        (True, True),
-        (True, False),
-        (False, True),
-        (False, False),
-    ],
+    "send_default_pii",
+    [True, False],
 )
 async def test_streaming_create_message_async(
     sentry_init,
     capture_items,
     send_default_pii,
-    include_prompts,
     get_model_response,
     async_iterator,
     server_side_event_chunks,
@@ -1850,7 +1781,7 @@ async def test_streaming_create_message_async(
     )
 
     sentry_init(
-        integrations=[AnthropicIntegration(include_prompts=include_prompts)],
+        integrations=[AnthropicIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         default_integrations=False,
@@ -1893,7 +1824,7 @@ async def test_streaming_create_message_async(
     assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
     assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
-    if send_default_pii and include_prompts:
+    if send_default_pii:
         assert json.loads(span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]) == [
             {
                 "role": "user",
@@ -1923,25 +1854,22 @@ async def test_streaming_create_message_async(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "data_collection,send_default_pii,include_prompts,outputs_collected",
+    "data_collection,send_default_pii,outputs_collected",
     [
         pytest.param(
             {"gen_ai": {"outputs": True}},
             False,
-            False,
             True,
-            id="gen-ai-outputs-enabled-overrides-pii-and-include-prompts",
+            id="gen-ai-outputs-enabled-overrides-pii",
         ),
         pytest.param(
             {"gen_ai": {"outputs": False}},
             True,
-            True,
             False,
-            id="gen-ai-outputs-disabled-overrides-pii-and-include-prompts",
+            id="gen-ai-outputs-disabled-overrides-pii",
         ),
         pytest.param(
             {"gen_ai": {}},
-            False,
             False,
             True,
             id="gen-ai-outputs-omitted-defaults-to-enabled",
@@ -1950,13 +1878,11 @@ async def test_streaming_create_message_async(
             None,
             True,
             True,
-            True,
-            id="legacy-pii-and-include-prompts-enabled",
+            id="legacy-pii",
         ),
         pytest.param(
             None,
             False,
-            True,
             False,
             id="legacy-pii-disabled",
         ),
@@ -1967,14 +1893,13 @@ async def test_streaming_create_message_data_collection_outputs_async(
     capture_items,
     data_collection,
     send_default_pii,
-    include_prompts,
     outputs_collected,
     get_model_response,
     async_iterator,
     server_side_event_chunks,
 ):
     sentry_init_kwargs = dict(
-        integrations=[AnthropicIntegration(include_prompts=include_prompts)],
+        integrations=[AnthropicIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
@@ -2104,7 +2029,7 @@ async def test_streaming_create_message_async_close(
     )
 
     sentry_init(
-        integrations=[AnthropicIntegration(include_prompts=True)],
+        integrations=[AnthropicIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
@@ -2208,7 +2133,7 @@ async def test_streaming_create_message_async_api_error(
     )
 
     sentry_init(
-        integrations=[AnthropicIntegration(include_prompts=True)],
+        integrations=[AnthropicIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
@@ -2266,19 +2191,13 @@ async def test_streaming_create_message_async_api_error(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "send_default_pii, include_prompts",
-    [
-        (True, True),
-        (True, False),
-        (False, True),
-        (False, False),
-    ],
+    "send_default_pii",
+    [True, False],
 )
 async def test_stream_message_async(
     sentry_init,
     capture_items,
     send_default_pii,
-    include_prompts,
     get_model_response,
     async_iterator,
     server_side_event_chunks,
@@ -2325,7 +2244,7 @@ async def test_stream_message_async(
     )
 
     sentry_init(
-        integrations=[AnthropicIntegration(include_prompts=include_prompts)],
+        integrations=[AnthropicIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
@@ -2368,7 +2287,7 @@ async def test_stream_message_async(
     assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
     assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
-    if send_default_pii and include_prompts:
+    if send_default_pii:
         assert json.loads(span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]) == [
             {
                 "role": "user",
@@ -2397,25 +2316,22 @@ async def test_stream_message_async(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "data_collection,send_default_pii,include_prompts,outputs_collected",
+    "data_collection,send_default_pii,outputs_collected",
     [
         pytest.param(
             {"gen_ai": {"outputs": True}},
             False,
-            False,
             True,
-            id="gen-ai-outputs-enabled-overrides-pii-and-include-prompts",
+            id="gen-ai-outputs-enabled-overrides-pii",
         ),
         pytest.param(
             {"gen_ai": {"outputs": False}},
             True,
-            True,
             False,
-            id="gen-ai-outputs-disabled-overrides-pii-and-include-prompts",
+            id="gen-ai-outputs-disabled-overrides-pii",
         ),
         pytest.param(
             {"gen_ai": {}},
-            False,
             False,
             True,
             id="gen-ai-outputs-omitted-defaults-to-enabled",
@@ -2424,13 +2340,11 @@ async def test_stream_message_async(
             None,
             True,
             True,
-            True,
-            id="legacy-pii-and-include-prompts-enabled",
+            id="legacy-pii",
         ),
         pytest.param(
             None,
             False,
-            True,
             False,
             id="legacy-pii-disabled",
         ),
@@ -2441,14 +2355,13 @@ async def test_stream_messages_data_collection_outputs_async(
     capture_items,
     data_collection,
     send_default_pii,
-    include_prompts,
     outputs_collected,
     get_model_response,
     async_iterator,
     server_side_event_chunks,
 ):
     sentry_init_kwargs = dict(
-        integrations=[AnthropicIntegration(include_prompts=include_prompts)],
+        integrations=[AnthropicIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
@@ -2576,7 +2489,7 @@ async def test_stream_messages_async_api_error(
     )
 
     sentry_init(
-        integrations=[AnthropicIntegration(include_prompts=True)],
+        integrations=[AnthropicIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
@@ -2683,7 +2596,7 @@ async def test_stream_messages_async_close(
     )
 
     sentry_init(
-        integrations=[AnthropicIntegration(include_prompts=True)],
+        integrations=[AnthropicIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
@@ -2751,19 +2664,13 @@ async def test_stream_messages_async_close(
     reason="Versions <0.27.0 do not include InputJSONDelta, which was introduced in >=0.27.0 along with a new message delta type for tool calling.",
 )
 @pytest.mark.parametrize(
-    "send_default_pii, include_prompts",
-    [
-        (True, True),
-        (True, False),
-        (False, True),
-        (False, False),
-    ],
+    "send_default_pii",
+    [True, False],
 )
 def test_streaming_create_message_with_input_json_delta(
     sentry_init,
     capture_items,
     send_default_pii,
-    include_prompts,
     get_model_response,
     server_side_event_chunks,
 ):
@@ -2837,7 +2744,7 @@ def test_streaming_create_message_with_input_json_delta(
     )
 
     sentry_init(
-        integrations=[AnthropicIntegration(include_prompts=include_prompts)],
+        integrations=[AnthropicIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
@@ -2875,7 +2782,7 @@ def test_streaming_create_message_with_input_json_delta(
     assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
     assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
-    if send_default_pii and include_prompts:
+    if send_default_pii:
         assert (
             span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
             == '[{"role": "user", "content": "What is the weather like in San Francisco?"}]'
@@ -2899,19 +2806,13 @@ def test_streaming_create_message_with_input_json_delta(
     reason="Versions <0.27.0 do not include InputJSONDelta, which was introduced in >=0.27.0 along with a new message delta type for tool calling.",
 )
 @pytest.mark.parametrize(
-    "send_default_pii, include_prompts",
-    [
-        (True, True),
-        (True, False),
-        (False, True),
-        (False, False),
-    ],
+    "send_default_pii",
+    [True, False],
 )
 def test_stream_messages_with_input_json_delta(
     sentry_init,
     capture_items,
     send_default_pii,
-    include_prompts,
     get_model_response,
     server_side_event_chunks,
 ):
@@ -2985,7 +2886,7 @@ def test_stream_messages_with_input_json_delta(
     )
 
     sentry_init(
-        integrations=[AnthropicIntegration(include_prompts=include_prompts)],
+        integrations=[AnthropicIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
@@ -3023,7 +2924,7 @@ def test_stream_messages_with_input_json_delta(
     assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
     assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
-    if send_default_pii and include_prompts:
+    if send_default_pii:
         assert (
             span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
             == '[{"role": "user", "content": "What is the weather like in San Francisco?"}]'
@@ -3048,19 +2949,13 @@ def test_stream_messages_with_input_json_delta(
     reason="Versions <0.27.0 do not include InputJSONDelta, which was introduced in >=0.27.0 along with a new message delta type for tool calling.",
 )
 @pytest.mark.parametrize(
-    "send_default_pii, include_prompts",
-    [
-        (True, True),
-        (True, False),
-        (False, True),
-        (False, False),
-    ],
+    "send_default_pii",
+    [True, False],
 )
 async def test_streaming_create_message_with_input_json_delta_async(
     sentry_init,
     capture_items,
     send_default_pii,
-    include_prompts,
     get_model_response,
     async_iterator,
     server_side_event_chunks,
@@ -3140,7 +3035,7 @@ async def test_streaming_create_message_with_input_json_delta_async(
     )
 
     sentry_init(
-        integrations=[AnthropicIntegration(include_prompts=include_prompts)],
+        integrations=[AnthropicIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
@@ -3178,7 +3073,7 @@ async def test_streaming_create_message_with_input_json_delta_async(
     assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
     assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
-    if send_default_pii and include_prompts:
+    if send_default_pii:
         assert (
             span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
             == '[{"role": "user", "content": "What is the weather like in San Francisco?"}]'
@@ -3204,19 +3099,13 @@ async def test_streaming_create_message_with_input_json_delta_async(
     reason="Versions <0.27.0 do not include InputJSONDelta, which was introduced in >=0.27.0 along with a new message delta type for tool calling.",
 )
 @pytest.mark.parametrize(
-    "send_default_pii, include_prompts",
-    [
-        (True, True),
-        (True, False),
-        (False, True),
-        (False, False),
-    ],
+    "send_default_pii",
+    [True, False],
 )
 async def test_stream_message_with_input_json_delta_async(
     sentry_init,
     capture_items,
     send_default_pii,
-    include_prompts,
     get_model_response,
     async_iterator,
     server_side_event_chunks,
@@ -3296,7 +3185,7 @@ async def test_stream_message_with_input_json_delta_async(
     )
 
     sentry_init(
-        integrations=[AnthropicIntegration(include_prompts=include_prompts)],
+        integrations=[AnthropicIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
@@ -3335,7 +3224,7 @@ async def test_stream_message_with_input_json_delta_async(
     assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
     assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
-    if send_default_pii and include_prompts:
+    if send_default_pii:
         assert (
             span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
             == '[{"role": "user", "content": "What is the weather like in San Francisco?"}]'
@@ -3570,7 +3459,7 @@ def test_collect_ai_data_with_input_json_delta():
 )
 def test_set_output_data_with_input_json_delta(sentry_init):
     sentry_init(
-        integrations=[AnthropicIntegration(include_prompts=True)],
+        integrations=[AnthropicIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
@@ -3623,7 +3512,7 @@ def test_anthropic_message_role_mapping(
 ):
     """Test that Anthropic integration properly maps message roles like 'ai' to 'assistant'"""
     sentry_init(
-        integrations=[AnthropicIntegration(include_prompts=True)],
+        integrations=[AnthropicIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
@@ -3666,23 +3555,17 @@ def test_anthropic_message_role_mapping(
 
 
 @pytest.mark.parametrize(
-    "send_default_pii, include_prompts",
-    [
-        (True, True),
-        (True, False),
-        (False, True),
-        (False, False),
-    ],
+    "send_default_pii",
+    [True, False],
 )
 def test_nonstreaming_create_message_with_system_prompt(
     sentry_init,
     capture_items,
     send_default_pii,
-    include_prompts,
 ):
     """Test that system prompts are properly captured in GEN_AI_REQUEST_MESSAGES."""
     sentry_init(
-        integrations=[AnthropicIntegration(include_prompts=include_prompts)],
+        integrations=[AnthropicIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
@@ -3724,7 +3607,7 @@ def test_nonstreaming_create_message_with_system_prompt(
     assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
     assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
-    if send_default_pii and include_prompts:
+    if send_default_pii:
         assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS in span["attributes"]
         system_instructions = json.loads(
             span["attributes"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
@@ -3755,23 +3638,17 @@ def test_nonstreaming_create_message_with_system_prompt(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "send_default_pii, include_prompts",
-    [
-        (True, True),
-        (True, False),
-        (False, True),
-        (False, False),
-    ],
+    "send_default_pii",
+    [True, False],
 )
 async def test_nonstreaming_create_message_with_system_prompt_async(
     sentry_init,
     capture_items,
     send_default_pii,
-    include_prompts,
 ):
     """Test that system prompts are properly captured in GEN_AI_REQUEST_MESSAGES (async)."""
     sentry_init(
-        integrations=[AnthropicIntegration(include_prompts=include_prompts)],
+        integrations=[AnthropicIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
@@ -3813,7 +3690,7 @@ async def test_nonstreaming_create_message_with_system_prompt_async(
     assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
     assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
-    if send_default_pii and include_prompts:
+    if send_default_pii:
         assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS in span["attributes"]
         system_instructions = json.loads(
             span["attributes"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
@@ -3843,19 +3720,13 @@ async def test_nonstreaming_create_message_with_system_prompt_async(
 
 
 @pytest.mark.parametrize(
-    "send_default_pii, include_prompts",
-    [
-        (True, True),
-        (True, False),
-        (False, True),
-        (False, False),
-    ],
+    "send_default_pii",
+    [True, False],
 )
 def test_streaming_create_message_with_system_prompt(
     sentry_init,
     capture_items,
     send_default_pii,
-    include_prompts,
     get_model_response,
     server_side_event_chunks,
 ):
@@ -3900,7 +3771,7 @@ def test_streaming_create_message_with_system_prompt(
     )
 
     sentry_init(
-        integrations=[AnthropicIntegration(include_prompts=include_prompts)],
+        integrations=[AnthropicIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
@@ -3942,7 +3813,7 @@ def test_streaming_create_message_with_system_prompt(
     assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
     assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
-    if send_default_pii and include_prompts:
+    if send_default_pii:
         assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS in span["attributes"]
         system_instructions = json.loads(
             span["attributes"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
@@ -3972,19 +3843,13 @@ def test_streaming_create_message_with_system_prompt(
 
 
 @pytest.mark.parametrize(
-    "send_default_pii, include_prompts",
-    [
-        (True, True),
-        (True, False),
-        (False, True),
-        (False, False),
-    ],
+    "send_default_pii",
+    [True, False],
 )
 def test_stream_messages_with_system_prompt(
     sentry_init,
     capture_items,
     send_default_pii,
-    include_prompts,
     get_model_response,
     server_side_event_chunks,
 ):
@@ -4029,7 +3894,7 @@ def test_stream_messages_with_system_prompt(
     )
 
     sentry_init(
-        integrations=[AnthropicIntegration(include_prompts=include_prompts)],
+        integrations=[AnthropicIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
@@ -4068,7 +3933,7 @@ def test_stream_messages_with_system_prompt(
     assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
     assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
-    if send_default_pii and include_prompts:
+    if send_default_pii:
         assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS in span["attributes"]
         system_instructions = json.loads(
             span["attributes"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
@@ -4097,19 +3962,13 @@ def test_stream_messages_with_system_prompt(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "send_default_pii, include_prompts",
-    [
-        (True, True),
-        (True, False),
-        (False, True),
-        (False, False),
-    ],
+    "send_default_pii",
+    [True, False],
 )
 async def test_stream_message_with_system_prompt_async(
     sentry_init,
     capture_items,
     send_default_pii,
-    include_prompts,
     get_model_response,
     async_iterator,
     server_side_event_chunks,
@@ -4157,7 +4016,7 @@ async def test_stream_message_with_system_prompt_async(
     )
 
     sentry_init(
-        integrations=[AnthropicIntegration(include_prompts=include_prompts)],
+        integrations=[AnthropicIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
@@ -4197,7 +4056,7 @@ async def test_stream_message_with_system_prompt_async(
     assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
     assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
-    if send_default_pii and include_prompts:
+    if send_default_pii:
         assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS in span["attributes"]
         system_instructions = json.loads(
             span["attributes"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
@@ -4227,19 +4086,13 @@ async def test_stream_message_with_system_prompt_async(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "send_default_pii, include_prompts",
-    [
-        (True, True),
-        (True, False),
-        (False, True),
-        (False, False),
-    ],
+    "send_default_pii",
+    [True, False],
 )
 async def test_streaming_create_message_with_system_prompt_async(
     sentry_init,
     capture_items,
     send_default_pii,
-    include_prompts,
     get_model_response,
     async_iterator,
     server_side_event_chunks,
@@ -4287,7 +4140,7 @@ async def test_streaming_create_message_with_system_prompt_async(
     )
 
     sentry_init(
-        integrations=[AnthropicIntegration(include_prompts=include_prompts)],
+        integrations=[AnthropicIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
@@ -4329,7 +4182,7 @@ async def test_streaming_create_message_with_system_prompt_async(
     assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
     assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
-    if send_default_pii and include_prompts:
+    if send_default_pii:
         assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS in span["attributes"]
         system_instructions = json.loads(
             span["attributes"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
@@ -4365,7 +4218,7 @@ def test_system_prompt_with_complex_structure(
 ):
     """Test that complex system prompt structures (list of text blocks) are properly captured."""
     sentry_init(
-        integrations=[AnthropicIntegration(include_prompts=True)],
+        integrations=[AnthropicIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
@@ -4590,7 +4443,7 @@ def test_message_with_url_image(
 ):
     """Test that messages with URL-referenced images are properly captured."""
     sentry_init(
-        integrations=[AnthropicIntegration(include_prompts=True)],
+        integrations=[AnthropicIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
@@ -4639,7 +4492,7 @@ def test_message_with_file_image(
 ):
     """Test that messages with file_id-referenced images are properly captured."""
     sentry_init(
-        integrations=[AnthropicIntegration(include_prompts=True)],
+        integrations=[AnthropicIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
@@ -4689,7 +4542,7 @@ def test_message_with_url_pdf(
 ):
     """Test that messages with URL-referenced PDF documents are properly captured."""
     sentry_init(
-        integrations=[AnthropicIntegration(include_prompts=True)],
+        integrations=[AnthropicIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
@@ -4738,7 +4591,7 @@ def test_message_with_file_document(
 ):
     """Test that messages with file_id-referenced documents are properly captured."""
     sentry_init(
-        integrations=[AnthropicIntegration(include_prompts=True)],
+        integrations=[AnthropicIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
@@ -4788,53 +4641,10 @@ def test_binary_content_not_stored_when_pii_disabled(
 ):
     """Test that binary content is not stored when send_default_pii is False."""
     sentry_init(
-        integrations=[AnthropicIntegration(include_prompts=True)],
+        integrations=[AnthropicIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=False,
-    )
-
-    client = Anthropic(api_key="z")
-    client.messages._post = mock.Mock(return_value=EXAMPLE_MESSAGE)
-
-    messages = [
-        {
-            "role": "user",
-            "content": [
-                {"type": "text", "text": "What's in this image?"},
-                {
-                    "type": "image",
-                    "source": {
-                        "type": "base64",
-                        "media_type": "image/jpeg",
-                        "data": "base64encodeddatahere...",
-                    },
-                },
-            ],
-        }
-    ]
-    items = capture_items("span")
-
-    client.messages.create(max_tokens=1024, messages=messages, model="model")
-
-    sentry_sdk.flush()
-    spans = [item.payload for item in items]
-    (span,) = spans
-
-    # Messages should not be stored
-    assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
-
-
-def test_binary_content_not_stored_when_prompts_disabled(
-    sentry_init,
-    capture_items,
-):
-    """Test that binary content is not stored when include_prompts is False."""
-    sentry_init(
-        integrations=[AnthropicIntegration(include_prompts=False)],
-        disabled_integrations=[StdlibIntegration],
-        traces_sample_rate=1.0,
-        send_default_pii=True,
     )
 
     client = Anthropic(api_key="z")
