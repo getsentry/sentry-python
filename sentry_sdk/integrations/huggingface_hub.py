@@ -1,5 +1,6 @@
 import inspect
 import sys
+import warnings
 from functools import wraps
 from typing import TYPE_CHECKING, cast
 
@@ -23,7 +24,7 @@ from sentry_sdk.utils import (
 )
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Iterable, Union
+    from typing import Any, Callable, Iterable, Optional, Union
 
     from huggingface_hub import (
         ChatCompletionStreamOutput,
@@ -42,9 +43,19 @@ class HuggingfaceHubIntegration(Integration):
     origin = f"auto.ai.{identifier}"
 
     def __init__(
-        self: "HuggingfaceHubIntegration", include_prompts: bool = True
+        self: "HuggingfaceHubIntegration", include_prompts: "Optional[bool]" = None
     ) -> None:
-        self.include_prompts = include_prompts
+        if include_prompts is not None:
+            warnings.warn(
+                "`HuggingfaceHubIntegration.include_prompts` is deprecated and will be removed in version 3.0. "
+                "To disable capture of GenAI attributes, pass "
+                "`data_collection={'gen_ai': {'inputs': False, 'outputs': False}}` "
+                "to `sentry_sdk.init`.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+
+        self.include_prompts = True if include_prompts is None else include_prompts
 
     @staticmethod
     def setup_once() -> None:

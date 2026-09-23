@@ -1,4 +1,5 @@
 import sys
+import warnings
 from functools import wraps
 from typing import TYPE_CHECKING
 
@@ -10,7 +11,7 @@ from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Iterator, Union
+    from typing import Any, Callable, Iterator, Optional, Union
 
     from sentry_sdk.tracing import Span
 
@@ -78,8 +79,20 @@ class CohereIntegration(Integration):
     identifier = "cohere"
     origin = f"auto.ai.{identifier}"
 
-    def __init__(self: "CohereIntegration", include_prompts: bool = True) -> None:
-        self.include_prompts = include_prompts
+    def __init__(
+        self: "CohereIntegration", include_prompts: "Optional[bool]" = True
+    ) -> None:
+        if include_prompts is not None:
+            warnings.warn(
+                "`CohereIntegration.include_prompts` is deprecated and will be removed in version 3.0. "
+                "To disable capture of GenAI attributes, pass "
+                "`data_collection={'gen_ai': {'inputs': False, 'outputs': False}}` "
+                "to `sentry_sdk.init`.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+
+        self.include_prompts = True if include_prompts is None else include_prompts
 
     @staticmethod
     def setup_once() -> None:

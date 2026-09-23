@@ -1,4 +1,5 @@
 import functools
+import warnings
 
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.utils import parse_version
@@ -21,7 +22,7 @@ from .patches import (
 from .spans.ai_client import ai_client_span, update_ai_client_span
 
 if TYPE_CHECKING:
-    from typing import Any
+    from typing import Any, Optional
 
     from pydantic_ai import ModelRequestContext, RunContext
     from pydantic_ai.capabilities import Hooks, WrapModelRequestHandler
@@ -84,7 +85,9 @@ class PydanticAIIntegration(Integration):
     origin = f"auto.ai.{identifier}"
 
     def __init__(
-        self, include_prompts: bool = True, handled_tool_call_exceptions: bool = True
+        self,
+        include_prompts: "Optional[bool]" = None,
+        handled_tool_call_exceptions: bool = True,
     ) -> None:
         """
         Initialize the Pydantic AI integration.
@@ -95,7 +98,17 @@ class PydanticAIIntegration(Integration):
             handled_tool_exceptions: Capture tool call exceptions that Pydantic AI
                 internally prevents from bubbling up.
         """
-        self.include_prompts = include_prompts
+        if include_prompts is not None:
+            warnings.warn(
+                "`PydanticAIIntegration.include_prompts` is deprecated and will be removed in version 3.0. "
+                "To disable capture of GenAI attributes, pass "
+                "`data_collection={'gen_ai': {'inputs': False, 'outputs': False}}` "
+                "to `sentry_sdk.init`.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+
+        self.include_prompts = True if include_prompts is None else include_prompts
         self.handled_tool_call_exceptions = handled_tool_call_exceptions
 
     @staticmethod

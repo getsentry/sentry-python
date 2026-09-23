@@ -1,6 +1,7 @@
 import json
 import sys
 import time
+import warnings
 from collections.abc import Iterable
 from functools import wraps
 from typing import TYPE_CHECKING, cast
@@ -123,10 +124,20 @@ class OpenAIIntegration(Integration):
 
     def __init__(
         self: "OpenAIIntegration",
-        include_prompts: bool = True,
+        include_prompts: "Optional[bool]" = None,
         tiktoken_encoding_name: "Optional[str]" = None,
     ) -> None:
-        self.include_prompts = include_prompts
+        if include_prompts is not None:
+            warnings.warn(
+                "`OpenAIIntegration.include_prompts` is deprecated and will be removed in version 3.0. "
+                "To disable capture of GenAI attributes, pass "
+                "`data_collection={'gen_ai': {'inputs': False, 'outputs': False}}` "
+                "to `sentry_sdk.init`.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+
+        self.include_prompts = True if include_prompts is None else include_prompts
 
         self.tiktoken_encoding = None
         if tiktoken_encoding_name is not None:

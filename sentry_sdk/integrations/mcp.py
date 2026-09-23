@@ -8,6 +8,7 @@ Supports the low-level `mcp.server.lowlevel.Server` API.
 """
 
 import inspect
+import warnings
 from collections.abc import Iterator
 from contextlib import contextmanager
 from functools import wraps
@@ -80,7 +81,7 @@ class MCPIntegration(Integration):
     identifier = "mcp"
     origin = "auto.ai.mcp"
 
-    def __init__(self, include_prompts: bool = True) -> None:
+    def __init__(self, include_prompts: "Optional[bool]" = None) -> None:
         """
         Initialize the MCP integration.
 
@@ -88,7 +89,17 @@ class MCPIntegration(Integration):
             include_prompts: Whether to include prompts (tool results and prompt content)
                              in span data. Requires send_default_pii=True. Default is True.
         """
-        self.include_prompts = include_prompts
+        if include_prompts is not None:
+            warnings.warn(
+                "`MCPIntegration.include_prompts` is deprecated and will be removed in version 3.0. "
+                "To disable capture of GenAI attributes, pass "
+                "`data_collection={'gen_ai': {'inputs': False, 'outputs': False}}` "
+                "to `sentry_sdk.init`.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+
+        self.include_prompts = True if include_prompts is None else include_prompts
 
     @staticmethod
     def setup_once() -> None:

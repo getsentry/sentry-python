@@ -1,4 +1,5 @@
 import copy
+import warnings
 from typing import TYPE_CHECKING
 
 import sentry_sdk
@@ -22,7 +23,7 @@ from sentry_sdk.utils import event_from_exception, has_data_collection_enabled
 
 if TYPE_CHECKING:
     from datetime import datetime
-    from typing import Any, Dict, List
+    from typing import Any, Dict, List, Optional
 
 try:
     import litellm  # type: ignore[import-not-found]
@@ -364,8 +365,20 @@ class LiteLLMIntegration(Integration):
     identifier = "litellm"
     origin = f"auto.ai.{identifier}"
 
-    def __init__(self: "LiteLLMIntegration", include_prompts: bool = True) -> None:
-        self.include_prompts = include_prompts
+    def __init__(
+        self: "LiteLLMIntegration", include_prompts: "Optional[bool]" = None
+    ) -> None:
+        if include_prompts is not None:
+            warnings.warn(
+                "`LiteLLMIntegration.include_prompts` is deprecated and will be removed in version 3.0. "
+                "To disable capture of GenAI attributes, pass "
+                "`data_collection={'gen_ai': {'inputs': False, 'outputs': False}}` "
+                "to `sentry_sdk.init`.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+
+        self.include_prompts = True if include_prompts is None else include_prompts
 
     @staticmethod
     def setup_once() -> None:

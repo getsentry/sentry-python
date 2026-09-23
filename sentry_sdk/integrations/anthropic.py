@@ -1,5 +1,6 @@
 import json
 import sys
+import warnings
 from collections.abc import Iterable
 from functools import wraps
 from typing import TYPE_CHECKING, cast
@@ -222,8 +223,20 @@ class AnthropicIntegration(Integration):
     identifier = "anthropic"
     origin = f"auto.ai.{identifier}"
 
-    def __init__(self: "AnthropicIntegration", include_prompts: bool = True) -> None:
-        self.include_prompts = include_prompts
+    def __init__(
+        self: "AnthropicIntegration", include_prompts: "Optional[bool]" = None
+    ) -> None:
+        if include_prompts is not None:
+            warnings.warn(
+                "`AnthropicIntegration.include_prompts` is deprecated and will be removed in version 3.0. "
+                "To disable capture of GenAI attributes, pass "
+                "`data_collection={'gen_ai': {'inputs': False, 'outputs': False}}` "
+                "to `sentry_sdk.init`.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+
+        self.include_prompts = True if include_prompts is None else include_prompts
 
     @staticmethod
     def setup_once() -> None:

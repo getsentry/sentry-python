@@ -234,10 +234,20 @@ class LangchainIntegration(Integration):
 
     def __init__(
         self: "LangchainIntegration",
-        include_prompts: bool = True,
+        include_prompts: "Optional[bool]" = True,
         max_spans: "Optional[int]" = None,
     ) -> None:
-        self.include_prompts = include_prompts
+        if include_prompts is not None:
+            warnings.warn(
+                "`LangchainIntegration.include_prompts` is deprecated and will be removed in version 3.0. "
+                "To disable capture of GenAI attributes, pass "
+                "`data_collection={'gen_ai': {'inputs': False, 'outputs': False}}` "
+                "to `sentry_sdk.init`.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+
+        self.include_prompts = True if include_prompts is None else include_prompts
         self.max_spans = max_spans
 
         if max_spans is not None:
