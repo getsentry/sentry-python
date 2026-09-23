@@ -50,17 +50,11 @@ def test_basic(
     assert span["name"] == "aws.s3.ListObjects"
 
 
-@pytest.mark.parametrize("send_default_pii", [True, False])
-def test_streaming(
-    sentry_init,
-    capture_events,
-    capture_items,
-    send_default_pii,
-):
+def test_streaming(sentry_init, capture_events, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[Boto3Integration()],
-        send_default_pii=send_default_pii,
+        data_collection={},
     )
 
     s3 = session.resource("s3")
@@ -101,15 +95,11 @@ def test_streaming(
         "thread.id": mock.ANY,
         "thread.name": mock.ANY,
     }
-    if send_default_pii:
-        expected_attrs["url.full"] = "https://bucket.s3.amazonaws.com/foo.pdf"
+    expected_attrs["url.full"] = "https://bucket.s3.amazonaws.com/foo.pdf"
     assert span1["attributes"] == ApproxDict(expected_attrs)
 
     assert "url.fragment" not in span1["attributes"]
     assert "url.query" not in span1["attributes"]
-    if not send_default_pii:
-        assert "url.full" not in span1["attributes"]
-
     span2 = spans[1]
     assert span2["attributes"]["sentry.op"] == "http.client.stream"
     assert span2["name"] == "aws.s3.GetObject"
@@ -157,7 +147,7 @@ def test_omit_url_data_if_parsing_fails(
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[Boto3Integration()],
-        send_default_pii=True,
+        data_collection={},
     )
 
     s3 = session.resource("s3")
@@ -228,12 +218,11 @@ def test_span_origin(
     assert spans[0]["attributes"]["sentry.origin"] == "auto.http.boto3"
 
 
-@pytest.mark.parametrize("send_default_pii", [True, False])
-def test_breadcrumb(sentry_init, capture_events, send_default_pii):
+def test_breadcrumb(sentry_init, capture_events):
     sentry_init(
         integrations=[Boto3Integration()],
         default_integrations=False,
-        send_default_pii=send_default_pii,
+        data_collection={},
     )
 
     s3 = session.resource("s3")
@@ -253,24 +242,14 @@ def test_breadcrumb(sentry_init, capture_events, send_default_pii):
     assert crumb["type"] == "http"
     assert crumb["category"] == "httplib"
 
-    if send_default_pii:
-        assert crumb["data"] == ApproxDict(
-            {
-                SPANDATA.URL_FULL: mock.ANY,
-                SPANDATA.HTTP_REQUEST_METHOD: "GET",
-                SPANDATA.URL_QUERY: mock.ANY,
-            }
-        )
-        assert SPANDATA.URL_FRAGMENT not in crumb["data"]
-    else:
-        assert crumb["data"] == ApproxDict(
-            {
-                SPANDATA.HTTP_REQUEST_METHOD: "GET",
-            }
-        )
-        assert SPANDATA.URL_FULL not in crumb["data"]
-        assert SPANDATA.URL_QUERY not in crumb["data"]
-        assert SPANDATA.URL_FRAGMENT not in crumb["data"]
+    assert crumb["data"] == ApproxDict(
+        {
+            SPANDATA.URL_FULL: mock.ANY,
+            SPANDATA.HTTP_REQUEST_METHOD: "GET",
+            SPANDATA.URL_QUERY: mock.ANY,
+        }
+    )
+    assert SPANDATA.URL_FRAGMENT not in crumb["data"]
 
 
 BUCKET_URL = "https://bucket.s3.amazonaws.com/"
@@ -280,18 +259,8 @@ BUCKET_URL = "https://bucket.s3.amazonaws.com/"
 # Structure of the parameters is "init_kwargs, expected_query"
 URL_QUERY_PARAMS = [
     pytest.param(
-        {"send_default_pii": True},
-        "list-type=2&prefix=foo&continuation-token=abc&encoding-type=url",
-        id="send_default_pii_true",
-    ),
-    pytest.param(
-        {"send_default_pii": False},
-        None,
-        id="send_default_pii_false",
-    ),
-    pytest.param(
         {},
-        None,
+        "list-type=2&prefix=foo&continuation-token=%5BFiltered%5D&encoding-type=url",
         id="defaults",
     ),
     pytest.param(
@@ -333,14 +302,6 @@ URL_QUERY_PARAMS = [
         {"data_collection": {"url_query_params": {"mode": "off"}}},
         "",
         id="data_collection_off",
-    ),
-    pytest.param(
-        {
-            "send_default_pii": True,
-            "data_collection": {"url_query_params": {"mode": "off"}},
-        },
-        "",
-        id="data_collection_wins_over_send_default_pii",
     ),
 ]
 
