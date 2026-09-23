@@ -161,10 +161,11 @@ def example_task_with_kwargs(**kwargs):
     [example_task, example_task_with_kwargs],
 )
 def test_tracing_in_ray_tasks(
+    sentry_init,
     task_options,
     task,
 ):
-    sentry_sdk.init(
+    sentry_init(
         integrations=[RayIntegration()],
         disabled_integrations=[StdlibIntegration],
         transport=RayTestTransport(),
@@ -237,8 +238,8 @@ def test_tracing_in_ray_tasks(
     assert client_spans[1]["trace_id"] == worker_spans[1]["trace_id"]
 
 
-def test_errors_in_ray_tasks():
-    sentry_sdk.init(
+def test_errors_in_ray_tasks(sentry_init):
+    sentry_init(
         integrations=[RayIntegration()],
         disabled_integrations=[StdlibIntegration],
         transport=RayTestTransport(),
@@ -288,9 +289,10 @@ def test_errors_in_ray_tasks():
 # Arbitrary keyword argument to test all decorator paths
 @pytest.mark.parametrize("remote_kwargs", [{}, {"namespace": "actors"}])
 def test_tracing_in_ray_actors(
+    sentry_init,
     remote_kwargs,
 ):
-    sentry_sdk.init(
+    sentry_init(
         integrations=[RayIntegration()],
         disabled_integrations=[StdlibIntegration],
         transport=RayTestTransport(),
@@ -363,8 +365,8 @@ def test_tracing_in_ray_actors(
     assert len(worker_spans) == 1
 
 
-def test_errors_in_ray_actors():
-    sentry_sdk.init(
+def test_errors_in_ray_actors(sentry_init):
+    sentry_init(
         integrations=[RayIntegration()],
         disabled_integrations=[StdlibIntegration],
         transport=RayLoggingTransport(),
