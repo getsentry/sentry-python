@@ -69,8 +69,8 @@ def test_monitor_beat_tasks_with_headers(monitor_beat_tasks):
         assert "sentry-monitor-start-timestamp-s" not in outgoing_headers["headers"]
 
 
-def test_span_with_transaction(sentry_init):
-    sentry_init(traces_sample_rate=1.0)
+def test_span_with_segment(sentry_init):
+    sentry_init(traces_sample_rate=1.0, data_collection={})
     headers = {}
     monitor_beat_tasks = False
 
@@ -89,8 +89,8 @@ def test_span_with_transaction(sentry_init):
             )
 
 
-def test_span_with_transaction_custom_headers(sentry_init):
-    sentry_init(traces_sample_rate=1.0)
+def test_span_with_segment_custom_headers(sentry_init):
+    sentry_init(traces_sample_rate=1.0, data_collection={})
     headers = {
         "baggage": BAGGAGE_VALUE,
         "sentry-trace": SENTRY_TRACE_VALUE,
@@ -133,7 +133,7 @@ def test_celery_trace_propagation_default(sentry_init, monitor_beat_tasks):
     The Celery integration has its own mechanism to propagate traces:
     https://docs.sentry.io/platforms/python/integrations/celery/#distributed-traces
     """
-    sentry_init()
+    sentry_init(data_collection={})
 
     headers = {}
     span = None
@@ -169,7 +169,7 @@ def test_celery_trace_propagation_traces_sample_rate(
     The Celery integration has its own mechanism to propagate traces:
     https://docs.sentry.io/platforms/python/integrations/celery/#distributed-traces
     """
-    sentry_init(traces_sample_rate=traces_sample_rate)
+    sentry_init(traces_sample_rate=traces_sample_rate, data_collection={})
 
     headers = {}
     span = None
