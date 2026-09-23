@@ -6,12 +6,10 @@ from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_ve
 from sentry_sdk.integrations.logging import ignore_logger_for_events
 from sentry_sdk.traces import SegmentNameSource
 from sentry_sdk.utils import (
-    SENSITIVE_DATA_SUBSTITUTE,
     _register_control_flow_exception,
     capture_internal_exceptions,
     ensure_integration_enabled,
     event_from_exception,
-    has_data_collection_enabled,
     parse_version,
     reraise,
 )
@@ -151,13 +149,9 @@ def _make_event_processor(
             }
             client_options = sentry_sdk.get_client().options
 
-            if has_data_collection_enabled(client_options):
-                if client_options["data_collection"]["queues"]:
-                    arq_job_dict["args"] = args
-                    arq_job_dict["kwargs"] = kwargs
-            else:
-                arq_job_dict["args"] = SENSITIVE_DATA_SUBSTITUTE
-                arq_job_dict["kwargs"] = SENSITIVE_DATA_SUBSTITUTE
+            if client_options["data_collection"]["queues"]:
+                arq_job_dict["args"] = args
+                arq_job_dict["kwargs"] = kwargs
 
             extra["arq-job"] = arq_job_dict
 

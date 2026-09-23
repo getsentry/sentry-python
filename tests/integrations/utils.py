@@ -1,7 +1,5 @@
 import pytest
 
-from sentry_sdk.utils import SENSITIVE_DATA_SUBSTITUTE
-
 # Shared parametrization test matrix exercising the precedence between the legacy
 # ``send_default_pii`` boolean and the ``data_collection.user_info`` setting.
 # Each case is ``(init_kwargs, expect_user_info)`` where the second element indicates
@@ -92,29 +90,5 @@ DATA_COLLECTION_QUEUES_CASES = [
         None,
         None,
         id="data_collection_queues_off",
-    ),
-    pytest.param(
-        {"send_default_pii": False},
-        SENSITIVE_DATA_SUBSTITUTE,
-        SENSITIVE_DATA_SUBSTITUTE,
-        id="no_pii",
-    ),
-    pytest.param(
-        {
-            "data_collection": {"queues": False},
-            "send_default_pii": False,
-        },
-        None,
-        None,
-        id="data_collection_queues_off_with_no_pii",
-    ),
-    pytest.param(
-        {
-            "data_collection": {"queues": True},
-            "send_default_pii": False,
-        },
-        [1],
-        {"b": 0},
-        id="data_collection_queues_on_with_no_pii",
     ),
 ]
