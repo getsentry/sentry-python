@@ -426,8 +426,6 @@ def test_clickhouse_client_breadcrumbs_with_data_collection_default(
 
 
 def test_clickhouse_client_with_data_collection(sentry_init, capture_items) -> None:
-    # Streamed spans never carry db.params/db.result, regardless of the
-    # data_collection configuration
     sentry_init(
         integrations=[ClickhouseDriverIntegration()],
         traces_sample_rate=1.0,
