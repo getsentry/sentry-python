@@ -59,6 +59,7 @@ async def test_basic(sentry_init, aiohttp_client, capture_events):
     request = event["request"]
     host = request["headers"]["Host"]
 
+    assert request["env"] == {"REMOTE_ADDR": "127.0.0.1"}
     assert request["method"] == "GET"
     assert request.get("data") is None
     assert request["url"] == "http://{host}/".format(host=host)
