@@ -17,6 +17,7 @@ from sentry_sdk.integrations.cloud_resource_context import (
     CLOUD_PLATFORM,
     CLOUD_PROVIDER,
 )
+from sentry_sdk.integrations.dedupe import DedupeIntegration
 from sentry_sdk.scope import Scope, should_send_default_pii
 from sentry_sdk.traces import SegmentNameSource
 from sentry_sdk.utils import (
@@ -134,6 +135,7 @@ def _wrap_handler(handler: "F") -> "F":
             timeout_thread = None
             with capture_internal_exceptions():
                 scope.clear_breadcrumbs()
+                DedupeIntegration.reset_last_seen()
                 scope.add_event_processor(
                     _make_request_event_processor(
                         request_data, aws_context, configured_time

@@ -11,6 +11,7 @@ from sentry_sdk.data_collection import _apply_data_collection_filtering_to_query
 from sentry_sdk.integrations import Integration
 from sentry_sdk.integrations._wsgi_common import _filter_headers
 from sentry_sdk.integrations.cloud_resource_context import CLOUD_PROVIDER
+from sentry_sdk.integrations.dedupe import DedupeIntegration
 from sentry_sdk.scope import Scope, should_send_default_pii
 from sentry_sdk.traces import SegmentNameSource
 from sentry_sdk.utils import (
@@ -60,6 +61,7 @@ def _wrap_func(func: "F") -> "F":
         with sentry_sdk.isolation_scope() as scope:
             with capture_internal_exceptions():
                 scope.clear_breadcrumbs()
+                DedupeIntegration.reset_last_seen()
                 scope.add_event_processor(
                     _make_request_event_processor(
                         gcp_event, configured_time, initial_time
