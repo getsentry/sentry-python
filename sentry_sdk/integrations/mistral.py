@@ -230,7 +230,7 @@ def _wrap_complete(f: "Callable[..., Any]") -> "Callable[..., Any]":
 
         model = kwargs.get("model")
 
-        with sentry_sdk.traces.start_span(
+        with sentry_sdk.start_span(
             name=f"chat {model}" if model is not None else "chat",
             attributes={
                 "sentry.op": OP.GEN_AI_CHAT,
@@ -358,7 +358,7 @@ def _wrap_complete_async(f: "Callable[..., Any]") -> "Callable[..., Any]":
 
         model = kwargs.get("model")
 
-        with sentry_sdk.traces.start_span(
+        with sentry_sdk.start_span(
             name=f"chat {model}" if model is not None else "chat",
             attributes={
                 "sentry.op": OP.GEN_AI_CHAT,

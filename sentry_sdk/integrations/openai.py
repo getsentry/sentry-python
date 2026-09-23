@@ -796,7 +796,7 @@ def _new_sync_chat_completion(
     # Same bool handling as in https://github.com/openai/openai-python/blob/acd0c54d8a68efeedde0e5b4e6c310eef1ce7867/src/openai/resources/completions.py#L585
     is_streaming_response = kwargs.get("stream", False) or False
 
-    span = sentry_sdk.traces.start_span(
+    span = sentry_sdk.start_span(
         name=f"chat {model}",
         attributes={
             "sentry.op": consts.OP.GEN_AI_CHAT,
@@ -874,7 +874,7 @@ async def _new_async_chat_completion(
     # Same bool handling as in https://github.com/openai/openai-python/blob/acd0c54d8a68efeedde0e5b4e6c310eef1ce7867/src/openai/resources/completions.py#L585
     is_streaming_response = kwargs.get("stream", False) or False
 
-    span = sentry_sdk.traces.start_span(
+    span = sentry_sdk.start_span(
         name=f"chat {model}",
         attributes={
             "sentry.op": consts.OP.GEN_AI_CHAT,
@@ -1300,7 +1300,7 @@ def _new_sync_embeddings_create(f: "Any", *args: "Any", **kwargs: "Any") -> "Any
 
     model = kwargs.get("model")
 
-    with sentry_sdk.traces.start_span(
+    with sentry_sdk.start_span(
         name=f"embeddings {model}",
         attributes={
             "sentry.op": consts.OP.GEN_AI_EMBEDDINGS,
@@ -1337,7 +1337,7 @@ async def _new_async_embeddings_create(
 
     model = kwargs.get("model")
 
-    with sentry_sdk.traces.start_span(
+    with sentry_sdk.start_span(
         name=f"embeddings {model}",
         attributes={
             "sentry.op": consts.OP.GEN_AI_EMBEDDINGS,
@@ -1404,7 +1404,7 @@ def _new_sync_responses_create(
     # Same bool handling as in https://github.com/openai/openai-python/blob/acd0c54d8a68efeedde0e5b4e6c310eef1ce7867/src/openai/resources/responses/responses.py#L940
     is_streaming_response = kwargs.get("stream", False) or False
 
-    span = sentry_sdk.traces.start_span(
+    span = sentry_sdk.start_span(
         name=f"responses {model}",
         attributes={
             "sentry.op": consts.OP.GEN_AI_RESPONSES,
@@ -1472,7 +1472,7 @@ async def _new_async_responses_create(
     # Same bool handling as in https://github.com/openai/openai-python/blob/acd0c54d8a68efeedde0e5b4e6c310eef1ce7867/src/openai/resources/responses/responses.py#L940
     is_streaming_response = kwargs.get("stream", False) or False
 
-    span = sentry_sdk.traces.start_span(
+    span = sentry_sdk.start_span(
         name=f"responses {model}",
         attributes={
             "sentry.op": consts.OP.GEN_AI_RESPONSES,

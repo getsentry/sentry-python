@@ -722,7 +722,7 @@ def _sentry_patched_create_sync(f: "Any", *args: "Any", **kwargs: "Any") -> "Any
 
     model = kwargs.get("model", "")
 
-    span = sentry_sdk.traces.start_span(
+    span = sentry_sdk.start_span(
         name=f"chat {model}".strip(),
         attributes={
             "sentry.op": OP.GEN_AI_CHAT,
@@ -812,7 +812,7 @@ async def _sentry_patched_create_async(
 
     model = kwargs.get("model", "")
 
-    span = sentry_sdk.traces.start_span(
+    span = sentry_sdk.start_span(
         name=f"chat {model}".strip(),
         attributes={
             "sentry.op": OP.GEN_AI_CHAT,
@@ -1053,7 +1053,7 @@ def _wrap_message_stream_manager_enter(f: "Any") -> "Any":
         except TypeError:
             return f(self)
 
-        span = sentry_sdk.traces.start_span(
+        span = sentry_sdk.start_span(
             name="chat"
             if patched_self._model is None
             else f"chat {patched_self._model}".strip(),
@@ -1157,7 +1157,7 @@ def _wrap_async_message_stream_manager_aenter(f: "Any") -> "Any":
         except TypeError:
             return await f(self)
 
-        span = sentry_sdk.traces.start_span(
+        span = sentry_sdk.start_span(
             name="chat"
             if patched_self._model is None
             else f"chat {patched_self._model}".strip(),

@@ -67,7 +67,7 @@ def test_redis_pipeline(
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         pipeline = connection.pipeline(transaction=is_transaction)
         pipeline.get("foo")
         pipeline.set("bar", 1)
@@ -118,7 +118,7 @@ def test_redis_pipeline_data_collection(
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         pipeline = connection.pipeline(transaction=False)
         pipeline.get("foo")
         pipeline.set("bar", 1)
@@ -154,7 +154,7 @@ def test_sensitive_data(
         connection = FakeRedis()
 
         items = capture_items("span")
-        with sentry_sdk.traces.start_span(name="custom parent"):
+        with sentry_sdk.start_span(name="custom parent"):
             connection.get("this is super secret")
         sentry_sdk.flush()
 
@@ -181,7 +181,7 @@ def test_pii_data_redacted(
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         connection.set("somekey1", "my secret string1")
         connection.set("somekey2", "my secret string2")
         connection.get("somekey2")
@@ -232,7 +232,7 @@ def test_data_collection_database_query_data(
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         connection.set("somekey1", "my secret string1")
 
     sentry_sdk.flush()
@@ -277,7 +277,7 @@ def test_database_query_data_takes_precedence_over_send_default_pii(
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         connection.set("somekey1", "my secret string1")
 
     sentry_sdk.flush()
@@ -302,7 +302,7 @@ def test_pii_data_sent(sentry_init, capture_items):
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         connection.set("somekey1", "my secret string1")
         connection.set("somekey2", "my secret string2")
         connection.get("somekey2")
@@ -342,7 +342,7 @@ def test_no_data_truncation_by_default(sentry_init, capture_items):
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         connection.set("somekey1", long_string)
         connection.set("somekey2", short_string)
 
@@ -416,7 +416,7 @@ def test_db_connection_attributes_client(sentry_init, capture_items):
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         connection = FakeRedis(connection_pool=MOCK_CONNECTION_POOL)
         connection.get("foobar")
 
@@ -445,7 +445,7 @@ def test_db_connection_attributes_pipeline(sentry_init, capture_items):
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         connection = FakeRedis(connection_pool=MOCK_CONNECTION_POOL)
         pipeline = connection.pipeline(transaction=False)
         pipeline.get("foo")
@@ -479,7 +479,7 @@ def test_span_origin(sentry_init, capture_items):
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         # default case
         connection.set("somekey", "somevalue")
 

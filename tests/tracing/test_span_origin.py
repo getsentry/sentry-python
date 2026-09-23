@@ -5,7 +5,7 @@ def test_span_origin_manual(sentry_init, capture_items):
     sentry_init(traces_sample_rate=1.0)
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="hi"):
+    with sentry_sdk.start_span(name="hi"):
         pass
 
     sentry_sdk.flush()
@@ -20,12 +20,12 @@ def test_span_origin_custom(sentry_init, capture_items):
     sentry_init(traces_sample_rate=1.0)
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(
+    with sentry_sdk.start_span(
         name="hi", attributes={"sentry.origin": "foo.foo2.foo3"}
     ):
         pass
 
-    with sentry_sdk.traces.start_span(
+    with sentry_sdk.start_span(
         name="ho", attributes={"sentry.origin": "baz.baz2.baz3"}
     ):
         pass

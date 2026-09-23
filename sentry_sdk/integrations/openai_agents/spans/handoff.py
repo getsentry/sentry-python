@@ -16,7 +16,7 @@ def handoff_span(
     from_agent: "Optional[agents.Agent]",
     to_agent_name: str,
 ) -> None:
-    with sentry_sdk.traces.start_span(
+    with sentry_sdk.start_span(
         name=f"handoff from {from_agent.name} to {to_agent_name}",  # type: ignore[union-attr]
         attributes={
             "sentry.op": OP.GEN_AI_HANDOFF,

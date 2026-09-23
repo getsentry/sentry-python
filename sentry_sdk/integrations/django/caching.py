@@ -58,10 +58,10 @@ def _patch_cache_method(
         op = OP.CACHE_PUT if is_set_operation else OP.CACHE_GET
         description = _get_span_description(method_name, args, kwargs)
 
-        if sentry_sdk.traces.get_current_span() is None:
+        if sentry_sdk.get_current_span() is None:
             return original_method(*args, **kwargs)
 
-        with sentry_sdk.traces.start_span(
+        with sentry_sdk.start_span(
             name=description,
             attributes={
                 "sentry.op": op,

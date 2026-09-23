@@ -1007,7 +1007,7 @@ async def test_multiple_handlers(sentry_init, capture_items, stdio):
     server.add_request_handler("prompts/get", GetPromptRequestParams, prompt_handler)
 
     items = capture_items("span")
-    tx_ctx = sentry_sdk.traces.start_span(name="mcp tx")
+    tx_ctx = sentry_sdk.start_span(name="mcp tx")
 
     with tx_ctx:
         await stdio(

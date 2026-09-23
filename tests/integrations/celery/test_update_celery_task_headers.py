@@ -74,8 +74,8 @@ def test_span_with_transaction(sentry_init):
     headers = {}
     monitor_beat_tasks = False
 
-    with sentry_sdk.traces.start_span(name="test_segment") as segment:
-        with sentry_sdk.traces.start_span(name="test_span") as span:
+    with sentry_sdk.start_span(name="test_segment") as segment:
+        with sentry_sdk.start_span(name="test_span") as span:
             outgoing_headers = _update_celery_task_headers(
                 headers, span, monitor_beat_tasks
             )
@@ -96,8 +96,8 @@ def test_span_with_transaction_custom_headers(sentry_init):
         "sentry-trace": SENTRY_TRACE_VALUE,
     }
 
-    with sentry_sdk.traces.start_span(name="test_segment") as segment:
-        with sentry_sdk.traces.start_span(name="test_span") as span:
+    with sentry_sdk.start_span(name="test_segment") as segment:
+        with sentry_sdk.start_span(name="test_span") as span:
             outgoing_headers = _update_celery_task_headers(headers, span, False)
 
             assert outgoing_headers["sentry-trace"] == span._to_traceparent()

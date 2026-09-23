@@ -77,7 +77,7 @@ async def test_create_task(
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(
+    with sentry_sdk.start_span(
         name="not so important", attributes={"sentry.op": "root"}
     ):
         foo_task = asyncio.create_task(foo())
@@ -128,7 +128,7 @@ async def test_gather(
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(
+    with sentry_sdk.start_span(
         name="not so important", attributes={"sentry.op": "root"}
     ):
         await asyncio.gather(foo(), bar(), return_exceptions=True)
@@ -168,8 +168,8 @@ async def test_exception(
 
     events = capture_events()
 
-    with sentry_sdk.traces.start_span(name="test_exception", parent_span=None):
-        with sentry_sdk.traces.start_span(name="not so important"):
+    with sentry_sdk.start_span(name="test_exception", parent_span=None):
+        with sentry_sdk.start_span(name="not so important"):
             tasks = [asyncio.create_task(boom()), asyncio.create_task(bar())]
             await asyncio.wait(tasks, return_when=asyncio.FIRST_EXCEPTION)
 
@@ -386,7 +386,7 @@ async def test_span_origin(
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="something"):
+    with sentry_sdk.start_span(name="something"):
         tasks = [
             asyncio.create_task(foo()),
         ]
@@ -421,7 +421,7 @@ async def test_task_spans_false(
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="test_no_spans"):
+    with sentry_sdk.start_span(name="test_no_spans"):
         tasks = [asyncio.create_task(foo()), asyncio.create_task(bar())]
         await asyncio.wait(tasks, return_when=asyncio.FIRST_EXCEPTION)
 
@@ -458,7 +458,7 @@ async def test_enable_asyncio_integration_with_task_spans_false(
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="test"):
+    with sentry_sdk.start_span(name="test"):
         await asyncio.create_task(foo())
 
     sentry_sdk.flush()
@@ -484,7 +484,7 @@ async def test_delayed_enable_integration(
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="test"):
+    with sentry_sdk.start_span(name="test"):
         await asyncio.create_task(foo())
 
     sentry_sdk.flush()
@@ -500,7 +500,7 @@ async def test_delayed_enable_integration(
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="test"):
+    with sentry_sdk.start_span(name="test"):
         await asyncio.create_task(foo())
 
     sentry_sdk.flush()
@@ -576,7 +576,7 @@ async def test_delayed_enable_integration_after_disabling(
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="test"):
+    with sentry_sdk.start_span(name="test"):
         await asyncio.create_task(foo())
 
     sentry_sdk.flush()
@@ -592,7 +592,7 @@ async def test_delayed_enable_integration_after_disabling(
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="test"):
+    with sentry_sdk.start_span(name="test"):
         await asyncio.create_task(foo())
 
     sentry_sdk.flush()
@@ -628,7 +628,7 @@ async def test_internal_tasks_not_wrapped(
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="test_streamed_span"):
+    with sentry_sdk.start_span(name="test_streamed_span"):
         user_task_obj = asyncio.create_task(user_task())
 
         with mark_sentry_task_internal():

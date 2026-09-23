@@ -90,7 +90,7 @@ def test_set_user_none_values_are_dropped_when_copying_to_attributes(
     )
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="test_segment"):
+    with sentry_sdk.start_span(name="test_segment"):
         sentry_sdk.get_isolation_scope().set_user(
             {"email": "ada@beans.com", "username": None}
         )
@@ -974,9 +974,9 @@ def test_handle_error_on_token_reset_isolation_scope(error_cls, scope_manager):
 def test_trace_context_tracing(sentry_init):
     sentry_init(traces_sample_rate=1.0)
 
-    with sentry_sdk.traces.start_span(name="seg") as segment:
-        with sentry_sdk.traces.start_span(name="span1"):
-            with sentry_sdk.traces.start_span(name="span2") as span:
+    with sentry_sdk.start_span(name="seg") as segment:
+        with sentry_sdk.start_span(name="span1"):
+            with sentry_sdk.start_span(name="span2") as span:
                 trace_context = sentry_sdk.get_current_scope().get_trace_context()
 
     assert trace_context["trace_id"] == segment.trace_id

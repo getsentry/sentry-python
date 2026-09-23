@@ -500,7 +500,7 @@ def test_user_ip_address_on_all_spans(
 
     @app.route("/child-span")
     def child_span_handler(request):
-        with sentry_sdk.traces.start_span(name="child-span"):
+        with sentry_sdk.start_span(name="child-span"):
             pass
         return response.text("ok")
 

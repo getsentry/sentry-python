@@ -681,7 +681,7 @@ def _capture_tool_input(
 
 def _create_tool_span(tool_name: str, tool_doc: "Optional[str]") -> "Span":
     """Create a span for tool execution."""
-    span = sentry_sdk.traces.start_span(
+    span = sentry_sdk.start_span(
         name=f"execute_tool {tool_name}",
         attributes={
             "sentry.op": OP.GEN_AI_EXECUTE_TOOL,

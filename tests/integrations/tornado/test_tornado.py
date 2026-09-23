@@ -69,7 +69,7 @@ class HelloHandler(RequestHandler):
 
 class ChildSpanHandler(RequestHandler):
     def get(self):
-        with sentry_sdk.traces.start_span(name="child-span"):
+        with sentry_sdk.start_span(name="child-span"):
             pass
         self.write("ok")
 
@@ -492,7 +492,7 @@ def test_transactions(
 
     client = tornado_testcase(Application([(r"/hi", handler)]))
 
-    with sentry_sdk.traces.start_span(name="client") as span:
+    with sentry_sdk.start_span(name="client") as span:
         request_headers = dict(span._iter_headers())
 
     response = client.fetch(

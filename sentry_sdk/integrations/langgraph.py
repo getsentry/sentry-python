@@ -143,7 +143,7 @@ def _wrap_pregel_invoke(f: "Callable[..., Any]") -> "Callable[..., Any]":
 
         graph_name = _get_graph_name(self)
 
-        with sentry_sdk.traces.start_span(
+        with sentry_sdk.start_span(
             name=f"invoke_agent {graph_name}".strip() if graph_name else "invoke_agent",
             attributes={
                 "sentry.op": OP.GEN_AI_INVOKE_AGENT,
@@ -187,7 +187,7 @@ def _wrap_pregel_ainvoke(f: "Callable[..., Any]") -> "Callable[..., Any]":
 
         graph_name = _get_graph_name(self)
 
-        with sentry_sdk.traces.start_span(
+        with sentry_sdk.start_span(
             name=f"invoke_agent {graph_name}".strip() if graph_name else "invoke_agent",
             attributes={
                 "sentry.op": OP.GEN_AI_INVOKE_AGENT,

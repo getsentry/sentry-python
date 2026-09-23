@@ -166,10 +166,10 @@ class CommandTracer(monitoring.CommandListener):
                     data=data,
                 )
 
-            if sentry_sdk.traces.get_current_span() is None:
+            if sentry_sdk.get_current_span() is None:
                 return
 
-            span = sentry_sdk.traces.start_span(name=query, attributes=data)
+            span = sentry_sdk.start_span(name=query, attributes=data)
 
             self._ongoing_operations[self._operation_key(event)] = span
 

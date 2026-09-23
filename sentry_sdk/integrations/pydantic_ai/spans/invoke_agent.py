@@ -48,7 +48,7 @@ def invoke_agent_span(
     if agent and getattr(agent, "name", None):
         name = agent.name
 
-    span = sentry_sdk.traces.start_span(
+    span = sentry_sdk.start_span(
         name=f"invoke_agent {name}",
         attributes={
             "sentry.op": OP.GEN_AI_INVOKE_AGENT,

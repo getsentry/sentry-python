@@ -161,7 +161,7 @@ def _wrap_chat(f: "Callable[..., Any]", streaming: bool) -> "Callable[..., Any]"
 
         message = kwargs.get("message")
 
-        span = sentry_sdk.traces.start_span(
+        span = sentry_sdk.start_span(
             name="cohere.client.Chat",
             attributes={
                 "sentry.op": consts.OP.COHERE_CHAT_COMPLETIONS_CREATE,
@@ -244,7 +244,7 @@ def _wrap_embed(f: "Callable[..., Any]") -> "Callable[..., Any]":
         if integration is None:
             return f(*args, **kwargs)
 
-        with sentry_sdk.traces.start_span(
+        with sentry_sdk.start_span(
             name="Cohere Embedding Creation",
             attributes={
                 "sentry.op": consts.OP.COHERE_EMBEDDINGS_CREATE,

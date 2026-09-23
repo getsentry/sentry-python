@@ -76,10 +76,10 @@ def _wrap_middleware(middleware: "Any", middleware_name: str) -> "Any":
         if function_basename:
             description = "{}.{}".format(description, function_basename)
 
-        if sentry_sdk.traces.get_current_span() is None:
+        if sentry_sdk.get_current_span() is None:
             return None
 
-        middleware_span = sentry_sdk.traces.start_span(
+        middleware_span = sentry_sdk.start_span(
             name=description,
             attributes={
                 "sentry.op": OP.MIDDLEWARE_DJANGO,

@@ -75,7 +75,7 @@ def test_sync_client_spans(
     url = f"http://localhost:{server_port}/hello?q=test#frag"
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         client = SyncClientBuilder().build()
         response = client.get(url).build().send()
         assert response.status == 200
@@ -121,7 +121,7 @@ async def test_async_client_spans(
     items = capture_items("span")
 
     async with ClientBuilder().build() as client:
-        with sentry_sdk.traces.start_span(name="custom parent"):
+        with sentry_sdk.start_span(name="custom parent"):
             response = await client.get(url).build().send()
             assert response.status == 200
 
@@ -157,7 +157,7 @@ def test_sync_simple_request_spans(
     url = f"http://localhost:{server_port}/hello-simple"
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         response = sync_pyreqwest_get(url).send()
         assert response.status == 200
 
@@ -194,7 +194,7 @@ async def test_async_simple_request_spans(
     url = f"http://localhost:{server_port}/hello-simple-async"
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         response = await async_pyreqwest_get(url).send()
         assert response.status == 200
 
@@ -227,7 +227,7 @@ def test_span_origin(
     url = f"http://localhost:{server_port}/origin"
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         client = SyncClientBuilder().build()
         client.get(url).build().send()
 
@@ -250,7 +250,7 @@ def test_outgoing_trace_headers(
     url = f"http://localhost:{server_port}/trace"
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(
+    with sentry_sdk.start_span(
         name="custom parent",
     ):
         client = SyncClientBuilder().build()
@@ -288,7 +288,7 @@ def test_outgoing_trace_headers_append_to_baggage(
     items = capture_items("span")
 
     with mock.patch("sentry_sdk.tracing_utils.Random.randrange", return_value=500000):
-        with sentry_sdk.traces.start_span(
+        with sentry_sdk.start_span(
             name="/interactions/other-dogs/new-dog",
             attributes={
                 "sentry.op": "greeting.sniff",
@@ -368,7 +368,7 @@ def test_omit_url_data_if_parsing_fails(
     url = f"http://localhost:{server_port}/parse-fail"
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         with mock.patch(
             "sentry_sdk.integrations.pyreqwest.parse_url",
             side_effect=ValueError,
@@ -403,7 +403,7 @@ def test_request_source_disabled(
     url = f"http://localhost:{server_port}/hello"
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         client = SyncClientBuilder().build()
         client.get(url).build().send()
 
@@ -438,7 +438,7 @@ def test_request_source_enabled(
     url = f"http://localhost:{server_port}/hello"
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         client = SyncClientBuilder().build()
         client.get(url).build().send()
 
@@ -468,7 +468,7 @@ def test_request_source(
     url = f"http://localhost:{server_port}/hello"
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         client = SyncClientBuilder().build()
         client.get(url).build().send()
 
@@ -508,7 +508,7 @@ def test_request_source_with_module_in_search_path(
     url = f"http://localhost:{server_port}/hello"
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         from pyreqwest_helpers.helpers import get_request_with_client
 
         client = SyncClientBuilder().build()
@@ -545,8 +545,8 @@ def test_no_request_source_if_duration_too_short(
     url = f"http://localhost:{server_port}/hello"
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
-        original_start_span = sentry_sdk.traces.start_span
+    with sentry_sdk.start_span(name="custom parent"):
+        original_start_span = sentry_sdk.start_span
 
         @contextmanager
         def fake_start_span(*args, **kwargs):
@@ -559,7 +559,7 @@ def test_no_request_source_if_duration_too_short(
                 span._end_timestamp = None
 
         with mock.patch(
-            "sentry_sdk.integrations.pyreqwest.sentry_sdk.traces.start_span",
+            "sentry_sdk.integrations.pyreqwest.sentry_sdk.start_span",
             fake_start_span,
         ):
             client = SyncClientBuilder().build()
@@ -591,8 +591,8 @@ def test_request_source_if_duration_over_threshold(
     url = f"http://localhost:{server_port}/hello"
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
-        original_start_span = sentry_sdk.traces.start_span
+    with sentry_sdk.start_span(name="custom parent"):
+        original_start_span = sentry_sdk.start_span
 
         @contextmanager
         def fake_start_span(*args, **kwargs):
@@ -605,7 +605,7 @@ def test_request_source_if_duration_over_threshold(
                 span._end_timestamp = None
 
         with mock.patch(
-            "sentry_sdk.integrations.pyreqwest.sentry_sdk.traces.start_span",
+            "sentry_sdk.integrations.pyreqwest.sentry_sdk.start_span",
             fake_start_span,
         ):
             client = SyncClientBuilder().build()
@@ -685,7 +685,7 @@ async def test_async_crumb_capture(
 
     events = capture_events()
 
-    with sentry_sdk.traces.start_span(name="segment"):
+    with sentry_sdk.start_span(name="segment"):
         async with ClientBuilder().build() as client:
             response = await client.get(url).build().send()
             assert response.status == 200
@@ -735,7 +735,7 @@ def test_crumb_capture_client_error(
 
     events = capture_events()
 
-    with sentry_sdk.traces.start_span(name="segment"):
+    with sentry_sdk.start_span(name="segment"):
         client = SyncClientBuilder().build()
         response = client.get(url).build().send()
         assert response.status == status_code
@@ -843,7 +843,7 @@ def test_url_query_data_collection_sync(
 
     url = f"http://localhost:{server_port}/hello?toy=tennisball&color=red&auth=secret#frag"
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         client = SyncClientBuilder().build()
         response = client.get(url).build().send()
         assert response.status == 200
@@ -942,7 +942,7 @@ async def test_url_query_data_collection_async(
     url = f"http://localhost:{server_port}/hello?toy=tennisball&color=red&auth=secret#frag"
 
     async with ClientBuilder().build() as client:
-        with sentry_sdk.traces.start_span(name="custom parent"):
+        with sentry_sdk.start_span(name="custom parent"):
             response = await client.get(url).build().send()
             assert response.status == 200
 
@@ -998,7 +998,7 @@ def test_url_full_reassembly_sync(
     base_url = f"http://localhost:{server_port}/hello"
     url = f"{base_url}?toy=tennisball&color=red&auth=secret#frag"
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         client = SyncClientBuilder().build()
         response = client.get(url).build().send()
         assert response.status == 200
@@ -1054,7 +1054,7 @@ async def test_url_full_reassembly_async(
     url = f"{base_url}?toy=tennisball&color=red&auth=secret#frag"
 
     async with ClientBuilder().build() as client:
-        with sentry_sdk.traces.start_span(name="custom parent"):
+        with sentry_sdk.start_span(name="custom parent"):
             response = await client.get(url).build().send()
             assert response.status == 200
 
@@ -1106,7 +1106,7 @@ def test_url_query_params_off_keeps_bare_url_sync(
     base_url = f"http://localhost:{server_port}/hello"
     url = f"{base_url}?toy=tennisball&color=red&auth=secret#frag"
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         client = SyncClientBuilder().build()
         response = client.get(url).build().send()
         assert response.status == 200
@@ -1168,7 +1168,7 @@ async def test_url_query_params_off_keeps_bare_url_async(
     url = f"{base_url}?toy=tennisball&color=red&auth=secret#frag"
 
     async with ClientBuilder().build() as client:
-        with sentry_sdk.traces.start_span(name="custom parent"):
+        with sentry_sdk.start_span(name="custom parent"):
             response = await client.get(url).build().send()
             assert response.status == 200
 
@@ -1227,7 +1227,7 @@ def test_crumb_url_query_data_collection_sync(
 
     events = capture_events()
 
-    with sentry_sdk.traces.start_span(name="segment"):
+    with sentry_sdk.start_span(name="segment"):
         client = SyncClientBuilder().build()
         response = client.get(url).build().send()
         assert response.status == 200
@@ -1290,7 +1290,7 @@ async def test_crumb_url_query_data_collection_async(
 
     events = capture_events()
 
-    with sentry_sdk.traces.start_span(name="segment"):
+    with sentry_sdk.start_span(name="segment"):
         async with ClientBuilder().build() as client:
             response = await client.get(url).build().send()
             assert response.status == 200
@@ -1330,7 +1330,7 @@ def test_omit_url_data_if_parsing_fails_data_collection(
 
     events = capture_events()
 
-    with sentry_sdk.traces.start_span(name="segment"):
+    with sentry_sdk.start_span(name="segment"):
         with mock.patch(
             "sentry_sdk.integrations.pyreqwest.parse_url",
             side_effect=ValueError,

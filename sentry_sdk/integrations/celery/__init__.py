@@ -94,7 +94,7 @@ class CeleryIntegration(Integration):
 
 def _set_status(status: str) -> None:
     with capture_internal_exceptions():
-        span = sentry_sdk.traces.get_current_span()
+        span = sentry_sdk.get_current_span()
 
         if span is not None:
             span.status = "ok" if status == "ok" else "error"
@@ -278,11 +278,8 @@ def _wrap_task_run(f: "F") -> "F":
         task_started_from_beat = sentry_sdk.get_isolation_scope()._name == "celery-beat"
 
         span = None
-        if (
-            not task_started_from_beat
-            and sentry_sdk.traces.get_current_span() is not None
-        ):
-            span = sentry_sdk.traces.start_span(
+        if not task_started_from_beat and sentry_sdk.get_current_span() is not None:
+            span = sentry_sdk.start_span(
                 name=task_name,
                 attributes={
                     "sentry.op": OP.QUEUE_SUBMIT_CELERY,
@@ -337,11 +334,11 @@ def _wrap_tracer(task: "Any", f: "F") -> "F":
             # something such as attribute access can fail.
             with capture_internal_exceptions():
                 headers = args[3].get("headers") or {}
-                sentry_sdk.traces.continue_trace(headers)
+                sentry_sdk.continue_trace(headers)
 
                 Scope.set_custom_sampling_context(custom_sampling_context)
 
-                span = sentry_sdk.traces.start_span(
+                span = sentry_sdk.start_span(
                     name=task_name,
                     parent_span=None,  # make this a segment
                     attributes={
@@ -380,10 +377,10 @@ def _wrap_task_call(task: "Any", f: "F") -> "F":
             return f(*args, **kwargs)
 
         try:
-            if sentry_sdk.traces.get_current_span() is None:
+            if sentry_sdk.get_current_span() is None:
                 return f(*args, **kwargs)
 
-            with sentry_sdk.traces.start_span(
+            with sentry_sdk.start_span(
                 name=task.name,
                 attributes={
                     "sentry.op": OP.QUEUE_PROCESS,
@@ -516,10 +513,10 @@ def _patch_producer_publish() -> None:
         routing_key = kwargs.get("routing_key")
         exchange = kwargs.get("exchange")
 
-        if sentry_sdk.traces.get_current_span() is None:
+        if sentry_sdk.get_current_span() is None:
             return original_publish(self, *args, **kwargs)
 
-        with sentry_sdk.traces.start_span(
+        with sentry_sdk.start_span(
             name=task_name,
             attributes={
                 "sentry.op": OP.QUEUE_PUBLISH,

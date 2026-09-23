@@ -170,7 +170,7 @@ def test_openfeature_span_integration(
     client = api.get_client()
 
     items = capture_items("span")
-    with sentry_sdk.traces.start_span(name="bar"):
+    with sentry_sdk.start_span(name="bar"):
         client.get_boolean_value("hello", default_value=False)
         client.get_boolean_value("world", default_value=False)
 

@@ -80,9 +80,9 @@ def _wrap_start(f: "Callable[P, T]") -> "Callable[P, T]":
         query = args[1]
 
         span = None
-        if sentry_sdk.traces.get_current_span() is not None:
-            span = sentry_sdk.traces.start_span(
-                name=query,  # type: ignore
+        if sentry_sdk.get_current_span() is not None:
+            span = sentry_sdk.start_span(
+                name=query,
                 attributes={
                     "sentry.op": OP.DB,
                     "sentry.origin": ClickhouseDriverIntegration.origin,

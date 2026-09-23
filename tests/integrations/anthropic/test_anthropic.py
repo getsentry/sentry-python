@@ -3576,7 +3576,7 @@ def test_set_output_data_with_input_json_delta(sentry_init):
         send_default_pii=True,
     )
 
-    span = sentry_sdk.traces.start_span(name="test")
+    span = sentry_sdk.start_span(name="test")
     integration = AnthropicIntegration()
     json_deltas = ["{'test': 'data',", "'more': 'json'}"]
     _set_output_data(

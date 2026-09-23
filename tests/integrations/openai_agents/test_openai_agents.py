@@ -2645,11 +2645,11 @@ async def test_hosted_mcp_tool_propagation_header_streamed(
     ) as create, mock.patch(
         "sentry_sdk.tracing_utils.Random.randrange", return_value=500000
     ):
-        sentry_sdk.traces.continue_trace(
+        sentry_sdk.continue_trace(
             {"sentry-trace": "01234567890123456789012345678901-0000000000000000"}
         )
 
-        with sentry_sdk.traces.start_span(
+        with sentry_sdk.start_span(
             name="/interactions/other-dogs/new-dog",
             attributes={
                 "sentry.op": "greeting.sniff",
@@ -2747,11 +2747,11 @@ async def test_hosted_mcp_tool_propagation_headers(
     ) as send, mock.patch(
         "sentry_sdk.tracing_utils.Random.randrange", return_value=500000
     ):
-        sentry_sdk.traces.continue_trace(
+        sentry_sdk.continue_trace(
             {"sentry-trace": "01234567890123456789012345678901-0000000000000000"}
         )
 
-        with sentry_sdk.traces.start_span(
+        with sentry_sdk.start_span(
             name="/interactions/other-dogs/new-dog",
             attributes={
                 "sentry.op": "greeting.sniff",
@@ -3145,7 +3145,7 @@ def test_openai_agents_message_role_mapping(sentry_init, test_message, expected_
 
     get_response_kwargs = {"input": [test_message]}
 
-    with sentry_sdk.traces.start_span(name="test") as span:
+    with sentry_sdk.start_span(name="test") as span:
         _set_input_data(span, get_response_kwargs)
 
     # Verify that messages were processed and roles were mapped
@@ -3703,7 +3703,7 @@ async def test_streaming_span_update_captures_response_data(
     ]
 
     # Test the unified update function (works for both streaming and non-streaming)
-    with sentry_sdk.traces.start_span(
+    with sentry_sdk.start_span(
         attributes={"sentry.op": "gen_ai.chat"}, name="test chat"
     ) as span:
         update_ai_client_span(span, mock_streaming_response)

@@ -268,7 +268,7 @@ async def _instrument_tool_call(
     request_id, session_id, mcp_transport = _get_request_context_data(ctx=ctx)
 
     # Start span and execute
-    with _active_http_scopes(ctx=ctx), sentry_sdk.traces.start_span(
+    with _active_http_scopes(ctx=ctx), sentry_sdk.start_span(
         name=f"tools/call {handler_name}",
         attributes={
             "sentry.op": OP.MCP_SERVER,
@@ -360,7 +360,7 @@ async def _instrument_prompt_get(
     request_id, session_id, mcp_transport = _get_request_context_data(ctx=ctx)
 
     # Start span and execute
-    with _active_http_scopes(ctx=ctx), sentry_sdk.traces.start_span(
+    with _active_http_scopes(ctx=ctx), sentry_sdk.start_span(
         name=f"prompts/get {handler_name}",
         attributes={
             "sentry.op": OP.MCP_SERVER,
@@ -463,7 +463,7 @@ async def _instrument_resource_read(
     request_id, session_id, mcp_transport = _get_request_context_data(ctx=ctx)
 
     # Start span and execute
-    with _active_http_scopes(ctx=ctx), sentry_sdk.traces.start_span(
+    with _active_http_scopes(ctx=ctx), sentry_sdk.start_span(
         name=f"resources/read {handler_name}",
         attributes={
             "sentry.op": OP.MCP_SERVER,
