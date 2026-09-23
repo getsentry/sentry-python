@@ -180,12 +180,6 @@ class LangchainIntegration(Integration):
 
     _ignored_exceptions: "set[type[Exception]]" = set()
 
-    def __init__(
-        self: "LangchainIntegration",
-        include_prompts: bool = True,
-    ) -> None:
-        self.include_prompts = include_prompts
-
     @staticmethod
     def setup_once() -> None:
         version = parse_version(LANGCHAIN_VERSION)
@@ -210,9 +204,8 @@ def _capture_exception(exc: "Any", scope: "Optional[Any]" = None) -> None:
 class SentryLangchainCallback(BaseCallbackHandler):
     """Callback handler that creates Sentry spans."""
 
-    def __init__(self, include_prompts: bool) -> None:
+    def __init__(self) -> None:
         self.span_map: "OrderedDict[UUID, Union[Span, _AgentFrameworkChatGenerationContext]]" = OrderedDict()
-        self.include_prompts = include_prompts
 
     def _handle_error(self, run_id: "UUID", error: "Any") -> None:
         is_ignored = isinstance(error, tuple(LangchainIntegration._ignored_exceptions))
@@ -398,7 +391,7 @@ class SentryLangchainCallback(BaseCallbackHandler):
             record_inputs = False
             if has_data_collection_enabled(client.options):
                 record_inputs = client.options["data_collection"]["gen_ai"]["inputs"]
-            elif should_send_default_pii() and self.include_prompts:
+            elif should_send_default_pii():
                 # TODO: Remove this branch once `send_default_pii` is deprecated
                 record_inputs = True
 
@@ -493,7 +486,7 @@ class SentryLangchainCallback(BaseCallbackHandler):
             record_inputs = False
             if has_data_collection_enabled(client.options):
                 record_inputs = client.options["data_collection"]["gen_ai"]["inputs"]
-            elif should_send_default_pii() and self.include_prompts:
+            elif should_send_default_pii():
                 # TODO: Remove this branch once `send_default_pii` is deprecated
                 record_inputs = True
 
@@ -546,7 +539,7 @@ class SentryLangchainCallback(BaseCallbackHandler):
             record_outputs = False
             if has_data_collection_enabled(client.options):
                 record_outputs = client.options["data_collection"]["gen_ai"]["outputs"]
-            elif should_send_default_pii() and self.include_prompts:
+            elif should_send_default_pii():
                 # TODO: Remove this branch once `send_default_pii` is deprecated
                 record_outputs = True
 
@@ -584,7 +577,7 @@ class SentryLangchainCallback(BaseCallbackHandler):
             record_outputs = False
             if has_data_collection_enabled(client.options):
                 record_outputs = client.options["data_collection"]["gen_ai"]["outputs"]
-            elif should_send_default_pii() and self.include_prompts:
+            elif should_send_default_pii():
                 # TODO: Remove this branch once `send_default_pii` is deprecated
                 record_outputs = True
 
@@ -694,7 +687,7 @@ class SentryLangchainCallback(BaseCallbackHandler):
             record_inputs = False
             if has_data_collection_enabled(client.options):
                 record_inputs = client.options["data_collection"]["gen_ai"]["inputs"]
-            elif should_send_default_pii() and self.include_prompts:
+            elif should_send_default_pii():
                 # TODO: Remove this branch once `send_default_pii` is deprecated
                 record_inputs = True
 
@@ -725,7 +718,7 @@ class SentryLangchainCallback(BaseCallbackHandler):
             record_outputs = False
             if has_data_collection_enabled(client.options):
                 record_outputs = client.options["data_collection"]["gen_ai"]["outputs"]
-            elif should_send_default_pii() and self.include_prompts:
+            elif should_send_default_pii():
                 # TODO: Remove this branch once `send_default_pii` is deprecated
                 record_outputs = True
 
@@ -1078,9 +1071,7 @@ def _wrap_configure(f: "Callable[..., Any]") -> "Callable[..., Any]":
             isinstance(cb, SentryLangchainCallback)
             for cb in itertools.chain(callbacks_list, inheritable_callbacks_list)
         ):
-            sentry_handler = SentryLangchainCallback(
-                integration.include_prompts,
-            )
+            sentry_handler = SentryLangchainCallback()
             if isinstance(local_callbacks, BaseCallbackManager):
                 local_callbacks = local_callbacks.copy()
                 local_callbacks.handlers = [
@@ -1118,7 +1109,7 @@ def _wrap_agent_executor_invoke(f: "Callable[..., Any]") -> "Callable[..., Any]"
         if has_data_collection_enabled(client.options):
             record_inputs = client.options["data_collection"]["gen_ai"]["inputs"]
             record_outputs = client.options["data_collection"]["gen_ai"]["outputs"]
-        elif should_send_default_pii() and integration.include_prompts:
+        elif should_send_default_pii():
             # TODO: Remove this branch once `send_default_pii` is deprecated
             record_inputs = True
             record_outputs = True
@@ -1172,7 +1163,7 @@ def _wrap_agent_executor_stream(f: "Callable[..., Any]") -> "Callable[..., Any]"
         if has_data_collection_enabled(client.options):
             record_inputs = client.options["data_collection"]["gen_ai"]["inputs"]
             record_outputs = client.options["data_collection"]["gen_ai"]["outputs"]
-        elif should_send_default_pii() and integration.include_prompts:
+        elif should_send_default_pii():
             # TODO: Remove this branch once `send_default_pii` is deprecated
             record_inputs = True
             record_outputs = True
