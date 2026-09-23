@@ -15,14 +15,12 @@ from sentry_sdk.integrations.celery.beat import (
 )
 from sentry_sdk.integrations.celery.utils import _now_seconds_since_epoch
 from sentry_sdk.integrations.logging import ignore_logger_for_events
-from sentry_sdk.scope import Scope, should_send_default_pii
+from sentry_sdk.scope import Scope
 from sentry_sdk.traces import BAGGAGE_HEADER_NAME, SegmentNameSource, Span
 from sentry_sdk.tracing_utils import Baggage
 from sentry_sdk.utils import (
-    SENSITIVE_DATA_SUBSTITUTE,
     capture_internal_exceptions,
     event_from_exception,
-    has_data_collection_enabled,
     parse_version,
     reraise,
 )
@@ -140,16 +138,9 @@ def _make_event_processor(
             celery_job = {"task_name": task.name}
 
             client_options = sentry_sdk.get_client().options
-            if has_data_collection_enabled(client_options):
-                if client_options["data_collection"]["queues"]:
-                    celery_job["args"] = args
-                    celery_job["kwargs"] = kwargs
-            elif should_send_default_pii():
+            if client_options["data_collection"]["queues"]:
                 celery_job["args"] = args
                 celery_job["kwargs"] = kwargs
-            else:
-                celery_job["args"] = SENSITIVE_DATA_SUBSTITUTE
-                celery_job["kwargs"] = SENSITIVE_DATA_SUBSTITUTE
 
             extra["celery-job"] = celery_job
 
