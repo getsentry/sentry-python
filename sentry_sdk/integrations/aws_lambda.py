@@ -17,7 +17,7 @@ from sentry_sdk.integrations.cloud_resource_context import (
     CLOUD_PLATFORM,
     CLOUD_PROVIDER,
 )
-from sentry_sdk.scope import Scope, should_send_default_pii
+from sentry_sdk.scope import Scope
 from sentry_sdk.traces import SegmentNameSource
 from sentry_sdk.utils import (
     AnnotatedValue,
@@ -25,7 +25,6 @@ from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
     event_from_exception,
-    has_data_collection_enabled,
     logger,
     reraise,
 )
@@ -180,31 +179,21 @@ def _wrap_handler(handler: "F") -> "F":
                     "httpMethod"
                 ]
 
+            data_collection = client.options["data_collection"]
             if "queryStringParameters" in request_data:
                 qs = request_data["queryStringParameters"]
                 if qs:
-                    if has_data_collection_enabled(client.options):
-                        filtered_qs = _apply_key_value_collection_filtering(
-                            items=qs,
-                            behaviour=client.options["data_collection"][
-                                "url_query_params"
-                            ],
-                        )
-                        if filtered_qs:
-                            additional_attributes["url.query"] = urlencode(filtered_qs)
-                    elif should_send_default_pii():
-                        additional_attributes["url.query"] = urlencode(qs)
+                    filtered_qs = _apply_key_value_collection_filtering(
+                        items=qs,
+                        behaviour=data_collection["url_query_params"],
+                    )
+                    if filtered_qs:
+                        additional_attributes["url.query"] = urlencode(filtered_qs)
 
-            if not scope._user:
-                if has_data_collection_enabled(client.options):
-                    if client.options["data_collection"]["user_info"]:
-                        user_info = _get_user_from_event(request_data)
-                        if user_info:
-                            scope.set_user(user_info)
-                elif should_send_default_pii():
-                    user_info = _get_user_from_event(request_data)
-                    if user_info:
-                        scope.set_user(user_info)
+            if not scope._user and data_collection["user_info"]:
+                user_info = _get_user_from_event(request_data)
+                if user_info:
+                    scope.set_user(user_info)
 
             sampling_context = {
                 "aws_event": aws_event,
@@ -397,43 +386,30 @@ def _make_request_event_processor(
 
         request["url"] = _get_url(aws_event, aws_context)
 
+        client_options = sentry_sdk.get_client().options
+        data_collection = client_options["data_collection"]
+
         if "queryStringParameters" in aws_event:
             query_string = aws_event["queryStringParameters"]
-            client_options = sentry_sdk.get_client().options
-            if has_data_collection_enabled(client_options):
-                if query_string:
-                    filtered_qs = _apply_key_value_collection_filtering(
-                        items=query_string,
-                        behaviour=client_options["data_collection"]["url_query_params"],
-                    )
-                    if filtered_qs:
-                        request["query_string"] = filtered_qs
-            else:
-                request["query_string"] = query_string
+            if query_string:
+                filtered_qs = _apply_key_value_collection_filtering(
+                    items=query_string,
+                    behaviour=data_collection["url_query_params"],
+                )
+                if filtered_qs:
+                    request["query_string"] = filtered_qs
 
         if "headers" in aws_event:
             request["headers"] = _filter_headers(aws_event["headers"])
 
-        client_options = sentry_sdk.get_client().options
-        if has_data_collection_enabled(client_options):
-            if client_options["data_collection"]["user_info"]:
-                extracted_user = _get_user_from_event(aws_event)
-                if extracted_user:
-                    user_info = sentry_event.setdefault("user", {})
-                    for key, value in extracted_user.items():
-                        user_info.setdefault(key, value)
-
-            if "incoming_request" in client_options["data_collection"]["http_bodies"]:
-                if "body" in aws_event:
-                    request["data"] = aws_event.get("body", "")
-
-        elif should_send_default_pii():
+        if data_collection["user_info"]:
             extracted_user = _get_user_from_event(aws_event)
             if extracted_user:
                 user_info = sentry_event.setdefault("user", {})
                 for key, value in extracted_user.items():
                     user_info.setdefault(key, value)
 
+        if "incoming_request" in data_collection["http_bodies"]:
             if "body" in aws_event:
                 request["data"] = aws_event.get("body", "")
         else:
