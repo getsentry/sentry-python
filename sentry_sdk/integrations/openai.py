@@ -117,10 +117,8 @@ class OpenAIIntegration(Integration):
 
     def __init__(
         self: "OpenAIIntegration",
-        include_prompts: bool = True,
         tiktoken_encoding_name: "Optional[str]" = None,
     ) -> None:
-        self.include_prompts = include_prompts
 
         self.tiktoken_encoding = None
         if tiktoken_encoding_name is not None:
@@ -383,7 +381,7 @@ def _set_responses_api_input_data(
     else:
         # Pre-data collection this was always set, so this needs to be left here for now until
         # we deprecate `send_default_pii`. Once we do, this 'else' branch should be removed,
-        # and the above branch placed below the "if not should_send_default_pii() or not integration.include_prompts"
+        # and the above branch placed below the "if not should_send_default_pii()"
         # line below
         tools = kwargs.get("tools")
         if tools is not None and _is_given(tools):
@@ -395,7 +393,7 @@ def _set_responses_api_input_data(
     if has_data_collection_enabled(client_options):
         if not client_options["data_collection"]["gen_ai"]["inputs"]:
             return
-    elif not should_send_default_pii() or not integration.include_prompts:
+    elif not should_send_default_pii():
         return
 
     explicit_instructions: "Union[Optional[str], Omit]" = kwargs.get("instructions")
@@ -511,7 +509,7 @@ def _set_completions_api_input_data(
     else:
         # Pre-data collection this was always set, so this needs to be left here for now until
         # we deprecate `send_default_pii`. Once we do, this 'else' branch should be removed,
-        # and the above branch placed below the "if not should_send_default_pii() or not integration.include_prompts"
+        # and the above branch placed below the "if not should_send_default_pii()"
         # line below
         tools = kwargs.get("tools")
         if tools is not None and _is_given(tools):
@@ -527,7 +525,7 @@ def _set_completions_api_input_data(
     if has_data_collection_enabled(client.options):
         if not client.options["data_collection"]["gen_ai"]["inputs"]:
             return
-    elif not should_send_default_pii() or not integration.include_prompts:
+    elif not should_send_default_pii():
         return
 
     if messages is None:
@@ -593,7 +591,7 @@ def _set_embeddings_input_data(
     if has_data_collection_enabled(client.options):
         if not client.options["data_collection"]["gen_ai"]["inputs"]:
             return
-    elif not should_send_default_pii() or not integration.include_prompts:
+    elif not should_send_default_pii():
         return
 
     if messages is None:
@@ -653,7 +651,7 @@ def _set_common_output_data(
                     set_data_normalized(
                         span, SPANDATA.GEN_AI_RESPONSE_TEXT, response_text
                     )
-        elif should_send_default_pii() and integration.include_prompts:
+        elif should_send_default_pii():
             response_text = [
                 choice.message.model_dump()
                 for choice in response.choices
@@ -715,11 +713,7 @@ def _set_common_output_data(
                         span, SPANDATA.GEN_AI_RESPONSE_TEXT, output_messages["response"]
                     )
 
-        elif (
-            should_send_default_pii()
-            and integration.include_prompts
-            and isinstance(response.output, list)
-        ):
+        elif should_send_default_pii() and isinstance(response.output, list):
             for output in response.output:
                 if output.type == "function_call":
                     output_messages["tool"].append(output.dict())
@@ -994,7 +988,7 @@ def _wrap_synchronous_completions_chunk_iterator(
                     set_data_normalized(
                         span, SPANDATA.GEN_AI_RESPONSE_TEXT, all_responses
                     )
-            elif should_send_default_pii() and integration.include_prompts:
+            elif should_send_default_pii():
                 set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, all_responses)
 
         _calculate_completions_token_usage(
@@ -1062,7 +1056,7 @@ async def _wrap_asynchronous_completions_chunk_iterator(
                     set_data_normalized(
                         span, SPANDATA.GEN_AI_RESPONSE_TEXT, all_responses
                     )
-            elif should_send_default_pii() and integration.include_prompts:
+            elif should_send_default_pii():
                 set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, all_responses)
 
         _calculate_completions_token_usage(
@@ -1132,7 +1126,7 @@ def _wrap_synchronous_responses_event_iterator(
                     set_data_normalized(
                         span, SPANDATA.GEN_AI_RESPONSE_TEXT, all_responses
                     )
-            elif should_send_default_pii() and integration.include_prompts:
+            elif should_send_default_pii():
                 set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, all_responses)
 
             if count_tokens_manually:
@@ -1203,7 +1197,7 @@ async def _wrap_asynchronous_responses_event_iterator(
                     set_data_normalized(
                         span, SPANDATA.GEN_AI_RESPONSE_TEXT, all_responses
                     )
-            elif should_send_default_pii() and integration.include_prompts:
+            elif should_send_default_pii():
                 set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, all_responses)
 
             if count_tokens_manually:
