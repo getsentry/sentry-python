@@ -195,7 +195,12 @@ def get_url_attributes_legacy(
     client: "sentry_sdk.client.BaseClient",
     parsed_url: "Optional[ParsedUrl]",
 ) -> "Attributes":
-    """Build outgoing HTTP URL attributes using legacy PII behavior."""
+    """Build the `url.*` span attributes for an outgoing HTTP request.
+
+    The query string is only included when the user has opted into collecting
+    it, either through `data_collection` (in which case the configured
+    filtering is applied) or through the legacy `send_default_pii`.
+    """
     attributes: "Attributes" = {}
     if parsed_url is None:
         return attributes
