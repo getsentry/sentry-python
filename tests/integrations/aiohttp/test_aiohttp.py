@@ -59,7 +59,6 @@ async def test_basic(sentry_init, aiohttp_client, capture_events):
     request = event["request"]
     host = request["headers"]["Host"]
 
-    assert request["env"] == {"REMOTE_ADDR": "127.0.0.1"}
     assert request["method"] == "GET"
     assert request["query_string"] == ""
     assert request.get("data") is None
@@ -99,7 +98,6 @@ async def test_post_body_not_read(sentry_init, aiohttp_client, capture_events):
     assert exception["type"] == "ZeroDivisionError"
     request = event["request"]
 
-    assert request["env"] == {"REMOTE_ADDR": "127.0.0.1"}
     assert request["method"] == "POST"
     assert request["data"] == BODY_NOT_READ_MESSAGE
 
@@ -128,7 +126,6 @@ async def test_post_body_read(sentry_init, aiohttp_client, capture_events):
     assert exception["type"] == "ZeroDivisionError"
     request = event["request"]
 
-    assert request["env"] == {"REMOTE_ADDR": "127.0.0.1"}
     assert request["method"] == "POST"
     assert request["data"] == json.dumps(body)
 
@@ -546,8 +543,6 @@ async def test_trace_from_headers_if_performance_disabled(
     "pii_options,url_expected,query_expected",
     [
         ({}, False, False),
-        ({"send_default_pii": True}, True, True),
-        ({"send_default_pii": False}, False, False),
         (
             {
                 "data_collection": {
@@ -638,8 +633,6 @@ async def test_crumb_capture(
     "pii_options,url_expected,query_expected",
     [
         ({}, False, False),
-        ({"send_default_pii": True}, True, True),
-        ({"send_default_pii": False}, False, False),
         (
             {
                 "data_collection": {
@@ -1479,44 +1472,18 @@ async def test_sensitive_header_scrubbing(sentry_init, aiohttp_client, capture_i
 
 
 @pytest.mark.parametrize(
-    "options,expected",
+    "data_collection,expected",
     [
         pytest.param(
             {
-                "send_default_pii": True,
-                "data_collection": {},
-            },
-            {
-                "authorization": "[Filtered]",
-                "custom": "foobar",
-                "cookie": "[Filtered]",
-            },
-            id="enabled_send_default_pii_redacts_auth_header_due_to_data_collection_default_settings",
-        ),
-        pytest.param(
-            {
-                "send_default_pii": False,
-                "data_collection": {},
-            },
-            {
-                "authorization": "[Filtered]",
-                "custom": "foobar",
-                "cookie": "[Filtered]",
-            },
-            id="disabled_send_default_pii_redacts_auth_header_due_to_data_collection_default_settings",
-        ),
-        pytest.param(
-            {
-                "send_default_pii": False,
-                "data_collection": {"http_headers": {"request": {"mode": "off"}}},
+                "http_headers": {"request": {"mode": "off"}},
             },
             None,
             id="data_collection_off_does_not_add_headers",
         ),
         pytest.param(
             {
-                "send_default_pii": False,
-                "data_collection": {"http_headers": {"request": {"mode": "allowlist"}}},
+                "http_headers": {"request": {"mode": "allowlist"}},
             },
             {
                 "authorization": "[Filtered]",
@@ -1527,12 +1494,9 @@ async def test_sensitive_header_scrubbing(sentry_init, aiohttp_client, capture_i
         ),
         pytest.param(
             {
-                "send_default_pii": False,
-                "data_collection": {
-                    "http_headers": {
-                        "request": {"mode": "allowlist", "terms": ["Authorization"]}
-                    }
-                },
+                "http_headers": {
+                    "request": {"mode": "allowlist", "terms": ["Authorization"]}
+                }
             },
             {
                 "authorization": "[Filtered]",
@@ -1542,14 +1506,7 @@ async def test_sensitive_header_scrubbing(sentry_init, aiohttp_client, capture_i
             id="data_collection_allow_list_redacts_sensitive_terms_even_when_provided_by_user",
         ),
         pytest.param(
-            {
-                "send_default_pii": False,
-                "data_collection": {
-                    "http_headers": {
-                        "request": {"mode": "allowlist", "terms": ["custom"]}
-                    }
-                },
-            },
+            {"http_headers": {"request": {"mode": "allowlist", "terms": ["custom"]}}},
             {
                 "authorization": "[Filtered]",
                 "custom": "foobar",
@@ -1558,14 +1515,7 @@ async def test_sensitive_header_scrubbing(sentry_init, aiohttp_client, capture_i
             id="data_collection_allow_list_does_not_redact_provided_term",
         ),
         pytest.param(
-            {
-                "send_default_pii": False,
-                "data_collection": {
-                    "http_headers": {
-                        "request": {"mode": "denylist", "terms": ["custom"]}
-                    }
-                },
-            },
+            {"http_headers": {"request": {"mode": "denylist", "terms": ["custom"]}}},
             {
                 "authorization": "[Filtered]",
                 "custom": "[Filtered]",
@@ -1574,14 +1524,7 @@ async def test_sensitive_header_scrubbing(sentry_init, aiohttp_client, capture_i
             id="data_collection_deny_list_redacts_sensitive_terms_when_provided_by_user",
         ),
         pytest.param(
-            {
-                "send_default_pii": False,
-                "data_collection": {
-                    "http_headers": {
-                        "request": {"mode": "allowlist", "terms": ["cookie"]}
-                    }
-                },
-            },
+            {"http_headers": {"request": {"mode": "allowlist", "terms": ["cookie"]}}},
             {
                 "authorization": "[Filtered]",
                 "custom": "[Filtered]",
@@ -1593,13 +1536,12 @@ async def test_sensitive_header_scrubbing(sentry_init, aiohttp_client, capture_i
 )
 @pytest.mark.asyncio
 async def test_sensitive_header_passthrough_with_pii(
-    sentry_init, aiohttp_client, capture_items, options, expected, request
+    sentry_init, aiohttp_client, capture_items, data_collection, expected, request
 ):
     sentry_init(
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
-        send_default_pii=options["send_default_pii"],
-        data_collection=options["data_collection"],
+        data_collection=data_collection,
     )
 
     async def hello(request):
@@ -1640,42 +1582,6 @@ async def test_sensitive_header_passthrough_with_pii(
             server_span["attributes"]["http.request.header.cookie"]
             == expected["cookie"]
         )
-
-
-@pytest.mark.asyncio
-async def test_sensitive_header_passthrough_with_pii_without_data_collection(
-    sentry_init, aiohttp_client, capture_items
-):
-    sentry_init(
-        integrations=[AioHttpIntegration()],
-        traces_sample_rate=1.0,
-        send_default_pii=True,
-    )
-
-    async def hello(request):
-        return web.Response(text="hello")
-
-    app = web.Application()
-    app.router.add_get("/", hello)
-
-    items = capture_items("span")
-
-    client = await aiohttp_client(app)
-    await client.get("/", headers={"Authorization": "Bearer secret-token"})
-
-    sentry_sdk.flush()
-
-    (server_span,) = [item.payload for item in items]
-
-    # With send_default_pii=True, _filter_headers is a no-op and the original
-    # value reaches the span attribute.
-    assert (
-        server_span["attributes"]["http.request.header.authorization"]
-        == "Bearer secret-token"
-    )
-    # client.address and user.ip_address is captured under send_default_pii=True.
-    assert server_span["attributes"]["client.address"] == "127.0.0.1"
-    assert server_span["attributes"]["user.ip_address"] == "127.0.0.1"
 
 
 @pytest.mark.asyncio
