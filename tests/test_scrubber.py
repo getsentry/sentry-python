@@ -3,7 +3,7 @@ import sys
 
 from sentry_sdk import capture_event, capture_exception, start_span, start_transaction
 from sentry_sdk.scrubber import EventScrubber
-from sentry_sdk.utils import event_from_exception
+from sentry_sdk.utils import AnnotatedValue, event_from_exception
 from tests.conftest import ApproxDict
 
 logger = logging.getLogger(__name__)
@@ -299,4 +299,25 @@ def test_default_scrubber_scrubs_nested_secret(sentry_init, capture_events):
     (event,) = events
     assert event["extra"]["user"]["password"] == "[Filtered]"
     assert event["extra"]["user"]["name"] == "ada"
+
+
+def test_recursive_scrub_leaves_caller_dict_and_mongo_session():
+    user = {"password": "secret", "name": "ada"}
+    event = {
+        "extra": {"user": user},
+        "spans": [
+            {
+                "data": {
+                    "operation_ids": {"session": "abc", "operation": 1},
+                    "password": "secret",
+                }
+            }
+        ],
+    }
+    EventScrubber(recursive=True).scrub_event(event)
+    assert user["password"] == "secret"
+    assert isinstance(event["extra"]["user"]["password"], AnnotatedValue)
+    assert event["extra"]["user"]["name"] == "ada"
+    assert event["spans"][0]["data"]["operation_ids"]["session"] == "abc"
+    assert isinstance(event["spans"][0]["data"]["password"], AnnotatedValue)
 

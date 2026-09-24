@@ -1,3 +1,4 @@
+import copy
 from typing import TYPE_CHECKING, Dict, List, cast
 
 from sentry_sdk.utils import (
@@ -111,12 +112,17 @@ class EventScrubber:
         if not isinstance(d, dict):
             return
 
-        for k, v in d.items():
+        for k, v in list(d.items()):
             # The cast is needed because mypy is not smart enough to figure out that k must be a
             # string after the isinstance check.
             if isinstance(k, str) and k.lower() in self.denylist:
                 d[k] = AnnotatedValue.substituted_because_contains_sensitive_data()
             elif self.recursive:
+                # Nested containers are often the caller's objects. Copy before
+                # walking them so scrubbing the event does not change that data.
+                if isinstance(v, (dict, list)):
+                    v = copy.deepcopy(v)
+                    d[k] = v
                 self.scrub_dict(v)  # no-op unless v is a dict
                 self.scrub_list(v)  # no-op unless v is a list
 
@@ -164,8 +170,18 @@ class EventScrubber:
         with capture_internal_exceptions():
             if "spans" in event:
                 for span in cast(List[Dict[str, object]], event["spans"]):
-                    if "data" in span:
-                        self.scrub_dict(span["data"])
+                    data = span.get("data")
+                    if not isinstance(data, dict):
+                        continue
+                    # PyMongo stores a logical session id here. "session" is on the
+                    # denylist because of cookies, and this value is not a secret.
+                    op_ids = data.get("operation_ids")
+                    session = op_ids.get("session") if isinstance(op_ids, dict) else None
+                    self.scrub_dict(data)
+                    if session is not None:
+                        restored = data.get("operation_ids")
+                        if isinstance(restored, dict):
+                            restored["session"] = session
 
     def scrub_event(self, event: "Event") -> None:
         self.scrub_request(event)
