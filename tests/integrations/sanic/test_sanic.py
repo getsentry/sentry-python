@@ -104,7 +104,7 @@ def get_client(app):
 
 
 def test_request_data(sentry_init, app, capture_events):
-    sentry_init(integrations=[SanicIntegration()])
+    sentry_init(integrations=[SanicIntegration()], data_collection={})
     events = capture_events()
 
     c = get_client(app)
@@ -368,7 +368,6 @@ class TransactionTestConfig:
         self.expected_source = expected_source
 
 
-@pytest.mark.parametrize("send_pii", [True, False])
 @pytest.mark.parametrize(
     "test_config",
     [
@@ -407,13 +406,12 @@ def test_transactions(
     sentry_init: "Any",
     app: "Any",
     capture_items: "Any",
-    send_pii: bool,
 ) -> None:
     # Init the SanicIntegration with the desired arguments
     sentry_init(
         integrations=[SanicIntegration()],
         traces_sample_rate=1.0,
-        send_default_pii=send_pii,
+        data_collection={},
     )
 
     items = capture_items("span")
@@ -458,16 +456,10 @@ def test_transactions(
             "error" if test_config.expected_status >= 400 else "ok"
         )
 
-        if send_pii:
-            assert attrs["url.full"].endswith(test_config.url)
-            assert attrs["url.path"] == test_config.url.split("?")[0]
-            if "?" in test_config.url:
-                assert attrs["http.query"] == test_config.url.split("?", 1)[1]
-
-        else:
-            assert "url.full" not in attrs
-            assert "url.path" not in attrs
-            assert "http.query" not in attrs
+        assert attrs["url.full"].endswith(test_config.url)
+        assert attrs["url.path"] == test_config.url.split("?")[0]
+        if "?" in test_config.url:
+            assert attrs["http.query"] == test_config.url.split("?", 1)[1]
 
 
 def test_span_origin(sentry_init, app, capture_items):
@@ -570,21 +562,6 @@ def test_client_address_span_attribute_data_collection(
 
 _QUERY_PARAM_DATA_COLLECTION_CASES = [
     pytest.param(
-        {"send_default_pii": True},
-        "toy=tennisball&color=red&auth=secret",
-        id="send_default_pii_true",
-    ),
-    pytest.param(
-        {"send_default_pii": False},
-        None,
-        id="send_default_pii_false",
-    ),
-    pytest.param(
-        {},
-        None,
-        id="defaults",
-    ),
-    pytest.param(
         {"data_collection": {}},
         "toy=tennisball&color=red&auth=%5BFiltered%5D",
         id="data_collection_denylist_default",
@@ -621,14 +598,6 @@ _QUERY_PARAM_DATA_COLLECTION_CASES = [
         None,
         id="data_collection_off",
     ),
-    pytest.param(
-        {
-            "send_default_pii": True,
-            "data_collection": {"url_query_params": {"mode": "off"}},
-        },
-        None,
-        id="data_collection_wins_over_send_default_pii",
-    ),
 ]
 
 
@@ -660,19 +629,10 @@ def test_url_query_data_collection(
         and i.payload["is_segment"]
     ]
 
-    data_collection_enabled = "data_collection" in init_kwargs
-    url_attrs_expected = data_collection_enabled or init_kwargs.get(
-        "send_default_pii", False
-    )
-
     if expected_query is None:
         assert "http.query" not in server_span["attributes"]
-        if url_attrs_expected:
-            assert server_span["attributes"]["url.full"].endswith("/message")
-            assert server_span["attributes"]["url.path"].endswith("/message")
-        else:
-            assert "url.full" not in server_span["attributes"]
-            assert "url.path" not in server_span["attributes"]
+        assert server_span["attributes"]["url.full"].endswith("/message")
+        assert server_span["attributes"]["url.path"].endswith("/message")
     else:
         assert server_span["attributes"]["http.query"] == expected_query
         assert server_span["attributes"]["url.full"].endswith(
@@ -700,11 +660,7 @@ def test_url_query_data_collection_event_processor(
 
     assert event["request"]["url"].endswith("/message")
     assert event["request"]["method"] == "GET"
-    if "data_collection" not in init_kwargs:
-        assert (
-            event["request"]["query_string"] == "toy=tennisball&color=red&auth=secret"
-        )
-    elif expected_query is None:
+    if expected_query is None:
         assert "query_string" not in event["request"]
     else:
         assert event["request"]["query_string"] == expected_query
