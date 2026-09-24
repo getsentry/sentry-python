@@ -355,6 +355,7 @@ def test_that_multiple_errors_are_captured(broker, worker, capture_events, fail_
         True,
     ],
 )
+@pytest.mark.parametrize("broker", [{"data_collection": {}}], indirect=True)
 def test_that_message_data_is_added_as_request(
     broker, worker, capture_events, fail_fast
 ):
@@ -394,7 +395,7 @@ def test_that_message_data_is_added_as_request(
 @pytest.mark.parametrize(
     "broker,expect_message_data",
     [
-        pytest.param({}, True, id="data_collection_not_enabled"),
+        pytest.param({"data_collection": {}}, True, id="data_collection_default"),
         pytest.param(
             {"data_collection": {"http_bodies": ["incoming_request"]}},
             True,
