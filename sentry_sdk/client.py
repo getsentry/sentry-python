@@ -930,14 +930,22 @@ class _Client(BaseClient):
             and event.get("type") != "transaction"
         ):
             new_event = None
+            exception_raised_in_before_send = False
             with capture_internal_exceptions():
-                new_event = before_send(event, hint or {})
+                try:
+                    new_event = before_send(event, hint or {})
+                except Exception:
+                    exception_raised_in_before_send = True
+                    raise
             if new_event is None:
                 logger.info("before send dropped event")
                 if self.transport:
-                    self.transport.record_lost_event(
-                        "before_send", data_category="error"
+                    reason = (
+                        "callback_error"
+                        if exception_raised_in_before_send
+                        else "before_send"
                     )
+                    self.transport.record_lost_event(reason, data_category="error")
 
                 # If this is an exception, reset the DedupeIntegration. It still
                 # remembers the dropped exception as the last exception, meaning
@@ -955,17 +963,29 @@ class _Client(BaseClient):
             and event.get("type") == "transaction"
         ):
             new_event = None
+            exception_raised_in_before_send_transaction = False
             spans_before = len(cast(List[Dict[str, object]], event.get("spans", [])))
+
             with capture_internal_exceptions():
-                new_event = before_send_transaction(event, hint or {})
+                try:
+                    new_event = before_send_transaction(event, hint or {})
+                except Exception:
+                    exception_raised_in_before_send_transaction = True
+                    raise
+
             if new_event is None:
                 logger.info("before send transaction dropped event")
                 if self.transport:
-                    self.transport.record_lost_event(
-                        reason="before_send", data_category="transaction"
+                    reason = (
+                        "callback_error"
+                        if exception_raised_in_before_send_transaction
+                        else "before_send"
                     )
                     self.transport.record_lost_event(
-                        reason="before_send",
+                        reason=reason, data_category="transaction"
+                    )
+                    self.transport.record_lost_event(
+                        reason=reason,
                         data_category="span",
                         quantity=spans_before + 1,  # +1 for the transaction itself
                     )
@@ -1265,15 +1285,32 @@ class _Client(BaseClient):
                     exception_raised_in_before_send_func = True
                     raise
 
-            if ty in ("log", "metric"):
-                # We are ok with dropping metrics and logs when an exception is raised
-                # because we allow users to drop them in their respect before_send_*
-                # functions.
+            if ty == "log":
                 if exception_raised_in_before_send_func:
+                    if self.transport:
+                        self.transport.record_lost_event(
+                            "callback_error", data_category="log_item"
+                        )
                     return
-                # Logs and metrics can be dropped in their respective
-                # before_send, so if we get None, don't queue them for sending.
                 if serialized is None:
+                    if self.transport:
+                        self.transport.record_lost_event(
+                            "before_send", data_category="log_item"
+                        )
+                    return
+
+            elif ty == "metric":
+                if exception_raised_in_before_send_func:
+                    if self.transport:
+                        self.transport.record_lost_event(
+                            "callback_error", data_category="trace_metric"
+                        )
+                    return
+                if serialized is None:
+                    if self.transport:
+                        self.transport.record_lost_event(
+                            "before_send", data_category="trace_metric"
+                        )
                     return
 
             elif ty == "span" and isinstance(telemetry, StreamedSpan):

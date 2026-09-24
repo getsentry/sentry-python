@@ -286,7 +286,16 @@ class Profile:
         options = client.options
 
         if callable(options.get("profiles_sampler")):
-            sample_rate = options["profiles_sampler"](sampling_context)
+            try:
+                sample_rate = options["profiles_sampler"](sampling_context)
+            except Exception:
+                logger.warning(
+                    "[Profiling] profiles_sampler raised; falling back to profiles_sample_rate",
+                    exc_info=True,
+                )
+                sample_rate = options["profiles_sample_rate"]
+                if sample_rate is None:
+                    sample_rate = options["_experiments"].get("profiles_sample_rate")
         elif options["profiles_sample_rate"] is not None:
             sample_rate = options["profiles_sample_rate"]
         else:
