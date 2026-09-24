@@ -662,6 +662,49 @@ def test_event_processor_drop_records_client_report(
 
 
 @pytest.mark.tests_internal_exceptions
+def test_event_processor_exception_drops_event_and_records_client_report(
+    sentry_init, capture_events, capture_record_lost_event_calls
+):
+    sentry_init(default_integrations=False)
+    events = capture_events()
+    record_lost_event_calls = capture_record_lost_event_calls()
+
+    scope = sentry_sdk.get_isolation_scope()
+
+    @scope.add_event_processor
+    def bad_processor(event, hint):
+        raise ValueError("processor error")
+
+    capture_message("should be dropped")
+
+    assert len(events) == 0
+    assert ("event_processor", "error", None, 1) in record_lost_event_calls
+
+
+@pytest.mark.tests_internal_exceptions
+def test_error_processor_exception_drops_event(
+    sentry_init, capture_events, capture_record_lost_event_calls
+):
+    sentry_init(default_integrations=False)
+    events = capture_events()
+    record_lost_event_calls = capture_record_lost_event_calls()
+
+    scope = sentry_sdk.get_isolation_scope()
+
+    @scope.add_error_processor
+    def bad_error_processor(event, exc_info):
+        raise ValueError("error processor error")
+
+    try:
+        raise ValueError("original error")
+    except Exception:
+        capture_exception()
+
+    assert len(events) == 0
+    assert ("event_processor", "error", None, 1) in record_lost_event_calls
+
+
+@pytest.mark.tests_internal_exceptions
 def test_before_send_exception_records_callback_error(
     sentry_init, capture_events, capture_record_lost_event_calls
 ):
