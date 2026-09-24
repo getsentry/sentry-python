@@ -59,17 +59,11 @@ def clear_captured_requests():
     PyreqwestMockHandler.captured_requests.clear()
 
 
-@pytest.mark.parametrize("send_default_pii", [True, False])
-def test_sync_client_spans(
-    sentry_init,
-    capture_items,
-    server_port,
-    send_default_pii,
-):
+def test_sync_client_spans(sentry_init, capture_items, server_port):
     sentry_init(
         integrations=[PyreqwestIntegration()],
         traces_sample_rate=1.0,
-        send_default_pii=send_default_pii,
+        data_collection={},
     )
 
     url = f"http://localhost:{server_port}/hello?q=test#frag"
@@ -90,31 +84,20 @@ def test_sync_client_spans(
     assert span["attributes"][SPANDATA.HTTP_STATUS_CODE] == 200
     assert span["attributes"]["sentry.origin"] == "auto.http.pyreqwest"
 
-    if send_default_pii:
-        assert (
-            span["attributes"]["url.full"]
-            == f"http://localhost:{server_port}/hello?q=test#frag"
-        )
-        assert span["attributes"][SPANDATA.URL_QUERY] == "q=test"
-        assert span["attributes"][SPANDATA.URL_FRAGMENT] == "frag"
-    else:
-        assert "url.full" not in span["attributes"]
-        assert SPANDATA.URL_QUERY not in span["attributes"]
-        assert SPANDATA.URL_FRAGMENT not in span["attributes"]
+    assert (
+        span["attributes"]["url.full"]
+        == f"http://localhost:{server_port}/hello?q=test#frag"
+    )
+    assert span["attributes"][SPANDATA.URL_QUERY] == "q=test"
+    assert span["attributes"][SPANDATA.URL_FRAGMENT] == "frag"
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("send_default_pii", [True, False])
-async def test_async_client_spans(
-    sentry_init,
-    capture_items,
-    server_port,
-    send_default_pii,
-):
+async def test_async_client_spans(sentry_init, capture_items, server_port):
     sentry_init(
         integrations=[PyreqwestIntegration()],
         traces_sample_rate=1.0,
-        send_default_pii=send_default_pii,
+        data_collection={},
     )
 
     url = f"http://localhost:{server_port}/hello"
@@ -135,23 +118,14 @@ async def test_async_client_spans(
     assert span["attributes"][SPANDATA.HTTP_STATUS_CODE] == 200
     assert span["attributes"]["sentry.origin"] == "auto.http.pyreqwest"
 
-    if send_default_pii:
-        assert span["attributes"]["url.full"] == url
-    else:
-        assert "url.full" not in span["attributes"]
+    assert span["attributes"]["url.full"] == url
 
 
-@pytest.mark.parametrize("send_default_pii", [True, False])
-def test_sync_simple_request_spans(
-    sentry_init,
-    capture_items,
-    server_port,
-    send_default_pii,
-):
+def test_sync_simple_request_spans(sentry_init, capture_items, server_port):
     sentry_init(
         integrations=[PyreqwestIntegration()],
         traces_sample_rate=1.0,
-        send_default_pii=send_default_pii,
+        data_collection={},
     )
 
     url = f"http://localhost:{server_port}/hello-simple"
@@ -170,25 +144,15 @@ def test_sync_simple_request_spans(
     assert span["attributes"][SPANDATA.HTTP_REQUEST_METHOD] == "GET"
     assert span["attributes"][SPANDATA.HTTP_STATUS_CODE] == 200
     assert span["attributes"]["sentry.origin"] == "auto.http.pyreqwest"
-
-    if send_default_pii:
-        assert span["attributes"]["url.full"] == url
-    else:
-        assert "url.full" not in span["attributes"]
+    assert span["attributes"]["url.full"] == url
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("send_default_pii", [True, False])
-async def test_async_simple_request_spans(
-    sentry_init,
-    capture_items,
-    server_port,
-    send_default_pii,
-):
+async def test_async_simple_request_spans(sentry_init, capture_items, server_port):
     sentry_init(
         integrations=[PyreqwestIntegration()],
         traces_sample_rate=1.0,
-        send_default_pii=send_default_pii,
+        data_collection={},
     )
 
     url = f"http://localhost:{server_port}/hello-simple-async"
@@ -208,10 +172,7 @@ async def test_async_simple_request_spans(
     assert span["attributes"][SPANDATA.HTTP_STATUS_CODE] == 200
     assert span["attributes"]["sentry.origin"] == "auto.http.pyreqwest"
 
-    if send_default_pii:
-        assert span["attributes"]["url.full"] == url
-    else:
-        assert "url.full" not in span["attributes"]
+    assert span["attributes"]["url.full"] == url
 
 
 def test_span_origin(
@@ -222,6 +183,7 @@ def test_span_origin(
     sentry_init(
         integrations=[PyreqwestIntegration()],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     url = f"http://localhost:{server_port}/origin"
@@ -245,6 +207,7 @@ def test_outgoing_trace_headers(
         integrations=[PyreqwestIntegration()],
         traces_sample_rate=1.0,
         trace_propagation_targets=["localhost"],
+        data_collection={},
     )
 
     url = f"http://localhost:{server_port}/trace"
@@ -282,6 +245,7 @@ def test_outgoing_trace_headers_append_to_baggage(
         traces_sample_rate=1.0,
         trace_propagation_targets=["localhost"],
         release="d08ebdb9309e1b004c6f52202de58a09c2268e42",
+        data_collection={},
     )
 
     url = f"http://localhost:{server_port}/baggage"
@@ -338,6 +302,7 @@ def test_trace_propagation_targets(
         integrations=[PyreqwestIntegration()],
         trace_propagation_targets=trace_propagation_targets,
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     url = f"http://localhost:{server_port}/propagation"
@@ -363,6 +328,7 @@ def test_omit_url_data_if_parsing_fails(
     sentry_init(
         integrations=[PyreqwestIntegration()],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     url = f"http://localhost:{server_port}/parse-fail"
@@ -398,6 +364,7 @@ def test_request_source_disabled(
         traces_sample_rate=1.0,
         enable_http_request_source=False,
         http_request_source_threshold_ms=0,
+        data_collection={},
     )
 
     url = f"http://localhost:{server_port}/hello"
@@ -429,6 +396,7 @@ def test_request_source_enabled(
         "integrations": [PyreqwestIntegration()],
         "traces_sample_rate": 1.0,
         "http_request_source_threshold_ms": 0,
+        "data_collection": {},
     }
     if enable_http_request_source is not None:
         sentry_options["enable_http_request_source"] = enable_http_request_source
@@ -463,6 +431,7 @@ def test_request_source(
         traces_sample_rate=1.0,
         enable_http_request_source=True,
         http_request_source_threshold_ms=0,
+        data_collection={},
     )
 
     url = f"http://localhost:{server_port}/hello"
@@ -503,6 +472,7 @@ def test_request_source_with_module_in_search_path(
         traces_sample_rate=1.0,
         enable_http_request_source=True,
         http_request_source_threshold_ms=0,
+        data_collection={},
     )
 
     url = f"http://localhost:{server_port}/hello"
@@ -540,6 +510,7 @@ def test_no_request_source_if_duration_too_short(
         traces_sample_rate=1.0,
         enable_http_request_source=True,
         http_request_source_threshold_ms=100,
+        data_collection={},
     )
 
     url = f"http://localhost:{server_port}/hello"
@@ -586,6 +557,7 @@ def test_request_source_if_duration_over_threshold(
         traces_sample_rate=1.0,
         enable_http_request_source=True,
         http_request_source_threshold_ms=100,
+        data_collection={},
     )
 
     url = f"http://localhost:{server_port}/hello"
@@ -637,6 +609,7 @@ def test_crumb_capture(
         integrations=[PyreqwestIntegration()],
         before_breadcrumb=before_breadcrumb,
         send_default_pii=send_default_pii,
+        data_collection={},
     )
 
     url = f"http://localhost:{server_port}/hello?q=test#frag"
@@ -679,6 +652,7 @@ async def test_async_crumb_capture(
     sentry_init(
         integrations=[PyreqwestIntegration()],
         send_default_pii=send_default_pii,
+        data_collection={},
     )
 
     url = f"http://localhost:{server_port}/hello?q=test#frag"
@@ -729,6 +703,7 @@ def test_crumb_capture_client_error(
 ):
     sentry_init(
         integrations=[PyreqwestIntegration()],
+        data_collection={},
     )
 
     url = f"http://localhost:{server_port}/status/{status_code}"
@@ -762,67 +737,32 @@ def test_crumb_capture_client_error(
 
 
 @pytest.mark.parametrize(
-    "init_kwargs, expected_query",
+    "data_collection, expected_query",
     [
         pytest.param(
-            {"send_default_pii": True},
-            "toy=tennisball&color=red&auth=secret",
-            id="send_default_pii_true",
-        ),
-        pytest.param(
-            {"send_default_pii": False},
-            None,
-            id="send_default_pii_false",
-        ),
-        pytest.param(
             {},
-            None,
-            id="defaults",
-        ),
-        pytest.param(
-            {"data_collection": {}},
             "toy=tennisball&color=red&auth=%5BFiltered%5D",
             id="data_collection_denylist_default",
         ),
         pytest.param(
-            {
-                "data_collection": {
-                    "url_query_params": {"mode": "denylist", "terms": ["toy"]}
-                }
-            },
+            {"url_query_params": {"mode": "denylist", "terms": ["toy"]}},
             "toy=%5BFiltered%5D&color=red&auth=%5BFiltered%5D",
             id="data_collection_denylist_custom_terms",
         ),
         pytest.param(
-            {
-                "data_collection": {
-                    "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
-                }
-            },
+            {"url_query_params": {"mode": "allowlist", "terms": ["toy"]}},
             "toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D",
             id="data_collection_allowlist",
         ),
         pytest.param(
-            {
-                "data_collection": {
-                    "url_query_params": {"mode": "allowlist", "terms": ["auth"]}
-                }
-            },
+            {"url_query_params": {"mode": "allowlist", "terms": ["auth"]}},
             "toy=%5BFiltered%5D&color=%5BFiltered%5D&auth=%5BFiltered%5D",
             id="data_collection_allowlist_sensitive_term",
         ),
         pytest.param(
-            {"data_collection": {"url_query_params": {"mode": "off"}}},
+            {"url_query_params": {"mode": "off"}},
             None,
             id="data_collection_off",
-        ),
-        pytest.param(
-            {
-                "send_default_pii": True,
-                "data_collection": {"url_query_params": {"mode": "off"}},
-            },
-            None,
-            id="data_collection_wins_over_send_default_pii",
         ),
     ],
 )
@@ -830,13 +770,13 @@ def test_url_query_data_collection_sync(
     sentry_init,
     capture_items,
     server_port,
-    init_kwargs,
+    data_collection,
     expected_query,
 ):
     sentry_init(
         integrations=[PyreqwestIntegration()],
         traces_sample_rate=1.0,
-        **init_kwargs,
+        data_collection=data_collection,
     )
 
     items = capture_items("span")
@@ -860,67 +800,32 @@ def test_url_query_data_collection_sync(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "init_kwargs, expected_query",
+    "data_collection, expected_query",
     [
         pytest.param(
-            {"send_default_pii": True},
-            "toy=tennisball&color=red&auth=secret",
-            id="send_default_pii_true",
-        ),
-        pytest.param(
-            {"send_default_pii": False},
-            None,
-            id="send_default_pii_false",
-        ),
-        pytest.param(
             {},
-            None,
-            id="defaults",
-        ),
-        pytest.param(
-            {"data_collection": {}},
             "toy=tennisball&color=red&auth=%5BFiltered%5D",
             id="data_collection_denylist_default",
         ),
         pytest.param(
-            {
-                "data_collection": {
-                    "url_query_params": {"mode": "denylist", "terms": ["toy"]}
-                }
-            },
+            {"url_query_params": {"mode": "denylist", "terms": ["toy"]}},
             "toy=%5BFiltered%5D&color=red&auth=%5BFiltered%5D",
             id="data_collection_denylist_custom_terms",
         ),
         pytest.param(
-            {
-                "data_collection": {
-                    "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
-                }
-            },
+            {"url_query_params": {"mode": "allowlist", "terms": ["toy"]}},
             "toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D",
             id="data_collection_allowlist",
         ),
         pytest.param(
-            {
-                "data_collection": {
-                    "url_query_params": {"mode": "allowlist", "terms": ["auth"]}
-                }
-            },
+            {"url_query_params": {"mode": "allowlist", "terms": ["auth"]}},
             "toy=%5BFiltered%5D&color=%5BFiltered%5D&auth=%5BFiltered%5D",
             id="data_collection_allowlist_sensitive_term",
         ),
         pytest.param(
-            {"data_collection": {"url_query_params": {"mode": "off"}}},
+            {"url_query_params": {"mode": "off"}},
             None,
             id="data_collection_off",
-        ),
-        pytest.param(
-            {
-                "send_default_pii": True,
-                "data_collection": {"url_query_params": {"mode": "off"}},
-            },
-            None,
-            id="data_collection_wins_over_send_default_pii",
         ),
     ],
 )
@@ -928,13 +833,13 @@ async def test_url_query_data_collection_async(
     sentry_init,
     capture_items,
     server_port,
-    init_kwargs,
+    data_collection,
     expected_query,
 ):
     sentry_init(
         integrations=[PyreqwestIntegration()],
         traces_sample_rate=1.0,
-        **init_kwargs,
+        data_collection=data_collection,
     )
 
     items = capture_items("span")
@@ -957,26 +862,17 @@ async def test_url_query_data_collection_async(
 
 
 @pytest.mark.parametrize(
-    "init_kwargs, expected_suffix",
+    "data_collection, expected_suffix",
     [
         pytest.param(
-            {"data_collection": {}},
+            {},
             "?toy=tennisball&color=red&auth=%5BFiltered%5D#frag",
             id="data_collection_denylist_default",
         ),
         pytest.param(
-            {
-                "data_collection": {
-                    "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
-                }
-            },
+            {"url_query_params": {"mode": "allowlist", "terms": ["toy"]}},
             "?toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D#frag",
             id="data_collection_allowlist",
-        ),
-        pytest.param(
-            {"send_default_pii": True},
-            "?toy=tennisball&color=red&auth=secret#frag",
-            id="send_default_pii_true",
         ),
     ],
 )
@@ -984,13 +880,13 @@ def test_url_full_reassembly_sync(
     sentry_init,
     capture_items,
     server_port,
-    init_kwargs,
+    data_collection,
     expected_suffix,
 ):
     sentry_init(
         integrations=[PyreqwestIntegration()],
         traces_sample_rate=1.0,
-        **init_kwargs,
+        data_collection=data_collection,
     )
 
     items = capture_items("span")
@@ -1012,26 +908,17 @@ def test_url_full_reassembly_sync(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "init_kwargs, expected_suffix",
+    "data_collection, expected_suffix",
     [
         pytest.param(
-            {"data_collection": {}},
+            {},
             "?toy=tennisball&color=red&auth=%5BFiltered%5D#frag",
             id="data_collection_denylist_default",
         ),
         pytest.param(
-            {
-                "data_collection": {
-                    "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
-                }
-            },
+            {"url_query_params": {"mode": "allowlist", "terms": ["toy"]}},
             "?toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D#frag",
             id="data_collection_allowlist",
-        ),
-        pytest.param(
-            {"send_default_pii": True},
-            "?toy=tennisball&color=red&auth=secret#frag",
-            id="send_default_pii_true",
         ),
     ],
 )
@@ -1039,13 +926,13 @@ async def test_url_full_reassembly_async(
     sentry_init,
     capture_items,
     server_port,
-    init_kwargs,
+    data_collection,
     expected_suffix,
 ):
     sentry_init(
         integrations=[PyreqwestIntegration()],
         traces_sample_rate=1.0,
-        **init_kwargs,
+        data_collection=data_collection,
     )
 
     items = capture_items("span")
@@ -1065,40 +952,13 @@ async def test_url_full_reassembly_async(
     assert span["attributes"][SPANDATA.URL_FULL] == base_url + expected_suffix
 
 
-@pytest.mark.parametrize(
-    "init_kwargs, expected_suffix",
-    [
-        pytest.param(
-            {"data_collection": {"url_query_params": {"mode": "off"}}},
-            "#frag",
-            id="data_collection_off",
-        ),
-        pytest.param(
-            {
-                "send_default_pii": True,
-                "data_collection": {"url_query_params": {"mode": "off"}},
-            },
-            "#frag",
-            id="data_collection_wins_over_send_default_pii",
-        ),
-        pytest.param(
-            {"send_default_pii": False},
-            None,
-            id="send_default_pii_false",
-        ),
-    ],
-)
 def test_url_query_params_off_keeps_bare_url_sync(
-    sentry_init,
-    capture_items,
-    server_port,
-    init_kwargs,
-    expected_suffix,
+    sentry_init, capture_items, server_port
 ):
     sentry_init(
         integrations=[PyreqwestIntegration()],
         traces_sample_rate=1.0,
-        **init_kwargs,
+        data_collection={"url_query_params": {"mode": "off"}},
     )
 
     items = capture_items("span")
@@ -1116,50 +976,18 @@ def test_url_query_params_off_keeps_bare_url_sync(
     span = [item.payload for item in items][0]
 
     assert SPANDATA.URL_QUERY not in span["attributes"]
-
-    if expected_suffix is None:
-        assert SPANDATA.URL_FULL not in span["attributes"]
-        assert SPANDATA.URL_FRAGMENT not in span["attributes"]
-    else:
-        assert span["attributes"][SPANDATA.URL_FULL] == base_url + expected_suffix
-        assert span["attributes"][SPANDATA.URL_FRAGMENT] == "frag"
+    assert span["attributes"][SPANDATA.URL_FULL] == base_url + "#frag"
+    assert span["attributes"][SPANDATA.URL_FRAGMENT] == "frag"
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "init_kwargs, expected_suffix",
-    [
-        pytest.param(
-            {"data_collection": {"url_query_params": {"mode": "off"}}},
-            "#frag",
-            id="data_collection_off",
-        ),
-        pytest.param(
-            {
-                "send_default_pii": True,
-                "data_collection": {"url_query_params": {"mode": "off"}},
-            },
-            "#frag",
-            id="data_collection_wins_over_send_default_pii",
-        ),
-        pytest.param(
-            {"send_default_pii": False},
-            None,
-            id="send_default_pii_false",
-        ),
-    ],
-)
 async def test_url_query_params_off_keeps_bare_url_async(
-    sentry_init,
-    capture_items,
-    server_port,
-    init_kwargs,
-    expected_suffix,
+    sentry_init, capture_items, server_port
 ):
     sentry_init(
         integrations=[PyreqwestIntegration()],
         traces_sample_rate=1.0,
-        **init_kwargs,
+        data_collection={"url_query_params": {"mode": "off"}},
     )
 
     items = capture_items("span")
@@ -1177,34 +1005,25 @@ async def test_url_query_params_off_keeps_bare_url_async(
     span = [item.payload for item in items][0]
 
     assert SPANDATA.URL_QUERY not in span["attributes"]
-
-    if expected_suffix is None:
-        assert SPANDATA.URL_FULL not in span["attributes"]
-        assert SPANDATA.URL_FRAGMENT not in span["attributes"]
-    else:
-        assert span["attributes"][SPANDATA.URL_FULL] == base_url + expected_suffix
-        assert span["attributes"][SPANDATA.URL_FRAGMENT] == "frag"
+    assert span["attributes"][SPANDATA.URL_FULL] == base_url + "#frag"
+    assert span["attributes"][SPANDATA.URL_FRAGMENT] == "frag"
 
 
 @pytest.mark.parametrize(
-    "init_kwargs, expected_query",
+    "data_collection, expected_query",
     [
         pytest.param(
-            {"data_collection": {}},
+            {},
             "toy=tennisball&color=red&auth=%5BFiltered%5D",
             id="data_collection_denylist_default",
         ),
         pytest.param(
-            {
-                "data_collection": {
-                    "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
-                }
-            },
+            {"url_query_params": {"mode": "allowlist", "terms": ["toy"]}},
             "toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D",
             id="data_collection_allowlist",
         ),
         pytest.param(
-            {"data_collection": {"url_query_params": {"mode": "off"}}},
+            {"url_query_params": {"mode": "off"}},
             "",
             id="data_collection_off",
         ),
@@ -1214,12 +1033,12 @@ def test_crumb_url_query_data_collection_sync(
     sentry_init,
     capture_events,
     server_port,
-    init_kwargs,
+    data_collection,
     expected_query,
 ):
     sentry_init(
         integrations=[PyreqwestIntegration()],
-        **init_kwargs,
+        data_collection=data_collection,
     )
 
     base_url = f"http://localhost:{server_port}/hello"
@@ -1250,24 +1069,20 @@ def test_crumb_url_query_data_collection_sync(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "init_kwargs, expected_query",
+    "data_collection, expected_query",
     [
         pytest.param(
-            {"data_collection": {}},
+            {},
             "toy=tennisball&color=red&auth=%5BFiltered%5D",
             id="data_collection_denylist_default",
         ),
         pytest.param(
-            {
-                "data_collection": {
-                    "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
-                }
-            },
+            {"url_query_params": {"mode": "allowlist", "terms": ["toy"]}},
             "toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D",
             id="data_collection_allowlist",
         ),
         pytest.param(
-            {"data_collection": {"url_query_params": {"mode": "off"}}},
+            {"url_query_params": {"mode": "off"}},
             "",
             id="data_collection_off",
         ),
@@ -1277,12 +1092,12 @@ async def test_crumb_url_query_data_collection_async(
     sentry_init,
     capture_events,
     server_port,
-    init_kwargs,
+    data_collection,
     expected_query,
 ):
     sentry_init(
         integrations=[PyreqwestIntegration()],
-        **init_kwargs,
+        data_collection=data_collection,
     )
 
     base_url = f"http://localhost:{server_port}/hello"
