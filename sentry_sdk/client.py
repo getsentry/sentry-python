@@ -351,7 +351,7 @@ def _get_options(*args: "Optional[str]", **kwargs: "Any") -> "Dict[str, Any]":
     if rv["enable_tracing"] is True and rv["traces_sample_rate"] is None:
         rv["traces_sample_rate"] = 1.0
 
-    if rv["send_default_pii"] is None:
+    if rv["send_default_pii"] is not None:
         deprecation_warning(
             "The send_default_pii option is deprecated. Use data_collection "
             "instead. "
