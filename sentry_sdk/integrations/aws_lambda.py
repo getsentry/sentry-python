@@ -399,7 +399,7 @@ def _make_request_event_processor(
                 if filtered_qs:
                     request["query_string"] = filtered_qs
 
-        if "headers" in aws_event:
+        if "headers" in aws_event and isinstance(aws_event["headers"], dict):
             request["headers"] = _filter_headers(aws_event["headers"])
 
         if data_collection["user_info"]:
@@ -428,7 +428,7 @@ def _get_url(aws_event: "Any", aws_context: "Any") -> str:
     path = aws_event.get("path", None)
 
     headers = aws_event.get("headers")
-    if headers is None:
+    if not isinstance(headers, dict):
         headers = {}
 
     host = headers.get("Host", None)

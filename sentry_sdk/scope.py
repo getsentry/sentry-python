@@ -1480,7 +1480,9 @@ class Scope:
             )
 
             for error_processor in error_processors:
-                new_event = error_processor(event, exc_info)
+                new_event = event
+                with capture_internal_exceptions():
+                    new_event = error_processor(event, exc_info)
                 if new_event is None:
                     return self._drop(error_processor, "error processor")
 

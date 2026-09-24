@@ -466,6 +466,29 @@ def test_traces_sampler_drops_span(sentry_init, capture_items):
     assert span["attributes"]["drop"] is False
 
 
+@pytest.mark.tests_internal_exceptions
+def test_traces_sampler_exception_falls_back(sentry_init, capture_items):
+    def traces_sampler(sampling_context):
+        raise ValueError("traces_sampler error")
+
+    sentry_init(
+        traces_sampler=traces_sampler,
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+    )
+
+    items = capture_items("span")
+
+    with sentry_sdk.traces.start_span(name="test"):
+        ...
+
+    sentry_sdk.get_client().flush()
+    spans = [item.payload for item in items]
+
+    # Falls back to traces_sample_rate=1.0, so span should still be sent
+    assert len(spans) == 1
+
+
 def test_traces_sampler_called_once_per_segment(sentry_init):
     traces_sampler_called = 0
     span_name_in_traces_sampler = None
