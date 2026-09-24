@@ -15,7 +15,6 @@ from sentry_sdk.utils import (
     AnnotatedValue,
     capture_internal_exceptions,
     event_from_exception,
-    has_data_collection_enabled,
     parse_version,
 )
 
@@ -226,11 +225,9 @@ class DramatiqMessageExtractor:
         request_info = contexts.setdefault("dramatiq", {})
         request_info["type"] = "dramatiq"
 
-        attach_request_body = True
-        if has_data_collection_enabled(client.options):
-            attach_request_body = (
-                "incoming_request" in client.options["data_collection"]["http_bodies"]
-            )
+        attach_request_body = (
+            "incoming_request" in client.options["data_collection"]["http_bodies"]
+        )
 
         if attach_request_body:
             data: "Optional[Union[AnnotatedValue, Dict[str, Any]]]" = None
