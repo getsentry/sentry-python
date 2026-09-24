@@ -870,7 +870,7 @@ def exceptions_from_error(
 
     This will return a list of exceptions (a flattened tree of exceptions) in the
     format of the Exception Interface documentation:
-    https://develop.sentry.dev/sdk/data-model/event-payloads/exception/
+    https://develop.sentry.dev/sdk/telemetry/errors/#exception-interface
 
     This function can handle:
     - simple exceptions
@@ -979,7 +979,7 @@ def exceptions_from_error_tuple(
     """
     Convert an exception into Sentry's structured "exception" format.
 
-    See https://develop.sentry.dev/sdk/data-model/event-payloads/exception/
+    See https://develop.sentry.dev/sdk/telemetry/errors/#exception-interface
     This is the entry point for exception handling.
     """
     exc_type, exc_value, tb = exc_info
