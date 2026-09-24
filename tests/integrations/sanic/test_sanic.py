@@ -369,6 +369,17 @@ class TransactionTestConfig:
 
 
 @pytest.mark.parametrize(
+    "data_collection, expect_query",
+    [
+        pytest.param({}, True, id="data_collection_default"),
+        pytest.param(
+            {"url_query_params": {"mode": "off"}},
+            False,
+            id="data_collection_url_query_params_off",
+        ),
+    ],
+)
+@pytest.mark.parametrize(
     "test_config",
     [
         TransactionTestConfig(
@@ -406,12 +417,14 @@ def test_transactions(
     sentry_init: "Any",
     app: "Any",
     capture_items: "Any",
+    data_collection: "Any",
+    expect_query: bool,
 ) -> None:
     # Init the SanicIntegration with the desired arguments
     sentry_init(
         integrations=[SanicIntegration()],
         traces_sample_rate=1.0,
-        data_collection={},
+        data_collection=data_collection,
     )
 
     items = capture_items("span")
@@ -456,10 +469,16 @@ def test_transactions(
             "error" if test_config.expected_status >= 400 else "ok"
         )
 
-        assert attrs["url.full"].endswith(test_config.url)
+        expected_url = (
+            test_config.url if expect_query else test_config.url.split("?", 1)[0]
+        )
+        assert attrs["url.full"].endswith(expected_url)
         assert attrs["url.path"] == test_config.url.split("?")[0]
         if "?" in test_config.url:
-            assert attrs["http.query"] == test_config.url.split("?", 1)[1]
+            if expect_query:
+                assert attrs["http.query"] == test_config.url.split("?", 1)[1]
+            else:
+                assert "http.query" not in attrs
 
 
 def test_span_origin(sentry_init, app, capture_items):
@@ -562,6 +581,16 @@ def test_client_address_span_attribute_data_collection(
 
 _QUERY_PARAM_DATA_COLLECTION_CASES = [
     pytest.param(
+        {"data_collection": {"url_query_params": {"mode": "denylist", "terms": []}}},
+        "toy=tennisball&color=red&auth=%5BFiltered%5D",
+        id="data_collection_denylist_empty_terms",
+    ),
+    pytest.param(
+        {"data_collection": {"url_query_params": {"mode": "off"}}},
+        None,
+        id="data_collection_off",
+    ),
+    pytest.param(
         {"data_collection": {}},
         "toy=tennisball&color=red&auth=%5BFiltered%5D",
         id="data_collection_denylist_default",
@@ -592,11 +621,6 @@ _QUERY_PARAM_DATA_COLLECTION_CASES = [
         },
         "toy=%5BFiltered%5D&color=%5BFiltered%5D&auth=%5BFiltered%5D",
         id="data_collection_allowlist_sensitive_term",
-    ),
-    pytest.param(
-        {"data_collection": {"url_query_params": {"mode": "off"}}},
-        None,
-        id="data_collection_off",
     ),
 ]
 
