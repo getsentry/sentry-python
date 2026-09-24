@@ -776,24 +776,16 @@ def test_event_processor_exception_drops_event_and_records_client_report(
     events = capture_events()
     record_lost_event_calls = capture_record_lost_event_calls()
 
-    old_processors = sentry_sdk.scope.global_event_processors
+    scope = sentry_sdk.get_isolation_scope()
 
-    try:
-        sentry_sdk.scope.global_event_processors = (
-            sentry_sdk.scope.global_event_processors.copy()
-        )
+    @scope.add_event_processor
+    def bad_processor(event, hint):
+        raise ValueError("processor error")
 
-        @add_global_event_processor
-        def bad_processor(event, hint):
-            raise ValueError("processor error")
+    capture_message("should be dropped")
 
-        capture_message("should be dropped")
-
-        assert len(events) == 0
-        assert ("event_processor", "error", None, 1) in record_lost_event_calls
-
-    finally:
-        sentry_sdk.scope.global_event_processors = old_processors
+    assert len(events) == 0
+    assert ("event_processor", "error", None, 1) in record_lost_event_calls
 
 
 @pytest.mark.tests_internal_exceptions
@@ -804,10 +796,11 @@ def test_error_processor_exception_drops_event(
     events = capture_events()
     record_lost_event_calls = capture_record_lost_event_calls()
 
+    scope = sentry_sdk.get_isolation_scope()
+
+    @scope.add_error_processor
     def bad_error_processor(event, exc_info):
         raise ValueError("error processor error")
-
-    sentry_sdk.get_isolation_scope().add_error_processor(bad_error_processor)
 
     try:
         raise ValueError("original error")

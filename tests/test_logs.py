@@ -198,7 +198,7 @@ def test_logs_before_send_log_raises_records_callback_error(
 
     get_client().flush()
 
-    assert not [item.payload for item in items]
+    assert not items
     assert ("callback_error", "log_item", None, 1) in record_lost_event_calls
 
 
@@ -217,7 +217,7 @@ def test_logs_before_send_log_returns_none_records_before_send(
 
     get_client().flush()
 
-    assert not [item.payload for item in items]
+    assert not items
     assert ("before_send", "log_item", None, 1) in record_lost_event_calls
 
 
