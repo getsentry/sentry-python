@@ -87,24 +87,24 @@ COOKIE_HEADER = "jwt=tokenval; theme=dark; lang=en; identity=alice"
     "init_kwargs, expected_cookies",
     [
         pytest.param(
-            {"send_default_pii": True},
+            {"data_collection": {}},
             {
-                "jwt": "tokenval",
+                "jwt": SENSITIVE_DATA_SUBSTITUTE,
                 "theme": "dark",
                 "lang": "en",
-                "identity": "alice",
+                "identity": SENSITIVE_DATA_SUBSTITUTE,
             },
-            id="send_default_pii_true",
+            id="data_collection_default",
         ),
         pytest.param(
-            {"send_default_pii": False},
-            None,
-            id="send_default_pii_false",
-        ),
-        pytest.param(
-            {},
-            None,
-            id="defaults",
+            {"data_collection": {"cookies": {"mode": "denylist", "terms": []}}},
+            {
+                "jwt": SENSITIVE_DATA_SUBSTITUTE,
+                "theme": "dark",
+                "lang": "en",
+                "identity": SENSITIVE_DATA_SUBSTITUTE,
+            },
+            id="data_collection_denylist_empty_terms",
         ),
         pytest.param(
             {"data_collection": {"cookies": {"mode": "off"}}},
@@ -155,19 +155,6 @@ COOKIE_HEADER = "jwt=tokenval; theme=dark; lang=en; identity=alice"
             },
             id="data_collection_allowlist_sensitive_term",
         ),
-        pytest.param(
-            {
-                "send_default_pii": False,
-                "data_collection": {"cookies": {"mode": "denylist"}},
-            },
-            {
-                "jwt": SENSITIVE_DATA_SUBSTITUTE,
-                "theme": "dark",
-                "lang": "en",
-                "identity": SENSITIVE_DATA_SUBSTITUTE,
-            },
-            id="data_collection_wins_over_send_default_pii",
-        ),
     ],
 )
 def test_cookie_data_collection(
@@ -194,19 +181,14 @@ class QueryHandler(RequestHandler):
 
 _QUERY_PARAM_DATA_COLLECTION_CASES = [
     pytest.param(
-        {"send_default_pii": True},
-        "toy=tennisball&color=red&auth=secret",
-        id="send_default_pii_true",
+        {"data_collection": {"url_query_params": {"mode": "denylist", "terms": []}}},
+        "toy=tennisball&color=red&auth=%5BFiltered%5D",
+        id="data_collection_denylist_empty_terms",
     ),
     pytest.param(
-        {"send_default_pii": False},
+        {"data_collection": {"url_query_params": {"mode": "off"}}},
         None,
-        id="send_default_pii_false",
-    ),
-    pytest.param(
-        {},
-        None,
-        id="defaults",
+        id="data_collection_off",
     ),
     pytest.param(
         {"data_collection": {}},
@@ -240,19 +222,6 @@ _QUERY_PARAM_DATA_COLLECTION_CASES = [
         "toy=%5BFiltered%5D&color=%5BFiltered%5D&auth=%5BFiltered%5D",
         id="data_collection_allowlist_sensitive_term",
     ),
-    pytest.param(
-        {"data_collection": {"url_query_params": {"mode": "off"}}},
-        None,
-        id="data_collection_off",
-    ),
-    pytest.param(
-        {
-            "send_default_pii": True,
-            "data_collection": {"url_query_params": {"mode": "off"}},
-        },
-        None,
-        id="data_collection_wins_over_send_default_pii",
-    ),
 ]
 
 
@@ -279,19 +248,10 @@ def test_url_query_data_collection(
 
     (server_span,) = [item.payload for item in items]
 
-    data_collection_enabled = "data_collection" in init_kwargs
-    url_attrs_expected = data_collection_enabled or init_kwargs.get(
-        "send_default_pii", False
-    )
-
     if expected_query is None:
         assert "url.query" not in server_span["attributes"]
-        if url_attrs_expected:
-            assert server_span["attributes"]["url.full"].endswith("/hi")
-            assert server_span["attributes"]["url.path"] == "/hi"
-        else:
-            assert "url.full" not in server_span["attributes"]
-            assert "url.path" not in server_span["attributes"]
+        assert server_span["attributes"]["url.full"].endswith("/hi")
+        assert server_span["attributes"]["url.path"] == "/hi"
     else:
         assert server_span["attributes"]["url.query"] == expected_query
         assert server_span["attributes"]["url.full"].endswith(f"/hi?{expected_query}")
@@ -465,7 +425,17 @@ def test_request_body_data_collection_event_processor(
         assert "data" not in event["request"]
 
 
-@pytest.mark.parametrize("send_pii", [True, False])
+@pytest.mark.parametrize(
+    "data_collection, expect_query",
+    [
+        pytest.param({}, True, id="data_collection_default"),
+        pytest.param(
+            {"url_query_params": {"mode": "off"}},
+            False,
+            id="data_collection_url_query_params_off",
+        ),
+    ],
+)
 @pytest.mark.parametrize(
     "handler,code",
     [
@@ -480,12 +450,13 @@ def test_transactions(
     capture_items,
     handler,
     code,
-    send_pii,
+    data_collection,
+    expect_query,
 ):
     sentry_init(
         integrations=[TornadoIntegration()],
         traces_sample_rate=1.0,
-        send_default_pii=send_pii,
+        data_collection=data_collection,
     )
 
     items = capture_items("event", "span")
@@ -533,15 +504,14 @@ def test_transactions(
     assert server_segment["status"] == ("ok" if code == 200 else "error")
     assert client_segment["trace_id"] == server_segment["trace_id"]
 
-    if send_pii:
+    assert server_segment["attributes"]["url.path"] == "/hi"
+    if expect_query:
         assert server_segment["attributes"]["url.query"] == "foo=bar"
         assert server_segment["attributes"]["url.full"].endswith("/hi?foo=bar")
         assert server_segment["attributes"]["url.full"].startswith("http://")
-        assert server_segment["attributes"]["url.path"] == "/hi"
     else:
         assert "url.query" not in server_segment["attributes"]
-        assert "url.full" not in server_segment["attributes"]
-        assert "url.path" not in server_segment["attributes"]
+        assert server_segment["attributes"]["url.full"].endswith("/hi")
 
 
 def test_400_not_logged(tornado_testcase, sentry_init, capture_events):
@@ -561,7 +531,10 @@ def test_400_not_logged(tornado_testcase, sentry_init, capture_events):
 
 
 def test_user_auth(tornado_testcase, sentry_init, capture_events):
-    sentry_init(integrations=[TornadoIntegration()], send_default_pii=True)
+    sentry_init(
+        integrations=[TornadoIntegration()],
+        data_collection={"user_info": True},
+    )
     events = capture_events()
 
     class UserHandler(RequestHandler):
@@ -629,7 +602,7 @@ def test_user_auth_data_collection(
 
 
 def test_formdata(tornado_testcase, sentry_init, capture_events):
-    sentry_init(integrations=[TornadoIntegration()], send_default_pii=True)
+    sentry_init(integrations=[TornadoIntegration()], data_collection={})
     events = capture_events()
 
     class FormdataHandler(RequestHandler):
@@ -654,7 +627,7 @@ def test_formdata(tornado_testcase, sentry_init, capture_events):
 
 
 def test_json(tornado_testcase, sentry_init, capture_events):
-    sentry_init(integrations=[TornadoIntegration()], send_default_pii=True)
+    sentry_init(integrations=[TornadoIntegration()], data_collection={})
     events = capture_events()
 
     class FormdataHandler(RequestHandler):
