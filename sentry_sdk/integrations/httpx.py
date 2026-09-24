@@ -7,7 +7,7 @@ from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_ve
 from sentry_sdk.tracing_utils import (
     add_http_breadcrumb,
     add_http_request_source,
-    get_url_attributes_legacy,
+    get_url_attributes,
     propagate_trace_headers,
 )
 from sentry_sdk.utils import (
@@ -59,7 +59,7 @@ def _install_httpx_client() -> None:
         with capture_internal_exceptions():
             parsed_url = parse_url(str(request.url), sanitize=False)
 
-        url_attributes = get_url_attributes_legacy(client, parsed_url)
+        url_attributes = get_url_attributes(client, parsed_url)
 
         if sentry_sdk.get_current_span() is None:
             span_ctx = nullcontext()
@@ -148,7 +148,7 @@ def _install_httpx_async_client() -> None:
                 },
             )
 
-        url_attributes = get_url_attributes_legacy(client, parsed_url)
+        url_attributes = get_url_attributes(client, parsed_url)
 
         with span_ctx as span:
             propagate_trace_headers(client, request)
