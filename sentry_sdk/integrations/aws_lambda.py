@@ -466,7 +466,7 @@ def _make_request_event_processor(
             else:
                 request["query_string"] = query_string
 
-        if "headers" in aws_event:
+        if "headers" in aws_event and isinstance(aws_event["headers"], dict):
             request["headers"] = _filter_headers(aws_event["headers"])
 
         client_options = sentry_sdk.get_client().options
