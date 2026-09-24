@@ -15,6 +15,7 @@ from sentry_sdk.integrations.pyramid import PyramidIntegration
 from sentry_sdk.serializer import MAX_DATABAG_BREADTH
 from sentry_sdk.traces import SpanStatus
 from tests.conftest import unpack_werkzeug_response
+from tests.integrations.utils import DATA_COLLECTION_USER_INFO_CASES
 
 
 def hi(request):
@@ -535,21 +536,7 @@ def test_span_origin(
     assert segment["attributes"]["sentry.origin"] == "auto.http.pyramid"
 
 
-@pytest.mark.parametrize(
-    "init_kwargs, expect_user",
-    [
-        pytest.param(
-            {"data_collection": {"user_info": True}},
-            True,
-            id="data_collection_user_info_true",
-        ),
-        pytest.param(
-            {"data_collection": {"user_info": False}},
-            False,
-            id="data_collection_user_info_false",
-        ),
-    ],
-)
+@pytest.mark.parametrize("init_kwargs, expect_user", DATA_COLLECTION_USER_INFO_CASES)
 def test_span_sets_user_id_on_segment(
     sentry_init,
     pyramid_config,
@@ -588,21 +575,7 @@ def test_span_sets_user_id_on_segment(
         assert "user.id" not in segment["attributes"]
 
 
-@pytest.mark.parametrize(
-    "init_kwargs, expect_user",
-    [
-        pytest.param(
-            {"data_collection": {"user_info": True}},
-            True,
-            id="data_collection_user_info_true",
-        ),
-        pytest.param(
-            {"data_collection": {"user_info": False}},
-            False,
-            id="data_collection_user_info_false",
-        ),
-    ],
-)
+@pytest.mark.parametrize("init_kwargs, expect_user", DATA_COLLECTION_USER_INFO_CASES)
 def test_user_id_error_event_data_collection(
     sentry_init,
     pyramid_config,
