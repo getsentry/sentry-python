@@ -14,7 +14,7 @@ from sentry_sdk.tracing_utils import (
     EnvironHeaders,
     add_http_breadcrumb,
     add_http_request_source,
-    get_url_attributes_legacy,
+    get_url_attributes,
     should_propagate_trace,
 )
 from sentry_sdk.utils import (
@@ -274,7 +274,7 @@ def _install_httplib() -> None:
         span: "Optional[Span]" = None
         breadcrumb: "dict[str, Any]" = {}
 
-        url_attributes = get_url_attributes_legacy(client, parsed_url)
+        url_attributes = get_url_attributes(client, parsed_url)
 
         breadcrumb[SPANDATA.HTTP_REQUEST_METHOD] = method
         breadcrumb.update(url_attributes)
