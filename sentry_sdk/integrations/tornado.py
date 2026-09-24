@@ -12,14 +12,12 @@ from sentry_sdk.integrations._wsgi_common import (
     request_body_within_bounds,
 )
 from sentry_sdk.integrations.logging import ignore_logger_for_events
-from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import SegmentNameSource
 from sentry_sdk.utils import (
     AnnotatedValue,
     capture_internal_exceptions,
     ensure_integration_enabled,
     event_from_exception,
-    has_data_collection_enabled,
     parse_url,
     transaction_from_function,
 )
@@ -98,14 +96,8 @@ def _handle_request_impl(self: "RequestHandler") -> "Generator[None, None, None]
         sentry_sdk.continue_trace(dict(headers))
         scope.set_custom_sampling_context({"tornado_request": self.request})
 
-        if self.request.remote_ip:
-            if has_data_collection_enabled(client.options):
-                if client.options["data_collection"]["user_info"]:
-                    scope.set_attribute(
-                        SPANDATA.USER_IP_ADDRESS, self.request.remote_ip
-                    )
-            elif should_send_default_pii():
-                scope.set_attribute(SPANDATA.USER_IP_ADDRESS, self.request.remote_ip)
+        if self.request.remote_ip and client.options["data_collection"]["user_info"]:
+            scope.set_attribute(SPANDATA.USER_IP_ADDRESS, self.request.remote_ip)
 
         with sentry_sdk.start_span(
             name=_DEFAULT_ROOT_SPAN_NAME,
@@ -151,47 +143,31 @@ def _get_request_attributes(request: "Any") -> "Dict[str, Any]":
     for header, value in headers.items():
         attributes[f"{SPANDATA.HTTP_REQUEST_HEADER}.{header.lower()}"] = value
 
-    if has_data_collection_enabled(client_options):
-        attributes["url.path"] = request.path
+    attributes["url.path"] = request.path
 
-        filtered_query = None
-        if request.query:
-            filtered_query = _apply_data_collection_filtering_to_query_string(
-                query_string=request.query,
-                behaviour=client_options["data_collection"]["url_query_params"],
-            )
-            if filtered_query:
-                attributes[SPANDATA.URL_QUERY] = filtered_query
-
-        parsed_url = parse_url(request.full_url())
-        attributes[SPANDATA.URL_FULL] = (
-            f"{parsed_url.url}?{filtered_query}" if filtered_query else parsed_url.url
+    filtered_query = None
+    if request.query:
+        filtered_query = _apply_data_collection_filtering_to_query_string(
+            query_string=request.query,
+            behaviour=client_options["data_collection"]["url_query_params"],
         )
+        if filtered_query:
+            attributes[SPANDATA.URL_QUERY] = filtered_query
 
-        if request.remote_ip:
-            if client_options["data_collection"]["user_info"]:
-                attributes[SPANDATA.CLIENT_ADDRESS] = request.remote_ip
+    parsed_url = parse_url(request.full_url())
+    attributes[SPANDATA.URL_FULL] = (
+        f"{parsed_url.url}?{filtered_query}" if filtered_query else parsed_url.url
+    )
 
-    elif should_send_default_pii():
-        attributes[SPANDATA.URL_FULL] = request.full_url()
-        attributes["url.path"] = request.path
-
-        if request.query:
-            attributes[SPANDATA.URL_QUERY] = request.query
-
-        if request.remote_ip:
-            attributes[SPANDATA.CLIENT_ADDRESS] = request.remote_ip
+    if request.remote_ip and client_options["data_collection"]["user_info"]:
+        attributes[SPANDATA.CLIENT_ADDRESS] = request.remote_ip
 
     if request.protocol:
         attributes[SPANDATA.NETWORK_PROTOCOL_NAME] = request.protocol
 
-    # The request data was unconditionally set pre-data collection which is
-    # why we're defaulting to True
-    record_incoming_request_data = True
-    if has_data_collection_enabled(client_options):
-        record_incoming_request_data = (
-            "incoming_request" in client_options["data_collection"]["http_bodies"]
-        )
+    record_incoming_request_data = (
+        "incoming_request" in client_options["data_collection"]["http_bodies"]
+    )
 
     if record_incoming_request_data:
         with capture_internal_exceptions():
@@ -260,38 +236,21 @@ def _make_event_processor(
                 request.path,
             )
 
-            if has_data_collection_enabled(client_options):
-                if request.query:
-                    filtered_query = _apply_data_collection_filtering_to_query_string(
-                        query_string=request.query,
-                        behaviour=client_options["data_collection"]["url_query_params"],
-                    )
-                    if filtered_query:
-                        request_info["query_string"] = filtered_query
-            else:
-                request_info["query_string"] = request.query
+            if request.query:
+                filtered_query = _apply_data_collection_filtering_to_query_string(
+                    query_string=request.query,
+                    behaviour=client_options["data_collection"]["url_query_params"],
+                )
+                if filtered_query:
+                    request_info["query_string"] = filtered_query
 
             request_info["method"] = request.method
 
-            # REMOTE_ADDR was unconditionally set pre-data collection, so it
-            # continues to be set when data collection is not enabled.
-            if (
-                not has_data_collection_enabled(client_options)
-                or client_options["data_collection"]["user_info"]
-            ):
+            if client_options["data_collection"]["user_info"]:
                 request_info["env"] = {"REMOTE_ADDR": request.remote_ip}
             request_info["headers"] = _filter_headers(dict(request.headers))
 
-        if has_data_collection_enabled(client_options):
-            if client_options["data_collection"]["user_info"]:
-                try:
-                    current_user = handler.current_user
-                except Exception:
-                    current_user = None
-
-                if current_user:
-                    event.setdefault("user", {}).setdefault("is_authenticated", True)
-        elif should_send_default_pii():
+        if client_options["data_collection"]["user_info"]:
             try:
                 current_user = handler.current_user
             except Exception:
