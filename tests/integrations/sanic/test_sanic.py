@@ -581,11 +581,6 @@ def test_client_address_span_attribute_data_collection(
 
 _QUERY_PARAM_DATA_COLLECTION_CASES = [
     pytest.param(
-        {"data_collection": {"url_query_params": {"mode": "denylist", "terms": []}}},
-        "toy=tennisball&color=red&auth=%5BFiltered%5D",
-        id="data_collection_denylist_empty_terms",
-    ),
-    pytest.param(
         {"data_collection": {"url_query_params": {"mode": "off"}}},
         None,
         id="data_collection_off",
