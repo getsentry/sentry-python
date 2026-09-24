@@ -1220,10 +1220,6 @@ class Transaction(Span):
                     "[Tracing] traces_sampler raised; falling back to parent sample rate or traces_sample_rate",
                     exc_info=True,
                 )
-                if client.transport:
-                    client.transport.record_lost_event(
-                        "callback_error", data_category="transaction"
-                    )
                 sample_rate = (
                     sampling_context["parent_sampled"]
                     if sampling_context["parent_sampled"] is not None
