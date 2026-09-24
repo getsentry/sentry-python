@@ -289,6 +289,43 @@ def test_metrics_before_send_raises_does_not_crash_application(
     assert not metrics
 
 
+@pytest.mark.tests_internal_exceptions
+def test_metrics_before_send_raises_records_callback_error(
+    sentry_init, capture_items, capture_record_lost_event_calls
+):
+    def _before_metric(record, hint):
+        raise ValueError("before_send_metric error")
+
+    sentry_init(before_send_metric=_before_metric)
+    items = capture_items("trace_metric")
+    record_lost_event_calls = capture_record_lost_event_calls()
+
+    sentry_sdk.metrics.count("test.keep", 1)
+
+    get_client().flush()
+
+    assert not [item.payload for item in items]
+    assert ("callback_error", "trace_metric", None, 1) in record_lost_event_calls
+
+
+def test_metrics_before_send_returns_none_records_before_send(
+    sentry_init, capture_items, capture_record_lost_event_calls
+):
+    def _before_metric(record, hint):
+        return None
+
+    sentry_init(before_send_metric=_before_metric)
+    items = capture_items("trace_metric")
+    record_lost_event_calls = capture_record_lost_event_calls()
+
+    sentry_sdk.metrics.count("test.drop", 1)
+
+    get_client().flush()
+
+    assert not [item.payload for item in items]
+    assert ("before_send", "trace_metric", None, 1) in record_lost_event_calls
+
+
 def test_transport_format(sentry_init, capture_envelopes):
     sentry_init(server_name="test-server", release="1.0.0")
 

@@ -1705,6 +1705,10 @@ def _make_sampling_decision(
                 "[Tracing] traces_sampler raised; falling back to parent sample rate or traces_sample_rate",
                 exc_info=True,
             )
+            if client.transport:
+                client.transport.record_lost_event(
+                    "callback_error", data_category="span"
+                )
             if propagation_context.parent_sampled is not None:
                 sample_rate = propagation_context.parent_sampled
             else:

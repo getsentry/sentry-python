@@ -183,6 +183,45 @@ def test_logs_before_send_log_raises_does_not_crash_application(
 
 
 @minimum_python_37
+@pytest.mark.tests_internal_exceptions
+def test_logs_before_send_log_raises_records_callback_error(
+    sentry_init, capture_items, capture_record_lost_event_calls
+):
+    def _before_log(record, hint):
+        raise ValueError("before_send_log error")
+
+    sentry_init(before_send_log=_before_log)
+    items = capture_items("log")
+    record_lost_event_calls = capture_record_lost_event_calls()
+
+    sentry_sdk.logger.error("This is an error log...")
+
+    get_client().flush()
+
+    assert not [item.payload for item in items]
+    assert ("callback_error", "log_item", None, 1) in record_lost_event_calls
+
+
+@minimum_python_37
+def test_logs_before_send_log_returns_none_records_before_send(
+    sentry_init, capture_items, capture_record_lost_event_calls
+):
+    def _before_log(record, hint):
+        return None
+
+    sentry_init(before_send_log=_before_log)
+    items = capture_items("log")
+    record_lost_event_calls = capture_record_lost_event_calls()
+
+    sentry_sdk.logger.error("This is an error log...")
+
+    get_client().flush()
+
+    assert not [item.payload for item in items]
+    assert ("before_send", "log_item", None, 1) in record_lost_event_calls
+
+
+@minimum_python_37
 def test_logs_attributes(sentry_init, capture_items):
     """
     Passing arbitrary attributes to log messages.
