@@ -508,7 +508,7 @@ def _get_url(aws_event: "Any", aws_context: "Any") -> str:
     path = aws_event.get("path", None)
 
     headers = aws_event.get("headers")
-    if headers is None:
+    if not isinstance(headers, dict):
         headers = {}
 
     host = headers.get("Host", None)
