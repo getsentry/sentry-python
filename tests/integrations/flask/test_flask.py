@@ -1208,12 +1208,13 @@ def test_span_http_query_data_collection(
 
 
 def test_empty_query_string_is_dropped_with_data_collection(
-    sentry_init, app, capture_events
+    sentry_init, app, capture_events, monkeypatch
 ):
     sentry_init(
         integrations=[flask_sentry.FlaskIntegration()],
         data_collection={},
     )
+    monkeypatch.setattr(flask_sentry, "flask_login", None)
     events = capture_events()
 
     client = app.test_client()
