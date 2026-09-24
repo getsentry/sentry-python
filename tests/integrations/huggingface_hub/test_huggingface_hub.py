@@ -791,8 +791,10 @@ def test_chat_completion_api_error(
 
     (error,) = (item.payload for item in items if item.type == "event")
 
-    assert error["exception"]["values"][0]["mechanism"]["type"] == "huggingface_hub"
-    assert not error["exception"]["values"][0]["mechanism"]["handled"]
+    assert len(error["exception"]["values"]) == 2
+    assert error["exception"]["values"][0]["mechanism"]["type"] == "chained"
+    assert error["exception"]["values"][-1]["mechanism"]["type"] == "huggingface_hub"
+    assert not error["exception"]["values"][-1]["mechanism"]["handled"]
 
     sentry_sdk.flush()
     spans = [item.payload for item in items if item.type == "span"]

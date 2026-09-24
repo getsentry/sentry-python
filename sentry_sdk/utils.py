@@ -866,27 +866,16 @@ def exceptions_from_error(
     seen_exception_ids: "Optional[Set[int]]" = None,
 ) -> "Tuple[int, List[Dict[str, Any]]]":
     """
-    Creates the list of exceptions.
-    This can include chained exceptions and exceptions from an ExceptionGroup.
+    Convert the given exception information into the Sentry "exception" format.
 
-    See the Exception Interface documentation for more details:
-    https://develop.sentry.dev/sdk/event-payloads/exception/
+    This will return a list of exceptions (a flattened tree of exceptions) in the
+    format of the Exception Interface documentation:
+    https://develop.sentry.dev/sdk/telemetry/errors/#exception-interface
 
-    Args:
-        exception_id (int):
-
-            Sequential counter for assigning ``mechanism.exception_id``
-            to each processed exception. Is NOT the result of calling `id()` on the exception itself.
-
-        parent_id (int):
-
-            The ``mechanism.exception_id`` of the parent exception.
-
-            Written into ``mechanism.parent_id`` in the event payload so Sentry can
-            reconstruct the exception tree.
-
-            Not to be confused with ``seen_exception_ids``, which tracks Python ``id()``
-            values for cycle detection.
+    This function can handle:
+    - simple exceptions
+    - chained exceptions (raise .. from ..)
+    - exception groups
     """
 
     if seen_exception_ids is None:
@@ -902,7 +891,7 @@ def exceptions_from_error(
         seen_exceptions.append(exc_value)
         seen_exception_ids.add(id(exc_value))
 
-    parent = single_exception_from_error_tuple(
+    base_exception = single_exception_from_error_tuple(
         exc_type=exc_type,
         exc_value=exc_value,
         tb=tb,
@@ -913,70 +902,60 @@ def exceptions_from_error(
         source=source,
         full_stack=full_stack,
     )
-    exceptions = [parent]
+    exceptions = [base_exception]
 
     parent_id = exception_id
     exception_id += 1
 
-    should_supress_context = (
+    causing_exception = None
+    exception_source = None
+
+    should_suppress_context = (
         hasattr(exc_value, "__suppress_context__") and exc_value.__suppress_context__  # type: ignore
     )
-    if should_supress_context:
-        # Add direct cause.
-        # The field `__cause__` is set when raised with the exception (using the `from` keyword).
-        exception_has_cause = (
+    if should_suppress_context:
+        has_explicit_causing_exception = (
             exc_value
             and hasattr(exc_value, "__cause__")
             and exc_value.__cause__ is not None
         )
-        if exception_has_cause:
-            cause = exc_value.__cause__  # type: ignore
-            (exception_id, child_exceptions) = exceptions_from_error(
-                exc_type=type(cause),
-                exc_value=cause,
-                tb=getattr(cause, "__traceback__", None),
-                client_options=client_options,
-                mechanism=mechanism,
-                exception_id=exception_id,
-                source="__cause__",
-                full_stack=full_stack,
-                seen_exceptions=seen_exceptions,
-                seen_exception_ids=seen_exception_ids,
-            )
-            exceptions.extend(child_exceptions)
-
+        if has_explicit_causing_exception:
+            exception_source = "__cause__"
+            causing_exception = exc_value.__cause__  # type: ignore
     else:
-        # Add indirect cause.
-        # The field `__context__` is assigned if another exception occurs while handling the exception.
-        exception_has_content = (
+        has_implicit_causing_exception = (
             exc_value
             and hasattr(exc_value, "__context__")
             and exc_value.__context__ is not None
         )
-        if exception_has_content:
-            context = exc_value.__context__  # type: ignore
-            (exception_id, child_exceptions) = exceptions_from_error(
-                exc_type=type(context),
-                exc_value=context,
-                tb=getattr(context, "__traceback__", None),
-                client_options=client_options,
-                mechanism=mechanism,
-                exception_id=exception_id,
-                source="__context__",
-                full_stack=full_stack,
-                seen_exceptions=seen_exceptions,
-                seen_exception_ids=seen_exception_ids,
-            )
-            exceptions.extend(child_exceptions)
+        if has_implicit_causing_exception:
+            exception_source = "__context__"
+            causing_exception = exc_value.__context__  # type: ignore
 
-    # Add exceptions from an ExceptionGroup.
+    if causing_exception:
+        (exception_id, child_exceptions) = exceptions_from_error(
+            exc_type=type(causing_exception),
+            exc_value=causing_exception,
+            tb=getattr(causing_exception, "__traceback__", None),
+            client_options=client_options,
+            mechanism=mechanism,
+            exception_id=exception_id,
+            parent_id=parent_id,
+            source=exception_source,
+            full_stack=full_stack,
+            seen_exceptions=seen_exceptions,
+            seen_exception_ids=seen_exception_ids,
+        )
+        exceptions.extend(child_exceptions)
+
+    # Add child exceptions from an ExceptionGroup.
     is_exception_group = exc_value and hasattr(exc_value, "exceptions")
     if is_exception_group:
-        for idx, e in enumerate(exc_value.exceptions):  # type: ignore
+        for idx, causing_exception in enumerate(exc_value.exceptions):  # type: ignore
             (exception_id, child_exceptions) = exceptions_from_error(
-                exc_type=type(e),
-                exc_value=e,
-                tb=getattr(e, "__traceback__", None),
+                exc_type=type(causing_exception),
+                exc_value=causing_exception,
+                tb=getattr(causing_exception, "__traceback__", None),
                 client_options=client_options,
                 mechanism=mechanism,
                 exception_id=exception_id,
@@ -997,37 +976,24 @@ def exceptions_from_error_tuple(
     mechanism: "Optional[Dict[str, Any]]" = None,
     full_stack: "Optional[list[dict[str, Any]]]" = None,
 ) -> "List[Dict[str, Any]]":
+    """
+    Convert an exception into Sentry's structured "exception" format.
+
+    See https://develop.sentry.dev/sdk/telemetry/errors/#exception-interface
+    This is the entry point for exception handling.
+    """
     exc_type, exc_value, tb = exc_info
 
-    is_exception_group = BaseExceptionGroup is not None and isinstance(
-        exc_value, BaseExceptionGroup
+    _, exceptions = exceptions_from_error(
+        exc_type=exc_type,
+        exc_value=exc_value,
+        tb=tb,
+        client_options=client_options,
+        mechanism=mechanism,
+        exception_id=0,
+        parent_id=0,
+        full_stack=full_stack,
     )
-
-    if is_exception_group:
-        (_, exceptions) = exceptions_from_error(
-            exc_type=exc_type,
-            exc_value=exc_value,
-            tb=tb,
-            client_options=client_options,
-            mechanism=mechanism,
-            exception_id=0,
-            parent_id=0,
-            full_stack=full_stack,
-        )
-
-    else:
-        exceptions = []
-        for exc_type, exc_value, tb in walk_exception_chain(exc_info):
-            exceptions.append(
-                single_exception_from_error_tuple(
-                    exc_type=exc_type,
-                    exc_value=exc_value,
-                    tb=tb,
-                    client_options=client_options,
-                    mechanism=mechanism,
-                    full_stack=full_stack,
-                )
-            )
 
     exceptions.reverse()
 
