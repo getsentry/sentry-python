@@ -191,8 +191,9 @@ def add_http_breadcrumb(status_code: "Optional[int]", data: "dict[str, Any]") ->
     sentry_sdk.add_breadcrumb(**kwargs)
 
 
-def get_url_attributes(
-    client: "sentry_sdk.client.BaseClient", parsed_url: "Optional[ParsedUrl]"
+def get_url_attributes_legacy(
+    client: "sentry_sdk.client.BaseClient",
+    parsed_url: "Optional[ParsedUrl]",
 ) -> "Attributes":
     """Build the `url.*` span attributes for an outgoing HTTP request.
 
@@ -216,6 +217,40 @@ def get_url_attributes(
         query = parsed_url.query
     else:
         return attributes
+
+    url_full = parsed_url.url
+    if query:
+        attributes[SPANDATA.URL_QUERY] = query
+        url_full += "?" + query
+
+    if parsed_url.fragment:
+        attributes[SPANDATA.URL_FRAGMENT] = parsed_url.fragment
+        url_full += "#" + parsed_url.fragment
+
+    attributes[SPANDATA.URL_FULL] = url_full
+
+    return attributes
+
+
+def get_url_attributes(
+    client: "sentry_sdk.client.BaseClient",
+    parsed_url: "Optional[ParsedUrl]",
+) -> "Attributes":
+    """Build the `url.*` span attributes for an outgoing HTTP request.
+
+    The query string is filtered through the resolved `data_collection`
+    settings.
+    """
+    attributes: "Attributes" = {}
+    if parsed_url is None:
+        return attributes
+
+    query: "Optional[str]" = None
+    if parsed_url.query:
+        query = _apply_data_collection_filtering_to_query_string(
+            query_string=parsed_url.query,
+            behaviour=client.options["data_collection"]["url_query_params"],
+        )
 
     url_full = parsed_url.url
     if query:

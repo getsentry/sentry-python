@@ -154,7 +154,7 @@ def graphql_span(
 
     client_options = sentry_sdk.get_client().options
 
-    if sentry_sdk.traces.get_current_span() is None:
+    if sentry_sdk.get_current_span() is None:
         yield
         return
 
@@ -165,7 +165,7 @@ def graphql_span(
     elif should_send_default_pii():
         additional_attributes["graphql.document"] = source
 
-    _graphql_span = sentry_sdk.traces.start_span(
+    _graphql_span = sentry_sdk.start_span(
         name=operation_name,
         attributes={
             "sentry.op": op,

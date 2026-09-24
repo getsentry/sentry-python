@@ -46,9 +46,9 @@ class ServerInterceptor(grpc.ServerInterceptor):  # type: ignore
                 if name:
                     metadata = dict(context.invocation_metadata())
 
-                    sentry_sdk.traces.continue_trace(metadata)
+                    sentry_sdk.continue_trace(metadata)
 
-                    with sentry_sdk.traces.start_span(
+                    with sentry_sdk.start_span(
                         name=name,
                         attributes={
                             "sentry.op": OP.GRPC_SERVER,

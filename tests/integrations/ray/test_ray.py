@@ -136,7 +136,7 @@ def read_spans_from_log(job_id, ray_temp_dir, min_spans=1, timeout=10):
 
 
 def example_task():
-    with sentry_sdk.traces.start_span(
+    with sentry_sdk.start_span(
         name="example task step",
         attributes={
             "sentry.op": "task",
@@ -147,7 +147,7 @@ def example_task():
 
 # RayIntegration must leave variadic keyword arguments at the end
 def example_task_with_kwargs(**kwargs):
-    with sentry_sdk.traces.start_span(
+    with sentry_sdk.start_span(
         name="example task step", attributes={"sentry.op": "task"}
     ):
         ...
@@ -161,10 +161,11 @@ def example_task_with_kwargs(**kwargs):
     [example_task, example_task_with_kwargs],
 )
 def test_tracing_in_ray_tasks(
+    sentry_init,
     task_options,
     task,
 ):
-    sentry_sdk.init(
+    sentry_init(
         integrations=[RayIntegration()],
         disabled_integrations=[StdlibIntegration],
         transport=RayTestTransport(),
@@ -195,7 +196,7 @@ def test_tracing_in_ray_tasks(
             _temp_dir=ray_temp_dir,
         )
 
-        with sentry_sdk.traces.start_span(
+        with sentry_sdk.start_span(
             name="ray test parent", attributes={"sentry.op": "task"}
         ):
             future = example_task.remote()
@@ -237,8 +238,8 @@ def test_tracing_in_ray_tasks(
     assert client_spans[1]["trace_id"] == worker_spans[1]["trace_id"]
 
 
-def test_errors_in_ray_tasks():
-    sentry_sdk.init(
+def test_errors_in_ray_tasks(sentry_init):
+    sentry_init(
         integrations=[RayIntegration()],
         disabled_integrations=[StdlibIntegration],
         transport=RayTestTransport(),
@@ -262,7 +263,7 @@ def test_errors_in_ray_tasks():
         def example_task():
             1 / 0
 
-        with sentry_sdk.traces.start_span(
+        with sentry_sdk.start_span(
             name="ray test parent", attributes={"sentry.op": "task"}
         ):
             with pytest.raises(ZeroDivisionError):
@@ -288,9 +289,10 @@ def test_errors_in_ray_tasks():
 # Arbitrary keyword argument to test all decorator paths
 @pytest.mark.parametrize("remote_kwargs", [{}, {"namespace": "actors"}])
 def test_tracing_in_ray_actors(
+    sentry_init,
     remote_kwargs,
 ):
-    sentry_sdk.init(
+    sentry_init(
         integrations=[RayIntegration()],
         disabled_integrations=[StdlibIntegration],
         transport=RayTestTransport(),
@@ -306,7 +308,7 @@ def test_tracing_in_ray_actors(
                 self.n = 0
 
             def increment(self):
-                with sentry_sdk.traces.start_span(
+                with sentry_sdk.start_span(
                     name="example actor execution", attributes={"sentry.op": "task"}
                 ):
                     self.n += 1
@@ -318,7 +320,7 @@ def test_tracing_in_ray_actors(
                 self.n = 0
 
             def increment(self):
-                with sentry_sdk.traces.start_span(
+                with sentry_sdk.start_span(
                     name="example actor execution", attributes={"sentry.op": "task"}
                 ):
                     self.n += 1
@@ -335,7 +337,7 @@ def test_tracing_in_ray_actors(
             _temp_dir=ray_temp_dir,
         )
 
-        with sentry_sdk.traces.start_span(
+        with sentry_sdk.start_span(
             name="ray test parent", attributes={"sentry.op": "task"}
         ):
             counter = Counter.remote()
@@ -363,8 +365,8 @@ def test_tracing_in_ray_actors(
     assert len(worker_spans) == 1
 
 
-def test_errors_in_ray_actors():
-    sentry_sdk.init(
+def test_errors_in_ray_actors(sentry_init):
+    sentry_init(
         integrations=[RayIntegration()],
         disabled_integrations=[StdlibIntegration],
         transport=RayLoggingTransport(),
@@ -390,14 +392,14 @@ def test_errors_in_ray_actors():
                 self.n = 0
 
             def increment(self):
-                with sentry_sdk.traces.start_span(
+                with sentry_sdk.start_span(
                     name="example actor execution", attributes={"sentry.op": "task"}
                 ):
                     1 / 0
 
                 return sentry_sdk.get_client().transport.envelopes
 
-        with sentry_sdk.traces.start_span(
+        with sentry_sdk.start_span(
             name="ray test parent", attributes={"sentry.op": "task"}
         ):
             with pytest.raises(ZeroDivisionError):

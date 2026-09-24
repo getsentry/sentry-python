@@ -132,7 +132,7 @@ async def _context_enter(request: "Request") -> None:
     scope.clear_breadcrumbs()
     scope.add_event_processor(_make_request_processor(weak_request))
 
-    sentry_sdk.traces.continue_trace(dict(request.headers))
+    sentry_sdk.continue_trace(dict(request.headers))
     scope.set_custom_sampling_context({"sanic_request": request})
 
     if request.remote_addr:
@@ -142,7 +142,7 @@ async def _context_enter(request: "Request") -> None:
         elif should_send_default_pii():
             scope.set_attribute(SPANDATA.USER_IP_ADDRESS, request.remote_addr)
 
-    span = sentry_sdk.traces.start_span(
+    span = sentry_sdk.start_span(
         # Unless the request results in a 404 error, the name and source
         # will get overwritten in _set_transaction
         name=request.path,

@@ -14,7 +14,7 @@ from sentry_sdk.tracing_utils import (
     EnvironHeaders,
     add_http_breadcrumb,
     add_http_request_source,
-    get_url_attributes,
+    get_url_attributes_legacy,
     should_propagate_trace,
 )
 from sentry_sdk.utils import (
@@ -274,13 +274,13 @@ def _install_httplib() -> None:
         span: "Optional[Span]" = None
         breadcrumb: "dict[str, Any]" = {}
 
-        url_attributes = get_url_attributes(client, parsed_url)
+        url_attributes = get_url_attributes_legacy(client, parsed_url)
 
         breadcrumb[SPANDATA.HTTP_REQUEST_METHOD] = method
         breadcrumb.update(url_attributes)
 
-        if sentry_sdk.traces.get_current_span() is not None:
-            span = sentry_sdk.traces.start_span(
+        if sentry_sdk.get_current_span() is not None:
+            span = sentry_sdk.start_span(
                 name="%s %s"
                 % (
                     method,
@@ -488,10 +488,10 @@ def _install_subprocess() -> None:
             data={"subprocess.cwd": cwd} if cwd else {},
         )
 
-        if sentry_sdk.traces.get_current_span() is None:
+        if sentry_sdk.get_current_span() is None:
             return old_popen_init(self, *a, **kw)
 
-        with sentry_sdk.traces.start_span(
+        with sentry_sdk.start_span(
             name=description,
             attributes={
                 "sentry.op": OP.SUBPROCESS,
@@ -525,9 +525,9 @@ def _install_subprocess() -> None:
     def sentry_patched_popen_wait(
         self: "subprocess.Popen[Any]", *a: "Any", **kw: "Any"
     ) -> "Any":
-        if sentry_sdk.traces.get_current_span() is None:
+        if sentry_sdk.get_current_span() is None:
             return old_popen_wait(self, *a, **kw)
-        with sentry_sdk.traces.start_span(
+        with sentry_sdk.start_span(
             name=OP.SUBPROCESS_WAIT,
             attributes={
                 "sentry.op": OP.SUBPROCESS_WAIT,
@@ -545,9 +545,9 @@ def _install_subprocess() -> None:
     def sentry_patched_popen_communicate(
         self: "subprocess.Popen[Any]", *a: "Any", **kw: "Any"
     ) -> "Any":
-        if sentry_sdk.traces.get_current_span() is None:
+        if sentry_sdk.get_current_span() is None:
             return old_popen_communicate(self, *a, **kw)
-        with sentry_sdk.traces.start_span(
+        with sentry_sdk.start_span(
             name=OP.SUBPROCESS_COMMUNICATE,
             attributes={
                 "sentry.op": OP.SUBPROCESS_COMMUNICATE,

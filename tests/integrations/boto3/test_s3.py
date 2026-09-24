@@ -33,7 +33,7 @@ def test_basic(
     bucket = s3.Bucket("bucket")
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent") as span, MockResponse(
+    with sentry_sdk.start_span(name="custom parent") as span, MockResponse(
         s3.meta.client, 200, {}, read_fixture("s3_list.xml")
     ):
         objects = [obj for obj in bucket.objects.all()]
@@ -50,17 +50,11 @@ def test_basic(
     assert span["name"] == "aws.s3.ListObjects"
 
 
-@pytest.mark.parametrize("send_default_pii", [True, False])
-def test_streaming(
-    sentry_init,
-    capture_events,
-    capture_items,
-    send_default_pii,
-):
+def test_streaming(sentry_init, capture_events, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[Boto3Integration()],
-        send_default_pii=send_default_pii,
+        data_collection={},
     )
 
     s3 = session.resource("s3")
@@ -68,7 +62,7 @@ def test_streaming(
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent") as span, MockResponse(
+    with sentry_sdk.start_span(name="custom parent") as span, MockResponse(
         s3.meta.client, 200, {}, b"hello"
     ):
         body = obj.get()["Body"]
@@ -101,15 +95,11 @@ def test_streaming(
         "thread.id": mock.ANY,
         "thread.name": mock.ANY,
     }
-    if send_default_pii:
-        expected_attrs["url.full"] = "https://bucket.s3.amazonaws.com/foo.pdf"
+    expected_attrs["url.full"] = "https://bucket.s3.amazonaws.com/foo.pdf"
     assert span1["attributes"] == ApproxDict(expected_attrs)
 
     assert "url.fragment" not in span1["attributes"]
     assert "url.query" not in span1["attributes"]
-    if not send_default_pii:
-        assert "url.full" not in span1["attributes"]
-
     span2 = spans[1]
     assert span2["attributes"]["sentry.op"] == "http.client.stream"
     assert span2["name"] == "aws.s3.GetObject"
@@ -131,7 +121,7 @@ def test_streaming_close(
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent") as span, MockResponse(
+    with sentry_sdk.start_span(name="custom parent") as span, MockResponse(
         s3.meta.client, 200, {}, b"hello"
     ):
         body = obj.get()["Body"]
@@ -157,7 +147,7 @@ def test_omit_url_data_if_parsing_fails(
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[Boto3Integration()],
-        send_default_pii=True,
+        data_collection={},
     )
 
     s3 = session.resource("s3")
@@ -169,7 +159,7 @@ def test_omit_url_data_if_parsing_fails(
         "sentry_sdk.integrations.boto3.parse_url",
         side_effect=ValueError,
     ):
-        with sentry_sdk.traces.start_span(name="custom parent") as span, MockResponse(
+        with sentry_sdk.start_span(name="custom parent") as span, MockResponse(
             s3.meta.client, 200, {}, read_fixture("s3_list.xml")
         ):
             objects = [obj for obj in bucket.objects.all()]
@@ -216,7 +206,7 @@ def test_span_origin(
     bucket = s3.Bucket("bucket")
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"), MockResponse(
+    with sentry_sdk.start_span(name="custom parent"), MockResponse(
         s3.meta.client, 200, {}, read_fixture("s3_list.xml")
     ):
         _ = [obj for obj in bucket.objects.all()]
@@ -228,12 +218,11 @@ def test_span_origin(
     assert spans[0]["attributes"]["sentry.origin"] == "auto.http.boto3"
 
 
-@pytest.mark.parametrize("send_default_pii", [True, False])
-def test_breadcrumb(sentry_init, capture_events, send_default_pii):
+def test_breadcrumb(sentry_init, capture_events):
     sentry_init(
         integrations=[Boto3Integration()],
         default_integrations=False,
-        send_default_pii=send_default_pii,
+        data_collection={},
     )
 
     s3 = session.resource("s3")
@@ -241,7 +230,7 @@ def test_breadcrumb(sentry_init, capture_events, send_default_pii):
 
     events = capture_events()
 
-    with sentry_sdk.traces.start_span(name="custom parent"), MockResponse(
+    with sentry_sdk.start_span(name="custom parent"), MockResponse(
         s3.meta.client, 200, {}, read_fixture("s3_list.xml")
     ):
         _ = [obj for obj in bucket.objects.all()]
@@ -253,24 +242,14 @@ def test_breadcrumb(sentry_init, capture_events, send_default_pii):
     assert crumb["type"] == "http"
     assert crumb["category"] == "httplib"
 
-    if send_default_pii:
-        assert crumb["data"] == ApproxDict(
-            {
-                SPANDATA.URL_FULL: mock.ANY,
-                SPANDATA.HTTP_REQUEST_METHOD: "GET",
-                SPANDATA.URL_QUERY: mock.ANY,
-            }
-        )
-        assert SPANDATA.URL_FRAGMENT not in crumb["data"]
-    else:
-        assert crumb["data"] == ApproxDict(
-            {
-                SPANDATA.HTTP_REQUEST_METHOD: "GET",
-            }
-        )
-        assert SPANDATA.URL_FULL not in crumb["data"]
-        assert SPANDATA.URL_QUERY not in crumb["data"]
-        assert SPANDATA.URL_FRAGMENT not in crumb["data"]
+    assert crumb["data"] == ApproxDict(
+        {
+            SPANDATA.URL_FULL: mock.ANY,
+            SPANDATA.HTTP_REQUEST_METHOD: "GET",
+            SPANDATA.URL_QUERY: mock.ANY,
+        }
+    )
+    assert SPANDATA.URL_FRAGMENT not in crumb["data"]
 
 
 BUCKET_URL = "https://bucket.s3.amazonaws.com/"
@@ -280,31 +259,19 @@ BUCKET_URL = "https://bucket.s3.amazonaws.com/"
 # Structure of the parameters is "init_kwargs, expected_query"
 URL_QUERY_PARAMS = [
     pytest.param(
-        {"send_default_pii": True},
-        "list-type=2&prefix=foo&continuation-token=abc&encoding-type=url",
-        id="send_default_pii_true",
-    ),
-    pytest.param(
-        {"send_default_pii": False},
-        None,
-        id="send_default_pii_false",
-    ),
-    pytest.param(
         {},
-        None,
+        "list-type=2&prefix=foo&continuation-token=%5BFiltered%5D&encoding-type=url",
         id="defaults",
     ),
     pytest.param(
-        {"_experiments": {"data_collection": {}}},
+        {"data_collection": {}},
         "list-type=2&prefix=foo&continuation-token=%5BFiltered%5D&encoding-type=url",
         id="data_collection_denylist_default",
     ),
     pytest.param(
         {
-            "_experiments": {
-                "data_collection": {
-                    "url_query_params": {"mode": "denylist", "terms": ["prefix"]}
-                }
+            "data_collection": {
+                "url_query_params": {"mode": "denylist", "terms": ["prefix"]}
             }
         },
         "list-type=2&prefix=%5BFiltered%5D&continuation-token=%5BFiltered%5D&encoding-type=url",
@@ -312,10 +279,8 @@ URL_QUERY_PARAMS = [
     ),
     pytest.param(
         {
-            "_experiments": {
-                "data_collection": {
-                    "url_query_params": {"mode": "allowlist", "terms": ["prefix"]}
-                }
+            "data_collection": {
+                "url_query_params": {"mode": "allowlist", "terms": ["prefix"]}
             }
         },
         "list-type=%5BFiltered%5D&prefix=foo&continuation-token=%5BFiltered%5D&encoding-type=%5BFiltered%5D",
@@ -323,12 +288,10 @@ URL_QUERY_PARAMS = [
     ),
     pytest.param(
         {
-            "_experiments": {
-                "data_collection": {
-                    "url_query_params": {
-                        "mode": "allowlist",
-                        "terms": ["continuation-token"],
-                    }
+            "data_collection": {
+                "url_query_params": {
+                    "mode": "allowlist",
+                    "terms": ["continuation-token"],
                 }
             }
         },
@@ -336,17 +299,9 @@ URL_QUERY_PARAMS = [
         id="data_collection_allowlist_sensitive_term",
     ),
     pytest.param(
-        {"_experiments": {"data_collection": {"url_query_params": {"mode": "off"}}}},
+        {"data_collection": {"url_query_params": {"mode": "off"}}},
         "",
         id="data_collection_off",
-    ),
-    pytest.param(
-        {
-            "send_default_pii": True,
-            "_experiments": {"data_collection": {"url_query_params": {"mode": "off"}}},
-        },
-        "",
-        id="data_collection_wins_over_send_default_pii",
     ),
 ]
 
@@ -366,7 +321,7 @@ def test_url_query_data_collection(
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"), MockResponse(
+    with sentry_sdk.start_span(name="custom parent"), MockResponse(
         client, 200, {}, read_fixture("s3_list.xml")
     ):
         client.list_objects_v2(Bucket="bucket", Prefix="foo", ContinuationToken="abc")
@@ -406,7 +361,7 @@ def test_url_query_data_collection_breadcrumb(
 
     events = capture_events()
 
-    with sentry_sdk.traces.start_span(name="custom parent"), MockResponse(
+    with sentry_sdk.start_span(name="custom parent"), MockResponse(
         client, 200, {}, read_fixture("s3_list.xml")
     ):
         client.list_objects_v2(Bucket="bucket", Prefix="foo", ContinuationToken="abc")

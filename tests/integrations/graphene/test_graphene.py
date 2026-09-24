@@ -185,7 +185,7 @@ def test_event_processor_data_collection_sync(
 ):
     init_kwargs = {
         "integrations": [GrapheneIntegration(), FlaskIntegration()],
-        "_experiments": {"data_collection": data_collection},
+        "data_collection": data_collection,
     }
     if send_default_pii is not None:
         init_kwargs["send_default_pii"] = send_default_pii
@@ -231,7 +231,7 @@ def test_event_processor_data_collection_async(
             FastApiIntegration(),
             StarletteIntegration(),
         ],
-        "_experiments": {"data_collection": data_collection},
+        "data_collection": data_collection,
     }
 
     if send_default_pii is not None:
@@ -391,7 +391,7 @@ def test_graphql_span_data_collection(
         "integrations": [GrapheneIntegration(), FlaskIntegration()],
         "traces_sample_rate": 1.0,
         "default_integrations": False,
-        "_experiments": {"data_collection": data_collection},
+        "data_collection": data_collection,
     }
     if send_default_pii is not None:
         init_kwargs["send_default_pii"] = send_default_pii

@@ -53,11 +53,9 @@ class ServerInterceptor(grpc.aio.ServerInterceptor):  # type: ignore
                         return await handler(request, context)
 
                     # What if the headers are empty?
-                    sentry_sdk.traces.continue_trace(
-                        dict(context.invocation_metadata())
-                    )
+                    sentry_sdk.continue_trace(dict(context.invocation_metadata()))
 
-                    with sentry_sdk.traces.start_span(
+                    with sentry_sdk.start_span(
                         name=name,
                         attributes={
                             "sentry.op": OP.GRPC_SERVER,

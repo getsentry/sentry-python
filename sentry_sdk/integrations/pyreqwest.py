@@ -7,7 +7,7 @@ from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_ve
 from sentry_sdk.tracing_utils import (
     add_http_breadcrumb,
     add_http_request_source,
-    get_url_attributes,
+    get_url_attributes_legacy,
     propagate_trace_headers,
 )
 from sentry_sdk.utils import (
@@ -116,12 +116,12 @@ def _sentry_pyreqwest_span(
     with capture_internal_exceptions():
         parsed_url = parse_url(str(request.url), sanitize=False)
 
-    if sentry_sdk.traces.get_current_span() is None:
+    if sentry_sdk.get_current_span() is None:
         propagate_trace_headers(client=sentry_sdk.get_client(), request=request)
         yield None
         return
 
-    with sentry_sdk.traces.start_span(
+    with sentry_sdk.start_span(
         name=f"{request.method} {parsed_url.url if parsed_url else SENSITIVE_DATA_SUBSTITUTE}",
         attributes={
             "sentry.op": OP.HTTP_CLIENT,
@@ -155,7 +155,7 @@ async def sentry_async_middleware(
         # after the request has been sent
         parsed_url = parse_url(str(request.url), sanitize=False)
 
-    url_attributes = get_url_attributes(sentry_sdk.get_client(), parsed_url)
+    url_attributes = get_url_attributes_legacy(sentry_sdk.get_client(), parsed_url)
 
     response = None
     with _sentry_pyreqwest_span(request, url_attributes) as span:
@@ -193,7 +193,7 @@ def sentry_sync_middleware(
         # after the request has been sent
         parsed_url = parse_url(str(request.url), sanitize=False)
 
-    url_attributes = get_url_attributes(sentry_sdk.get_client(), parsed_url)
+    url_attributes = get_url_attributes_legacy(sentry_sdk.get_client(), parsed_url)
 
     response = None
     with _sentry_pyreqwest_span(request, url_attributes) as span:

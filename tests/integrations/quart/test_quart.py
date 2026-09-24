@@ -826,7 +826,7 @@ async def test_request_attributes_with_pii(sentry_init, capture_items):
         pytest.param(
             {
                 "send_default_pii": True,
-                "data_collection": None,
+                "data_collection": {},
             },
             {
                 "authorization": "[Filtered]",
@@ -838,7 +838,7 @@ async def test_request_attributes_with_pii(sentry_init, capture_items):
         pytest.param(
             {
                 "send_default_pii": False,
-                "data_collection": None,
+                "data_collection": {},
             },
             {
                 "authorization": "[Filtered]",
@@ -941,9 +941,7 @@ async def test_sensitive_header_scrubbing(
         integrations=[quart_sentry.QuartIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=options["send_default_pii"],
-        _experiments={
-            "data_collection": options["data_collection"],
-        },
+        data_collection=options["data_collection"],
     )
     items = capture_items("span")
 
@@ -1057,24 +1055,24 @@ async def test_quart_auth_user_id(
 
 QUART_USER_INFO_CASES = [
     pytest.param(
-        {"_experiments": {"data_collection": {}}},
+        {"data_collection": {}},
         True,
         id="dc_default_user_info",
     ),
     pytest.param(
-        {"_experiments": {"data_collection": {"user_info": True}}},
+        {"data_collection": {"user_info": True}},
         True,
         id="dc_user_info_true",
     ),
     pytest.param(
-        {"_experiments": {"data_collection": {"user_info": False}}},
+        {"data_collection": {"user_info": False}},
         False,
         id="dc_user_info_false",
     ),
     pytest.param(
         {
             "send_default_pii": True,
-            "_experiments": {"data_collection": {"user_info": False}},
+            "data_collection": {"user_info": False},
         },
         False,
         id="dc_wins_over_pii",
@@ -1128,12 +1126,10 @@ async def test_quart_auth_user_id_data_collection(
 ):
     from quart_auth import AuthUser, login_user
 
-    kwargs = dict(init_kwargs)
     sentry_init(
         integrations=[quart_sentry.QuartIntegration()],
         traces_sample_rate=1.0,
-        _experiments=kwargs.pop("_experiments", {}),
-        **kwargs,
+        **init_kwargs,
     )
     items = capture_items("span")
 
@@ -1167,12 +1163,10 @@ async def test_quart_auth_user_id_data_collection(
 async def test_request_attributes_data_collection(
     sentry_init, capture_items, init_kwargs, expect_user_info
 ):
-    kwargs = dict(init_kwargs)
     sentry_init(
         integrations=[quart_sentry.QuartIntegration()],
         traces_sample_rate=1.0,
-        _experiments=kwargs.pop("_experiments", {}),
-        **kwargs,
+        **init_kwargs,
     )
     items = capture_items("span")
 
@@ -1243,16 +1237,14 @@ _QUERY_PARAM_DATA_COLLECTION_CASES = [
         id="defaults",
     ),
     pytest.param(
-        {"_experiments": {"data_collection": {}}},
+        {"data_collection": {}},
         "toy=tennisball&color=red&auth=%5BFiltered%5D",
         id="data_collection_denylist_default",
     ),
     pytest.param(
         {
-            "_experiments": {
-                "data_collection": {
-                    "url_query_params": {"mode": "denylist", "terms": ["toy"]}
-                }
+            "data_collection": {
+                "url_query_params": {"mode": "denylist", "terms": ["toy"]}
             }
         },
         "toy=%5BFiltered%5D&color=red&auth=%5BFiltered%5D",
@@ -1260,10 +1252,8 @@ _QUERY_PARAM_DATA_COLLECTION_CASES = [
     ),
     pytest.param(
         {
-            "_experiments": {
-                "data_collection": {
-                    "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
-                }
+            "data_collection": {
+                "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
             }
         },
         "toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D",
@@ -1271,24 +1261,22 @@ _QUERY_PARAM_DATA_COLLECTION_CASES = [
     ),
     pytest.param(
         {
-            "_experiments": {
-                "data_collection": {
-                    "url_query_params": {"mode": "allowlist", "terms": ["auth"]}
-                }
+            "data_collection": {
+                "url_query_params": {"mode": "allowlist", "terms": ["auth"]}
             }
         },
         "toy=%5BFiltered%5D&color=%5BFiltered%5D&auth=%5BFiltered%5D",
         id="data_collection_allowlist_sensitive_term",
     ),
     pytest.param(
-        {"_experiments": {"data_collection": {"url_query_params": {"mode": "off"}}}},
+        {"data_collection": {"url_query_params": {"mode": "off"}}},
         None,
         id="data_collection_off",
     ),
     pytest.param(
         {
             "send_default_pii": True,
-            "_experiments": {"data_collection": {"url_query_params": {"mode": "off"}}},
+            "data_collection": {"url_query_params": {"mode": "off"}},
         },
         None,
         id="data_collection_wins_over_send_default_pii",
@@ -1303,13 +1291,10 @@ _QUERY_PARAM_DATA_COLLECTION_CASES = [
 async def test_url_query_data_collection(
     sentry_init, capture_items, init_kwargs, expected_query
 ):
-    kwargs = dict(init_kwargs)
-    experiments = kwargs.pop("_experiments", {})
     sentry_init(
         integrations=[quart_sentry.QuartIntegration()],
         traces_sample_rate=1.0,
-        _experiments=experiments,
-        **kwargs,
+        **init_kwargs,
     )
     items = capture_items("span")
 
@@ -1325,7 +1310,7 @@ async def test_url_query_data_collection(
 
     segment = spans[0]
 
-    data_collection_enabled = "data_collection" in experiments
+    data_collection_enabled = "data_collection" in init_kwargs
     url_attrs_expected = data_collection_enabled or init_kwargs.get(
         "send_default_pii", False
     )
@@ -1350,7 +1335,7 @@ async def test_url_query_multi_and_blank_values(sentry_init, capture_items):
     sentry_init(
         integrations=[quart_sentry.QuartIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"data_collection": {}},
+        data_collection={},
     )
     items = capture_items("span")
 

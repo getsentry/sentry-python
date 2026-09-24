@@ -469,18 +469,16 @@ def mock_hf_chat_completion_api_streaming_tools(httpx_mock):
 
 @pytest.mark.httpx_mock(assert_all_requests_were_expected=False)
 @pytest.mark.parametrize("send_default_pii", [True, False])
-@pytest.mark.parametrize("include_prompts", [True, False])
 def test_text_generation(
     sentry_init: "Any",
     capture_items: "Any",
     send_default_pii: "Any",
-    include_prompts: "Any",
     mock_hf_text_generation_api: "Any",
 ) -> None:
     sentry_init(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        integrations=[HuggingfaceHubIntegration(include_prompts=include_prompts)],
+        integrations=[HuggingfaceHubIntegration()],
     )
 
     client = InferenceClient(model="test-model")
@@ -522,11 +520,11 @@ def test_text_generation(
         "sentry.origin": "auto.ai.huggingface_hub",
     }
 
-    if send_default_pii and include_prompts:
+    if send_default_pii:
         expected_data["gen_ai.request.messages"] = "Hello"
         expected_data["gen_ai.response.text"] = "[mocked] Hello! How can i help you?"
 
-    if not send_default_pii or not include_prompts:
+    if not send_default_pii:
         assert "gen_ai.request.messages" not in expected_data
         assert "gen_ai.response.text" not in expected_data
 
@@ -538,18 +536,16 @@ def test_text_generation(
 
 @pytest.mark.httpx_mock(assert_all_requests_were_expected=False)
 @pytest.mark.parametrize("send_default_pii", [True, False])
-@pytest.mark.parametrize("include_prompts", [True, False])
 def test_text_generation_streaming(
     sentry_init: "Any",
     capture_items: "Any",
     send_default_pii: "Any",
-    include_prompts: "Any",
     mock_hf_text_generation_api_streaming: "Any",
 ) -> None:
     sentry_init(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        integrations=[HuggingfaceHubIntegration(include_prompts=include_prompts)],
+        integrations=[HuggingfaceHubIntegration()],
     )
 
     client = InferenceClient(model="test-model")
@@ -593,11 +589,11 @@ def test_text_generation_streaming(
         "sentry.origin": "auto.ai.huggingface_hub",
     }
 
-    if send_default_pii and include_prompts:
+    if send_default_pii:
         expected_data["gen_ai.request.messages"] = "Hello"
         expected_data["gen_ai.response.text"] = "the mocked model response"
 
-    if not send_default_pii or not include_prompts:
+    if not send_default_pii:
         assert "gen_ai.request.messages" not in expected_data
         assert "gen_ai.response.text" not in expected_data
 
@@ -609,18 +605,16 @@ def test_text_generation_streaming(
 
 @pytest.mark.httpx_mock(assert_all_requests_were_expected=False)
 @pytest.mark.parametrize("send_default_pii", [True, False])
-@pytest.mark.parametrize("include_prompts", [True, False])
 def test_chat_completion(
     sentry_init: "Any",
     capture_items: "Any",
     send_default_pii: "Any",
-    include_prompts: "Any",
     mock_hf_chat_completion_api: "Any",
 ) -> None:
     sentry_init(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        integrations=[HuggingfaceHubIntegration(include_prompts=include_prompts)],
+        integrations=[HuggingfaceHubIntegration()],
     )
 
     client = get_hf_provider_inference_client()
@@ -671,7 +665,7 @@ def test_chat_completion(
         "sentry.origin": "auto.ai.huggingface_hub",
     }
 
-    if send_default_pii and include_prompts:
+    if send_default_pii:
         expected_data["gen_ai.request.messages"] = safe_serialize(
             [
                 {
@@ -685,7 +679,7 @@ def test_chat_completion(
             "[mocked] Hello! How can I help you today?"
         )
 
-    if not send_default_pii or not include_prompts:
+    if not send_default_pii:
         assert "gen_ai.request.messages" not in expected_data
         assert "gen_ai.response.text" not in expected_data
 
@@ -694,18 +688,16 @@ def test_chat_completion(
 
 @pytest.mark.httpx_mock(assert_all_requests_were_expected=False)
 @pytest.mark.parametrize("send_default_pii", [True, False])
-@pytest.mark.parametrize("include_prompts", [True, False])
 def test_chat_completion_streaming(
     sentry_init: "Any",
     capture_items: "Any",
     send_default_pii: "Any",
-    include_prompts: "Any",
     mock_hf_chat_completion_api_streaming: "Any",
 ) -> None:
     sentry_init(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        integrations=[HuggingfaceHubIntegration(include_prompts=include_prompts)],
+        integrations=[HuggingfaceHubIntegration()],
     )
 
     client = get_hf_provider_inference_client()
@@ -760,7 +752,7 @@ def test_chat_completion_streaming(
         expected_data["gen_ai.usage.output_tokens"] = 14
         expected_data["gen_ai.usage.total_tokens"] = 197
 
-    if send_default_pii and include_prompts:
+    if send_default_pii:
         expected_data["gen_ai.request.messages"] = safe_serialize(
             [
                 {
@@ -772,7 +764,7 @@ def test_chat_completion_streaming(
         )
         expected_data["gen_ai.response.text"] = "the mocked model response"
 
-    if not send_default_pii or not include_prompts:
+    if not send_default_pii:
         assert "gen_ai.request.messages" not in expected_data
         assert "gen_ai.response.text" not in expected_data
 
@@ -877,18 +869,16 @@ def test_span_status_error(
 
 @pytest.mark.httpx_mock(assert_all_requests_were_expected=False)
 @pytest.mark.parametrize("send_default_pii", [True, False])
-@pytest.mark.parametrize("include_prompts", [True, False])
 def test_chat_completion_with_tools(
     sentry_init: "Any",
     capture_items: "Any",
     send_default_pii: "Any",
-    include_prompts: "Any",
     mock_hf_chat_completion_api_tools: "Any",
 ):
     sentry_init(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        integrations=[HuggingfaceHubIntegration(include_prompts=include_prompts)],
+        integrations=[HuggingfaceHubIntegration()],
     )
 
     client = get_hf_provider_inference_client()
@@ -949,7 +939,7 @@ def test_chat_completion_with_tools(
         "sentry.origin": "auto.ai.huggingface_hub",
     }
 
-    if send_default_pii and include_prompts:
+    if send_default_pii:
         expected_data["gen_ai.request.messages"] = (
             '[{"role": "user", "content": "What is the weather in Paris?"}]'
         )
@@ -957,7 +947,7 @@ def test_chat_completion_with_tools(
             '[{"function": {"arguments": {"location": "Paris"}, "name": "get_weather", "description": "None"}, "id": "call_123", "type": "function"}]'
         )
 
-    if not send_default_pii or not include_prompts:
+    if not send_default_pii:
         assert "gen_ai.request.messages" not in expected_data
         assert "gen_ai.response.text" not in expected_data
         assert "gen_ai.response.tool_calls" not in expected_data
@@ -967,18 +957,16 @@ def test_chat_completion_with_tools(
 
 @pytest.mark.httpx_mock(assert_all_requests_were_expected=False)
 @pytest.mark.parametrize("send_default_pii", [True, False])
-@pytest.mark.parametrize("include_prompts", [True, False])
 def test_chat_completion_streaming_with_tools(
     sentry_init: "Any",
     capture_items: "Any",
     send_default_pii: "Any",
-    include_prompts: "Any",
     mock_hf_chat_completion_api_streaming_tools: "Any",
 ) -> None:
     sentry_init(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        integrations=[HuggingfaceHubIntegration(include_prompts=include_prompts)],
+        integrations=[HuggingfaceHubIntegration()],
     )
 
     client = get_hf_provider_inference_client()
@@ -1045,7 +1033,7 @@ def test_chat_completion_streaming_with_tools(
         expected_data["gen_ai.usage.output_tokens"] = 14
         expected_data["gen_ai.usage.total_tokens"] = 197
 
-    if send_default_pii and include_prompts:
+    if send_default_pii:
         expected_data["gen_ai.request.messages"] = (
             '[{"role": "user", "content": "What is the weather in Paris?"}]'
         )
@@ -1054,7 +1042,7 @@ def test_chat_completion_streaming_with_tools(
             '[{"function": {"arguments": {"location": "Paris"}, "name": "get_weather"}, "id": "call_123", "type": "function", "index": "None"}]'
         )
 
-    if not send_default_pii or not include_prompts:
+    if not send_default_pii:
         assert "gen_ai.request.messages" not in expected_data
         assert "gen_ai.response.text" not in expected_data
         assert "gen_ai.response.tool_calls" not in expected_data
@@ -1080,11 +1068,10 @@ DATA_COLLECTION_TOOLS = [
 
 @pytest.mark.httpx_mock(assert_all_requests_were_expected=False)
 @pytest.mark.parametrize(
-    "data_collection,send_default_pii,include_prompts,expected_present,expected_absent",
+    "data_collection,send_default_pii,expected_present,expected_absent",
     [
         pytest.param(
             {"gen_ai": {"inputs": True, "outputs": True}},
-            False,
             False,
             [
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
@@ -1096,7 +1083,6 @@ DATA_COLLECTION_TOOLS = [
         pytest.param(
             {"gen_ai": {"inputs": False, "outputs": False}},
             True,
-            True,
             [],
             [
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
@@ -1106,7 +1092,6 @@ DATA_COLLECTION_TOOLS = [
         ),
         pytest.param(
             {"gen_ai": {"inputs": True, "outputs": False}},
-            False,
             False,
             [
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
@@ -1119,7 +1104,6 @@ DATA_COLLECTION_TOOLS = [
         pytest.param(
             {"gen_ai": {"inputs": False, "outputs": True}},
             False,
-            False,
             [
                 SPANDATA.GEN_AI_RESPONSE_TEXT,
             ],
@@ -1131,7 +1115,6 @@ DATA_COLLECTION_TOOLS = [
         pytest.param(
             {"gen_ai": {}},
             False,
-            False,
             [
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
                 SPANDATA.GEN_AI_RESPONSE_TEXT,
@@ -1142,18 +1125,16 @@ DATA_COLLECTION_TOOLS = [
         pytest.param(
             None,
             True,
-            True,
             [
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
                 SPANDATA.GEN_AI_RESPONSE_TEXT,
             ],
             [],
-            id="no-gen-ai-config-legacy-pii-and-include-prompts-enabled",
+            id="no-gen-ai-config-legacy-pii",
         ),
         pytest.param(
             None,
             False,
-            True,
             [],
             [
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
@@ -1169,17 +1150,16 @@ def test_text_generation_data_collection(
     mock_hf_text_generation_api: "Any",
     data_collection: "Any",
     send_default_pii: "Any",
-    include_prompts: "Any",
     expected_present: "Any",
     expected_absent: "Any",
 ) -> None:
     sentry_init_kwargs = dict(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        integrations=[HuggingfaceHubIntegration(include_prompts=include_prompts)],
+        integrations=[HuggingfaceHubIntegration()],
     )
     if data_collection is not None:
-        sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
+        sentry_init_kwargs["data_collection"] = data_collection
 
     sentry_init(**sentry_init_kwargs)
 
@@ -1214,11 +1194,10 @@ def test_text_generation_data_collection(
 
 @pytest.mark.httpx_mock(assert_all_requests_were_expected=False)
 @pytest.mark.parametrize(
-    "data_collection,send_default_pii,include_prompts,expected_present,expected_absent",
+    "data_collection,send_default_pii,expected_present,expected_absent",
     [
         pytest.param(
             {"gen_ai": {"inputs": True, "outputs": True}},
-            False,
             False,
             [
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
@@ -1230,7 +1209,6 @@ def test_text_generation_data_collection(
         pytest.param(
             {"gen_ai": {"inputs": False, "outputs": False}},
             True,
-            True,
             [],
             [
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
@@ -1240,7 +1218,6 @@ def test_text_generation_data_collection(
         ),
         pytest.param(
             {"gen_ai": {"inputs": True, "outputs": False}},
-            False,
             False,
             [
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
@@ -1253,7 +1230,6 @@ def test_text_generation_data_collection(
         pytest.param(
             {"gen_ai": {"inputs": False, "outputs": True}},
             False,
-            False,
             [
                 SPANDATA.GEN_AI_RESPONSE_TEXT,
             ],
@@ -1265,7 +1241,6 @@ def test_text_generation_data_collection(
         pytest.param(
             {"gen_ai": {}},
             False,
-            False,
             [
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
                 SPANDATA.GEN_AI_RESPONSE_TEXT,
@@ -1276,18 +1251,16 @@ def test_text_generation_data_collection(
         pytest.param(
             None,
             True,
-            True,
             [
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
                 SPANDATA.GEN_AI_RESPONSE_TEXT,
             ],
             [],
-            id="no-gen-ai-config-legacy-pii-and-include-prompts-enabled",
+            id="no-gen-ai-config-legacy-pii",
         ),
         pytest.param(
             None,
             False,
-            True,
             [],
             [
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
@@ -1303,17 +1276,16 @@ def test_text_generation_streaming_data_collection(
     mock_hf_text_generation_api_streaming: "Any",
     data_collection: "Any",
     send_default_pii: "Any",
-    include_prompts: "Any",
     expected_present: "Any",
     expected_absent: "Any",
 ) -> None:
     sentry_init_kwargs = dict(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        integrations=[HuggingfaceHubIntegration(include_prompts=include_prompts)],
+        integrations=[HuggingfaceHubIntegration()],
     )
     if data_collection is not None:
-        sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
+        sentry_init_kwargs["data_collection"] = data_collection
 
     sentry_init(**sentry_init_kwargs)
 
@@ -1350,11 +1322,10 @@ def test_text_generation_streaming_data_collection(
 
 @pytest.mark.httpx_mock(assert_all_requests_were_expected=False)
 @pytest.mark.parametrize(
-    "data_collection,send_default_pii,include_prompts,expected_present,expected_absent",
+    "data_collection,send_default_pii,expected_present,expected_absent",
     [
         pytest.param(
             {"gen_ai": {"inputs": True, "outputs": True}},
-            False,
             False,
             [
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
@@ -1367,7 +1338,6 @@ def test_text_generation_streaming_data_collection(
         pytest.param(
             {"gen_ai": {"inputs": False, "outputs": False}},
             True,
-            True,
             [],
             [
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
@@ -1378,7 +1348,6 @@ def test_text_generation_streaming_data_collection(
         ),
         pytest.param(
             {"gen_ai": {"inputs": True, "outputs": False}},
-            False,
             False,
             [
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
@@ -1392,7 +1361,6 @@ def test_text_generation_streaming_data_collection(
         pytest.param(
             {"gen_ai": {"inputs": False, "outputs": True}},
             False,
-            False,
             [
                 SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
             ],
@@ -1405,7 +1373,6 @@ def test_text_generation_streaming_data_collection(
         pytest.param(
             {"gen_ai": {}},
             False,
-            False,
             [
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
                 SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
@@ -1417,19 +1384,17 @@ def test_text_generation_streaming_data_collection(
         pytest.param(
             None,
             True,
-            True,
             [
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
                 SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
                 SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
             ],
             [],
-            id="no-gen-ai-config-legacy-pii-and-include-prompts-enabled",
+            id="no-gen-ai-config-legacy-pii",
         ),
         pytest.param(
             None,
             False,
-            True,
             [
                 SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
             ],
@@ -1447,17 +1412,16 @@ def test_chat_completion_data_collection_tools(
     mock_hf_chat_completion_api_tools: "Any",
     data_collection: "Any",
     send_default_pii: "Any",
-    include_prompts: "Any",
     expected_present: "Any",
     expected_absent: "Any",
 ) -> None:
     sentry_init_kwargs = dict(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        integrations=[HuggingfaceHubIntegration(include_prompts=include_prompts)],
+        integrations=[HuggingfaceHubIntegration()],
     )
     if data_collection is not None:
-        sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
+        sentry_init_kwargs["data_collection"] = data_collection
 
     sentry_init(**sentry_init_kwargs)
 
@@ -1503,11 +1467,10 @@ def test_chat_completion_data_collection_tools(
 
 @pytest.mark.httpx_mock(assert_all_requests_were_expected=False)
 @pytest.mark.parametrize(
-    "data_collection,send_default_pii,include_prompts,expected_present,expected_absent",
+    "data_collection,send_default_pii,expected_present,expected_absent",
     [
         pytest.param(
             {"gen_ai": {"inputs": True, "outputs": True}},
-            False,
             False,
             [
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
@@ -1521,7 +1484,6 @@ def test_chat_completion_data_collection_tools(
         pytest.param(
             {"gen_ai": {"inputs": False, "outputs": False}},
             True,
-            True,
             [],
             [
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
@@ -1533,7 +1495,6 @@ def test_chat_completion_data_collection_tools(
         ),
         pytest.param(
             {"gen_ai": {"inputs": True, "outputs": False}},
-            False,
             False,
             [
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
@@ -1548,7 +1509,6 @@ def test_chat_completion_data_collection_tools(
         pytest.param(
             {"gen_ai": {"inputs": False, "outputs": True}},
             False,
-            False,
             [
                 SPANDATA.GEN_AI_RESPONSE_TEXT,
                 SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
@@ -1562,7 +1522,6 @@ def test_chat_completion_data_collection_tools(
         pytest.param(
             {"gen_ai": {}},
             False,
-            False,
             [
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
                 SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
@@ -1575,7 +1534,6 @@ def test_chat_completion_data_collection_tools(
         pytest.param(
             None,
             True,
-            True,
             [
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
                 SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
@@ -1583,12 +1541,11 @@ def test_chat_completion_data_collection_tools(
                 SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
             ],
             [],
-            id="no-gen-ai-config-legacy-pii-and-include-prompts-enabled",
+            id="no-gen-ai-config-legacy-pii",
         ),
         pytest.param(
             None,
             False,
-            True,
             [
                 SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
             ],
@@ -1607,17 +1564,16 @@ def test_chat_completion_streaming_data_collection_tools(
     mock_hf_chat_completion_api_streaming_tools: "Any",
     data_collection: "Any",
     send_default_pii: "Any",
-    include_prompts: "Any",
     expected_present: "Any",
     expected_absent: "Any",
 ) -> None:
     sentry_init_kwargs = dict(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        integrations=[HuggingfaceHubIntegration(include_prompts=include_prompts)],
+        integrations=[HuggingfaceHubIntegration()],
     )
     if data_collection is not None:
-        sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
+        sentry_init_kwargs["data_collection"] = data_collection
 
     sentry_init(**sentry_init_kwargs)
 

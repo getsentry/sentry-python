@@ -12,17 +12,16 @@ from sentry_sdk.integrations.cohere import CohereIntegration
 
 
 @pytest.mark.parametrize(
-    "send_default_pii, include_prompts",
-    [(True, True), (True, False), (False, True), (False, False)],
+    "send_default_pii",
+    [True, False],
 )
 def test_nonstreaming_chat(
     sentry_init,
     capture_items,
     send_default_pii,
-    include_prompts,
 ):
     sentry_init(
-        integrations=[CohereIntegration(include_prompts=include_prompts)],
+        integrations=[CohereIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
     )
@@ -59,7 +58,7 @@ def test_nonstreaming_chat(
     assert span["attributes"]["sentry.op"] == "ai.chat_completions.create.cohere"
     assert span["attributes"][SPANDATA.AI_MODEL_ID] == "some-model"
 
-    if send_default_pii and include_prompts:
+    if send_default_pii:
         assert (
             '{"role": "system", "content": "some context"}'
             in span["attributes"][SPANDATA.AI_INPUT_MESSAGES]
@@ -80,17 +79,16 @@ def test_nonstreaming_chat(
 
 # noinspection PyTypeChecker
 @pytest.mark.parametrize(
-    "send_default_pii, include_prompts",
-    [(True, True), (True, False), (False, True), (False, False)],
+    "send_default_pii",
+    [True, False],
 )
 def test_streaming_chat(
     sentry_init,
     capture_items,
     send_default_pii,
-    include_prompts,
 ):
     sentry_init(
-        integrations=[CohereIntegration(include_prompts=include_prompts)],
+        integrations=[CohereIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
     )
@@ -142,7 +140,7 @@ def test_streaming_chat(
     assert span["attributes"]["sentry.op"] == "ai.chat_completions.create.cohere"
     assert span["attributes"][SPANDATA.AI_MODEL_ID] == "some-model"
 
-    if send_default_pii and include_prompts:
+    if send_default_pii:
         assert (
             '{"role": "system", "content": "some context"}'
             in span["attributes"][SPANDATA.AI_INPUT_MESSAGES]
@@ -206,17 +204,16 @@ def test_span_status_error(sentry_init, capture_items):
 
 
 @pytest.mark.parametrize(
-    "send_default_pii, include_prompts",
-    [(True, True), (True, False), (False, True), (False, False)],
+    "send_default_pii",
+    [True, False],
 )
 def test_embed(
     sentry_init,
     capture_items,
     send_default_pii,
-    include_prompts,
 ):
     sentry_init(
-        integrations=[CohereIntegration(include_prompts=include_prompts)],
+        integrations=[CohereIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
     )
@@ -249,7 +246,7 @@ def test_embed(
     span = items[0].payload
 
     assert span["attributes"]["sentry.op"] == "ai.embeddings.create.cohere"
-    if send_default_pii and include_prompts:
+    if send_default_pii:
         assert "hello" in span["attributes"][SPANDATA.AI_INPUT_MESSAGES]
     else:
         assert SPANDATA.AI_INPUT_MESSAGES not in span["attributes"]
@@ -326,11 +323,10 @@ def test_span_origin_embed(sentry_init, capture_items):
     assert span["attributes"]["sentry.origin"] == "auto.ai.cohere"
 
 
-# data_collection config, send_default_pii, include_prompts, expect_inputs, expect_outputs
+# data_collection config, send_default_pii, expect_inputs, expect_outputs
 DATA_COLLECTION_CASES = [
     pytest.param(
         {"gen_ai": {"inputs": True, "outputs": True}},
-        False,
         False,
         True,
         True,
@@ -339,14 +335,12 @@ DATA_COLLECTION_CASES = [
     pytest.param(
         {"gen_ai": {"inputs": False, "outputs": False}},
         True,
-        True,
         False,
         False,
         id="gen-ai-inputs-and-outputs-disabled-override-legacy-on",
     ),
     pytest.param(
         {"gen_ai": {"inputs": True, "outputs": False}},
-        False,
         False,
         True,
         False,
@@ -356,13 +350,11 @@ DATA_COLLECTION_CASES = [
         {"gen_ai": {"inputs": False, "outputs": True}},
         False,
         False,
-        False,
         True,
         id="gen-ai-outputs-enabled-inputs-disabled",
     ),
     pytest.param(
         {"gen_ai": {}},
-        False,
         False,
         True,
         True,
@@ -373,13 +365,11 @@ DATA_COLLECTION_CASES = [
         True,
         True,
         True,
-        True,
-        id="no-gen-ai-config-legacy-pii-and-include-prompts-enabled",
+        id="no-gen-ai-config-legacy-pii",
     ),
     pytest.param(
         None,
         False,
-        True,
         False,
         False,
         id="no-gen-ai-config-legacy-pii-disabled",
@@ -391,21 +381,20 @@ def _init_with_data_collection(
     sentry_init,
     data_collection,
     send_default_pii,
-    include_prompts,
 ):
     kwargs = dict(
-        integrations=[CohereIntegration(include_prompts=include_prompts)],
+        integrations=[CohereIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
     )
     if data_collection is not None:
-        kwargs["_experiments"] = {"data_collection": data_collection}
+        kwargs["data_collection"] = data_collection
 
     sentry_init(**kwargs)
 
 
 @pytest.mark.parametrize(
-    "data_collection, send_default_pii, include_prompts, expect_inputs, expect_outputs",
+    "data_collection, send_default_pii, expect_inputs, expect_outputs",
     DATA_COLLECTION_CASES,
 )
 def test_nonstreaming_chat_data_collection(
@@ -413,7 +402,6 @@ def test_nonstreaming_chat_data_collection(
     capture_items,
     data_collection,
     send_default_pii,
-    include_prompts,
     expect_inputs,
     expect_outputs,
 ):
@@ -421,7 +409,6 @@ def test_nonstreaming_chat_data_collection(
         sentry_init,
         data_collection,
         send_default_pii,
-        include_prompts,
     )
 
     client = Client(api_key="z")
@@ -483,7 +470,7 @@ def test_nonstreaming_chat_data_collection(
 
 
 @pytest.mark.parametrize(
-    "data_collection, send_default_pii, include_prompts, expect_inputs, expect_outputs",
+    "data_collection, send_default_pii, expect_inputs, expect_outputs",
     DATA_COLLECTION_CASES,
 )
 def test_streaming_chat_data_collection(
@@ -491,7 +478,6 @@ def test_streaming_chat_data_collection(
     capture_items,
     data_collection,
     send_default_pii,
-    include_prompts,
     expect_inputs,
     expect_outputs,
 ):
@@ -499,7 +485,6 @@ def test_streaming_chat_data_collection(
         sentry_init,
         data_collection,
         send_default_pii,
-        include_prompts,
     )
 
     client = Client(api_key="z")
@@ -574,7 +559,7 @@ def test_streaming_chat_data_collection(
 
 
 @pytest.mark.parametrize(
-    "data_collection, send_default_pii, include_prompts, expect_inputs, expect_outputs",
+    "data_collection, send_default_pii, expect_inputs, expect_outputs",
     DATA_COLLECTION_CASES,
 )
 def test_embed_data_collection(
@@ -582,7 +567,6 @@ def test_embed_data_collection(
     capture_items,
     data_collection,
     send_default_pii,
-    include_prompts,
     expect_inputs,
     expect_outputs,
 ):
@@ -590,7 +574,6 @@ def test_embed_data_collection(
         sentry_init,
         data_collection,
         send_default_pii,
-        include_prompts,
     )
 
     client = Client(api_key="z")

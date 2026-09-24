@@ -138,7 +138,7 @@ def test_grpc_server_continues_transaction(
     stub = gRPCTestServiceStub(channel)
     items = capture_items_forksafe("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent") as segment_span:
+    with sentry_sdk.start_span(name="custom parent") as segment_span:
         metadata = (
             (
                 "baggage",
@@ -189,7 +189,7 @@ def test_grpc_client_starts_span(
     stub = gRPCTestServiceStub(channel)
     items = capture_items_forksafe("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         stub.TestServe(gRPCTestMessage(text="test"))
 
     _tear_down(server=server)
@@ -241,7 +241,7 @@ def test_grpc_client_unary_stream_starts_span(
     stub = gRPCTestServiceStub(channel)
     items = capture_items_forksafe("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         [el for el in stub.TestUnaryStream(gRPCTestMessage(text="test"))]
 
     _tear_down(server=server)
@@ -304,7 +304,7 @@ def test_grpc_client_other_interceptor(
     stub = gRPCTestServiceStub(channel)
     items = capture_items_forksafe("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         stub.TestServe(gRPCTestMessage(text="test"))
 
     _tear_down(server=server)
@@ -359,7 +359,7 @@ def test_prevent_dual_client_interceptor(
     stub = gRPCTestServiceStub(channel)
     items = capture_items_forksafe("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         stub.TestServe(gRPCTestMessage(text="test"))
 
     _tear_down(server=server)
@@ -400,7 +400,7 @@ def test_grpc_client_and_servers_interceptors_integration(
     stub = gRPCTestServiceStub(channel)
     items = capture_items_forksafe("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         stub.TestServe(gRPCTestMessage(text="test"))
 
     _tear_down(server=server)
@@ -469,7 +469,7 @@ def test_span_origin(
     stub = gRPCTestServiceStub(channel)
     items = capture_items_forksafe("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         stub.TestServe(gRPCTestMessage(text="test"))
 
     _tear_down(server=server)
@@ -494,7 +494,7 @@ class TestService(gRPCTestServiceServicer):
 
     @staticmethod
     def TestServe(request, context):  # noqa: N802
-        with sentry_sdk.traces.start_span(
+        with sentry_sdk.start_span(
             name="test",
             attributes={
                 "sentry.op": "test",

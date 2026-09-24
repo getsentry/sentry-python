@@ -197,7 +197,7 @@ def test_statsig_span_integration(
         user = StatsigUser(user_id="user-id")
 
         items = capture_items("span")
-        with sentry_sdk.traces.start_span(name="hi"):
+        with sentry_sdk.start_span(name="hi"):
             statsig.check_gate(user, "hello")
             statsig.check_gate(user, "world")
 

@@ -138,8 +138,8 @@ class SentryMiddleware(Middleware):  # type: ignore[misc]
 
         scope.set_transaction_name(message.actor_name, source=SegmentNameSource.TASK)
 
-        sentry_sdk.traces.continue_trace(sentry_headers)
-        span = sentry_sdk.traces.start_span(
+        sentry_sdk.continue_trace(sentry_headers)
+        span = sentry_sdk.start_span(
             name=message.actor_name,
             attributes={
                 "sentry.op": OP.QUEUE_TASK_DRAMATIQ,
