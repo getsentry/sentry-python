@@ -6,11 +6,15 @@ from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.integrations.boto3._context import AwsCallContext
 from sentry_sdk.integrations.boto3._instrumentation import (
     _finish_span,
+    _get_error_attributes,
+    _get_response_attributes,
     _instrument_streaming_body,
     _sentry_before_sign,
     _sentry_request_created,
+    _set_span_attributes,
     _start_client_span,
 )
+from sentry_sdk.integrations.boto3.consts import IDENTIFIER
 from sentry_sdk.traces import NoOpStreamedSpan, StreamedSpan
 from sentry_sdk.utils import capture_internal_exceptions
 
@@ -65,8 +69,6 @@ def _activate_client_span(
 
 
 def _patch_botocore_client() -> None:
-    from sentry_sdk.integrations.boto3 import Boto3Integration
-
     orig_init = BaseClient.__init__
     orig_make_api_call = BaseClient._make_api_call  # type: ignore
 
@@ -88,7 +90,7 @@ def _patch_botocore_client() -> None:
         https://opentelemetry.io/docs/specs/semconv/rpc/rpc-spans/#rpc-client-span
         """
         client = sentry_sdk.get_client()
-        if client.get_integration(Boto3Integration) is None:
+        if client.get_integration(IDENTIFIER) is None:
             return orig_make_api_call(self, operation_name, api_params)
 
         ctx = AwsCallContext(operation_name, api_params)
@@ -109,7 +111,15 @@ def _patch_botocore_client() -> None:
 
         try:
             with span_ctx:
-                parsed = orig_make_api_call(self, operation_name, api_params)
+                try:
+                    parsed = orig_make_api_call(self, operation_name, api_params)
+                except BaseException as error:
+                    with capture_internal_exceptions():
+                        _set_span_attributes(span, _get_error_attributes(error))
+                    raise
+                else:
+                    with capture_internal_exceptions():
+                        _set_span_attributes(span, _get_response_attributes(parsed))
         except BaseException as error:
             _finish_span(span, error)
             raise

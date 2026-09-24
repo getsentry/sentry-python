@@ -4,7 +4,7 @@ from urllib.parse import urlsplit
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA, SPANSTATUS
 from sentry_sdk.integrations import DidNotEnable
-from sentry_sdk.integrations.boto3.consts import ORIGIN
+from sentry_sdk.integrations.boto3.consts import IDENTIFIER, ORIGIN
 from sentry_sdk.traces import NoOpStreamedSpan, StreamedSpan
 from sentry_sdk.tracing import BAGGAGE_HEADER_NAME, Span
 from sentry_sdk.tracing_utils import (
@@ -27,6 +27,7 @@ if TYPE_CHECKING:
 
 try:
     from botocore.awsrequest import AWSRequest
+    from botocore.exceptions import ClientError
     from botocore.response import StreamingBody
 except ImportError:
     raise DidNotEnable("botocore not installed")
@@ -38,6 +39,7 @@ _AWS_RPC_SYSTEM_NAME = "aws-api"
 def _set_span_attributes(
     span: "Union[Span, StreamedSpan]", attributes: "Attributes"
 ) -> None:
+    """Will be removed in the major."""
     if isinstance(span, StreamedSpan):
         span.set_attributes(attributes)
         return
@@ -89,11 +91,104 @@ def _get_client_attributes(
     return attributes
 
 
+def _get_response_attributes(response: "Any") -> "Attributes":
+    if not isinstance(response, dict):
+        return {}
+
+    metadata = response.get("ResponseMetadata")
+    if not isinstance(metadata, dict):
+        return {}
+    attributes: "Attributes" = {}
+
+    # botocore injects HTTP status into `ResponseMetadata` after parsing.
+    # https://github.com/boto/botocore/blob/develop/botocore/parsers.py#L273-L284
+    status_code = metadata.get("HTTPStatusCode")
+    if isinstance(status_code, int) and 100 <= status_code <= 599:
+        attributes[SPANDATA.HTTP_STATUS_CODE] = status_code
+
+    retry_attempts = metadata.get("RetryAttempts")
+    # botocore represents retries as `attempts - 1`; OTel suggests "if and only if", so skip zero.
+    # https://github.com/boto/botocore/blob/develop/botocore/endpoint.py#L221-L229
+    # https://opentelemetry.io/docs/specs/semconv/http/http-spans/#http-client-span
+    if (
+        isinstance(retry_attempts, int)
+        # avoid emitting `resend_count=True`.
+        and not isinstance(retry_attempts, bool)
+        and retry_attempts > 0
+    ):
+        attributes[SPANDATA.HTTP_REQUEST_RESEND_COUNT] = retry_attempts
+
+    headers = metadata.get("HTTPHeaders")
+    if not isinstance(headers, dict):
+        headers = {}
+
+    request_id = next(
+        (
+            value
+            for value in (
+                metadata.get("RequestId"),
+                headers.get("x-amzn-requestid"),
+                headers.get("x-amzn-request-id"),
+                headers.get("x-amz-request-id"),
+            )
+            if isinstance(value, str) and value
+        ),
+        None,
+    )
+    if request_id is not None:
+        attributes[SPANDATA.AWS_REQUEST_ID] = request_id
+
+    # S3's `HostId` is the extended request ID returned in `x-amz-id-2`.
+    # https://docs.aws.amazon.com/AmazonS3/latest/developerguide/get-request-ids.html
+    extended_request_id = next(
+        (
+            value
+            for value in (metadata.get("HostId"), headers.get("x-amz-id-2"))
+            if isinstance(value, str) and value
+        ),
+        None,
+    )
+    if extended_request_id is not None:
+        attributes[SPANDATA.AWS_EXTENDED_REQUEST_ID] = extended_request_id
+
+    return attributes
+
+
+def _get_error_type(exception: "BaseException") -> str:
+    if isinstance(exception, ClientError):
+        # `ClientError` wraps AWS service errors; `Error.Code` identifies the
+        # actual service error, e.g. `AccessDeniedException`.
+        # https://docs.aws.amazon.com/boto3/latest/guide/error-handling.html
+        error = exception.response.get("Error")
+        if isinstance(error, dict):
+            error_code = error.get("Code")
+            if isinstance(error_code, str) and error_code:
+                return error_code
+
+    # failures before a service response have no AWS error code.
+    # https://opentelemetry.io/docs/specs/semconv/rpc/rpc-spans/
+    exception_type = type(exception)
+    exception_name = exception_type.__qualname__
+    exception_module = exception_type.__module__
+    if exception_module not in ("builtins", "__builtins__"):
+        return "%s.%s" % (exception_module, exception_name)
+    return exception_name
+
+
+def _get_error_attributes(exception: "BaseException") -> "Attributes":
+    attributes: "Attributes" = {}
+    if isinstance(exception, ClientError):
+        attributes.update(_get_response_attributes(exception.response))
+
+    attributes[SPANDATA.ERROR_TYPE] = _get_error_type(exception)
+    return attributes
+
+
 def _start_client_span(
     ctx: "AwsCallContext",
 ) -> "Optional[Union[Span, StreamedSpan]]":
     client = sentry_sdk.get_client()
-    if client.get_integration("boto3") is None:
+    if client.get_integration(IDENTIFIER) is None:
         return None
 
     # use unknown if `service_id_hyphenized` so span name can still be created.
@@ -202,6 +297,13 @@ def _instrument_streaming_body(
 
         finished = True
         # finish stream span before boto span, and only once across read/close.
+        if error is not None:
+            with capture_internal_exceptions():
+                attributes = _get_error_attributes(error)
+                _set_span_attributes(streaming_span, attributes)
+                if isinstance(span, StreamedSpan):
+                    _set_span_attributes(span, attributes)
+
         _finish_span(streaming_span, error)
         _finish_span(span, error)
 
@@ -338,7 +440,7 @@ def _sentry_request_created(
     """
 
     client = sentry_sdk.get_client()
-    if client.get_integration("boto3") is None:
+    if client.get_integration(IDENTIFIER) is None:
         return
 
     with capture_internal_exceptions():
@@ -366,7 +468,7 @@ def _sentry_before_sign(
     request: "AWSRequest", signature_version: "Any", **kwargs: "Any"
 ) -> None:
     client = sentry_sdk.get_client()
-    if client.get_integration("boto3") is None:
+    if client.get_integration(IDENTIFIER) is None:
         return
 
     with capture_internal_exceptions():
