@@ -214,7 +214,7 @@ def test_option_before_breadcrumb(sentry_init, capture_events, monkeypatch):
 
 @pytest.mark.tests_internal_exceptions
 def test_option_before_breadcrumb_exception(sentry_init, capture_events):
-    """Exceptions in before_breadcrumb are contained."""
+    """Breadcrumb is dropped if before_breadcrumb raises an exception."""
 
     def before_breadcrumb(crumb, hint):
         1 / 0
@@ -234,10 +234,7 @@ def test_option_before_breadcrumb_exception(sentry_init, capture_events):
     (event,) = events
 
     assert event["exception"]["values"][0]["type"] == "ValueError"
-    (crumb,) = event["breadcrumbs"]["values"]
-    assert "timestamp" in crumb
-    assert crumb["message"] == "Hello"
-    assert crumb["type"] == "default"
+    assert event["breadcrumbs"]["values"] == []
 
 
 def test_breadcrumb_arguments(sentry_init, capture_events):
