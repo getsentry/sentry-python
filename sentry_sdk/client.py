@@ -56,6 +56,7 @@ from sentry_sdk.utils import (
     capture_internal_exceptions,
     current_stacktrace,
     datetime_from_isoformat,
+    deprecation_warning,
     env_to_bool,
     format_timestamp,
     get_before_send_log,
@@ -349,6 +350,13 @@ def _get_options(*args: "Optional[str]", **kwargs: "Any") -> "Dict[str, Any]":
 
     if rv["enable_tracing"] is True and rv["traces_sample_rate"] is None:
         rv["traces_sample_rate"] = 1.0
+
+    if rv["send_default_pii"] is None:
+        deprecation_warning(
+            "The send_default_pii option is deprecated. Use data_collection "
+            "instead. "
+            "See https://docs.sentry.io/platforms/python/data-management/data-collected/"
+        )
 
     rv["data_collection"] = _resolve_data_collection(rv)
 
