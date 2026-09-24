@@ -235,7 +235,13 @@ def test_flask_login_partially_configured(
     assert event.get("user", {}).get("id") is None
 
 
-@pytest.mark.parametrize("init_kwargs, expect_user", DATA_COLLECTION_USER_INFO_CASES)
+@pytest.mark.parametrize(
+    "init_kwargs, expect_user",
+    [
+        pytest.param({"data_collection": {}}, True, id="data_collection_default"),
+        *DATA_COLLECTION_USER_INFO_CASES,
+    ],
+)
 @pytest.mark.parametrize("user_id", [None, "42", 3])
 def test_flask_login_configured(
     init_kwargs,
