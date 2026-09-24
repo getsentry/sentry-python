@@ -919,6 +919,7 @@ class Scope:
 
         new_crumb = crumb
         if before_breadcrumb is not None:
+            new_crumb = None
             with capture_internal_exceptions():
                 new_crumb = before_breadcrumb(crumb, hint)
 
@@ -1480,7 +1481,7 @@ class Scope:
             )
 
             for error_processor in error_processors:
-                new_event = event
+                new_event = None
                 with capture_internal_exceptions():
                     new_event = error_processor(event, exc_info)
                 if new_event is None:
@@ -1510,7 +1511,7 @@ class Scope:
             )
 
             for event_processor in event_processors:
-                new_event = event
+                new_event = None
                 with capture_internal_exceptions():
                     new_event = event_processor(event, hint)
                 if new_event is None:
