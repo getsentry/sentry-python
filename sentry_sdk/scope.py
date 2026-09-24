@@ -1828,7 +1828,7 @@ class Scope:
             )
 
             for error_processor in error_processors:
-                new_event = None
+                new_event = event
                 with capture_internal_exceptions():
                     new_event = error_processor(event, exc_info)
                 if new_event is None:
@@ -1858,7 +1858,7 @@ class Scope:
             )
 
             for event_processor in event_processors:
-                new_event = None
+                new_event = event
                 with capture_internal_exceptions():
                     new_event = event_processor(event, hint)
                 if new_event is None:
