@@ -1,6 +1,5 @@
 import pytest
 
-
 # Shared parametrization test matrix for ``data_collection.user_info`` setting.
 # Each case is ``(init_kwargs, expect_user_info)`` where the second element indicates
 # whether user info (IP address, user identity, etc.) is expected to be collected.
