@@ -235,10 +235,11 @@ def test_flask_login_partially_configured(
     assert event.get("user", {}).get("id") is None
 
 
-@pytest.mark.parametrize("send_default_pii", [True, False])
+@pytest.mark.parametrize("init_kwargs, expect_user", DATA_COLLECTION_USER_INFO_CASES)
 @pytest.mark.parametrize("user_id", [None, "42", 3])
 def test_flask_login_configured(
-    send_default_pii,
+    init_kwargs,
+    expect_user,
     sentry_init,
     app,
     user_id,
@@ -249,8 +250,8 @@ def test_flask_login_configured(
 ):
     sentry_init(
         integrations=[flask_sentry.FlaskIntegration()],
-        send_default_pii=send_default_pii,
         traces_sample_rate=1.0,
+        **init_kwargs,
     )
 
     class User:
@@ -284,7 +285,7 @@ def test_flask_login_configured(
     spans = [i.payload for i in items if i.type == "span"]
     segment = next(s for s in spans if s["name"] == "hi")
 
-    if send_default_pii and user_id is not None:
+    if expect_user and user_id is not None:
         assert segment["attributes"]["user.id"] == str(user_id)
         assert segment["attributes"]["user.email"] == "user@example.com"
         assert segment["attributes"]["user.name"] == "testuser"
@@ -293,12 +294,16 @@ def test_flask_login_configured(
 
 
 @pytest.mark.parametrize("max_value_length", [1024, None])
-def test_flask_large_json_request(sentry_init, capture_events, app, max_value_length):
+def test_flask_large_json_request(
+    sentry_init, capture_events, app, monkeypatch, max_value_length
+):
     sentry_init(
         integrations=[flask_sentry.FlaskIntegration()],
         max_request_body_size="always",
         max_value_length=max_value_length,
+        data_collection={},
     )
+    monkeypatch.setattr(flask_sentry, "flask_login", None)
 
     data = {"foo": {"bar": "a" * (1034)}}
 
@@ -355,7 +360,7 @@ def test_flask_session_tracking(sentry_init, capture_envelopes, app):
         except ZeroDivisionError:
             pass
 
-    sentry_sdk.get_client().flush()
+    sentry_sdk.flush()
 
     (first_event, error_event, session) = envelopes
     first_event = first_event.get_event()
@@ -373,8 +378,12 @@ def test_flask_session_tracking(sentry_init, capture_envelopes, app):
 
 
 @pytest.mark.parametrize("data", [{}, []], ids=["empty-dict", "empty-list"])
-def test_flask_empty_json_request(sentry_init, capture_events, app, data):
-    sentry_init(integrations=[flask_sentry.FlaskIntegration()])
+def test_flask_empty_json_request(sentry_init, capture_events, app, monkeypatch, data):
+    sentry_init(
+        integrations=[flask_sentry.FlaskIntegration()],
+        data_collection={},
+    )
+    monkeypatch.setattr(flask_sentry, "flask_login", None)
 
     @app.route("/", methods=["POST"])
     def index():
@@ -396,13 +405,15 @@ def test_flask_empty_json_request(sentry_init, capture_events, app, data):
 
 @pytest.mark.parametrize("max_value_length", [1024, None])
 def test_flask_medium_formdata_request(
-    sentry_init, capture_events, app, max_value_length
+    sentry_init, capture_events, app, monkeypatch, max_value_length
 ):
     sentry_init(
         integrations=[flask_sentry.FlaskIntegration()],
         max_request_body_size="always",
         max_value_length=max_value_length,
+        data_collection={},
     )
+    monkeypatch.setattr(flask_sentry, "flask_login", None)
 
     data = {"foo": "a" * (1034)}
 
@@ -438,10 +449,15 @@ def test_flask_medium_formdata_request(
 
 
 @pytest.mark.parametrize("input_char", ["a", b"a"])
-def test_flask_too_large_raw_request(sentry_init, input_char, capture_events, app):
+def test_flask_too_large_raw_request(
+    sentry_init, input_char, capture_events, app, monkeypatch
+):
     sentry_init(
-        integrations=[flask_sentry.FlaskIntegration()], max_request_body_size="small"
+        integrations=[flask_sentry.FlaskIntegration()],
+        max_request_body_size="small",
+        data_collection={},
     )
+    monkeypatch.setattr(flask_sentry, "flask_login", None)
 
     data = input_char * 2000
 
@@ -472,12 +488,16 @@ def test_flask_too_large_raw_request(sentry_init, input_char, capture_events, ap
 
 
 @pytest.mark.parametrize("max_value_length", [1024, None])
-def test_flask_files_and_form(sentry_init, capture_events, app, max_value_length):
+def test_flask_files_and_form(
+    sentry_init, capture_events, app, monkeypatch, max_value_length
+):
     sentry_init(
         integrations=[flask_sentry.FlaskIntegration()],
         max_request_body_size="always",
         max_value_length=max_value_length,
+        data_collection={},
     )
+    monkeypatch.setattr(flask_sentry, "flask_login", None)
 
     data = {
         "foo": "a" * (1034),
@@ -519,11 +539,14 @@ def test_flask_files_and_form(sentry_init, capture_events, app, max_value_length
 
 
 def test_json_not_truncated_if_max_request_body_size_is_always(
-    sentry_init, capture_events, app
+    sentry_init, capture_events, app, monkeypatch
 ):
     sentry_init(
-        integrations=[flask_sentry.FlaskIntegration()], max_request_body_size="always"
+        integrations=[flask_sentry.FlaskIntegration()],
+        max_request_body_size="always",
+        data_collection={},
     )
+    monkeypatch.setattr(flask_sentry, "flask_login", None)
 
     data = {
         "key{}".format(i): "value{}".format(i) for i in range(MAX_DATABAG_BREADTH + 10)
@@ -949,7 +972,7 @@ def test_request_not_modified_by_reference(sentry_init, capture_events, app):
         integrations=[
             flask_sentry.FlaskIntegration(),
             LoggingIntegration(event_level=logging.ERROR),
-        ]
+        ],
     )
 
     @app.route("/", methods=["POST"])
@@ -1083,16 +1106,6 @@ def test_segment_http_method_custom(
     "init_kwargs, expected_query_string",
     [
         pytest.param(
-            {"send_default_pii": True},
-            "toy=tennisball&color=red&auth=secret",
-            id="legacy_send_default_pii_true",
-        ),
-        pytest.param(
-            {"send_default_pii": False},
-            "toy=tennisball&color=red&auth=secret",
-            id="legacy_send_default_pii_false",
-        ),
-        pytest.param(
             {"data_collection": {}},
             "toy=tennisball&color=red&auth=%5BFiltered%5D",
             id="data_collection_denylist_default",
@@ -1124,7 +1137,7 @@ def test_query_string_data_collection(
     sentry_init(integrations=[flask_sentry.FlaskIntegration()], **init_kwargs)
     # This test is about query-string filtering, not user data. Disable
     # flask_login so the module-level login manager (which has no user_loader)
-    # does not raise when send_default_pii is on.
+    # does not raise while user info collection is enabled.
     monkeypatch.setattr(flask_sentry, "flask_login", None)
     events = capture_events()
 
@@ -1142,16 +1155,6 @@ def test_query_string_data_collection(
 @pytest.mark.parametrize(
     "init_kwargs, expected_query",
     [
-        pytest.param(
-            {"send_default_pii": True},
-            "toy=tennisball&color=red&auth=secret",
-            id="legacy_send_default_pii_true",
-        ),
-        pytest.param(
-            {"send_default_pii": False},
-            None,
-            id="legacy_send_default_pii_false",
-        ),
         pytest.param(
             {"data_collection": {}},
             "toy=tennisball&color=red&auth=%5BFiltered%5D",
@@ -1202,20 +1205,6 @@ def test_span_http_query_data_collection(
         assert SPANDATA.HTTP_QUERY not in segment["attributes"]
     else:
         assert segment["attributes"][SPANDATA.HTTP_QUERY] == expected_query
-
-
-def test_query_string_empty_legacy_emits_empty_string(
-    sentry_init, app, capture_events, monkeypatch
-):
-    sentry_init(integrations=[flask_sentry.FlaskIntegration()], send_default_pii=True)
-    monkeypatch.setattr(flask_sentry, "flask_login", None)
-    events = capture_events()
-
-    client = app.test_client()
-    client.get("/message")
-
-    (event,) = events
-    assert event["request"]["query_string"] == ""
 
 
 def test_empty_query_string_is_dropped_with_data_collection(
