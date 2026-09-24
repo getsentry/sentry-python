@@ -24,7 +24,6 @@ import sentry_sdk
 from sentry_sdk._types import BLOB_DATA_SUBSTITUTE
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.pydantic_ai import PydanticAIIntegration
-from sentry_sdk.integrations.pydantic_ai.spans.ai_client import _set_input_messages
 from sentry_sdk.integrations.pydantic_ai.spans.utils import _set_usage_data
 from sentry_sdk.utils import package_version
 
@@ -2762,34 +2761,6 @@ async def test_agent_without_name(
 
 
 @pytest.mark.asyncio
-async def test_input_messages_error_handling(sentry_init, capture_items):
-    """
-    Test that _set_input_messages handles errors gracefully.
-    """
-    import sentry_sdk
-
-    sentry_init(
-        integrations=[PydanticAIIntegration()],
-        traces_sample_rate=1.0,
-        send_default_pii=True,
-    )
-
-    with sentry_sdk.start_transaction(op="test", name="test") as transaction:
-        span = sentry_sdk.start_span(op="test_span")
-
-        # Pass invalid messages that would cause an error
-        invalid_messages = [object()]  # Plain object without expected attributes
-
-        # Should not raise, error is caught internally
-        _set_input_messages(span, invalid_messages)
-
-        span.finish()
-
-    # Should not crash
-    assert transaction is not None
-
-
-@pytest.mark.asyncio
 async def test_available_tools_error_handling(sentry_init, capture_items):
     """
     Test that _set_available_tools handles errors gracefully.
@@ -2936,42 +2907,6 @@ async def test_message_parts_with_tool_return(
 
     # Should have chat spans
     assert len(chat_spans) == 2
-
-
-@pytest.mark.asyncio
-async def test_message_parts_with_list_content(sentry_init, capture_items):
-    """
-    Test that message parts with list content are handled correctly.
-    """
-    from unittest.mock import MagicMock
-
-    import sentry_sdk
-
-    sentry_init(
-        integrations=[PydanticAIIntegration()],
-        traces_sample_rate=1.0,
-        send_default_pii=True,
-    )
-
-    with sentry_sdk.start_transaction(op="test", name="test") as transaction:
-        span = sentry_sdk.start_span(op="test_span")
-
-        # Create message with list content
-        mock_msg = MagicMock()
-        mock_part = MagicMock()
-        mock_part.content = ["item1", "item2", {"complex": "item"}]
-        mock_msg.parts = [mock_part]
-        mock_msg.instructions = None
-
-        messages = [mock_msg]
-
-        # Should handle list content
-        _set_input_messages(span, messages)
-
-        span.finish()
-
-    # Should not crash
-    assert transaction is not None
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
@@ -3167,106 +3102,6 @@ async def test_output_data_error_handling(sentry_init, capture_items):
         span.finish()
 
     # Should not crash
-    assert transaction is not None
-
-
-@pytest.mark.asyncio
-async def test_message_with_system_prompt_part(sentry_init, capture_items):
-    """
-    Test that SystemPromptPart is handled with correct role.
-    """
-    from unittest.mock import MagicMock
-
-    from pydantic_ai import messages
-
-    import sentry_sdk
-
-    sentry_init(
-        integrations=[PydanticAIIntegration()],
-        traces_sample_rate=1.0,
-        send_default_pii=True,
-    )
-
-    with sentry_sdk.start_transaction(op="test", name="test") as transaction:
-        span = sentry_sdk.start_span(op="test_span")
-
-        # Create message with SystemPromptPart
-        system_part = messages.SystemPromptPart(content="You are a helpful assistant")
-
-        mock_msg = MagicMock()
-        mock_msg.parts = [system_part]
-        mock_msg.instructions = None
-
-        msgs = [mock_msg]
-
-        # Should handle system prompt
-        _set_input_messages(span, msgs)
-
-        span.finish()
-
-    # Should not crash
-    assert transaction is not None
-
-
-@pytest.mark.asyncio
-async def test_message_with_instructions(sentry_init, capture_items):
-    """
-    Test that messages with instructions field are handled correctly.
-    """
-    from unittest.mock import MagicMock
-
-    import sentry_sdk
-
-    sentry_init(
-        integrations=[PydanticAIIntegration()],
-        traces_sample_rate=1.0,
-        send_default_pii=True,
-    )
-
-    with sentry_sdk.start_transaction(op="test", name="test") as transaction:
-        span = sentry_sdk.start_span(op="test_span")
-
-        # Create message with instructions
-        mock_msg = MagicMock()
-        mock_msg.instructions = "System instructions here"
-        mock_part = MagicMock()
-        mock_part.content = "User message"
-        mock_msg.parts = [mock_part]
-
-        msgs = [mock_msg]
-
-        # Should extract system prompt from instructions
-        _set_input_messages(span, msgs)
-
-        span.finish()
-
-    # Should not crash
-    assert transaction is not None
-
-
-@pytest.mark.asyncio
-async def test_set_input_messages_without_prompts(sentry_init, capture_items):
-    """
-    Test that _set_input_messages respects _should_send_prompts().
-    """
-    import sentry_sdk
-
-    sentry_init(
-        integrations=[PydanticAIIntegration(include_prompts=False)],
-        traces_sample_rate=1.0,
-        send_default_pii=True,
-    )
-
-    with sentry_sdk.start_transaction(op="test", name="test") as transaction:
-        span = sentry_sdk.start_span(op="test_span")
-
-        # Even with messages, should not set them
-        messages = ["test"]
-        _set_input_messages(span, messages)
-
-        span.finish()
-
-    # Should not crash and should not set messages
     assert transaction is not None
 
 
@@ -3758,6 +3593,8 @@ async def test_binary_content_encoding_image(
     span_streaming,
 ):
     """Test that BinaryContent with image data is properly encoded in messages."""
+    agent = Agent("test", name="test_binary_image_agent")
+
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
@@ -3766,71 +3603,34 @@ async def test_binary_content_encoding_image(
         trace_lifecycle="stream" if span_streaming else "static",
     )
 
-    if span_streaming:
+    binary_content = BinaryContent(
+        data=b"fake_image_data_12345", media_type="image/png"
+    )
+
+    if span_streaming or stream_gen_ai_spans:
         items = capture_items("span")
 
-        with sentry_sdk.traces.start_span(
-            name="test", attributes={"sentry.op": "test"}
-        ):
-            span = sentry_sdk.traces.start_span(
-                name="custom span", attributes={"sentry.op": "test_span"}
-            )
-            binary_content = BinaryContent(
-                data=b"fake_image_data_12345", media_type="image/png"
-            )
-            user_part = UserPromptPart(content=["Look at this image:", binary_content])
-            mock_msg = MagicMock()
-            mock_msg.parts = [user_part]
-            mock_msg.instructions = None
-
-            _set_input_messages(span, [mock_msg])
-            span.finish()
+        await agent.run(["Look at this image:", binary_content])
 
         sentry_sdk.flush()
         spans = [item.payload for item in items]
+        msg_spans = [
+            s for s in spans if "gen_ai.request.messages" in s.get("attributes", {})
+        ]
+        assert msg_spans, "expected a span carrying gen_ai.request.messages"
 
-        span_data = spans[0]["attributes"]
-        messages_data = _get_messages_from_span(span_data)
-        assert _find_binary_content(messages_data, "image", "image/png")
-    elif stream_gen_ai_spans:
-        items = capture_items("transaction")
-
-        with sentry_sdk.start_transaction(op="test", name="test"):
-            span = sentry_sdk.start_span(op="test_span")
-            binary_content = BinaryContent(
-                data=b"fake_image_data_12345", media_type="image/png"
-            )
-            user_part = UserPromptPart(content=["Look at this image:", binary_content])
-            mock_msg = MagicMock()
-            mock_msg.parts = [user_part]
-            mock_msg.instructions = None
-
-            _set_input_messages(span, [mock_msg])
-            span.finish()
-
-        (event,) = (item.payload for item in items)
-        span_data = event["spans"][0]["data"]
-        messages_data = _get_messages_from_span(span_data)
+        messages_data = _get_messages_from_span(msg_spans[0]["attributes"])
         assert _find_binary_content(messages_data, "image", "image/png")
     else:
         events = capture_events()
 
-        with sentry_sdk.start_transaction(op="test", name="test"):
-            span = sentry_sdk.start_span(op="test_span")
-            binary_content = BinaryContent(
-                data=b"fake_image_data_12345", media_type="image/png"
-            )
-            user_part = UserPromptPart(content=["Look at this image:", binary_content])
-            mock_msg = MagicMock()
-            mock_msg.parts = [user_part]
-            mock_msg.instructions = None
+        await agent.run(["Look at this image:", binary_content])
 
-            _set_input_messages(span, [mock_msg])
-            span.finish()
+        (transaction,) = events
+        chat_spans = [s for s in transaction["spans"] if s["op"] == "gen_ai.chat"]
+        assert len(chat_spans) == 1
 
-        (event,) = events
-        span_data = event["spans"][0]["data"]
-        messages_data = _get_messages_from_span(span_data)
+        messages_data = _get_messages_from_span(chat_spans[0]["data"])
         assert _find_binary_content(messages_data, "image", "image/png")
 
 
@@ -3845,6 +3645,8 @@ async def test_binary_content_encoding_mixed_content(
     span_streaming,
 ):
     """Test that BinaryContent mixed with text content is properly handled."""
+    agent = Agent("test", name="test_binary_mixed_agent")
+
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
@@ -3853,66 +3655,22 @@ async def test_binary_content_encoding_mixed_content(
         trace_lifecycle="stream" if span_streaming else "static",
     )
 
-    if span_streaming:
+    binary_content = BinaryContent(data=b"fake_image_bytes", media_type="image/jpeg")
+
+    if span_streaming or stream_gen_ai_spans:
         items = capture_items("span")
 
-        with sentry_sdk.traces.start_span(
-            name="test", attributes={"sentry.op": "test"}
-        ):
-            span = sentry_sdk.traces.start_span(
-                name="custom span", attributes={"sentry.op": "test_span"}
-            )
-            binary_content = BinaryContent(
-                data=b"fake_image_bytes", media_type="image/jpeg"
-            )
-            user_part = UserPromptPart(
-                content=["Here is an image:", binary_content, "What do you see?"]
-            )
-            mock_msg = MagicMock()
-            mock_msg.parts = [user_part]
-            mock_msg.instructions = None
-
-            _set_input_messages(span, [mock_msg])
-            span.finish()
+        await agent.run(["Here is an image:", binary_content, "What do you see?"])
 
         sentry_sdk.flush()
         spans = [item.payload for item in items]
+        msg_spans = [
+            s for s in spans if "gen_ai.request.messages" in s.get("attributes", {})
+        ]
+        assert msg_spans, "expected a span carrying gen_ai.request.messages"
 
-        span_data = spans[0]["attributes"]
-        messages_data = _get_messages_from_span(span_data)
+        messages_data = _get_messages_from_span(msg_spans[0]["attributes"])
 
-        # Verify both text and binary content are present
-        found_text = any(
-            content_item.get("type") == "text"
-            for msg in messages_data
-            if "content" in msg
-            for content_item in msg["content"]
-        )
-        assert found_text, "Text content should be found"
-        assert _find_binary_content(messages_data, "image", "image/jpeg")
-    elif stream_gen_ai_spans:
-        items = capture_items("transaction")
-
-        with sentry_sdk.start_transaction(op="test", name="test"):
-            span = sentry_sdk.start_span(op="test_span")
-            binary_content = BinaryContent(
-                data=b"fake_image_bytes", media_type="image/jpeg"
-            )
-            user_part = UserPromptPart(
-                content=["Here is an image:", binary_content, "What do you see?"]
-            )
-            mock_msg = MagicMock()
-            mock_msg.parts = [user_part]
-            mock_msg.instructions = None
-
-            _set_input_messages(span, [mock_msg])
-            span.finish()
-
-        (event,) = (item.payload for item in items)
-        span_data = event["spans"][0]["data"]
-        messages_data = _get_messages_from_span(span_data)
-
-        # Verify both text and binary content are present
         found_text = any(
             content_item.get("type") == "text"
             for msg in messages_data
@@ -3924,26 +3682,14 @@ async def test_binary_content_encoding_mixed_content(
     else:
         events = capture_events()
 
-        with sentry_sdk.start_transaction(op="test", name="test"):
-            span = sentry_sdk.start_span(op="test_span")
-            binary_content = BinaryContent(
-                data=b"fake_image_bytes", media_type="image/jpeg"
-            )
-            user_part = UserPromptPart(
-                content=["Here is an image:", binary_content, "What do you see?"]
-            )
-            mock_msg = MagicMock()
-            mock_msg.parts = [user_part]
-            mock_msg.instructions = None
+        await agent.run(["Here is an image:", binary_content, "What do you see?"])
 
-            _set_input_messages(span, [mock_msg])
-            span.finish()
+        (transaction,) = events
+        chat_spans = [s for s in transaction["spans"] if s["op"] == "gen_ai.chat"]
+        assert len(chat_spans) == 1
 
-        (event,) = events
-        span_data = event["spans"][0]["data"]
-        messages_data = _get_messages_from_span(span_data)
+        messages_data = _get_messages_from_span(chat_spans[0]["data"])
 
-        # Verify both text and binary content are present
         found_text = any(
             content_item.get("type") == "text"
             for msg in messages_data
