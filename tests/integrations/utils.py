@@ -1,14 +1,10 @@
 import pytest
 
-# Shared parametrization test matrix exercising the precedence between the legacy
-# ``send_default_pii`` boolean and the ``data_collection.user_info`` setting.
+
+# Shared parametrization test matrix for ``data_collection.user_info`` setting.
 # Each case is ``(init_kwargs, expect_user_info)`` where the second element indicates
 # whether user info (IP address, user identity, etc.) is expected to be collected.
 DATA_COLLECTION_USER_INFO_CASES = [
-    pytest.param({"send_default_pii": True}, True, id="legacy_send_default_pii_true"),
-    pytest.param(
-        {"send_default_pii": False}, False, id="legacy_send_default_pii_false"
-    ),
     pytest.param(
         {"data_collection": {"user_info": True}},
         True,
@@ -18,22 +14,6 @@ DATA_COLLECTION_USER_INFO_CASES = [
         {"data_collection": {"user_info": False}},
         False,
         id="data_collection_user_info_false",
-    ),
-    pytest.param(
-        {
-            "send_default_pii": True,
-            "data_collection": {"user_info": False},
-        },
-        False,
-        id="data_collection_wins_over_send_default_pii_true",
-    ),
-    pytest.param(
-        {
-            "send_default_pii": False,
-            "data_collection": {"user_info": True},
-        },
-        True,
-        id="data_collection_wins_over_send_default_pii_false",
     ),
 ]
 
@@ -53,9 +33,8 @@ DATA_COLLECTION_REMOTE_ADDR_CASES = [
     ),
 ]
 
-# Shared parametrization test matrix exercising the interaction between the
-# ``data_collection.queues`` setting and the legacy ``send_default_pii`` boolean
-# for job/task args and kwargs collected by queue integrations (rq, arq, huey).
+
+# Shared parametrization test matrix for ``data_collection.queues`` setting.
 # Each case is ``(init_kwargs, expected_args, expected_kwargs)`` where ``None`` for
 # the expected values means args/kwargs are not collected at all.
 DATA_COLLECTION_QUEUES_CASES = [
