@@ -1,9 +1,9 @@
-from functools import partial
 from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
-from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
+from sentry_sdk.integrations import DidNotEnable
+from sentry_sdk.integrations.boto3.consts import ORIGIN
 from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing import BAGGAGE_HEADER_NAME, Span
 from sentry_sdk.tracing_utils import (
@@ -16,7 +16,6 @@ from sentry_sdk.tracing_utils import (
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     parse_url,
-    parse_version,
 )
 
 if TYPE_CHECKING:
@@ -26,46 +25,17 @@ if TYPE_CHECKING:
 
 
 try:
-    from botocore import __version__ as BOTOCORE_VERSION
     from botocore.awsrequest import AWSRequest
-    from botocore.client import BaseClient
     from botocore.response import StreamingBody
 except ImportError:
     raise DidNotEnable("botocore is not installed")
 
 
-class Boto3Integration(Integration):
-    identifier = "boto3"
-    origin = f"auto.http.{identifier}"
-
-    @staticmethod
-    def setup_once() -> None:
-        version = parse_version(BOTOCORE_VERSION)
-        _check_minimum_version(Boto3Integration, version, "botocore")
-
-        orig_init = BaseClient.__init__
-
-        def sentry_patched_init(
-            self: "BaseClient", *args: "Any", **kwargs: "Any"
-        ) -> None:
-            orig_init(self, *args, **kwargs)
-            meta = self.meta
-            service_id = meta.service_model.service_id
-            meta.events.register(
-                "request-created",
-                partial(_sentry_request_created, service_id=service_id),
-            )
-            # run after other `before-sign` handlers, allowing it to see and preserve existing baggage.
-            meta.events.register_last("before-sign", _sentry_before_sign)
-            meta.events.register("after-call", _sentry_after_call)
-            meta.events.register("after-call-error", _sentry_after_call_error)
-
-        BaseClient.__init__ = sentry_patched_init  # type: ignore
-
-
 def _sentry_request_created(
     service_id: "ServiceId", request: "AWSRequest", operation_name: str, **kwargs: "Any"
 ) -> None:
+    from sentry_sdk.integrations.boto3 import Boto3Integration
+
     description = "aws.%s.%s" % (service_id.hyphenize(), operation_name)
 
     client = sentry_sdk.get_client()
@@ -93,7 +63,7 @@ def _sentry_request_created(
                 name=description,
                 attributes={
                     "sentry.op": OP.HTTP_CLIENT,
-                    "sentry.origin": Boto3Integration.origin,
+                    "sentry.origin": ORIGIN,
                     SPANDATA.RPC_METHOD: f"{service_id}/{operation_name}",
                 },
             )
@@ -105,7 +75,7 @@ def _sentry_request_created(
         span = sentry_sdk.start_span(
             op=OP.HTTP_CLIENT,
             name=description,
-            origin=Boto3Integration.origin,
+            origin=ORIGIN,
         )
 
         if parsed_url:
@@ -141,6 +111,8 @@ def _sentry_request_created(
 def _sentry_before_sign(
     request: "AWSRequest", signature_version: "Any", **kwargs: "Any"
 ) -> None:
+    from sentry_sdk.integrations.boto3 import Boto3Integration
+
     client = sentry_sdk.get_client()
     if client.get_integration(Boto3Integration) is None:
         return
@@ -214,14 +186,14 @@ def _sentry_after_call(
             parent_span=span,
             attributes={
                 "sentry.op": OP.HTTP_CLIENT_STREAM,
-                "sentry.origin": Boto3Integration.origin,
+                "sentry.origin": ORIGIN,
             },
         )
     else:
         streaming_span = span.start_child(
             op=OP.HTTP_CLIENT_STREAM,
             name=span.description,
-            origin=Boto3Integration.origin,
+            origin=ORIGIN,
         )
 
     orig_read = body.read
