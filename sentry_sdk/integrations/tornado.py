@@ -6,8 +6,8 @@ from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.data_collection import _apply_data_collection_filtering_to_query_string
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.integrations._wsgi_common import (
-    RequestExtractor,
-    _filter_headers,
+    LegacyRequestExtractor,
+    _filter_headers_legacy,
     _is_json_content_type,
     request_body_within_bounds,
 )
@@ -147,7 +147,7 @@ def _get_request_attributes(request: "Any") -> "Dict[str, Any]":
     if request.method:
         attributes[SPANDATA.HTTP_REQUEST_METHOD] = request.method.upper()
 
-    headers = _filter_headers(dict(request.headers), use_annotated_value=False)
+    headers = _filter_headers_legacy(dict(request.headers), use_annotated_value=False)
     for header, value in headers.items():
         attributes[f"{SPANDATA.HTTP_REQUEST_HEADER}.{header.lower()}"] = value
 
@@ -280,7 +280,7 @@ def _make_event_processor(
                 or client_options["data_collection"]["user_info"]
             ):
                 request_info["env"] = {"REMOTE_ADDR": request.remote_ip}
-            request_info["headers"] = _filter_headers(dict(request.headers))
+            request_info["headers"] = _filter_headers_legacy(dict(request.headers))
 
         if has_data_collection_enabled(client_options):
             if client_options["data_collection"]["user_info"]:
@@ -305,7 +305,7 @@ def _make_event_processor(
     return tornado_processor
 
 
-class TornadoRequestExtractor(RequestExtractor):
+class TornadoRequestExtractor(LegacyRequestExtractor):
     def content_length(self) -> int:
         if self.request.body is None:
             return 0

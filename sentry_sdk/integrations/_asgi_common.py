@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk.data_collection import _apply_data_collection_filtering_to_query_string
-from sentry_sdk.integrations._wsgi_common import _filter_headers
+from sentry_sdk.integrations._wsgi_common import _filter_headers_legacy
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.utils import has_data_collection_enabled
 
@@ -121,7 +121,7 @@ def _get_request_data(
 
         headers = _get_headers(asgi_scope)
 
-        request_data["headers"] = _filter_headers(
+        request_data["headers"] = _filter_headers_legacy(
             headers,
             use_annotated_value=False,
         )
@@ -175,7 +175,7 @@ def _get_request_attributes(
 
         headers = _get_headers(asgi_scope)
 
-        filtered_headers = _filter_headers(headers, use_annotated_value=False)
+        filtered_headers = _filter_headers_legacy(headers, use_annotated_value=False)
         for header, value in filtered_headers.items():
             attributes[f"http.request.header.{header.lower()}"] = value
 

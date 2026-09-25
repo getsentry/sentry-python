@@ -5,7 +5,7 @@ from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.integrations._wsgi_common import (
     DEFAULT_HTTP_METHODS_TO_CAPTURE,
-    RequestExtractor,
+    LegacyRequestExtractor,
 )
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
 from sentry_sdk.scope import should_send_default_pii
@@ -185,7 +185,7 @@ def _request_started(app: "Flask", **kwargs: "Any") -> None:
     scope.add_event_processor(evt_processor)
 
 
-class FlaskRequestExtractor(RequestExtractor):
+class FlaskRequestExtractor(LegacyRequestExtractor):
     def env(self) -> "Dict[str, str]":
         return self.request.environ
 
