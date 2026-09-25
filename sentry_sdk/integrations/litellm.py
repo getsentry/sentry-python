@@ -3,7 +3,6 @@ from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk import consts
-from sentry_sdk.ai.monitoring import record_token_usage
 from sentry_sdk.ai.utils import (
     set_data_normalized,
     transform_openai_content_part,
@@ -229,12 +228,25 @@ def _success_callback(
         # Record token usage
         if hasattr(completion_response, "usage"):
             usage = completion_response.usage
-            record_token_usage(
-                span,
-                input_tokens=getattr(usage, "prompt_tokens", None),
-                output_tokens=getattr(usage, "completion_tokens", None),
-                total_tokens=getattr(usage, "total_tokens", None),
-            )
+
+            input_tokens = getattr(usage, "prompt_tokens", None)
+            if input_tokens is not None:
+                span.set_attribute(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, input_tokens)
+
+            output_tokens = getattr(usage, "completion_tokens", None)
+            if output_tokens is not None:
+                span.set_attribute(SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS, output_tokens)
+
+            total_tokens = getattr(usage, "total_tokens", None)
+            if (
+                total_tokens is None
+                and input_tokens is not None
+                and output_tokens is not None
+            ):
+                total_tokens = input_tokens + output_tokens
+
+            if total_tokens is not None:
+                span.set_attribute(SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, total_tokens)
 
     finally:
         is_streaming = kwargs.get("stream")

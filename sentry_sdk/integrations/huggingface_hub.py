@@ -4,7 +4,6 @@ from functools import wraps
 from typing import TYPE_CHECKING, cast
 
 import sentry_sdk
-from sentry_sdk.ai.monitoring import record_token_usage
 from sentry_sdk.ai.utils import set_data_normalized
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
@@ -239,18 +238,23 @@ def _wrap_huggingface_task(f: "Callable[..., Any]", op: str) -> "Callable[..., A
                             text_response,
                         )
 
-            if usage is not None:
-                record_token_usage(
-                    span,
-                    input_tokens=usage.prompt_tokens,
-                    output_tokens=usage.completion_tokens,
-                    total_tokens=usage.total_tokens,
+            if usage is not None and usage.prompt_tokens is not None:
+                span.set_attribute(
+                    SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, usage.prompt_tokens
                 )
-            elif tokens_used > 0:
-                record_token_usage(
-                    span,
-                    total_tokens=tokens_used,
+
+            if usage is not None and usage.completion_tokens is not None:
+                span.set_attribute(
+                    SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS, usage.completion_tokens
                 )
+
+            if usage is not None and usage.total_tokens is not None:
+                span.set_attribute(
+                    SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, usage.total_tokens
+                )
+
+            elif tokens_used > 0 and tokens_used is not None:
+                span.set_attribute(SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, tokens_used)
 
             # If the response is not a generator (meaning a streaming response)
             # we are done and can return the response
@@ -313,9 +317,8 @@ def _wrap_huggingface_task(f: "Callable[..., Any]", op: str) -> "Callable[..., A
                                     )
 
                         if tokens_used > 0:
-                            record_token_usage(
-                                span,
-                                total_tokens=tokens_used,
+                            span.set_attribute(
+                                SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, tokens_used
                             )
 
                     span.__exit__(None, None, None)
@@ -419,12 +422,20 @@ def _wrap_huggingface_task(f: "Callable[..., Any]", op: str) -> "Callable[..., A
                                         text_response,
                                     )
 
-                        if usage is not None:
-                            record_token_usage(
-                                span,
-                                input_tokens=usage.prompt_tokens,
-                                output_tokens=usage.completion_tokens,
-                                total_tokens=usage.total_tokens,
+                        if usage is not None and usage.prompt_tokens is not None:
+                            span.set_attribute(
+                                SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, usage.prompt_tokens
+                            )
+
+                        if usage is not None and usage.completion_tokens is not None:
+                            span.set_attribute(
+                                SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS,
+                                usage.completion_tokens,
+                            )
+
+                        if usage is not None and usage.total_tokens is not None:
+                            span.set_attribute(
+                                SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, usage.total_tokens
                             )
 
                         span.__exit__(None, None, None)
