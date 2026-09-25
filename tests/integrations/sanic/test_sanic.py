@@ -104,7 +104,7 @@ def get_client(app):
 
 
 def test_request_data(sentry_init, app, capture_events):
-    sentry_init(integrations=[SanicIntegration()])
+    sentry_init(integrations=[SanicIntegration()], data_collection={})
     events = capture_events()
 
     c = get_client(app)
@@ -368,7 +368,17 @@ class TransactionTestConfig:
         self.expected_source = expected_source
 
 
-@pytest.mark.parametrize("send_pii", [True, False])
+@pytest.mark.parametrize(
+    "data_collection, expect_query",
+    [
+        pytest.param({}, True, id="data_collection_default"),
+        pytest.param(
+            {"url_query_params": {"mode": "off"}},
+            False,
+            id="data_collection_url_query_params_off",
+        ),
+    ],
+)
 @pytest.mark.parametrize(
     "test_config",
     [
@@ -407,13 +417,14 @@ def test_transactions(
     sentry_init: "Any",
     app: "Any",
     capture_items: "Any",
-    send_pii: bool,
+    data_collection: "Any",
+    expect_query: bool,
 ) -> None:
     # Init the SanicIntegration with the desired arguments
     sentry_init(
         integrations=[SanicIntegration()],
         traces_sample_rate=1.0,
-        send_default_pii=send_pii,
+        data_collection=data_collection,
     )
 
     items = capture_items("span")
@@ -458,16 +469,16 @@ def test_transactions(
             "error" if test_config.expected_status >= 400 else "ok"
         )
 
-        if send_pii:
-            assert attrs["url.full"].endswith(test_config.url)
-            assert attrs["url.path"] == test_config.url.split("?")[0]
-            if "?" in test_config.url:
+        expected_url = (
+            test_config.url if expect_query else test_config.url.split("?", 1)[0]
+        )
+        assert attrs["url.full"].endswith(expected_url)
+        assert attrs["url.path"] == test_config.url.split("?")[0]
+        if "?" in test_config.url:
+            if expect_query:
                 assert attrs["http.query"] == test_config.url.split("?", 1)[1]
-
-        else:
-            assert "url.full" not in attrs
-            assert "url.path" not in attrs
-            assert "http.query" not in attrs
+            else:
+                assert "http.query" not in attrs
 
 
 def test_span_origin(sentry_init, app, capture_items):
@@ -492,9 +503,9 @@ def test_span_origin(sentry_init, app, capture_items):
     assert segment["attributes"]["sentry.origin"] == "auto.http.sanic"
 
 
-@pytest.mark.parametrize("init_kwargs, expect_ip", DATA_COLLECTION_USER_INFO_CASES)
+@pytest.mark.parametrize("data_collection, expect_ip", DATA_COLLECTION_USER_INFO_CASES)
 def test_user_ip_address_on_all_spans(
-    sentry_init, app, capture_items, init_kwargs, expect_ip
+    sentry_init, app, capture_items, data_collection, expect_ip
 ):
     app.config.FORWARDED_SECRET = "test"
 
@@ -508,7 +519,7 @@ def test_user_ip_address_on_all_spans(
         integrations=[SanicIntegration()],
         default_integrations=False,
         traces_sample_rate=1.0,
-        **init_kwargs,
+        data_collection=data_collection,
     )
 
     items = capture_items("span")
@@ -532,9 +543,9 @@ def test_user_ip_address_on_all_spans(
         assert "user.ip_address" not in child_span["attributes"]
 
 
-@pytest.mark.parametrize("init_kwargs, expect_ip", DATA_COLLECTION_USER_INFO_CASES)
+@pytest.mark.parametrize("data_collection, expect_ip", DATA_COLLECTION_USER_INFO_CASES)
 def test_client_address_span_attribute_data_collection(
-    sentry_init, app, capture_items, init_kwargs, expect_ip
+    sentry_init, app, capture_items, data_collection, expect_ip
 ):
     app.config.FORWARDED_SECRET = "test"
 
@@ -542,7 +553,7 @@ def test_client_address_span_attribute_data_collection(
         integrations=[SanicIntegration()],
         default_integrations=False,
         traces_sample_rate=1.0,
-        **init_kwargs,
+        data_collection=data_collection,
     )
 
     items = capture_items("span")
@@ -570,78 +581,43 @@ def test_client_address_span_attribute_data_collection(
 
 _QUERY_PARAM_DATA_COLLECTION_CASES = [
     pytest.param(
-        {"send_default_pii": True},
-        "toy=tennisball&color=red&auth=secret",
-        id="send_default_pii_true",
-    ),
-    pytest.param(
-        {"send_default_pii": False},
-        None,
-        id="send_default_pii_false",
-    ),
-    pytest.param(
-        {},
-        None,
-        id="defaults",
-    ),
-    pytest.param(
-        {"data_collection": {}},
-        "toy=tennisball&color=red&auth=%5BFiltered%5D",
-        id="data_collection_denylist_default",
-    ),
-    pytest.param(
-        {
-            "data_collection": {
-                "url_query_params": {"mode": "denylist", "terms": ["toy"]}
-            }
-        },
-        "toy=%5BFiltered%5D&color=red&auth=%5BFiltered%5D",
-        id="data_collection_denylist_custom_terms",
-    ),
-    pytest.param(
-        {
-            "data_collection": {
-                "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
-            }
-        },
-        "toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D",
-        id="data_collection_allowlist",
-    ),
-    pytest.param(
-        {
-            "data_collection": {
-                "url_query_params": {"mode": "allowlist", "terms": ["auth"]}
-            }
-        },
-        "toy=%5BFiltered%5D&color=%5BFiltered%5D&auth=%5BFiltered%5D",
-        id="data_collection_allowlist_sensitive_term",
-    ),
-    pytest.param(
-        {"data_collection": {"url_query_params": {"mode": "off"}}},
+        {"url_query_params": {"mode": "off"}},
         None,
         id="data_collection_off",
     ),
     pytest.param(
-        {
-            "send_default_pii": True,
-            "data_collection": {"url_query_params": {"mode": "off"}},
-        },
-        None,
-        id="data_collection_wins_over_send_default_pii",
+        {},
+        "toy=tennisball&color=red&auth=%5BFiltered%5D",
+        id="data_collection_denylist_default",
+    ),
+    pytest.param(
+        {"url_query_params": {"mode": "denylist", "terms": ["toy"]}},
+        "toy=%5BFiltered%5D&color=red&auth=%5BFiltered%5D",
+        id="data_collection_denylist_custom_terms",
+    ),
+    pytest.param(
+        {"url_query_params": {"mode": "allowlist", "terms": ["toy"]}},
+        "toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D",
+        id="data_collection_allowlist",
+    ),
+    pytest.param(
+        {"url_query_params": {"mode": "allowlist", "terms": ["auth"]}},
+        "toy=%5BFiltered%5D&color=%5BFiltered%5D&auth=%5BFiltered%5D",
+        id="data_collection_allowlist_sensitive_term",
     ),
 ]
 
 
 @pytest.mark.parametrize(
-    "init_kwargs, expected_query", _QUERY_PARAM_DATA_COLLECTION_CASES
+    "data_collection, expected_query", _QUERY_PARAM_DATA_COLLECTION_CASES
 )
 def test_url_query_data_collection(
-    sentry_init, app, capture_items, init_kwargs, expected_query
+    sentry_init, app, capture_items, data_collection, expected_query
 ):
     sentry_init(
         integrations=[SanicIntegration()],
         traces_sample_rate=1.0,
-        **init_kwargs,
+        data_collection=data_collection,
     )
 
     items = capture_items("span")
@@ -660,19 +636,10 @@ def test_url_query_data_collection(
         and i.payload["is_segment"]
     ]
 
-    data_collection_enabled = "data_collection" in init_kwargs
-    url_attrs_expected = data_collection_enabled or init_kwargs.get(
-        "send_default_pii", False
-    )
-
     if expected_query is None:
         assert "http.query" not in server_span["attributes"]
-        if url_attrs_expected:
-            assert server_span["attributes"]["url.full"].endswith("/message")
-            assert server_span["attributes"]["url.path"].endswith("/message")
-        else:
-            assert "url.full" not in server_span["attributes"]
-            assert "url.path" not in server_span["attributes"]
+        assert server_span["attributes"]["url.full"].endswith("/message")
+        assert server_span["attributes"]["url.path"].endswith("/message")
     else:
         assert server_span["attributes"]["http.query"] == expected_query
         assert server_span["attributes"]["url.full"].endswith(
@@ -682,12 +649,12 @@ def test_url_query_data_collection(
 
 
 @pytest.mark.parametrize(
-    "init_kwargs, expected_query", _QUERY_PARAM_DATA_COLLECTION_CASES
+    "data_collection, expected_query", _QUERY_PARAM_DATA_COLLECTION_CASES
 )
 def test_url_query_data_collection_event_processor(
-    sentry_init, app, capture_events, init_kwargs, expected_query
+    sentry_init, app, capture_events, data_collection, expected_query
 ):
-    sentry_init(integrations=[SanicIntegration()], **init_kwargs)
+    sentry_init(integrations=[SanicIntegration()], data_collection=data_collection)
 
     events = capture_events()
 
@@ -700,11 +667,7 @@ def test_url_query_data_collection_event_processor(
 
     assert event["request"]["url"].endswith("/message")
     assert event["request"]["method"] == "GET"
-    if "data_collection" not in init_kwargs:
-        assert (
-            event["request"]["query_string"] == "toy=tennisball&color=red&auth=secret"
-        )
-    elif expected_query is None:
+    if expected_query is None:
         assert "query_string" not in event["request"]
     else:
         assert event["request"]["query_string"] == expected_query
@@ -791,12 +754,12 @@ def test_oversized_request_body_not_annotated_data_collection(
 
 
 @pytest.mark.parametrize(
-    "init_kwargs, expect_remote_addr", DATA_COLLECTION_REMOTE_ADDR_CASES
+    "data_collection, expect_remote_addr", DATA_COLLECTION_REMOTE_ADDR_CASES
 )
 def test_remote_addr_data_collection(
-    sentry_init, app, capture_events, init_kwargs, expect_remote_addr
+    sentry_init, app, capture_events, data_collection, expect_remote_addr
 ):
-    sentry_init(integrations=[SanicIntegration()], **init_kwargs)
+    sentry_init(integrations=[SanicIntegration()], data_collection=data_collection)
     events = capture_events()
 
     c = get_client(app)

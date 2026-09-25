@@ -32,7 +32,7 @@ from sentry_sdk import (
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.logging import LoggingIntegration
 from sentry_sdk.serializer import MAX_DATABAG_BREADTH
-from tests.integrations.utils import DATA_COLLECTION_USER_INFO_CASES
+from tests.integrations.utils import DATA_COLLECTION_USER_INFO_CASES_LEGACY
 
 # Query string used across the query-param filtering tests below. ``auth`` is a
 # built-in sensitive term, so it is redacted by the default denylist.
@@ -1234,7 +1234,9 @@ def test_empty_query_string_is_dropped_with_data_collection(
     assert "query_string" not in event["request"]
 
 
-@pytest.mark.parametrize("init_kwargs, expect_ip", DATA_COLLECTION_USER_INFO_CASES)
+@pytest.mark.parametrize(
+    "init_kwargs, expect_ip", DATA_COLLECTION_USER_INFO_CASES_LEGACY
+)
 def test_user_info_span_attributes_data_collection(
     sentry_init, app, capture_items, monkeypatch, init_kwargs, expect_ip
 ):
@@ -1265,7 +1267,9 @@ def test_user_info_span_attributes_data_collection(
         assert "client.address" not in segment["attributes"]
 
 
-@pytest.mark.parametrize("init_kwargs, expect_ip", DATA_COLLECTION_USER_INFO_CASES)
+@pytest.mark.parametrize(
+    "init_kwargs, expect_ip", DATA_COLLECTION_USER_INFO_CASES_LEGACY
+)
 def test_user_info_error_event_data_collection(
     sentry_init, app, capture_events, monkeypatch, init_kwargs, expect_ip
 ):
@@ -1316,7 +1320,9 @@ def test_error_event_no_user_ip_address_without_remote_addr(
     assert "ip_address" not in event.get("user", {})
 
 
-@pytest.mark.parametrize("init_kwargs, expect_user", DATA_COLLECTION_USER_INFO_CASES)
+@pytest.mark.parametrize(
+    "init_kwargs, expect_user", DATA_COLLECTION_USER_INFO_CASES_LEGACY
+)
 def test_flask_login_user_identity_error_event_data_collection(
     sentry_init, app, capture_events, init_kwargs, expect_user
 ):
@@ -1364,7 +1370,9 @@ def test_flask_login_user_identity_error_event_data_collection(
         assert "username" not in user
 
 
-@pytest.mark.parametrize("init_kwargs, expect_user", DATA_COLLECTION_USER_INFO_CASES)
+@pytest.mark.parametrize(
+    "init_kwargs, expect_user", DATA_COLLECTION_USER_INFO_CASES_LEGACY
+)
 def test_flask_login_user_identity_span_attributes_data_collection(
     sentry_init, app, capture_items, init_kwargs, expect_user
 ):

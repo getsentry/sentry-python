@@ -9,8 +9,8 @@ from sentry_sdk import capture_message
 from sentry_sdk._types import SENSITIVE_DATA_SUBSTITUTE
 from sentry_sdk.integrations.tornado import TornadoIntegration
 from tests.integrations.utils import (
-    DATA_COLLECTION_REMOTE_ADDR_CASES,
-    DATA_COLLECTION_USER_INFO_CASES,
+    DATA_COLLECTION_REMOTE_ADDR_CASES_LEGACY,
+    DATA_COLLECTION_USER_INFO_CASES_LEGACY,
 )
 
 
@@ -602,7 +602,9 @@ def test_user_auth(tornado_testcase, sentry_init, capture_events):
     assert "user" not in event
 
 
-@pytest.mark.parametrize("init_kwargs, expect_user", DATA_COLLECTION_USER_INFO_CASES)
+@pytest.mark.parametrize(
+    "init_kwargs, expect_user", DATA_COLLECTION_USER_INFO_CASES_LEGACY
+)
 def test_user_auth_data_collection(
     tornado_testcase, sentry_init, capture_events, init_kwargs, expect_user
 ):
@@ -845,7 +847,9 @@ def test_span_origin(
     assert segment["attributes"]["sentry.origin"] == "auto.http.tornado"
 
 
-@pytest.mark.parametrize("init_kwargs, expect_ip", DATA_COLLECTION_USER_INFO_CASES)
+@pytest.mark.parametrize(
+    "init_kwargs, expect_ip", DATA_COLLECTION_USER_INFO_CASES_LEGACY
+)
 def test_user_ip_address_on_all_spans(
     tornado_testcase, sentry_init, capture_items, init_kwargs, expect_ip
 ):
@@ -872,7 +876,9 @@ def test_user_ip_address_on_all_spans(
         assert "user.ip_address" not in child_span["attributes"]
 
 
-@pytest.mark.parametrize("init_kwargs, expect_ip", DATA_COLLECTION_USER_INFO_CASES)
+@pytest.mark.parametrize(
+    "init_kwargs, expect_ip", DATA_COLLECTION_USER_INFO_CASES_LEGACY
+)
 def test_client_address_span_attribute_data_collection(
     tornado_testcase, sentry_init, capture_items, init_kwargs, expect_ip
 ):
@@ -902,7 +908,7 @@ def test_client_address_span_attribute_data_collection(
 
 
 @pytest.mark.parametrize(
-    "init_kwargs, expect_remote_addr", DATA_COLLECTION_REMOTE_ADDR_CASES
+    "init_kwargs, expect_remote_addr", DATA_COLLECTION_REMOTE_ADDR_CASES_LEGACY
 )
 def test_remote_addr_data_collection(
     tornado_testcase, sentry_init, capture_events, init_kwargs, expect_remote_addr

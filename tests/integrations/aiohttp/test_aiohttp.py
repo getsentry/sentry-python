@@ -1410,14 +1410,14 @@ async def test_tracing(sentry_init, aiohttp_client, capture_items):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("init_kwargs, expect_ip", DATA_COLLECTION_USER_INFO_CASES)
+@pytest.mark.parametrize("data_collection, expect_ip", DATA_COLLECTION_USER_INFO_CASES)
 async def test_user_address_with_data_collection(
-    sentry_init, aiohttp_client, capture_items, init_kwargs, expect_ip
+    sentry_init, aiohttp_client, capture_items, data_collection, expect_ip
 ):
     sentry_init(
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
-        **init_kwargs,
+        data_collection=data_collection,
     )
 
     async def hello(request):
@@ -2090,12 +2090,12 @@ async def test_server_url_query_data_collection_event_processor(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "init_kwargs, expect_remote_addr", DATA_COLLECTION_REMOTE_ADDR_CASES
+    "data_collection, expect_remote_addr", DATA_COLLECTION_REMOTE_ADDR_CASES
 )
 async def test_remote_addr_data_collection(
-    sentry_init, aiohttp_client, capture_events, init_kwargs, expect_remote_addr
+    sentry_init, aiohttp_client, capture_events, data_collection, expect_remote_addr
 ):
-    sentry_init(integrations=[AioHttpIntegration()], **init_kwargs)
+    sentry_init(integrations=[AioHttpIntegration()], data_collection=data_collection)
 
     async def hello(request):
         capture_message("hi")
