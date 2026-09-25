@@ -19,7 +19,7 @@ from sentry_sdk.integrations.litestar import LitestarIntegration
 from sentry_sdk.utils import SENSITIVE_DATA_SUBSTITUTE
 from tests.conftest import ApproxDict
 from tests.integrations.conftest import parametrize_test_configurable_status_codes
-from tests.integrations.utils import DATA_COLLECTION_USER_INFO_CASES
+from tests.integrations.utils import DATA_COLLECTION_USER_INFO_CASES_LEGACY
 
 
 def litestar_app_factory(middleware=None, debug=True, exception_handlers=None):
@@ -448,7 +448,9 @@ def test_span_origin(
         assert span["attributes"]["sentry.origin"] == "auto.http.litestar"
 
 
-@pytest.mark.parametrize("init_kwargs, expect_user", DATA_COLLECTION_USER_INFO_CASES)
+@pytest.mark.parametrize(
+    "init_kwargs, expect_user", DATA_COLLECTION_USER_INFO_CASES_LEGACY
+)
 def test_litestar_scope_user_on_exception_event(
     sentry_init,
     capture_exceptions,

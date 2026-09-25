@@ -10,7 +10,7 @@ from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.huey import HueyIntegration
 from sentry_sdk.traces import SegmentNameSource, SpanStatus
 from sentry_sdk.utils import parse_version
-from tests.integrations.utils import DATA_COLLECTION_QUEUES_CASES
+from tests.integrations.utils import DATA_COLLECTION_QUEUES_CASES_LEGACY
 
 HUEY_VERSION = parse_version(HUEY_VERSION)
 
@@ -205,7 +205,7 @@ def test_task_lock(capture_items, init_huey, lock_name):
 
 @pytest.mark.parametrize(
     "init_kwargs,expected_args,expected_kwargs",
-    DATA_COLLECTION_QUEUES_CASES,
+    DATA_COLLECTION_QUEUES_CASES_LEGACY,
 )
 def test_task_args_kwargs_data_collection(
     capture_items,
