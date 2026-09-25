@@ -4,11 +4,9 @@ import json
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
-from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import SpanStatus
 from sentry_sdk.utils import (
     capture_internal_exceptions,
-    has_data_collection_enabled,
     parse_version,
 )
 
@@ -141,10 +139,7 @@ class CommandTracer(monitoring.CommandListener):
             operation_name = event.command_name
 
             command.pop("lsid", None)
-            if has_data_collection_enabled(client.options):
-                if not client.options["data_collection"]["database_query_data"]:
-                    command = _strip_pii(command)
-            elif not should_send_default_pii():
+            if not client.options["data_collection"]["database_query_data"]:
                 command = _strip_pii(command)
 
             query = json.dumps(command, default=str)
