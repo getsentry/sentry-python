@@ -9,7 +9,6 @@ from typing import TYPE_CHECKING
 from urllib.parse import urlencode
 
 import sentry_sdk
-from sentry_sdk.api import continue_trace
 from sentry_sdk.consts import OP
 from sentry_sdk.data_collection import _apply_key_value_collection_filtering
 from sentry_sdk.integrations import Integration
@@ -18,17 +17,14 @@ from sentry_sdk.integrations.cloud_resource_context import (
     CLOUD_PLATFORM,
     CLOUD_PROVIDER,
 )
-from sentry_sdk.scope import Scope, should_send_default_pii
+from sentry_sdk.scope import Scope
 from sentry_sdk.traces import SegmentNameSource
-from sentry_sdk.tracing import TransactionSource
-from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
     AnnotatedValue,
     TimeoutThread,
     capture_internal_exceptions,
     ensure_integration_enabled,
     event_from_exception,
-    has_data_collection_enabled,
     logger,
     reraise,
 )
@@ -142,10 +138,6 @@ def _wrap_handler(handler: "F") -> "F":
                         request_data, aws_context, configured_time
                     )
                 )
-                scope.set_tag("aws_region", aws_region)
-                if batch_size > 1:
-                    scope.set_tag("batch_request", True)
-                    scope.set_tag("batch_size", batch_size)
 
                 # Starting the Timeout thread only if the configured time is greater than Timeout warning
                 # buffer and timeout_warning parameter is set True.
@@ -187,31 +179,21 @@ def _wrap_handler(handler: "F") -> "F":
                     "httpMethod"
                 ]
 
+            data_collection = client.options["data_collection"]
             if "queryStringParameters" in request_data:
                 qs = request_data["queryStringParameters"]
                 if qs:
-                    if has_data_collection_enabled(client.options):
-                        filtered_qs = _apply_key_value_collection_filtering(
-                            items=qs,
-                            behaviour=client.options["data_collection"][
-                                "url_query_params"
-                            ],
-                        )
-                        if filtered_qs:
-                            additional_attributes["url.query"] = urlencode(filtered_qs)
-                    elif should_send_default_pii():
-                        additional_attributes["url.query"] = urlencode(qs)
+                    filtered_qs = _apply_key_value_collection_filtering(
+                        items=qs,
+                        behaviour=data_collection["url_query_params"],
+                    )
+                    if filtered_qs:
+                        additional_attributes["url.query"] = urlencode(filtered_qs)
 
-            if not scope._user:
-                if has_data_collection_enabled(client.options):
-                    if client.options["data_collection"]["user_info"]:
-                        user_info = _get_user_from_event(request_data)
-                        if user_info:
-                            scope.set_user(user_info)
-                elif should_send_default_pii():
-                    user_info = _get_user_from_event(request_data)
-                    if user_info:
-                        scope.set_user(user_info)
+            if not scope._user and data_collection["user_info"]:
+                user_info = _get_user_from_event(request_data)
+                if user_info:
+                    scope.set_user(user_info)
 
             sampling_context = {
                 "aws_event": aws_event,
@@ -220,45 +202,31 @@ def _wrap_handler(handler: "F") -> "F":
 
             function_name = aws_context.function_name
 
-            if has_span_streaming_enabled(client.options):
-                sentry_sdk.traces.continue_trace(headers)
-                Scope.set_custom_sampling_context(sampling_context)
-                span_ctx = sentry_sdk.traces.start_span(
-                    name=function_name,
-                    parent_span=None,
-                    attributes={
-                        "sentry.op": OP.FUNCTION_AWS,
-                        "sentry.origin": AwsLambdaIntegration.origin,
-                        "sentry.segment.name.source": SegmentNameSource.COMPONENT,
-                        "cloud.region": aws_region,
-                        "cloud.resource_id": aws_context.invoked_function_arn,
-                        "cloud.platform": CLOUD_PLATFORM.AWS_LAMBDA,
-                        "cloud.provider": CLOUD_PROVIDER.AWS,
-                        "faas.name": function_name,
-                        "faas.invocation_id": aws_context.aws_request_id,
-                        "faas.version": aws_context.function_version,
-                        "aws.lambda.invoked_arn": aws_context.invoked_function_arn,
-                        "aws.log.group.names": [aws_context.log_group_name],
-                        "aws.log.stream.names": [aws_context.log_stream_name],
-                        "messaging.batch.message_count": batch_size,
-                        **header_attributes,
-                        **additional_attributes,
-                    },
-                )
-            else:
-                transaction = continue_trace(
-                    headers,
-                    op=OP.FUNCTION_AWS,
-                    name=function_name,
-                    source=TransactionSource.COMPONENT,
-                    origin=AwsLambdaIntegration.origin,
-                )
+            sentry_sdk.continue_trace(headers)
+            Scope.set_custom_sampling_context(sampling_context)
 
-                span_ctx = sentry_sdk.start_transaction(
-                    transaction, custom_sampling_context=sampling_context
-                )
-
-            with span_ctx:
+            with sentry_sdk.start_span(
+                name=function_name,
+                parent_span=None,
+                attributes={
+                    "sentry.op": OP.FUNCTION_AWS,
+                    "sentry.origin": AwsLambdaIntegration.origin,
+                    "sentry.segment.name.source": SegmentNameSource.COMPONENT,
+                    "cloud.region": aws_region,
+                    "cloud.resource_id": aws_context.invoked_function_arn,
+                    "cloud.platform": CLOUD_PLATFORM.AWS_LAMBDA,
+                    "cloud.provider": CLOUD_PROVIDER.AWS,
+                    "faas.name": function_name,
+                    "faas.invocation_id": aws_context.aws_request_id,
+                    "faas.version": aws_context.function_version,
+                    "aws.lambda.invoked_arn": aws_context.invoked_function_arn,
+                    "aws.log.group.names": [aws_context.log_group_name],
+                    "aws.log.stream.names": [aws_context.log_stream_name],
+                    "messaging.batch.message_count": batch_size,
+                    **header_attributes,
+                    **additional_attributes,
+                },
+            ):
                 try:
                     return handler(aws_event, aws_context, *args, **kwargs)
                 except Exception:
@@ -311,76 +279,42 @@ class AwsLambdaIntegration(Integration):
             )
             return
 
-        pre_37 = hasattr(lambda_bootstrap, "handle_http_request")  # Python 3.6
+        lambda_bootstrap.LambdaRuntimeClient.post_init_error = _wrap_init_error(
+            lambda_bootstrap.LambdaRuntimeClient.post_init_error
+        )
 
-        if pre_37:
-            old_handle_event_request = lambda_bootstrap.handle_event_request
+        old_handle_event_request = lambda_bootstrap.handle_event_request
 
-            def sentry_handle_event_request(
-                request_handler: "Any", *args: "Any", **kwargs: "Any"
-            ) -> "Any":
-                request_handler = _wrap_handler(request_handler)
-                return old_handle_event_request(request_handler, *args, **kwargs)
-
-            lambda_bootstrap.handle_event_request = sentry_handle_event_request
-
-            old_handle_http_request = lambda_bootstrap.handle_http_request
-
-            def sentry_handle_http_request(
-                request_handler: "Any", *args: "Any", **kwargs: "Any"
-            ) -> "Any":
-                request_handler = _wrap_handler(request_handler)
-                return old_handle_http_request(request_handler, *args, **kwargs)
-
-            lambda_bootstrap.handle_http_request = sentry_handle_http_request
-
-            # Patch to_json to drain the queue. This should work even when the
-            # SDK is initialized inside of the handler
-
-            old_to_json = lambda_bootstrap.to_json
-
-            def sentry_to_json(*args: "Any", **kwargs: "Any") -> "Any":
-                _drain_queue()
-                return old_to_json(*args, **kwargs)
-
-            lambda_bootstrap.to_json = sentry_to_json
-        else:
-            lambda_bootstrap.LambdaRuntimeClient.post_init_error = _wrap_init_error(
-                lambda_bootstrap.LambdaRuntimeClient.post_init_error
-            )
-
-            old_handle_event_request = lambda_bootstrap.handle_event_request
-
-            def sentry_handle_event_request(  # type: ignore
+        def sentry_handle_event_request(  # type: ignore
+            lambda_runtime_client, request_handler, *args, **kwargs
+        ):
+            request_handler = _wrap_handler(request_handler)
+            return old_handle_event_request(
                 lambda_runtime_client, request_handler, *args, **kwargs
-            ):
-                request_handler = _wrap_handler(request_handler)
-                return old_handle_event_request(
-                    lambda_runtime_client, request_handler, *args, **kwargs
-                )
-
-            lambda_bootstrap.handle_event_request = sentry_handle_event_request
-
-            # Patch the runtime client to drain the queue. This should work
-            # even when the SDK is initialized inside of the handler
-
-            def _wrap_post_function(f: "F") -> "F":
-                def inner(*args: "Any", **kwargs: "Any") -> "Any":
-                    _drain_queue()
-                    return f(*args, **kwargs)
-
-                return inner  # type: ignore
-
-            lambda_bootstrap.LambdaRuntimeClient.post_invocation_result = (
-                _wrap_post_function(
-                    lambda_bootstrap.LambdaRuntimeClient.post_invocation_result
-                )
             )
-            lambda_bootstrap.LambdaRuntimeClient.post_invocation_error = (
-                _wrap_post_function(
-                    lambda_bootstrap.LambdaRuntimeClient.post_invocation_error
-                )
+
+        lambda_bootstrap.handle_event_request = sentry_handle_event_request
+
+        # Patch the runtime client to drain the queue. This should work
+        # even when the SDK is initialized inside of the handler
+
+        def _wrap_post_function(f: "F") -> "F":
+            def inner(*args: "Any", **kwargs: "Any") -> "Any":
+                _drain_queue()
+                return f(*args, **kwargs)
+
+            return inner  # type: ignore
+
+        lambda_bootstrap.LambdaRuntimeClient.post_invocation_result = (
+            _wrap_post_function(
+                lambda_bootstrap.LambdaRuntimeClient.post_invocation_result
             )
+        )
+        lambda_bootstrap.LambdaRuntimeClient.post_invocation_error = (
+            _wrap_post_function(
+                lambda_bootstrap.LambdaRuntimeClient.post_invocation_error
+            )
+        )
 
 
 def get_lambda_bootstrap() -> "Optional[Any]":
@@ -452,50 +386,36 @@ def _make_request_event_processor(
 
         request["url"] = _get_url(aws_event, aws_context)
 
+        client_options = sentry_sdk.get_client().options
+        data_collection = client_options["data_collection"]
+
         if "queryStringParameters" in aws_event:
             query_string = aws_event["queryStringParameters"]
-            client_options = sentry_sdk.get_client().options
-            if has_data_collection_enabled(client_options):
-                if query_string:
-                    filtered_qs = _apply_key_value_collection_filtering(
-                        items=query_string,
-                        behaviour=client_options["data_collection"]["url_query_params"],
-                    )
-                    if filtered_qs:
-                        request["query_string"] = filtered_qs
-            else:
-                request["query_string"] = query_string
+            if query_string:
+                filtered_qs = _apply_key_value_collection_filtering(
+                    items=query_string,
+                    behaviour=data_collection["url_query_params"],
+                )
+                if filtered_qs:
+                    request["query_string"] = filtered_qs
 
         if "headers" in aws_event and isinstance(aws_event["headers"], dict):
             request["headers"] = _filter_headers(aws_event["headers"])
 
-        client_options = sentry_sdk.get_client().options
-        if has_data_collection_enabled(client_options):
-            if client_options["data_collection"]["user_info"]:
-                extracted_user = _get_user_from_event(aws_event)
-                if extracted_user:
-                    user_info = sentry_event.setdefault("user", {})
-                    for key, value in extracted_user.items():
-                        user_info.setdefault(key, value)
-
-            if "incoming_request" in client_options["data_collection"]["http_bodies"]:
-                if "body" in aws_event:
-                    request["data"] = aws_event.get("body", "")
-
-        elif should_send_default_pii():
+        if data_collection["user_info"]:
             extracted_user = _get_user_from_event(aws_event)
             if extracted_user:
                 user_info = sentry_event.setdefault("user", {})
                 for key, value in extracted_user.items():
                     user_info.setdefault(key, value)
 
+        if "incoming_request" in data_collection["http_bodies"]:
             if "body" in aws_event:
                 request["data"] = aws_event.get("body", "")
-        else:
-            if aws_event.get("body", None):
-                # Unfortunately couldn't find a way to get structured body from AWS
-                # event. Meaning every body is unstructured to us.
-                request["data"] = AnnotatedValue.removed_because_raw_data()
+        elif aws_event.get("body", None):
+            # Unfortunately couldn't find a way to get structured body from AWS
+            # event. Meaning every body is unstructured to us.
+            request["data"] = AnnotatedValue.removed_because_raw_data()
 
         sentry_event["request"] = deepcopy(request)
 

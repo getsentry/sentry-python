@@ -1,8 +1,6 @@
 import importlib
-import json
 import sys
 import threading
-from unittest import mock
 
 import pytest
 
@@ -144,40 +142,6 @@ async def test_has_context(sentry_init, capture_events):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "url,transaction_style,expected_transaction,expected_source",
-    [
-        ("/message", "endpoint", "hi", "component"),
-        ("/message", "url", "/message", "route"),
-        ("/message/123456", "endpoint", "hi_with_id", "component"),
-        ("/message/123456", "url", "/message/<message_id>", "route"),
-    ],
-)
-async def test_transaction_style(
-    sentry_init,
-    capture_events,
-    url,
-    transaction_style,
-    expected_transaction,
-    expected_source,
-):
-    sentry_init(
-        integrations=[
-            quart_sentry.QuartIntegration(transaction_style=transaction_style)
-        ]
-    )
-    app = quart_app_factory()
-    events = capture_events()
-
-    client = app.test_client()
-    response = await client.get(url)
-    assert response.status_code == 200
-
-    (event,) = events
-    assert event["transaction"] == expected_transaction
-
-
-@pytest.mark.asyncio
 async def test_http_route(
     sentry_init,
     capture_items,
@@ -185,7 +149,6 @@ async def test_http_route(
     sentry_init(
         integrations=[quart_sentry.QuartIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     app = quart_app_factory()
@@ -572,8 +535,11 @@ async def test_errorhandler_for_exception_swallows_exception(
 
 
 @pytest.mark.asyncio
-async def test_tracing_success(sentry_init, capture_events):
-    sentry_init(traces_sample_rate=1.0, integrations=[quart_sentry.QuartIntegration()])
+async def test_tracing_success(sentry_init, capture_items):
+    sentry_init(
+        traces_sample_rate=1.0,
+        integrations=[quart_sentry.QuartIntegration()],
+    )
     app = quart_app_factory()
 
     @app.before_request
@@ -586,31 +552,33 @@ async def test_tracing_success(sentry_init, capture_events):
         capture_message("hi")
         return "ok"
 
-    events = capture_events()
+    items = capture_items("span", "event")
 
     async with app.test_client() as client:
         response = await client.get("/message_tx")
         assert response.status_code == 200
 
-    message_event, transaction_event = events
+    sentry_sdk.flush()
 
-    assert transaction_event["type"] == "transaction"
-    assert transaction_event["transaction"] == "hi_tx"
-    assert transaction_event["tags"]["view"] == "yes"
-    assert transaction_event["tags"]["before_request"] == "yes"
+    message, span = [item.payload for item in items]
 
-    assert message_event["message"] == "hi"
-    assert message_event["transaction"] == "hi_tx"
-    assert message_event["tags"]["view"] == "yes"
-    assert message_event["tags"]["before_request"] == "yes"
+    assert span["name"] == "hi_tx"
+
+    assert message["message"] == "hi"
+    assert message["transaction"] == "hi_tx"
+    assert message["tags"]["view"] == "yes"
+    assert message["tags"]["before_request"] == "yes"
 
 
 @pytest.mark.asyncio
-async def test_tracing_error(sentry_init, capture_events):
-    sentry_init(traces_sample_rate=1.0, integrations=[quart_sentry.QuartIntegration()])
+async def test_tracing_error(sentry_init, capture_items):
+    sentry_init(
+        traces_sample_rate=1.0,
+        integrations=[quart_sentry.QuartIntegration()],
+    )
     app = quart_app_factory()
 
-    events = capture_events()
+    items = capture_items("span", "event")
 
     @app.route("/error")
     async def error():
@@ -620,10 +588,11 @@ async def test_tracing_error(sentry_init, capture_events):
         response = await client.get("/error")
         assert response.status_code == 500
 
-    error_event, transaction_event = events
+    sentry_sdk.flush()
 
-    assert transaction_event["type"] == "transaction"
-    assert transaction_event["transaction"] == "error"
+    error_event, span = [item.payload for item in items]
+
+    assert span["name"] == "error"
 
     assert error_event["transaction"] == "error"
     (exception,) = error_event["exception"]["values"]
@@ -658,105 +627,30 @@ async def test_class_based_views(sentry_init, capture_events):
     assert event["transaction"] == "hello_class"
 
 
-@pytest.mark.parametrize("endpoint", ["/sync/thread_ids", "/async/thread_ids"])
 @pytest.mark.asyncio
-async def test_active_thread_id(
-    sentry_init, capture_envelopes, teardown_profiling, endpoint
-):
-    with mock.patch(
-        "sentry_sdk.profiler.transaction_profiler.PROFILE_MINIMUM_SAMPLES", 0
-    ):
-        sentry_init(
-            traces_sample_rate=1.0,
-            profiles_sample_rate=1.0,
-        )
-        app = quart_app_factory()
-
-        envelopes = capture_envelopes()
-
-        async with app.test_client() as client:
-            response = await client.get(endpoint)
-            assert response.status_code == 200
-
-        data = json.loads(await response.get_data(as_text=True))
-
-        envelopes = [envelope for envelope in envelopes]
-        assert len(envelopes) == 1
-
-        profiles = [item for item in envelopes[0].items if item.type == "profile"]
-        assert len(profiles) == 1, envelopes[0].items
-
-        for item in profiles:
-            transactions = item.payload.json["transactions"]
-            assert len(transactions) == 1
-            assert str(data["active"]) == transactions[0]["active_thread_id"]
-
-        transactions = [
-            item for item in envelopes[0].items if item.type == "transaction"
-        ]
-        assert len(transactions) == 1
-
-        for item in transactions:
-            transaction = item.payload.json
-            trace_context = transaction["contexts"]["trace"]
-            assert str(data["active"]) == trace_context["data"]["thread.id"]
-
-
-@pytest.mark.parametrize("endpoint", ["/sync/thread_ids", "/async/thread_ids"])
-@pytest.mark.asyncio
-async def test_active_thread_id_span_streaming(
-    sentry_init, capture_items, teardown_profiling, endpoint
-):
-    with mock.patch(
-        "sentry_sdk.profiler.transaction_profiler.PROFILE_MINIMUM_SAMPLES", 0
-    ):
-        sentry_init(
-            traces_sample_rate=1.0,
-            profiles_sample_rate=1.0,
-            trace_lifecycle="stream",
-        )
-        app = quart_app_factory()
-
-        items = capture_items("span")
-
-        async with app.test_client() as client:
-            response = await client.get(endpoint)
-            assert response.status_code == 200
-
-        data = json.loads(await response.get_data(as_text=True))
-
-        sentry_sdk.flush()
-
-        spans = [item.payload for item in items]
-        assert len(spans) == 1
-
-        segment = spans[0]
-        assert str(data["active"]) == segment["attributes"]["thread.id"]
-
-
-@pytest.mark.asyncio
-async def test_span_origin(sentry_init, capture_events):
+async def test_span_origin(sentry_init, capture_items):
     sentry_init(
         integrations=[quart_sentry.QuartIntegration()],
         traces_sample_rate=1.0,
     )
     app = quart_app_factory()
-    events = capture_events()
+    items = capture_items("span")
 
     client = app.test_client()
     await client.get("/message")
 
-    (_, event) = events
+    sentry_sdk.flush()
 
-    assert event["contexts"]["trace"]["origin"] == "auto.http.quart"
+    (span,) = [item.payload for item in items]
+
+    assert span["attributes"]["sentry.origin"] == "auto.http.quart"
 
 
 @pytest.mark.asyncio
-async def test_span_streaming_basic(sentry_init, capture_items):
+async def test_basic(sentry_init, capture_items):
     sentry_init(
         integrations=[quart_sentry.QuartIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     items = capture_items("span")
 
@@ -790,7 +684,7 @@ async def test_span_streaming_basic(sentry_init, capture_items):
         ("/message/123456", "url", "/message/<message_id>", "route"),
     ],
 )
-async def test_span_streaming_transaction_style(
+async def test_transaction_style(
     sentry_init,
     capture_items,
     url,
@@ -803,7 +697,6 @@ async def test_span_streaming_transaction_style(
             quart_sentry.QuartIntegration(transaction_style=transaction_style)
         ],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     items = capture_items("span")
 
@@ -824,11 +717,10 @@ async def test_span_streaming_transaction_style(
 
 
 @pytest.mark.asyncio
-async def test_span_streaming_with_error(sentry_init, capture_items):
+async def test_with_error(sentry_init, capture_items):
     sentry_init(
         integrations=[quart_sentry.QuartIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     items = capture_items("event", "span")
 
@@ -867,12 +759,11 @@ async def test_span_streaming_with_error(sentry_init, capture_items):
 
 
 @pytest.mark.asyncio
-async def test_span_streaming_request_attributes_no_pii(sentry_init, capture_items):
+async def test_request_attributes_no_pii(sentry_init, capture_items):
     sentry_init(
         integrations=[quart_sentry.QuartIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=False,
-        trace_lifecycle="stream",
     )
     items = capture_items("span")
 
@@ -898,12 +789,11 @@ async def test_span_streaming_request_attributes_no_pii(sentry_init, capture_ite
 
 
 @pytest.mark.asyncio
-async def test_span_streaming_request_attributes_with_pii(sentry_init, capture_items):
+async def test_request_attributes_with_pii(sentry_init, capture_items):
     sentry_init(
         integrations=[quart_sentry.QuartIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
     items = capture_items("span")
 
@@ -1044,14 +934,13 @@ async def test_span_streaming_request_attributes_with_pii(sentry_init, capture_i
     ],
 )
 @pytest.mark.asyncio
-async def test_span_streaming_sensitive_header_scrubbing(
+async def test_sensitive_header_scrubbing(
     sentry_init, capture_items, options, expected, request
 ):
     sentry_init(
         integrations=[quart_sentry.QuartIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=options["send_default_pii"],
-        trace_lifecycle="stream",
         data_collection=options["data_collection"],
     )
     items = capture_items("span")
@@ -1090,14 +979,11 @@ async def test_span_streaming_sensitive_header_scrubbing(
 
 
 @pytest.mark.asyncio
-async def test_span_streaming_sensitive_header_without_data_collection(
-    sentry_init, capture_items
-):
+async def test_sensitive_header_without_data_collection(sentry_init, capture_items):
     sentry_init(
         integrations=[quart_sentry.QuartIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=False,
-        trace_lifecycle="stream",
     )
     items = capture_items("span")
 
@@ -1128,7 +1014,7 @@ async def test_span_streaming_sensitive_header_without_data_collection(
 @pytest.mark.asyncio
 @pytest.mark.parametrize("send_default_pii", [True, False])
 @pytest.mark.parametrize("user_id", [None, "42"])
-async def test_span_streaming_quart_auth_user_id(
+async def test_quart_auth_user_id(
     send_default_pii,
     sentry_init,
     user_id,
@@ -1140,7 +1026,6 @@ async def test_span_streaming_quart_auth_user_id(
         integrations=[quart_sentry.QuartIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream",
     )
     items = capture_items("span")
 
@@ -1233,7 +1118,7 @@ async def test_quart_auth_user_info_data_collection(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("init_kwargs, expect_user_info", QUART_USER_INFO_CASES)
-async def test_span_streaming_quart_auth_user_id_data_collection(
+async def test_quart_auth_user_id_data_collection(
     sentry_init,
     capture_items,
     init_kwargs,
@@ -1244,7 +1129,6 @@ async def test_span_streaming_quart_auth_user_id_data_collection(
     sentry_init(
         integrations=[quart_sentry.QuartIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         **init_kwargs,
     )
     items = capture_items("span")
@@ -1276,13 +1160,12 @@ async def test_span_streaming_quart_auth_user_id_data_collection(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("init_kwargs, expect_user_info", QUART_USER_INFO_CASES)
-async def test_span_streaming_request_attributes_data_collection(
+async def test_request_attributes_data_collection(
     sentry_init, capture_items, init_kwargs, expect_user_info
 ):
     sentry_init(
         integrations=[quart_sentry.QuartIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         **init_kwargs,
     )
     items = capture_items("span")
@@ -1307,14 +1190,13 @@ async def test_span_streaming_request_attributes_data_collection(
 
 
 @pytest.mark.asyncio
-async def test_span_streaming_sensitive_header_passthrough_with_pii_and_no_data_collection(
+async def test_sensitive_header_passthrough_with_pii_and_no_data_collection(
     sentry_init, capture_items
 ):
     sentry_init(
         integrations=[quart_sentry.QuartIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        trace_lifecycle="stream",
     )
     items = capture_items("span")
 
@@ -1406,13 +1288,12 @@ _QUERY_PARAM_DATA_COLLECTION_CASES = [
 @pytest.mark.parametrize(
     "init_kwargs, expected_query", _QUERY_PARAM_DATA_COLLECTION_CASES
 )
-async def test_span_streaming_url_query_data_collection(
+async def test_url_query_data_collection(
     sentry_init, capture_items, init_kwargs, expected_query
 ):
     sentry_init(
         integrations=[quart_sentry.QuartIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         **init_kwargs,
     )
     items = capture_items("span")
@@ -1450,13 +1331,10 @@ async def test_span_streaming_url_query_data_collection(
 
 
 @pytest.mark.asyncio
-async def test_span_streaming_url_query_multi_and_blank_values(
-    sentry_init, capture_items
-):
+async def test_url_query_multi_and_blank_values(sentry_init, capture_items):
     sentry_init(
         integrations=[quart_sentry.QuartIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         data_collection={},
     )
     items = capture_items("span")

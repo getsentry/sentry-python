@@ -7,24 +7,19 @@ and resource handler execution, and captures errors that occur during execution.
 Supports the low-level `mcp.server.lowlevel.Server` API.
 """
 
-import inspect
 from collections.abc import Iterator
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from functools import wraps
 from typing import TYPE_CHECKING
 
 import sentry_sdk
-from sentry_sdk.ai.utils import _set_span_data_attribute, get_start_span_function
 from sentry_sdk.consts import OP, SPANDATA
-from sentry_sdk.integrations import DidNotEnable, Integration
+from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.traces import StreamedSpan
-from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
     has_data_collection_enabled,
-    nullcontext,
     package_version,
     safe_serialize,
 )
@@ -37,69 +32,36 @@ try:
 
     MCP_PACKAGE_VERSION = package_version("mcp")
 
-    if MCP_PACKAGE_VERSION and MCP_PACKAGE_VERSION < (2, 0, 0):
-        from mcp.server.lowlevel.server import (  # type: ignore[attr-defined]
-            request_ctx,
-        )
 except ImportError:
-    raise DidNotEnable("MCP SDK not installed")
-
-try:
-    from fastmcp import FastMCP  # type: ignore[import-not-found]
-except ImportError:
-    FastMCP = None
-
-if MCP_PACKAGE_VERSION and MCP_PACKAGE_VERSION >= (2, 0, 0):
-    try:
-        from mcp.server.context import (
-            ServerRequestContext,
-        )
-    except ImportError:
-        ServerRequestContext = None  # type: ignore[assignment,misc]
-else:
-    ServerRequestContext = None  # type: ignore[assignment,misc]
+    raise DidNotEnable("MCP SDK not installed or incompatible")
 
 
 if TYPE_CHECKING:
-    from typing import Any, Awaitable, Callable, Optional, Union
+    from typing import Any, Optional
 
-    from mcp.server.context import CallNext, HandlerResult
-    from mcp_types import (
-        CallToolResult,
-        GetPromptResult,
-        InputRequiredResult,
-        ReadResourceResult,
+    from mcp.server.context import (
+        CallNext,
+        HandlerResult,
+        ServerRequestContext,
     )
     from starlette.types import Receive, Scope, Send
 
-    from sentry_sdk.traces import StreamedSpan
-    from sentry_sdk.tracing import Span
+    from sentry_sdk.traces import Span
 
 
 class MCPIntegration(Integration):
     identifier = "mcp"
     origin = "auto.ai.mcp"
 
-    def __init__(self, include_prompts: bool = True) -> None:
-        """
-        Initialize the MCP integration.
-
-        Args:
-            include_prompts: Whether to include prompts (tool results and prompt content)
-                             in span data. Requires send_default_pii=True. Default is True.
-        """
-        self.include_prompts = include_prompts
-
     @staticmethod
     def setup_once() -> None:
         """
         Patches MCP server classes to instrument handler execution.
         """
+        _check_minimum_version(MCPIntegration, MCP_PACKAGE_VERSION)
+
         _patch_lowlevel_server()
         _patch_handle_request()
-
-        if FastMCP is not None:
-            _patch_fastmcp()
 
 
 def _capture_exception(exc: "Any") -> None:
@@ -182,7 +144,7 @@ def _get_request_context_data(
 
 
 def _set_span_input_data(
-    span: "Union[StreamedSpan, Span]",
+    span: "Span",
     handler_name: str,
     span_data_key: str,
     mcp_method_name: str,
@@ -194,28 +156,27 @@ def _set_span_input_data(
     """Set input span data for MCP handlers."""
 
     # Set handler identifier
-    _set_span_data_attribute(span, span_data_key, handler_name)
-    _set_span_data_attribute(span, SPANDATA.MCP_METHOD_NAME, mcp_method_name)
+    span.set_attribute(span_data_key, handler_name)
+    span.set_attribute(SPANDATA.MCP_METHOD_NAME, mcp_method_name)
 
     # Set transport/MCP transport type
-    _set_span_data_attribute(
-        span,
+    span.set_attribute(
         SPANDATA.NETWORK_TRANSPORT,
         "pipe" if mcp_transport == "stdio" else "tcp",
     )
-    _set_span_data_attribute(span, SPANDATA.MCP_TRANSPORT, mcp_transport)
+    span.set_attribute(SPANDATA.MCP_TRANSPORT, mcp_transport)
 
     # Set request_id if provided
     if request_id:
-        _set_span_data_attribute(span, SPANDATA.MCP_REQUEST_ID, request_id)
+        span.set_attribute(SPANDATA.MCP_REQUEST_ID, request_id)
 
     # Set session_id if provided
     if session_id:
-        _set_span_data_attribute(span, SPANDATA.MCP_SESSION_ID, session_id)
+        span.set_attribute(SPANDATA.MCP_SESSION_ID, session_id)
 
     # Set request arguments (excluding common request context objects)
     for k, v in arguments.items():
-        _set_span_data_attribute(span, f"mcp.request.argument.{k}", safe_serialize(v))
+        span.set_attribute(f"mcp.request.argument.{k}", safe_serialize(v))
 
 
 def _extract_tool_result_content(result: "Any") -> "Any":
@@ -270,131 +231,7 @@ def _extract_text_from_content_blocks(content_blocks: "Any") -> "Any":
     return " ".join(texts) if texts else content_blocks
 
 
-async def _tool_handler_wrapper(
-    func: "Callable[..., Awaitable[Union[CallToolResult, InputRequiredResult]]]",
-    original_args: "tuple[Any, ...]",
-    original_kwargs: "Optional[dict[str, Any]]" = None,
-    self: "Optional[Any]" = None,
-    force_await: bool = True,
-) -> "Union[CallToolResult, InputRequiredResult]":
-    """
-    Wrapper for MCP tool handlers.
-    Creates and manages the MCP span and attaches all attributes on the span.
-
-    Args:
-        func: The handler function to wrap
-        original_args: Original arguments passed to the handler
-        original_kwargs: Original keyword arguments passed to the handler
-        self: Optional instance for bound methods
-    """
-    client = sentry_sdk.get_client()
-
-    original_kwargs = original_kwargs or {}
-
-    if original_args:
-        handler_name = original_args[0]
-    elif original_kwargs.get("name"):
-        handler_name = original_kwargs["name"]
-
-    arguments = {}
-    if len(original_args) > 1 and original_args[1] is not None:
-        arguments = original_args[1]
-    elif original_kwargs.get("arguments"):
-        arguments = original_kwargs["arguments"]
-
-    if has_data_collection_enabled(client.options):
-        if not client.options["data_collection"]["gen_ai"]["inputs"]:
-            # Arguments can contain sensitive data and shouldn't be added to the span
-            # if the user has opted out via this config.
-            arguments = {}
-
-    ctx = None
-    try:
-        ctx = request_ctx.get()
-    except LookupError:
-        pass
-
-    # Get request ID, session ID, and transport from context
-    request_id, session_id, mcp_transport = _get_request_context_data(ctx=ctx)
-
-    span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
-
-    # Start span and execute
-    with _active_http_scopes(ctx=ctx):
-        span_mgr: "Union[Span, StreamedSpan]"
-        if span_streaming:
-            span_mgr = sentry_sdk.traces.start_span(
-                name=f"tools/call {handler_name}",
-                attributes={
-                    "sentry.op": OP.MCP_SERVER,
-                    "sentry.origin": MCPIntegration.origin,
-                },
-            )
-        else:
-            span_mgr = get_start_span_function()(
-                op=OP.MCP_SERVER,
-                name=f"tools/call {handler_name}",
-                origin=MCPIntegration.origin,
-            )
-
-        with span_mgr as span:
-            # Set input span data
-            _set_span_input_data(
-                span,
-                handler_name,
-                SPANDATA.MCP_TOOL_NAME,
-                "tools/call",
-                arguments,
-                request_id,
-                session_id,
-                mcp_transport,
-            )
-
-            try:
-                # Execute the async handler
-                if self is not None:
-                    original_args = (self, *original_args)
-
-                result = func(*original_args, **original_kwargs)
-                if force_await or inspect.isawaitable(result):
-                    result = await result
-
-            except Exception as e:
-                with capture_internal_exceptions():
-                    _capture_exception(e)
-                raise
-
-            if result is None:
-                return result
-
-            # Get integration to check PII settings
-            integration = client.get_integration(MCPIntegration)
-            if integration is None:
-                return result
-
-            # Check if we should include sensitive data
-            should_include_data = False
-            if has_data_collection_enabled(client.options):
-                if client.options["data_collection"]["gen_ai"]["outputs"]:
-                    should_include_data = True
-            elif should_send_default_pii() and integration.include_prompts:
-                should_include_data = True
-
-            extracted = _extract_tool_result_content(result)
-            if extracted is not None and should_include_data:
-                _set_span_data_attribute(
-                    span, SPANDATA.MCP_TOOL_RESULT_CONTENT, safe_serialize(extracted)
-                )
-                # Set content count if result is a dict
-                if isinstance(extracted, dict):
-                    _set_span_data_attribute(
-                        span, SPANDATA.MCP_TOOL_RESULT_CONTENT_COUNT, len(extracted)
-                    )
-
-    return result
-
-
-async def _instrument_v2_tool_call(
+async def _instrument_tool_call(
     ctx: "ServerRequestContext[Any, Any]",
     call_next: "CallNext",
 ) -> "HandlerResult":
@@ -420,263 +257,71 @@ async def _instrument_v2_tool_call(
     # Get request ID, session ID, and transport from context
     request_id, session_id, mcp_transport = _get_request_context_data(ctx=ctx)
 
-    span_streaming = has_span_streaming_enabled(client.options)
-
     # Start span and execute
-    with _active_http_scopes(ctx=ctx):
-        span_mgr: "Union[Span, StreamedSpan]"
-        if span_streaming:
-            span_mgr = sentry_sdk.traces.start_span(
-                name=f"tools/call {handler_name}",
-                attributes={
-                    "sentry.op": OP.MCP_SERVER,
-                    "sentry.origin": MCPIntegration.origin,
-                },
-            )
-        else:
-            span_mgr = get_start_span_function()(
-                op=OP.MCP_SERVER,
-                name=f"tools/call {handler_name}",
-                origin=MCPIntegration.origin,
-            )
+    with _active_http_scopes(ctx=ctx), sentry_sdk.start_span(
+        name=f"tools/call {handler_name}",
+        attributes={
+            "sentry.op": OP.MCP_SERVER,
+            "sentry.origin": MCPIntegration.origin,
+        },
+    ) as span:
+        # Set input span data
+        _set_span_input_data(
+            span,
+            handler_name,
+            SPANDATA.MCP_TOOL_NAME,
+            "tools/call",
+            arguments,
+            request_id,
+            session_id,
+            mcp_transport,
+        )
 
-        with span_mgr as span:
-            # Set input span data
-            _set_span_input_data(
-                span,
-                handler_name,
-                SPANDATA.MCP_TOOL_NAME,
-                "tools/call",
-                arguments,
-                request_id,
-                session_id,
-                mcp_transport,
-            )
+        try:
+            result = await call_next(ctx)
+        except Exception as e:
+            with capture_internal_exceptions():
+                _capture_exception(e)
+            raise
 
-            try:
-                result = await call_next(ctx)
+        if not isinstance(result, dict):
+            return result
 
-            except Exception as e:
-                with capture_internal_exceptions():
-                    _capture_exception(e)
-                raise
+        # Get integration to check PII settings
+        integration = client.get_integration(MCPIntegration)
+        if integration is None:
+            return result
 
-            if not isinstance(result, dict):
-                return result
-
-            # Get integration to check PII settings
-            integration = client.get_integration(MCPIntegration)
-            if integration is None:
-                return result
-
-            # Check if we should include sensitive data
-            should_include_result_data = False
-            if has_data_collection_enabled(client.options):
-                if client.options["data_collection"]["gen_ai"]["outputs"]:
-                    should_include_result_data = True
-            elif should_send_default_pii() and integration.include_prompts:
+        # Check if we should include sensitive data
+        should_include_result_data = False
+        if has_data_collection_enabled(client.options):
+            if client.options["data_collection"]["gen_ai"]["outputs"]:
                 should_include_result_data = True
+        elif should_send_default_pii():
+            should_include_result_data = True
 
-            result_content = result
-            if "structuredContent" in result:
-                result_content = result["structuredContent"]
-            elif isinstance(result.get("content"), list):
-                result_content = _extract_text_from_content_blocks(result["content"])
+        result_content = result
+        if "structuredContent" in result:
+            result_content = result["structuredContent"]
+        elif isinstance(result.get("content"), list):
+            result_content = _extract_text_from_content_blocks(result["content"])
 
-            if result_content is not None and should_include_result_data:
-                _set_span_data_attribute(
-                    span,
-                    SPANDATA.MCP_TOOL_RESULT_CONTENT,
-                    safe_serialize(result_content),
+        if result_content is not None and should_include_result_data:
+            span.set_attribute(
+                SPANDATA.MCP_TOOL_RESULT_CONTENT,
+                safe_serialize(result_content),
+            )
+            # Set content count if result is a dict
+            if isinstance(result_content, dict):
+                span.set_attribute(
+                    SPANDATA.MCP_TOOL_RESULT_CONTENT_COUNT,
+                    len(result_content),
                 )
-                # Set content count if result is a dict
-                if isinstance(result_content, dict):
-                    _set_span_data_attribute(
-                        span,
-                        SPANDATA.MCP_TOOL_RESULT_CONTENT_COUNT,
-                        len(result_content),
-                    )
 
     return result
 
 
-async def _prompt_handler_wrapper(
-    func: "Callable[..., Awaitable[Union[GetPromptResult, InputRequiredResult]]]",
-    original_args: "tuple[Any, ...]",
-    original_kwargs: "Optional[dict[str, Any]]" = None,
-    self: "Optional[Any]" = None,
-    force_await: bool = True,
-) -> "Union[GetPromptResult, InputRequiredResult]":
-    """
-    Wrapper for MCP prompt handlers.
-    Creates and manages the MCP span and attaches all attributes on the span.
-
-    Args:
-        func: The handler function to wrap
-        original_args: Original arguments passed to the handler
-        original_kwargs: Original keyword arguments passed to the handler
-        self: Optional instance for bound methods
-    """
-    client = sentry_sdk.get_client()
-
-    original_kwargs = original_kwargs or {}
-
-    if original_args:
-        handler_name = original_args[0]
-    elif original_kwargs.get("name"):
-        handler_name = original_kwargs["name"]
-
-    arguments = {}
-    if len(original_args) > 1 and original_args[1] is not None:
-        arguments = original_args[1]
-    elif original_kwargs.get("arguments"):
-        arguments = original_kwargs["arguments"]
-
-    if has_data_collection_enabled(client.options):
-        if not client.options["data_collection"]["gen_ai"]["inputs"]:
-            # Arguments can contain sensitive data and shouldn't be added to the span
-            # if the user has opted out via this config.
-            arguments = {}
-
-    ctx = None
-    try:
-        ctx = request_ctx.get()
-    except LookupError:
-        pass
-
-    # Get request ID, session ID, and transport from context
-    request_id, session_id, mcp_transport = _get_request_context_data(ctx=ctx)
-
-    span_streaming = has_span_streaming_enabled(client.options)
-
-    # Start span and execute
-    with _active_http_scopes(ctx=ctx):
-        span_mgr: "Union[Span, StreamedSpan]"
-        if span_streaming:
-            span_mgr = sentry_sdk.traces.start_span(
-                name=f"prompts/get {handler_name}",
-                attributes={
-                    "sentry.op": OP.MCP_SERVER,
-                    "sentry.origin": MCPIntegration.origin,
-                },
-            )
-        else:
-            span_mgr = get_start_span_function()(
-                op=OP.MCP_SERVER,
-                name=f"prompts/get {handler_name}",
-                origin=MCPIntegration.origin,
-            )
-
-        with span_mgr as span:
-            # Set input span data
-            _set_span_input_data(
-                span,
-                handler_name,
-                SPANDATA.MCP_PROMPT_NAME,
-                "prompts/get",
-                arguments,
-                request_id,
-                session_id,
-                mcp_transport,
-            )
-
-            try:
-                # Execute the async handler
-                if self is not None:
-                    original_args = (self, *original_args)
-
-                result = func(*original_args, **original_kwargs)
-                if force_await or inspect.isawaitable(result):
-                    result = await result
-
-            except Exception as e:
-                with capture_internal_exceptions():
-                    _capture_exception(e)
-                raise
-
-            if result is None:
-                return result
-
-            # Get integration to check PII settings
-            integration = client.get_integration(MCPIntegration)
-            if integration is None:
-                return result
-
-            # Check if we should include sensitive data
-            should_include_result_data = False
-            if has_data_collection_enabled(client.options):
-                if client.options["data_collection"]["gen_ai"]["inputs"]:
-                    should_include_result_data = True
-            elif should_send_default_pii() and integration.include_prompts:
-                should_include_result_data = True
-
-            # For prompts, count messages and set role/content only for single-message prompts
-            try:
-                messages: "Optional[list[str]]" = None
-                message_count = 0
-
-                # Check if result has messages attribute (GetPromptResult)
-                if hasattr(result, "messages") and result.messages:
-                    messages = result.messages  # type: ignore[assignment]
-                    message_count = len(messages)  # type: ignore[arg-type]
-                # Also check if result is a dict with messages
-                elif isinstance(result, dict) and result.get("messages"):
-                    messages = result["messages"]
-                    message_count = len(messages)
-
-                # Always set message count if we found messages
-                if message_count > 0:
-                    _set_span_data_attribute(
-                        span, SPANDATA.MCP_PROMPT_RESULT_MESSAGE_COUNT, message_count
-                    )
-
-                # Only set role and content for single-message prompts if PII is allowed
-                if message_count == 1 and should_include_result_data and messages:
-                    first_message = messages[0]
-                    # Extract role
-                    role = None
-                    if hasattr(first_message, "role"):
-                        role = first_message.role
-                    elif isinstance(first_message, dict) and "role" in first_message:
-                        role = first_message["role"]
-
-                    if role:
-                        _set_span_data_attribute(
-                            span, SPANDATA.MCP_PROMPT_RESULT_MESSAGE_ROLE, role
-                        )
-
-                    # Extract content text
-                    content_text = None
-                    if hasattr(first_message, "content"):
-                        msg_content = first_message.content
-                        # Content can be a TextContent object or similar
-                        if hasattr(msg_content, "text"):
-                            content_text = msg_content.text
-                        elif isinstance(msg_content, dict) and "text" in msg_content:
-                            content_text = msg_content["text"]
-                        elif isinstance(msg_content, str):
-                            content_text = msg_content
-                    elif isinstance(first_message, dict) and "content" in first_message:
-                        msg_content = first_message["content"]
-                        if isinstance(msg_content, dict) and "text" in msg_content:
-                            content_text = msg_content["text"]
-                        elif isinstance(msg_content, str):
-                            content_text = msg_content
-
-                    if content_text:
-                        _set_span_data_attribute(
-                            span,
-                            SPANDATA.MCP_PROMPT_RESULT_MESSAGE_CONTENT,
-                            content_text,
-                        )
-            except Exception:
-                # Silently ignore if we can't extract message info
-                pass
-
-    return result
-
-
-async def _instrument_v2_prompt_get(
+async def _instrument_prompt_get(
     ctx: "ServerRequestContext[Any, Any]",
     call_next: "CallNext",
 ) -> "HandlerResult":
@@ -704,209 +349,94 @@ async def _instrument_v2_prompt_get(
     # Get request ID, session ID, and transport from context
     request_id, session_id, mcp_transport = _get_request_context_data(ctx=ctx)
 
-    span_streaming = has_span_streaming_enabled(client.options)
-
     # Start span and execute
-    with _active_http_scopes(ctx=ctx):
-        span_mgr: "Union[Span, StreamedSpan]"
-        if span_streaming:
-            span_mgr = sentry_sdk.traces.start_span(
-                name=f"prompts/get {handler_name}",
-                attributes={
-                    "sentry.op": OP.MCP_SERVER,
-                    "sentry.origin": MCPIntegration.origin,
-                },
-            )
-        else:
-            span_mgr = get_start_span_function()(
-                op=OP.MCP_SERVER,
-                name=f"prompts/get {handler_name}",
-                origin=MCPIntegration.origin,
-            )
+    with _active_http_scopes(ctx=ctx), sentry_sdk.start_span(
+        name=f"prompts/get {handler_name}",
+        attributes={
+            "sentry.op": OP.MCP_SERVER,
+            "sentry.origin": MCPIntegration.origin,
+        },
+    ) as span:
+        # Set input span data
+        _set_span_input_data(
+            span,
+            handler_name,
+            SPANDATA.MCP_PROMPT_NAME,
+            "prompts/get",
+            arguments,
+            request_id,
+            session_id,
+            mcp_transport,
+        )
 
-        with span_mgr as span:
-            # Set input span data
-            _set_span_input_data(
-                span,
-                handler_name,
-                SPANDATA.MCP_PROMPT_NAME,
-                "prompts/get",
-                arguments,
-                request_id,
-                session_id,
-                mcp_transport,
-            )
+        try:
+            result = await call_next(ctx)
+        except Exception as e:
+            with capture_internal_exceptions():
+                _capture_exception(e)
+            raise
 
-            try:
-                result = await call_next(ctx)
-            except Exception as e:
-                with capture_internal_exceptions():
-                    _capture_exception(e)
-                raise
+        if not isinstance(result, dict):
+            return result
 
-            if not isinstance(result, dict):
-                return result
+        # Get integration to check PII settings
+        integration = client.get_integration(MCPIntegration)
+        if integration is None:
+            return result
 
-            # Get integration to check PII settings
-            integration = client.get_integration(MCPIntegration)
-            if integration is None:
-                return result
-
-            # Check if we should include sensitive data
-            should_include_result_data = False
-            if has_data_collection_enabled(client.options):
-                if client.options["data_collection"]["gen_ai"]["inputs"]:
-                    should_include_result_data = True
-            elif should_send_default_pii() and integration.include_prompts:
+        # Check if we should include sensitive data
+        should_include_result_data = False
+        if has_data_collection_enabled(client.options):
+            if client.options["data_collection"]["gen_ai"]["inputs"]:
                 should_include_result_data = True
+        elif should_send_default_pii():
+            should_include_result_data = True
 
-            # For prompts, count messages and set role/content only for single-message prompts
-            try:
-                messages: "Optional[list[dict[str, Any]]]" = None
-                message_count = 0
+        # For prompts, count messages and set role/content only for single-message prompts
+        try:
+            messages: "Optional[list[dict[str, Any]]]" = None
+            message_count = 0
 
-                if result.get("messages"):
-                    messages = result["messages"]
-                    message_count = len(messages)
+            if result.get("messages"):
+                messages = result["messages"]
+                message_count = len(messages)
 
-                # Always set message count if we found messages
-                if message_count > 0:
-                    _set_span_data_attribute(
-                        span, SPANDATA.MCP_PROMPT_RESULT_MESSAGE_COUNT, message_count
+            # Always set message count if we found messages
+            if message_count > 0:
+                span.set_attribute(
+                    SPANDATA.MCP_PROMPT_RESULT_MESSAGE_COUNT, message_count
+                )
+
+            # Only set role and content for single-message prompts if PII is allowed
+            if message_count == 1 and should_include_result_data and messages:
+                first_message = messages[0]
+                # Extract role
+                role = None
+                if "role" in first_message:
+                    role = first_message["role"]
+
+                if role:
+                    span.set_attribute(SPANDATA.MCP_PROMPT_RESULT_MESSAGE_ROLE, role)
+
+                content_text = None
+                if "content" in first_message:
+                    msg_content = first_message["content"]
+                    if "text" in msg_content:
+                        content_text = msg_content["text"]
+
+                if content_text:
+                    span.set_attribute(
+                        SPANDATA.MCP_PROMPT_RESULT_MESSAGE_CONTENT,
+                        content_text,
                     )
-
-                # Only set role and content for single-message prompts if PII is allowed
-                if message_count == 1 and should_include_result_data and messages:
-                    first_message = messages[0]
-                    # Extract role
-                    role = None
-                    if "role" in first_message:
-                        role = first_message["role"]
-
-                    if role:
-                        _set_span_data_attribute(
-                            span, SPANDATA.MCP_PROMPT_RESULT_MESSAGE_ROLE, role
-                        )
-
-                    content_text = None
-                    if "content" in first_message:
-                        msg_content = first_message["content"]
-                        if "text" in msg_content:
-                            content_text = msg_content["text"]
-
-                    if content_text:
-                        _set_span_data_attribute(
-                            span,
-                            SPANDATA.MCP_PROMPT_RESULT_MESSAGE_CONTENT,
-                            content_text,
-                        )
-            except Exception:
-                # Silently ignore if we can't extract message info
-                pass
+        except Exception:
+            # Silently ignore if we can't extract message info
+            pass
 
     return result
 
 
-async def _resource_handler_wrapper(
-    func: "Callable[..., Awaitable[Union[ReadResourceResult, InputRequiredResult]]]",
-    original_args: "tuple[Any, ...]",
-    original_kwargs: "Optional[dict[str, Any]]" = None,
-    self: "Optional[Any]" = None,
-    force_await: bool = True,
-) -> "Union[ReadResourceResult, InputRequiredResult]":
-    """
-    Wrapper for MCP resource handlers.
-    Creates and manages the MCP span and attaches all attributes on the span.
-
-    Args:
-        func: The handler function to wrap
-        original_args: Original arguments passed to the handler
-        original_kwargs: Original keyword arguments passed to the handler
-        self: Optional instance for bound methods
-    """
-    original_kwargs = original_kwargs or {}
-
-    handler_name = "unknown"
-    if original_args:
-        handler_name = str(original_args[0])
-    elif original_kwargs.get("uri"):
-        handler_name = str(original_kwargs["uri"])
-
-    arguments: "dict[str, Any]" = {}
-
-    ctx = None
-    try:
-        ctx = request_ctx.get()
-    except LookupError:
-        pass
-
-    # Get request ID, session ID, and transport from context
-    request_id, session_id, mcp_transport = _get_request_context_data(ctx=ctx)
-
-    span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
-
-    # Start span and execute
-    with _active_http_scopes(ctx=ctx):
-        span_mgr: "Union[Span, StreamedSpan]"
-        if span_streaming:
-            span_mgr = sentry_sdk.traces.start_span(
-                name=f"resources/read {handler_name}",
-                attributes={
-                    "sentry.op": OP.MCP_SERVER,
-                    "sentry.origin": MCPIntegration.origin,
-                },
-            )
-        else:
-            span_mgr = get_start_span_function()(
-                op=OP.MCP_SERVER,
-                name=f"resources/read {handler_name}",
-                origin=MCPIntegration.origin,
-            )
-
-        with span_mgr as span:
-            # Set input span data
-            _set_span_input_data(
-                span,
-                handler_name,
-                SPANDATA.MCP_RESOURCE_URI,
-                "resources/read",
-                arguments,
-                request_id,
-                session_id,
-                mcp_transport,
-            )
-
-            if original_args:
-                uri = original_args[0]
-            else:
-                uri = original_kwargs.get("uri")
-
-            protocol = None
-            if uri is not None and hasattr(uri, "scheme"):
-                protocol = uri.scheme
-            elif handler_name and "://" in handler_name:
-                protocol = handler_name.split("://")[0]
-            if protocol:
-                _set_span_data_attribute(span, SPANDATA.MCP_RESOURCE_PROTOCOL, protocol)
-
-            try:
-                # Execute the async handler
-                if self is not None:
-                    original_args = (self, *original_args)
-
-                result = func(*original_args, **original_kwargs)
-                if force_await or inspect.isawaitable(result):
-                    result = await result
-
-            except Exception as e:
-                with capture_internal_exceptions():
-                    _capture_exception(e)
-                raise
-
-    return result
-
-
-async def _instrument_v2_resource_read(
+async def _instrument_resource_read(
     ctx: "ServerRequestContext[Any, Any]",
     call_next: "CallNext",
 ) -> "HandlerResult":
@@ -922,145 +452,59 @@ async def _instrument_v2_resource_read(
     # Get request ID, session ID, and transport from context
     request_id, session_id, mcp_transport = _get_request_context_data(ctx=ctx)
 
-    span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
-
     # Start span and execute
-    with _active_http_scopes(ctx=ctx):
-        span_mgr: "Union[Span, StreamedSpan]"
-        if span_streaming:
-            span_mgr = sentry_sdk.traces.start_span(
-                name=f"resources/read {handler_name}",
-                attributes={
-                    "sentry.op": OP.MCP_SERVER,
-                    "sentry.origin": MCPIntegration.origin,
-                },
-            )
-        else:
-            span_mgr = get_start_span_function()(
-                op=OP.MCP_SERVER,
-                name=f"resources/read {handler_name}",
-                origin=MCPIntegration.origin,
-            )
+    with _active_http_scopes(ctx=ctx), sentry_sdk.start_span(
+        name=f"resources/read {handler_name}",
+        attributes={
+            "sentry.op": OP.MCP_SERVER,
+            "sentry.origin": MCPIntegration.origin,
+        },
+    ) as span:
+        # Set input span data
+        _set_span_input_data(
+            span,
+            handler_name,
+            SPANDATA.MCP_RESOURCE_URI,
+            "resources/read",
+            {},
+            request_id,
+            session_id,
+            mcp_transport,
+        )
 
-        with span_mgr as span:
-            # Set input span data
-            _set_span_input_data(
-                span,
-                handler_name,
-                SPANDATA.MCP_RESOURCE_URI,
-                "resources/read",
-                {},
-                request_id,
-                session_id,
-                mcp_transport,
-            )
+        protocol = None
+        if handler_name and "://" in handler_name:
+            protocol = handler_name.split("://")[0]
+        if protocol:
+            span.set_attribute(SPANDATA.MCP_RESOURCE_PROTOCOL, protocol)
 
-            protocol = None
-            if handler_name and "://" in handler_name:
-                protocol = handler_name.split("://")[0]
-            if protocol:
-                _set_span_data_attribute(span, SPANDATA.MCP_RESOURCE_PROTOCOL, protocol)
+        try:
+            result = await call_next(ctx)
 
-            try:
-                result = await call_next(ctx)
-
-            except Exception as e:
-                with capture_internal_exceptions():
-                    _capture_exception(e)
-                raise
+        except Exception as e:
+            with capture_internal_exceptions():
+                _capture_exception(e)
+            raise
 
     return result
-
-
-def _patch_lowlevel_server() -> None:
-    """
-    Patches the mcp.server.lowlevel.Server class to instrument handler execution.
-    """
-    if MCP_PACKAGE_VERSION and MCP_PACKAGE_VERSION >= (2, 0, 0):
-        _patch_lowlevel_server_v2()
-    else:
-        _patch_lowlevel_server_v1()
-
-
-def _patch_lowlevel_server_v1() -> None:
-    """Patches v1 Server decorator methods (call_tool, get_prompt, read_resource)."""
-    # Patch call_tool decorator
-    original_call_tool = Server.call_tool  # type: ignore[attr-defined]
-
-    def patched_call_tool(
-        self: "Server", **kwargs: "Any"
-    ) -> "Callable[[Callable[..., Any]], Callable[..., Any]]":
-        """Patched version of Server.call_tool that adds Sentry instrumentation."""
-
-        def instrumented_decorator(func: "Callable[..., Any]") -> "Callable[..., Any]":
-            @wraps(func)
-            async def wrapper(*args: "Any") -> "Any":
-                return await _tool_handler_wrapper(func, args, force_await=False)
-
-            # Then register it with the original MCP decorator
-            return original_call_tool(self, **kwargs)(wrapper)
-
-        return instrumented_decorator
-
-    Server.call_tool = patched_call_tool  # type: ignore[attr-defined]
-
-    # Patch get_prompt decorator
-    original_get_prompt = Server.get_prompt  # type: ignore[attr-defined]
-
-    def patched_get_prompt(
-        self: "Server",
-    ) -> "Callable[[Callable[..., Any]], Callable[..., Any]]":
-        """Patched version of Server.get_prompt that adds Sentry instrumentation."""
-
-        def instrumented_decorator(func: "Callable[..., Any]") -> "Callable[..., Any]":
-            @wraps(func)
-            async def wrapper(*args: "Any") -> "Any":
-                return await _prompt_handler_wrapper(func, args, force_await=False)
-
-            # Then register it with the original MCP decorator
-            return original_get_prompt(self)(wrapper)
-
-        return instrumented_decorator
-
-    Server.get_prompt = patched_get_prompt  # type: ignore[attr-defined]
-
-    # Patch read_resource decorator
-    original_read_resource = Server.read_resource  # type: ignore[attr-defined]
-
-    def patched_read_resource(
-        self: "Server",
-    ) -> "Callable[[Callable[..., Any]], Callable[..., Any]]":
-        """Patched version of Server.read_resource that adds Sentry instrumentation."""
-
-        def instrumented_decorator(func: "Callable[..., Any]") -> "Callable[..., Any]":
-            @wraps(func)
-            async def wrapper(*args: "Any") -> "Any":
-                return await _resource_handler_wrapper(func, args, force_await=False)
-
-            # Then register it with the original MCP decorator
-            return original_read_resource(self)(wrapper)
-
-        return instrumented_decorator
-
-    Server.read_resource = patched_read_resource  # type: ignore[attr-defined]
 
 
 async def _sentry_middleware(
     ctx: "ServerRequestContext[Any, Any]", call_next: "CallNext"
 ) -> "HandlerResult":
     if ctx.method == "tools/call":
-        return await _instrument_v2_tool_call(ctx, call_next)
+        return await _instrument_tool_call(ctx, call_next)
 
     if ctx.method == "prompts/get":
-        return await _instrument_v2_prompt_get(ctx, call_next)
+        return await _instrument_prompt_get(ctx, call_next)
 
     if ctx.method == "resources/read":
-        return await _instrument_v2_resource_read(ctx, call_next)
+        return await _instrument_resource_read(ctx, call_next)
 
     return await call_next(ctx)
 
 
-def _patch_lowlevel_server_v2() -> None:
+def _patch_lowlevel_server() -> None:
     """Patches the v2 Server to wrap tool/prompt/resource handlers.
 
     Handlers can be registered either via the Server(...) constructor kwargs
@@ -1095,45 +539,3 @@ def _patch_handle_request() -> None:
         await original_handle_request(self, scope, receive, send)
 
     StreamableHTTPServerTransport.handle_request = patched_handle_request  # type: ignore[method-assign]
-
-
-def _patch_fastmcp() -> None:
-    """
-    Patches the standalone fastmcp package's FastMCP class.
-
-    The standalone fastmcp package (v2.14.0+) registers its own handlers for
-    prompts and resources directly, bypassing the Server decorators we patch.
-    This function patches the _get_prompt_mcp and _read_resource_mcp methods
-    to add instrumentation for those handlers.
-    """
-    if FastMCP is not None and hasattr(FastMCP, "_get_prompt_mcp"):
-        original_get_prompt_mcp = FastMCP._get_prompt_mcp
-
-        @wraps(original_get_prompt_mcp)
-        async def patched_get_prompt_mcp(
-            self: "Any", *args: "Any", **kwargs: "Any"
-        ) -> "Any":
-            return await _prompt_handler_wrapper(
-                original_get_prompt_mcp,
-                args,
-                kwargs,
-                self,
-            )
-
-        FastMCP._get_prompt_mcp = patched_get_prompt_mcp
-
-    if FastMCP is not None and hasattr(FastMCP, "_read_resource_mcp"):
-        original_read_resource_mcp = FastMCP._read_resource_mcp
-
-        @wraps(original_read_resource_mcp)
-        async def patched_read_resource_mcp(
-            self: "Any", *args: "Any", **kwargs: "Any"
-        ) -> "Any":
-            return await _resource_handler_wrapper(
-                original_read_resource_mcp,
-                args,
-                kwargs,
-                self,
-            )
-
-        FastMCP._read_resource_mcp = patched_read_resource_mcp

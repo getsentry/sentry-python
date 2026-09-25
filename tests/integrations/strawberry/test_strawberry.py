@@ -201,7 +201,9 @@ def test_capture_request_if_available_and_send_pii_is_on(
 
     (error_event,) = events
 
-    assert error_event["exception"]["values"][0]["mechanism"]["type"] == "strawberry"
+    assert len(error_event["exception"]["values"]) == 2
+    assert error_event["exception"]["values"][0]["mechanism"]["type"] == "chained"
+    assert error_event["exception"]["values"][-1]["mechanism"]["type"] == "strawberry"
     assert error_event["request"]["api_target"] == "graphql"
     assert error_event["request"]["data"] == {
         "query": query,
@@ -255,7 +257,10 @@ def test_do_not_capture_request_if_send_pii_is_off(
     assert len(events) == 1
 
     (error_event,) = events
-    assert error_event["exception"]["values"][0]["mechanism"]["type"] == "strawberry"
+
+    assert len(error_event["exception"]["values"]) == 2
+    assert error_event["exception"]["values"][0]["mechanism"]["type"] == "chained"
+    assert error_event["exception"]["values"][-1]["mechanism"]["type"] == "strawberry"
     assert "data" not in error_event["request"]
     assert "response" not in error_event["contexts"]
 
@@ -336,15 +341,18 @@ def test_event_processor_data_collection(
     assert len(events) == 1
 
     (error_event,) = events
-    assert error_event["exception"]["values"][0]["mechanism"]["type"] == "strawberry"
+    assert len(error_event["exception"]["values"]) == 2
+    assert error_event["exception"]["values"][0]["mechanism"]["type"] == "chained"
+    assert error_event["exception"]["values"][-1]["mechanism"]["type"] == "strawberry"
 
     # request.data comes from the framework integration and must not be
     # overwritten by the strawberry integration
-    assert error_event["request"]["data"] == {
-        "query": query,
-        "operationName": "ErrorQuery",
-        "variables": {"value": "boom"},
-    }
+    assert error_event["request"]["data"] == ApproxDict(
+        {
+            "operationName": "ErrorQuery",
+            "variables": {"value": "boom"},
+        }
+    )
 
     if expect_api_target:
         assert error_event["request"]["api_target"] == "graphql"
@@ -541,8 +549,7 @@ def test_breadcrumb_no_operation_name(
     "send_default_pii",
     [True, False],
 )
-@pytest.mark.parametrize("span_streaming", [True, False])
-def test_capture_transaction_on_error(
+def test_capture_segment_on_error(
     request,
     sentry_init,
     capture_events,
@@ -551,7 +558,6 @@ def test_capture_transaction_on_error(
     async_execution,
     framework_integrations,
     send_default_pii,
-    span_streaming,
 ):
     sentry_init(
         send_default_pii=send_default_pii,
@@ -560,13 +566,9 @@ def test_capture_transaction_on_error(
         ]
         + framework_integrations,
         traces_sample_rate=1,
-        trace_lifecycle="stream" if span_streaming else "static",
     )
 
-    if span_streaming:
-        items = capture_items("event", "span")
-    else:
-        events = capture_events()
+    items = capture_items("event", "span")
 
     schema = strawberry.Schema(Query)
 
@@ -576,103 +578,40 @@ def test_capture_transaction_on_error(
     query = "query ErrorQuery { error }"
     client.post("/graphql", json={"query": query, "operationName": "ErrorQuery"})
 
-    if span_streaming:
-        sentry_sdk.flush()
-        error_events = [i.payload for i in items if i.type == "event"]
-        spans = [i.payload for i in items if i.type == "span"]
+    sentry_sdk.flush()
+    error_events = [i.payload for i in items if i.type == "event"]
+    spans = [i.payload for i in items if i.type == "span"]
 
-        assert len(error_events) == 1
+    assert len(error_events) == 1
 
-        assert len(spans) == 5
-        parse_span, validate_span, resolve_span, query_span, segment = spans
+    assert len(spans) == 5
+    parse_span, validate_span, resolve_span, query_span, segment = spans
 
-        assert segment["is_segment"] is True
-        assert segment["name"] == "ErrorQuery"
-        assert segment["attributes"]["sentry.op"] == OP.GRAPHQL_QUERY
+    assert segment["is_segment"] is True
+    assert segment["name"] == "ErrorQuery"
+    assert segment["attributes"]["sentry.op"] == OP.GRAPHQL_QUERY
 
-        assert query_span["attributes"]["sentry.op"] == OP.GRAPHQL_QUERY
-        assert query_span["name"] == "query ErrorQuery"
-        assert query_span["attributes"]["graphql.operation.type"] == "query"
-        assert query_span["attributes"]["graphql.operation.name"] == "ErrorQuery"
+    assert query_span["attributes"]["sentry.op"] == OP.GRAPHQL_QUERY
+    assert query_span["name"] == "query ErrorQuery"
+    assert query_span["attributes"]["graphql.operation.type"] == "query"
+    assert query_span["attributes"]["graphql.operation.name"] == "ErrorQuery"
 
-        if send_default_pii is True:
-            assert query_span["attributes"]["graphql.document"] == query
-        else:
-            assert "graphql.document" not in query_span["attributes"]
-
-        assert parse_span["attributes"]["sentry.op"] == OP.GRAPHQL_PARSE
-        assert parse_span["name"] == "parsing"
-        assert parse_span["parent_span_id"] == query_span["span_id"]
-
-        assert validate_span["attributes"]["sentry.op"] == OP.GRAPHQL_VALIDATE
-        assert validate_span["name"] == "validation"
-        assert validate_span["parent_span_id"] == query_span["span_id"]
-
-        assert resolve_span["attributes"]["sentry.op"] == OP.GRAPHQL_RESOLVE
-        assert resolve_span["name"] == "resolving Query.error"
-        assert resolve_span["parent_span_id"] == query_span["span_id"]
+    if send_default_pii is True:
+        assert query_span["attributes"]["graphql.document"] == query
     else:
-        assert len(events) == 2
-        (_, transaction_event) = events
+        assert "graphql.document" not in query_span["attributes"]
 
-        assert transaction_event["transaction"] == "ErrorQuery"
-        assert transaction_event["contexts"]["trace"]["op"] == OP.GRAPHQL_QUERY
-        assert transaction_event["spans"]
+    assert parse_span["attributes"]["sentry.op"] == OP.GRAPHQL_PARSE
+    assert parse_span["name"] == "parsing"
+    assert parse_span["parent_span_id"] == query_span["span_id"]
 
-        query_spans = [
-            span
-            for span in transaction_event["spans"]
-            if span["op"] == OP.GRAPHQL_QUERY
-        ]
-        assert len(query_spans) == 1, "exactly one query span expected"
-        query_span = query_spans[0]
-        assert query_span["description"] == "query ErrorQuery"
-        assert query_span["data"]["graphql.operation.type"] == "query"
-        assert query_span["data"]["graphql.operation.name"] == "ErrorQuery"
-        assert query_span["data"]["graphql.resource_name"]
+    assert validate_span["attributes"]["sentry.op"] == OP.GRAPHQL_VALIDATE
+    assert validate_span["name"] == "validation"
+    assert validate_span["parent_span_id"] == query_span["span_id"]
 
-        if send_default_pii is True:
-            assert query_span["data"]["graphql.document"] == query
-        else:
-            assert "graphql.document" not in query_span["data"]
-
-        parse_spans = [
-            span
-            for span in transaction_event["spans"]
-            if span["op"] == OP.GRAPHQL_PARSE
-        ]
-        assert len(parse_spans) == 1, "exactly one parse span expected"
-        parse_span = parse_spans[0]
-        assert parse_span["parent_span_id"] == query_span["span_id"]
-        assert parse_span["description"] == "parsing"
-
-        validate_spans = [
-            span
-            for span in transaction_event["spans"]
-            if span["op"] == OP.GRAPHQL_VALIDATE
-        ]
-        assert len(validate_spans) == 1, "exactly one validate span expected"
-        validate_span = validate_spans[0]
-        assert validate_span["parent_span_id"] == query_span["span_id"]
-        assert validate_span["description"] == "validation"
-
-        resolve_spans = [
-            span
-            for span in transaction_event["spans"]
-            if span["op"] == OP.GRAPHQL_RESOLVE
-        ]
-        assert len(resolve_spans) == 1, "exactly one resolve span expected"
-        resolve_span = resolve_spans[0]
-        assert resolve_span["parent_span_id"] == query_span["span_id"]
-        assert resolve_span["description"] == "resolving Query.error"
-        assert resolve_span["data"] == ApproxDict(
-            {
-                "graphql.field_name": "error",
-                "graphql.parent_type": "Query",
-                "graphql.field_path": "Query.error",
-                "graphql.path": "error",
-            }
-        )
+    assert resolve_span["attributes"]["sentry.op"] == OP.GRAPHQL_RESOLVE
+    assert resolve_span["name"] == "resolving Query.error"
+    assert resolve_span["parent_span_id"] == query_span["span_id"]
 
 
 @parameterize_strawberry_test
@@ -680,8 +619,7 @@ def test_capture_transaction_on_error(
     "send_default_pii",
     [True, False],
 )
-@pytest.mark.parametrize("span_streaming", [True, False])
-def test_capture_transaction_on_success(
+def test_capture_segment_on_success(
     request,
     sentry_init,
     capture_events,
@@ -690,7 +628,6 @@ def test_capture_transaction_on_success(
     async_execution,
     framework_integrations,
     send_default_pii,
-    span_streaming,
 ):
     sentry_init(
         integrations=[
@@ -699,13 +636,9 @@ def test_capture_transaction_on_success(
         + framework_integrations,
         traces_sample_rate=1,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream" if span_streaming else "static",
     )
 
-    if span_streaming:
-        items = capture_items("span")
-    else:
-        events = capture_events()
+    items = capture_items("span")
 
     schema = strawberry.Schema(Query)
 
@@ -715,100 +648,37 @@ def test_capture_transaction_on_success(
     query = "query GreetingQuery { hello }"
     client.post("/graphql", json={"query": query, "operationName": "GreetingQuery"})
 
-    if span_streaming:
-        sentry_sdk.flush()
-        spans = [i.payload for i in items]
+    sentry_sdk.flush()
+    spans = [i.payload for i in items]
 
-        assert len(spans) == 5
-        parse_span, validate_span, resolve_span, query_span, segment = spans
+    assert len(spans) == 5
+    parse_span, validate_span, resolve_span, query_span, segment = spans
 
-        assert segment["is_segment"] is True
-        assert segment["name"] == "GreetingQuery"
-        assert segment["attributes"]["sentry.op"] == OP.GRAPHQL_QUERY
+    assert segment["is_segment"] is True
+    assert segment["name"] == "GreetingQuery"
+    assert segment["attributes"]["sentry.op"] == OP.GRAPHQL_QUERY
 
-        assert query_span["attributes"]["sentry.op"] == OP.GRAPHQL_QUERY
-        assert query_span["name"] == "query GreetingQuery"
-        assert query_span["attributes"]["graphql.operation.type"] == "query"
-        assert query_span["attributes"]["graphql.operation.name"] == "GreetingQuery"
+    assert query_span["attributes"]["sentry.op"] == OP.GRAPHQL_QUERY
+    assert query_span["name"] == "query GreetingQuery"
+    assert query_span["attributes"]["graphql.operation.type"] == "query"
+    assert query_span["attributes"]["graphql.operation.name"] == "GreetingQuery"
 
-        if send_default_pii is True:
-            assert query_span["attributes"]["graphql.document"] == query
-        else:
-            assert "graphql.document" not in query_span["attributes"]
-
-        assert parse_span["attributes"]["sentry.op"] == OP.GRAPHQL_PARSE
-        assert parse_span["name"] == "parsing"
-        assert parse_span["parent_span_id"] == query_span["span_id"]
-
-        assert validate_span["attributes"]["sentry.op"] == OP.GRAPHQL_VALIDATE
-        assert validate_span["name"] == "validation"
-        assert validate_span["parent_span_id"] == query_span["span_id"]
-
-        assert resolve_span["attributes"]["sentry.op"] == OP.GRAPHQL_RESOLVE
-        assert resolve_span["name"] == "resolving Query.hello"
-        assert resolve_span["parent_span_id"] == query_span["span_id"]
+    if send_default_pii is True:
+        assert query_span["attributes"]["graphql.document"] == query
     else:
-        assert len(events) == 1
-        (transaction_event,) = events
+        assert "graphql.document" not in query_span["attributes"]
 
-        assert transaction_event["transaction"] == "GreetingQuery"
-        assert transaction_event["contexts"]["trace"]["op"] == OP.GRAPHQL_QUERY
-        assert transaction_event["spans"]
+    assert parse_span["attributes"]["sentry.op"] == OP.GRAPHQL_PARSE
+    assert parse_span["name"] == "parsing"
+    assert parse_span["parent_span_id"] == query_span["span_id"]
 
-        query_spans = [
-            span
-            for span in transaction_event["spans"]
-            if span["op"] == OP.GRAPHQL_QUERY
-        ]
-        assert len(query_spans) == 1, "exactly one query span expected"
-        query_span = query_spans[0]
-        assert query_span["description"] == "query GreetingQuery"
-        assert query_span["data"]["graphql.operation.type"] == "query"
-        assert query_span["data"]["graphql.operation.name"] == "GreetingQuery"
-        assert query_span["data"]["graphql.resource_name"]
+    assert validate_span["attributes"]["sentry.op"] == OP.GRAPHQL_VALIDATE
+    assert validate_span["name"] == "validation"
+    assert validate_span["parent_span_id"] == query_span["span_id"]
 
-        if send_default_pii is True:
-            assert query_span["data"]["graphql.document"] == query
-        else:
-            assert "graphql.document" not in query_span["data"]
-
-        parse_spans = [
-            span
-            for span in transaction_event["spans"]
-            if span["op"] == OP.GRAPHQL_PARSE
-        ]
-        assert len(parse_spans) == 1, "exactly one parse span expected"
-        parse_span = parse_spans[0]
-        assert parse_span["parent_span_id"] == query_span["span_id"]
-        assert parse_span["description"] == "parsing"
-
-        validate_spans = [
-            span
-            for span in transaction_event["spans"]
-            if span["op"] == OP.GRAPHQL_VALIDATE
-        ]
-        assert len(validate_spans) == 1, "exactly one validate span expected"
-        validate_span = validate_spans[0]
-        assert validate_span["parent_span_id"] == query_span["span_id"]
-        assert validate_span["description"] == "validation"
-
-        resolve_spans = [
-            span
-            for span in transaction_event["spans"]
-            if span["op"] == OP.GRAPHQL_RESOLVE
-        ]
-        assert len(resolve_spans) == 1, "exactly one resolve span expected"
-        resolve_span = resolve_spans[0]
-        assert resolve_span["parent_span_id"] == query_span["span_id"]
-        assert resolve_span["description"] == "resolving Query.hello"
-        assert resolve_span["data"] == ApproxDict(
-            {
-                "graphql.field_name": "hello",
-                "graphql.parent_type": "Query",
-                "graphql.field_path": "Query.hello",
-                "graphql.path": "hello",
-            }
-        )
+    assert resolve_span["attributes"]["sentry.op"] == OP.GRAPHQL_RESOLVE
+    assert resolve_span["name"] == "resolving Query.hello"
+    assert resolve_span["parent_span_id"] == query_span["span_id"]
 
 
 @parameterize_strawberry_test
@@ -816,8 +686,7 @@ def test_capture_transaction_on_success(
     "send_default_pii",
     [True, False],
 )
-@pytest.mark.parametrize("span_streaming", [True, False])
-def test_transaction_no_operation_name(
+def test_segment_no_operation_name(
     request,
     sentry_init,
     capture_events,
@@ -826,7 +695,6 @@ def test_transaction_no_operation_name(
     async_execution,
     framework_integrations,
     send_default_pii,
-    span_streaming,
 ):
     sentry_init(
         integrations=[
@@ -835,13 +703,9 @@ def test_transaction_no_operation_name(
         + framework_integrations,
         traces_sample_rate=1,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream" if span_streaming else "static",
     )
 
-    if span_streaming:
-        items = capture_items("span")
-    else:
-        events = capture_events()
+    items = capture_items("span")
 
     schema = strawberry.Schema(Query)
 
@@ -851,105 +715,39 @@ def test_transaction_no_operation_name(
     query = "{ hello }"
     client.post("/graphql", json={"query": query})
 
-    if span_streaming:
-        sentry_sdk.flush()
-        spans = [i.payload for i in items]
+    sentry_sdk.flush()
+    spans = [i.payload for i in items]
 
-        assert len(spans) == 5
-        parse_span, validate_span, resolve_span, query_span, segment = spans
+    assert len(spans) == 5
+    parse_span, validate_span, resolve_span, query_span, segment = spans
 
-        assert segment["is_segment"] is True
-        if async_execution:
-            assert segment["name"] == "/graphql"
-        else:
-            assert segment["name"] == "graphql_view"
-
-        assert query_span["attributes"]["sentry.op"] == OP.GRAPHQL_QUERY
-        assert query_span["name"] == "query"
-        assert query_span["attributes"]["graphql.operation.type"] == "query"
-        assert "graphql.operation.name" not in query_span["attributes"]
-
-        if send_default_pii is True:
-            assert query_span["attributes"]["graphql.document"] == query
-        else:
-            assert "graphql.document" not in query_span["attributes"]
-
-        assert parse_span["attributes"]["sentry.op"] == OP.GRAPHQL_PARSE
-        assert parse_span["name"] == "parsing"
-        assert parse_span["parent_span_id"] == query_span["span_id"]
-
-        assert validate_span["attributes"]["sentry.op"] == OP.GRAPHQL_VALIDATE
-        assert validate_span["name"] == "validation"
-        assert validate_span["parent_span_id"] == query_span["span_id"]
-
-        assert resolve_span["attributes"]["sentry.op"] == OP.GRAPHQL_RESOLVE
-        assert resolve_span["name"] == "resolving Query.hello"
-        assert resolve_span["parent_span_id"] == query_span["span_id"]
+    assert segment["is_segment"] is True
+    if async_execution:
+        assert segment["name"] == "/graphql"
     else:
-        assert len(events) == 1
-        (transaction_event,) = events
+        assert segment["name"] == "graphql_view"
 
-        if async_execution:
-            assert transaction_event["transaction"] == "/graphql"
-        else:
-            assert transaction_event["transaction"] == "graphql_view"
+    assert query_span["attributes"]["sentry.op"] == OP.GRAPHQL_QUERY
+    assert query_span["name"] == "query"
+    assert query_span["attributes"]["graphql.operation.type"] == "query"
+    assert "graphql.operation.name" not in query_span["attributes"]
 
-        assert transaction_event["spans"]
+    if send_default_pii is True:
+        assert query_span["attributes"]["graphql.document"] == query
+    else:
+        assert "graphql.document" not in query_span["attributes"]
 
-        query_spans = [
-            span
-            for span in transaction_event["spans"]
-            if span["op"] == OP.GRAPHQL_QUERY
-        ]
-        assert len(query_spans) == 1, "exactly one query span expected"
-        query_span = query_spans[0]
-        assert query_span["description"] == "query"
-        assert query_span["data"]["graphql.operation.type"] == "query"
-        assert query_span["data"]["graphql.operation.name"] is None
-        assert query_span["data"]["graphql.resource_name"]
+    assert parse_span["attributes"]["sentry.op"] == OP.GRAPHQL_PARSE
+    assert parse_span["name"] == "parsing"
+    assert parse_span["parent_span_id"] == query_span["span_id"]
 
-        if send_default_pii is True:
-            assert query_span["data"]["graphql.document"] == query
-        else:
-            assert "graphql.document" not in query_span["data"]
+    assert validate_span["attributes"]["sentry.op"] == OP.GRAPHQL_VALIDATE
+    assert validate_span["name"] == "validation"
+    assert validate_span["parent_span_id"] == query_span["span_id"]
 
-        parse_spans = [
-            span
-            for span in transaction_event["spans"]
-            if span["op"] == OP.GRAPHQL_PARSE
-        ]
-        assert len(parse_spans) == 1, "exactly one parse span expected"
-        parse_span = parse_spans[0]
-        assert parse_span["parent_span_id"] == query_span["span_id"]
-        assert parse_span["description"] == "parsing"
-
-        validate_spans = [
-            span
-            for span in transaction_event["spans"]
-            if span["op"] == OP.GRAPHQL_VALIDATE
-        ]
-        assert len(validate_spans) == 1, "exactly one validate span expected"
-        validate_span = validate_spans[0]
-        assert validate_span["parent_span_id"] == query_span["span_id"]
-        assert validate_span["description"] == "validation"
-
-        resolve_spans = [
-            span
-            for span in transaction_event["spans"]
-            if span["op"] == OP.GRAPHQL_RESOLVE
-        ]
-        assert len(resolve_spans) == 1, "exactly one resolve span expected"
-        resolve_span = resolve_spans[0]
-        assert resolve_span["parent_span_id"] == query_span["span_id"]
-        assert resolve_span["description"] == "resolving Query.hello"
-        assert resolve_span["data"] == ApproxDict(
-            {
-                "graphql.field_name": "hello",
-                "graphql.parent_type": "Query",
-                "graphql.field_path": "Query.hello",
-                "graphql.path": "hello",
-            }
-        )
+    assert resolve_span["attributes"]["sentry.op"] == OP.GRAPHQL_RESOLVE
+    assert resolve_span["name"] == "resolving Query.hello"
+    assert resolve_span["parent_span_id"] == query_span["span_id"]
 
 
 @parameterize_strawberry_test
@@ -957,8 +755,7 @@ def test_transaction_no_operation_name(
     "send_default_pii",
     [True, False],
 )
-@pytest.mark.parametrize("span_streaming", [True, False])
-def test_transaction_mutation(
+def test_segment_mutation(
     request,
     sentry_init,
     capture_events,
@@ -967,7 +764,6 @@ def test_transaction_mutation(
     async_execution,
     framework_integrations,
     send_default_pii,
-    span_streaming,
 ):
     sentry_init(
         integrations=[
@@ -976,13 +772,9 @@ def test_transaction_mutation(
         + framework_integrations,
         traces_sample_rate=1,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream" if span_streaming else "static",
     )
 
-    if span_streaming:
-        items = capture_items("span")
-    else:
-        events = capture_events()
+    items = capture_items("span")
 
     schema = strawberry.Schema(Query, mutation=Mutation)
 
@@ -992,100 +784,37 @@ def test_transaction_mutation(
     query = 'mutation Change { change(attribute: "something") }'
     client.post("/graphql", json={"query": query})
 
-    if span_streaming:
-        sentry_sdk.flush()
-        spans = [i.payload for i in items]
+    sentry_sdk.flush()
+    spans = [i.payload for i in items]
 
-        assert len(spans) == 5
-        parse_span, validate_span, resolve_span, mutation_span, segment = spans
+    assert len(spans) == 5
+    parse_span, validate_span, resolve_span, mutation_span, segment = spans
 
-        assert segment["is_segment"] is True
-        assert segment["name"] == "Change"
-        assert segment["attributes"]["sentry.op"] == OP.GRAPHQL_MUTATION
+    assert segment["is_segment"] is True
+    assert segment["name"] == "Change"
+    assert segment["attributes"]["sentry.op"] == OP.GRAPHQL_MUTATION
 
-        assert mutation_span["attributes"]["sentry.op"] == OP.GRAPHQL_MUTATION
-        assert mutation_span["name"] == "mutation"
-        assert mutation_span["attributes"]["graphql.operation.type"] == "mutation"
-        assert "graphql.operation.name" not in mutation_span["attributes"]
+    assert mutation_span["attributes"]["sentry.op"] == OP.GRAPHQL_MUTATION
+    assert mutation_span["name"] == "mutation"
+    assert mutation_span["attributes"]["graphql.operation.type"] == "mutation"
+    assert "graphql.operation.name" not in mutation_span["attributes"]
 
-        if send_default_pii is True:
-            assert mutation_span["attributes"]["graphql.document"] == query
-        else:
-            assert "graphql.document" not in mutation_span["attributes"]
-
-        assert parse_span["attributes"]["sentry.op"] == OP.GRAPHQL_PARSE
-        assert parse_span["name"] == "parsing"
-        assert parse_span["parent_span_id"] == mutation_span["span_id"]
-
-        assert validate_span["attributes"]["sentry.op"] == OP.GRAPHQL_VALIDATE
-        assert validate_span["name"] == "validation"
-        assert validate_span["parent_span_id"] == mutation_span["span_id"]
-
-        assert resolve_span["attributes"]["sentry.op"] == OP.GRAPHQL_RESOLVE
-        assert resolve_span["name"] == "resolving Mutation.change"
-        assert resolve_span["parent_span_id"] == mutation_span["span_id"]
+    if send_default_pii is True:
+        assert mutation_span["attributes"]["graphql.document"] == query
     else:
-        assert len(events) == 1
-        (transaction_event,) = events
+        assert "graphql.document" not in mutation_span["attributes"]
 
-        assert transaction_event["transaction"] == "Change"
-        assert transaction_event["contexts"]["trace"]["op"] == OP.GRAPHQL_MUTATION
-        assert transaction_event["spans"]
+    assert parse_span["attributes"]["sentry.op"] == OP.GRAPHQL_PARSE
+    assert parse_span["name"] == "parsing"
+    assert parse_span["parent_span_id"] == mutation_span["span_id"]
 
-        query_spans = [
-            span
-            for span in transaction_event["spans"]
-            if span["op"] == OP.GRAPHQL_MUTATION
-        ]
-        assert len(query_spans) == 1, "exactly one mutation span expected"
-        query_span = query_spans[0]
-        assert query_span["description"] == "mutation"
-        assert query_span["data"]["graphql.operation.type"] == "mutation"
-        assert query_span["data"]["graphql.operation.name"] is None
-        assert query_span["data"]["graphql.resource_name"]
+    assert validate_span["attributes"]["sentry.op"] == OP.GRAPHQL_VALIDATE
+    assert validate_span["name"] == "validation"
+    assert validate_span["parent_span_id"] == mutation_span["span_id"]
 
-        if send_default_pii is True:
-            assert query_span["data"]["graphql.document"] == query
-        else:
-            assert "graphql.document" not in query_span["data"]
-
-        parse_spans = [
-            span
-            for span in transaction_event["spans"]
-            if span["op"] == OP.GRAPHQL_PARSE
-        ]
-        assert len(parse_spans) == 1, "exactly one parse span expected"
-        parse_span = parse_spans[0]
-        assert parse_span["parent_span_id"] == query_span["span_id"]
-        assert parse_span["description"] == "parsing"
-
-        validate_spans = [
-            span
-            for span in transaction_event["spans"]
-            if span["op"] == OP.GRAPHQL_VALIDATE
-        ]
-        assert len(validate_spans) == 1, "exactly one validate span expected"
-        validate_span = validate_spans[0]
-        assert validate_span["parent_span_id"] == query_span["span_id"]
-        assert validate_span["description"] == "validation"
-
-        resolve_spans = [
-            span
-            for span in transaction_event["spans"]
-            if span["op"] == OP.GRAPHQL_RESOLVE
-        ]
-        assert len(resolve_spans) == 1, "exactly one resolve span expected"
-        resolve_span = resolve_spans[0]
-        assert resolve_span["parent_span_id"] == query_span["span_id"]
-        assert resolve_span["description"] == "resolving Mutation.change"
-        assert resolve_span["data"] == ApproxDict(
-            {
-                "graphql.field_name": "change",
-                "graphql.parent_type": "Mutation",
-                "graphql.field_path": "Mutation.change",
-                "graphql.path": "change",
-            }
-        )
+    assert resolve_span["attributes"]["sentry.op"] == OP.GRAPHQL_RESOLVE
+    assert resolve_span["name"] == "resolving Mutation.change"
+    assert resolve_span["parent_span_id"] == mutation_span["span_id"]
 
 
 @parameterize_strawberry_test
@@ -1118,7 +847,6 @@ def test_transaction_mutation(
         ),
     ],
 )
-@pytest.mark.parametrize("span_streaming", [True, False])
 def test_graphql_span_data_collection(
     request,
     sentry_init,
@@ -1130,23 +858,19 @@ def test_graphql_span_data_collection(
     data_collection,
     send_default_pii,
     expect_document,
-    span_streaming,
 ):
     init_kwargs = {
         "integrations": [StrawberryIntegration(async_execution=async_execution)]
         + framework_integrations,
         "traces_sample_rate": 1,
-        "trace_lifecycle": "stream" if span_streaming else "static",
         "data_collection": data_collection,
     }
     if send_default_pii is not None:
         init_kwargs["send_default_pii"] = send_default_pii
+
     sentry_init(**init_kwargs)
 
-    if span_streaming:
-        items = capture_items("span")
-    else:
-        events = capture_events()
+    items = capture_items("span")
 
     schema = strawberry.Schema(Query)
 
@@ -1156,39 +880,20 @@ def test_graphql_span_data_collection(
     query = "query GreetingQuery { hello }"
     client.post("/graphql", json={"query": query, "operationName": "GreetingQuery"})
 
-    if span_streaming:
-        sentry_sdk.flush()
-        spans = [i.payload for i in items]
-        assert len(spans) == 5
-        query_span = spans[3]
+    sentry_sdk.flush()
+    spans = [i.payload for i in items]
+    assert len(spans) == 5
+    query_span = spans[3]
 
-        assert query_span["attributes"]["sentry.op"] == OP.GRAPHQL_QUERY
-        assert query_span["attributes"]["graphql.operation.type"] == "query"
-        # operation.name is always set when an operation name is present
-        assert query_span["attributes"]["graphql.operation.name"] == "GreetingQuery"
+    assert query_span["attributes"]["sentry.op"] == OP.GRAPHQL_QUERY
+    assert query_span["attributes"]["graphql.operation.type"] == "query"
+    # operation.name is always set when an operation name is present
+    assert query_span["attributes"]["graphql.operation.name"] == "GreetingQuery"
 
-        if expect_document:
-            assert query_span["attributes"]["graphql.document"] == query
-        else:
-            assert "graphql.document" not in query_span["attributes"]
+    if expect_document:
+        assert query_span["attributes"]["graphql.document"] == query
     else:
-        assert len(events) == 1
-        (transaction_event,) = events
-
-        query_spans = [
-            span
-            for span in transaction_event["spans"]
-            if span["op"] == OP.GRAPHQL_QUERY
-        ]
-        assert len(query_spans) == 1, "exactly one query span expected"
-        query_span = query_spans[0]
-        assert query_span["data"]["graphql.operation.type"] == "query"
-        assert query_span["data"]["graphql.operation.name"] == "GreetingQuery"
-
-        if expect_document:
-            assert query_span["data"]["graphql.document"] == query
-        else:
-            assert "graphql.document" not in query_span["data"]
+        assert "graphql.document" not in query_span["attributes"]
 
 
 @parameterize_strawberry_test
@@ -1247,7 +952,6 @@ def test_handle_none_query_gracefully_with_data_collection(
 
 
 @parameterize_strawberry_test
-@pytest.mark.parametrize("span_streaming", [True, False])
 def test_span_origin(
     request,
     sentry_init,
@@ -1256,7 +960,6 @@ def test_span_origin(
     client_factory,
     async_execution,
     framework_integrations,
-    span_streaming,
 ):
     """
     Tests for OP.GRAPHQL_MUTATION, OP.GRAPHQL_PARSE, OP.GRAPHQL_VALIDATE, OP.GRAPHQL_RESOLVE,
@@ -1267,13 +970,9 @@ def test_span_origin(
         ]
         + framework_integrations,
         traces_sample_rate=1,
-        trace_lifecycle="stream" if span_streaming else "static",
     )
 
-    if span_streaming:
-        items = capture_items("span")
-    else:
-        events = capture_events()
+    items = capture_items("span")
 
     schema = strawberry.Schema(Query, mutation=Mutation)
 
@@ -1285,36 +984,23 @@ def test_span_origin(
 
     is_flask = "Flask" in str(framework_integrations[0])
 
-    if span_streaming:
-        sentry_sdk.flush()
-        spans = [i.payload for i in items]
+    sentry_sdk.flush()
+    spans = [i.payload for i in items]
 
-        assert len(spans) == 5
-        parse_span, validate_span, resolve_span, mutation_span, segment = spans
+    assert len(spans) == 5
+    parse_span, validate_span, resolve_span, mutation_span, segment = spans
 
-        assert segment["is_segment"] is True
-        if is_flask:
-            assert segment["attributes"]["sentry.origin"] == "auto.http.flask"
-        else:
-            assert segment["attributes"]["sentry.origin"] == "auto.http.starlette"
-
-        for span in (parse_span, validate_span, resolve_span, mutation_span):
-            assert span["attributes"]["sentry.origin"] == "auto.graphql.strawberry"
+    assert segment["is_segment"] is True
+    if is_flask:
+        assert segment["attributes"]["sentry.origin"] == "auto.http.flask"
     else:
-        (event,) = events
+        assert segment["attributes"]["sentry.origin"] == "auto.http.starlette"
 
-        if is_flask:
-            assert event["contexts"]["trace"]["origin"] == "auto.http.flask"
-        else:
-            assert event["contexts"]["trace"]["origin"] == "auto.http.starlette"
-
-        for span in event["spans"]:
-            if span["op"].startswith("graphql."):
-                assert span["origin"] == "auto.graphql.strawberry"
+    for span in (parse_span, validate_span, resolve_span, mutation_span):
+        assert span["attributes"]["sentry.origin"] == "auto.graphql.strawberry"
 
 
 @parameterize_strawberry_test
-@pytest.mark.parametrize("span_streaming", [True, False])
 def test_span_origin2(
     request,
     sentry_init,
@@ -1323,7 +1009,6 @@ def test_span_origin2(
     client_factory,
     async_execution,
     framework_integrations,
-    span_streaming,
 ):
     """
     Tests for OP.GRAPHQL_QUERY
@@ -1334,13 +1019,9 @@ def test_span_origin2(
         ]
         + framework_integrations,
         traces_sample_rate=1,
-        trace_lifecycle="stream" if span_streaming else "static",
     )
 
-    if span_streaming:
-        items = capture_items("span")
-    else:
-        events = capture_events()
+    items = capture_items("span")
 
     schema = strawberry.Schema(Query, mutation=Mutation)
 
@@ -1352,36 +1033,23 @@ def test_span_origin2(
 
     is_flask = "Flask" in str(framework_integrations[0])
 
-    if span_streaming:
-        sentry_sdk.flush()
-        spans = [i.payload for i in items]
+    sentry_sdk.flush()
+    spans = [i.payload for i in items]
 
-        assert len(spans) == 5
-        parse_span, validate_span, resolve_span, query_span, segment = spans
+    assert len(spans) == 5
+    parse_span, validate_span, resolve_span, query_span, segment = spans
 
-        assert segment["is_segment"] is True
-        if is_flask:
-            assert segment["attributes"]["sentry.origin"] == "auto.http.flask"
-        else:
-            assert segment["attributes"]["sentry.origin"] == "auto.http.starlette"
-
-        for span in (parse_span, validate_span, resolve_span, query_span):
-            assert span["attributes"]["sentry.origin"] == "auto.graphql.strawberry"
+    assert segment["is_segment"] is True
+    if is_flask:
+        assert segment["attributes"]["sentry.origin"] == "auto.http.flask"
     else:
-        (event,) = events
+        assert segment["attributes"]["sentry.origin"] == "auto.http.starlette"
 
-        if is_flask:
-            assert event["contexts"]["trace"]["origin"] == "auto.http.flask"
-        else:
-            assert event["contexts"]["trace"]["origin"] == "auto.http.starlette"
-
-        for span in event["spans"]:
-            if span["op"].startswith("graphql."):
-                assert span["origin"] == "auto.graphql.strawberry"
+    for span in (parse_span, validate_span, resolve_span, query_span):
+        assert span["attributes"]["sentry.origin"] == "auto.graphql.strawberry"
 
 
 @parameterize_strawberry_test
-@pytest.mark.parametrize("span_streaming", [True, False])
 def test_span_origin3(
     request,
     sentry_init,
@@ -1390,7 +1058,6 @@ def test_span_origin3(
     client_factory,
     async_execution,
     framework_integrations,
-    span_streaming,
 ):
     """
     Tests for OP.GRAPHQL_SUBSCRIPTION
@@ -1401,13 +1068,9 @@ def test_span_origin3(
         ]
         + framework_integrations,
         traces_sample_rate=1,
-        trace_lifecycle="stream" if span_streaming else "static",
     )
 
-    if span_streaming:
-        items = capture_items("span")
-    else:
-        events = capture_events()
+    items = capture_items("span")
 
     schema = strawberry.Schema(Query, subscription=Subscription)
 
@@ -1419,29 +1082,17 @@ def test_span_origin3(
 
     is_flask = "Flask" in str(framework_integrations[0])
 
-    if span_streaming:
-        sentry_sdk.flush()
-        spans = [i.payload for i in items]
+    sentry_sdk.flush()
+    spans = [i.payload for i in items]
 
-        assert len(spans) == 5
-        parse_span, validate_span, resolve_span, subscription_span, segment = spans
+    assert len(spans) == 5
+    parse_span, validate_span, resolve_span, subscription_span, segment = spans
 
-        assert segment["is_segment"] is True
-        if is_flask:
-            assert segment["attributes"]["sentry.origin"] == "auto.http.flask"
-        else:
-            assert segment["attributes"]["sentry.origin"] == "auto.http.starlette"
-
-        for span in (parse_span, validate_span, resolve_span, subscription_span):
-            assert span["attributes"]["sentry.origin"] == "auto.graphql.strawberry"
+    assert segment["is_segment"] is True
+    if is_flask:
+        assert segment["attributes"]["sentry.origin"] == "auto.http.flask"
     else:
-        (event,) = events
+        assert segment["attributes"]["sentry.origin"] == "auto.http.starlette"
 
-        if is_flask:
-            assert event["contexts"]["trace"]["origin"] == "auto.http.flask"
-        else:
-            assert event["contexts"]["trace"]["origin"] == "auto.http.starlette"
-
-        for span in event["spans"]:
-            if span["op"].startswith("graphql."):
-                assert span["origin"] == "auto.graphql.strawberry"
+    for span in (parse_span, validate_span, resolve_span, subscription_span):
+        assert span["attributes"]["sentry.origin"] == "auto.graphql.strawberry"

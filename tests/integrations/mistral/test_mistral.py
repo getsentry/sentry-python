@@ -51,21 +51,15 @@ def mistral_response():
     )
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_nonstreaming_chat(
     sentry_init,
     capture_items,
     get_model_response,
     mistral_response,
-    stream_gen_ai_spans,
-    span_streaming,
 ):
     sentry_init(
         integrations=[MistralIntegration()],
         traces_sample_rate=1.0,
-        stream_gen_ai_spans=stream_gen_ai_spans,
-        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = Mistral(api_key="z")
@@ -75,110 +69,58 @@ def test_nonstreaming_chat(
         serialize_pydantic=True,
     )
 
-    if span_streaming or stream_gen_ai_spans:
-        items = capture_items("span")
+    items = capture_items("span")
 
-        with mock.patch.object(
-            Chat,
-            "do_request",
-            return_value=model_response,
-        ), sentry_sdk.start_transaction(name="mistral"):
-            client.chat.complete(
-                model="mistral-medium-latest",
-                messages=[
-                    {"role": "user", "content": "What is the best French cheese?"}
-                ],
-                max_tokens=1024,
-                presence_penalty=0.1,
-                frequency_penalty=0.2,
-                temperature=0.7,
-                top_p=0.9,
-                reasoning_effort="high",
-            )
-        sentry_sdk.flush()
-        spans = [item.payload for item in items]
-        (span,) = (
-            span
-            for span in spans
-            if span["attributes"].get("sentry.op") == OP.GEN_AI_CHAT
+    with mock.patch.object(
+        Chat,
+        "do_request",
+        return_value=model_response,
+    ):
+        client.chat.complete(
+            model="mistral-medium-latest",
+            messages=[{"role": "user", "content": "What is the best French cheese?"}],
+            max_tokens=1024,
+            presence_penalty=0.1,
+            frequency_penalty=0.2,
+            temperature=0.7,
+            top_p=0.9,
+            reasoning_effort="high",
         )
+    sentry_sdk.flush()
+    spans = [item.payload for item in items]
+    (span,) = (
+        span for span in spans if span["attributes"].get("sentry.op") == OP.GEN_AI_CHAT
+    )
 
-        assert span["name"] == "chat mistral-medium-latest"
-        assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "mistral"
-        assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["name"] == "chat mistral-medium-latest"
+    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "mistral"
+    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
 
-        assert (
-            span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "mistral-medium-latest"
-        )
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
+    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "mistral-medium-latest"
+    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
 
-        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
-        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
-        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
-        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.1
-        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 1024
-        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_REASONING_LEVEL] == "high"
+    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
+    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
+    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
+    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.1
+    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 1024
+    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_REASONING_LEVEL] == "high"
 
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
-    else:
-        items = capture_items("transaction")
-
-        with mock.patch.object(
-            Chat,
-            "do_request",
-            return_value=model_response,
-        ), sentry_sdk.start_transaction(name="mistral"):
-            client.chat.complete(
-                model="open-mistral",
-                messages=[{"role": "user", "content": "Hello, Mistral"}],
-                max_tokens=1024,
-                presence_penalty=0.1,
-                frequency_penalty=0.2,
-                temperature=0.7,
-                top_p=0.9,
-                reasoning_effort="high",
-            )
-
-        (transaction,) = [item.payload for item in items]
-        (span,) = transaction["spans"]
-
-        assert span["description"] == "chat open-mistral"
-        assert span["data"][SPANDATA.GEN_AI_PROVIDER_NAME] == "mistral"
-        assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-
-        assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "open-mistral"
-        assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
-
-        assert span["data"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
-        assert span["data"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
-        assert span["data"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
-        assert span["data"][SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.1
-        assert span["data"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 1024
-        assert span["data"][SPANDATA.GEN_AI_REQUEST_REASONING_LEVEL] == "high"
-
-        assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-        assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
-        assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 async def test_nonstreaming_chat_async(
     sentry_init,
     capture_items,
     get_model_response,
     mistral_response,
-    stream_gen_ai_spans,
-    span_streaming,
 ):
     sentry_init(
         integrations=[MistralIntegration()],
         traces_sample_rate=1.0,
-        stream_gen_ai_spans=stream_gen_ai_spans,
-        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = Mistral(api_key="z")
@@ -188,93 +130,47 @@ async def test_nonstreaming_chat_async(
         serialize_pydantic=True,
     )
 
-    if span_streaming or stream_gen_ai_spans:
-        items = capture_items("span")
+    items = capture_items("span")
 
-        with mock.patch.object(
-            Chat,
-            "do_request_async",
-            return_value=model_response,
-        ), sentry_sdk.start_transaction(name="mistral"):
-            await client.chat.complete_async(
-                model="mistral-medium-latest",
-                messages=[
-                    {"role": "user", "content": "What is the best French cheese?"}
-                ],
-                max_tokens=1024,
-                presence_penalty=0.1,
-                frequency_penalty=0.2,
-                temperature=0.7,
-                top_p=0.9,
-                reasoning_effort="high",
-            )
-
-        sentry_sdk.flush()
-        spans = [item.payload for item in items]
-        (span,) = (
-            span
-            for span in spans
-            if span["attributes"].get("sentry.op") == OP.GEN_AI_CHAT
+    with mock.patch.object(
+        Chat,
+        "do_request_async",
+        return_value=model_response,
+    ):
+        await client.chat.complete_async(
+            model="mistral-medium-latest",
+            messages=[{"role": "user", "content": "What is the best French cheese?"}],
+            max_tokens=1024,
+            presence_penalty=0.1,
+            frequency_penalty=0.2,
+            temperature=0.7,
+            top_p=0.9,
+            reasoning_effort="high",
         )
 
-        assert span["name"] == "chat mistral-medium-latest"
-        assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "mistral"
-        assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+    sentry_sdk.flush()
+    spans = [item.payload for item in items]
+    (span,) = (
+        span for span in spans if span["attributes"].get("sentry.op") == OP.GEN_AI_CHAT
+    )
 
-        assert (
-            span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "mistral-medium-latest"
-        )
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
+    assert span["name"] == "chat mistral-medium-latest"
+    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "mistral"
+    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
 
-        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
-        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
-        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
-        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.1
-        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 1024
-        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_REASONING_LEVEL] == "high"
+    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "mistral-medium-latest"
+    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
 
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
-    else:
-        items = capture_items("transaction")
+    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
+    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
+    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
+    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.1
+    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 1024
+    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_REASONING_LEVEL] == "high"
 
-        with mock.patch.object(
-            Chat,
-            "do_request_async",
-            return_value=model_response,
-        ), sentry_sdk.start_transaction(name="mistral"):
-            await client.chat.complete_async(
-                model="mistral-medium-latest",
-                messages=[{"role": "user", "content": "Hello, Mistral"}],
-                max_tokens=1024,
-                presence_penalty=0.1,
-                frequency_penalty=0.2,
-                temperature=0.7,
-                top_p=0.9,
-                reasoning_effort="high",
-            )
-
-        (transaction,) = [item.payload for item in items]
-        (span,) = transaction["spans"]
-
-        assert span["description"] == "chat mistral-medium-latest"
-        assert span["data"][SPANDATA.GEN_AI_PROVIDER_NAME] == "mistral"
-        assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-
-        assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "mistral-medium-latest"
-        assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
-
-        assert span["data"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
-        assert span["data"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
-        assert span["data"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
-        assert span["data"][SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.1
-        assert span["data"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 1024
-        assert span["data"][SPANDATA.GEN_AI_REQUEST_REASONING_LEVEL] == "high"
-
-        assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-        assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
-        assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
 
 
 @pytest.mark.parametrize(
@@ -470,8 +366,6 @@ async def test_nonstreaming_chat_async(
     ),
 )
 @pytest.mark.parametrize("data_collection", [True, False])
-@pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_input_attributes_nonstreaming_chat(
     sentry_init,
     capture_items,
@@ -481,23 +375,17 @@ def test_input_attributes_nonstreaming_chat(
     expected_system_instructions,
     expected_input_messages,
     data_collection,
-    stream_gen_ai_spans,
-    span_streaming,
 ):
     if data_collection:
         sentry_init(
             integrations=[MistralIntegration()],
             traces_sample_rate=1.0,
-            stream_gen_ai_spans=stream_gen_ai_spans,
-            trace_lifecycle="stream" if span_streaming else "static",
             data_collection={},
         )
     else:
         sentry_init(
             integrations=[MistralIntegration()],
             traces_sample_rate=1.0,
-            stream_gen_ai_spans=stream_gen_ai_spans,
-            trace_lifecycle="stream" if span_streaming else "static",
             send_default_pii=True,
         )
 
@@ -508,61 +396,33 @@ def test_input_attributes_nonstreaming_chat(
         serialize_pydantic=True,
     )
 
-    if span_streaming or stream_gen_ai_spans:
-        items = capture_items("span")
+    items = capture_items("span")
 
-        with mock.patch.object(
-            Chat,
-            "do_request",
-            return_value=model_response,
-        ), sentry_sdk.start_transaction(name="mistral"):
-            client.chat.complete(
-                model="mistral-medium-latest",
-                messages=messages,
-            )
-
-        sentry_sdk.flush()
-        spans = [item.payload for item in items]
-        (span,) = (
-            span
-            for span in spans
-            if span["attributes"].get("sentry.op") == OP.GEN_AI_CHAT
+    with mock.patch.object(
+        Chat,
+        "do_request",
+        return_value=model_response,
+    ):
+        client.chat.complete(
+            model="mistral-medium-latest",
+            messages=messages,
         )
 
-        assert span["name"] == "chat mistral-medium-latest"
-        assert (
-            json.loads(span["attributes"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS])
-            == expected_system_instructions
-        )
-        assert (
-            json.loads(span["attributes"][SPANDATA.GEN_AI_INPUT_MESSAGES])
-            == expected_input_messages
-        )
-    else:
-        items = capture_items("transaction")
+    sentry_sdk.flush()
+    spans = [item.payload for item in items]
+    (span,) = (
+        span for span in spans if span["attributes"].get("sentry.op") == OP.GEN_AI_CHAT
+    )
 
-        with mock.patch.object(
-            Chat,
-            "do_request",
-            return_value=model_response,
-        ), sentry_sdk.start_transaction(name="mistral"):
-            client.chat.complete(
-                model="open-mistral",
-                messages=messages,
-            )
-
-        (transaction,) = [item.payload for item in items]
-        (span,) = transaction["spans"]
-
-        assert span["description"] == "chat open-mistral"
-        assert (
-            json.loads(span["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS])
-            == expected_system_instructions
-        )
-        assert (
-            json.loads(span["data"][SPANDATA.GEN_AI_INPUT_MESSAGES])
-            == expected_input_messages
-        )
+    assert span["name"] == "chat mistral-medium-latest"
+    assert (
+        json.loads(span["attributes"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS])
+        == expected_system_instructions
+    )
+    assert (
+        json.loads(span["attributes"][SPANDATA.GEN_AI_INPUT_MESSAGES])
+        == expected_input_messages
+    )
 
 
 @pytest.mark.parametrize(
@@ -759,8 +619,6 @@ def test_input_attributes_nonstreaming_chat(
 )
 @pytest.mark.asyncio
 @pytest.mark.parametrize("data_collection", [True, False])
-@pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 async def test_input_attributes_nonstreaming_chat_async(
     sentry_init,
     capture_items,
@@ -770,23 +628,17 @@ async def test_input_attributes_nonstreaming_chat_async(
     expected_system_instructions,
     expected_input_messages,
     data_collection,
-    stream_gen_ai_spans,
-    span_streaming,
 ):
     if data_collection:
         sentry_init(
             integrations=[MistralIntegration()],
             traces_sample_rate=1.0,
-            stream_gen_ai_spans=stream_gen_ai_spans,
-            trace_lifecycle="stream" if span_streaming else "static",
             data_collection={},
         )
     else:
         sentry_init(
             integrations=[MistralIntegration()],
             traces_sample_rate=1.0,
-            stream_gen_ai_spans=stream_gen_ai_spans,
-            trace_lifecycle="stream" if span_streaming else "static",
             send_default_pii=True,
         )
     client = Mistral(api_key="z")
@@ -796,89 +648,53 @@ async def test_input_attributes_nonstreaming_chat_async(
         serialize_pydantic=True,
     )
 
-    if span_streaming or stream_gen_ai_spans:
-        items = capture_items("span")
+    items = capture_items("span")
 
-        with mock.patch.object(
-            Chat,
-            "do_request_async",
-            return_value=model_response,
-        ), sentry_sdk.start_transaction(name="mistral"):
-            await client.chat.complete_async(
-                model="mistral-medium-latest",
-                messages=messages,
-            )
-
-        sentry_sdk.flush()
-        spans = [item.payload for item in items]
-        (span,) = (
-            span
-            for span in spans
-            if span["attributes"].get("sentry.op") == OP.GEN_AI_CHAT
+    with mock.patch.object(
+        Chat,
+        "do_request_async",
+        return_value=model_response,
+    ):
+        await client.chat.complete_async(
+            model="mistral-medium-latest",
+            messages=messages,
         )
 
-        assert span["name"] == "chat mistral-medium-latest"
-        assert (
-            json.loads(span["attributes"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS])
-            == expected_system_instructions
-        )
-        assert (
-            json.loads(span["attributes"][SPANDATA.GEN_AI_INPUT_MESSAGES])
-            == expected_input_messages
-        )
-    else:
-        items = capture_items("transaction")
+    sentry_sdk.flush()
+    spans = [item.payload for item in items]
+    (span,) = (
+        span for span in spans if span["attributes"].get("sentry.op") == OP.GEN_AI_CHAT
+    )
 
-        with mock.patch.object(
-            Chat,
-            "do_request_async",
-            return_value=model_response,
-        ), sentry_sdk.start_transaction(name="mistral"):
-            await client.chat.complete_async(
-                model="mistral-medium-latest",
-                messages=messages,
-            )
-
-        (transaction,) = [item.payload for item in items]
-        (span,) = transaction["spans"]
-
-        assert span["description"] == "chat mistral-medium-latest"
-        assert (
-            json.loads(span["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS])
-            == expected_system_instructions
-        )
-        assert (
-            json.loads(span["data"][SPANDATA.GEN_AI_INPUT_MESSAGES])
-            == expected_input_messages
-        )
+    assert span["name"] == "chat mistral-medium-latest"
+    assert (
+        json.loads(span["attributes"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS])
+        == expected_system_instructions
+    )
+    assert (
+        json.loads(span["attributes"][SPANDATA.GEN_AI_INPUT_MESSAGES])
+        == expected_input_messages
+    )
 
 
 @pytest.mark.parametrize("data_collection", [True, False])
-@pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_output_attributes_nonstreaming_chat(
     sentry_init,
     capture_items,
     get_model_response,
     mistral_response,
     data_collection,
-    stream_gen_ai_spans,
-    span_streaming,
 ):
     if data_collection:
         sentry_init(
             integrations=[MistralIntegration()],
             traces_sample_rate=1.0,
-            stream_gen_ai_spans=stream_gen_ai_spans,
-            trace_lifecycle="stream" if span_streaming else "static",
             data_collection={},
         )
     else:
         sentry_init(
             integrations=[MistralIntegration()],
             traces_sample_rate=1.0,
-            stream_gen_ai_spans=stream_gen_ai_spans,
-            trace_lifecycle="stream" if span_streaming else "static",
             send_default_pii=True,
         )
 
@@ -889,106 +705,61 @@ def test_output_attributes_nonstreaming_chat(
         serialize_pydantic=True,
     )
 
-    if span_streaming or stream_gen_ai_spans:
-        items = capture_items("span")
+    items = capture_items("span")
 
-        with mock.patch.object(
-            Chat,
-            "do_request",
-            return_value=model_response,
-        ), sentry_sdk.start_transaction(name="mistral"):
-            client.chat.complete(
-                model="mistral-medium-latest",
-                messages=[
-                    {"role": "user", "content": "What is the best French cheese?"}
-                ],
-            )
-
-        sentry_sdk.flush()
-        spans = [item.payload for item in items]
-        (span,) = (
-            span
-            for span in spans
-            if span["attributes"].get("sentry.op") == OP.GEN_AI_CHAT
+    with mock.patch.object(
+        Chat,
+        "do_request",
+        return_value=model_response,
+    ):
+        client.chat.complete(
+            model="mistral-medium-latest",
+            messages=[{"role": "user", "content": "What is the best French cheese?"}],
         )
 
-        assert span["name"] == "chat mistral-medium-latest"
-        assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
-            {
-                "role": "assistant",
-                "parts": [
-                    {"type": "text", "content": "Hello, how can I help you?"},
-                ],
-            },
-            {
-                "role": "assistant",
-                "parts": [
-                    {"type": "text", "content": "Response 1"},
-                    {"type": "text", "content": "Response 2"},
-                ],
-            },
-        ]
-    else:
-        items = capture_items("transaction")
+    sentry_sdk.flush()
+    spans = [item.payload for item in items]
+    (span,) = (
+        span for span in spans if span["attributes"].get("sentry.op") == OP.GEN_AI_CHAT
+    )
 
-        with mock.patch.object(
-            Chat,
-            "do_request",
-            return_value=model_response,
-        ), sentry_sdk.start_transaction(name="mistral"):
-            client.chat.complete(
-                model="open-mistral",
-                messages=[{"role": "user", "content": "Hello, Mistral"}],
-            )
-
-        (transaction,) = [item.payload for item in items]
-        (span,) = transaction["spans"]
-
-        assert span["description"] == "chat open-mistral"
-        assert json.loads(span["data"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
-            {
-                "role": "assistant",
-                "parts": [
-                    {"type": "text", "content": "Hello, how can I help you?"},
-                ],
-            },
-            {
-                "role": "assistant",
-                "parts": [
-                    {"type": "text", "content": "Response 1"},
-                    {"type": "text", "content": "Response 2"},
-                ],
-            },
-        ]
+    assert span["name"] == "chat mistral-medium-latest"
+    assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+        {
+            "role": "assistant",
+            "parts": [
+                {"type": "text", "content": "Hello, how can I help you?"},
+            ],
+        },
+        {
+            "role": "assistant",
+            "parts": [
+                {"type": "text", "content": "Response 1"},
+                {"type": "text", "content": "Response 2"},
+            ],
+        },
+    ]
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("data_collection", [True, False])
-@pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 async def test_output_attributes_nonstreaming_chat_async(
     sentry_init,
     capture_items,
     get_model_response,
     mistral_response,
     data_collection,
-    stream_gen_ai_spans,
-    span_streaming,
 ):
     if data_collection:
         sentry_init(
             integrations=[MistralIntegration()],
             traces_sample_rate=1.0,
-            stream_gen_ai_spans=stream_gen_ai_spans,
-            trace_lifecycle="stream" if span_streaming else "static",
             data_collection={},
         )
     else:
         sentry_init(
             integrations=[MistralIntegration()],
             traces_sample_rate=1.0,
-            stream_gen_ai_spans=stream_gen_ai_spans,
-            trace_lifecycle="stream" if span_streaming else "static",
             send_default_pii=True,
         )
 
@@ -999,74 +770,37 @@ async def test_output_attributes_nonstreaming_chat_async(
         serialize_pydantic=True,
     )
 
-    if span_streaming or stream_gen_ai_spans:
-        items = capture_items("span")
+    items = capture_items("span")
 
-        with mock.patch.object(
-            Chat,
-            "do_request_async",
-            return_value=model_response,
-        ), sentry_sdk.start_transaction(name="mistral"):
-            await client.chat.complete_async(
-                model="mistral-medium-latest",
-                messages=[
-                    {"role": "user", "content": "What is the best French cheese?"}
-                ],
-            )
-
-        sentry_sdk.flush()
-        spans = [item.payload for item in items]
-        (span,) = (
-            span
-            for span in spans
-            if span["attributes"].get("sentry.op") == OP.GEN_AI_CHAT
+    with mock.patch.object(
+        Chat,
+        "do_request_async",
+        return_value=model_response,
+    ):
+        await client.chat.complete_async(
+            model="mistral-medium-latest",
+            messages=[{"role": "user", "content": "What is the best French cheese?"}],
         )
 
-        assert span["name"] == "chat mistral-medium-latest"
-        assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
-            {
-                "role": "assistant",
-                "parts": [
-                    {"type": "text", "content": "Hello, how can I help you?"},
-                ],
-            },
-            {
-                "role": "assistant",
-                "parts": [
-                    {"type": "text", "content": "Response 1"},
-                    {"type": "text", "content": "Response 2"},
-                ],
-            },
-        ]
-    else:
-        items = capture_items("transaction")
+    sentry_sdk.flush()
+    spans = [item.payload for item in items]
+    (span,) = (
+        span for span in spans if span["attributes"].get("sentry.op") == OP.GEN_AI_CHAT
+    )
 
-        with mock.patch.object(
-            Chat,
-            "do_request_async",
-            return_value=model_response,
-        ), sentry_sdk.start_transaction(name="mistral"):
-            await client.chat.complete_async(
-                model="mistral-medium-latest",
-                messages=[{"role": "user", "content": "Hello, Mistral"}],
-            )
-
-        (transaction,) = [item.payload for item in items]
-        (span,) = transaction["spans"]
-
-        assert span["description"] == "chat mistral-medium-latest"
-        assert json.loads(span["data"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
-            {
-                "role": "assistant",
-                "parts": [
-                    {"type": "text", "content": "Hello, how can I help you?"},
-                ],
-            },
-            {
-                "role": "assistant",
-                "parts": [
-                    {"type": "text", "content": "Response 1"},
-                    {"type": "text", "content": "Response 2"},
-                ],
-            },
-        ]
+    assert span["name"] == "chat mistral-medium-latest"
+    assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+        {
+            "role": "assistant",
+            "parts": [
+                {"type": "text", "content": "Hello, how can I help you?"},
+            ],
+        },
+        {
+            "role": "assistant",
+            "parts": [
+                {"type": "text", "content": "Response 1"},
+                {"type": "text", "content": "Response 2"},
+            ],
+        },
+    ]

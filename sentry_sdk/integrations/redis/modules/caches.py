@@ -4,7 +4,6 @@ Code used for the Caches module in Sentry
 
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.redis.utils import _get_safe_key, _key_as_string
-from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.utils import capture_internal_exceptions
 
 GET_COMMANDS = ("get", "mget")
@@ -13,10 +12,10 @@ SET_COMMANDS = ("set", "setex")
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any, Optional, Union
+    from typing import Any, Optional
 
     from sentry_sdk.integrations.redis import RedisIntegration
-    from sentry_sdk.tracing import Span
+    from sentry_sdk.traces import Span
 
 
 def _get_op(name: str) -> "Optional[str]":
@@ -74,38 +73,29 @@ def _get_cache_span_description(
     integration: "RedisIntegration",
 ) -> str:
     description = _key_as_string(_get_safe_key(redis_command, args, kwargs))
-
-    if integration.max_data_size and len(description) > integration.max_data_size:
-        description = description[: integration.max_data_size - len("...")] + "..."
-
     return description
 
 
 def _set_cache_data(
-    span: "Union[Span, StreamedSpan]",
+    span: "Span",
     redis_client: "Any",
     properties: "dict[str, Any]",
     return_value: "Optional[Any]",
 ) -> None:
-    if isinstance(span, StreamedSpan):
-        set_on_span = span.set_attribute
-    else:
-        set_on_span = span.set_data
-
     with capture_internal_exceptions():
-        set_on_span(SPANDATA.CACHE_KEY, properties["key"])
+        span.set_attribute(SPANDATA.CACHE_KEY, properties["key"])
 
         if properties["redis_command"] in GET_COMMANDS:
             if return_value is not None:
-                set_on_span(SPANDATA.CACHE_HIT, True)
+                span.set_attribute(SPANDATA.CACHE_HIT, True)
                 size = (
                     len(str(return_value).encode("utf-8"))
                     if not isinstance(return_value, bytes)
                     else len(return_value)
                 )
-                set_on_span(SPANDATA.CACHE_ITEM_SIZE, size)
+                span.set_attribute(SPANDATA.CACHE_ITEM_SIZE, size)
             else:
-                set_on_span(SPANDATA.CACHE_HIT, False)
+                span.set_attribute(SPANDATA.CACHE_HIT, False)
 
         elif properties["redis_command"] in SET_COMMANDS:
             if properties["value"] is not None:
@@ -114,7 +104,7 @@ def _set_cache_data(
                     if not isinstance(properties["value"], bytes)
                     else len(properties["value"])
                 )
-                set_on_span(SPANDATA.CACHE_ITEM_SIZE, size)
+                span.set_attribute(SPANDATA.CACHE_ITEM_SIZE, size)
 
         try:
             connection_params = redis_client.connection_pool.connection_kwargs
@@ -129,8 +119,8 @@ def _set_cache_data(
 
         host = connection_params.get("host")
         if host is not None:
-            set_on_span(SPANDATA.NETWORK_PEER_ADDRESS, host)
+            span.set_attribute(SPANDATA.NETWORK_PEER_ADDRESS, host)
 
         port = connection_params.get("port")
         if port is not None:
-            set_on_span(SPANDATA.NETWORK_PEER_PORT, port)
+            span.set_attribute(SPANDATA.NETWORK_PEER_PORT, port)

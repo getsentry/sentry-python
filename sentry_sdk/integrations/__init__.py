@@ -1,3 +1,4 @@
+import sys
 from abc import ABC, abstractmethod
 from itertools import zip_longest
 from threading import Lock
@@ -59,11 +60,15 @@ _DEFAULT_INTEGRATIONS = [
     "sentry_sdk.integrations.atexit.AtexitIntegration",
     "sentry_sdk.integrations.dedupe.DedupeIntegration",
     "sentry_sdk.integrations.excepthook.ExcepthookIntegration",
-    "sentry_sdk.integrations.logging.LoggingIntegration",
     "sentry_sdk.integrations.modules.ModulesIntegration",
     "sentry_sdk.integrations.stdlib.StdlibIntegration",
     "sentry_sdk.integrations.threading.ThreadingIntegration",
 ]
+
+if sys.version_info >= (3, 8):
+    _DEFAULT_INTEGRATIONS.append(
+        "sentry_sdk.integrations.unraisablehook.UnraisablehookIntegration"
+    )
 
 _AUTO_ENABLING_INTEGRATIONS = [
     "sentry_sdk.integrations.aiohttp.AioHttpIntegration",
@@ -91,7 +96,6 @@ _AUTO_ENABLING_INTEGRATIONS = [
     "sentry_sdk.integrations.langchain.LangchainIntegration",
     "sentry_sdk.integrations.langgraph.LanggraphIntegration",
     "sentry_sdk.integrations.litestar.LitestarIntegration",
-    "sentry_sdk.integrations.loguru.LoguruIntegration",
     "sentry_sdk.integrations.mcp.MCPIntegration",
     "sentry_sdk.integrations.openai.OpenAIIntegration",
     "sentry_sdk.integrations.openai_agents.OpenAIAgentsIntegration",
@@ -105,7 +109,6 @@ _AUTO_ENABLING_INTEGRATIONS = [
     "sentry_sdk.integrations.sqlalchemy.SqlalchemyIntegration",
     "sentry_sdk.integrations.starlette.StarletteIntegration",
     "sentry_sdk.integrations.starlite.StarliteIntegration",
-    "sentry_sdk.integrations.strawberry.StrawberryIntegration",
     "sentry_sdk.integrations.tornado.TornadoIntegration",
 ]
 
@@ -118,7 +121,7 @@ del _generate_default_integrations_iterator
 
 
 _MIN_VERSIONS = {
-    "aiohttp": (3, 4),
+    "aiohttp": (3, 7),
     "aiomysql": (0, 3, 0),
     "anthropic": (0, 16),
     "ariadne": (0, 20),
@@ -127,55 +130,54 @@ _MIN_VERSIONS = {
     "beam": (2, 12),
     "boto3": (1, 16),  # botocore
     "bottle": (0, 12),
-    "celery": (4, 4, 7),
-    "chalice": (1, 16, 0),
+    "celery": (5, 0, 0),
+    "chalice": (1, 22, 0),
     "clickhouse_driver": (0, 2, 0),
     "cohere": (5, 4, 0),
-    "django": (1, 8),
+    "django": (2, 0),
     "dramatiq": (1, 9),
-    "falcon": (1, 4),
-    "fastapi": (0, 79, 0),
-    "flask": (1, 1, 4),
+    "falcon": (3, 0),
+    "fastapi": (0, 85, 0),
+    "flask": (2, 0, 0),
     "gql": (3, 4, 1),
     "graphene": (3, 3),
     "google_genai": (1, 29, 0),  # google-genai
     "grpc": (1, 32, 0),  # grpcio
     "httpx": (0, 16, 0),
     "httpx2": (2, 0, 0),
+    "huey": (2, 0),
     "huggingface_hub": (0, 24, 7),
     "langchain": (0, 1, 0),
     "langgraph": (0, 6, 6),
     "launchdarkly": (9, 8, 0),
+    "litestar": (2, 0, 0),
     "litellm": (1, 77, 5),
     "loguru": (0, 7, 0),
-    "mcp": (1, 15, 0),
+    "mcp": (2, 0),
     "mistral": (2, 0, 5),
     "openai": (1, 0, 0),
-    "openai_agents": (0, 0, 19),
+    "openai_agents": (0, 10, 3),
     "openfeature": (0, 7, 1),
-    "pydantic_ai": (1, 0, 0),
+    "pydantic_ai": (1, 76, 0),
     "pymongo": (3, 5, 0),
+    "pyramid": (2, 0),
     "pyreqwest": (0, 11, 6),
-    "quart": (0, 16, 0),
+    "quart": (0, 19, 0),
     "ray": (2, 7, 0),
-    "requests": (2, 0, 0),
-    "rq": (0, 6),
-    "sanic": (0, 8),
-    "sqlalchemy": (1, 2),
-    "starlette": (0, 16),
+    "redis": (4, 2, 0),
+    "requests": (2, 30, 0),
+    "rq": (1, 0),
+    "sanic": (22, 0),
+    "spark": (3, 0),  # pyspark
+    "sqlalchemy": (1, 4),
+    "starlette": (0, 20),
     "starlite": (1, 48),
     "statsig": (0, 55, 3),
     "strawberry": (0, 209, 5),
     "tornado": (6, 0),
+    "trytond_wsgi": (5, 4),
     "typer": (0, 15),
     "unleash": (6, 0, 1),
-}
-
-
-_INTEGRATION_DEACTIVATES = {
-    "langchain": {"openai", "anthropic", "google_genai"},
-    "openai_agents": {"openai"},
-    "pydantic_ai": {"openai", "anthropic"},
 }
 
 
@@ -194,23 +196,12 @@ def setup_integrations(
 
     `disabled_integrations` takes precedence over `with_defaults` and
     `with_auto_enabling_integrations`.
-
-    Some integrations are designed to automatically deactivate other integrations
-    in order to avoid conflicts and prevent duplicate telemetry from being collected.
-    For example, enabling the `langchain` integration will auto-deactivate both the
-    `openai` and `anthropic` integrations.
-
-    Users can override this behavior by:
-      - Explicitly providing an integration in the `integrations=[]` list, or
-      - Disabling the higher-level integration via the `disabled_integrations` option.
     """
     integrations = dict(
         (integration.identifier, integration) for integration in integrations or ()
     )
 
     logger.debug("Setting up integrations (with default = %s)", with_defaults)
-
-    user_provided_integrations = set(integrations.keys())
 
     # Integrations that will not be enabled
     disabled_integrations = [
@@ -229,27 +220,6 @@ def setup_integrations(
                 instance = integration_cls()
                 integrations[instance.identifier] = instance
                 used_as_default_integration.add(instance.identifier)
-
-    disabled_integration_identifiers = {
-        integration.identifier for integration in disabled_integrations
-    }
-
-    for integration, targets_to_deactivate in _INTEGRATION_DEACTIVATES.items():
-        if (
-            integration in integrations
-            and integration not in disabled_integration_identifiers
-        ):
-            for target in targets_to_deactivate:
-                if target not in user_provided_integrations:
-                    for cls in iter_default_integrations(True):
-                        if cls.identifier == target:
-                            if cls not in disabled_integrations:
-                                disabled_integrations.append(cls)
-                                logger.debug(
-                                    "Auto-deactivating %s integration because %s integration is active",
-                                    target,
-                                    integration,
-                                )
 
     for identifier, integration in integrations.items():
         with _installer_lock:

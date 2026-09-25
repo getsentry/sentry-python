@@ -317,7 +317,6 @@ def test_span_http_query_data_collection(
     sentry_init(
         integrations=[DjangoIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         **init_kwargs,
     )
 
@@ -378,7 +377,6 @@ def test_user_info_span_attributes_data_collection(
     sentry_init(
         integrations=[DjangoIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         **init_kwargs,
     )
 
@@ -410,7 +408,6 @@ def test_user_identity_span_attributes_data_collection(
     sentry_init(
         integrations=[DjangoIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         **init_kwargs,
     )
 

@@ -13,31 +13,26 @@ def test_envelope_by_trace_id(sentry_init, capture_envelopes, monkeypatch):
     """Envelopes only contain spans of one trace ID."""
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     envelopes = capture_envelopes()
 
     with sentry_sdk.new_scope():
-        sentry_sdk.traces.new_trace()
+        sentry_sdk.new_trace()
         # Keep parent open as its bucket in the batcher would be emptied when it is finished.
-        parent_a = sentry_sdk.traces.start_span(name="parent a")
-        with sentry_sdk.traces.start_span(
-            name="span 1a", parent_span=parent_a
-        ) as span1:
+        parent_a = sentry_sdk.start_span(name="parent a")
+        with sentry_sdk.start_span(name="span 1a", parent_span=parent_a) as span1:
             trace_id1 = span1.trace_id
-        with sentry_sdk.traces.start_span(name="span 1b", parent_span=parent_a):
+        with sentry_sdk.start_span(name="span 1b", parent_span=parent_a):
             pass
 
     with sentry_sdk.new_scope():
-        sentry_sdk.traces.new_trace()
-        parent_b = sentry_sdk.traces.start_span(name="parent b")
+        sentry_sdk.new_trace()
+        parent_b = sentry_sdk.start_span(name="parent b")
         # Keep parent open as its bucket in the batcher would be emptied when it is finished.
-        with sentry_sdk.traces.start_span(
-            name="span 2a", parent_span=parent_b
-        ) as span2:
+        with sentry_sdk.start_span(name="span 2a", parent_span=parent_b) as span2:
             trace_id2 = span2.trace_id
-        with sentry_sdk.traces.start_span(name="span 2b", parent_span=parent_b):
+        with sentry_sdk.start_span(name="span 2b", parent_span=parent_b):
             pass
 
     sentry_sdk.flush()
@@ -68,21 +63,20 @@ def test_max_envelope_size(sentry_init, capture_envelopes, monkeypatch):
 
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     envelopes = capture_envelopes()
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
-        with sentry_sdk.traces.start_span(name="span 1"):
+    with sentry_sdk.start_span(name="custom parent"):
+        with sentry_sdk.start_span(name="span 1"):
             pass
-        with sentry_sdk.traces.start_span(name="span 2"):
+        with sentry_sdk.start_span(name="span 2"):
             pass
-        with sentry_sdk.traces.start_span(name="span 3"):
+        with sentry_sdk.start_span(name="span 3"):
             pass
-        with sentry_sdk.traces.start_span(name="span 4"):
+        with sentry_sdk.start_span(name="span 4"):
             pass
-        with sentry_sdk.traces.start_span(name="span 5"):
+        with sentry_sdk.start_span(name="span 5"):
             pass
 
         sentry_sdk.flush()
@@ -110,18 +104,17 @@ def test_drop_after_max_reached(
 
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     envelopes = capture_envelopes()
     record_lost_event_calls = capture_record_lost_event_calls()
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
-        with sentry_sdk.traces.start_span(name="span 1"):
+    with sentry_sdk.start_span(name="custom parent"):
+        with sentry_sdk.start_span(name="span 1"):
             pass
-        with sentry_sdk.traces.start_span(name="span 2"):
+        with sentry_sdk.start_span(name="span 2"):
             pass
-        with sentry_sdk.traces.start_span(name="span 3"):
+        with sentry_sdk.start_span(name="span 3"):
             pass
 
         sentry_sdk.flush()
@@ -144,7 +137,6 @@ def test_drop_isolated_per_bucket(
 
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     envelopes = capture_envelopes()
@@ -152,21 +144,21 @@ def test_drop_isolated_per_bucket(
 
     with sentry_sdk.new_scope():
         # Keep parent open as its bucket in the batcher would be emptied when it is finished.
-        parent_a = sentry_sdk.traces.start_span(name="parent a")
-        with sentry_sdk.traces.start_span(name="a1", parent_span=parent_a) as span_a:
+        parent_a = sentry_sdk.start_span(name="parent a")
+        with sentry_sdk.start_span(name="a1", parent_span=parent_a) as span_a:
             trace_id_a = span_a.trace_id
-        with sentry_sdk.traces.start_span(name="a2", parent_span=parent_a):
+        with sentry_sdk.start_span(name="a2", parent_span=parent_a):
             pass
-        with sentry_sdk.traces.start_span(name="a3"):
+        with sentry_sdk.start_span(name="a3"):
             pass
 
     with sentry_sdk.new_scope():
-        sentry_sdk.traces.new_trace()
+        sentry_sdk.new_trace()
         # Keep parent open as its bucket in the batcher would be emptied when it is finished.
-        parent_b = sentry_sdk.traces.start_span(name="parent b")
-        with sentry_sdk.traces.start_span(name="b1", parent_span=parent_b) as span_b:
+        parent_b = sentry_sdk.start_span(name="parent b")
+        with sentry_sdk.start_span(name="b1", parent_span=parent_b) as span_b:
             trace_id_b = span_b.trace_id
-        with sentry_sdk.traces.start_span(name="b2", parent_span=parent_b):
+        with sentry_sdk.start_span(name="b2", parent_span=parent_b):
             pass
 
     sentry_sdk.flush()
@@ -195,13 +187,12 @@ def test_length_based_flushing(sentry_init, capture_items, monkeypatch):
 
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
-        with sentry_sdk.traces.start_span(name="span"):
+    with sentry_sdk.start_span(name="custom parent"):
+        with sentry_sdk.start_span(name="span"):
             pass
 
         time.sleep(0.1)
@@ -219,13 +210,12 @@ def test_weight_based_flushing(sentry_init, capture_envelopes, monkeypatch):
 
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     envelopes = capture_envelopes()
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
-        with sentry_sdk.traces.start_span(name="span"):
+    with sentry_sdk.start_span(name="custom parent"):
+        with sentry_sdk.start_span(name="span"):
             pass
 
         time.sleep(0.1)
@@ -245,13 +235,12 @@ def test_weight_based_flushing_by_attribute_size(
 
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     envelopes = capture_envelopes()
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
-        with sentry_sdk.traces.start_span(name="small span") as bare_span:
+    with sentry_sdk.start_span(name="custom parent"):
+        with sentry_sdk.start_span(name="small span") as bare_span:
             pass
 
         bare_span_size = SpanBatcher._estimate_size(bare_span._to_json())
@@ -264,9 +253,7 @@ def test_weight_based_flushing_by_attribute_size(
         # The first span alone is well under the byte limit, so no flush yet.
         assert len(envelopes) == 0
 
-        with sentry_sdk.traces.start_span(
-            name="big span", attributes={"big": big_attr}
-        ):
+        with sentry_sdk.start_span(name="big span", attributes={"big": big_attr}):
             pass
 
         time.sleep(0.1)
@@ -283,26 +270,25 @@ def test_bucket_recreated_after_flush(sentry_init, capture_envelopes, monkeypatc
 
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     envelopes = capture_envelopes()
 
-    sentry_sdk.traces.new_trace()
+    sentry_sdk.new_trace()
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
-        with sentry_sdk.traces.start_span(name="span 1") as span1:
+    with sentry_sdk.start_span(name="custom parent"):
+        with sentry_sdk.start_span(name="span 1") as span1:
             trace_id = span1.trace_id
-        with sentry_sdk.traces.start_span(name="span 2"):
+        with sentry_sdk.start_span(name="span 2"):
             pass
 
         time.sleep(0.1)
 
         assert len(envelopes) == 1
 
-        with sentry_sdk.traces.start_span(name="span 3"):
+        with sentry_sdk.start_span(name="span 3"):
             pass
-        with sentry_sdk.traces.start_span(name="span 4"):
+        with sentry_sdk.start_span(name="span 4"):
             pass
 
         time.sleep(0.1)
@@ -333,13 +319,12 @@ def test_quiet_buckets_flush_eventually(sentry_init, capture_envelopes, monkeypa
 
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     envelopes = capture_envelopes()
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
-        with sentry_sdk.traces.start_span(name="span 1"):
+    with sentry_sdk.start_span(name="custom parent"):
+        with sentry_sdk.start_span(name="span 1"):
             pass
 
         time.sleep(0.3)
@@ -359,28 +344,27 @@ def test_quiet_buckets_flushed_with_busy_neighbors(
 
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     envelopes = capture_envelopes()
 
-    sentry_sdk.traces.new_trace()
+    sentry_sdk.new_trace()
 
     with sentry_sdk.new_scope():
         # Keep parent open as its bucket in the batcher would be emptied when it is finished.
-        parent_a = sentry_sdk.traces.start_span(name="parent a")
-        with sentry_sdk.traces.start_span(name="span 1", parent_span=parent_a) as span1:
+        parent_a = sentry_sdk.start_span(name="parent a")
+        with sentry_sdk.start_span(name="span 1", parent_span=parent_a) as span1:
             trace_id1 = span1.trace_id
 
     with sentry_sdk.new_scope():
-        sentry_sdk.traces.new_trace()
+        sentry_sdk.new_trace()
         # Keep parent open as its bucket in the batcher would be emptied when it is finished.
-        parent_b = sentry_sdk.traces.start_span(name="parent b")
-        with sentry_sdk.traces.start_span(name="span 2", parent_span=parent_b) as span2:
+        parent_b = sentry_sdk.start_span(name="parent b")
+        with sentry_sdk.start_span(name="span 2", parent_span=parent_b) as span2:
             trace_id2 = span2.trace_id
 
         for i in range(3, 10):
-            with sentry_sdk.traces.start_span(name=f"span {i}", parent_span=parent_b):
+            with sentry_sdk.start_span(name=f"span {i}", parent_span=parent_b):
                 pass
 
     time.sleep(0.3)
@@ -412,12 +396,11 @@ def test_transport_format(sentry_init, capture_envelopes):
         server_name="test-server",
         release="1.0.0",
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     envelopes = capture_envelopes()
 
-    with sentry_sdk.traces.start_span(name="test"):
+    with sentry_sdk.start_span(name="test"):
         ...
 
     sentry_sdk.get_client().flush()
@@ -465,11 +448,11 @@ def test_trace_bucket_flushes_when_segment_ends(
     """All currently completed spans in a trace are flushed when the segment is finished."""
     monkeypatch.setattr(SpanBatcher, "FLUSH_WAIT_TIME", 100000)
 
-    sentry_init(traces_sample_rate=1.0, trace_lifecycle="stream")
+    sentry_init(traces_sample_rate=1.0)
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="segment span"):
-        with sentry_sdk.traces.start_span(name="child"):
+    with sentry_sdk.start_span(name="segment span"):
+        with sentry_sdk.start_span(name="child"):
             pass
 
     time.sleep(0.1)
@@ -498,7 +481,6 @@ def test_span_batcher_lock_reset_in_child_after_fork(sentry_init):
     """
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     batcher = sentry_sdk.get_client().span_batcher
     assert batcher is not None
