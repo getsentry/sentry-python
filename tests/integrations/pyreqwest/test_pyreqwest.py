@@ -594,12 +594,10 @@ def test_request_source_if_duration_over_threshold(
     assert SPANDATA.CODE_FUNCTION in data
 
 
-@pytest.mark.parametrize("send_default_pii", [True, False])
 def test_crumb_capture(
     sentry_init,
     capture_events,
     server_port,
-    send_default_pii,
 ):
     def before_breadcrumb(crumb, hint):
         crumb["data"]["extra"] = "foo"
@@ -608,7 +606,6 @@ def test_crumb_capture(
     sentry_init(
         integrations=[PyreqwestIntegration()],
         before_breadcrumb=before_breadcrumb,
-        send_default_pii=send_default_pii,
         data_collection={},
     )
 
@@ -633,25 +630,21 @@ def test_crumb_capture(
         SPANDATA.HTTP_STATUS_CODE: 200,
         "extra": "foo",
     }
-    if send_default_pii:
-        expected["url"] = f"http://localhost:{server_port}/hello?q=test#frag"
-        expected[SPANDATA.HTTP_QUERY] = "q=test"
-        expected[SPANDATA.HTTP_FRAGMENT] = "frag"
+    expected["url"] = f"http://localhost:{server_port}/hello?q=test#frag"
+    expected[SPANDATA.HTTP_QUERY] = "q=test"
+    expected[SPANDATA.HTTP_FRAGMENT] = "frag"
 
     assert crumb["data"] == ApproxDict(expected)
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("send_default_pii", [True, False])
 async def test_async_crumb_capture(
     sentry_init,
     capture_events,
     server_port,
-    send_default_pii,
 ):
     sentry_init(
         integrations=[PyreqwestIntegration()],
-        send_default_pii=send_default_pii,
         data_collection={},
     )
 
@@ -676,10 +669,9 @@ async def test_async_crumb_capture(
         SPANDATA.HTTP_METHOD: "GET",
         SPANDATA.HTTP_STATUS_CODE: 200,
     }
-    if send_default_pii:
-        expected["url"] = f"http://localhost:{server_port}/hello?q=test#frag"
-        expected[SPANDATA.HTTP_QUERY] = "q=test"
-        expected[SPANDATA.HTTP_FRAGMENT] = "frag"
+    expected["url"] = f"http://localhost:{server_port}/hello?q=test#frag"
+    expected[SPANDATA.HTTP_QUERY] = "q=test"
+    expected[SPANDATA.HTTP_FRAGMENT] = "frag"
 
     assert crumb["data"] == ApproxDict(expected)
 
