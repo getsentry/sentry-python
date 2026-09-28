@@ -30,20 +30,22 @@ if TYPE_CHECKING:
 
     class NoulModel(TypedDict):
         type: Literal["noul"]
-        name: str
         instructions: NotRequired[JSONContent | None]
 
     class ChoiceModel(TypedDict):
         type: Literal["choice"]
-        name: str
         criteria: NotRequired[Mapping[str, JSONContent | None]]
         instructions: NotRequired[JSONContent | None]
 
     class ScoreModel(TypedDict):
         type: Literal["score"]
-        name: str
         criteria: NotRequired[Sequence[JSONContent]]
         instructions: NotRequired[JSONContent | None]
+
+    class InputMessageModel(TypedDict):
+        type: Literal["evaluation"]
+        state: NotRequired[JSONContent]
+        questions: NotRequired[list[Union[NoulModel, ChoiceModel, ScoreModel]]]
 
 
 try:
@@ -69,45 +71,42 @@ class TypeSafeIntegration(Integration):
 
 def _transform_questions(
     questions: "Questions",
-) -> "list[Union[NoulModel, ChoiceModel, ScoreModel]]":
-    transformed_questions: "list[Union[NoulModel, ChoiceModel, ScoreModel]]" = []
+) -> "dict[str, Union[NoulModel, ChoiceModel, ScoreModel]]":
+    transformed_questions: "dict[str, Union[NoulModel, ChoiceModel, ScoreModel]]" = {}
     for name, question in questions.items():
         if isinstance(question, Noul):
             noul: "NoulModel" = {
                 "type": "noul",
-                "name": name,
             }
 
             if question.instructions is not None:
                 noul["instructions"] = question.instructions
 
-            transformed_questions.append(noul)
+            transformed_questions[name] = noul
             continue
 
         if isinstance(question, Choice):
             choice: "ChoiceModel" = {
                 "type": "choice",
-                "name": name,
                 "criteria": question.criteria,
             }
 
             if question.instructions is not None:
                 choice["instructions"] = question.instructions
 
-            transformed_questions.append(choice)
+            transformed_questions[name] = choice
             continue
 
         if isinstance(question, Score):
             score: "ScoreModel" = {
                 "type": "score",
-                "name": name,
                 "criteria": question.criteria,
             }
 
             if question.instructions is not None:
                 score["instructions"] = question.instructions
 
-            transformed_questions.append(score)
+            transformed_questions[name] = score
             continue
 
         if not isinstance(question, dict):
@@ -117,18 +116,16 @@ def _transform_questions(
         if question_type == "noul":
             noul = {
                 "type": question_type,
-                "name": name,
             }
             if "instructions" in question:
                 noul["instructions"] = question["instructions"]
 
-            transformed_questions.append(noul)
+            transformed_questions[name] = noul
             continue
 
         if question_type == "choice":
             choice = {
                 "type": question_type,
-                "name": name,
             }
             if "criteria" in question:
                 choice["criteria"] = cast(
@@ -137,20 +134,19 @@ def _transform_questions(
             if "instructions" in question:
                 choice["instructions"] = question["instructions"]
 
-            transformed_questions.append(choice)
+            transformed_questions[name] = choice
             continue
 
         if question_type == "score":
             score = {
                 "type": question_type,
-                "name": name,
             }
             if "criteria" in question:
                 score["criteria"] = cast("Sequence[JSONContent]", question["criteria"])
             if "instructions" in question:
                 score["instructions"] = question["instructions"]
 
-            transformed_questions.append(score)
+            transformed_questions[name] = score
             continue
 
     return transformed_questions
@@ -197,8 +193,8 @@ def _wrap_system_one(f: "Callable[..., Any]") -> "Callable[..., Any]":
             if model is not None:
                 set_on_span(SPANDATA.GEN_AI_REQUEST_MODEL, model)
 
-            state = kwargs.get("state")
-            questions = kwargs.get("questions")
+            state = args[0] if len(args) > 0 else kwargs.get("state")
+            questions = args[1] if len(args) > 1 else kwargs.get("questions")
             if isinstance(questions, Mapping) and (
                 (
                     has_data_collection_enabled(client.options)
@@ -209,17 +205,16 @@ def _wrap_system_one(f: "Callable[..., Any]") -> "Callable[..., Any]":
                     and should_send_default_pii()
                 )
             ):
-                if state is not None and questions:
-                    set_on_span(
-                        SPANDATA.GEN_AI_INPUT_MESSAGES,
-                        json.dumps(
-                            {
-                                "type": "evaluation",
-                                "state": state,
-                                "questions": _transform_questions(questions),
-                            }
-                        ),
-                    )
+                input_message: "InputMessageModel" = {
+                    "type": "evaluation",
+                }
+                if state is not None:
+                    input_message["state"] = state
+
+                if isinstance(questions, Mapping):
+                    input_message["questions"] = _transform_questions(questions)
+
+                set_on_span(SPANDATA.GEN_AI_INPUT_MESSAGES, json.dumps([input_message]))
 
             response = f(self, *args, **kwargs)
 
@@ -276,30 +271,26 @@ def _wrap_system_one_async(f: "Callable[..., Any]") -> "Callable[..., Any]":
             if model is not None:
                 set_on_span(SPANDATA.GEN_AI_REQUEST_MODEL, model)
 
-            state = kwargs.get("state")
-            questions = kwargs.get("questions")
+            state = args[0] if len(args) > 0 else kwargs.get("state")
+            questions = args[1] if len(args) > 1 else kwargs.get("questions")
 
-            if isinstance(questions, Mapping) and (
-                (
-                    has_data_collection_enabled(client.options)
-                    and client.options["data_collection"]["gen_ai"]["inputs"]
-                )
-                or (
-                    not has_data_collection_enabled(client.options)
-                    and should_send_default_pii()
-                )
+            if (
+                has_data_collection_enabled(client.options)
+                and client.options["data_collection"]["gen_ai"]["inputs"]
+            ) or (
+                not has_data_collection_enabled(client.options)
+                and should_send_default_pii()
             ):
-                if state is not None and questions:
-                    set_on_span(
-                        SPANDATA.GEN_AI_INPUT_MESSAGES,
-                        json.dumps(
-                            {
-                                "type": "evaluation",
-                                "state": state,
-                                "questions": _transform_questions(questions),
-                            }
-                        ),
-                    )
+                input_message: "InputMessageModel" = {
+                    "type": "evaluation",
+                }
+                if state is not None:
+                    input_message["state"] = state
+
+                if isinstance(questions, Mapping):
+                    input_message["questions"] = _transform_questions(questions)
+
+                set_on_span(SPANDATA.GEN_AI_INPUT_MESSAGES, json.dumps([input_message]))
 
             response = await f(self, *args, **kwargs)
 
