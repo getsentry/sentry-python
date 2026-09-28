@@ -167,6 +167,48 @@ def test_system_one(
                 },
             ],
         }
+        assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+            {
+                "type": "noul",
+                "name": "spam",
+                "noul": 0.98,
+            },
+            {
+                "type": "choice",
+                "name": "tone",
+                "choice": "friendly",
+                "probabilities": {"friendly": 0.9, "hostile": 0.1},
+                "confidence": 0.9,
+            },
+            {
+                "type": "score",
+                "name": "urgency",
+                "score": 1.7,
+                "probabilities": [0.1, 0.1, 0.8],
+                "confidence": 0.8,
+                "legend": ["can wait", "this week", "today"],
+            },
+            {
+                "type": "noul",
+                "name": "spam_obj",
+                "noul": 0.98,
+            },
+            {
+                "type": "choice",
+                "name": "tone_obj",
+                "choice": "friendly",
+                "probabilities": {"friendly": 0.9, "hostile": 0.1},
+                "confidence": 0.9,
+            },
+            {
+                "type": "score",
+                "name": "urgency_obj",
+                "score": 1.7,
+                "probabilities": [0.1, 0.1, 0.8],
+                "confidence": 0.8,
+                "legend": ["can wait", "this week", "today"],
+            },
+        ]
     else:
         items = capture_items("transaction")
 
@@ -257,6 +299,48 @@ def test_system_one(
                 },
             ],
         }
+        assert json.loads(span["data"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+            {
+                "type": "noul",
+                "name": "spam",
+                "noul": 0.98,
+            },
+            {
+                "type": "choice",
+                "name": "tone",
+                "choice": "friendly",
+                "probabilities": {"friendly": 0.9, "hostile": 0.1},
+                "confidence": 0.9,
+            },
+            {
+                "type": "score",
+                "name": "urgency",
+                "score": 1.7,
+                "probabilities": [0.1, 0.1, 0.8],
+                "confidence": 0.8,
+                "legend": ["can wait", "this week", "today"],
+            },
+            {
+                "type": "noul",
+                "name": "spam_obj",
+                "noul": 0.98,
+            },
+            {
+                "type": "choice",
+                "name": "tone_obj",
+                "choice": "friendly",
+                "probabilities": {"friendly": 0.9, "hostile": 0.1},
+                "confidence": 0.9,
+            },
+            {
+                "type": "score",
+                "name": "urgency_obj",
+                "score": 1.7,
+                "probabilities": [0.1, 0.1, 0.8],
+                "confidence": 0.8,
+                "legend": ["can wait", "this week", "today"],
+            },
+        ]
 
 
 @pytest.mark.asyncio
@@ -376,6 +460,48 @@ async def test_system_one_async(
                 },
             ],
         }
+        assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+            {
+                "type": "noul",
+                "name": "spam",
+                "noul": 0.98,
+            },
+            {
+                "type": "choice",
+                "name": "tone",
+                "choice": "friendly",
+                "probabilities": {"friendly": 0.9, "hostile": 0.1},
+                "confidence": 0.9,
+            },
+            {
+                "type": "score",
+                "name": "urgency",
+                "score": 1.7,
+                "probabilities": [0.1, 0.1, 0.8],
+                "confidence": 0.8,
+                "legend": ["can wait", "this week", "today"],
+            },
+            {
+                "type": "noul",
+                "name": "spam_obj",
+                "noul": 0.98,
+            },
+            {
+                "type": "choice",
+                "name": "tone_obj",
+                "choice": "friendly",
+                "probabilities": {"friendly": 0.9, "hostile": 0.1},
+                "confidence": 0.9,
+            },
+            {
+                "type": "score",
+                "name": "urgency_obj",
+                "score": 1.7,
+                "probabilities": [0.1, 0.1, 0.8],
+                "confidence": 0.8,
+                "legend": ["can wait", "this week", "today"],
+            },
+        ]
     else:
         items = capture_items("transaction")
 
@@ -469,3 +595,45 @@ async def test_system_one_async(
                 },
             ],
         }
+        assert json.loads(span["data"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+            {
+                "type": "noul",
+                "name": "spam",
+                "noul": 0.98,
+            },
+            {
+                "type": "choice",
+                "name": "tone",
+                "choice": "friendly",
+                "probabilities": {"friendly": 0.9, "hostile": 0.1},
+                "confidence": 0.9,
+            },
+            {
+                "type": "score",
+                "name": "urgency",
+                "score": 1.7,
+                "probabilities": [0.1, 0.1, 0.8],
+                "confidence": 0.8,
+                "legend": ["can wait", "this week", "today"],
+            },
+            {
+                "type": "noul",
+                "name": "spam_obj",
+                "noul": 0.98,
+            },
+            {
+                "type": "choice",
+                "name": "tone_obj",
+                "choice": "friendly",
+                "probabilities": {"friendly": 0.9, "hostile": 0.1},
+                "confidence": 0.9,
+            },
+            {
+                "type": "score",
+                "name": "urgency_obj",
+                "score": 1.7,
+                "probabilities": [0.1, 0.1, 0.8],
+                "confidence": 0.8,
+                "legend": ["can wait", "this week", "today"],
+            },
+        ]

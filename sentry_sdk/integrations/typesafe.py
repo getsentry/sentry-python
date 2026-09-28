@@ -40,12 +40,32 @@ if TYPE_CHECKING:
         criteria: NotRequired[Sequence[JSONContent]]
         instructions: NotRequired[JSONContent | None]
 
+    class NoulEvaluationModel(TypedDict):
+        name: str
+        type: Literal["noul"]
+        noul: float
+
+    class ChoiceEvaluationModel(TypedDict):
+        name: str
+        type: Literal["choice"]
+        choice: str
+        probabilities: dict[str, float]
+        confidence: float
+
+    class ScoreEvaluationModel(TypedDict):
+        name: str
+        type: Literal["score"]
+        score: float
+        probabilities: list[float]
+        confidence: float
+        legend: list[JSONContent]
+
 
 try:
-    from typesafe_sdk import Choice, Noul, Score
+    from typesafe_sdk import Choice, ChoiceAnswer, Noul, NoulAnswer, Score, ScoreAnswer
     from typesafe_sdk._core.client.aio.client import AsyncTypeSafeClient
     from typesafe_sdk._core.client.sync.client import TypeSafeClient
-    from typesafe_sdk._core.response_types import SystemOneResponse
+    from typesafe_sdk._core.response_types import Answer, SystemOneResponse
 except ImportError:
     raise DidNotEnable("typesafe-sdk not installed")
 
@@ -151,6 +171,53 @@ def _transform_questions(
     return transformed_questions
 
 
+def _transform_evaluation_answers(
+    answers: dict[str, Answer],
+) -> list[Union[NoulEvaluationModel, ChoiceEvaluationModel, ScoreEvaluationModel]]:
+    items: list[
+        Union[NoulEvaluationModel, ChoiceEvaluationModel, ScoreEvaluationModel]
+    ] = []
+    for name, answer in answers.items():
+        if isinstance(answer, NoulAnswer):
+            items.append(
+                {
+                    "name": name,
+                    "type": "noul",
+                    "noul": answer.noul,
+                }
+            )
+            continue
+
+        if isinstance(answer, ChoiceAnswer):
+            items.append(
+                {
+                    "name": name,
+                    "type": "choice",
+                    "choice": answer.choice,
+                    "probabilities": answer.probabilities,
+                    "confidence": answer.confidence,
+                }
+            )
+            continue
+
+        if isinstance(answer, ScoreAnswer):
+            items.append(
+                {
+                    "name": name,
+                    "type": "score",
+                    "score": answer.score,
+                    "probabilities": [
+                        value for _, value in answer.probabilities.items()
+                    ],
+                    "confidence": answer.confidence,
+                    "legend": [value for _, value in answer.legend.items()],
+                }
+            )
+            continue
+
+    return items
+
+
 def _wrap_system_one(f: "Callable[..., Any]") -> "Callable[..., Any]":
     @wraps(f)
     def wrap_system_one(self: "TypeSafeClient", *args: "Any", **kwargs: "Any") -> "Any":
@@ -221,6 +288,11 @@ def _wrap_system_one(f: "Callable[..., Any]") -> "Callable[..., Any]":
                 set_on_span(
                     SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS, response.usage.output_tokens
                 )
+
+            set_on_span(
+                SPANDATA.GEN_AI_OUTPUT_MESSAGES,
+                json.dumps(_transform_evaluation_answers(response.answers)),
+            )
 
             return response
 
@@ -299,6 +371,11 @@ def _wrap_system_one_async(f: "Callable[..., Any]") -> "Callable[..., Any]":
                 set_on_span(
                     SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS, response.usage.output_tokens
                 )
+
+            set_on_span(
+                SPANDATA.GEN_AI_OUTPUT_MESSAGES,
+                json.dumps(_transform_evaluation_answers(response.answers)),
+            )
 
             return response
 
