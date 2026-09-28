@@ -26,7 +26,7 @@ from sentry_sdk.integrations._asgi_common import (
 from sentry_sdk.integrations._wsgi_common import (
     DEFAULT_HTTP_METHODS_TO_CAPTURE,
 )
-from sentry_sdk.scope import Scope, should_send_default_pii
+from sentry_sdk.scope import Scope
 from sentry_sdk.sessions import track_session
 from sentry_sdk.traces import (
     SOURCE_FOR_STYLE,
@@ -37,7 +37,6 @@ from sentry_sdk.utils import (
     _get_installed_modules,
     capture_internal_exceptions,
     event_from_exception,
-    has_data_collection_enabled,
     logger,
     qualname_from_function,
     reraise,
@@ -223,12 +222,7 @@ class SentryAsgiMiddleware:
 
                     if scope.get("client"):
                         client_options = sentry_sdk.get_client().options
-                        if has_data_collection_enabled(client_options):
-                            if client_options["data_collection"]["user_info"]:
-                                sentry_scope.set_attribute(
-                                    SPANDATA.USER_IP_ADDRESS, _get_ip(scope)
-                                )
-                        elif should_send_default_pii():
+                        if client_options["data_collection"]["user_info"]:
                             sentry_scope.set_attribute(
                                 SPANDATA.USER_IP_ADDRESS, _get_ip(scope)
                             )
