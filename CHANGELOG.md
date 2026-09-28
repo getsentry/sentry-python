@@ -4,6 +4,23 @@
 
 ### New Features ✨
 
+- **New integration:** TypeSafe (#4733) by @alexander-alderman-webb
+
+  Add the TypeSafe integration to your `sentry_sdk.init` call:
+
+```python
+import sentry_sdk
+from sentry_sdk.integrations.typesafe import TypeSafeIntegration
+
+sentry_sdk.init(
+    dsn="...",
+    traces_sample_rate=1.0,
+    integrations=[
+        TypeSafeIntegration(),
+    ]
+)
+```
+
 #### Typesafe
 
 - Record `gen_ai.output.messages` by @alexander-alderman-webb in [#7720](https://github.com/getsentry/sentry-python/pull/7720)
