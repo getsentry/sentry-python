@@ -168,6 +168,7 @@ _MIN_VERSIONS = {
     "strawberry": (0, 209, 5),
     "tornado": (6, 0),
     "typer": (0, 15),
+    "typesafe": (0, 7),
     "unleash": (6, 0, 1),
 }
 
