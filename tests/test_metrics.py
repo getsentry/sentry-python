@@ -333,7 +333,7 @@ def test_transport_format(sentry_init, capture_envelopes):
 
     sentry_sdk.metrics.count("test.counter", 1)
 
-    sentry_sdk.get_client().flush()
+    sentry_sdk.flush()
 
     assert len(envelopes) == 1
     assert len(envelopes[0].items) == 1

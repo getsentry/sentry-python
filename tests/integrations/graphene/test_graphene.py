@@ -458,7 +458,7 @@ def test_graphql_streamed_span_holds_query_information(
     client = sync_app.test_client()
     client.post("/graphql", json=query)
 
-    sentry_sdk.get_client().flush()
+    sentry_sdk.flush()
 
     spans = [item.payload for item in items]
     assert len(spans) == 2
@@ -518,7 +518,7 @@ def test_graphql_streamed_span_data_collection(
     client = sync_app.test_client()
     client.post("/graphql", json=query)
 
-    sentry_sdk.get_client().flush()
+    sentry_sdk.flush()
 
     spans = [item.payload for item in items]
     assert len(spans) == 2
@@ -612,7 +612,7 @@ def test_breadcrumbs_hold_query_information_on_error_with_span_streaming(
     client = sync_app.test_client()
     client.post("/graphql", json=query)
 
-    sentry_sdk.get_client().flush()
+    sentry_sdk.flush()
 
     events = [item.payload for item in items if item.type == "event"]
     assert len(events) == 1
