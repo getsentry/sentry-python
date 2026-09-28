@@ -148,6 +148,7 @@ def test_worker_span_with_error(
     sentry_init(
         integrations=[RqIntegration()],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     queue = rq.Queue(connection=FakeRedis())
@@ -274,6 +275,7 @@ def test_worker_span_no_error(
     sentry_init(
         integrations=[RqIntegration()],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     queue = rq.Queue(connection=FakeRedis())
