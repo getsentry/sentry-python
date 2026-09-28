@@ -1408,6 +1408,13 @@ async def test_user_address_with_data_collection(
 
 @pytest.mark.asyncio
 async def test_sensitive_header_scrubbing(sentry_init, aiohttp_client, capture_items):
+    """
+    aiohttp's request-header pipeline routes through the shared
+    data_collection ``_filter_headers`` helper. The full allow/deny/off/
+    cookie semantics of that helper are exhaustively tested in
+    tests/integrations/wsgi/test_wsgi.py and tests/integrations/asgi/
+    test_asgi.py; here we only verify aiohttp wires into it correctly.
+    """
     sentry_init(
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
@@ -1447,119 +1454,6 @@ async def test_sensitive_header_scrubbing(sentry_init, aiohttp_client, capture_i
         server_span["attributes"]["http.request.header.x-custom-header"]
         == "passthrough"
     )
-
-
-@pytest.mark.parametrize(
-    "data_collection,expected",
-    [
-        pytest.param(
-            {
-                "http_headers": {"request": {"mode": "off"}},
-            },
-            None,
-            id="data_collection_off_does_not_add_headers",
-        ),
-        pytest.param(
-            {
-                "http_headers": {"request": {"mode": "allowlist"}},
-            },
-            {
-                "authorization": "[Filtered]",
-                "custom": "[Filtered]",
-                "cookie": "[Filtered]",
-            },
-            id="data_collection_allow_list_redacts_terms_that_do_not_appear",
-        ),
-        pytest.param(
-            {
-                "http_headers": {
-                    "request": {"mode": "allowlist", "terms": ["Authorization"]}
-                }
-            },
-            {
-                "authorization": "[Filtered]",
-                "custom": "[Filtered]",
-                "cookie": "[Filtered]",
-            },
-            id="data_collection_allow_list_redacts_sensitive_terms_even_when_provided_by_user",
-        ),
-        pytest.param(
-            {"http_headers": {"request": {"mode": "allowlist", "terms": ["custom"]}}},
-            {
-                "authorization": "[Filtered]",
-                "custom": "foobar",
-                "cookie": "[Filtered]",
-            },
-            id="data_collection_allow_list_does_not_redact_provided_term",
-        ),
-        pytest.param(
-            {"http_headers": {"request": {"mode": "denylist", "terms": ["custom"]}}},
-            {
-                "authorization": "[Filtered]",
-                "custom": "[Filtered]",
-                "cookie": "[Filtered]",
-            },
-            id="data_collection_deny_list_redacts_sensitive_terms_when_provided_by_user",
-        ),
-        pytest.param(
-            {"http_headers": {"request": {"mode": "allowlist", "terms": ["cookie"]}}},
-            {
-                "authorization": "[Filtered]",
-                "custom": "[Filtered]",
-                "cookie": "[Filtered]",
-            },
-            id="data_collection_cookie_is_always_redacted_even_when_allow_listed",
-        ),
-    ],
-)
-@pytest.mark.asyncio
-async def test_sensitive_header_passthrough_with_pii(
-    sentry_init, aiohttp_client, capture_items, data_collection, expected, request
-):
-    sentry_init(
-        integrations=[AioHttpIntegration()],
-        traces_sample_rate=1.0,
-        data_collection=data_collection,
-    )
-
-    async def hello(request):
-        return web.Response(text="hello")
-
-    app = web.Application()
-    app.router.add_get("/", hello)
-
-    items = capture_items("span")
-
-    client = await aiohttp_client(app)
-    await client.get(
-        "/",
-        headers={
-            "Authorization": "Bearer secret-token",
-            "x-custom-header": "foobar",
-            "Cookie": "sessionid=secret",
-        },
-    )
-
-    sentry_sdk.flush()
-
-    (server_span,) = [item.payload for item in items]
-
-    if expected is None:
-        assert "http.request.header.authorization" not in server_span["attributes"]
-        assert "http.request.header.cookie" not in server_span["attributes"]
-    else:
-        assert (
-            server_span["attributes"]["http.request.header.authorization"]
-            == expected["authorization"]
-        )
-        assert (
-            server_span["attributes"]["http.request.header.x-custom-header"]
-            == expected["custom"]
-        )
-        assert (
-            server_span["attributes"]["http.request.header.cookie"]
-            == expected["cookie"]
-        )
 
 
 @pytest.mark.asyncio

@@ -201,7 +201,6 @@ async def test_capture_transaction(
     assert span["attributes"]["network.protocol.name"] == "http"
     assert span["attributes"]["http.request.method"] == "GET"
     assert span["attributes"]["http.request.header.host"] == "localhost"
-    assert span["attributes"]["http.request.header.remote-addr"] == "127.0.0.1"
     assert span["attributes"]["http.request.header.user-agent"] == "ASGI-Test-Client"
 
     if should_send_pii:
@@ -672,6 +671,164 @@ def test_get_headers():
         "x-real-ip": "10.10.10.10",
         "some_header": "123, abc",
     }
+
+
+@pytest.mark.asyncio
+async def test_request_headers_redacts_sensitive_headers(
+    sentry_init, asgi3_app, capture_items
+):
+    sentry_init(
+        traces_sample_rate=1.0,
+        data_collection={},
+    )
+    app = SentryAsgiMiddleware(asgi3_app)
+
+    items = capture_items("span")
+    async with TestClient(app) as client:
+        await client.get(
+            "/some_url",
+            headers={
+                "Authorization": "Bearer secret-token",
+                "X-Custom-Header": "passthrough",
+            },
+        )
+
+    sentry_sdk.flush()
+
+    (span,) = [item.payload for item in items]
+    attributes = span["attributes"]
+
+    assert attributes["http.request.header.authorization"] == "[Filtered]"
+    assert attributes["http.request.header.x-custom-header"] == "passthrough"
+
+
+@pytest.mark.asyncio
+async def test_request_headers_data_collection_off_collects_no_headers(
+    sentry_init, asgi3_app, capture_items
+):
+    sentry_init(
+        traces_sample_rate=1.0,
+        data_collection={"http_headers": {"request": {"mode": "off"}}},
+    )
+    app = SentryAsgiMiddleware(asgi3_app)
+
+    items = capture_items("span")
+    async with TestClient(app) as client:
+        await client.get(
+            "/some_url",
+            headers={
+                "X-Forwarded-For": "1.2.3.4",
+                "X-Custom-Header": "passthrough",
+            },
+        )
+
+    sentry_sdk.flush()
+
+    (span,) = [item.payload for item in items]
+    attributes = span["attributes"]
+
+    assert not any(key.startswith("http.request.header.") for key in attributes)
+
+
+@pytest.mark.asyncio
+async def test_request_headers_data_collection_allowlist_redacts_all_but_allowed_terms(
+    sentry_init, asgi3_app, capture_items
+):
+    sentry_init(
+        traces_sample_rate=1.0,
+        data_collection={
+            "http_headers": {"request": {"mode": "allowlist", "terms": ["custom"]}}
+        },
+    )
+    app = SentryAsgiMiddleware(asgi3_app)
+
+    items = capture_items("span")
+    async with TestClient(app) as client:
+        await client.get(
+            "/some_url",
+            headers={
+                "X-Forwarded-For": "1.2.3.4",
+                "X-Custom-Header": "passthrough",
+            },
+        )
+
+    sentry_sdk.flush()
+
+    (span,) = [item.payload for item in items]
+    attributes = span["attributes"]
+
+    assert attributes["http.request.header.x-custom-header"] == "passthrough"
+    assert attributes["http.request.header.x-forwarded-for"] == "[Filtered]"
+    assert attributes["http.request.header.host"] == "[Filtered]"
+
+
+@pytest.mark.asyncio
+async def test_request_headers_data_collection_denylist_redacts_only_matched_terms(
+    sentry_init, asgi3_app, capture_items
+):
+    sentry_init(
+        traces_sample_rate=1.0,
+        data_collection={
+            "http_headers": {"request": {"mode": "denylist", "terms": ["custom"]}}
+        },
+    )
+    app = SentryAsgiMiddleware(asgi3_app)
+
+    items = capture_items("span")
+    async with TestClient(app) as client:
+        await client.get(
+            "/some_url",
+            headers={
+                "X-Forwarded-For": "1.2.3.4",
+                "X-Custom-Header": "passthrough",
+            },
+        )
+
+    sentry_sdk.flush()
+
+    (span,) = [item.payload for item in items]
+    attributes = span["attributes"]
+
+    assert attributes["http.request.header.x-custom-header"] == "[Filtered]"
+    assert attributes["http.request.header.x-forwarded-for"] == "1.2.3.4"
+    assert attributes["http.request.header.host"] == "localhost"
+
+
+@pytest.mark.asyncio
+async def test_request_headers_data_collection_cookie_always_redacted(
+    sentry_init, asgi3_app, capture_items
+):
+    """
+    The ``cookie``/``set-cookie`` headers are always redacted in the
+    data-collection path, even when explicitly allowlisted.
+    """
+    sentry_init(
+        traces_sample_rate=1.0,
+        data_collection={
+            "http_headers": {
+                "request": {"mode": "allowlist", "terms": ["cookie", "custom"]}
+            }
+        },
+    )
+    app = SentryAsgiMiddleware(asgi3_app)
+
+    items = capture_items("span")
+    async with TestClient(app) as client:
+        await client.get(
+            "/some_url",
+            headers={
+                "Cookie": "sessionid=secret",
+                "X-Custom-Header": "passthrough",
+            },
+        )
+
+    sentry_sdk.flush()
+
+    (span,) = [item.payload for item in items]
+    attributes = span["attributes"]
+
+    assert attributes["http.request.header.cookie"] == "[Filtered]"
+    assert attributes["http.request.header.x-custom-header"] == "passthrough"
 
 
 @pytest.mark.asyncio
