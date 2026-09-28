@@ -15,7 +15,6 @@ from sentry_sdk.utils import (
     AnnotatedValue,
     capture_internal_exceptions,
     event_from_exception,
-    has_data_collection_enabled,
     parse_version,
 )
 
@@ -226,13 +225,7 @@ class DramatiqMessageExtractor:
         request_info = contexts.setdefault("dramatiq", {})
         request_info["type"] = "dramatiq"
 
-        attach_request_body = True
-        if has_data_collection_enabled(client.options):
-            attach_request_body = (
-                "incoming_request" in client.options["data_collection"]["http_bodies"]
-            )
-
-        if attach_request_body:
+        if client.options["data_collection"]["queues"]:
             data: "Optional[Union[AnnotatedValue, Dict[str, Any]]]" = None
             if not request_body_within_bounds(client, self.content_length()):
                 data = AnnotatedValue.removed_because_over_size_limit()
