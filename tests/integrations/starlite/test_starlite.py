@@ -13,7 +13,7 @@ import sentry_sdk
 from sentry_sdk import capture_message
 from sentry_sdk._types import SENSITIVE_DATA_SUBSTITUTE
 from sentry_sdk.integrations.starlite import StarliteIntegration
-from tests.integrations.utils import DATA_COLLECTION_USER_INFO_CASES
+from tests.integrations.utils import DATA_COLLECTION_USER_INFO_CASES_LEGACY
 
 
 def starlite_app_factory(middleware=None, debug=True, exception_handlers=None):
@@ -398,7 +398,9 @@ def test_span_origin(sentry_init, capture_items):
         assert item.payload["attributes"]["sentry.origin"] == "auto.http.starlite"
 
 
-@pytest.mark.parametrize("init_kwargs, expect_user", DATA_COLLECTION_USER_INFO_CASES)
+@pytest.mark.parametrize(
+    "init_kwargs, expect_user", DATA_COLLECTION_USER_INFO_CASES_LEGACY
+)
 def test_starlite_scope_user_on_exception_event(
     sentry_init, capture_exceptions, capture_events, init_kwargs, expect_user
 ):

@@ -11,7 +11,7 @@ from sentry_sdk.integrations.wsgi import (
     _ScopedResponse,
     get_request_url,
 )
-from tests.integrations.utils import DATA_COLLECTION_USER_INFO_CASES
+from tests.integrations.utils import DATA_COLLECTION_USER_INFO_CASES_LEGACY
 
 
 @pytest.fixture
@@ -1114,7 +1114,9 @@ def test_user_ip_address_on_all_spans(sentry_init, capture_items, send_default_p
         assert "user.ip_address" not in child_span["attributes"]
 
 
-@pytest.mark.parametrize("init_kwargs, expect_ip", DATA_COLLECTION_USER_INFO_CASES)
+@pytest.mark.parametrize(
+    "init_kwargs, expect_ip", DATA_COLLECTION_USER_INFO_CASES_LEGACY
+)
 def test_user_info_span_attributes_data_collection(
     sentry_init, capture_items, init_kwargs, expect_ip
 ):
@@ -1151,7 +1153,9 @@ def test_user_info_span_attributes_data_collection(
         assert "client.address" not in server_span["attributes"]
 
 
-@pytest.mark.parametrize("init_kwargs, expect_ip", DATA_COLLECTION_USER_INFO_CASES)
+@pytest.mark.parametrize(
+    "init_kwargs, expect_ip", DATA_COLLECTION_USER_INFO_CASES_LEGACY
+)
 def test_user_info_error_event_data_collection(
     sentry_init, crashing_app, capture_events, init_kwargs, expect_ip
 ):

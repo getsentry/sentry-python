@@ -8,7 +8,7 @@ import sentry_sdk
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.rq import RqIntegration
 from sentry_sdk.utils import SENSITIVE_DATA_SUBSTITUTE, parse_version
-from tests.integrations.utils import DATA_COLLECTION_QUEUES_CASES
+from tests.integrations.utils import DATA_COLLECTION_QUEUES_CASES_LEGACY
 
 
 @pytest.fixture(autouse=True)
@@ -91,7 +91,7 @@ def test_basic(
 
 @pytest.mark.parametrize(
     "init_kwargs,expected_args,expected_kwargs",
-    DATA_COLLECTION_QUEUES_CASES,
+    DATA_COLLECTION_QUEUES_CASES_LEGACY,
 )
 def test_job_args_kwargs_data_collection(
     sentry_init,
