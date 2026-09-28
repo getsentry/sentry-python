@@ -1,16 +1,55 @@
+import json
+from collections.abc import Mapping
 from functools import wraps
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import sentry_sdk
 from sentry_sdk.ai.utils import get_start_span_function
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration
-from sentry_sdk.tracing_utils import has_span_streaming_enabled
+from sentry_sdk.scope import should_send_default_pii
+from sentry_sdk.tracing_utils import (
+    has_data_collection_enabled,
+    has_span_streaming_enabled,
+)
 
 if TYPE_CHECKING:
-    from typing import Any, Callable
+    from typing import (
+        Any,
+        Callable,
+        Literal,
+        Mapping,
+        NotRequired,
+        Sequence,
+        TypedDict,
+        Union,
+    )
+
+    from typesafe_sdk import JSONContent
+    from typesafe_sdk._core.question_types import Questions
+
+    class NoulModel(TypedDict):
+        type: Literal["noul"]
+        instructions: NotRequired[JSONContent | None]
+
+    class ChoiceModel(TypedDict):
+        type: Literal["choice"]
+        criteria: NotRequired[Mapping[str, JSONContent | None]]
+        instructions: NotRequired[JSONContent | None]
+
+    class ScoreModel(TypedDict):
+        type: Literal["score"]
+        criteria: NotRequired[Sequence[JSONContent]]
+        instructions: NotRequired[JSONContent | None]
+
+    class InputMessageModel(TypedDict):
+        type: Literal["evaluation"]
+        state: NotRequired[JSONContent]
+        questions: NotRequired[dict[str, Union[NoulModel, ChoiceModel, ScoreModel]]]
+
 
 try:
+    from typesafe_sdk import Choice, Noul, Score
     from typesafe_sdk._core.client.aio.client import AsyncTypeSafeClient
     from typesafe_sdk._core.client.sync.client import TypeSafeClient
     from typesafe_sdk._core.response_types import SystemOneResponse
@@ -28,6 +67,89 @@ class TypeSafeIntegration(Integration):
         AsyncTypeSafeClient.system_one = _wrap_system_one_async(  # type: ignore[method-assign]
             AsyncTypeSafeClient.system_one
         )
+
+
+def _transform_questions(
+    questions: "Questions",
+) -> "dict[str, Union[NoulModel, ChoiceModel, ScoreModel]]":
+    transformed_questions: "dict[str, Union[NoulModel, ChoiceModel, ScoreModel]]" = {}
+    for name, question in questions.items():
+        if isinstance(question, Noul):
+            noul: "NoulModel" = {
+                "type": "noul",
+            }
+
+            if question.instructions is not None:
+                noul["instructions"] = question.instructions
+
+            transformed_questions[name] = noul
+            continue
+
+        if isinstance(question, Choice):
+            choice: "ChoiceModel" = {
+                "type": "choice",
+                "criteria": question.criteria,
+            }
+
+            if question.instructions is not None:
+                choice["instructions"] = question.instructions
+
+            transformed_questions[name] = choice
+            continue
+
+        if isinstance(question, Score):
+            score: "ScoreModel" = {
+                "type": "score",
+                "criteria": question.criteria,
+            }
+
+            if question.instructions is not None:
+                score["instructions"] = question.instructions
+
+            transformed_questions[name] = score
+            continue
+
+        if not isinstance(question, dict):
+            continue
+
+        question_type = question.get("type")
+        if question_type == "noul":
+            noul = {
+                "type": question_type,
+            }
+            if "instructions" in question:
+                noul["instructions"] = question["instructions"]
+
+            transformed_questions[name] = noul
+            continue
+
+        if question_type == "choice":
+            choice = {
+                "type": question_type,
+            }
+            if "criteria" in question:
+                choice["criteria"] = cast(
+                    "Mapping[str, JSONContent | None]", question["criteria"]
+                )
+            if "instructions" in question:
+                choice["instructions"] = question["instructions"]
+
+            transformed_questions[name] = choice
+            continue
+
+        if question_type == "score":
+            score = {
+                "type": question_type,
+            }
+            if "criteria" in question:
+                score["criteria"] = cast("Sequence[JSONContent]", question["criteria"])
+            if "instructions" in question:
+                score["instructions"] = question["instructions"]
+
+            transformed_questions[name] = score
+            continue
+
+    return transformed_questions
 
 
 def _wrap_system_one(f: "Callable[..., Any]") -> "Callable[..., Any]":
@@ -70,6 +192,27 @@ def _wrap_system_one(f: "Callable[..., Any]") -> "Callable[..., Any]":
         with span:
             if model is not None:
                 set_on_span(SPANDATA.GEN_AI_REQUEST_MODEL, model)
+
+            if (
+                has_data_collection_enabled(client.options)
+                and client.options["data_collection"]["gen_ai"]["inputs"]
+            ) or (
+                not has_data_collection_enabled(client.options)
+                and should_send_default_pii()
+            ):
+                input_message: "InputMessageModel" = {
+                    "type": "evaluation",
+                }
+
+                state = args[0] if len(args) > 0 else kwargs.get("state")
+                if state is not None:
+                    input_message["state"] = state
+
+                questions = args[1] if len(args) > 1 else kwargs.get("questions")
+                if isinstance(questions, Mapping):
+                    input_message["questions"] = _transform_questions(questions)
+
+                set_on_span(SPANDATA.GEN_AI_INPUT_MESSAGES, json.dumps([input_message]))
 
             response = f(self, *args, **kwargs)
 
@@ -125,6 +268,27 @@ def _wrap_system_one_async(f: "Callable[..., Any]") -> "Callable[..., Any]":
         with span:
             if model is not None:
                 set_on_span(SPANDATA.GEN_AI_REQUEST_MODEL, model)
+
+            if (
+                has_data_collection_enabled(client.options)
+                and client.options["data_collection"]["gen_ai"]["inputs"]
+            ) or (
+                not has_data_collection_enabled(client.options)
+                and should_send_default_pii()
+            ):
+                input_message: "InputMessageModel" = {
+                    "type": "evaluation",
+                }
+
+                state = args[0] if len(args) > 0 else kwargs.get("state")
+                if state is not None:
+                    input_message["state"] = state
+
+                questions = args[1] if len(args) > 1 else kwargs.get("questions")
+                if isinstance(questions, Mapping):
+                    input_message["questions"] = _transform_questions(questions)
+
+                set_on_span(SPANDATA.GEN_AI_INPUT_MESSAGES, json.dumps([input_message]))
 
             response = await f(self, *args, **kwargs)
 

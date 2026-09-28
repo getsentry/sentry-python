@@ -1,3 +1,4 @@
+import json
 from unittest import mock
 
 import pytest
@@ -65,6 +66,7 @@ def test_system_one(
     sentry_init(
         integrations=[TypeSafeIntegration()],
         traces_sample_rate=1.0,
+        send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
         trace_lifecycle="stream" if span_streaming else "static",
     )
@@ -119,6 +121,46 @@ def test_system_one(
         assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "jev-latest"
 
         assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "jev-latest"
+
+        assert json.loads(span["attributes"][SPANDATA.GEN_AI_INPUT_MESSAGES]) == [
+            {
+                "type": "evaluation",
+                "state": {
+                    "subject": "Charged twice this month",
+                    "body": "I see two charges of $49. I only have one account. Please fix this ASAP.",
+                },
+                "questions": {
+                    "spam": {
+                        "type": "noul",
+                        "instructions": "Spam?",
+                    },
+                    "tone": {
+                        "type": "choice",
+                        "instructions": "Tone?",
+                        "criteria": {"friendly": None, "hostile": None},
+                    },
+                    "quality": {
+                        "type": "score",
+                        "instructions": "Quality?",
+                        "criteria": ["bad", "ok", "great"],
+                    },
+                    "spam_obj": {
+                        "type": "noul",
+                        "instructions": "Spam?",
+                    },
+                    "tone_obj": {
+                        "type": "choice",
+                        "instructions": "Tone?",
+                        "criteria": {"friendly": None, "hostile": None},
+                    },
+                    "quality_obj": {
+                        "type": "score",
+                        "instructions": "Quality?",
+                        "criteria": ["bad", "ok", "great"],
+                    },
+                },
+            }
+        ]
     else:
         items = capture_items("transaction")
 
@@ -163,6 +205,46 @@ def test_system_one(
 
         assert span["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "jev-latest"
 
+        assert json.loads(span["data"][SPANDATA.GEN_AI_INPUT_MESSAGES]) == [
+            {
+                "type": "evaluation",
+                "state": {
+                    "subject": "Charged twice this month",
+                    "body": "I see two charges of $49. I only have one account. Please fix this ASAP.",
+                },
+                "questions": {
+                    "spam": {
+                        "type": "noul",
+                        "instructions": "Spam?",
+                    },
+                    "tone": {
+                        "type": "choice",
+                        "instructions": "Tone?",
+                        "criteria": {"friendly": None, "hostile": None},
+                    },
+                    "quality": {
+                        "type": "score",
+                        "instructions": "Quality?",
+                        "criteria": ["bad", "ok", "great"],
+                    },
+                    "spam_obj": {
+                        "type": "noul",
+                        "instructions": "Spam?",
+                    },
+                    "tone_obj": {
+                        "type": "choice",
+                        "instructions": "Tone?",
+                        "criteria": {"friendly": None, "hostile": None},
+                    },
+                    "quality_obj": {
+                        "type": "score",
+                        "instructions": "Quality?",
+                        "criteria": ["bad", "ok", "great"],
+                    },
+                },
+            }
+        ]
+
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("span_streaming", [True, False])
@@ -177,6 +259,7 @@ async def test_system_one_async(
     sentry_init(
         integrations=[TypeSafeIntegration()],
         traces_sample_rate=1.0,
+        send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
         trace_lifecycle="stream" if span_streaming else "static",
     )
@@ -234,6 +317,46 @@ async def test_system_one_async(
         assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "jev-latest"
 
         assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "jev-latest"
+
+        assert json.loads(span["attributes"][SPANDATA.GEN_AI_INPUT_MESSAGES]) == [
+            {
+                "type": "evaluation",
+                "state": {
+                    "subject": "Charged twice this month",
+                    "body": "I see two charges of $49. I only have one account. Please fix this ASAP.",
+                },
+                "questions": {
+                    "spam": {
+                        "type": "noul",
+                        "instructions": "Spam?",
+                    },
+                    "tone": {
+                        "type": "choice",
+                        "instructions": "Tone?",
+                        "criteria": {"friendly": None, "hostile": None},
+                    },
+                    "quality": {
+                        "type": "score",
+                        "instructions": "Quality?",
+                        "criteria": ["bad", "ok", "great"],
+                    },
+                    "spam_obj": {
+                        "type": "noul",
+                        "instructions": "Spam?",
+                    },
+                    "tone_obj": {
+                        "type": "choice",
+                        "instructions": "Tone?",
+                        "criteria": {"friendly": None, "hostile": None},
+                    },
+                    "quality_obj": {
+                        "type": "score",
+                        "instructions": "Quality?",
+                        "criteria": ["bad", "ok", "great"],
+                    },
+                },
+            }
+        ]
     else:
         items = capture_items("transaction")
 
@@ -280,3 +403,43 @@ async def test_system_one_async(
         assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "jev-latest"
 
         assert span["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "jev-latest"
+
+        assert json.loads(span["data"][SPANDATA.GEN_AI_INPUT_MESSAGES]) == [
+            {
+                "type": "evaluation",
+                "state": {
+                    "subject": "Charged twice this month",
+                    "body": "I see two charges of $49. I only have one account. Please fix this ASAP.",
+                },
+                "questions": {
+                    "spam": {
+                        "type": "noul",
+                        "instructions": "Spam?",
+                    },
+                    "tone": {
+                        "type": "choice",
+                        "instructions": "Tone?",
+                        "criteria": {"friendly": None, "hostile": None},
+                    },
+                    "quality": {
+                        "type": "score",
+                        "instructions": "Quality?",
+                        "criteria": ["bad", "ok", "great"],
+                    },
+                    "spam_obj": {
+                        "type": "noul",
+                        "instructions": "Spam?",
+                    },
+                    "tone_obj": {
+                        "type": "choice",
+                        "instructions": "Tone?",
+                        "criteria": {"friendly": None, "hostile": None},
+                    },
+                    "quality_obj": {
+                        "type": "score",
+                        "instructions": "Quality?",
+                        "criteria": ["bad", "ok", "great"],
+                    },
+                },
+            }
+        ]
