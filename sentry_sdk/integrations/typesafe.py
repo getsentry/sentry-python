@@ -303,10 +303,17 @@ def _wrap_system_one(f: "Callable[..., Any]") -> "Callable[..., Any]":
                     SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS, response.usage.output_tokens
                 )
 
-            set_on_span(
-                SPANDATA.GEN_AI_OUTPUT_MESSAGES,
-                json.dumps(_transform_evaluation_answers(response.answers)),
-            )
+            if (
+                has_data_collection_enabled(client.options)
+                and client.options["data_collection"]["gen_ai"]["outputs"]
+            ) or (
+                not has_data_collection_enabled(client.options)
+                and should_send_default_pii()
+            ):
+                set_on_span(
+                    SPANDATA.GEN_AI_OUTPUT_MESSAGES,
+                    json.dumps(_transform_evaluation_answers(response.answers)),
+                )
 
             return response
 
@@ -398,10 +405,17 @@ def _wrap_system_one_async(f: "Callable[..., Any]") -> "Callable[..., Any]":
                     SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS, response.usage.output_tokens
                 )
 
-            set_on_span(
-                SPANDATA.GEN_AI_OUTPUT_MESSAGES,
-                json.dumps(_transform_evaluation_answers(response.answers)),
-            )
+            if (
+                has_data_collection_enabled(client.options)
+                and client.options["data_collection"]["gen_ai"]["outputs"]
+            ) or (
+                not has_data_collection_enabled(client.options)
+                and should_send_default_pii()
+            ):
+                set_on_span(
+                    SPANDATA.GEN_AI_OUTPUT_MESSAGES,
+                    json.dumps(_transform_evaluation_answers(response.answers)),
+                )
 
             return response
 
