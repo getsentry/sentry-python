@@ -238,7 +238,7 @@ def test_profiles_sampler(
 
 @pytest.mark.tests_internal_exceptions
 @mock.patch("sentry_sdk.profiler.transaction_profiler.PROFILE_MINIMUM_SAMPLES", 0)
-def test_profiles_sampler_exception_falls_back_to_profiles_sample_rate(
+def test_profiles_sampler_exception_unsamples(
     sentry_init,
     capture_envelopes,
     teardown_profiling,
@@ -263,8 +263,7 @@ def test_profiles_sampler_exception_falls_back_to_profiles_sample_rate(
             items[item.type].append(item)
 
     assert len(items["transaction"]) == 1
-    # Falls back to profiles_sample_rate=1.0, so profile should be sent
-    assert len(items["profile"]) == 1
+    assert len(items["profile"]) == 0
 
 
 def test_minimum_unique_samples_required(
