@@ -63,9 +63,9 @@ if TYPE_CHECKING:
         name: str
         type: Literal["score"]
         score: float
-        probabilities: dict[str, float]
+        probabilities: dict[int, float]
         confidence: float
-        legend: dict[str, JSONContent]
+        legend: dict[int, Union[str, dict[str, Any], list[Any]]]
 
 
 try:
