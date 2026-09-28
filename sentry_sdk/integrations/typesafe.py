@@ -1,4 +1,5 @@
 import json
+from collections.abc import Mapping
 from functools import wraps
 from typing import TYPE_CHECKING, cast
 
@@ -6,7 +7,11 @@ import sentry_sdk
 from sentry_sdk.ai.utils import get_start_span_function
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration
-from sentry_sdk.tracing_utils import has_span_streaming_enabled
+from sentry_sdk.scope import should_send_default_pii
+from sentry_sdk.tracing_utils import (
+    has_data_collection_enabled,
+    has_span_streaming_enabled,
+)
 
 if TYPE_CHECKING:
     from typing import (
@@ -194,17 +199,27 @@ def _wrap_system_one(f: "Callable[..., Any]") -> "Callable[..., Any]":
 
             state = kwargs.get("state")
             questions = kwargs.get("questions")
-            if state is not None and questions:
-                set_on_span(
-                    SPANDATA.GEN_AI_INPUT_MESSAGES,
-                    json.dumps(
-                        {
-                            "type": "evaluation",
-                            "state": state,
-                            "questions": _transform_questions(questions),
-                        }
-                    ),
+            if isinstance(questions, Mapping) and (
+                (
+                    has_data_collection_enabled(client.options)
+                    and client.options["data_collection"]["gen_ai"]["inputs"]
                 )
+                or (
+                    not has_data_collection_enabled(client.options)
+                    and should_send_default_pii()
+                )
+            ):
+                if state is not None and questions:
+                    set_on_span(
+                        SPANDATA.GEN_AI_INPUT_MESSAGES,
+                        json.dumps(
+                            {
+                                "type": "evaluation",
+                                "state": state,
+                                "questions": _transform_questions(questions),
+                            }
+                        ),
+                    )
 
             response = f(self, *args, **kwargs)
 
@@ -273,17 +288,28 @@ def _wrap_system_one_async(f: "Callable[..., Any]") -> "Callable[..., Any]":
 
             state = kwargs.get("state")
             questions = kwargs.get("questions")
-            if state is not None and questions:
-                set_on_span(
-                    SPANDATA.GEN_AI_INPUT_MESSAGES,
-                    json.dumps(
-                        {
-                            "type": "evaluation",
-                            "state": state,
-                            "questions": _transform_questions(questions),
-                        }
-                    ),
+
+            if isinstance(questions, Mapping) and (
+                (
+                    has_data_collection_enabled(client.options)
+                    and client.options["data_collection"]["gen_ai"]["inputs"]
                 )
+                or (
+                    not has_data_collection_enabled(client.options)
+                    and should_send_default_pii()
+                )
+            ):
+                if state is not None and questions:
+                    set_on_span(
+                        SPANDATA.GEN_AI_INPUT_MESSAGES,
+                        json.dumps(
+                            {
+                                "type": "evaluation",
+                                "state": state,
+                                "questions": _transform_questions(questions),
+                            }
+                        ),
+                    )
 
             response = await f(self, *args, **kwargs)
 

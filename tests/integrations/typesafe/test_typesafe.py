@@ -66,6 +66,7 @@ def test_system_one(
     sentry_init(
         integrations=[TypeSafeIntegration()],
         traces_sample_rate=1.0,
+        send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
         trace_lifecycle="stream" if span_streaming else "static",
     )
@@ -272,6 +273,7 @@ async def test_system_one_async(
     sentry_init(
         integrations=[TypeSafeIntegration()],
         traces_sample_rate=1.0,
+        send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
         trace_lifecycle="stream" if span_streaming else "static",
     )
