@@ -164,6 +164,48 @@ def test_system_one(
                 },
             }
         ]
+
+        assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+            {
+                "type": "evaluation",
+                "answers": {
+                    "spam": {
+                        "type": "noul",
+                        "noul": 0.98,
+                    },
+                    "tone": {
+                        "type": "choice",
+                        "choice": "friendly",
+                        "probabilities": {"friendly": 0.9, "hostile": 0.1},
+                        "confidence": 0.9,
+                    },
+                    "urgency": {
+                        "type": "score",
+                        "score": 1.7,
+                        "probabilities": {"0": 0.1, "1": 0.1, "2": 0.8},
+                        "confidence": 0.8,
+                        "legend": {"0": "can wait", "1": "this week", "2": "today"},
+                    },
+                    "spam_obj": {
+                        "type": "noul",
+                        "noul": 0.98,
+                    },
+                    "tone_obj": {
+                        "type": "choice",
+                        "choice": "friendly",
+                        "probabilities": {"friendly": 0.9, "hostile": 0.1},
+                        "confidence": 0.9,
+                    },
+                    "urgency_obj": {
+                        "type": "score",
+                        "score": 1.7,
+                        "probabilities": {"0": 0.1, "1": 0.1, "2": 0.8},
+                        "confidence": 0.8,
+                        "legend": {"0": "can wait", "1": "this week", "2": "today"},
+                    },
+                },
+            }
+        ]
     else:
         items = capture_items("transaction")
 
@@ -246,6 +288,48 @@ def test_system_one(
                         "type": "score",
                         "instructions": "Quality?",
                         "criteria": ["bad", "ok", "great"],
+                    },
+                },
+            }
+        ]
+
+        assert json.loads(span["data"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+            {
+                "type": "evaluation",
+                "answers": {
+                    "spam": {
+                        "type": "noul",
+                        "noul": 0.98,
+                    },
+                    "tone": {
+                        "type": "choice",
+                        "choice": "friendly",
+                        "probabilities": {"friendly": 0.9, "hostile": 0.1},
+                        "confidence": 0.9,
+                    },
+                    "urgency": {
+                        "type": "score",
+                        "score": 1.7,
+                        "probabilities": {"0": 0.1, "1": 0.1, "2": 0.8},
+                        "confidence": 0.8,
+                        "legend": {"0": "can wait", "1": "this week", "2": "today"},
+                    },
+                    "spam_obj": {
+                        "type": "noul",
+                        "noul": 0.98,
+                    },
+                    "tone_obj": {
+                        "type": "choice",
+                        "choice": "friendly",
+                        "probabilities": {"friendly": 0.9, "hostile": 0.1},
+                        "confidence": 0.9,
+                    },
+                    "urgency_obj": {
+                        "type": "score",
+                        "score": 1.7,
+                        "probabilities": {"0": 0.1, "1": 0.1, "2": 0.8},
+                        "confidence": 0.8,
+                        "legend": {"0": "can wait", "1": "this week", "2": "today"},
                     },
                 },
             }
@@ -366,6 +450,48 @@ async def test_system_one_async(
                 },
             }
         ]
+
+        assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+            {
+                "type": "evaluation",
+                "answers": {
+                    "spam": {
+                        "type": "noul",
+                        "noul": 0.98,
+                    },
+                    "tone": {
+                        "type": "choice",
+                        "choice": "friendly",
+                        "probabilities": {"friendly": 0.9, "hostile": 0.1},
+                        "confidence": 0.9,
+                    },
+                    "urgency": {
+                        "type": "score",
+                        "score": 1.7,
+                        "probabilities": {"0": 0.1, "1": 0.1, "2": 0.8},
+                        "confidence": 0.8,
+                        "legend": {"0": "can wait", "1": "this week", "2": "today"},
+                    },
+                    "spam_obj": {
+                        "type": "noul",
+                        "noul": 0.98,
+                    },
+                    "tone_obj": {
+                        "type": "choice",
+                        "choice": "friendly",
+                        "probabilities": {"friendly": 0.9, "hostile": 0.1},
+                        "confidence": 0.9,
+                    },
+                    "urgency_obj": {
+                        "type": "score",
+                        "score": 1.7,
+                        "probabilities": {"0": 0.1, "1": 0.1, "2": 0.8},
+                        "confidence": 0.8,
+                        "legend": {"0": "can wait", "1": "this week", "2": "today"},
+                    },
+                },
+            }
+        ]
     else:
         items = capture_items("transaction")
 
@@ -451,6 +577,48 @@ async def test_system_one_async(
                         "type": "score",
                         "instructions": "Quality?",
                         "criteria": ["bad", "ok", "great"],
+                    },
+                },
+            }
+        ]
+
+        assert json.loads(span["data"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+            {
+                "type": "evaluation",
+                "answers": {
+                    "spam": {
+                        "type": "noul",
+                        "noul": 0.98,
+                    },
+                    "tone": {
+                        "type": "choice",
+                        "choice": "friendly",
+                        "probabilities": {"friendly": 0.9, "hostile": 0.1},
+                        "confidence": 0.9,
+                    },
+                    "urgency": {
+                        "type": "score",
+                        "score": 1.7,
+                        "probabilities": {"0": 0.1, "1": 0.1, "2": 0.8},
+                        "confidence": 0.8,
+                        "legend": {"0": "can wait", "1": "this week", "2": "today"},
+                    },
+                    "spam_obj": {
+                        "type": "noul",
+                        "noul": 0.98,
+                    },
+                    "tone_obj": {
+                        "type": "choice",
+                        "choice": "friendly",
+                        "probabilities": {"friendly": 0.9, "hostile": 0.1},
+                        "confidence": 0.9,
+                    },
+                    "urgency_obj": {
+                        "type": "score",
+                        "score": 1.7,
+                        "probabilities": {"0": 0.1, "1": 0.1, "2": 0.8},
+                        "confidence": 0.8,
+                        "legend": {"0": "can wait", "1": "this week", "2": "today"},
                     },
                 },
             }
