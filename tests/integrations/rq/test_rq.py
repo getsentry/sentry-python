@@ -7,8 +7,8 @@ from fakeredis import FakeRedis
 import sentry_sdk
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.rq import RqIntegration
-from sentry_sdk.utils import SENSITIVE_DATA_SUBSTITUTE, parse_version
-from tests.integrations.utils import DATA_COLLECTION_QUEUES_CASES_LEGACY
+from sentry_sdk.utils import parse_version
+from tests.integrations.utils import DATA_COLLECTION_QUEUES_CASES
 
 
 @pytest.fixture(autouse=True)
@@ -47,15 +47,13 @@ def do_trick(dog, trick):
     return "{}, can you {}? Good dog!".format(dog, trick)
 
 
-@pytest.mark.parametrize("send_default_pii", [True, False])
 def test_basic(
     sentry_init,
     capture_items,
-    send_default_pii,
 ):
     sentry_init(
         integrations=[RqIntegration()],
-        send_default_pii=send_default_pii,
+        data_collection={},
     )
 
     queue = rq.Queue(connection=FakeRedis())
@@ -73,12 +71,8 @@ def test_basic(
     assert exception["stacktrace"]["frames"][-1]["vars"]["foo"] == "42"
 
     extra = event["extra"]["rq-job"]
-    if send_default_pii:
-        assert extra["args"] == []
-        assert extra["kwargs"] == {"foo": 42}
-    else:
-        assert extra["args"] == SENSITIVE_DATA_SUBSTITUTE
-        assert extra["kwargs"] == SENSITIVE_DATA_SUBSTITUTE
+    assert extra["args"] == []
+    assert extra["kwargs"] == {"foo": 42}
     assert extra["description"] == "tests.integrations.rq.test_rq.crashing_job(foo=42)"
     assert extra["func"] == "tests.integrations.rq.test_rq.crashing_job"
     assert "job_id" in extra
@@ -90,19 +84,19 @@ def test_basic(
 
 
 @pytest.mark.parametrize(
-    "init_kwargs,expected_args,expected_kwargs",
-    DATA_COLLECTION_QUEUES_CASES_LEGACY,
+    "data_collection,expected_args,expected_kwargs",
+    DATA_COLLECTION_QUEUES_CASES,
 )
 def test_job_args_kwargs_data_collection(
     sentry_init,
     capture_items,
-    init_kwargs,
+    data_collection,
     expected_args,
     expected_kwargs,
 ):
     sentry_init(
         integrations=[RqIntegration()],
-        **init_kwargs,
+        data_collection=data_collection,
     )
 
     queue = rq.Queue(connection=FakeRedis())
@@ -130,6 +124,7 @@ def test_transport_shutdown(
 ):
     sentry_init(
         integrations=[RqIntegration()],
+        data_collection={},
     )
 
     queue = rq.Queue(connection=FakeRedis())
@@ -147,16 +142,14 @@ def test_transport_shutdown(
     assert exception["type"] == "ZeroDivisionError"
 
 
-@pytest.mark.parametrize("send_default_pii", [True, False])
 def test_worker_span_with_error(
     sentry_init,
     capture_items,
-    send_default_pii,
 ):
     sentry_init(
         integrations=[RqIntegration()],
         traces_sample_rate=1.0,
-        send_default_pii=send_default_pii,
+        data_collection={},
     )
 
     queue = rq.Queue(connection=FakeRedis())
@@ -201,6 +194,7 @@ def test_error_has_trace_context_if_tracing_disabled(
 ):
     sentry_init(
         integrations=[RqIntegration()],
+        data_collection={},
     )
 
     queue = rq.Queue(connection=FakeRedis())
@@ -222,6 +216,7 @@ def test_tracing_enabled(
     sentry_init(
         integrations=[RqIntegration()],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     queue = rq.Queue(connection=FakeRedis())
@@ -262,6 +257,7 @@ def test_tracing_disabled(
 ):
     sentry_init(
         integrations=[RqIntegration()],
+        data_collection={},
     )
 
     queue = rq.Queue(connection=FakeRedis())
@@ -276,16 +272,14 @@ def test_tracing_disabled(
     assert error_event["contexts"]["trace"]["trace_id"]
 
 
-@pytest.mark.parametrize("send_default_pii", [True, False])
 def test_worker_span_no_error(
     sentry_init,
     capture_items,
-    send_default_pii,
 ):
     sentry_init(
         integrations=[RqIntegration()],
         traces_sample_rate=1.0,
-        send_default_pii=send_default_pii,
+        data_collection={},
     )
 
     queue = rq.Queue(connection=FakeRedis())
@@ -315,6 +309,7 @@ def test_traces_sampler_gets_correct_values_in_sampling_context(
     sentry_init(
         integrations=[RqIntegration()],
         traces_sampler=traces_sampler,
+        data_collection={},
     )
 
     queue = rq.Queue(connection=FakeRedis())
@@ -350,6 +345,7 @@ def test_job_with_retries(
 ):
     sentry_init(
         integrations=[RqIntegration()],
+        data_collection={},
     )
 
     queue = rq.Queue(connection=FakeRedis())
@@ -370,6 +366,7 @@ def test_span_origin(
     sentry_init(
         integrations=[RqIntegration()],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     queue = rq.Queue(connection=FakeRedis())
