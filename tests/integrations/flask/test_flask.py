@@ -380,7 +380,7 @@ def test_flask_session_tracking(sentry_init, capture_envelopes, app):
         except ZeroDivisionError:
             pass
 
-    sentry_sdk.get_client().flush()
+    sentry_sdk.flush()
 
     (first_event, error_event, session) = envelopes
     first_event = first_event.get_event()
@@ -1085,7 +1085,7 @@ def test_response_status_code_ok_in_transaction_context(
     client = app.test_client()
     client.get("/message")
 
-    sentry_sdk.get_client().flush()
+    sentry_sdk.flush()
 
     (_, transaction_envelope, _) = envelopes
     transaction = transaction_envelope.get_transaction_event()
@@ -1112,7 +1112,7 @@ def test_response_status_code_not_found_in_transaction_context(
     client = app.test_client()
     client.get("/not-existing-route")
 
-    sentry_sdk.get_client().flush()
+    sentry_sdk.flush()
 
     (transaction_envelope, _) = envelopes
     transaction = transaction_envelope.get_transaction_event()
