@@ -236,6 +236,37 @@ def test_profiles_sampler(
         assert record_lost_event_calls == [("sample_rate", "profile", None, 1)]
 
 
+@pytest.mark.tests_internal_exceptions
+@mock.patch("sentry_sdk.profiler.transaction_profiler.PROFILE_MINIMUM_SAMPLES", 0)
+def test_profiles_sampler_exception_falls_back_to_profiles_sample_rate(
+    sentry_init,
+    capture_envelopes,
+    teardown_profiling,
+):
+    def bad_sampler(sampling_context):
+        raise ValueError("profiles_sampler error")
+
+    sentry_init(
+        traces_sample_rate=1.0,
+        profiles_sampler=bad_sampler,
+        profiles_sample_rate=1.0,
+    )
+
+    envelopes = capture_envelopes()
+
+    with start_transaction(name="profiling"):
+        pass
+
+    items = defaultdict(list)
+    for envelope in envelopes:
+        for item in envelope.items:
+            items[item.type].append(item)
+
+    assert len(items["transaction"]) == 1
+    # Falls back to profiles_sample_rate=1.0, so profile should be sent
+    assert len(items["profile"]) == 1
+
+
 def test_minimum_unique_samples_required(
     sentry_init,
     capture_envelopes,
