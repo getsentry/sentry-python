@@ -5,12 +5,10 @@ from sentry_sdk import capture_event, get_client
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.integrations._wsgi_common import request_body_within_bounds
 from sentry_sdk.integrations.logging import ignore_logger_for_events
-from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
     event_from_exception,
-    has_data_collection_enabled,
     package_version,
 )
 
@@ -138,32 +136,21 @@ def _make_request_event_processor(data: "GraphQLSchema") -> "EventProcessor":
                 return event
             client_options = sentry_sdk.get_client().options
 
-            if has_data_collection_enabled(client_options):
-                dc_graphql = client_options["data_collection"]["graphql"]
-                collect_variables = dc_graphql["variables"]
-                collect_document = dc_graphql[
-                    "document"
-                ] and request_body_within_bounds(get_client(), content_length)
-
-                if collect_document or collect_variables:
-                    request_info = event.setdefault("request", {})
-                    request_info["api_target"] = "graphql"
-                    request_info["data"] = {
-                        key: value
-                        for key, value in data.items()
-                        if (key != "query" or collect_document)
-                        and (key != "variables" or collect_variables)
-                    }
-                elif event.get("request", {}).get("data"):
-                    del event["request"]["data"]
-
-            elif should_send_default_pii() and request_body_within_bounds(
+            dc_graphql = client_options["data_collection"]["graphql"]
+            collect_variables = dc_graphql["variables"]
+            collect_document = dc_graphql["document"] and request_body_within_bounds(
                 get_client(), content_length
-            ):
+            )
+
+            if collect_document or collect_variables:
                 request_info = event.setdefault("request", {})
                 request_info["api_target"] = "graphql"
-                request_info["data"] = data
-
+                request_info["data"] = {
+                    key: value
+                    for key, value in data.items()
+                    if (key != "query" or collect_document)
+                    and (key != "variables" or collect_variables)
+                }
             elif event.get("request", {}).get("data"):
                 del event["request"]["data"]
 
@@ -178,13 +165,9 @@ def _make_response_event_processor(response: "Dict[str, Any]") -> "EventProcesso
     def inner(event: "Event", hint: "dict[str, Any]") -> "Event":
         client_options = sentry_sdk.get_client().options
         with capture_internal_exceptions():
-            if has_data_collection_enabled(client_options):
-                collect_response = (
-                    "outgoing_response"
-                    in client_options["data_collection"]["http_bodies"]
-                )
-            else:
-                collect_response = should_send_default_pii()
+            collect_response = (
+                "outgoing_response" in client_options["data_collection"]["http_bodies"]
+            )
 
             if collect_response and response.get("errors"):
                 contexts = event.setdefault("contexts", {})

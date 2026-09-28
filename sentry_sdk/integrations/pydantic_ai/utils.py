@@ -19,33 +19,12 @@ if TYPE_CHECKING:
     from pydantic_ai.settings import ModelSettings
 
 
-def _should_send_prompts_legacy() -> bool:
-    """
-    Check if prompts should be sent to Sentry based on the deprecated
-    ``send_default_pii`` option and the ``include_prompts`` integration setting.
-
-    TODO: Remove this once `send_default_pii` is deprecated.
-    """
-    if not should_send_default_pii():
-        return False
-
-    from . import PydanticAIIntegration
-
-    # Get the integration instance from the client
-    integration = sentry_sdk.get_client().get_integration(PydanticAIIntegration)
-
-    if integration is None:
-        return False
-
-    return getattr(integration, "include_prompts", False)
-
-
 def _should_send_inputs() -> bool:
     client = sentry_sdk.get_client()
     if has_data_collection_enabled(client.options):
         return bool(client.options["data_collection"]["gen_ai"]["inputs"])
 
-    return _should_send_prompts_legacy()
+    return should_send_default_pii()
 
 
 def _should_send_outputs() -> bool:
@@ -53,7 +32,7 @@ def _should_send_outputs() -> bool:
     if has_data_collection_enabled(client.options):
         return bool(client.options["data_collection"]["gen_ai"]["outputs"])
 
-    return _should_send_prompts_legacy()
+    return should_send_default_pii()
 
 
 def _set_agent_data(span: "Span", agent: "Optional[Agent]") -> None:

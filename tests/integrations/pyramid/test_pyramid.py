@@ -15,7 +15,7 @@ from sentry_sdk.integrations.pyramid import PyramidIntegration
 from sentry_sdk.serializer import MAX_DATABAG_BREADTH
 from sentry_sdk.traces import SpanStatus
 from tests.conftest import unpack_werkzeug_response
-from tests.integrations.utils import DATA_COLLECTION_USER_INFO_CASES
+from tests.integrations.utils import DATA_COLLECTION_USER_INFO_CASES_LEGACY
 
 
 def hi(request):
@@ -93,7 +93,7 @@ def test_view_exceptions(
 
 
 def test_has_context(route, get_client, sentry_init, capture_events):
-    sentry_init(integrations=[PyramidIntegration()])
+    sentry_init(integrations=[PyramidIntegration()], data_collection={})
     events = capture_events()
 
     @route("/context_message/{msg}")
@@ -110,7 +110,6 @@ def test_has_context(route, get_client, sentry_init, capture_events):
         "env": {"SERVER_NAME": "localhost", "SERVER_PORT": "80"},
         "headers": {"Host": "localhost"},
         "method": "GET",
-        "query_string": "",
         "url": "http://localhost/context_message/yoo",
     }
     assert event["transaction"] == "hi2"
@@ -182,6 +181,7 @@ def test_large_json_request(
         integrations=[PyramidIntegration()],
         max_request_body_size="always",
         max_value_length=max_value_length,
+        data_collection={},
     )
 
     data = {"foo": {"bar": "a" * (1034)}}
@@ -215,7 +215,7 @@ def test_large_json_request(
 
 @pytest.mark.parametrize("data", [{}, []], ids=["empty-dict", "empty-list"])
 def test_flask_empty_json_request(sentry_init, capture_events, route, get_client, data):
-    sentry_init(integrations=[PyramidIntegration()])
+    sentry_init(integrations=[PyramidIntegration()], data_collection={})
 
     @route("/")
     def index(request):
@@ -238,7 +238,11 @@ def test_flask_empty_json_request(sentry_init, capture_events, route, get_client
 def test_json_not_truncated_if_max_request_body_size_is_always(
     sentry_init, capture_events, route, get_client
 ):
-    sentry_init(integrations=[PyramidIntegration()], max_request_body_size="always")
+    sentry_init(
+        integrations=[PyramidIntegration()],
+        max_request_body_size="always",
+        data_collection={},
+    )
 
     data = {
         "key{}".format(i): "value{}".format(i) for i in range(MAX_DATABAG_BREADTH + 10)
@@ -268,6 +272,7 @@ def test_files_and_form(
         integrations=[PyramidIntegration()],
         max_request_body_size="always",
         max_value_length=max_value_length,
+        data_collection={},
     )
 
     data = {
@@ -403,11 +408,11 @@ def test_error_in_authenticated_userid(
     from sentry_sdk.integrations.logging import LoggingIntegration
 
     sentry_init(
-        send_default_pii=True,
         integrations=[
             PyramidIntegration(),
             LoggingIntegration(event_level=logging.ERROR),
         ],
+        data_collection={},
     )
     logger = logging.getLogger("test_pyramid")
 
@@ -531,7 +536,9 @@ def test_span_origin(
     assert segment["attributes"]["sentry.origin"] == "auto.http.pyramid"
 
 
-@pytest.mark.parametrize("init_kwargs, expect_user", DATA_COLLECTION_USER_INFO_CASES)
+@pytest.mark.parametrize(
+    "init_kwargs, expect_user", DATA_COLLECTION_USER_INFO_CASES_LEGACY
+)
 def test_span_sets_user_id_on_segment(
     sentry_init,
     pyramid_config,
@@ -570,7 +577,9 @@ def test_span_sets_user_id_on_segment(
         assert "user.id" not in segment["attributes"]
 
 
-@pytest.mark.parametrize("init_kwargs, expect_user", DATA_COLLECTION_USER_INFO_CASES)
+@pytest.mark.parametrize(
+    "init_kwargs, expect_user", DATA_COLLECTION_USER_INFO_CASES_LEGACY
+)
 def test_user_id_error_event_data_collection(
     sentry_init,
     pyramid_config,
@@ -630,7 +639,7 @@ def test_request_body_data_collection(
 ):
     sentry_init(
         integrations=[PyramidIntegration()],
-        _experiments={"data_collection": data_collection},
+        data_collection=data_collection,
     )
 
     data = {"foo": "bar"}
@@ -659,7 +668,7 @@ def test_request_body_dropped_with_form_and_files_data_collection(
     sentry_init(
         integrations=[PyramidIntegration()],
         max_request_body_size="always",
-        _experiments={"data_collection": {"http_bodies": []}},
+        data_collection={"http_bodies": []},
     )
 
     data = {
@@ -693,7 +702,7 @@ def test_oversized_request_body_not_annotated_data_collection(
     sentry_init(
         integrations=[PyramidIntegration()],
         max_request_body_size="small",
-        _experiments={"data_collection": {"http_bodies": []}},
+        data_collection={"http_bodies": []},
     )
 
     data = "a" * 2000

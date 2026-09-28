@@ -184,7 +184,7 @@ def test_existing_span(sentry_init, capture_items, app):
     client = RequestHandler(app)
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(
+    with sentry_sdk.start_span(
         name="lambda_segment",
         parent_span=None,
         attributes={
@@ -217,7 +217,7 @@ def test_existing_span_error(
     client = RequestHandler(app)
     items = capture_items("event", "span")
 
-    with sentry_sdk.traces.start_span(
+    with sentry_sdk.start_span(
         name="lambda_segment",
         parent_span=None,
         attributes={"sentry.origin": "auto.function.aws_lambda"},

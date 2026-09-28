@@ -350,11 +350,11 @@ def _patch_drf() -> None:
                     if (
                         integration is None
                         or not getattr(self, "authenticators", None)
-                        or sentry_sdk.traces.get_current_span() is None
+                        or sentry_sdk.get_current_span() is None
                     ):
                         return old_drf_authenticate(self)
 
-                    with sentry_sdk.traces.start_span(
+                    with sentry_sdk.start_span(
                         name="authenticate",
                         attributes={
                             "sentry.op": OP.VIEW_AUTHENTICATE,
@@ -831,9 +831,9 @@ def install_sql_hook() -> None:
         with capture_internal_exceptions():
             sentry_sdk.add_breadcrumb(message="connect", category="query")
 
-        if sentry_sdk.traces.get_current_span() is None:
+        if sentry_sdk.get_current_span() is None:
             return real_connect(self)
-        with sentry_sdk.traces.start_span(
+        with sentry_sdk.start_span(
             name="connect",
             attributes={
                 "sentry.op": OP.DB,
@@ -849,10 +849,10 @@ def install_sql_hook() -> None:
         if integration is None or not integration.db_transaction_spans:
             return real_commit(self)
 
-        if sentry_sdk.traces.get_current_span() is None:
+        if sentry_sdk.get_current_span() is None:
             return real_commit(self)
 
-        with sentry_sdk.traces.start_span(
+        with sentry_sdk.start_span(
             name=SPANNAME.DB_COMMIT,
             attributes={
                 "sentry.op": OP.DB,
@@ -868,10 +868,10 @@ def install_sql_hook() -> None:
         if integration is None or not integration.db_transaction_spans:
             return real_rollback(self)
 
-        if sentry_sdk.traces.get_current_span() is None:
+        if sentry_sdk.get_current_span() is None:
             return real_rollback(self)
 
-        with sentry_sdk.traces.start_span(
+        with sentry_sdk.start_span(
             name=SPANNAME.DB_ROLLBACK,
             attributes={
                 "sentry.op": OP.DB,

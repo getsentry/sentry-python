@@ -175,7 +175,7 @@ def set_span_data_for_streaming_response(
                     safe_serialize([accumulated_response["text"]]),
                 )
 
-        elif should_send_default_pii() and integration.include_prompts:
+        elif should_send_default_pii():
             span.set_attribute(
                 SPANDATA.GEN_AI_RESPONSE_TEXT,
                 safe_serialize([accumulated_response["text"]]),

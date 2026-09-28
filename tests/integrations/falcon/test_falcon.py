@@ -68,6 +68,7 @@ def test_has_context(
 ):
     sentry_init(
         integrations=[FalconIntegration()],
+        data_collection={},
     )
 
     client = make_client()
@@ -280,6 +281,7 @@ def test_falcon_large_json_request(
         integrations=[FalconIntegration()],
         max_request_body_size="always",
         max_value_length=max_value_length,
+        data_collection={},
     )
 
     data = {"foo": {"bar": "a" * (1034)}}
@@ -314,13 +316,23 @@ def test_falcon_large_json_request(
 
 
 @pytest.mark.parametrize("data", [{}, []], ids=["empty-dict", "empty-list"])
+@pytest.mark.parametrize(
+    "data_collection, expect_body",
+    [
+        pytest.param({}, True, id="default-http-bodies"),
+        pytest.param({"http_bodies": []}, False, id="no-http-bodies"),
+    ],
+)
 def test_falcon_empty_json_request(
     sentry_init,
     capture_items,
     data,
+    data_collection,
+    expect_body,
 ):
     sentry_init(
         integrations=[FalconIntegration()],
+        data_collection=data_collection,
     )
 
     class Resource:
@@ -340,7 +352,10 @@ def test_falcon_empty_json_request(
     assert response.status == falcon.HTTP_200
 
     (event,) = (item.payload for item in items)
-    assert event["request"]["data"] == data
+    if expect_body:
+        assert event["request"]["data"] == data
+    else:
+        assert "data" not in event["request"]
 
 
 def test_falcon_raw_data_request(
@@ -349,6 +364,7 @@ def test_falcon_raw_data_request(
 ):
     sentry_init(
         integrations=[FalconIntegration()],
+        data_collection={},
     )
 
     class Resource:
@@ -613,6 +629,7 @@ def test_falcon_request_media(sentry_init):
 
     sentry_init(
         integrations=[FalconIntegration()],
+        data_collection={},
     )
 
     try:

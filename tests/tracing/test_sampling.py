@@ -14,10 +14,10 @@ def test_sampling_decided_only_for_segments(sentry_init, capture_events):
         traces_sample_rate=0.5,
     )
 
-    with sentry_sdk.traces.start_span(name="hi") as segment:
+    with sentry_sdk.start_span(name="hi") as segment:
         assert segment.sampled is not None
 
-        with sentry_sdk.traces.start_span(name="hey") as span:
+        with sentry_sdk.start_span(name="hey") as span:
             assert span.sampled == segment.sampled
 
 
@@ -30,7 +30,7 @@ def test_no_double_sampling(sentry_init, capture_items):
     )
     items = capture_items()
 
-    with sentry_sdk.traces.start_span(name="/"):
+    with sentry_sdk.start_span(name="/"):
         pass
 
     sentry_sdk.flush()
@@ -44,15 +44,15 @@ def test_get_span_from_scope_regardless_of_sampling_decision(
 ):
     sentry_init(traces_sample_rate=1.0)
 
-    sentry_sdk.traces.continue_trace(
+    sentry_sdk.continue_trace(
         {
             "sentry-trace": f"0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-{int(sampling_decision)}"
         }
     )
 
-    with sentry_sdk.traces.start_span(name="/"):
-        with sentry_sdk.traces.start_span(name="child-span"):
-            with sentry_sdk.traces.start_span(name="child-child-span"):
+    with sentry_sdk.start_span(name="/"):
+        with sentry_sdk.start_span(name="child-span"):
+            with sentry_sdk.start_span(name="child-child-span"):
                 scope = sentry_sdk.get_current_scope()
                 if sampling_decision is True:
                     assert scope.span.name == "child-child-span"
@@ -75,14 +75,14 @@ def test_uses_traces_sample_rate_correctly(
         traces_sample_rate=traces_sample_rate,
     )
 
-    sentry_sdk.traces.continue_trace(
+    sentry_sdk.continue_trace(
         {
             "sentry-trace": "0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331",
             "baggage": "sentry-sample_rand=0.500000",
         }
     )
 
-    with sentry_sdk.traces.start_span(name="dogpark") as span:
+    with sentry_sdk.start_span(name="dogpark") as span:
         assert span.sampled is expected_decision
 
 
@@ -99,14 +99,14 @@ def test_uses_traces_sampler_return_value_correctly(
         traces_sampler=mock.Mock(return_value=traces_sampler_return_value),
     )
 
-    sentry_sdk.traces.continue_trace(
+    sentry_sdk.continue_trace(
         {
             "sentry-trace": "0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331",
             "baggage": "sentry-sample_rand=0.500000",
         }
     )
 
-    with sentry_sdk.traces.start_span(name="dogpark") as span:
+    with sentry_sdk.start_span(name="dogpark") as span:
         assert span.sampled is expected_decision
 
 
@@ -118,7 +118,7 @@ def test_tolerates_traces_sampler_returning_a_boolean(
         traces_sampler=mock.Mock(return_value=traces_sampler_return_value),
     )
 
-    with sentry_sdk.traces.start_span(name="dogpark") as span:
+    with sentry_sdk.start_span(name="dogpark") as span:
         assert span.sampled is traces_sampler_return_value
 
 
@@ -133,13 +133,13 @@ def test_traces_sampler_raising_falls_back_to_parent_sampling_decision(
         traces_sample_rate=0.0 if parent_sampling_decision else 1.0,
     )
 
-    sentry_sdk.traces.continue_trace(
+    sentry_sdk.continue_trace(
         {
             "sentry-trace": f"0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-{int(parent_sampling_decision)}"
         }
     )
 
-    with sentry_sdk.traces.start_span(name="dogpark") as span:
+    with sentry_sdk.start_span(name="dogpark") as span:
         assert span.sampled is parent_sampling_decision
 
 
@@ -157,14 +157,14 @@ def test_traces_sampler_raising_falls_back_to_traces_sample_rate(
         traces_sample_rate=traces_sample_rate,
     )
 
-    sentry_sdk.traces.continue_trace(
+    sentry_sdk.continue_trace(
         {
             "sentry-trace": "0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331",
             "baggage": "sentry-sample_rand=0.500000",
         }
     )
 
-    with sentry_sdk.traces.start_span(name="dogpark") as span:
+    with sentry_sdk.start_span(name="dogpark") as span:
         assert span.sampled is expected_decision
 
 
@@ -188,7 +188,7 @@ def test_traces_sampler_raising_no_incoming_trace_falls_back_to_traces_sample_ra
         "sentry_sdk.tracing_utils._generate_sample_rand", lambda *a, **kw: 0.5
     )
 
-    with sentry_sdk.traces.start_span(name="dogpark") as span:
+    with sentry_sdk.start_span(name="dogpark") as span:
         assert span.sampled is expected_decision
 
 
@@ -199,7 +199,7 @@ def test_traces_sampler_raising_no_incoming_trace_and_no_traces_sample_rate(
         traces_sampler=mock.Mock(side_effect=ValueError("boom")),
     )
 
-    with sentry_sdk.traces.start_span(name="dogpark") as span:
+    with sentry_sdk.start_span(name="dogpark") as span:
         assert span.sampled is False
 
 
@@ -214,7 +214,7 @@ def test_only_captures_segment_when_sampled_is_true(
     )
     items = capture_items()
 
-    span = sentry_sdk.traces.start_span(name="dogpark")
+    span = sentry_sdk.start_span(name="dogpark")
     span.end()
 
     sentry_sdk.flush()
@@ -238,7 +238,7 @@ def test_prefers_traces_sampler_to_traces_sample_rate(
         traces_sampler=traces_sampler,
     )
 
-    span = sentry_sdk.traces.start_span(name="dogpark")
+    span = sentry_sdk.start_span(name="dogpark")
     assert traces_sampler.called is True
     assert span.sampled is traces_sampler_return_value
 
@@ -254,12 +254,12 @@ def test_ignores_inherited_sample_decision_when_traces_sampler_defined(
         traces_sampler=traces_sampler,
     )
 
-    sentry_sdk.traces.continue_trace(
+    sentry_sdk.continue_trace(
         {
             "sentry-trace": f"0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-{parent_sampling_decision}"
         }
     )
-    span = sentry_sdk.traces.start_span(name="dogpark")
+    span = sentry_sdk.start_span(name="dogpark")
     assert span.sampled is not bool(int(parent_sampling_decision))
 
 
@@ -271,7 +271,7 @@ def test_inherits_parent_sampling_decision_when_traces_sampler_undefined(
         traces_sample_rate=0.5,
     )
 
-    sentry_sdk.traces.continue_trace(
+    sentry_sdk.continue_trace(
         {
             "sentry-trace": f"0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-{parent_sampling_decision}"
         }
@@ -282,7 +282,7 @@ def test_inherits_parent_sampling_decision_when_traces_sampler_undefined(
     # precedence
     mock_random_value = 0.25 if parent_sampling_decision == "0" else 0.75
     with mock.patch.object(random, "random", return_value=mock_random_value):
-        span = sentry_sdk.traces.start_span(name="dogpark")
+        span = sentry_sdk.start_span(name="dogpark")
         assert span.sampled is bool(int(parent_sampling_decision))
 
 
@@ -309,7 +309,7 @@ def test_custom_sampling_context(sentry_init):
         }
     )
 
-    with sentry_sdk.traces.start_span(name="span"):
+    with sentry_sdk.start_span(name="span"):
         ...
 
 
@@ -325,18 +325,18 @@ def test_custom_sampling_context_update_to_context_value_persists(sentry_init):
         traces_sampler=traces_sampler,
     )
 
-    sentry_sdk.traces.new_trace()
+    sentry_sdk.new_trace()
 
     sentry_sdk.get_current_scope().set_custom_sampling_context({"custom_value": 1})
 
-    with sentry_sdk.traces.start_span(name="span", attributes={"first": True}):
+    with sentry_sdk.start_span(name="span", attributes={"first": True}):
         ...
 
-    sentry_sdk.traces.new_trace()
+    sentry_sdk.new_trace()
 
     sentry_sdk.get_current_scope().set_custom_sampling_context({"custom_value": 2})
 
-    with sentry_sdk.traces.start_span(name="span", attributes={"first": False}):
+    with sentry_sdk.start_span(name="span", attributes={"first": False}):
         ...
 
 
@@ -372,7 +372,7 @@ def test_warns_and_sets_sampled_to_false_on_invalid_traces_sampler_return_value(
     )
 
     with mock.patch.object(logger, "warning", mock.Mock()):
-        span = sentry_sdk.traces.start_span(name="dogpark")
+        span = sentry_sdk.start_span(name="dogpark")
         logger.warning.assert_any_call(StringContaining("Given sample rate is invalid"))
         assert span.sampled is False
 
@@ -399,7 +399,7 @@ def test_records_lost_event_only_if_traces_sample_rate_enabled(
     sentry_init(traces_sample_rate=traces_sample_rate)
     record_lost_event_calls = capture_record_lost_event_calls()
 
-    span = sentry_sdk.traces.start_span(name="dogpark")
+    span = sentry_sdk.start_span(name="dogpark")
     assert span.sampled is sampled_output
     span.end()
 
@@ -429,7 +429,7 @@ def test_records_lost_event_only_if_traces_sampler_enabled(
     sentry_init(traces_sampler=traces_sampler)
     record_lost_event_calls = capture_record_lost_event_calls()
 
-    segment = sentry_sdk.traces.start_span(name="dogpark")
+    segment = sentry_sdk.start_span(name="dogpark")
     assert segment.sampled is sampled_output
     segment.end()
 
@@ -447,10 +447,10 @@ def test_unsampled_spans_produce_client_report_if_traces_sample_rate_defined(
     items = capture_items("span")
     record_lost_event_calls = capture_record_lost_event_calls()
 
-    with sentry_sdk.traces.start_span(name="segment"):
-        with sentry_sdk.traces.start_span(name="child1"):
+    with sentry_sdk.start_span(name="segment"):
+        with sentry_sdk.start_span(name="child1"):
             pass
-        with sentry_sdk.traces.start_span(name="child2"):
+        with sentry_sdk.start_span(name="child2"):
             pass
 
     sentry_sdk.get_client().flush()
@@ -475,10 +475,10 @@ def test_unsampled_spans_produce_client_report_if_traces_sampler_defined(
     items = capture_items("span")
     record_lost_event_calls = capture_record_lost_event_calls()
 
-    with sentry_sdk.traces.start_span(name="segment"):
-        with sentry_sdk.traces.start_span(name="child1"):
+    with sentry_sdk.start_span(name="segment"):
+        with sentry_sdk.start_span(name="child1"):
             pass
-        with sentry_sdk.traces.start_span(name="child2"):
+        with sentry_sdk.start_span(name="child2"):
             pass
 
     sentry_sdk.get_client().flush()
@@ -503,10 +503,10 @@ def test_no_client_reports_if_tracing_is_off(
     items = capture_items("span")
     record_lost_event_calls = capture_record_lost_event_calls()
 
-    with sentry_sdk.traces.start_span(name="segment"):
-        with sentry_sdk.traces.start_span(name="child1"):
+    with sentry_sdk.start_span(name="segment"):
+        with sentry_sdk.start_span(name="child1"):
             pass
-        with sentry_sdk.traces.start_span(name="child2"):
+        with sentry_sdk.start_span(name="child2"):
             pass
 
     sentry_sdk.get_client().flush()

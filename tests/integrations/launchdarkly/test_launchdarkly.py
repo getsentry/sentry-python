@@ -208,7 +208,7 @@ def test_launchdarkly_span_integration(
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="bar"):
+    with sentry_sdk.start_span(name="bar"):
         client.variation("hello", Context.create("my-org", "organization"), False)
         client.variation("other", Context.create("my-org", "organization"), False)
 

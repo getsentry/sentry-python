@@ -135,25 +135,19 @@ class MockCompletionResponse:
 
 
 @pytest.mark.parametrize(
-    "send_default_pii, include_prompts",
-    [
-        (True, True),
-        (True, False),
-        (False, True),
-        (False, False),
-    ],
+    "send_default_pii",
+    [True, False],
 )
 def test_nonstreaming_chat_completion(
     reset_litellm_executor,
     sentry_init,
     capture_items,
     send_default_pii,
-    include_prompts,
     get_model_response,
     nonstreaming_chat_completions_model_response,
 ):
     sentry_init(
-        integrations=[LiteLLMIntegration(include_prompts=include_prompts)],
+        integrations=[LiteLLMIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
@@ -214,7 +208,7 @@ def test_nonstreaming_chat_completion(
     assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "openai"
     assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
 
-    if send_default_pii and include_prompts:
+    if send_default_pii:
         assert json.loads(span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]) == [
             {
                 "role": "user",
@@ -234,24 +228,18 @@ def test_nonstreaming_chat_completion(
 
 @pytest.mark.asyncio(loop_scope="session")
 @pytest.mark.parametrize(
-    "send_default_pii, include_prompts",
-    [
-        (True, True),
-        (True, False),
-        (False, True),
-        (False, False),
-    ],
+    "send_default_pii",
+    [True, False],
 )
 async def test_async_nonstreaming_chat_completion(
     sentry_init,
     capture_items,
     send_default_pii,
-    include_prompts,
     get_model_response,
     nonstreaming_chat_completions_model_response,
 ):
     sentry_init(
-        integrations=[LiteLLMIntegration(include_prompts=include_prompts)],
+        integrations=[LiteLLMIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
@@ -313,7 +301,7 @@ async def test_async_nonstreaming_chat_completion(
     assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "openai"
     assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
 
-    if send_default_pii and include_prompts:
+    if send_default_pii:
         assert json.loads(span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]) == [
             {
                 "role": "user",
@@ -332,26 +320,20 @@ async def test_async_nonstreaming_chat_completion(
 
 
 @pytest.mark.parametrize(
-    "send_default_pii, include_prompts",
-    [
-        (True, True),
-        (True, False),
-        (False, True),
-        (False, False),
-    ],
+    "send_default_pii",
+    [True, False],
 )
 def test_streaming_chat_completion(
     reset_litellm_executor,
     sentry_init,
     capture_items,
     send_default_pii,
-    include_prompts,
     get_model_response,
     server_side_event_chunks,
     streaming_chat_completions_model_response,
 ):
     sentry_init(
-        integrations=[LiteLLMIntegration(include_prompts=include_prompts)],
+        integrations=[LiteLLMIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
@@ -406,26 +388,20 @@ def test_streaming_chat_completion(
 
 @pytest.mark.asyncio(loop_scope="session")
 @pytest.mark.parametrize(
-    "send_default_pii, include_prompts",
-    [
-        (True, True),
-        (True, False),
-        (False, True),
-        (False, False),
-    ],
+    "send_default_pii",
+    [True, False],
 )
 async def test_async_streaming_chat_completion(
     sentry_init,
     capture_items,
     send_default_pii,
-    include_prompts,
     get_model_response,
     async_iterator,
     server_side_event_chunks,
     streaming_chat_completions_model_response,
 ):
     sentry_init(
-        integrations=[LiteLLMIntegration(include_prompts=include_prompts)],
+        integrations=[LiteLLMIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
@@ -495,7 +471,7 @@ def test_embeddings_create(
     to ensure proper integration testing.
     """
     sentry_init(
-        integrations=[LiteLLMIntegration(include_prompts=True)],
+        integrations=[LiteLLMIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
@@ -565,7 +541,7 @@ async def test_async_embeddings_create(
     to ensure proper integration testing.
     """
     sentry_init(
-        integrations=[LiteLLMIntegration(include_prompts=True)],
+        integrations=[LiteLLMIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
@@ -630,7 +606,7 @@ def test_embeddings_create_with_list_input(
 ):
     """Test embedding with list input."""
     sentry_init(
-        integrations=[LiteLLMIntegration(include_prompts=True)],
+        integrations=[LiteLLMIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
@@ -694,7 +670,7 @@ async def test_async_embeddings_create_with_list_input(
 ):
     """Test embedding with list input."""
     sentry_init(
-        integrations=[LiteLLMIntegration(include_prompts=True)],
+        integrations=[LiteLLMIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
@@ -757,7 +733,7 @@ def test_embeddings_no_pii(
 ):
     """Test that PII is not captured when disabled."""
     sentry_init(
-        integrations=[LiteLLMIntegration(include_prompts=True)],
+        integrations=[LiteLLMIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=False,  # PII disabled
@@ -813,7 +789,7 @@ async def test_async_embeddings_no_pii(
 ):
     """Test that PII is not captured when disabled."""
     sentry_init(
-        integrations=[LiteLLMIntegration(include_prompts=True)],
+        integrations=[LiteLLMIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=False,  # PII disabled
@@ -1515,7 +1491,7 @@ def test_binary_content_encoding_image_url(
     nonstreaming_chat_completions_model_response,
 ):
     sentry_init(
-        integrations=[LiteLLMIntegration(include_prompts=True)],
+        integrations=[LiteLLMIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
@@ -1605,7 +1581,7 @@ async def test_async_binary_content_encoding_image_url(
     nonstreaming_chat_completions_model_response,
 ):
     sentry_init(
-        integrations=[LiteLLMIntegration(include_prompts=True)],
+        integrations=[LiteLLMIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
@@ -1696,7 +1672,7 @@ def test_binary_content_encoding_mixed_content(
     nonstreaming_chat_completions_model_response,
 ):
     sentry_init(
-        integrations=[LiteLLMIntegration(include_prompts=True)],
+        integrations=[LiteLLMIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
@@ -1775,7 +1751,7 @@ async def test_async_binary_content_encoding_mixed_content(
     nonstreaming_chat_completions_model_response,
 ):
     sentry_init(
-        integrations=[LiteLLMIntegration(include_prompts=True)],
+        integrations=[LiteLLMIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
@@ -1855,7 +1831,7 @@ def test_binary_content_encoding_uri_type(
     nonstreaming_chat_completions_model_response,
 ):
     sentry_init(
-        integrations=[LiteLLMIntegration(include_prompts=True)],
+        integrations=[LiteLLMIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
@@ -1938,7 +1914,7 @@ async def test_async_binary_content_encoding_uri_type(
     nonstreaming_chat_completions_model_response,
 ):
     sentry_init(
-        integrations=[LiteLLMIntegration(include_prompts=True)],
+        integrations=[LiteLLMIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
@@ -2116,11 +2092,10 @@ def test_convert_message_parts_image_url_missing_url():
 
 
 @pytest.mark.parametrize(
-    "data_collection, send_default_pii, include_prompts, expected_present, expected_absent",
+    "data_collection, send_default_pii, expected_present, expected_absent",
     [
         pytest.param(
             {"gen_ai": {"inputs": True, "outputs": True}},
-            False,
             False,
             [SPANDATA.GEN_AI_REQUEST_MESSAGES, SPANDATA.GEN_AI_RESPONSE_TEXT],
             [],
@@ -2129,14 +2104,12 @@ def test_convert_message_parts_image_url_missing_url():
         pytest.param(
             {"gen_ai": {"inputs": False, "outputs": False}},
             True,
-            True,
             [],
             [SPANDATA.GEN_AI_REQUEST_MESSAGES, SPANDATA.GEN_AI_RESPONSE_TEXT],
             id="gen-ai-inputs-and-outputs-disabled-override-legacy-on",
         ),
         pytest.param(
             {"gen_ai": {"inputs": True, "outputs": False}},
-            False,
             False,
             [SPANDATA.GEN_AI_REQUEST_MESSAGES],
             [SPANDATA.GEN_AI_RESPONSE_TEXT],
@@ -2145,14 +2118,12 @@ def test_convert_message_parts_image_url_missing_url():
         pytest.param(
             {"gen_ai": {"inputs": False, "outputs": True}},
             False,
-            False,
             [SPANDATA.GEN_AI_RESPONSE_TEXT],
             [SPANDATA.GEN_AI_REQUEST_MESSAGES],
             id="gen-ai-outputs-enabled-inputs-disabled",
         ),
         pytest.param(
             {"gen_ai": {}},
-            False,
             False,
             [SPANDATA.GEN_AI_REQUEST_MESSAGES, SPANDATA.GEN_AI_RESPONSE_TEXT],
             [],
@@ -2161,15 +2132,13 @@ def test_convert_message_parts_image_url_missing_url():
         pytest.param(
             None,
             True,
-            True,
             [SPANDATA.GEN_AI_REQUEST_MESSAGES, SPANDATA.GEN_AI_RESPONSE_TEXT],
             [],
-            id="no-gen-ai-config-legacy-pii-and-include-prompts-enabled",
+            id="no-gen-ai-config-legacy-pii",
         ),
         pytest.param(
             None,
             False,
-            True,
             [],
             [SPANDATA.GEN_AI_REQUEST_MESSAGES, SPANDATA.GEN_AI_RESPONSE_TEXT],
             id="no-gen-ai-config-legacy-pii-disabled",
@@ -2184,18 +2153,17 @@ def test_chat_completion_data_collection(
     nonstreaming_chat_completions_model_response,
     data_collection,
     send_default_pii,
-    include_prompts,
     expected_present,
     expected_absent,
 ):
     sentry_init_kwargs = dict(
-        integrations=[LiteLLMIntegration(include_prompts=include_prompts)],
+        integrations=[LiteLLMIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
     )
     if data_collection is not None:
-        sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
+        sentry_init_kwargs["data_collection"] = data_collection
 
     sentry_init(**sentry_init_kwargs)
 
@@ -2266,11 +2234,10 @@ def test_chat_completion_data_collection(
 
 
 @pytest.mark.parametrize(
-    "data_collection, send_default_pii, include_prompts, should_collect_input",
+    "data_collection, send_default_pii, should_collect_input",
     [
         pytest.param(
             {"gen_ai": {"inputs": True}},
-            False,
             False,
             True,
             id="gen-ai-inputs-enabled-override-legacy-off",
@@ -2278,13 +2245,11 @@ def test_chat_completion_data_collection(
         pytest.param(
             {"gen_ai": {"inputs": False}},
             True,
-            True,
             False,
             id="gen-ai-inputs-disabled-override-legacy-on",
         ),
         pytest.param(
             {"gen_ai": {}},
-            False,
             False,
             True,
             id="gen-ai-inputs-omitted-default-to-enabled",
@@ -2293,13 +2258,11 @@ def test_chat_completion_data_collection(
             None,
             True,
             True,
-            True,
-            id="no-gen-ai-config-legacy-pii-and-include-prompts-enabled",
+            id="no-gen-ai-config-legacy-pii",
         ),
         pytest.param(
             None,
             False,
-            True,
             False,
             id="no-gen-ai-config-legacy-pii-disabled",
         ),
@@ -2312,17 +2275,16 @@ def test_embeddings_data_collection(
     openai_embedding_model_response,
     data_collection,
     send_default_pii,
-    include_prompts,
     should_collect_input,
 ):
     sentry_init_kwargs = dict(
-        integrations=[LiteLLMIntegration(include_prompts=include_prompts)],
+        integrations=[LiteLLMIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
     )
     if data_collection is not None:
-        sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
+        sentry_init_kwargs["data_collection"] = data_collection
 
     sentry_init(**sentry_init_kwargs)
 

@@ -32,7 +32,7 @@ from sentry_sdk import (
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.logging import LoggingIntegration
 from sentry_sdk.serializer import MAX_DATABAG_BREADTH
-from tests.integrations.utils import DATA_COLLECTION_USER_INFO_CASES
+from tests.integrations.utils import DATA_COLLECTION_USER_INFO_CASES_LEGACY
 
 # Query string used across the query-param filtering tests below. ``auth`` is a
 # built-in sensitive term, so it is redacted by the default denylist.
@@ -1093,27 +1093,21 @@ def test_segment_http_method_custom(
             id="legacy_send_default_pii_false",
         ),
         pytest.param(
-            {"_experiments": {"data_collection": {}}},
+            {"data_collection": {}},
             "toy=tennisball&color=red&auth=%5BFiltered%5D",
             id="data_collection_denylist_default",
         ),
         pytest.param(
             {
-                "_experiments": {
-                    "data_collection": {
-                        "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
-                    }
+                "data_collection": {
+                    "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
                 }
             },
             "toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D",
             id="data_collection_allowlist",
         ),
         pytest.param(
-            {
-                "_experiments": {
-                    "data_collection": {"url_query_params": {"mode": "off"}}
-                }
-            },
+            {"data_collection": {"url_query_params": {"mode": "off"}}},
             None,
             id="data_collection_off",
         ),
@@ -1159,27 +1153,21 @@ def test_query_string_data_collection(
             id="legacy_send_default_pii_false",
         ),
         pytest.param(
-            {"_experiments": {"data_collection": {}}},
+            {"data_collection": {}},
             "toy=tennisball&color=red&auth=%5BFiltered%5D",
             id="data_collection_denylist_default",
         ),
         pytest.param(
             {
-                "_experiments": {
-                    "data_collection": {
-                        "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
-                    }
+                "data_collection": {
+                    "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
                 }
             },
             "toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D",
             id="data_collection_allowlist",
         ),
         pytest.param(
-            {
-                "_experiments": {
-                    "data_collection": {"url_query_params": {"mode": "off"}}
-                }
-            },
+            {"data_collection": {"url_query_params": {"mode": "off"}}},
             None,
             id="data_collection_off",
         ),
@@ -1235,7 +1223,7 @@ def test_empty_query_string_is_dropped_with_data_collection(
 ):
     sentry_init(
         integrations=[flask_sentry.FlaskIntegration()],
-        _experiments={"data_collection": {}},
+        data_collection={},
     )
     events = capture_events()
 
@@ -1246,17 +1234,15 @@ def test_empty_query_string_is_dropped_with_data_collection(
     assert "query_string" not in event["request"]
 
 
-@pytest.mark.parametrize("init_kwargs, expect_ip", DATA_COLLECTION_USER_INFO_CASES)
+@pytest.mark.parametrize(
+    "init_kwargs, expect_ip", DATA_COLLECTION_USER_INFO_CASES_LEGACY
+)
 def test_user_info_span_attributes_data_collection(
     sentry_init, app, capture_items, monkeypatch, init_kwargs, expect_ip
 ):
-    init_kwargs = dict(init_kwargs)  # shallow copy so we can mutate
-    experiments = init_kwargs.pop("_experiments", {})
-
     sentry_init(
         integrations=[flask_sentry.FlaskIntegration()],
         traces_sample_rate=1.0,
-        _experiments=experiments,
         **init_kwargs,
     )
     # This test is about user IP collection, not flask_login. Disable
@@ -1281,7 +1267,9 @@ def test_user_info_span_attributes_data_collection(
         assert "client.address" not in segment["attributes"]
 
 
-@pytest.mark.parametrize("init_kwargs, expect_ip", DATA_COLLECTION_USER_INFO_CASES)
+@pytest.mark.parametrize(
+    "init_kwargs, expect_ip", DATA_COLLECTION_USER_INFO_CASES_LEGACY
+)
 def test_user_info_error_event_data_collection(
     sentry_init, app, capture_events, monkeypatch, init_kwargs, expect_ip
 ):
@@ -1313,7 +1301,7 @@ def test_error_event_no_user_ip_address_without_remote_addr(
 ):
     sentry_init(
         integrations=[flask_sentry.FlaskIntegration()],
-        _experiments={"data_collection": {"user_info": True}},
+        data_collection={"user_info": True},
     )
     monkeypatch.setattr(flask_sentry, "flask_login", None)
 
@@ -1332,7 +1320,9 @@ def test_error_event_no_user_ip_address_without_remote_addr(
     assert "ip_address" not in event.get("user", {})
 
 
-@pytest.mark.parametrize("init_kwargs, expect_user", DATA_COLLECTION_USER_INFO_CASES)
+@pytest.mark.parametrize(
+    "init_kwargs, expect_user", DATA_COLLECTION_USER_INFO_CASES_LEGACY
+)
 def test_flask_login_user_identity_error_event_data_collection(
     sentry_init, app, capture_events, init_kwargs, expect_user
 ):
@@ -1380,17 +1370,15 @@ def test_flask_login_user_identity_error_event_data_collection(
         assert "username" not in user
 
 
-@pytest.mark.parametrize("init_kwargs, expect_user", DATA_COLLECTION_USER_INFO_CASES)
+@pytest.mark.parametrize(
+    "init_kwargs, expect_user", DATA_COLLECTION_USER_INFO_CASES_LEGACY
+)
 def test_flask_login_user_identity_span_attributes_data_collection(
     sentry_init, app, capture_items, init_kwargs, expect_user
 ):
-    init_kwargs = dict(init_kwargs)
-    experiments = init_kwargs.pop("_experiments", {})
-
     sentry_init(
         integrations=[flask_sentry.FlaskIntegration()],
         traces_sample_rate=1.0,
-        _experiments=experiments,
         **init_kwargs,
     )
 
@@ -1457,7 +1445,7 @@ def test_flask_request_body_data_collection(
 ):
     sentry_init(
         integrations=[flask_sentry.FlaskIntegration()],
-        _experiments={"data_collection": data_collection},
+        data_collection=data_collection,
     )
     # This test is about request body gating, not user data.
     monkeypatch.setattr(flask_sentry, "flask_login", None)
@@ -1488,7 +1476,7 @@ def test_flask_request_body_dropped_with_form_and_files_data_collection(
     sentry_init(
         integrations=[flask_sentry.FlaskIntegration()],
         max_request_body_size="always",
-        _experiments={"data_collection": {"http_bodies": []}},
+        data_collection={"http_bodies": []},
     )
     monkeypatch.setattr(flask_sentry, "flask_login", None)
 
@@ -1525,7 +1513,7 @@ def test_flask_oversized_request_body_not_annotated_data_collection(
     sentry_init(
         integrations=[flask_sentry.FlaskIntegration()],
         max_request_body_size="small",
-        _experiments={"data_collection": {"http_bodies": []}},
+        data_collection={"http_bodies": []},
     )
     monkeypatch.setattr(flask_sentry, "flask_login", None)
 

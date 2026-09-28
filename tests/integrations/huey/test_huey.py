@@ -10,7 +10,7 @@ from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.huey import HueyIntegration
 from sentry_sdk.traces import SegmentNameSource, SpanStatus
 from sentry_sdk.utils import parse_version
-from tests.integrations.utils import DATA_COLLECTION_QUEUES_CASES
+from tests.integrations.utils import DATA_COLLECTION_QUEUES_CASES_LEGACY
 
 HUEY_VERSION = parse_version(HUEY_VERSION)
 
@@ -205,7 +205,7 @@ def test_task_lock(capture_items, init_huey, lock_name):
 
 @pytest.mark.parametrize(
     "init_kwargs,expected_args,expected_kwargs",
-    DATA_COLLECTION_QUEUES_CASES,
+    DATA_COLLECTION_QUEUES_CASES_LEGACY,
 )
 def test_task_args_kwargs_data_collection(
     capture_items,
@@ -245,7 +245,7 @@ def test_huey_enqueue(init_huey, capture_items):
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="test"):
+    with sentry_sdk.start_span(name="test"):
         dummy_task()
 
     sentry_sdk.get_client().flush()
@@ -275,7 +275,7 @@ def test_huey_propagate_trace(init_huey, capture_items):
     def propagated_trace_task():
         pass
 
-    with sentry_sdk.traces.start_span(name="producer"):
+    with sentry_sdk.start_span(name="producer"):
         execute_huey_task(huey, propagated_trace_task)
 
     sentry_sdk.get_client().flush()
@@ -302,7 +302,7 @@ def test_span_origin_producer(init_huey, capture_items):
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="test"):
+    with sentry_sdk.start_span(name="test"):
         dummy_task()
 
     sentry_sdk.get_client().flush()
@@ -356,7 +356,7 @@ def test_huey_enqueue_group(init_huey, capture_items):
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="submission"):
+    with sentry_sdk.start_span(name="submission"):
         huey.enqueue(group([task1.s(), task2.s()]))
 
     for _ in range(2):
@@ -443,7 +443,7 @@ def test_huey_enqueue_chord(init_huey, capture_items):
         pass
 
     items = capture_items("span")
-    with sentry_sdk.traces.start_span(name="submission"):
+    with sentry_sdk.start_span(name="submission"):
         huey.enqueue(chord([task1.s()], task2.s()))
 
     for _ in range(2):

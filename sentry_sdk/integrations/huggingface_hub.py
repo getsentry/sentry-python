@@ -36,11 +36,6 @@ class HuggingfaceHubIntegration(Integration):
     identifier = "huggingface_hub"
     origin = f"auto.ai.{identifier}"
 
-    def __init__(
-        self: "HuggingfaceHubIntegration", include_prompts: bool = True
-    ) -> None:
-        self.include_prompts = include_prompts
-
     @staticmethod
     def setup_once() -> None:
         version = parse_version(HUGGINGFACE_HUB_VERSION)
@@ -95,7 +90,7 @@ def _wrap_huggingface_task(f: "Callable[..., Any]", op: str) -> "Callable[..., A
         model = hf_client.model or kwargs.get("model") or ""
         operation_name = op.split(".")[-1]
 
-        span = sentry_sdk.traces.start_span(
+        span = sentry_sdk.start_span(
             name=f"{operation_name} {model}",
             attributes={
                 "sentry.op": op,
@@ -131,7 +126,7 @@ def _wrap_huggingface_task(f: "Callable[..., Any]", op: str) -> "Callable[..., A
                 set_data_normalized(
                     span, SPANDATA.GEN_AI_REQUEST_MESSAGES, prompt, unpack=False
                 )
-        elif should_send_default_pii() and integration.include_prompts:
+        elif should_send_default_pii():
             set_data_normalized(
                 span, SPANDATA.GEN_AI_REQUEST_MESSAGES, prompt, unpack=False
             )
@@ -219,7 +214,7 @@ def _wrap_huggingface_task(f: "Callable[..., Any]", op: str) -> "Callable[..., A
                             tool_calls,
                             unpack=False,
                         )
-                elif should_send_default_pii() and integration.include_prompts:
+                elif should_send_default_pii():
                     set_data_normalized(
                         span,
                         SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
@@ -237,7 +232,7 @@ def _wrap_huggingface_task(f: "Callable[..., Any]", op: str) -> "Callable[..., A
                                 SPANDATA.GEN_AI_RESPONSE_TEXT,
                                 text_response,
                             )
-                    elif should_send_default_pii() and integration.include_prompts:
+                    elif should_send_default_pii():
                         set_data_normalized(
                             span,
                             SPANDATA.GEN_AI_RESPONSE_TEXT,
@@ -304,7 +299,7 @@ def _wrap_huggingface_task(f: "Callable[..., Any]", op: str) -> "Callable[..., A
                         if has_data_collection_enabled(client.options):
                             if client.options["data_collection"]["gen_ai"]["outputs"]:
                                 should_set_response_text = True
-                        elif should_send_default_pii() and integration.include_prompts:
+                        elif should_send_default_pii():
                             should_set_response_text = True
 
                         if should_set_response_text:
@@ -397,10 +392,7 @@ def _wrap_huggingface_task(f: "Callable[..., Any]", op: str) -> "Callable[..., A
                                         tool_calls,
                                         unpack=False,
                                     )
-                            elif (
-                                should_send_default_pii()
-                                and integration.include_prompts
-                            ):
+                            elif should_send_default_pii():
                                 set_data_normalized(
                                     span,
                                     SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
@@ -420,10 +412,7 @@ def _wrap_huggingface_task(f: "Callable[..., Any]", op: str) -> "Callable[..., A
                                             SPANDATA.GEN_AI_RESPONSE_TEXT,
                                             text_response,
                                         )
-                                elif (
-                                    should_send_default_pii()
-                                    and integration.include_prompts
-                                ):
+                                elif should_send_default_pii():
                                     set_data_normalized(
                                         span,
                                         SPANDATA.GEN_AI_RESPONSE_TEXT,

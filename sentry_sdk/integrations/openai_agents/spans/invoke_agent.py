@@ -24,7 +24,7 @@ def invoke_agent_span(
 ) -> "Span":
     client_options = sentry_sdk.get_client().options
 
-    span = sentry_sdk.traces.start_span(
+    span = sentry_sdk.start_span(
         name=f"invoke_agent {agent.name}",
         attributes={
             "sentry.op": OP.GEN_AI_INVOKE_AGENT,

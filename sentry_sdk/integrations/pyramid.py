@@ -8,13 +8,11 @@ from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.integrations._wsgi_common import RequestExtractor
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
-from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import SOURCE_FOR_STYLE as SEGMENT_SOURCE_FOR_STYLE
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
     event_from_exception,
-    has_data_collection_enabled,
     package_version,
     reraise,
 )
@@ -92,12 +90,7 @@ class PyramidIntegration(Integration):
 
             scope = sentry_sdk.get_isolation_scope()
 
-            if has_data_collection_enabled(client.options):
-                if client.options["data_collection"]["user_info"]:
-                    user_id = request.authenticated_userid
-                    if user_id:
-                        scope.set_user({"id": user_id})
-            elif should_send_default_pii():
+            if client.options["data_collection"]["user_info"]:
                 user_id = request.authenticated_userid
                 if user_id:
                     scope.set_user({"id": user_id})
@@ -233,12 +226,8 @@ def _make_event_processor(
             PyramidRequestExtractor(request).extract_into_event(event)
 
         client_options = sentry_sdk.get_client().options
-        if has_data_collection_enabled(client_options):
-            if client_options["data_collection"]["user_info"]:
-                with capture_internal_exceptions():
-                    user_info = event.setdefault("user", {})
-                    user_info.setdefault("id", request.authenticated_userid)
-        elif should_send_default_pii():
+
+        if client_options["data_collection"]["user_info"]:
             with capture_internal_exceptions():
                 user_info = event.setdefault("user", {})
                 user_info.setdefault("id", request.authenticated_userid)

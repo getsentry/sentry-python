@@ -207,7 +207,7 @@ def patch_get_request_handler() -> None:
 
             @wraps(old_call)
             def _sentry_call(*args: "Any", **kwargs: "Any") -> "Any":
-                current_span = sentry_sdk.traces.get_current_span()
+                current_span = sentry_sdk.get_current_span()
 
                 if type(current_span) is Span:
                     segment = current_span._segment

@@ -250,7 +250,7 @@ def test_non_dict_event(
     assert segment_spans[0]["status"] == "error"
 
 
-def test_request_data_with_send_default_pii_false(lambda_client, test_environment):
+def test_request_data_with_default_data_collection(lambda_client, test_environment):
     payload = b"""
         {
           "resource": "/asd",
@@ -290,8 +290,7 @@ def test_request_data_with_send_default_pii_false(lambda_client, test_environmen
     attrs = segment_spans[0]["attributes"]
 
     assert _get_span_attr(attrs, "http.request.method") == "GET"
-    # With send_default_pii=False (default for layer), query string is not included.
-    assert "url.query" not in attrs
+    assert _get_span_attr(attrs, "url.query") == "bonkers=true"
 
 
 USER_INFO_PAYLOAD = b"""
@@ -827,7 +826,7 @@ def test_request_attributes(lambda_client, test_environment):
     }
 
     lambda_client.invoke(
-        FunctionName="BasicOkSpanStreamingPii",
+        FunctionName="BasicOkSpanStreamingDataCollection",
         Payload=json.dumps(payload),
     )
     span_items = test_environment["server"].span_items
@@ -846,14 +845,14 @@ def test_request_attributes(lambda_client, test_environment):
         _get_span_attr(attrs, "http.request.header.content-type") == "application/json"
     )
     assert _get_span_attr(attrs, "http.request.header.accept") == "text/html"
-    assert _get_span_attr(attrs, "faas.name") == "BasicOkSpanStreamingPii"
+    assert _get_span_attr(attrs, "faas.name") == "BasicOkSpanStreamingDataCollection"
     assert _get_span_attr(attrs, "cloud.provider") == "aws"
     assert _get_span_attr(attrs, "cloud.platform") == "aws_lambda"
     assert _get_span_attr(attrs, "cloud.region") == "us-east-1"
     assert _get_span_attr(attrs, "faas.version") == "$LATEST"
     assert "faas.invocation_id" in attrs
     assert _get_span_attr(attrs, "aws.log.group.names") == [
-        "aws/lambda/BasicOkSpanStreamingPii"
+        "aws/lambda/BasicOkSpanStreamingDataCollection"
     ]
     assert _get_span_attr(attrs, "aws.log.stream.names") == ["$LATEST"]
 
@@ -886,46 +885,6 @@ def test_url_query_params_with_data_collection(lambda_client, test_environment):
         _get_span_attr(attrs, "url.query")
         == "page=2&tracking=%5BFiltered%5D&token=%5BFiltered%5D"
     )
-
-
-def test_user_info_with_send_default_pii(lambda_client, test_environment):
-    payload = b"""
-        {
-          "resource": "/asd",
-          "path": "/asd",
-          "httpMethod": "GET",
-          "headers": {
-            "Host": "iwsz2c7uwi.execute-api.us-east-1.amazonaws.com",
-            "User-Agent": "custom",
-            "X-Forwarded-Proto": "https"
-          },
-          "queryStringParameters": {
-            "bonkers": "true"
-          },
-          "pathParameters": null,
-          "stageVariables": null,
-          "requestContext": {
-            "identity": {
-                "sourceIp": "213.47.147.207",
-                "userArn": "42"
-            }
-          },
-          "body": null,
-          "isBase64Encoded": false
-        }
-    """
-
-    lambda_client.invoke(
-        FunctionName="BasicOkSpanStreamingPii",
-        Payload=payload,
-    )
-    span_items = test_environment["server"].span_items
-
-    segment_spans = [s for s in span_items if s.get("is_segment")]
-    assert len(segment_spans) == 1
-    attrs = segment_spans[0]["attributes"]
-
-    assert _get_span_attr(attrs, "user.id") == "42"
 
 
 def test_user_info_with_data_collection_user_info_off(lambda_client, test_environment):

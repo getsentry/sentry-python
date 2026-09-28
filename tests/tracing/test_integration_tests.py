@@ -17,12 +17,12 @@ def test_basic(sentry_init, capture_items, sample_rate):
     sentry_init(traces_sample_rate=sample_rate)
     items = capture_items()
 
-    with sentry_sdk.traces.start_span(name="hi"):
+    with sentry_sdk.start_span(name="hi"):
         with pytest.raises(ZeroDivisionError):
-            with sentry_sdk.traces.start_span(name="foo"):
+            with sentry_sdk.start_span(name="foo"):
                 1 / 0
 
-        with sentry_sdk.traces.start_span(name="bar"):
+        with sentry_sdk.start_span(name="bar"):
             pass
 
     sentry_sdk.flush()
@@ -51,7 +51,7 @@ def test_error_event_linked_without_performance(sentry_init, capture_items):
     sentry_init(traces_sample_rate=None)
     items = capture_items("event")
 
-    with sentry_sdk.traces.start_span(
+    with sentry_sdk.start_span(
         name="no-op span",
         attributes={"sentry.segment.name.source": "custom segment source"},
     ):
@@ -103,10 +103,10 @@ def test_continue_trace(sentry_init, capture_items, parent_sampled, sample_rate)
         ),
     }
 
-    sentry_sdk.traces.continue_trace(headers)
+    sentry_sdk.continue_trace(headers)
 
     # child segment, to prove that we can read 'sentry-trace' header data correctly
-    with sentry_sdk.traces.start_span(name="WRONG") as child_segment:
+    with sentry_sdk.start_span(name="WRONG") as child_segment:
         assert child_segment is not None
         assert child_segment._parent_sampled == parent_sampled
         assert child_segment.trace_id == trace_id
@@ -198,12 +198,12 @@ def test_dynamic_sampling_head_sdk_creates_dsc(
 
     # make sure segment is sampled for both cases
     with mock.patch("sentry_sdk.tracing_utils.Random.randrange", return_value=250000):
-        sentry_sdk.traces.new_trace()
-        with sentry_sdk.traces.start_span(name="Head SDK segment") as segment:
+        sentry_sdk.new_trace()
+        with sentry_sdk.start_span(name="Head SDK segment") as segment:
             baggage = segment._baggage
             assert baggage is None
 
-            with sentry_sdk.traces.start_span(name="foo"):
+            with sentry_sdk.start_span(name="foo"):
                 pass
 
     sentry_sdk.flush()
@@ -257,9 +257,9 @@ def test_memory_usage(sentry_init, capture_events, args):
 
     references = weakref.WeakSet()
 
-    with sentry_sdk.traces.start_span(name="hi"):
+    with sentry_sdk.start_span(name="hi"):
         for i in range(100):
-            with sentry_sdk.traces.start_span(name=f"hi {i}") as span:
+            with sentry_sdk.start_span(name=f"hi {i}") as span:
 
                 def foo():
                     pass
@@ -288,7 +288,7 @@ def test_segments_do_not_go_through_before_send(sentry_init, capture_items):
     )
     items = capture_items()
 
-    with sentry_sdk.traces.start_span(name="/"):
+    with sentry_sdk.start_span(name="/"):
         pass
 
     sentry_sdk.flush()
@@ -299,12 +299,12 @@ def test_segments_do_not_go_through_before_send(sentry_init, capture_items):
 def test_start_span_after_finish(sentry_init, capture_items):
     class CustomTransport(Transport):
         def capture_envelope(self, envelope):
-            with sentry_sdk.traces.start_span(name="toolate"):
+            with sentry_sdk.start_span(name="toolate"):
                 pass
             sentry_sdk.flush()
 
         def capture_event(self, event):
-            with sentry_sdk.traces.start_span(name="justdont"):
+            with sentry_sdk.start_span(name="justdont"):
                 pass
             sentry_sdk.flush()
 
@@ -314,7 +314,7 @@ def test_start_span_after_finish(sentry_init, capture_items):
     )
     items = capture_items()
 
-    with sentry_sdk.traces.start_span(name="hi"):
+    with sentry_sdk.start_span(name="hi"):
         pass
 
     sentry_sdk.flush()
@@ -328,13 +328,13 @@ def test_trace_propagation_meta_head_sdk(sentry_init):
         release="foo",
     )
 
-    sentry_sdk.traces.new_trace()
+    sentry_sdk.new_trace()
 
     meta = None
     span = None
 
-    with sentry_sdk.traces.start_span(name="Head SDK segment") as segment:
-        with sentry_sdk.traces.start_span(name="foo") as current_span:
+    with sentry_sdk.start_span(name="Head SDK segment") as segment:
+        with sentry_sdk.start_span(name="foo") as current_span:
             span = current_span
             meta = sentry_sdk.get_current_scope().trace_propagation_meta()
 
@@ -362,9 +362,9 @@ def test_non_error_exceptions(
     sentry_init(traces_sample_rate=1.0)
     items = capture_items()
 
-    with sentry_sdk.traces.start_span(name="hi"):
+    with sentry_sdk.start_span(name="hi"):
         with pytest.raises(exception_cls):
-            with sentry_sdk.traces.start_span(name="foo"):
+            with sentry_sdk.start_span(name="foo"):
                 raise exception_cls(exception_value)
 
     sentry_sdk.flush()
@@ -381,9 +381,9 @@ def test_good_sysexit_doesnt_fail_segment(sentry_init, capture_items, exception_
     sentry_init(traces_sample_rate=1.0)
     items = capture_items()
 
-    with sentry_sdk.traces.start_span(name="hi"):
+    with sentry_sdk.start_span(name="hi"):
         with pytest.raises(SystemExit):
-            with sentry_sdk.traces.start_span(name="foo"):
+            with sentry_sdk.start_span(name="foo"):
                 if exception_value is not False:
                     sys.exit(exception_value)
                 else:
@@ -438,9 +438,9 @@ def test_continue_trace_strict_trace_continuation(
         ),
     }
 
-    sentry_sdk.traces.continue_trace(headers)
+    sentry_sdk.continue_trace(headers)
 
-    with sentry_sdk.traces.start_span(name="strict trace") as segment:
+    with sentry_sdk.start_span(name="strict trace") as segment:
         headers = sentry_sdk.get_current_scope().iter_trace_propagation_headers(segment)
 
         if should_continue_trace:
@@ -461,12 +461,12 @@ def test_continue_trace_forces_new_traces_when_no_propagation(
 
     sentry_init(traces_sample_rate=1.0)
 
-    sentry_sdk.traces.continue_trace({})
-    with sentry_sdk.traces.start_span(name="segment1") as segment1:
+    sentry_sdk.continue_trace({})
+    with sentry_sdk.start_span(name="segment1") as segment1:
         pass
 
-    sentry_sdk.traces.continue_trace({})
-    with sentry_sdk.traces.start_span(name="segment2") as segment2:
+    sentry_sdk.continue_trace({})
+    with sentry_sdk.start_span(name="segment2") as segment2:
         pass
 
     assert segment1.trace_id != segment2.trace_id
@@ -477,12 +477,12 @@ def test_continue_trace_forces_new_traces_when_no_propagation_with_new_trace(
 ):
     sentry_init(traces_sample_rate=1.0)
 
-    sentry_sdk.traces.new_trace()
-    with sentry_sdk.traces.start_span(name="segment1") as segment1:
+    sentry_sdk.new_trace()
+    with sentry_sdk.start_span(name="segment1") as segment1:
         pass
 
-    sentry_sdk.traces.new_trace()
-    with sentry_sdk.traces.start_span(name="segment2") as segment2:
+    sentry_sdk.new_trace()
+    with sentry_sdk.start_span(name="segment2") as segment2:
         pass
 
     assert segment1.trace_id != segment2.trace_id

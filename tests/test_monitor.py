@@ -78,7 +78,7 @@ def test_segment_uses_downsampled_rate(
 
     # make sure we don't sample the segment
     with mock.patch("sentry_sdk.tracing_utils.Random.randrange", return_value=750000):
-        with sentry_sdk.traces.start_span(name="foobar") as segment:
+        with sentry_sdk.start_span(name="foobar") as segment:
             assert segment.sampled is False
             assert segment._sample_rate == 0.5
 

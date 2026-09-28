@@ -116,12 +116,12 @@ def _sentry_pyreqwest_span(
     with capture_internal_exceptions():
         parsed_url = parse_url(str(request.url), sanitize=False)
 
-    if sentry_sdk.traces.get_current_span() is None:
+    if sentry_sdk.get_current_span() is None:
         propagate_trace_headers(client=sentry_sdk.get_client(), request=request)
         yield None
         return
 
-    with sentry_sdk.traces.start_span(
+    with sentry_sdk.start_span(
         name=f"{request.method} {parsed_url.url if parsed_url else SENSITIVE_DATA_SUBSTITUTE}",
         attributes={
             "sentry.op": OP.HTTP_CLIENT,

@@ -37,7 +37,7 @@ def test_crumb_capture_and_hint_sync(
 
     url = "http://example.com/"
 
-    with sentry_sdk.traces.start_span(name="segment"):
+    with sentry_sdk.start_span(name="segment"):
         events = capture_events()
 
         response = httpx2.Client().get(url)
@@ -93,7 +93,7 @@ async def test_crumb_capture_and_hint_async(
 
     url = "http://example.com/"
 
-    with sentry_sdk.traces.start_span(name="segment"):
+    with sentry_sdk.start_span(name="segment"):
         events = capture_events()
 
         response = await httpx2.AsyncClient().get(url)
@@ -219,7 +219,7 @@ def test_crumb_capture_client_error_sync(
 
     url = "http://example.com/"
 
-    with sentry_sdk.traces.start_span(name="segment"):
+    with sentry_sdk.start_span(name="segment"):
         events = capture_events()
 
         response = httpx2.Client().get(url)
@@ -281,7 +281,7 @@ async def test_crumb_capture_client_error_async(
 
     url = "http://example.com/"
 
-    with sentry_sdk.traces.start_span(name="segment"):
+    with sentry_sdk.start_span(name="segment"):
         events = capture_events()
 
         response = await httpx2.AsyncClient().get(url)
@@ -484,7 +484,7 @@ def test_outgoing_trace_headers_sync(sentry_init, capture_items, httpx2_mock):
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="test"):
+    with sentry_sdk.start_span(name="test"):
         response = httpx2.Client().get(url)
 
     sentry_sdk.flush()
@@ -513,7 +513,7 @@ async def test_outgoing_trace_headers_async(sentry_init, capture_items, httpx2_m
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="test"):
+    with sentry_sdk.start_span(name="test"):
         response = await httpx2.AsyncClient().get(url)
 
     sentry_sdk.flush()
@@ -547,7 +547,7 @@ def test_outgoing_trace_headers_append_to_baggage_sync(
     items = capture_items("span")
 
     with mock.patch("sentry_sdk.tracing_utils.Random.randrange", return_value=500000):
-        with sentry_sdk.traces.start_span(name="test"):
+        with sentry_sdk.start_span(name="test"):
             response = httpx2.Client().get(url, headers={"baGGage": "custom=data"})
 
     sentry_sdk.flush()
@@ -580,7 +580,7 @@ async def test_outgoing_trace_headers_append_to_baggage_async(
     items = capture_items("span")
 
     with mock.patch("sentry_sdk.tracing_utils.Random.randrange", return_value=500000):
-        with sentry_sdk.traces.start_span(name="test"):
+        with sentry_sdk.start_span(name="test"):
             response = await httpx2.AsyncClient().get(
                 url, headers={"baGGage": "custom=data"}
             )
@@ -619,7 +619,7 @@ def test_outgoing_trace_headers_no_current_span(sentry_init, httpx2_mock):
 
     httpx2_client = httpx2.Client()
 
-    assert sentry_sdk.traces.get_current_span() is None
+    assert sentry_sdk.get_current_span() is None
 
     response = httpx2_client.get(url)
 
@@ -655,7 +655,7 @@ async def test_outgoing_trace_headers_no_current_span_async(sentry_init, httpx2_
 
     httpx2_client = httpx2.AsyncClient()
 
-    assert sentry_sdk.traces.get_current_span() is None
+    assert sentry_sdk.get_current_span() is None
 
     response = await httpx2_client.get(url)
 
@@ -686,7 +686,7 @@ def test_request_source_disabled_sync(sentry_init, capture_items, httpx2_mock):
 
     url = "http://example.com/"
 
-    with sentry_sdk.traces.start_span(name="test"):
+    with sentry_sdk.start_span(name="test"):
         httpx2.Client().get(url)
 
     sentry_sdk.flush()
@@ -714,7 +714,7 @@ async def test_request_source_disabled_async(sentry_init, capture_items, httpx2_
 
     url = "http://example.com/"
 
-    with sentry_sdk.traces.start_span(name="test"):
+    with sentry_sdk.start_span(name="test"):
         await httpx2.AsyncClient().get(url)
 
     sentry_sdk.flush()
@@ -750,7 +750,7 @@ def test_request_source_enabled_sync(
 
     url = "http://example.com/"
 
-    with sentry_sdk.traces.start_span(name="test"):
+    with sentry_sdk.start_span(name="test"):
         httpx2.Client().get(url)
 
     sentry_sdk.flush()
@@ -787,7 +787,7 @@ async def test_request_source_enabled_async(
 
     url = "http://example.com/"
 
-    with sentry_sdk.traces.start_span(name="test"):
+    with sentry_sdk.start_span(name="test"):
         await httpx2.AsyncClient().get(url)
 
     sentry_sdk.flush()
@@ -814,7 +814,7 @@ def test_request_source_sync(sentry_init, capture_items, httpx2_mock):
 
     url = "http://example.com/"
 
-    with sentry_sdk.traces.start_span(name="test"):
+    with sentry_sdk.start_span(name="test"):
         httpx2.Client().get(url)
 
     sentry_sdk.flush()
@@ -857,7 +857,7 @@ async def test_request_source_async(sentry_init, capture_items, httpx2_mock):
 
     url = "http://example.com/"
 
-    with sentry_sdk.traces.start_span(name="test"):
+    with sentry_sdk.start_span(name="test"):
         await httpx2.AsyncClient().get(url)
 
     sentry_sdk.flush()
@@ -906,7 +906,7 @@ def test_request_source_with_module_in_search_path_sync(
 
     url = "http://example.com/"
 
-    with sentry_sdk.traces.start_span(name="test"):
+    with sentry_sdk.start_span(name="test"):
         from httpx2_helpers.helpers import get_request_with_client
 
         get_request_with_client(httpx2.Client(), url)
@@ -951,7 +951,7 @@ async def test_request_source_with_module_in_search_path_async(
 
     url = "http://example.com/"
 
-    with sentry_sdk.traces.start_span(name="test"):
+    with sentry_sdk.start_span(name="test"):
         from httpx2_helpers.helpers import async_get_request_with_client
 
         await async_get_request_with_client(httpx2.AsyncClient(), url)
@@ -996,7 +996,7 @@ def test_no_request_source_if_duration_too_short_sync(
 
     url = "http://example.com/"
 
-    with sentry_sdk.traces.start_span(name="test"):
+    with sentry_sdk.start_span(name="test"):
         httpx2.Client().get(url)
 
     sentry_sdk.flush()
@@ -1027,7 +1027,7 @@ async def test_no_request_source_if_duration_too_short_async(
 
     url = "http://example.com/"
 
-    with sentry_sdk.traces.start_span(name="test"):
+    with sentry_sdk.start_span(name="test"):
         await httpx2.AsyncClient().get(url)
 
     sentry_sdk.flush()
@@ -1057,7 +1057,7 @@ def test_request_source_if_duration_over_threshold_sync(
 
     url = "http://example.com/"
 
-    with sentry_sdk.traces.start_span(name="test"):
+    with sentry_sdk.start_span(name="test"):
         httpx2.Client().get(url)
 
     sentry_sdk.flush()
@@ -1106,7 +1106,7 @@ async def test_request_source_if_duration_over_threshold_async(
 
     url = "http://example.com/"
 
-    with sentry_sdk.traces.start_span(name="test"):
+    with sentry_sdk.start_span(name="test"):
         await httpx2.AsyncClient().get(url)
 
     sentry_sdk.flush()
@@ -1149,7 +1149,7 @@ def test_span_origin_sync(sentry_init, capture_items, httpx2_mock):
 
     url = "http://example.com/"
 
-    with sentry_sdk.traces.start_span(name="test"):
+    with sentry_sdk.start_span(name="test"):
         httpx2.Client().get(url)
 
     sentry_sdk.flush()
@@ -1172,7 +1172,7 @@ async def test_span_origin_async(sentry_init, capture_items, httpx2_mock):
 
     url = "http://example.com/"
 
-    with sentry_sdk.traces.start_span(name="test"):
+    with sentry_sdk.start_span(name="test"):
         await httpx2.AsyncClient().get(url)
 
     sentry_sdk.flush()
@@ -1195,7 +1195,7 @@ def test_http_url_attributes_sync(sentry_init, capture_items, httpx2_mock):
 
     url = "http://example.com/?foo=bar#frag"
 
-    with sentry_sdk.traces.start_span(name="test"):
+    with sentry_sdk.start_span(name="test"):
         httpx2.Client().get(url)
 
     sentry_sdk.flush()
@@ -1223,7 +1223,7 @@ async def test_http_url_attributes_async(sentry_init, capture_items, httpx2_mock
 
     url = "http://example.com/?foo=bar#frag"
 
-    with sentry_sdk.traces.start_span(name="test"):
+    with sentry_sdk.start_span(name="test"):
         await httpx2.AsyncClient().get(url)
 
     sentry_sdk.flush()
@@ -1252,7 +1252,7 @@ def test_http_url_attributes_no_query_or_fragment_sync(
 
     url = "http://example.com/"
 
-    with sentry_sdk.traces.start_span(name="test"):
+    with sentry_sdk.start_span(name="test"):
         httpx2.Client().get(url)
 
     sentry_sdk.flush()
@@ -1282,7 +1282,7 @@ async def test_http_url_attributes_no_query_or_fragment_async(
 
     url = "http://example.com/"
 
-    with sentry_sdk.traces.start_span(name="test"):
+    with sentry_sdk.start_span(name="test"):
         await httpx2.AsyncClient().get(url)
 
     sentry_sdk.flush()
@@ -1308,7 +1308,7 @@ def test_http_url_attributes_pii_disabled_sync(sentry_init, capture_items, httpx
 
     url = "http://example.com/?foo=bar#frag"
 
-    with sentry_sdk.traces.start_span(name="test"):
+    with sentry_sdk.start_span(name="test"):
         httpx2.Client().get(url)
 
     sentry_sdk.flush()
@@ -1337,7 +1337,7 @@ async def test_http_url_attributes_pii_disabled_async(
 
     url = "http://example.com/?foo=bar#frag"
 
-    with sentry_sdk.traces.start_span(name="test"):
+    with sentry_sdk.start_span(name="test"):
         await httpx2.AsyncClient().get(url)
 
     sentry_sdk.flush()
@@ -1370,16 +1370,14 @@ async def test_http_url_attributes_pii_disabled_async(
             id="defaults",
         ),
         pytest.param(
-            {"_experiments": {"data_collection": {}}},
+            {"data_collection": {}},
             "toy=tennisball&color=red&auth=%5BFiltered%5D",
             id="data_collection_denylist_default",
         ),
         pytest.param(
             {
-                "_experiments": {
-                    "data_collection": {
-                        "url_query_params": {"mode": "denylist", "terms": ["toy"]}
-                    }
+                "data_collection": {
+                    "url_query_params": {"mode": "denylist", "terms": ["toy"]}
                 }
             },
             "toy=%5BFiltered%5D&color=red&auth=%5BFiltered%5D",
@@ -1387,10 +1385,8 @@ async def test_http_url_attributes_pii_disabled_async(
         ),
         pytest.param(
             {
-                "_experiments": {
-                    "data_collection": {
-                        "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
-                    }
+                "data_collection": {
+                    "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
                 }
             },
             "toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D",
@@ -1398,30 +1394,22 @@ async def test_http_url_attributes_pii_disabled_async(
         ),
         pytest.param(
             {
-                "_experiments": {
-                    "data_collection": {
-                        "url_query_params": {"mode": "allowlist", "terms": ["auth"]}
-                    }
+                "data_collection": {
+                    "url_query_params": {"mode": "allowlist", "terms": ["auth"]}
                 }
             },
             "toy=%5BFiltered%5D&color=%5BFiltered%5D&auth=%5BFiltered%5D",
             id="data_collection_allowlist_sensitive_term",
         ),
         pytest.param(
-            {
-                "_experiments": {
-                    "data_collection": {"url_query_params": {"mode": "off"}}
-                }
-            },
+            {"data_collection": {"url_query_params": {"mode": "off"}}},
             None,
             id="data_collection_off",
         ),
         pytest.param(
             {
                 "send_default_pii": True,
-                "_experiments": {
-                    "data_collection": {"url_query_params": {"mode": "off"}}
-                },
+                "data_collection": {"url_query_params": {"mode": "off"}},
             },
             None,
             id="data_collection_wins_over_send_default_pii",
@@ -1443,7 +1431,7 @@ def test_url_query_data_collection_sync(
 
     url = "http://example.com/?toy=tennisball&color=red&auth=secret#frag"
 
-    with sentry_sdk.traces.start_span(name="test"):
+    with sentry_sdk.start_span(name="test"):
         httpx2.Client().get(url)
 
     sentry_sdk.flush()
@@ -1476,16 +1464,14 @@ def test_url_query_data_collection_sync(
             id="defaults",
         ),
         pytest.param(
-            {"_experiments": {"data_collection": {}}},
+            {"data_collection": {}},
             "toy=tennisball&color=red&auth=%5BFiltered%5D",
             id="data_collection_denylist_default",
         ),
         pytest.param(
             {
-                "_experiments": {
-                    "data_collection": {
-                        "url_query_params": {"mode": "denylist", "terms": ["toy"]}
-                    }
+                "data_collection": {
+                    "url_query_params": {"mode": "denylist", "terms": ["toy"]}
                 }
             },
             "toy=%5BFiltered%5D&color=red&auth=%5BFiltered%5D",
@@ -1493,10 +1479,8 @@ def test_url_query_data_collection_sync(
         ),
         pytest.param(
             {
-                "_experiments": {
-                    "data_collection": {
-                        "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
-                    }
+                "data_collection": {
+                    "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
                 }
             },
             "toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D",
@@ -1504,30 +1488,22 @@ def test_url_query_data_collection_sync(
         ),
         pytest.param(
             {
-                "_experiments": {
-                    "data_collection": {
-                        "url_query_params": {"mode": "allowlist", "terms": ["auth"]}
-                    }
+                "data_collection": {
+                    "url_query_params": {"mode": "allowlist", "terms": ["auth"]}
                 }
             },
             "toy=%5BFiltered%5D&color=%5BFiltered%5D&auth=%5BFiltered%5D",
             id="data_collection_allowlist_sensitive_term",
         ),
         pytest.param(
-            {
-                "_experiments": {
-                    "data_collection": {"url_query_params": {"mode": "off"}}
-                }
-            },
+            {"data_collection": {"url_query_params": {"mode": "off"}}},
             None,
             id="data_collection_off",
         ),
         pytest.param(
             {
                 "send_default_pii": True,
-                "_experiments": {
-                    "data_collection": {"url_query_params": {"mode": "off"}}
-                },
+                "data_collection": {"url_query_params": {"mode": "off"}},
             },
             None,
             id="data_collection_wins_over_send_default_pii",
@@ -1549,7 +1525,7 @@ async def test_url_query_data_collection_async(
 
     url = "http://example.com/?toy=tennisball&color=red&auth=secret#frag"
 
-    with sentry_sdk.traces.start_span(name="test"):
+    with sentry_sdk.start_span(name="test"):
         await httpx2.AsyncClient().get(url)
 
     sentry_sdk.flush()
@@ -1566,16 +1542,14 @@ async def test_url_query_data_collection_async(
     "init_kwargs, expected_url_full",
     [
         pytest.param(
-            {"_experiments": {"data_collection": {}}},
+            {"data_collection": {}},
             "http://example.com/?toy=tennisball&color=red&auth=%5BFiltered%5D#frag",
             id="data_collection_denylist_default",
         ),
         pytest.param(
             {
-                "_experiments": {
-                    "data_collection": {
-                        "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
-                    }
+                "data_collection": {
+                    "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
                 }
             },
             "http://example.com/?toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D#frag",
@@ -1598,7 +1572,7 @@ def test_url_full_reassembly_sync(
 
     url = "http://example.com/?toy=tennisball&color=red&auth=secret#frag"
 
-    with sentry_sdk.traces.start_span(name="test"):
+    with sentry_sdk.start_span(name="test"):
         httpx2.Client().get(url)
 
     sentry_sdk.flush()
@@ -1613,16 +1587,14 @@ def test_url_full_reassembly_sync(
     "init_kwargs, expected_url_full",
     [
         pytest.param(
-            {"_experiments": {"data_collection": {}}},
+            {"data_collection": {}},
             "http://example.com/?toy=tennisball&color=red&auth=%5BFiltered%5D#frag",
             id="data_collection_denylist_default",
         ),
         pytest.param(
             {
-                "_experiments": {
-                    "data_collection": {
-                        "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
-                    }
+                "data_collection": {
+                    "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
                 }
             },
             "http://example.com/?toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D#frag",
@@ -1645,7 +1617,7 @@ async def test_url_full_reassembly_async(
 
     url = "http://example.com/?toy=tennisball&color=red&auth=secret#frag"
 
-    with sentry_sdk.traces.start_span(name="test"):
+    with sentry_sdk.start_span(name="test"):
         await httpx2.AsyncClient().get(url)
 
     sentry_sdk.flush()
@@ -1659,20 +1631,14 @@ async def test_url_full_reassembly_async(
     "init_kwargs, expected_url_full",
     [
         pytest.param(
-            {
-                "_experiments": {
-                    "data_collection": {"url_query_params": {"mode": "off"}}
-                }
-            },
+            {"data_collection": {"url_query_params": {"mode": "off"}}},
             "http://example.com/#frag",
             id="data_collection_off",
         ),
         pytest.param(
             {
                 "send_default_pii": True,
-                "_experiments": {
-                    "data_collection": {"url_query_params": {"mode": "off"}}
-                },
+                "data_collection": {"url_query_params": {"mode": "off"}},
             },
             "http://example.com/#frag",
             id="data_collection_wins_over_send_default_pii",
@@ -1699,7 +1665,7 @@ def test_url_query_params_off_keeps_bare_url_sync(
 
     url = "http://example.com/?toy=tennisball&color=red&auth=secret#frag"
 
-    with sentry_sdk.traces.start_span(name="test"):
+    with sentry_sdk.start_span(name="test"):
         httpx2.Client().get(url)
 
     sentry_sdk.flush()
@@ -1721,20 +1687,14 @@ def test_url_query_params_off_keeps_bare_url_sync(
     "init_kwargs, expected_url_full",
     [
         pytest.param(
-            {
-                "_experiments": {
-                    "data_collection": {"url_query_params": {"mode": "off"}}
-                }
-            },
+            {"data_collection": {"url_query_params": {"mode": "off"}}},
             "http://example.com/#frag",
             id="data_collection_off",
         ),
         pytest.param(
             {
                 "send_default_pii": True,
-                "_experiments": {
-                    "data_collection": {"url_query_params": {"mode": "off"}}
-                },
+                "data_collection": {"url_query_params": {"mode": "off"}},
             },
             "http://example.com/#frag",
             id="data_collection_wins_over_send_default_pii",
@@ -1761,7 +1721,7 @@ async def test_url_query_params_off_keeps_bare_url_async(
 
     url = "http://example.com/?toy=tennisball&color=red&auth=secret#frag"
 
-    with sentry_sdk.traces.start_span(name="test"):
+    with sentry_sdk.start_span(name="test"):
         await httpx2.AsyncClient().get(url)
 
     sentry_sdk.flush()
@@ -1782,7 +1742,7 @@ async def test_url_query_params_off_keeps_bare_url_async(
     "init_kwargs, expected_url, expected_query, expected_fragment",
     [
         pytest.param(
-            {"_experiments": {"data_collection": {}}},
+            {"data_collection": {}},
             "http://example.com/?toy=tennisball&color=red&auth=%5BFiltered%5D#frag",
             "toy=tennisball&color=red&auth=%5BFiltered%5D",
             "frag",
@@ -1790,10 +1750,8 @@ async def test_url_query_params_off_keeps_bare_url_async(
         ),
         pytest.param(
             {
-                "_experiments": {
-                    "data_collection": {
-                        "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
-                    }
+                "data_collection": {
+                    "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
                 }
             },
             "http://example.com/?toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D#frag",
@@ -1802,11 +1760,7 @@ async def test_url_query_params_off_keeps_bare_url_async(
             id="data_collection_allowlist",
         ),
         pytest.param(
-            {
-                "_experiments": {
-                    "data_collection": {"url_query_params": {"mode": "off"}}
-                }
-            },
+            {"data_collection": {"url_query_params": {"mode": "off"}}},
             "http://example.com/#frag",
             "",
             "frag",
@@ -1839,7 +1793,7 @@ def test_crumb_url_query_data_collection_sync(
 
     url = "http://example.com/?toy=tennisball&color=red&auth=secret#frag"
 
-    with sentry_sdk.traces.start_span(name="segment"):
+    with sentry_sdk.start_span(name="segment"):
         events = capture_events()
 
         httpx2.Client().get(url)
@@ -1864,7 +1818,7 @@ def test_crumb_url_query_data_collection_sync(
     "init_kwargs, expected_url, expected_query, expected_fragment",
     [
         pytest.param(
-            {"_experiments": {"data_collection": {}}},
+            {"data_collection": {}},
             "http://example.com/?toy=tennisball&color=red&auth=%5BFiltered%5D#frag",
             "toy=tennisball&color=red&auth=%5BFiltered%5D",
             "frag",
@@ -1872,10 +1826,8 @@ def test_crumb_url_query_data_collection_sync(
         ),
         pytest.param(
             {
-                "_experiments": {
-                    "data_collection": {
-                        "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
-                    }
+                "data_collection": {
+                    "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
                 }
             },
             "http://example.com/?toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D#frag",
@@ -1884,11 +1836,7 @@ def test_crumb_url_query_data_collection_sync(
             id="data_collection_allowlist",
         ),
         pytest.param(
-            {
-                "_experiments": {
-                    "data_collection": {"url_query_params": {"mode": "off"}}
-                }
-            },
+            {"data_collection": {"url_query_params": {"mode": "off"}}},
             "http://example.com/#frag",
             "",
             "frag",
@@ -1921,7 +1869,7 @@ async def test_crumb_url_query_data_collection_async(
 
     url = "http://example.com/?toy=tennisball&color=red&auth=secret#frag"
 
-    with sentry_sdk.traces.start_span(name="segment"):
+    with sentry_sdk.start_span(name="segment"):
         events = capture_events()
 
         await httpx2.AsyncClient().get(url)
@@ -1950,14 +1898,14 @@ def test_omit_url_data_if_parsing_fails(
     sentry_init(
         integrations=[Httpx2Integration()],
         traces_sample_rate=1.0,
-        _experiments={"data_collection": {}},
+        data_collection={},
     )
 
     items = capture_items("span")
 
     url = "http://example.com/?toy=tennisball&color=red&auth=secret#frag"
 
-    with sentry_sdk.traces.start_span(name="segment"):
+    with sentry_sdk.start_span(name="segment"):
         events = capture_events()
 
         with mock.patch(

@@ -78,16 +78,16 @@ def test_on_new_span_on_close(
         traces_sample_rate=1.0,
     )
     items = capture_items("span")
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         rust_tracing.new_span(RustTracingLevel.Info, 3)
 
-        sentry_first_rust_span = sentry_sdk.traces.get_current_span()
+        sentry_first_rust_span = sentry_sdk.get_current_span()
         rust_first_rust_span = rust_tracing.spans[3]
 
         assert sentry_first_rust_span == rust_first_rust_span
 
         rust_tracing.close_span(3)
-        assert sentry_sdk.traces.get_current_span() != sentry_first_rust_span
+        assert sentry_sdk.get_current_span() != sentry_first_rust_span
 
     sentry_sdk.flush()
     spans = [item.payload for item in items]
@@ -128,17 +128,17 @@ def test_nested_on_new_span_on_close(
         traces_sample_rate=1.0,
     )
     items = capture_items("span")
-    with sentry_sdk.traces.start_span(name="custom parent"):
-        original_sentry_span = sentry_sdk.traces.get_current_span()
+    with sentry_sdk.start_span(name="custom parent"):
+        original_sentry_span = sentry_sdk.get_current_span()
 
         rust_tracing.new_span(RustTracingLevel.Info, 3, index_arg=10)
-        sentry_first_rust_span = sentry_sdk.traces.get_current_span()
+        sentry_first_rust_span = sentry_sdk.get_current_span()
         rust_first_rust_span = rust_tracing.spans[3]
 
         # Use a different `index_arg` value for the inner span to help
         # distinguish the two at the end of the test
         rust_tracing.new_span(RustTracingLevel.Info, 5, index_arg=9)
-        sentry_second_rust_span = sentry_sdk.traces.get_current_span()
+        sentry_second_rust_span = sentry_sdk.get_current_span()
         rust_second_rust_span = rust_tracing.spans[5]
 
         assert rust_second_rust_span == sentry_second_rust_span
@@ -146,13 +146,13 @@ def test_nested_on_new_span_on_close(
         rust_tracing.close_span(5)
 
         # Ensure the current sentry span was moved back to the parent
-        sentry_span_after_close = sentry_sdk.traces.get_current_span()
+        sentry_span_after_close = sentry_sdk.get_current_span()
         assert sentry_span_after_close == sentry_first_rust_span
         assert sentry_span_after_close == rust_first_rust_span
 
         rust_tracing.close_span(3)
 
-        assert sentry_sdk.traces.get_current_span() == original_sentry_span
+        assert sentry_sdk.get_current_span() == original_sentry_span
 
     sentry_sdk.flush()
     spans = [item.payload for item in items]
@@ -201,12 +201,12 @@ def test_on_new_span_without_active_span(sentry_init):
         traces_sample_rate=1.0,
     )
 
-    assert sentry_sdk.traces.get_current_span() is None
+    assert sentry_sdk.get_current_span() is None
 
     # In streaming mode we do not create an orphan root segment when there
     # is no active span
     rust_tracing.new_span(RustTracingLevel.Info, 3)
-    assert sentry_sdk.traces.get_current_span() is None
+    assert sentry_sdk.get_current_span() is None
 
 
 def test_on_event_exception(
@@ -226,7 +226,7 @@ def test_on_event_exception(
     items = capture_items("event")
     sentry_sdk.get_isolation_scope().clear_breadcrumbs()
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         rust_tracing.new_span(RustTracingLevel.Info, 3)
 
         # Mapped to Exception
@@ -267,7 +267,7 @@ def test_on_event_breadcrumb(
     items = capture_items("event")
     sentry_sdk.get_isolation_scope().clear_breadcrumbs()
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         rust_tracing.new_span(RustTracingLevel.Info, 3)
 
         # Mapped to Breadcrumb
@@ -302,7 +302,7 @@ def test_on_event_event(
     items = capture_items("event")
     sentry_sdk.get_isolation_scope().clear_breadcrumbs()
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         rust_tracing.new_span(RustTracingLevel.Info, 3)
 
         # Mapped to Event
@@ -343,7 +343,7 @@ def test_on_event_ignored(
     items = capture_items("span")
     sentry_sdk.get_isolation_scope().clear_breadcrumbs()
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         rust_tracing.new_span(RustTracingLevel.Info, 3)
 
         # Ignored
@@ -380,23 +380,23 @@ def test_span_filter(
         traces_sample_rate=1.0,
     )
     items = capture_items("span")
-    with sentry_sdk.traces.start_span(name="custom parent"):
-        original_sentry_span = sentry_sdk.traces.get_current_span()
+    with sentry_sdk.start_span(name="custom parent"):
+        original_sentry_span = sentry_sdk.get_current_span()
 
         # Span is not ignored
         rust_tracing.new_span(RustTracingLevel.Info, 3, index_arg=10)
-        info_span = sentry_sdk.traces.get_current_span()
+        info_span = sentry_sdk.get_current_span()
 
         # Span is ignored, current span should remain the same
         rust_tracing.new_span(RustTracingLevel.Trace, 5, index_arg=9)
-        assert sentry_sdk.traces.get_current_span() == info_span
+        assert sentry_sdk.get_current_span() == info_span
 
         # Closing the filtered span should leave the current span alone
         rust_tracing.close_span(5)
-        assert sentry_sdk.traces.get_current_span() == info_span
+        assert sentry_sdk.get_current_span() == info_span
 
         rust_tracing.close_span(3)
-        assert sentry_sdk.traces.get_current_span() == original_sentry_span
+        assert sentry_sdk.get_current_span() == original_sentry_span
 
     sentry_sdk.flush()
     spans = [item.payload for item in items]
@@ -418,15 +418,15 @@ def test_record(
         integrations=[integration],
         traces_sample_rate=1.0,
     )
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         rust_tracing.new_span(RustTracingLevel.Info, 3)
 
-        span_before_record = sentry_sdk.traces.get_current_span()._to_json()
+        span_before_record = sentry_sdk.get_current_span()._to_json()
         assert span_before_record["attributes"]["version"] == "None"
 
         rust_tracing.record(3)
 
-        span_after_record = sentry_sdk.traces.get_current_span()._to_json()
+        span_after_record = sentry_sdk.get_current_span()._to_json()
         assert span_after_record["attributes"]["version"] == "memoized"
 
 
@@ -448,17 +448,17 @@ def test_record_in_ignored_span(
         integrations=[integration],
         traces_sample_rate=1.0,
     )
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         rust_tracing.new_span(RustTracingLevel.Info, 3)
 
-        span_before_record = sentry_sdk.traces.get_current_span()._to_json()
+        span_before_record = sentry_sdk.get_current_span()._to_json()
         assert span_before_record["attributes"]["version"] == "None"
 
         rust_tracing.new_span(RustTracingLevel.Trace, 5)
         rust_tracing.record(5)
 
         # `on_record()` should not do anything to the current Sentry span if the associated Rust span was ignored
-        span_after_record = sentry_sdk.traces.get_current_span()._to_json()
+        span_after_record = sentry_sdk.get_current_span()._to_json()
         assert span_after_record["attributes"]["version"] == "None"
 
 
@@ -491,10 +491,10 @@ def test_include_tracing_fields(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
     )
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         rust_tracing.new_span(RustTracingLevel.Info, 3)
 
-        span_before_record = sentry_sdk.traces.get_current_span()._to_json()
+        span_before_record = sentry_sdk.get_current_span()._to_json()
         if tracing_fields_expected:
             assert span_before_record["attributes"]["version"] == "None"
         else:
@@ -502,7 +502,7 @@ def test_include_tracing_fields(
 
         rust_tracing.record(3)
 
-        span_after_record = sentry_sdk.traces.get_current_span()._to_json()
+        span_after_record = sentry_sdk.get_current_span()._to_json()
 
         if tracing_fields_expected:
             assert span_after_record["attributes"]["sentry.op"] == "function"

@@ -127,6 +127,43 @@ def test_logs_before_send_log_raises_does_not_crash_application(
     assert not logs
 
 
+@pytest.mark.tests_internal_exceptions
+def test_logs_before_send_log_raises_records_callback_error(
+    sentry_init, capture_items, capture_record_lost_event_calls
+):
+    def _before_log(record, hint):
+        raise ValueError("before_send_log error")
+
+    sentry_init(before_send_log=_before_log)
+    items = capture_items("log")
+    record_lost_event_calls = capture_record_lost_event_calls()
+
+    sentry_sdk.logger.error("This is an error log...")
+
+    get_client().flush()
+
+    assert not items
+    assert ("callback_error", "log_item", None, 1) in record_lost_event_calls
+
+
+def test_logs_before_send_log_returns_none_records_before_send(
+    sentry_init, capture_items, capture_record_lost_event_calls
+):
+    def _before_log(record, hint):
+        return None
+
+    sentry_init(before_send_log=_before_log)
+    items = capture_items("log")
+    record_lost_event_calls = capture_record_lost_event_calls()
+
+    sentry_sdk.logger.error("This is an error log...")
+
+    get_client().flush()
+
+    assert not items
+    assert ("before_send", "log_item", None, 1) in record_lost_event_calls
+
+
 def test_logs_attributes(sentry_init, capture_items):
     """
     Passing arbitrary attributes to log messages.
@@ -233,7 +270,7 @@ def test_logs_tied_to_segments(sentry_init, capture_items):
     sentry_init(traces_sample_rate=1.0)
     items = capture_items("log")
 
-    with sentry_sdk.traces.start_span(name="test-segment") as sgmt:
+    with sentry_sdk.start_span(name="test-segment") as sgmt:
         sentry_sdk.logger.warning("This is a log tied to a segment")
 
     sentry_sdk.flush()
@@ -267,8 +304,8 @@ def test_logs_tied_to_spans(sentry_init, capture_items):
     sentry_init(traces_sample_rate=1.0)
     items = capture_items("log")
 
-    with sentry_sdk.traces.start_span(name="test-segment"):
-        with sentry_sdk.traces.start_span(name="test-span") as span:
+    with sentry_sdk.start_span(name="test-segment"):
+        with sentry_sdk.start_span(name="test-span") as span:
             sentry_sdk.logger.warning("This is a log tied to a span")
 
     sentry_sdk.flush()

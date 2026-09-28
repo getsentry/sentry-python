@@ -21,10 +21,10 @@ def patch_views() -> None:
     old_render = SimpleTemplateResponse.render
 
     def sentry_patched_render(self: "SimpleTemplateResponse") -> "Any":
-        if sentry_sdk.traces.get_current_span() is None:
+        if sentry_sdk.get_current_span() is None:
             return old_render(self)
 
-        with sentry_sdk.traces.start_span(
+        with sentry_sdk.start_span(
             name="serialize response",
             attributes={
                 "sentry.op": OP.VIEW_RESPONSE_RENDER,
@@ -62,7 +62,7 @@ def _wrap_sync_view(callback: "Any") -> "Any":
     def sentry_wrapped_callback(request: "Any", *args: "Any", **kwargs: "Any") -> "Any":
         client = sentry_sdk.get_client()
 
-        current_span = sentry_sdk.traces.get_current_span()
+        current_span = sentry_sdk.get_current_span()
         if type(current_span) is Span:
             segment = current_span._segment
             segment._update_active_thread()
@@ -71,10 +71,10 @@ def _wrap_sync_view(callback: "Any") -> "Any":
         if not integration or not integration.middleware_spans:
             return callback(request, *args, **kwargs)
 
-        if sentry_sdk.traces.get_current_span() is None:
+        if sentry_sdk.get_current_span() is None:
             return callback(request, *args, **kwargs)
 
-        with sentry_sdk.traces.start_span(
+        with sentry_sdk.start_span(
             name=request.resolver_match.view_name,
             attributes={
                 "sentry.op": OP.VIEW_RENDER,

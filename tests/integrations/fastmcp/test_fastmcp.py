@@ -11,7 +11,7 @@ Tests focus on verifying Sentry integration behavior:
 - Span creation when tools/prompts/resources are called through MCP protocol
 - Span data accuracy (operation, name, origin, etc.)
 - Error capture and instrumentation
-- PII and include_prompts flag behavior
+- PII flag behavior
 - Request context data extraction
 - Transport detection (stdio, http, sse)
 
@@ -267,20 +267,19 @@ def reset_request_ctx():
 @pytest.mark.asyncio
 @pytest.mark.parametrize("FastMCP", fastmcp_implementations, ids=fastmcp_ids)
 @pytest.mark.parametrize(
-    "send_default_pii, include_prompts",
-    [(True, True), (True, False), (False, True), (False, False)],
+    "send_default_pii",
+    [True, False],
 )
 async def test_fastmcp_tool_sync(
     sentry_init,
     capture_items,
     FastMCP,
     send_default_pii,
-    include_prompts,
     stdio,
 ):
     """Test that FastMCP synchronous tool handlers create proper spans"""
     sentry_init(
-        integrations=[MCPIntegration(include_prompts=include_prompts)],
+        integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
     )
@@ -320,7 +319,7 @@ async def test_fastmcp_tool_sync(
     assert span["attributes"][SPANDATA.MCP_REQUEST_ID] == "req-123"
 
     # Check PII-sensitive data
-    if send_default_pii and include_prompts:
+    if send_default_pii:
         assert SPANDATA.MCP_TOOL_RESULT_CONTENT in span["attributes"]
     else:
         assert SPANDATA.MCP_TOOL_RESULT_CONTENT not in span["attributes"]
@@ -329,15 +328,15 @@ async def test_fastmcp_tool_sync(
 @pytest.mark.parametrize("FastMCP", fastmcp_implementations, ids=fastmcp_ids)
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "send_default_pii, include_prompts",
-    [(True, True), (True, False), (False, True), (False, False)],
+    "send_default_pii",
+    [True, False],
 )
 async def test_fastmcp_tool_async(
-    sentry_init, capture_items, FastMCP, send_default_pii, include_prompts, json_rpc
+    sentry_init, capture_items, FastMCP, send_default_pii, json_rpc
 ):
     """Test that FastMCP async tool handlers create proper spans"""
     sentry_init(
-        integrations=[MCPIntegration(include_prompts=include_prompts)],
+        integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
     )
@@ -398,7 +397,7 @@ async def test_fastmcp_tool_async(
     assert span["attributes"][SPANDATA.MCP_SESSION_ID] == session_id
 
     # Check PII-sensitive data
-    if send_default_pii and include_prompts:
+    if send_default_pii:
         assert SPANDATA.MCP_TOOL_RESULT_CONTENT in span["attributes"]
     else:
         assert SPANDATA.MCP_TOOL_RESULT_CONTENT not in span["attributes"]
@@ -464,7 +463,7 @@ async def test_fastmcp_tool_with_complex_return(
 ):
     """Test FastMCP tool with complex nested return value"""
     sentry_init(
-        integrations=[MCPIntegration(include_prompts=True)],
+        integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
     )
@@ -499,7 +498,6 @@ async def test_fastmcp_tool_with_complex_return(
     assert len(tool_spans) == 1
     assert tool_spans[0]["attributes"]["sentry.op"] == OP.MCP_SERVER
     assert tool_spans[0]["attributes"][SPANDATA.MCP_TOOL_NAME] == "get_user_data"
-    # Complex return value should be captured since include_prompts=True and send_default_pii=True
     assert SPANDATA.MCP_TOOL_RESULT_CONTENT in tool_spans[0]["attributes"]
 
 
@@ -511,20 +509,19 @@ async def test_fastmcp_tool_with_complex_return(
 @pytest.mark.asyncio
 @pytest.mark.parametrize("FastMCP", fastmcp_implementations, ids=fastmcp_ids)
 @pytest.mark.parametrize(
-    "send_default_pii, include_prompts",
-    [(True, True), (False, False)],
+    "send_default_pii",
+    [True, False],
 )
 async def test_fastmcp_prompt_sync(
     sentry_init,
     capture_items,
     FastMCP,
     send_default_pii,
-    include_prompts,
     stdio,
 ):
     """Test that FastMCP synchronous prompt handlers create proper spans"""
     sentry_init(
-        integrations=[MCPIntegration(include_prompts=include_prompts)],
+        integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
     )
@@ -550,7 +547,7 @@ async def test_fastmcp_prompt_sync(
             return [message]
 
         items = capture_items("span")
-        with sentry_sdk.traces.start_span(name="custom parent"):
+        with sentry_sdk.start_span(name="custom parent"):
             await stdio(
                 mcp._mcp_server,
                 method="prompts/get",
@@ -574,7 +571,7 @@ async def test_fastmcp_prompt_sync(
         assert span["attributes"][SPANDATA.MCP_PROMPT_NAME] == "code_help_prompt"
 
         # Check PII-sensitive data
-        if send_default_pii and include_prompts:
+        if send_default_pii:
             assert SPANDATA.MCP_PROMPT_RESULT_MESSAGE_CONTENT in span["attributes"]
         else:
             assert SPANDATA.MCP_PROMPT_RESULT_MESSAGE_CONTENT not in span["attributes"]

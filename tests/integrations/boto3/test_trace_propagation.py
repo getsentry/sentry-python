@@ -75,7 +75,7 @@ def test_botocore_merges_propagation_before_sigv4_signing(
         client.meta.events.register_last(
             "before-sign", capture_headers_after_instrumentation
         )
-        with sentry_sdk.traces.start_span(  # type: ignore[attr-defined]
+        with sentry_sdk.start_span(  # type: ignore[attr-defined]
             name="incoming"
         ):
             response = client.head_object(
@@ -143,7 +143,7 @@ def test_botocore_without_boto3_integration_preserves_signed_baggage(
 
         # inject `baggage` before SigV4; stdlib-only path cannot change signed fields.
         client.meta.events.register("before-sign", _inject_signed_baggage)
-        with sentry_sdk.traces.start_span(  # type: ignore[attr-defined]
+        with sentry_sdk.start_span(  # type: ignore[attr-defined]
             name="incoming"
         ):
             response = client.head_object(

@@ -78,7 +78,7 @@ def test_rediscluster_basic(
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         rc = redis.RedisCluster(host="localhost", port=6379)
         rc.set("bar", 1)
 
@@ -128,7 +128,7 @@ def test_rediscluster_pipeline(
     rc = redis.RedisCluster(host="localhost", port=6379)
 
     items = capture_items("span")
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         pipeline = rc.pipeline()
         pipeline.get("foo")
         pipeline.set("bar", 1)
@@ -169,7 +169,7 @@ def test_rediscluster_span_origin(
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         # default case
         rc.set("somekey", "somevalue")
 

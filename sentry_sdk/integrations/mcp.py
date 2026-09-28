@@ -53,16 +53,6 @@ class MCPIntegration(Integration):
     identifier = "mcp"
     origin = "auto.ai.mcp"
 
-    def __init__(self, include_prompts: bool = True) -> None:
-        """
-        Initialize the MCP integration.
-
-        Args:
-            include_prompts: Whether to include prompts (tool results and prompt content)
-                             in span data. Requires send_default_pii=True. Default is True.
-        """
-        self.include_prompts = include_prompts
-
     @staticmethod
     def setup_once() -> None:
         """
@@ -268,7 +258,7 @@ async def _instrument_tool_call(
     request_id, session_id, mcp_transport = _get_request_context_data(ctx=ctx)
 
     # Start span and execute
-    with _active_http_scopes(ctx=ctx), sentry_sdk.traces.start_span(
+    with _active_http_scopes(ctx=ctx), sentry_sdk.start_span(
         name=f"tools/call {handler_name}",
         attributes={
             "sentry.op": OP.MCP_SERVER,
@@ -307,7 +297,7 @@ async def _instrument_tool_call(
         if has_data_collection_enabled(client.options):
             if client.options["data_collection"]["gen_ai"]["outputs"]:
                 should_include_result_data = True
-        elif should_send_default_pii() and integration.include_prompts:
+        elif should_send_default_pii():
             should_include_result_data = True
 
         result_content = result
@@ -360,7 +350,7 @@ async def _instrument_prompt_get(
     request_id, session_id, mcp_transport = _get_request_context_data(ctx=ctx)
 
     # Start span and execute
-    with _active_http_scopes(ctx=ctx), sentry_sdk.traces.start_span(
+    with _active_http_scopes(ctx=ctx), sentry_sdk.start_span(
         name=f"prompts/get {handler_name}",
         attributes={
             "sentry.op": OP.MCP_SERVER,
@@ -399,7 +389,7 @@ async def _instrument_prompt_get(
         if has_data_collection_enabled(client.options):
             if client.options["data_collection"]["gen_ai"]["inputs"]:
                 should_include_result_data = True
-        elif should_send_default_pii() and integration.include_prompts:
+        elif should_send_default_pii():
             should_include_result_data = True
 
         # For prompts, count messages and set role/content only for single-message prompts
@@ -463,7 +453,7 @@ async def _instrument_resource_read(
     request_id, session_id, mcp_transport = _get_request_context_data(ctx=ctx)
 
     # Start span and execute
-    with _active_http_scopes(ctx=ctx), sentry_sdk.traces.start_span(
+    with _active_http_scopes(ctx=ctx), sentry_sdk.start_span(
         name=f"resources/read {handler_name}",
         attributes={
             "sentry.op": OP.MCP_SERVER,

@@ -767,7 +767,7 @@ def test_request_body_data_collection(
 ):
     sentry_init(
         integrations=[BottleIntegration()],
-        _experiments={"data_collection": data_collection},
+        data_collection=data_collection,
     )
 
     data = {"foo": "bar"}
@@ -796,7 +796,7 @@ def test_request_body_dropped_with_form_and_files_data_collection(
     sentry_init(
         integrations=[BottleIntegration()],
         max_request_body_size="always",
-        _experiments={"data_collection": {"http_bodies": []}},
+        data_collection={"http_bodies": []},
     )
 
     data = {
@@ -824,6 +824,34 @@ def test_request_body_dropped_with_form_and_files_data_collection(
     assert "data" not in event.get("_meta", {}).get("request", {})
 
 
+def test_error_event_has_transaction_name(sentry_init, capture_events):
+    """
+    Error events captured during request handling should have the correct
+    transaction name set by the event processor, even though the inline
+    set_transaction_name call happens after the handler returns.
+    """
+    sentry_init(integrations=[BottleIntegration(transaction_style="url")])
+    events = capture_events()
+
+    app = Bottle()
+
+    @app.route("/error/<error_id>")
+    def error_handler(error_id):
+        1 / 0
+
+    client = Client(app)
+
+    try:
+        client.get("/error/123")
+    except ZeroDivisionError:
+        pass
+
+    (event,) = events
+    assert event["exception"]["values"][0]["type"] == "ZeroDivisionError"
+    assert event["transaction"] == "/error/<error_id>"
+    assert event["transaction_info"] == {"source": "route"}
+
+
 def test_oversized_request_body_not_annotated_data_collection(
     sentry_init, capture_events, app, get_client
 ):
@@ -834,7 +862,7 @@ def test_oversized_request_body_not_annotated_data_collection(
     sentry_init(
         integrations=[BottleIntegration()],
         max_request_body_size="small",
-        _experiments={"data_collection": {"http_bodies": []}},
+        data_collection={"http_bodies": []},
     )
 
     data = "a" * 2000

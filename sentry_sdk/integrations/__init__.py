@@ -154,6 +154,7 @@ _MIN_VERSIONS = {
     "litellm": (1, 77, 5),
     "loguru": (0, 7, 0),
     "mcp": (2, 0),
+    "mistral": (2, 0, 5),
     "openai": (1, 0, 0),
     "openai_agents": (0, 10, 3),
     "openfeature": (0, 7, 1),

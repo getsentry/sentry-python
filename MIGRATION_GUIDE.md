@@ -31,6 +31,7 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 - The option `attach_stacktrace` is now `True` by default, meaning the SDK will attach stack traces to messages.
 - The Django integration now creates spans for cache operations by default. Pass `DjangoIntegration(cache_spans=False)` to `sentry_sdk.init()` to turn them off.
 - The Django integration no longer force-enables cache spans when Spotlight is active and `settings.DEBUG` is `True`. The `cache_spans` option is now always respected as given.
+- Exception groups in exception chains are now properly unfurled.
 
 ### Logging
 

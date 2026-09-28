@@ -146,76 +146,13 @@ def start_span(
     parent_span: "Optional[Span]" = _DEFAULT_PARENT_SPAN,  # type: ignore[assignment]
     active: bool = True,
 ) -> "Span":
-    """
-    Start a span.
 
-    The span's parent, unless provided explicitly via the `parent_span` argument,
-    will be the current active span, if any. If there is none, this span will
-    become the root of a new span tree. If you explicitly want this span to be
-    top-level without a parent, set `parent_span=None`.
-
-    `start_span()` can either be used as context manager or you can use the span
-    object it returns and explicitly end it via `span.end()`. The following is
-    equivalent:
-
-    ```python
-    import sentry_sdk
-
-    with sentry_sdk.traces.start_span(name="My Span"):
-        # do something
-
-    # The span automatically finishes once the `with` block is exited
-    ```
-
-    ```python
-    import sentry_sdk
-
-    span = sentry_sdk.traces.start_span(name="My Span")
-    # do something
-    span.end()
-    ```
-
-    To continue a trace from another service, call
-    `sentry_sdk.traces.continue_trace()` prior to creating a top-level span.
-
-    :param name: The name to identify this span by.
-    :type name: str
-
-    :param attributes: Key-value attributes to set on the span from the start.
-        These will also be accessible in the traces sampler.
-    :type attributes: "Optional[Attributes]"
-
-    :param parent_span: A span instance that the new span should consider its
-        parent. If not provided, the parent will be set to the currently active
-        span, if any. If set to `None`, this span will become a new root-level
-        span.
-    :type parent_span: "Optional[Span]"
-
-    :param active: Controls whether spans started while this span is running
-        will automatically become its children. That's the default behavior. If
-        you want to create a span that shouldn't have any children (unless
-        provided explicitly via the `parent_span` argument), set this to `False`.
-    :type active: bool
-
-    :return: The span that has been started.
-    :rtype: Span
-    """
     return sentry_sdk.get_current_scope().start_span(
         name, attributes, parent_span, active
     )
 
 
 def continue_trace(incoming: "dict[str, Any]") -> None:
-    """
-    Continue a trace from headers or environment variables.
-
-    This function sets the propagation context on the scope. Any span started
-    in the updated scope will belong under the trace extracted from the
-    provided propagation headers or environment variables.
-
-    continue_trace() doesn't start any spans on its own. Use the start_span()
-    API for that.
-    """
     # This is set both on the isolation and the current scope for compatibility
     # reasons. Conceptually, it belongs on the isolation scope, and it also
     # used to be set there in non-span-first mode. But in span first mode, we
@@ -230,15 +167,6 @@ def continue_trace(incoming: "dict[str, Any]") -> None:
 
 
 def new_trace() -> None:
-    """
-    Resets the propagation context, forcing a new trace.
-
-    This function sets the propagation context on the scope. Any span started
-    in the updated scope will start its own trace.
-
-    new_trace() doesn't start any spans on its own. Use the start_span() API
-    for that.
-    """
     sentry_sdk.get_isolation_scope().set_new_propagation_context()
     sentry_sdk.get_current_scope().set_new_propagation_context()
 
@@ -897,9 +825,6 @@ def trace(
 def get_current_span(
     scope: "Optional[sentry_sdk.Scope]" = None,
 ) -> "Optional[Span]":
-    """
-    Returns the currently active span on the scope if the span is a `Span`, otherwise `None`.
-    """
     scope = scope or sentry_sdk.get_current_scope()
     current_span = scope.span
     return current_span

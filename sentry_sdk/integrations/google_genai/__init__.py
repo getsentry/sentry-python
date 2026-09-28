@@ -40,9 +40,6 @@ class GoogleGenAIIntegration(Integration):
     identifier = IDENTIFIER
     origin = ORIGIN
 
-    def __init__(self: "GoogleGenAIIntegration", include_prompts: bool = True) -> None:
-        self.include_prompts = include_prompts
-
     @staticmethod
     def setup_once() -> None:
         version = parse_version(GOOGLE_GENAI_VERSION)
@@ -80,7 +77,7 @@ def _wrap_generate_content_stream(f: "Callable[..., Any]") -> "Callable[..., Any
 
         _model, contents, model_name = prepare_generate_content_args(args, kwargs)
 
-        chat_span = sentry_sdk.traces.start_span(
+        chat_span = sentry_sdk.start_span(
             name=f"chat {model_name}",
             attributes={
                 "sentry.op": OP.GEN_AI_CHAT,
@@ -144,7 +141,7 @@ def _wrap_async_generate_content_stream(
 
         _model, contents, model_name = prepare_generate_content_args(args, kwargs)
 
-        chat_span = sentry_sdk.traces.start_span(
+        chat_span = sentry_sdk.start_span(
             name=f"chat {model_name}",
             attributes={
                 "sentry.op": OP.GEN_AI_CHAT,
@@ -204,7 +201,7 @@ def _wrap_generate_content(f: "Callable[..., Any]") -> "Callable[..., Any]":
 
         model, contents, model_name = prepare_generate_content_args(args, kwargs)
 
-        with sentry_sdk.traces.start_span(
+        with sentry_sdk.start_span(
             name=f"chat {model_name}",
             attributes={
                 "sentry.op": OP.GEN_AI_CHAT,
@@ -247,7 +244,7 @@ def _wrap_async_generate_content(f: "Callable[..., Any]") -> "Callable[..., Any]
 
         model, contents, model_name = prepare_generate_content_args(args, kwargs)
 
-        with sentry_sdk.traces.start_span(
+        with sentry_sdk.start_span(
             name=f"chat {model_name}",
             attributes={
                 "sentry.op": OP.GEN_AI_CHAT,
@@ -284,7 +281,7 @@ def _wrap_embed_content(f: "Callable[..., Any]") -> "Callable[..., Any]":
 
         model_name, contents = prepare_embed_content_args(args, kwargs)
 
-        with sentry_sdk.traces.start_span(
+        with sentry_sdk.start_span(
             name=f"embeddings {model_name}",
             attributes={
                 "sentry.op": OP.GEN_AI_EMBEDDINGS,
@@ -322,7 +319,7 @@ def _wrap_async_embed_content(f: "Callable[..., Any]") -> "Callable[..., Any]":
 
         model_name, contents = prepare_embed_content_args(args, kwargs)
 
-        with sentry_sdk.traces.start_span(
+        with sentry_sdk.start_span(
             name=f"embeddings {model_name}",
             attributes={
                 "sentry.op": OP.GEN_AI_EMBEDDINGS,

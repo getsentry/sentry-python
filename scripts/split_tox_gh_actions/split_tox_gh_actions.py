@@ -92,6 +92,7 @@ GROUPS = {
         "google_genai",
         "huggingface_hub",
         "litellm",
+        "mistral",
         "openai-base",
         "openai-notiktoken",
     ],

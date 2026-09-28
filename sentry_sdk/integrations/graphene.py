@@ -3,12 +3,10 @@ from contextlib import contextmanager
 import sentry_sdk
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
-from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
     event_from_exception,
-    has_data_collection_enabled,
     parse_version,
 )
 
@@ -112,13 +110,7 @@ def _patch_graphql() -> None:
 def _event_processor(event: "Event", hint: "Dict[str, Any]") -> "Event":
     client_options = sentry_sdk.get_client().options
 
-    if has_data_collection_enabled(client_options):
-        if client_options["data_collection"]["graphql"]["document"]:
-            request_info = event.setdefault("request", {})
-            request_info["api_target"] = "graphql"
-        elif event.get("request", {}).get("data"):
-            del event["request"]["data"]
-    elif should_send_default_pii():
+    if client_options["data_collection"]["graphql"]["document"]:
         request_info = event.setdefault("request", {})
         request_info["api_target"] = "graphql"
     elif event.get("request", {}).get("data"):
@@ -154,18 +146,15 @@ def graphql_span(
 
     client_options = sentry_sdk.get_client().options
 
-    if sentry_sdk.traces.get_current_span() is None:
+    if sentry_sdk.get_current_span() is None:
         yield
         return
 
     additional_attributes = {}
-    if has_data_collection_enabled(client_options):
-        if client_options["data_collection"]["graphql"]["document"]:
-            additional_attributes["graphql.document"] = source
-    elif should_send_default_pii():
+    if client_options["data_collection"]["graphql"]["document"]:
         additional_attributes["graphql.document"] = source
 
-    _graphql_span = sentry_sdk.traces.start_span(
+    _graphql_span = sentry_sdk.start_span(
         name=operation_name,
         attributes={
             "sentry.op": op,

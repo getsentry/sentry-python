@@ -34,7 +34,7 @@ async def test_no_cache_basic(sentry_init, capture_events, capture_items):
     connection = FakeRedisAsync()
 
     items = capture_items("span")
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         await connection.get("myasynccachekey")
     sentry_sdk.flush()
 
@@ -58,7 +58,7 @@ async def test_cache_basic(sentry_init, capture_events, capture_items):
     connection = FakeRedisAsync()
 
     items = capture_items("span")
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         await connection.get("myasynccachekey")
     sentry_sdk.flush()
 
@@ -84,7 +84,7 @@ async def test_cache_keys(sentry_init, capture_events, capture_items):
     connection = FakeRedisAsync()
 
     items = capture_items("span")
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         await connection.get("asomethingelse")
         await connection.get("ablub")
         await connection.get("ablubkeything")
@@ -136,7 +136,7 @@ async def test_cache_data(sentry_init, capture_events, capture_items):
     connection = FakeRedisAsync(host=host, port=6378)
 
     items = capture_items("span")
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         await connection.get("myasynccachekey")
         await connection.set("myasynccachekey", "事实胜于雄辩")
         await connection.get("myasynccachekey")

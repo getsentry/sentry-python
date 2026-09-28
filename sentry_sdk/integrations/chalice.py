@@ -82,7 +82,7 @@ def _get_view_function_response(
                 source=SegmentNameSource.COMPONENT,
             )
 
-            current_span = sentry_sdk.traces.get_current_span()
+            current_span = sentry_sdk.get_current_span()
             segment = None
             if type(current_span) is Span:
                 # A segment already exists (created by the AWS Lambda

@@ -11,7 +11,6 @@ from sentry_sdk.traces import Span
 from ..consts import SPAN_ORIGIN
 from ..utils import (
     _set_agent_data,
-    _set_available_tools,
     _set_model_data,
     _should_send_inputs,
     _should_send_outputs,
@@ -48,7 +47,7 @@ def invoke_agent_span(
     if agent and getattr(agent, "name", None):
         name = agent.name
 
-    span = sentry_sdk.traces.start_span(
+    span = sentry_sdk.start_span(
         name=f"invoke_agent {name}",
         attributes={
             "sentry.op": OP.GEN_AI_INVOKE_AGENT,
@@ -59,7 +58,6 @@ def invoke_agent_span(
 
     _set_agent_data(span, agent)
     _set_model_data(span, agent, model, model_settings)
-    _set_available_tools(span, agent)
 
     # Add user prompt and system prompts if available and prompts are enabled
     if _should_send_inputs():

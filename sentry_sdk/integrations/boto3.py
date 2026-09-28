@@ -85,8 +85,8 @@ def _sentry_request_created(
     if request.method is not None:
         breadcrumb[SPANDATA.HTTP_REQUEST_METHOD] = request.method
 
-    if sentry_sdk.traces.get_current_span() is not None:
-        span = sentry_sdk.traces.start_span(
+    if sentry_sdk.get_current_span() is not None:
+        span = sentry_sdk.start_span(
             name=description,
             attributes={
                 "sentry.op": OP.HTTP_CLIENT,
@@ -176,7 +176,7 @@ def _sentry_after_call(
     if not isinstance(body, StreamingBody):
         return
 
-    streaming_span = sentry_sdk.traces.start_span(
+    streaming_span = sentry_sdk.start_span(
         name=span.name,
         parent_span=span,
         attributes={

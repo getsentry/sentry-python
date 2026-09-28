@@ -137,16 +137,16 @@ def test_spans_from_multiple_threads(
     items = capture_items("span")
 
     def do_some_work(number):
-        with sentry_sdk.traces.start_span(name=f"inner-run-{number}") as span:
+        with sentry_sdk.start_span(name=f"inner-run-{number}") as span:
             inner_run_spans[number] = span
 
     threads = []
     outer_submit_spans = {}
     inner_run_spans = {}
 
-    with sentry_sdk.traces.start_span(name="outer-seg", parent_span=None) as outer:
+    with sentry_sdk.start_span(name="outer-seg", parent_span=None) as outer:
         for number in range(5):
-            with sentry_sdk.traces.start_span(name=f"outer-submit-{number}") as span:
+            with sentry_sdk.start_span(name=f"outer-submit-{number}") as span:
                 t = Thread(target=do_some_work, args=(number,))
                 t.start()
                 threads.append(t)
@@ -200,18 +200,16 @@ def test_spans_from_threadpool(
     items = capture_items()
 
     def do_some_work(number):
-        with sentry_sdk.traces.start_span(name=f"inner-run-{number}") as span:
+        with sentry_sdk.start_span(name=f"inner-run-{number}") as span:
             inner_run_spans[number] = span
 
     outer_submit_spans = {}
     inner_run_spans = {}
 
-    with sentry_sdk.traces.start_span(name="outer-seg") as outer:
+    with sentry_sdk.start_span(name="outer-seg") as outer:
         with futures.ThreadPoolExecutor(max_workers=1) as executor:
             for number in range(5):
-                with sentry_sdk.traces.start_span(
-                    name=f"outer-submit-{number}"
-                ) as span:
+                with sentry_sdk.start_span(name=f"outer-submit-{number}") as span:
                     outer_submit_spans[number] = span
                     future = executor.submit(do_some_work, number)
                     future.result()

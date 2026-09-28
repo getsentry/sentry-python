@@ -29,7 +29,7 @@ def execute_tool_span(
         agent: The agent executing the tool
         tool_definition: The definition of the tool, if available
     """
-    span = sentry_sdk.traces.start_span(
+    span = sentry_sdk.start_span(
         name=f"execute_tool {tool_name}",
         attributes={
             "sentry.op": OP.GEN_AI_EXECUTE_TOOL,

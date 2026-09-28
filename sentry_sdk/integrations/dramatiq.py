@@ -15,7 +15,6 @@ from sentry_sdk.utils import (
     AnnotatedValue,
     capture_internal_exceptions,
     event_from_exception,
-    has_data_collection_enabled,
     parse_version,
 )
 
@@ -138,8 +137,8 @@ class SentryMiddleware(Middleware):  # type: ignore[misc]
 
         scope.set_transaction_name(message.actor_name, source=SegmentNameSource.TASK)
 
-        sentry_sdk.traces.continue_trace(sentry_headers)
-        span = sentry_sdk.traces.start_span(
+        sentry_sdk.continue_trace(sentry_headers)
+        span = sentry_sdk.start_span(
             name=message.actor_name,
             attributes={
                 "sentry.op": OP.QUEUE_TASK_DRAMATIQ,
@@ -226,13 +225,7 @@ class DramatiqMessageExtractor:
         request_info = contexts.setdefault("dramatiq", {})
         request_info["type"] = "dramatiq"
 
-        attach_request_body = True
-        if has_data_collection_enabled(client.options):
-            attach_request_body = (
-                "incoming_request" in client.options["data_collection"]["http_bodies"]
-            )
-
-        if attach_request_body:
+        if client.options["data_collection"]["queues"]:
             data: "Optional[Union[AnnotatedValue, Dict[str, Any]]]" = None
             if not request_body_within_bounds(client, self.content_length()):
                 data = AnnotatedValue.removed_because_over_size_limit()

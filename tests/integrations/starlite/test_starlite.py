@@ -13,7 +13,7 @@ import sentry_sdk
 from sentry_sdk import capture_message
 from sentry_sdk._types import SENSITIVE_DATA_SUBSTITUTE
 from sentry_sdk.integrations.starlite import StarliteIntegration
-from tests.integrations.utils import DATA_COLLECTION_USER_INFO_CASES
+from tests.integrations.utils import DATA_COLLECTION_USER_INFO_CASES_LEGACY
 
 
 def starlite_app_factory(middleware=None, debug=True, exception_handlers=None):
@@ -398,7 +398,9 @@ def test_span_origin(sentry_init, capture_items):
         assert item.payload["attributes"]["sentry.origin"] == "auto.http.starlite"
 
 
-@pytest.mark.parametrize("init_kwargs, expect_user", DATA_COLLECTION_USER_INFO_CASES)
+@pytest.mark.parametrize(
+    "init_kwargs, expect_user", DATA_COLLECTION_USER_INFO_CASES_LEGACY
+)
 def test_starlite_scope_user_on_exception_event(
     sentry_init, capture_exceptions, capture_events, init_kwargs, expect_user
 ):
@@ -462,9 +464,7 @@ def test_request_body_data_collection(
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[StarliteIntegration()],
-        _experiments=(
-            {} if data_collection is None else {"data_collection": data_collection}
-        ),
+        data_collection=data_collection,
     )
 
     starlite_app = starlite_app_factory()
@@ -490,7 +490,7 @@ def test_request_body_data_collection_wins_over_send_default_pii(
         traces_sample_rate=1.0,
         integrations=[StarliteIntegration()],
         send_default_pii=True,
-        _experiments={"data_collection": {"http_bodies": []}},
+        data_collection={"http_bodies": []},
     )
 
     starlite_app = starlite_app_factory()
@@ -528,12 +528,12 @@ def test_request_body_data_collection_wins_over_send_default_pii(
             id="defaults",
         ),
         pytest.param(
-            {"_experiments": {"data_collection": {"cookies": {"mode": "off"}}}},
+            {"data_collection": {"cookies": {"mode": "off"}}},
             None,
             id="data_collection_off",
         ),
         pytest.param(
-            {"_experiments": {"data_collection": {"cookies": {"mode": "denylist"}}}},
+            {"data_collection": {"cookies": {"mode": "denylist"}}},
             {
                 "jwt": SENSITIVE_DATA_SUBSTITUTE,
                 "theme": "dark",
@@ -543,13 +543,7 @@ def test_request_body_data_collection_wins_over_send_default_pii(
             id="data_collection_denylist_default",
         ),
         pytest.param(
-            {
-                "_experiments": {
-                    "data_collection": {
-                        "cookies": {"mode": "denylist", "terms": ["theme"]}
-                    }
-                }
-            },
+            {"data_collection": {"cookies": {"mode": "denylist", "terms": ["theme"]}}},
             {
                 "jwt": SENSITIVE_DATA_SUBSTITUTE,
                 "theme": SENSITIVE_DATA_SUBSTITUTE,
@@ -559,13 +553,7 @@ def test_request_body_data_collection_wins_over_send_default_pii(
             id="data_collection_denylist_custom_terms",
         ),
         pytest.param(
-            {
-                "_experiments": {
-                    "data_collection": {
-                        "cookies": {"mode": "allowlist", "terms": ["theme"]}
-                    }
-                }
-            },
+            {"data_collection": {"cookies": {"mode": "allowlist", "terms": ["theme"]}}},
             {
                 "jwt": SENSITIVE_DATA_SUBSTITUTE,
                 "theme": "dark",
@@ -576,10 +564,8 @@ def test_request_body_data_collection_wins_over_send_default_pii(
         ),
         pytest.param(
             {
-                "_experiments": {
-                    "data_collection": {
-                        "cookies": {"mode": "allowlist", "terms": ["identity"]}
-                    }
+                "data_collection": {
+                    "cookies": {"mode": "allowlist", "terms": ["identity"]}
                 }
             },
             {
@@ -593,7 +579,7 @@ def test_request_body_data_collection_wins_over_send_default_pii(
         pytest.param(
             {
                 "send_default_pii": False,
-                "_experiments": {"data_collection": {"cookies": {"mode": "denylist"}}},
+                "data_collection": {"cookies": {"mode": "denylist"}},
             },
             {
                 "jwt": SENSITIVE_DATA_SUBSTITUTE,

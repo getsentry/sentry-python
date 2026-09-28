@@ -154,10 +154,10 @@ def enable_span_for_middleware(middleware: "Middleware") -> "Middleware":
         middleware_name = self.__class__.__name__
 
         def _start_middleware_span(op: str, name: str) -> "Any":
-            if sentry_sdk.traces.get_current_span() is None:
+            if sentry_sdk.get_current_span() is None:
                 return nullcontext()
 
-            return sentry_sdk.traces.start_span(
+            return sentry_sdk.start_span(
                 name=name,
                 attributes={
                     "sentry.op": op,

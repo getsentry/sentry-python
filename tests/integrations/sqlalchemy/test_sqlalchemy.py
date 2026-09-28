@@ -118,7 +118,7 @@ def test_transactions(
     session = Session()
 
     items = capture_items("span")
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         with session.begin_nested():
             session.query(Person).first()
 
@@ -202,7 +202,7 @@ def test_transactions_no_engine_url(
     session = Session()
 
     items = capture_items("span")
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         with session.begin_nested():
             session.query(Person).first()
 
@@ -242,7 +242,7 @@ def test_long_sql_query_preserved(
         "sqlite:///:memory:", connect_args={"check_same_thread": False}
     )
     items = capture_items("span")
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         with engine.connect() as con:
             con.execute(text(" UNION ".join("SELECT {}".format(i) for i in range(100))))
 
@@ -284,7 +284,7 @@ def test_query_source_disabled(
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         Base = declarative_base()  # noqa: N806
 
         class Person(Base):
@@ -341,7 +341,7 @@ def test_query_source_enabled(
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         Base = declarative_base()  # noqa: N806
 
         class Person(Base):
@@ -391,7 +391,7 @@ def test_query_source(
     )
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         Base = declarative_base()  # noqa: N806
 
         class Person(Base):
@@ -464,7 +464,7 @@ def test_query_source_with_module_in_search_path(
     )
 
     items = capture_items("span")
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         Base = declarative_base()  # noqa: N806
 
         class Person(Base):
@@ -533,7 +533,7 @@ def test_no_query_source_if_duration_too_short(
     )
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         Base = declarative_base()  # noqa: N806
 
         class Person(Base):
@@ -602,7 +602,7 @@ def test_query_source_if_duration_over_threshold(
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         Base = declarative_base()  # noqa: N806
 
         class Person(Base):
@@ -689,7 +689,7 @@ def test_span_origin(
         "sqlite:///:memory:", connect_args={"check_same_thread": False}
     )
     items = capture_items("span")
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         with engine.connect() as con:
             con.execute(text("SELECT 0"))
 

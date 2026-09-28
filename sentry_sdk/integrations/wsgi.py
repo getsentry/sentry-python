@@ -129,7 +129,7 @@ class SentryWsgiMiddleware:
 
                     span_ctx: "ContextManager[Union[Span, None]]" = nullcontext()
                     if method in self.http_methods_to_capture:
-                        sentry_sdk.traces.continue_trace(dict(_get_headers(environ)))
+                        sentry_sdk.continue_trace(dict(_get_headers(environ)))
                         Scope.set_custom_sampling_context({"wsgi_environ": environ})
 
                         if has_data_collection_enabled(client.options):
@@ -144,7 +144,7 @@ class SentryWsgiMiddleware:
                             if client_ip:
                                 scope.set_attribute(SPANDATA.USER_IP_ADDRESS, client_ip)
 
-                        span_ctx = sentry_sdk.traces.start_span(
+                        span_ctx = sentry_sdk.start_span(
                             name=_DEFAULT_TRANSACTION_NAME,
                             attributes={
                                 "sentry.segment.name.source": SegmentNameSource.ROUTE,

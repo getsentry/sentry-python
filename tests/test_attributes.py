@@ -204,7 +204,7 @@ def test_user_attributes(sentry_init, capture_items):
         }
     )
 
-    with sentry_sdk.traces.start_span(name="login"):
+    with sentry_sdk.start_span(name="login"):
         sentry_sdk.metrics.count("test", 1)
 
     sentry_sdk.get_client().flush()

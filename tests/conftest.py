@@ -342,6 +342,8 @@ def _install_flush_completion_handshake(client: "sentry_sdk.Client") -> None:
 
 @pytest.fixture
 def sentry_init(request):
+    client = None
+
     def inner(*a, **kw):
         kw.setdefault("transport", TestTransport())
         client = sentry_sdk.Client(*a, **kw)
@@ -360,6 +362,8 @@ def sentry_init(request):
             yield inner
         finally:
             sentry_sdk.get_global_scope().set_client(old_client)
+            if client is not None:
+                client.close()
 
 
 class TestTransport(Transport):
@@ -1216,6 +1220,7 @@ def get_model_response():
             200,
             request=model_request,
             content=response_content,
+            headers={"Content-Type": "application/json"},
         )
 
         return response

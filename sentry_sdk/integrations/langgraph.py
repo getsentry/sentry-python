@@ -32,9 +32,6 @@ class LanggraphIntegration(Integration):
     identifier = "langgraph"
     origin = f"auto.ai.{identifier}"
 
-    def __init__(self: "LanggraphIntegration", include_prompts: bool = True) -> None:
-        self.include_prompts = include_prompts
-
     @staticmethod
     def setup_once() -> None:
         version = package_version("langgraph")
@@ -60,7 +57,7 @@ def _should_record_inputs(integration: "LanggraphIntegration") -> bool:
         return bool(client.options["data_collection"]["gen_ai"]["inputs"])
 
     # To remove once data collection has been fully rolled out
-    return should_send_default_pii() and integration.include_prompts
+    return should_send_default_pii()
 
 
 def _should_record_outputs(integration: "LanggraphIntegration") -> bool:
@@ -69,7 +66,7 @@ def _should_record_outputs(integration: "LanggraphIntegration") -> bool:
         return bool(client.options["data_collection"]["gen_ai"]["outputs"])
 
     # To remove once data collection has been fully rolled out
-    return should_send_default_pii() and integration.include_prompts
+    return should_send_default_pii()
 
 
 def _get_graph_name(graph_obj: "Any") -> "Optional[str]":
@@ -143,7 +140,7 @@ def _wrap_pregel_invoke(f: "Callable[..., Any]") -> "Callable[..., Any]":
 
         graph_name = _get_graph_name(self)
 
-        with sentry_sdk.traces.start_span(
+        with sentry_sdk.start_span(
             name=f"invoke_agent {graph_name}".strip() if graph_name else "invoke_agent",
             attributes={
                 "sentry.op": OP.GEN_AI_INVOKE_AGENT,
@@ -187,7 +184,7 @@ def _wrap_pregel_ainvoke(f: "Callable[..., Any]") -> "Callable[..., Any]":
 
         graph_name = _get_graph_name(self)
 
-        with sentry_sdk.traces.start_span(
+        with sentry_sdk.start_span(
             name=f"invoke_agent {graph_name}".strip() if graph_name else "invoke_agent",
             attributes={
                 "sentry.op": OP.GEN_AI_INVOKE_AGENT,

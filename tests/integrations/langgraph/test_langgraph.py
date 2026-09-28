@@ -137,37 +137,18 @@ class InterruptingChatModel(BaseChatModel):
         raise GraphBubbleUp("interrupt")
 
 
-def test_langgraph_integration_init():
-    """Test LanggraphIntegration initialization with different parameters."""
-    integration = LanggraphIntegration()
-    assert integration.include_prompts is True
-    assert integration.identifier == "langgraph"
-    assert integration.origin == "auto.ai.langgraph"
-
-    integration = LanggraphIntegration(include_prompts=False)
-    assert integration.include_prompts is False
-    assert integration.identifier == "langgraph"
-    assert integration.origin == "auto.ai.langgraph"
-
-
 @pytest.mark.parametrize(
-    "send_default_pii, include_prompts",
-    [
-        (True, True),
-        (True, False),
-        (False, True),
-        (False, False),
-    ],
+    "send_default_pii",
+    [True, False],
 )
 def test_pregel_invoke(
     sentry_init,
     capture_items,
     send_default_pii,
-    include_prompts,
 ):
     """Test Pregel.invoke() wrapper creates proper invoke_agent span."""
     sentry_init(
-        integrations=[LanggraphIntegration(include_prompts=include_prompts)],
+        integrations=[LanggraphIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
     )
@@ -224,7 +205,7 @@ def test_pregel_invoke(
     assert invoke_span["attributes"][SPANDATA.GEN_AI_PIPELINE_NAME] == "test_graph"
     assert invoke_span["attributes"][SPANDATA.GEN_AI_AGENT_NAME] == "test_graph"
 
-    if send_default_pii and include_prompts:
+    if send_default_pii:
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES in invoke_span["attributes"]
         assert SPANDATA.GEN_AI_RESPONSE_TEXT in invoke_span["attributes"]
 
@@ -257,23 +238,17 @@ def test_pregel_invoke(
 
 
 @pytest.mark.parametrize(
-    "send_default_pii, include_prompts",
-    [
-        (True, True),
-        (True, False),
-        (False, True),
-        (False, False),
-    ],
+    "send_default_pii",
+    [True, False],
 )
 def test_pregel_ainvoke(
     sentry_init,
     capture_items,
     send_default_pii,
-    include_prompts,
 ):
     """Test Pregel.ainvoke() async wrapper creates proper invoke_agent span."""
     sentry_init(
-        integrations=[LanggraphIntegration(include_prompts=include_prompts)],
+        integrations=[LanggraphIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
     )
@@ -327,7 +302,7 @@ def test_pregel_ainvoke(
     assert invoke_span["attributes"][SPANDATA.GEN_AI_PIPELINE_NAME] == "async_graph"
     assert invoke_span["attributes"][SPANDATA.GEN_AI_AGENT_NAME] == "async_graph"
 
-    if send_default_pii and include_prompts:
+    if send_default_pii:
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES in invoke_span["attributes"]
         assert SPANDATA.GEN_AI_RESPONSE_TEXT in invoke_span["attributes"]
 
@@ -357,7 +332,7 @@ def test_pregel_invoke_error(
 ):
     """Test error handling during graph execution."""
     sentry_init(
-        integrations=[LanggraphIntegration(include_prompts=True)],
+        integrations=[LanggraphIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
     )
@@ -393,7 +368,7 @@ def test_pregel_ainvoke_error(
 ):
     """Test error handling during async graph execution."""
     sentry_init(
-        integrations=[LanggraphIntegration(include_prompts=True)],
+        integrations=[LanggraphIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
     )
@@ -526,7 +501,7 @@ def test_extraction_functions_complex_scenario(
 ):
     """Test extraction functions with complex scenarios including multiple messages and edge cases."""
     sentry_init(
-        integrations=[LanggraphIntegration(include_prompts=True)],
+        integrations=[LanggraphIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
     )
@@ -605,7 +580,7 @@ def test_langgraph_message_role_mapping(
 ):
     """Test that Langgraph integration properly maps message roles like 'ai' to 'assistant'"""
     sentry_init(
-        integrations=[LanggraphIntegration(include_prompts=True)],
+        integrations=[LanggraphIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
     )
@@ -750,7 +725,7 @@ def test_pregel_invoke_gates_request_messages_on_inputs_setting(
         "send_default_pii": send_default_pii,
     }
     if data_collection is not None:
-        init_kwargs["_experiments"] = {"data_collection": data_collection}
+        init_kwargs["data_collection"] = data_collection
 
     sentry_init(**init_kwargs)
 
@@ -835,7 +810,7 @@ def test_pregel_invoke_gates_response_text_and_tool_calls_on_outputs_setting(
         "send_default_pii": send_default_pii,
     }
     if data_collection is not None:
-        init_kwargs["_experiments"] = {"data_collection": data_collection}
+        init_kwargs["data_collection"] = data_collection
 
     sentry_init(**init_kwargs)
 
@@ -926,7 +901,7 @@ def test_pregel_ainvoke_gates_inputs_and_outputs_independently(
         "send_default_pii": send_default_pii,
     }
     if data_collection is not None:
-        init_kwargs["_experiments"] = {"data_collection": data_collection}
+        init_kwargs["data_collection"] = data_collection
 
     sentry_init(**init_kwargs)
 

@@ -261,7 +261,7 @@ async def test_formdata_request_body_data_collection_http_bodies_empty(
         traces_sample_rate=1.0,
         max_request_body_size="always",
         integrations=[StarletteIntegration()],
-        _experiments={"data_collection": {"http_bodies": []}},
+        data_collection={"http_bodies": []},
     )
 
     app = fastapi_app_factory()
@@ -309,9 +309,7 @@ async def test_request_body_data_collection(
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[StarletteIntegration()],
-        _experiments=(
-            {} if data_collection is None else {"data_collection": data_collection}
-        ),
+        data_collection=data_collection,
     )
 
     app = fastapi_app_factory()
@@ -928,8 +926,8 @@ async def test_feature_flags(sentry_init, capture_events):
     async def _error():
         add_feature_flag("hello", False)
 
-        with sentry_sdk.traces.start_span(name="test-span"):
-            with sentry_sdk.traces.start_span(name="test-span-2"):
+        with sentry_sdk.start_span(name="test-span"):
+            with sentry_sdk.start_span(name="test-span-2"):
                 raise ValueError("something is wrong!")
 
     try:

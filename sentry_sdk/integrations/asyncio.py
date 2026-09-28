@@ -148,8 +148,8 @@ def patch_asyncio() -> None:
 
                 with sentry_sdk.isolation_scope():
                     span_ctx = nullcontext()
-                    if task_spans and sentry_sdk.traces.get_current_span() is not None:
-                        span_ctx = sentry_sdk.traces.start_span(
+                    if task_spans and sentry_sdk.get_current_span() is not None:
+                        span_ctx = sentry_sdk.start_span(
                             name=get_name(coro),
                             attributes={
                                 "sentry.op": OP.FUNCTION,

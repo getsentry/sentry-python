@@ -57,10 +57,6 @@ jobs:
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh "py${{ matrix.python-version }}-typer"
-      - name: Test integration_deactivation
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-integration_deactivation"
       - name: Test shadowed_module
         run: |
           set -x # print commands that are executed

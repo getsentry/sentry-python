@@ -25,7 +25,7 @@ def test_no_cache_basic(sentry_init, capture_events, capture_items):
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         connection.get("mycachekey")
 
     sentry_sdk.flush()
@@ -50,7 +50,7 @@ def test_cache_basic(sentry_init, capture_events, capture_items):
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         connection.hget("mycachekey", "myfield")
         connection.get("mycachekey")
         connection.set("mycachekey1", "bla")
@@ -118,7 +118,7 @@ def test_cache_keys(sentry_init, capture_events, capture_items):
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         connection.get("somethingelse")
         connection.get("blub")
         connection.get("blubkeything")
@@ -171,7 +171,7 @@ def test_cache_data(sentry_init, capture_events, capture_items):
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         connection.get("mycachekey")
         connection.set("mycachekey", "事实胜于雄辩")
         connection.get("mycachekey")
@@ -249,7 +249,7 @@ def test_cache_prefixes(sentry_init, capture_events, capture_items):
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         connection.mget("yes", "no")
         connection.mget("no", 1, "yes")
         connection.mget("no", "yes.1", "yes.2")
