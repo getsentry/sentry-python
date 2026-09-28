@@ -1217,14 +1217,11 @@ class Transaction(Span):
                 sample_rate = client.options["traces_sampler"](sampling_context)
             except Exception:
                 logger.warning(
-                    "[Tracing] traces_sampler raised; falling back to parent sample rate or traces_sample_rate",
+                    "[Tracing] traces_sampler raised; unsampling trace",
                     exc_info=True,
                 )
-                sample_rate = (
-                    sampling_context["parent_sampled"]
-                    if sampling_context["parent_sampled"] is not None
-                    else client.options["traces_sample_rate"]
-                )
+                self.sampled = False
+                return
         else:
             sample_rate = (
                 sampling_context["parent_sampled"]

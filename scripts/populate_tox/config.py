@@ -561,6 +561,13 @@ TEST_SUITE_CONFIG = {
         "package": "typer",
         "num_versions": 2,
     },
+    "typesafe": {
+        "package": "typesafe-sdk",
+        "integration_name": "typesafe",
+        "deps": {
+            "*": ["pytest-asyncio"],
+        },
+    },
     "unleash": {
         "package": "UnleashClient",
         "num_versions": 2,

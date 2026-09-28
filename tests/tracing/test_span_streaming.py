@@ -565,7 +565,7 @@ def test_traces_sampler_drops_span(sentry_init, capture_items):
 
 
 @pytest.mark.tests_internal_exceptions
-def test_traces_sampler_exception_falls_back(sentry_init, capture_items):
+def test_traces_sampler_exception_unsamples(sentry_init, capture_items):
     def traces_sampler(sampling_context):
         raise ValueError("traces_sampler error")
 
@@ -581,10 +581,10 @@ def test_traces_sampler_exception_falls_back(sentry_init, capture_items):
         ...
 
     sentry_sdk.flush()
+
     spans = [item.payload for item in items]
 
-    # Falls back to traces_sample_rate=1.0, so span should still be sent
-    assert len(spans) == 1
+    assert not spans
 
 
 def test_traces_sampler_called_once_per_segment(sentry_init):
