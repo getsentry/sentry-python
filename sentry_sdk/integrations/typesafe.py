@@ -221,6 +221,16 @@ def _wrap_system_one(f: "Callable[..., Any]") -> "Callable[..., Any]":
 
             set_on_span(SPANDATA.GEN_AI_RESPONSE_MODEL, response.model)
 
+            if response.usage.input_tokens is not None:
+                set_on_span(
+                    SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, response.usage.input_tokens
+                )
+
+            if response.usage.output_tokens is not None:
+                set_on_span(
+                    SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS, response.usage.output_tokens
+                )
+
             return response
 
     return wrap_system_one
@@ -296,6 +306,16 @@ def _wrap_system_one_async(f: "Callable[..., Any]") -> "Callable[..., Any]":
                 return response
 
             set_on_span(SPANDATA.GEN_AI_RESPONSE_MODEL, response.model)
+
+            if response.usage.input_tokens is not None:
+                set_on_span(
+                    SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, response.usage.input_tokens
+                )
+
+            if response.usage.output_tokens is not None:
+                set_on_span(
+                    SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS, response.usage.output_tokens
+                )
 
             return response
 
