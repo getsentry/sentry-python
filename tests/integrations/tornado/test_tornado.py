@@ -156,9 +156,7 @@ COOKIE_HEADER = "jwt=tokenval; theme=dark; lang=en; identity=alice"
 def test_cookie_data_collection(
     tornado_testcase, sentry_init, capture_events, data_collection, expected_cookies
 ):
-    sentry_init(
-        integrations=[TornadoIntegration()], data_collection=data_collection
-    )
+    sentry_init(integrations=[TornadoIntegration()], data_collection=data_collection)
     events = capture_events()
     client = tornado_testcase(Application([(r"/hi", CrashingHandler)]))
 
@@ -566,9 +564,7 @@ def test_user_auth(tornado_testcase, sentry_init, capture_events):
 def test_user_auth_data_collection(
     tornado_testcase, sentry_init, capture_events, data_collection, expect_user
 ):
-    sentry_init(
-        integrations=[TornadoIntegration()], data_collection=data_collection
-    )
+    sentry_init(integrations=[TornadoIntegration()], data_collection=data_collection)
     events = capture_events()
 
     class UserHandler(RequestHandler):
@@ -807,9 +803,7 @@ def test_span_origin(
     assert segment["attributes"]["sentry.origin"] == "auto.http.tornado"
 
 
-@pytest.mark.parametrize(
-    "data_collection, expect_ip", DATA_COLLECTION_USER_INFO_CASES
-)
+@pytest.mark.parametrize("data_collection, expect_ip", DATA_COLLECTION_USER_INFO_CASES)
 def test_user_ip_address_on_all_spans(
     tornado_testcase, sentry_init, capture_items, data_collection, expect_ip
 ):
@@ -836,9 +830,7 @@ def test_user_ip_address_on_all_spans(
         assert "user.ip_address" not in child_span["attributes"]
 
 
-@pytest.mark.parametrize(
-    "data_collection, expect_ip", DATA_COLLECTION_USER_INFO_CASES
-)
+@pytest.mark.parametrize("data_collection, expect_ip", DATA_COLLECTION_USER_INFO_CASES)
 def test_client_address_span_attribute_data_collection(
     tornado_testcase, sentry_init, capture_items, data_collection, expect_ip
 ):
@@ -873,9 +865,7 @@ def test_client_address_span_attribute_data_collection(
 def test_remote_addr_data_collection(
     tornado_testcase, sentry_init, capture_events, data_collection, expect_remote_addr
 ):
-    sentry_init(
-        integrations=[TornadoIntegration()], data_collection=data_collection
-    )
+    sentry_init(integrations=[TornadoIntegration()], data_collection=data_collection)
     events = capture_events()
     client = tornado_testcase(Application([(r"/hi", CrashingHandler)]))
 
