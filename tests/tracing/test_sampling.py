@@ -611,7 +611,7 @@ def test_unsampled_spans_produce_client_report_if_traces_sample_rate_defined(
         with sentry_sdk.traces.start_span(name="child2"):
             pass
 
-    sentry_sdk.get_client().flush()
+    sentry_sdk.flush()
 
     spans = [item.payload for item in items]
     assert not spans
@@ -640,7 +640,7 @@ def test_unsampled_spans_produce_client_report_if_traces_sampler_defined(
         with sentry_sdk.traces.start_span(name="child2"):
             pass
 
-    sentry_sdk.get_client().flush()
+    sentry_sdk.flush()
 
     spans = [item.payload for item in items]
     assert not spans
@@ -669,7 +669,7 @@ def test_no_client_reports_if_tracing_is_off(
         with sentry_sdk.traces.start_span(name="child2"):
             pass
 
-    sentry_sdk.get_client().flush()
+    sentry_sdk.flush()
 
     spans = [item.payload for item in items]
     assert not spans
