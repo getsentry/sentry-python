@@ -117,6 +117,8 @@ def test_system_one(
         assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "typesafe"
         assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "evaluate"
         assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "jev-latest"
+
+        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "jev-latest"
     else:
         items = capture_items("transaction")
 
@@ -158,6 +160,8 @@ def test_system_one(
         assert span["data"][SPANDATA.GEN_AI_PROVIDER_NAME] == "typesafe"
         assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "evaluate"
         assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "jev-latest"
+
+        assert span["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "jev-latest"
 
 
 @pytest.mark.asyncio
@@ -228,6 +232,8 @@ async def test_system_one_async(
         assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "typesafe"
         assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "evaluate"
         assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "jev-latest"
+
+        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "jev-latest"
     else:
         items = capture_items("transaction")
 
@@ -272,3 +278,5 @@ async def test_system_one_async(
         assert span["data"][SPANDATA.GEN_AI_PROVIDER_NAME] == "typesafe"
         assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "evaluate"
         assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "jev-latest"
+
+        assert span["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "jev-latest"

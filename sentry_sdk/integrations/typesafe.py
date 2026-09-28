@@ -13,6 +13,7 @@ if TYPE_CHECKING:
 try:
     from typesafe_sdk._core.client.aio.client import AsyncTypeSafeClient
     from typesafe_sdk._core.client.sync.client import TypeSafeClient
+    from typesafe_sdk._core.response_types import SystemOneResponse
 except ImportError:
     raise DidNotEnable("typesafe-sdk not installed")
 
@@ -70,7 +71,14 @@ def _wrap_system_one(f: "Callable[..., Any]") -> "Callable[..., Any]":
             if model is not None:
                 set_on_span(SPANDATA.GEN_AI_REQUEST_MODEL, model)
 
-            return f(self, *args, **kwargs)
+            response = f(self, *args, **kwargs)
+
+            if not isinstance(response, SystemOneResponse):
+                return response
+
+            set_on_span(SPANDATA.GEN_AI_RESPONSE_MODEL, response.model)
+
+            return response
 
     return wrap_system_one
 
@@ -118,6 +126,13 @@ def _wrap_system_one_async(f: "Callable[..., Any]") -> "Callable[..., Any]":
             if model is not None:
                 set_on_span(SPANDATA.GEN_AI_REQUEST_MODEL, model)
 
-            return await f(self, *args, **kwargs)
+            response = await f(self, *args, **kwargs)
+
+            if not isinstance(response, SystemOneResponse):
+                return response
+
+            set_on_span(SPANDATA.GEN_AI_RESPONSE_MODEL, response.model)
+
+            return response
 
     return wrap_system_one_async
