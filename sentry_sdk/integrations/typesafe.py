@@ -76,6 +76,8 @@ def _wrap_system_one(f: "Callable[..., Any]") -> "Callable[..., Any]":
             if not isinstance(response, SystemOneResponse):
                 return response
 
+            set_on_span(SPANDATA.GEN_AI_RESPONSE_MODEL, response.model)
+
             return response
 
     return wrap_system_one
@@ -128,6 +130,8 @@ def _wrap_system_one_async(f: "Callable[..., Any]") -> "Callable[..., Any]":
 
             if not isinstance(response, SystemOneResponse):
                 return response
+
+            set_on_span(SPANDATA.GEN_AI_RESPONSE_MODEL, response.model)
 
             return response
 
