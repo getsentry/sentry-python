@@ -251,7 +251,6 @@ def _wrap_system_one(f: "Callable[..., Any]") -> "Callable[..., Any]":
                 name=f"evaluate {model}".strip(),
                 origin=TypeSafeIntegration.origin,
             )
-            span.__enter__()
             span.set_data(SPANDATA.GEN_AI_PROVIDER_NAME, "typesafe")
             span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "evaluate")
             set_on_span = span.set_data
@@ -278,6 +277,8 @@ def _wrap_system_one(f: "Callable[..., Any]") -> "Callable[..., Any]":
 
             if not isinstance(response, SystemOneResponse):
                 return response
+
+            set_on_span(SPANDATA.GEN_AI_RESPONSE_MODEL, response.model)
 
             if response.usage.input_tokens is not None:
                 set_on_span(
@@ -334,7 +335,6 @@ def _wrap_system_one_async(f: "Callable[..., Any]") -> "Callable[..., Any]":
                 name=f"evaluate {model}".strip(),
                 origin=TypeSafeIntegration.origin,
             )
-            span.__enter__()
             span.set_data(SPANDATA.GEN_AI_PROVIDER_NAME, "typesafe")
             span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "evaluate")
             set_on_span = span.set_data
@@ -361,6 +361,8 @@ def _wrap_system_one_async(f: "Callable[..., Any]") -> "Callable[..., Any]":
 
             if not isinstance(response, SystemOneResponse):
                 return response
+
+            set_on_span(SPANDATA.GEN_AI_RESPONSE_MODEL, response.model)
 
             if response.usage.input_tokens is not None:
                 set_on_span(
