@@ -19,7 +19,7 @@ from sentry_sdk.integrations.litestar import LitestarIntegration
 from sentry_sdk.utils import SENSITIVE_DATA_SUBSTITUTE
 from tests.conftest import ApproxDict
 from tests.integrations.conftest import parametrize_test_configurable_status_codes
-from tests.integrations.utils import DATA_COLLECTION_USER_INFO_CASES_LEGACY
+from tests.integrations.utils import DATA_COLLECTION_USER_INFO_CASES
 
 
 def litestar_app_factory(middleware=None, debug=True, exception_handlers=None):
@@ -108,6 +108,7 @@ def test_catch_exceptions(
 ):
     sentry_init(
         integrations=[LitestarIntegration()],
+        data_collection={},
     )
     litestar_app = litestar_app_factory()
     client = TestClient(litestar_app)
@@ -154,6 +155,7 @@ def test_segment_name_and_source(
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[LitestarIntegration()],
+        data_collection={},
     )
     litestar_app = litestar_app_factory()
     client = TestClient(litestar_app)
@@ -179,6 +181,7 @@ def test_middleware_spans(
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[LitestarIntegration()],
+        data_collection={},
     )
 
     logging_config = LoggingMiddlewareConfig()
@@ -235,6 +238,7 @@ def test_middleware_callback_spans(
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[LitestarIntegration()],
+        data_collection={},
     )
 
     litestar_app = litestar_app_factory(middleware=[SampleMiddleware])
@@ -315,6 +319,7 @@ def test_middleware_receive_send(
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[LitestarIntegration()],
+        data_collection={},
     )
     litestar_app = litestar_app_factory(middleware=[SampleReceiveSendMiddleware])
 
@@ -350,6 +355,7 @@ def test_middleware_partial_receive_send(
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[LitestarIntegration()],
+        data_collection={},
     )
 
     litestar_app = litestar_app_factory(middleware=[SamplePartialReceiveSendMiddleware])
@@ -419,6 +425,7 @@ def test_span_origin(
     sentry_init(
         integrations=[LitestarIntegration()],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     logging_config = LoggingMiddlewareConfig()
@@ -449,13 +456,13 @@ def test_span_origin(
 
 
 @pytest.mark.parametrize(
-    "init_kwargs, expect_user", DATA_COLLECTION_USER_INFO_CASES_LEGACY
+    "data_collection, expect_user", DATA_COLLECTION_USER_INFO_CASES
 )
 def test_litestar_scope_user_on_exception_event(
     sentry_init,
     capture_exceptions,
     capture_items,
-    init_kwargs,
+    data_collection,
     expect_user,
 ):
     class TestUserMiddleware(AbstractMiddleware):
@@ -469,7 +476,7 @@ def test_litestar_scope_user_on_exception_event(
 
     sentry_init(
         integrations=[LitestarIntegration()],
-        **init_kwargs,
+        data_collection=data_collection,
     )
 
     litestar_app = litestar_app_factory(middleware=[TestUserMiddleware])
@@ -503,7 +510,6 @@ COOKIE_HEADER = "jwt=tokenval; theme=dark; lang=en; identity=alice"
 @pytest.mark.parametrize(
     "data_collection, expect_body",
     [
-        pytest.param(None, True, id="no_data_collection_experiment"),
         pytest.param({}, True, id="data_collection_http_bodies_default"),
         pytest.param(
             {"http_bodies": ["incoming_request"]},
@@ -540,57 +546,26 @@ def test_request_body_data_collection(
         assert "data" not in event["request"]
 
 
-def test_request_body_data_collection_wins_over_send_default_pii(
-    sentry_init, capture_events
-):
-    sentry_init(
-        traces_sample_rate=1.0,
-        integrations=[LitestarIntegration()],
-        send_default_pii=True,
-        data_collection={"http_bodies": []},
-    )
-
-    litestar_app = litestar_app_factory()
-    events = capture_events()
-
-    client = TestClient(litestar_app)
-    client.post("/body/json", json={"foo": {"bar": "baz", "qux": ["1", "2", "3"]}})
-
-    (event,) = events
-
-    assert "data" not in event["request"]
-
-
 @pytest.mark.parametrize(
-    "init_kwargs, expected_cookies",
+    "data_collection, expected_cookies",
     [
         pytest.param(
-            {"send_default_pii": True},
+            {},
             {
-                "jwt": "tokenval",
+                "jwt": SENSITIVE_DATA_SUBSTITUTE,
                 "theme": "dark",
                 "lang": "en",
-                "identity": "alice",
+                "identity": SENSITIVE_DATA_SUBSTITUTE,
             },
-            id="send_default_pii_true",
+            id="data_collection_default",
         ),
         pytest.param(
-            {"send_default_pii": False},
-            None,
-            id="send_default_pii_false",
-        ),
-        pytest.param(
-            {},
-            None,
-            id="defaults",
-        ),
-        pytest.param(
-            {"data_collection": {"cookies": {"mode": "off"}}},
+            {"cookies": {"mode": "off"}},
             None,
             id="data_collection_off",
         ),
         pytest.param(
-            {"data_collection": {"cookies": {"mode": "denylist"}}},
+            {"cookies": {"mode": "denylist"}},
             {
                 "jwt": SENSITIVE_DATA_SUBSTITUTE,
                 "theme": "dark",
@@ -600,7 +575,7 @@ def test_request_body_data_collection_wins_over_send_default_pii(
             id="data_collection_denylist_default",
         ),
         pytest.param(
-            {"data_collection": {"cookies": {"mode": "denylist", "terms": ["theme"]}}},
+            {"cookies": {"mode": "denylist", "terms": ["theme"]}},
             {
                 "jwt": SENSITIVE_DATA_SUBSTITUTE,
                 "theme": SENSITIVE_DATA_SUBSTITUTE,
@@ -610,7 +585,7 @@ def test_request_body_data_collection_wins_over_send_default_pii(
             id="data_collection_denylist_custom_terms",
         ),
         pytest.param(
-            {"data_collection": {"cookies": {"mode": "allowlist", "terms": ["theme"]}}},
+            {"cookies": {"mode": "allowlist", "terms": ["theme"]}},
             {
                 "jwt": SENSITIVE_DATA_SUBSTITUTE,
                 "theme": "dark",
@@ -620,11 +595,7 @@ def test_request_body_data_collection_wins_over_send_default_pii(
             id="data_collection_allowlist",
         ),
         pytest.param(
-            {
-                "data_collection": {
-                    "cookies": {"mode": "allowlist", "terms": ["identity"]}
-                }
-            },
+            {"cookies": {"mode": "allowlist", "terms": ["identity"]}},
             {
                 "jwt": SENSITIVE_DATA_SUBSTITUTE,
                 "theme": SENSITIVE_DATA_SUBSTITUTE,
@@ -633,28 +604,15 @@ def test_request_body_data_collection_wins_over_send_default_pii(
             },
             id="data_collection_allowlist_sensitive_term",
         ),
-        pytest.param(
-            {
-                "send_default_pii": False,
-                "data_collection": {"cookies": {"mode": "denylist"}},
-            },
-            {
-                "jwt": SENSITIVE_DATA_SUBSTITUTE,
-                "theme": "dark",
-                "lang": "en",
-                "identity": SENSITIVE_DATA_SUBSTITUTE,
-            },
-            id="data_collection_wins_over_send_default_pii",
-        ),
     ],
 )
 def test_cookie_data_collection(
-    sentry_init, capture_events, init_kwargs, expected_cookies
+    sentry_init, capture_events, data_collection, expected_cookies
 ):
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[LitestarIntegration()],
-        **init_kwargs,
+        data_collection=data_collection,
     )
 
     litestar_app = litestar_app_factory()
@@ -686,6 +644,7 @@ def test_configurable_status_codes_handler(
     )
     sentry_init(
         integrations=[LitestarIntegration(**integration_kwargs)],
+        data_collection={},
     )
 
     @get("/error")
@@ -719,6 +678,7 @@ def test_configurable_status_codes_middleware(
 
     sentry_init(
         integrations=[LitestarIntegration(**integration_kwargs)],
+        data_collection={},
     )
 
     def create_raising_middleware(app):
@@ -747,6 +707,7 @@ def test_catch_non_http_exceptions_in_middleware(
 ):
     sentry_init(
         integrations=[LitestarIntegration()],
+        data_collection={},
     )
 
     def create_raising_middleware(app):
