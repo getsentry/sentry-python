@@ -128,7 +128,9 @@ class EventScrubber:
                 if "cookies" in event["request"]:
                     self.scrub_dict(event["request"]["cookies"])
                 if "data" in event["request"]:
-                    self.scrub_dict(event["request"]["data"])
+                    data = event["request"]["data"]
+                    self.scrub_dict(data)  # no-op unless data is a dict
+                    self.scrub_list(data)  # no-op unless data is a list
 
     def scrub_extra(self, event: "Event") -> None:
         with capture_internal_exceptions():
