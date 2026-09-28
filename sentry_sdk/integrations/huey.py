@@ -6,7 +6,6 @@ import sentry_sdk
 from sentry_sdk.api import get_baggage, get_traceparent
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
-from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import (
     BAGGAGE_HEADER_NAME,
     SENTRY_TRACE_HEADER_NAME,
@@ -15,12 +14,10 @@ from sentry_sdk.traces import (
     SpanStatus,
 )
 from sentry_sdk.utils import (
-    SENSITIVE_DATA_SUBSTITUTE,
     _register_control_flow_exception,
     capture_internal_exceptions,
     ensure_integration_enabled,
     event_from_exception,
-    has_data_collection_enabled,
     parse_version,
     reraise,
 )
@@ -132,16 +129,9 @@ def _make_event_processor(task: "Any") -> "EventProcessor":
             }
 
             client_options = sentry_sdk.get_client().options
-            if has_data_collection_enabled(client_options):
-                if client_options["data_collection"]["queues"]:
-                    huey_job["args"] = task.args
-                    huey_job["kwargs"] = task.kwargs
-            elif should_send_default_pii():
+            if client_options["data_collection"]["queues"]:
                 huey_job["args"] = task.args
                 huey_job["kwargs"] = task.kwargs
-            else:
-                huey_job["args"] = SENSITIVE_DATA_SUBSTITUTE
-                huey_job["kwargs"] = SENSITIVE_DATA_SUBSTITUTE
 
             extra["huey-job"] = huey_job
 
