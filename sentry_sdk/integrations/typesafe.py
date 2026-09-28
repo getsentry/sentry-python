@@ -45,7 +45,7 @@ if TYPE_CHECKING:
     class InputMessageModel(TypedDict):
         type: Literal["evaluation"]
         state: NotRequired[JSONContent]
-        questions: NotRequired[list[Union[NoulModel, ChoiceModel, ScoreModel]]]
+        questions: NotRequired[dict[str, Union[NoulModel, ChoiceModel, ScoreModel]]]
 
 
 try:
@@ -193,24 +193,22 @@ def _wrap_system_one(f: "Callable[..., Any]") -> "Callable[..., Any]":
             if model is not None:
                 set_on_span(SPANDATA.GEN_AI_REQUEST_MODEL, model)
 
-            state = args[0] if len(args) > 0 else kwargs.get("state")
-            questions = args[1] if len(args) > 1 else kwargs.get("questions")
-            if isinstance(questions, Mapping) and (
-                (
-                    has_data_collection_enabled(client.options)
-                    and client.options["data_collection"]["gen_ai"]["inputs"]
-                )
-                or (
-                    not has_data_collection_enabled(client.options)
-                    and should_send_default_pii()
-                )
+            if (
+                has_data_collection_enabled(client.options)
+                and client.options["data_collection"]["gen_ai"]["inputs"]
+            ) or (
+                not has_data_collection_enabled(client.options)
+                and should_send_default_pii()
             ):
                 input_message: "InputMessageModel" = {
                     "type": "evaluation",
                 }
+
+                state = args[0] if len(args) > 0 else kwargs.get("state")
                 if state is not None:
                     input_message["state"] = state
 
+                questions = args[1] if len(args) > 1 else kwargs.get("questions")
                 if isinstance(questions, Mapping):
                     input_message["questions"] = _transform_questions(questions)
 
@@ -271,9 +269,6 @@ def _wrap_system_one_async(f: "Callable[..., Any]") -> "Callable[..., Any]":
             if model is not None:
                 set_on_span(SPANDATA.GEN_AI_REQUEST_MODEL, model)
 
-            state = args[0] if len(args) > 0 else kwargs.get("state")
-            questions = args[1] if len(args) > 1 else kwargs.get("questions")
-
             if (
                 has_data_collection_enabled(client.options)
                 and client.options["data_collection"]["gen_ai"]["inputs"]
@@ -284,9 +279,12 @@ def _wrap_system_one_async(f: "Callable[..., Any]") -> "Callable[..., Any]":
                 input_message: "InputMessageModel" = {
                     "type": "evaluation",
                 }
+
+                state = args[0] if len(args) > 0 else kwargs.get("state")
                 if state is not None:
                     input_message["state"] = state
 
+                questions = args[1] if len(args) > 1 else kwargs.get("questions")
                 if isinstance(questions, Mapping):
                     input_message["questions"] = _transform_questions(questions)
 
