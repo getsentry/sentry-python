@@ -84,10 +84,10 @@ def test_sets_new_tracer_provider_with_otlp_exporter(sentry_init):
     )
 
     if OTLP_EXPORTER_VERSION is not None and OTLP_EXPORTER_VERSION >= (1, 45):
-        assert "X-Sentry-Auth" in exporter._client._headers
+        assert "x-sentry-auth" in exporter._client._headers
         assert (
             "Sentry sentry_key=mysecret, sentry_version=7, sentry_client=sentry.python/"
-            in exporter._client._headers["X-Sentry-Auth"]
+            in exporter._client._headers["x-sentry-auth"]
         )
         return
 
@@ -121,10 +121,10 @@ def test_uses_existing_tracer_provider_with_otlp_exporter(sentry_init):
         == "https://bla.ingest.sentry.io/api/12312012/integration/otlp/v1/traces/"
     )
     if OTLP_EXPORTER_VERSION is not None and OTLP_EXPORTER_VERSION >= (1, 45):
-        assert "X-Sentry-Auth" in exporter._client._headers
+        assert "x-sentry-auth" in exporter._client._headers
         assert (
             "Sentry sentry_key=mysecret, sentry_version=7, sentry_client=sentry.python/"
-            in exporter._client._headers["X-Sentry-Auth"]
+            in exporter._client._headers["x-sentry-auth"]
         )
         return
 
@@ -278,7 +278,7 @@ def test_collector_url_sets_endpoint(sentry_init):
     if OTLP_EXPORTER_VERSION is not None and OTLP_EXPORTER_VERSION >= (1, 45):
         assert (
             exporter._client._headers is None
-            or "X-Sentry-Auth" not in exporter._client._headers
+            or "x-sentry-auth" not in exporter._client._headers
         )
         return
 
@@ -325,7 +325,8 @@ def test_collector_url_none_falls_back_to_dsn(sentry_init):
     )
 
     if OTLP_EXPORTER_VERSION is not None and OTLP_EXPORTER_VERSION >= (1, 45):
-        assert "X-Sentry-Auth" in exporter._client._headers
+        assert "x-sentry-auth" in exporter._client._headers
+        return
 
     assert "X-Sentry-Auth" in exporter._headers
 
