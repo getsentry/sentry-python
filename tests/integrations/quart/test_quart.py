@@ -848,7 +848,11 @@ async def test_sensitive_header_scrubbing(sentry_init, capture_items):
 
     sentry_sdk.flush()
 
-    (segment,) = [item.payload for item in items]
+    spans = [item.payload for item in items]
+    assert len(spans) == 1
+
+    segment = spans[0]
+
     assert (
         segment["attributes"]["http.request.header.authorization"]
         == SENSITIVE_DATA_SUBSTITUTE

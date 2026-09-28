@@ -1408,13 +1408,6 @@ async def test_user_address_with_data_collection(
 
 @pytest.mark.asyncio
 async def test_sensitive_header_scrubbing(sentry_init, aiohttp_client, capture_items):
-    """
-    aiohttp's request-header pipeline routes through the shared
-    data_collection ``_filter_headers`` helper. The full allow/deny/off/
-    cookie semantics of that helper are exhaustively tested in
-    tests/integrations/wsgi/test_wsgi.py and tests/integrations/asgi/
-    test_asgi.py; here we only verify aiohttp wires into it correctly.
-    """
     sentry_init(
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
