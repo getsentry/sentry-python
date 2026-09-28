@@ -293,7 +293,16 @@ def _wrap_system_one(f: "Callable[..., Any]") -> "Callable[..., Any]":
             ):
                 set_on_span(
                     SPANDATA.GEN_AI_OUTPUT_MESSAGES,
-                    json.dumps(_transform_evaluation_answers(response.answers)),
+                    json.dumps(
+                        [
+                            {
+                                "type": "evaluation",
+                                "answers": _transform_evaluation_answers(
+                                    response.answers
+                                ),
+                            }
+                        ]
+                    ),
                 )
 
             return response
@@ -391,7 +400,16 @@ def _wrap_system_one_async(f: "Callable[..., Any]") -> "Callable[..., Any]":
             ):
                 set_on_span(
                     SPANDATA.GEN_AI_OUTPUT_MESSAGES,
-                    json.dumps(_transform_evaluation_answers(response.answers)),
+                    json.dumps(
+                        [
+                            {
+                                "type": "evaluation",
+                                "answers": _transform_evaluation_answers(
+                                    response.answers
+                                ),
+                            }
+                        ]
+                    ),
                 )
 
             return response
