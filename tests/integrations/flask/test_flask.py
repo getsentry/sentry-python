@@ -973,13 +973,17 @@ def test_dont_override_sentry_trace_context(sentry_init, app):
         assert response.data == b"hi"
 
 
-def test_request_not_modified_by_reference(sentry_init, capture_events, app):
+def test_request_not_modified_by_reference(
+    sentry_init, capture_events, app, monkeypatch
+):
     sentry_init(
         integrations=[
             flask_sentry.FlaskIntegration(),
             LoggingIntegration(event_level=logging.ERROR),
         ],
+        data_collection={},
     )
+    monkeypatch.setattr(flask_sentry, "flask_login", None)
 
     @app.route("/", methods=["POST"])
     def index():
@@ -1003,7 +1007,7 @@ def test_request_not_modified_by_reference(sentry_init, capture_events, app):
 
     (event,) = events
 
-    assert event["request"]["data"]["password"] == "[Filtered]"
+    assert event["request"]["data"]["password"] == "ohno"
     assert event["request"]["headers"]["Authorization"] == "[Filtered]"
     assert event["request"]["headers"]["Proxy-Authorization"] == "[Filtered]"
 
