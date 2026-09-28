@@ -48,19 +48,16 @@ if TYPE_CHECKING:
         questions: NotRequired[dict[str, Union[NoulModel, ChoiceModel, ScoreModel]]]
 
     class NoulEvaluationModel(TypedDict):
-        name: str
         type: Literal["noul"]
         noul: float
 
     class ChoiceEvaluationModel(TypedDict):
-        name: str
         type: Literal["choice"]
         choice: str
         probabilities: dict[str, float]
         confidence: float
 
     class ScoreEvaluationModel(TypedDict):
-        name: str
         type: Literal["score"]
         score: float
         probabilities: dict[int, float]
@@ -174,42 +171,35 @@ def _transform_questions(
 
 def _transform_evaluation_answers(
     answers: "dict[str, Answer]",
-) -> "list[Union[NoulEvaluationModel, ChoiceEvaluationModel, ScoreEvaluationModel]]":
-    items: "list[Union[NoulEvaluationModel, ChoiceEvaluationModel, ScoreEvaluationModel]]" = []
+) -> (
+    "dict[str, Union[NoulEvaluationModel, ChoiceEvaluationModel, ScoreEvaluationModel]]"
+):
+    items: "dict[str, Union[NoulEvaluationModel, ChoiceEvaluationModel, ScoreEvaluationModel]]" = {}
     for name, answer in answers.items():
         if isinstance(answer, NoulAnswer):
-            items.append(
-                {
-                    "name": name,
-                    "type": "noul",
-                    "noul": answer.noul,
-                }
-            )
+            items[name] = {
+                "type": "noul",
+                "noul": answer.noul,
+            }
             continue
 
         if isinstance(answer, ChoiceAnswer):
-            items.append(
-                {
-                    "name": name,
-                    "type": "choice",
-                    "choice": answer.choice,
-                    "probabilities": answer.probabilities,
-                    "confidence": answer.confidence,
-                }
-            )
+            items[name] = {
+                "type": "choice",
+                "choice": answer.choice,
+                "probabilities": answer.probabilities,
+                "confidence": answer.confidence,
+            }
             continue
 
         if isinstance(answer, ScoreAnswer):
-            items.append(
-                {
-                    "name": name,
-                    "type": "score",
-                    "score": answer.score,
-                    "probabilities": answer.probabilities,
-                    "confidence": answer.confidence,
-                    "legend": answer.legend,
-                }
-            )
+            items[name] = {
+                "type": "score",
+                "score": answer.score,
+                "probabilities": answer.probabilities,
+                "confidence": answer.confidence,
+                "legend": answer.legend,
+            }
             continue
 
     return items
