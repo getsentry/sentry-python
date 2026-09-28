@@ -1,5 +1,6 @@
+import json
 from functools import wraps
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import sentry_sdk
 from sentry_sdk.ai.utils import get_start_span_function
@@ -8,9 +9,40 @@ from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
 
 if TYPE_CHECKING:
-    from typing import Any, Callable
+    from typing import (
+        Any,
+        Callable,
+        Literal,
+        Mapping,
+        NotRequired,
+        Sequence,
+        TypedDict,
+        Union,
+    )
+
+    from typesafe_sdk import JSONContent
+    from typesafe_sdk._core.question_types import Questions
+
+    class NoulModel(TypedDict):
+        type: Literal["noul"]
+        name: str
+        instructions: NotRequired[JSONContent | None]
+
+    class ChoiceModel(TypedDict):
+        type: Literal["choice"]
+        name: str
+        criteria: NotRequired[Mapping[str, JSONContent | None]]
+        instructions: NotRequired[JSONContent | None]
+
+    class ScoreModel(TypedDict):
+        type: Literal["score"]
+        name: str
+        criteria: NotRequired[Sequence[JSONContent]]
+        instructions: NotRequired[JSONContent | None]
+
 
 try:
+    from typesafe_sdk import Choice, Noul, Score
     from typesafe_sdk._core.client.aio.client import AsyncTypeSafeClient
     from typesafe_sdk._core.client.sync.client import TypeSafeClient
     from typesafe_sdk._core.response_types import SystemOneResponse
@@ -28,6 +60,95 @@ class TypeSafeIntegration(Integration):
         AsyncTypeSafeClient.system_one = _wrap_system_one_async(  # type: ignore[method-assign]
             AsyncTypeSafeClient.system_one
         )
+
+
+def _transform_questions(
+    questions: "Questions",
+) -> "list[Union[NoulModel, ChoiceModel, ScoreModel]]":
+    transformed_questions: "list[Union[NoulModel, ChoiceModel, ScoreModel]]" = []
+    for name, question in questions.items():
+        if isinstance(question, Noul):
+            noul: "NoulModel" = {
+                "type": "noul",
+                "name": name,
+            }
+
+            if question.instructions is not None:
+                noul["instructions"] = question.instructions
+
+            transformed_questions.append(noul)
+            continue
+
+        if isinstance(question, Choice):
+            choice: "ChoiceModel" = {
+                "type": "choice",
+                "name": name,
+                "criteria": question.criteria,
+            }
+
+            if question.instructions is not None:
+                choice["instructions"] = question.instructions
+
+            transformed_questions.append(choice)
+            continue
+
+        if isinstance(question, Score):
+            score: "ScoreModel" = {
+                "type": "score",
+                "name": name,
+                "criteria": question.criteria,
+            }
+
+            if question.instructions is not None:
+                score["instructions"] = question.instructions
+
+            transformed_questions.append(score)
+            continue
+
+        if not isinstance(question, dict):
+            continue
+
+        question_type = question.get("type")
+        if question_type == "noul":
+            noul = {
+                "type": question_type,
+                "name": name,
+            }
+            if "instructions" in question:
+                noul["instructions"] = question["instructions"]
+
+            transformed_questions.append(noul)
+            continue
+
+        if question_type == "choice":
+            choice = {
+                "type": question_type,
+                "name": name,
+            }
+            if "criteria" in question:
+                choice["criteria"] = cast(
+                    "Mapping[str, JSONContent | None]", question["criteria"]
+                )
+            if "instructions" in question:
+                choice["instructions"] = question["instructions"]
+
+            transformed_questions.append(choice)
+            continue
+
+        if question_type == "score":
+            score = {
+                "type": question_type,
+                "name": name,
+            }
+            if "criteria" in question:
+                score["criteria"] = cast("Sequence[JSONContent]", question["criteria"])
+            if "instructions" in question:
+                score["instructions"] = question["instructions"]
+
+            transformed_questions.append(score)
+            continue
+
+    return transformed_questions
 
 
 def _wrap_system_one(f: "Callable[..., Any]") -> "Callable[..., Any]":
@@ -71,6 +192,20 @@ def _wrap_system_one(f: "Callable[..., Any]") -> "Callable[..., Any]":
         with span:
             if model is not None:
                 set_on_span(SPANDATA.GEN_AI_REQUEST_MODEL, model)
+
+            state = kwargs.get("state")
+            questions = kwargs.get("questions")
+            if state is not None and questions:
+                set_on_span(
+                    SPANDATA.GEN_AI_INPUT_MESSAGES,
+                    json.dumps(
+                        {
+                            "type": "evaluation",
+                            "state": state,
+                            "questions": _transform_questions(questions),
+                        }
+                    ),
+                )
 
             response = f(self, *args, **kwargs)
 
@@ -125,6 +260,20 @@ def _wrap_system_one_async(f: "Callable[..., Any]") -> "Callable[..., Any]":
         with span:
             if model is not None:
                 set_on_span(SPANDATA.GEN_AI_REQUEST_MODEL, model)
+
+            state = kwargs.get("state")
+            questions = kwargs.get("questions")
+            if state is not None and questions:
+                set_on_span(
+                    SPANDATA.GEN_AI_INPUT_MESSAGES,
+                    json.dumps(
+                        {
+                            "type": "evaluation",
+                            "state": state,
+                            "questions": _transform_questions(questions),
+                        }
+                    ),
+                )
 
             response = await f(self, *args, **kwargs)
 

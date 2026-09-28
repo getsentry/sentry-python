@@ -1,3 +1,4 @@
+import json
 from unittest import mock
 
 import pytest
@@ -119,6 +120,50 @@ def test_system_one(
         assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "jev-latest"
 
         assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "jev-latest"
+
+        assert json.loads(span["attributes"][SPANDATA.GEN_AI_INPUT_MESSAGES]) == {
+            "type": "evaluation",
+            "state": {
+                "subject": "Charged twice this month",
+                "body": "I see two charges of $49. I only have one account. Please fix this ASAP.",
+            },
+            "questions": [
+                {
+                    "type": "noul",
+                    "name": "spam",
+                    "instructions": "Spam?",
+                },
+                {
+                    "type": "choice",
+                    "name": "tone",
+                    "instructions": "Tone?",
+                    "criteria": {"friendly": None, "hostile": None},
+                },
+                {
+                    "type": "score",
+                    "name": "quality",
+                    "instructions": "Quality?",
+                    "criteria": ["bad", "ok", "great"],
+                },
+                {
+                    "type": "noul",
+                    "name": "spam_obj",
+                    "instructions": "Spam?",
+                },
+                {
+                    "type": "choice",
+                    "name": "tone_obj",
+                    "instructions": "Tone?",
+                    "criteria": {"friendly": None, "hostile": None},
+                },
+                {
+                    "type": "score",
+                    "name": "quality_obj",
+                    "instructions": "Quality?",
+                    "criteria": ["bad", "ok", "great"],
+                },
+            ],
+        }
     else:
         items = capture_items("transaction")
 
@@ -162,6 +207,50 @@ def test_system_one(
         assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "jev-latest"
 
         assert span["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "jev-latest"
+
+        assert json.loads(span["data"][SPANDATA.GEN_AI_INPUT_MESSAGES]) == {
+            "type": "evaluation",
+            "state": {
+                "subject": "Charged twice this month",
+                "body": "I see two charges of $49. I only have one account. Please fix this ASAP.",
+            },
+            "questions": [
+                {
+                    "type": "noul",
+                    "name": "spam",
+                    "instructions": "Spam?",
+                },
+                {
+                    "type": "choice",
+                    "name": "tone",
+                    "instructions": "Tone?",
+                    "criteria": {"friendly": None, "hostile": None},
+                },
+                {
+                    "type": "score",
+                    "name": "quality",
+                    "instructions": "Quality?",
+                    "criteria": ["bad", "ok", "great"],
+                },
+                {
+                    "type": "noul",
+                    "name": "spam_obj",
+                    "instructions": "Spam?",
+                },
+                {
+                    "type": "choice",
+                    "name": "tone_obj",
+                    "instructions": "Tone?",
+                    "criteria": {"friendly": None, "hostile": None},
+                },
+                {
+                    "type": "score",
+                    "name": "quality_obj",
+                    "instructions": "Quality?",
+                    "criteria": ["bad", "ok", "great"],
+                },
+            ],
+        }
 
 
 @pytest.mark.asyncio
@@ -234,6 +323,50 @@ async def test_system_one_async(
         assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "jev-latest"
 
         assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "jev-latest"
+
+        assert json.loads(span["attributes"][SPANDATA.GEN_AI_INPUT_MESSAGES]) == {
+            "type": "evaluation",
+            "state": {
+                "subject": "Charged twice this month",
+                "body": "I see two charges of $49. I only have one account. Please fix this ASAP.",
+            },
+            "questions": [
+                {
+                    "type": "noul",
+                    "name": "spam",
+                    "instructions": "Spam?",
+                },
+                {
+                    "type": "choice",
+                    "name": "tone",
+                    "instructions": "Tone?",
+                    "criteria": {"friendly": None, "hostile": None},
+                },
+                {
+                    "type": "score",
+                    "name": "quality",
+                    "instructions": "Quality?",
+                    "criteria": ["bad", "ok", "great"],
+                },
+                {
+                    "type": "noul",
+                    "name": "spam_obj",
+                    "instructions": "Spam?",
+                },
+                {
+                    "type": "choice",
+                    "name": "tone_obj",
+                    "instructions": "Tone?",
+                    "criteria": {"friendly": None, "hostile": None},
+                },
+                {
+                    "type": "score",
+                    "name": "quality_obj",
+                    "instructions": "Quality?",
+                    "criteria": ["bad", "ok", "great"],
+                },
+            ],
+        }
     else:
         items = capture_items("transaction")
 
@@ -280,3 +413,47 @@ async def test_system_one_async(
         assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "jev-latest"
 
         assert span["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "jev-latest"
+
+        assert json.loads(span["data"][SPANDATA.GEN_AI_INPUT_MESSAGES]) == {
+            "type": "evaluation",
+            "state": {
+                "subject": "Charged twice this month",
+                "body": "I see two charges of $49. I only have one account. Please fix this ASAP.",
+            },
+            "questions": [
+                {
+                    "type": "noul",
+                    "name": "spam",
+                    "instructions": "Spam?",
+                },
+                {
+                    "type": "choice",
+                    "name": "tone",
+                    "instructions": "Tone?",
+                    "criteria": {"friendly": None, "hostile": None},
+                },
+                {
+                    "type": "score",
+                    "name": "quality",
+                    "instructions": "Quality?",
+                    "criteria": ["bad", "ok", "great"],
+                },
+                {
+                    "type": "noul",
+                    "name": "spam_obj",
+                    "instructions": "Spam?",
+                },
+                {
+                    "type": "choice",
+                    "name": "tone_obj",
+                    "instructions": "Tone?",
+                    "criteria": {"friendly": None, "hostile": None},
+                },
+                {
+                    "type": "score",
+                    "name": "quality_obj",
+                    "instructions": "Quality?",
+                    "criteria": ["bad", "ok", "great"],
+                },
+            ],
+        }
