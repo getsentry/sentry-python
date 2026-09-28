@@ -312,6 +312,12 @@ TEST_SUITE_CONFIG = {
             "*": ["pytest-asyncio", "httpx"],
         },
     },
+    "mistral": {
+        "package": "mistralai",
+        "deps": {
+            "*": ["pytest-asyncio", "httpx"],
+        },
+    },
     "fastmcp": {
         "package": "fastmcp",
         "deps": {
@@ -554,6 +560,13 @@ TEST_SUITE_CONFIG = {
     "typer": {
         "package": "typer",
         "num_versions": 2,
+    },
+    "typesafe": {
+        "package": "typesafe-sdk",
+        "integration_name": "typesafe",
+        "deps": {
+            "*": ["pytest-asyncio"],
+        },
     },
     "unleash": {
         "package": "UnleashClient",

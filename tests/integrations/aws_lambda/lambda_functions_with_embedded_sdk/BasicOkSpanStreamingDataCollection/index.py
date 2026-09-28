@@ -8,13 +8,11 @@ sentry_sdk.init(
     traces_sample_rate=1.0,
     integrations=[AwsLambdaIntegration()],
     trace_lifecycle="stream",
-    _experiments={
-        "data_collection": {
-            "url_query_params": {
-                "mode": "denylist",
-                "terms": ["tracking"],
-            }
-        },
+    data_collection={
+        "url_query_params": {
+            "mode": "denylist",
+            "terms": ["tracking"],
+        }
     },
 )
 

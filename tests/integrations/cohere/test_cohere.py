@@ -614,7 +614,7 @@ def _init_with_data_collection(
         trace_lifecycle="stream" if span_streaming else "static",
     )
     if data_collection is not None:
-        kwargs["_experiments"] = {"data_collection": data_collection}
+        kwargs["data_collection"] = data_collection
 
     sentry_init(**kwargs)
 

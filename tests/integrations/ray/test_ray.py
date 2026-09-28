@@ -179,8 +179,8 @@ def example_task_with_kwargs(span_streaming: bool, **kwargs):
     [example_task, example_task_with_kwargs],
 )
 @pytest.mark.parametrize("span_streaming", [True, False])
-def test_tracing_in_ray_tasks(task_options, task, span_streaming):
-    sentry_sdk.init(
+def test_tracing_in_ray_tasks(sentry_init, task_options, task, span_streaming):
+    sentry_init(
         integrations=[RayIntegration()],
         disabled_integrations=[StdlibIntegration],
         transport=RayTestTransport(),
@@ -308,8 +308,8 @@ def test_tracing_in_ray_tasks(task_options, task, span_streaming):
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
-def test_errors_in_ray_tasks(span_streaming):
-    sentry_sdk.init(
+def test_errors_in_ray_tasks(sentry_init, span_streaming):
+    sentry_init(
         integrations=[RayIntegration()],
         disabled_integrations=[StdlibIntegration],
         transport=RayTestTransport(),
@@ -368,8 +368,8 @@ def test_errors_in_ray_tasks(span_streaming):
 # Arbitrary keyword argument to test all decorator paths
 @pytest.mark.parametrize("remote_kwargs", [{}, {"namespace": "actors"}])
 @pytest.mark.parametrize("span_streaming", [True, False])
-def test_tracing_in_ray_actors(remote_kwargs, span_streaming):
-    sentry_sdk.init(
+def test_tracing_in_ray_actors(sentry_init, remote_kwargs, span_streaming):
+    sentry_init(
         integrations=[RayIntegration()],
         disabled_integrations=[StdlibIntegration],
         transport=RayTestTransport(),
@@ -483,8 +483,8 @@ def test_tracing_in_ray_actors(remote_kwargs, span_streaming):
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
-def test_errors_in_ray_actors(span_streaming):
-    sentry_sdk.init(
+def test_errors_in_ray_actors(sentry_init, span_streaming):
+    sentry_init(
         integrations=[RayIntegration()],
         disabled_integrations=[StdlibIntegration],
         transport=RayLoggingTransport(),

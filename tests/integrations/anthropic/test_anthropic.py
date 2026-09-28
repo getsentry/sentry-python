@@ -403,7 +403,7 @@ def test_nonstreaming_create_message_data_collection(
         trace_lifecycle="stream" if span_streaming else "static",
     )
     if data_collection is not None:
-        sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
+        sentry_init_kwargs["data_collection"] = data_collection
     sentry_init(**sentry_init_kwargs)
 
     client = Anthropic(api_key="z")
@@ -492,7 +492,7 @@ def test_nonstreaming_create_message_data_collection_tools(
         trace_lifecycle="stream" if span_streaming else "static",
     )
     if data_collection is not None:
-        sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
+        sentry_init_kwargs["data_collection"] = data_collection
     sentry_init(**sentry_init_kwargs)
 
     client = Anthropic(api_key="z")
@@ -587,7 +587,7 @@ async def test_nonstreaming_create_message_data_collection_async(
         trace_lifecycle="stream" if span_streaming else "static",
     )
     if data_collection is not None:
-        sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
+        sentry_init_kwargs["data_collection"] = data_collection
     sentry_init(**sentry_init_kwargs)
 
     client = AsyncAnthropic(api_key="z")
@@ -705,7 +705,7 @@ def test_nonstreaming_create_message_data_collection_outputs(
         trace_lifecycle="stream" if span_streaming else "static",
     )
     if data_collection is not None:
-        sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
+        sentry_init_kwargs["data_collection"] = data_collection
     sentry_init(**sentry_init_kwargs)
 
     client = Anthropic(api_key="z")
@@ -833,7 +833,7 @@ async def test_nonstreaming_create_message_data_collection_outputs_async(
         trace_lifecycle="stream" if span_streaming else "static",
     )
     if data_collection is not None:
-        sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
+        sentry_init_kwargs["data_collection"] = data_collection
     sentry_init(**sentry_init_kwargs)
 
     client = AsyncAnthropic(api_key="z")
@@ -1390,7 +1390,7 @@ def test_streaming_create_message_data_collection(
         trace_lifecycle="stream" if span_streaming else "static",
     )
     if data_collection is not None:
-        sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
+        sentry_init_kwargs["data_collection"] = data_collection
     sentry_init(**sentry_init_kwargs)
 
     client = Anthropic(api_key="z")
@@ -1539,7 +1539,7 @@ def test_streaming_create_message_data_collection_outputs(
         trace_lifecycle="stream" if span_streaming else "static",
     )
     if data_collection is not None:
-        sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
+        sentry_init_kwargs["data_collection"] = data_collection
     sentry_init(**sentry_init_kwargs)
 
     client = Anthropic(api_key="z")
@@ -2346,7 +2346,7 @@ def test_stream_messages_data_collection_outputs(
         trace_lifecycle="stream" if span_streaming else "static",
     )
     if data_collection is not None:
-        sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
+        sentry_init_kwargs["data_collection"] = data_collection
     sentry_init(**sentry_init_kwargs)
 
     client = Anthropic(api_key="z")
@@ -3175,7 +3175,7 @@ async def test_streaming_create_message_data_collection_outputs_async(
         trace_lifecycle="stream" if span_streaming else "static",
     )
     if data_collection is not None:
-        sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
+        sentry_init_kwargs["data_collection"] = data_collection
     sentry_init(**sentry_init_kwargs)
 
     client = AsyncAnthropic(api_key="z")
@@ -3992,7 +3992,7 @@ async def test_stream_messages_data_collection_outputs_async(
         trace_lifecycle="stream" if span_streaming else "static",
     )
     if data_collection is not None:
-        sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
+        sentry_init_kwargs["data_collection"] = data_collection
     sentry_init(**sentry_init_kwargs)
 
     client = AsyncAnthropic(api_key="z")

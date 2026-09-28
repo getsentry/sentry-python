@@ -448,7 +448,7 @@ def test_clickhouse_client_breadcrumbs_with_data_collection(
 ) -> None:
     sentry_init(
         integrations=[ClickhouseDriverIntegration()],
-        _experiments={"data_collection": {"database_query_data": True}},
+        data_collection={"database_query_data": True},
     )
     events = capture_events()
 
@@ -552,7 +552,7 @@ def test_clickhouse_client_breadcrumbs_with_data_collection_span_streaming(
     sentry_init(
         integrations=[ClickhouseDriverIntegration()],
         trace_lifecycle="stream",
-        _experiments={"data_collection": {"database_query_data": True}},
+        data_collection={"database_query_data": True},
     )
     events = capture_events()
 
@@ -654,7 +654,7 @@ def test_clickhouse_client_breadcrumbs_with_data_collection_disabled(
 ) -> None:
     sentry_init(
         integrations=[ClickhouseDriverIntegration()],
-        _experiments={"data_collection": {"database_query_data": False}},
+        data_collection={"database_query_data": False},
     )
     events = capture_events()
 
@@ -754,7 +754,7 @@ def test_clickhouse_client_breadcrumbs_with_data_collection_disabled_span_stream
     sentry_init(
         integrations=[ClickhouseDriverIntegration()],
         trace_lifecycle="stream",
-        _experiments={"data_collection": {"database_query_data": False}},
+        data_collection={"database_query_data": False},
     )
     events = capture_events()
 
@@ -854,7 +854,7 @@ def test_clickhouse_client_breadcrumbs_data_collection_overrides_pii(
     sentry_init(
         integrations=[ClickhouseDriverIntegration()],
         send_default_pii=True,
-        _experiments={"data_collection": {"database_query_data": False}},
+        data_collection={"database_query_data": False},
     )
     events = capture_events()
 
@@ -955,7 +955,7 @@ def test_clickhouse_client_breadcrumbs_data_collection_overrides_pii_span_stream
         integrations=[ClickhouseDriverIntegration()],
         send_default_pii=True,
         trace_lifecycle="stream",
-        _experiments={"data_collection": {"database_query_data": False}},
+        data_collection={"database_query_data": False},
     )
     events = capture_events()
 
@@ -1054,7 +1054,7 @@ def test_clickhouse_client_breadcrumbs_with_data_collection_default(
 ) -> None:
     sentry_init(
         integrations=[ClickhouseDriverIntegration()],
-        _experiments={"data_collection": {}},
+        data_collection={},
     )
     events = capture_events()
 
@@ -1158,7 +1158,7 @@ def test_clickhouse_client_breadcrumbs_with_data_collection_default_span_streami
     sentry_init(
         integrations=[ClickhouseDriverIntegration()],
         trace_lifecycle="stream",
-        _experiments={"data_collection": {}},
+        data_collection={},
     )
     events = capture_events()
 
@@ -1264,9 +1264,7 @@ def test_clickhouse_client_span_streaming_with_data_collection(
         integrations=[ClickhouseDriverIntegration()],
         traces_sample_rate=1.0,
         trace_lifecycle="stream",
-        _experiments={
-            "data_collection": {"database_query_data": True},
-        },
+        data_collection={"database_query_data": True},
     )
     items = capture_items("span")
 
@@ -1299,7 +1297,7 @@ def test_clickhouse_client_send_data_generator_with_data_collection(
 ) -> None:
     sentry_init(
         integrations=[ClickhouseDriverIntegration()],
-        _experiments={"data_collection": {"database_query_data": True}},
+        data_collection={"database_query_data": True},
     )
     events = capture_events()
 
@@ -1329,7 +1327,7 @@ def test_clickhouse_client_send_data_generator_with_data_collection_disabled(
 ) -> None:
     sentry_init(
         integrations=[ClickhouseDriverIntegration()],
-        _experiments={"data_collection": {"database_query_data": False}},
+        data_collection={"database_query_data": False},
     )
     events = capture_events()
 
@@ -1360,7 +1358,7 @@ def test_clickhouse_client_send_data_generator_span_streaming_with_data_collecti
     sentry_init(
         integrations=[ClickhouseDriverIntegration()],
         trace_lifecycle="stream",
-        _experiments={"data_collection": {"database_query_data": True}},
+        data_collection={"database_query_data": True},
     )
     events = capture_events()
 
@@ -1391,7 +1389,7 @@ def test_clickhouse_client_send_data_generator_span_streaming_with_data_collecti
     sentry_init(
         integrations=[ClickhouseDriverIntegration()],
         trace_lifecycle="stream",
-        _experiments={"data_collection": {"database_query_data": False}},
+        data_collection={"database_query_data": False},
     )
     events = capture_events()
 

@@ -311,7 +311,7 @@ def test_event_processor_data_collection(
     init_kwargs = {
         "integrations": [StrawberryIntegration(async_execution=async_execution)]
         + framework_integrations,
-        "_experiments": {"data_collection": data_collection},
+        "data_collection": data_collection,
     }
     if send_default_pii is not None:
         init_kwargs["send_default_pii"] = send_default_pii
@@ -376,7 +376,7 @@ def test_response_data_collection(
     sentry_init(
         integrations=[StrawberryIntegration(async_execution=async_execution)]
         + framework_integrations,
-        _experiments={"data_collection": data_collection},
+        data_collection=data_collection,
     )
     events = capture_events()
 
@@ -439,7 +439,7 @@ def test_request_data_collection_no_framework(
     # the integration's public event-processing path
     sentry_init(
         integrations=[StrawberryIntegration()],
-        _experiments={"data_collection": data_collection},
+        data_collection=data_collection,
     )
     events = capture_events()
 
@@ -479,9 +479,7 @@ def test_request_data_collection_no_framework(
 def test_request_data_collection_no_variables(sentry_init, capture_events):
     sentry_init(
         integrations=[StrawberryIntegration()],
-        _experiments={
-            "data_collection": {"graphql": {"document": True, "variables": True}}
-        },
+        data_collection={"graphql": {"document": True, "variables": True}},
     )
     events = capture_events()
 
@@ -1139,7 +1137,7 @@ def test_graphql_span_data_collection(
         + framework_integrations,
         "traces_sample_rate": 1,
         "trace_lifecycle": "stream" if span_streaming else "static",
-        "_experiments": {"data_collection": data_collection},
+        "data_collection": data_collection,
     }
     if send_default_pii is not None:
         init_kwargs["send_default_pii"] = send_default_pii
@@ -1234,9 +1232,7 @@ def test_handle_none_query_gracefully_with_data_collection(
             StrawberryIntegration(async_execution=async_execution),
         ]
         + framework_integrations,
-        _experiments={
-            "data_collection": {"graphql": {"document": True, "variables": True}}
-        },
+        data_collection={"graphql": {"document": True, "variables": True}},
     )
     events = capture_events()
 

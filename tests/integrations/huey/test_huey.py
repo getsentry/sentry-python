@@ -93,7 +93,7 @@ def test_task_transaction_or_segment(
         execute_huey_task(
             huey, division, 1, int(not task_fails), exceptions=(DivisionByZero,)
         )
-        sentry_sdk.get_client().flush()
+        sentry_sdk.flush()
 
         payloads = [i.payload for i in items]
         # The task is enqueued without a wrapping span, so in streaming mode no
@@ -156,7 +156,7 @@ def test_task_retry(capture_events, capture_items, init_huey, has_span_streaming
     if has_span_streaming:
         items = capture_items("span")
         execute_huey_task(huey, retry_task, context)
-        sentry_sdk.get_client().flush()
+        sentry_sdk.flush()
 
         payloads = [i.payload for i in items]
         # The initial enqueue happens without a wrapping span, so no producer
@@ -179,7 +179,7 @@ def test_task_retry(capture_events, capture_items, init_huey, has_span_streaming
         task = huey.dequeue()
         huey.execute(task)
 
-        sentry_sdk.get_client().flush()
+        sentry_sdk.flush()
 
         all_payloads = [i.payload for i in items]
 
@@ -223,7 +223,7 @@ def test_task_cancel_does_not_override_status(
     if has_span_streaming:
         items = capture_items("span")
         execute_huey_task(huey, cancel_task)
-        sentry_sdk.get_client().flush()
+        sentry_sdk.flush()
 
         payloads = [i.payload for i in items]
         # Enqueued without a wrapping span -> no producer span in streaming mode.
@@ -269,7 +269,7 @@ def test_task_lock(
         with huey.lock_task(lock_name):
             assert huey.is_locked(task_lock_name) == should_be_locked
             execute_huey_task(huey, maybe_locked_task)
-        sentry_sdk.get_client().flush()
+        sentry_sdk.flush()
 
         payloads = [i.payload for i in items]
         # Enqueued without a wrapping span -> no producer span in streaming mode.
@@ -325,7 +325,7 @@ def test_task_args_kwargs_data_collection(
     if has_span_streaming:
         items = capture_items("event")
         execute_huey_task(huey, division, 1, b=0, exceptions=(DivisionByZero,))
-        sentry_sdk.get_client().flush()
+        sentry_sdk.flush()
         events = [item.payload for item in items]
     else:
         events = capture_events()
@@ -443,7 +443,7 @@ def test_huey_enqueue_group(
             task = huey.dequeue()
             huey.execute(task)
 
-        sentry_sdk.get_client().flush()
+        sentry_sdk.flush()
         assert len(items) == 6
 
         (
@@ -575,7 +575,7 @@ def test_huey_enqueue_chord(
             task = huey.dequeue()
             huey.execute(task)
 
-        sentry_sdk.get_client().flush()
+        sentry_sdk.flush()
         assert len(items) == 6
 
         (

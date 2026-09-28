@@ -145,7 +145,7 @@ def test_sentry_logs_warning(
 
     logger.warning("this is {} a {}", "just", "template")
 
-    sentry_sdk.get_client().flush()
+    sentry_sdk.flush()
     logs = [item.payload for item in items]
 
     attrs = logs[0]["attributes"]
@@ -168,7 +168,7 @@ def test_sentry_logs_debug(
     envelopes = capture_envelopes()
 
     logger.debug("this is %s a template %s", "1", "2")
-    sentry_sdk.get_client().flush()
+    sentry_sdk.flush()
 
     assert len(envelopes) == 0
 
@@ -194,7 +194,7 @@ def test_sentry_log_levels(sentry_init, capture_items, uninstall_integration, re
     logger.error("this is a log")
     logger.critical("this is a log")
 
-    sentry_sdk.get_client().flush()
+    sentry_sdk.flush()
     logs = [item.payload for item in items]
     assert len(logs) == 4
 
@@ -229,7 +229,7 @@ def test_disable_loguru_logs(
     logger.error("this is a log")
     logger.critical("this is a log")
 
-    sentry_sdk.get_client().flush()
+    sentry_sdk.flush()
     logs = [item.payload for item in items]
     assert len(logs) == 0
 
@@ -251,7 +251,7 @@ def test_disable_sentry_logs_by_default(
     logger.error("this is a log")
     logger.critical("this is a log")
 
-    sentry_sdk.get_client().flush()
+    sentry_sdk.flush()
     logs = [item.payload for item in items]
     assert len(logs) == 0
 
@@ -274,7 +274,7 @@ def test_enable_sentry_logs_if_enable_logs_is_true(
     logger.error("this is a log")
     logger.critical("this is a log")
 
-    sentry_sdk.get_client().flush()
+    sentry_sdk.flush()
     logs = [item.payload for item in items]
     assert len(logs) == 5
 
@@ -299,7 +299,7 @@ def test_disable_sentry_logs_if_enable_logs_is_true_but_integration_option_is_fa
     logger.error("this is a log")
     logger.critical("this is a log")
 
-    sentry_sdk.get_client().flush()
+    sentry_sdk.flush()
     logs = [item.payload for item in items]
     assert not logs
 
@@ -323,7 +323,7 @@ def test_disable_sentry_logs_explicitly(
     logger.error("this is a log")
     logger.critical("this is a log")
 
-    sentry_sdk.get_client().flush()
+    sentry_sdk.flush()
     logs = [item.payload for item in items]
     assert len(logs) == 0
 
@@ -348,7 +348,7 @@ def test_no_log_infinite_loop(
     envelopes = capture_envelopes()
 
     logger.debug("this is %s a template %s", "1", "2")
-    sentry_sdk.get_client().flush()
+    sentry_sdk.flush()
 
     assert len(envelopes) == 1
 
@@ -366,7 +366,7 @@ def test_logging_errors(
 
     logger.error(Exception("test exc 1"))
     logger.error("error is %s", Exception("test exc 2"))
-    sentry_sdk.get_client().flush()
+    sentry_sdk.flush()
 
     error_event_1 = envelopes[0].items[0].payload.json
     assert error_event_1["level"] == "error"
@@ -424,7 +424,7 @@ def test_log_strips_project_root(
     with patch("loguru._handler.Message", FakeMessage):
         logger.error("some message")
 
-    sentry_sdk.get_client().flush()
+    sentry_sdk.flush()
 
     logs = [item.payload for item in items]
     assert len(logs) == 1
@@ -473,7 +473,7 @@ def test_log_keeps_full_path_if_not_in_project_root(
     with patch("loguru._handler.Message", FakeMessage):
         logger.error("some message")
 
-    sentry_sdk.get_client().flush()
+    sentry_sdk.flush()
 
     logs = [item.payload for item in items]
     assert len(logs) == 1
@@ -491,7 +491,7 @@ def test_logger_with_all_attributes(
     items = capture_items("log")
 
     logger.warning("log #{}", 1)
-    sentry_sdk.get_client().flush()
+    sentry_sdk.flush()
 
     logs = [item.payload for item in items]
 
@@ -564,7 +564,7 @@ def test_logger_capture_parameters_from_args(
 
     logger.warning("Task ID: {}", 123)
 
-    sentry_sdk.get_client().flush()
+    sentry_sdk.flush()
 
     logs = [item.payload for item in items]
 
@@ -583,7 +583,7 @@ def test_logger_capture_parameters_from_kwargs(
 
     logger.warning("Task ID: {task_id}", task_id=123)
 
-    sentry_sdk.get_client().flush()
+    sentry_sdk.flush()
 
     logs = [item.payload for item in items]
 
@@ -603,7 +603,7 @@ def test_logger_capture_parameters_from_contextualize(
     with logger.contextualize(task_id=123):
         logger.warning("Log")
 
-    sentry_sdk.get_client().flush()
+    sentry_sdk.flush()
 
     logs = [item.payload for item in items]
 
@@ -621,7 +621,7 @@ def test_logger_capture_parameters_from_bind(
     items = capture_items("log")
 
     logger.bind(task_id=123).warning("Log")
-    sentry_sdk.get_client().flush()
+    sentry_sdk.flush()
 
     logs = [item.payload for item in items]
 
@@ -639,7 +639,7 @@ def test_logger_capture_parameters_from_patch(
     items = capture_items("log")
 
     logger.patch(lambda record: record["extra"].update(task_id=123)).warning("Log")
-    sentry_sdk.get_client().flush()
+    sentry_sdk.flush()
 
     logs = [item.payload for item in items]
 
@@ -657,7 +657,7 @@ def test_no_parameters_no_template(
     items = capture_items("log")
 
     logger.warning("Logging a hardcoded warning")
-    sentry_sdk.get_client().flush()
+    sentry_sdk.flush()
 
     logs = [item.payload for item in items]
 

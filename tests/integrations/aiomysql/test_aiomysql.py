@@ -218,7 +218,7 @@ async def test_execute_many_record_params_with_data_collection_enabled(
 ) -> None:
     sentry_init(
         integrations=[AioMySQLIntegration()],
-        _experiments={"data_collection": {"database_query_data": True}},
+        data_collection={"database_query_data": True},
     )
     events = capture_events()
 
@@ -266,7 +266,7 @@ async def test_execute_many_record_params_with_data_collection_disabled(
 ) -> None:
     sentry_init(
         integrations=[AioMySQLIntegration(record_params=True)],
-        _experiments={"data_collection": {"database_query_data": False}},
+        data_collection={"database_query_data": False},
     )
     events = capture_events()
 
@@ -307,7 +307,7 @@ async def test_execute_many_record_params_with_data_collection_default(
 ) -> None:
     sentry_init(
         integrations=[AioMySQLIntegration()],
-        _experiments={"data_collection": {}},
+        data_collection={},
     )
     events = capture_events()
 
@@ -444,7 +444,7 @@ async def test_execute_record_params_with_data_collection_enabled(
 ) -> None:
     sentry_init(
         integrations=[AioMySQLIntegration()],
-        _experiments={"data_collection": {"database_query_data": True}},
+        data_collection={"database_query_data": True},
     )
     events = capture_events()
 
@@ -485,7 +485,7 @@ async def test_execute_record_params_with_data_collection_disabled(
 ) -> None:
     sentry_init(
         integrations=[AioMySQLIntegration(record_params=True)],
-        _experiments={"data_collection": {"database_query_data": False}},
+        data_collection={"database_query_data": False},
     )
     events = capture_events()
 
@@ -523,7 +523,7 @@ async def test_execute_record_params_with_data_collection_default(
 ) -> None:
     sentry_init(
         integrations=[AioMySQLIntegration()],
-        _experiments={"data_collection": {}},
+        data_collection={},
     )
     events = capture_events()
 

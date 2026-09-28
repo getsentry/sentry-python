@@ -149,6 +149,7 @@ _MIN_VERSIONS = {
     "litellm": (1, 77, 5),
     "loguru": (0, 7, 0),
     "mcp": (1, 15, 0),
+    "mistral": (2, 0, 5),
     "openai": (1, 0, 0),
     "openai_agents": (0, 0, 19),
     "openfeature": (0, 7, 1),
@@ -167,6 +168,7 @@ _MIN_VERSIONS = {
     "strawberry": (0, 209, 5),
     "tornado": (6, 0),
     "typer": (0, 15),
+    "typesafe": (0, 7),
     "unleash": (6, 0, 1),
 }
 

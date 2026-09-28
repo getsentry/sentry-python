@@ -185,7 +185,7 @@ def test_event_processor_data_collection_sync(
 ):
     init_kwargs = {
         "integrations": [GrapheneIntegration(), FlaskIntegration()],
-        "_experiments": {"data_collection": data_collection},
+        "data_collection": data_collection,
     }
     if send_default_pii is not None:
         init_kwargs["send_default_pii"] = send_default_pii
@@ -231,7 +231,7 @@ def test_event_processor_data_collection_async(
             FastApiIntegration(),
             StarletteIntegration(),
         ],
-        "_experiments": {"data_collection": data_collection},
+        "data_collection": data_collection,
     }
 
     if send_default_pii is not None:
@@ -384,7 +384,7 @@ def test_graphql_span_data_collection(
         "integrations": [GrapheneIntegration(), FlaskIntegration()],
         "traces_sample_rate": 1.0,
         "default_integrations": False,
-        "_experiments": {"data_collection": data_collection},
+        "data_collection": data_collection,
     }
     if send_default_pii is not None:
         init_kwargs["send_default_pii"] = send_default_pii
@@ -458,7 +458,7 @@ def test_graphql_streamed_span_holds_query_information(
     client = sync_app.test_client()
     client.post("/graphql", json=query)
 
-    sentry_sdk.get_client().flush()
+    sentry_sdk.flush()
 
     spans = [item.payload for item in items]
     assert len(spans) == 2
@@ -494,7 +494,7 @@ def test_graphql_streamed_span_data_collection(
         "traces_sample_rate": 1.0,
         "default_integrations": False,
         "trace_lifecycle": "stream",
-        "_experiments": {"data_collection": data_collection},
+        "data_collection": data_collection,
     }
     if send_default_pii is not None:
         init_kwargs["send_default_pii"] = send_default_pii
@@ -518,7 +518,7 @@ def test_graphql_streamed_span_data_collection(
     client = sync_app.test_client()
     client.post("/graphql", json=query)
 
-    sentry_sdk.get_client().flush()
+    sentry_sdk.flush()
 
     spans = [item.payload for item in items]
     assert len(spans) == 2
@@ -612,7 +612,7 @@ def test_breadcrumbs_hold_query_information_on_error_with_span_streaming(
     client = sync_app.test_client()
     client.post("/graphql", json=query)
 
-    sentry_sdk.get_client().flush()
+    sentry_sdk.flush()
 
     events = [item.payload for item in items if item.type == "event"]
     assert len(events) == 1

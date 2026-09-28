@@ -831,10 +831,8 @@ async def test_get_request_data_url_with_filtered_host(
     # substituted "[Filtered]" value.
     sentry_init(
         traces_sample_rate=1.0,
-        _experiments={
-            "data_collection": {
-                "http_headers": {"request": {"mode": "allowlist", "terms": []}}
-            }
+        data_collection={
+            "http_headers": {"request": {"mode": "allowlist", "terms": []}}
         },
     )
     app = SentryAsgiMiddleware(asgi3_app)
@@ -863,10 +861,8 @@ async def test_get_request_attributes_url_with_filtered_host(
         send_default_pii=True,
         traces_sample_rate=1.0,
         trace_lifecycle="stream",
-        _experiments={
-            "data_collection": {
-                "http_headers": {"request": {"mode": "allowlist", "terms": []}}
-            },
+        data_collection={
+            "http_headers": {"request": {"mode": "allowlist", "terms": []}}
         },
     )
     app = SentryAsgiMiddleware(asgi3_app)
@@ -895,9 +891,7 @@ async def test_get_request_attributes_url_with_headers_off(
         send_default_pii=True,
         traces_sample_rate=1.0,
         trace_lifecycle="stream",
-        _experiments={
-            "data_collection": {"http_headers": {"request": {"mode": "off"}}},
-        },
+        data_collection={"http_headers": {"request": {"mode": "off"}}},
     )
     app = SentryAsgiMiddleware(asgi3_app)
 
@@ -942,16 +936,14 @@ def _http_scope():
             id="defaults",
         ),
         pytest.param(
-            {"_experiments": {"data_collection": {}}},
+            {"data_collection": {}},
             "token=%5BFiltered%5D&theme=dark&lang=en&session=%5BFiltered%5D",
             id="data_collection_denylist_default",
         ),
         pytest.param(
             {
-                "_experiments": {
-                    "data_collection": {
-                        "url_query_params": {"mode": "denylist", "terms": ["theme"]}
-                    }
+                "data_collection": {
+                    "url_query_params": {"mode": "denylist", "terms": ["theme"]}
                 }
             },
             "token=%5BFiltered%5D&theme=%5BFiltered%5D&lang=en&session=%5BFiltered%5D",
@@ -959,10 +951,8 @@ def _http_scope():
         ),
         pytest.param(
             {
-                "_experiments": {
-                    "data_collection": {
-                        "url_query_params": {"mode": "allowlist", "terms": ["theme"]}
-                    }
+                "data_collection": {
+                    "url_query_params": {"mode": "allowlist", "terms": ["theme"]}
                 }
             },
             "token=%5BFiltered%5D&theme=dark&lang=%5BFiltered%5D&session=%5BFiltered%5D",
@@ -970,21 +960,15 @@ def _http_scope():
         ),
         pytest.param(
             {
-                "_experiments": {
-                    "data_collection": {
-                        "url_query_params": {"mode": "allowlist", "terms": ["token"]}
-                    }
+                "data_collection": {
+                    "url_query_params": {"mode": "allowlist", "terms": ["token"]}
                 }
             },
             "token=%5BFiltered%5D&theme=%5BFiltered%5D&lang=%5BFiltered%5D&session=%5BFiltered%5D",
             id="data_collection_allowlist_sensitive_term",
         ),
         pytest.param(
-            {
-                "_experiments": {
-                    "data_collection": {"url_query_params": {"mode": "off"}}
-                }
-            },
+            {"data_collection": {"url_query_params": {"mode": "off"}}},
             None,
             id="data_collection_off",
         ),
@@ -992,9 +976,7 @@ def _http_scope():
         pytest.param(
             {
                 "send_default_pii": True,
-                "_experiments": {
-                    "data_collection": {"url_query_params": {"mode": "off"}}
-                },
+                "data_collection": {"url_query_params": {"mode": "off"}},
             },
             None,
             id="data_collection_wins_over_send_default_pii",
@@ -1044,7 +1026,7 @@ async def test_get_request_data_query_string_empty_legacy_is_none(
 async def test_get_request_data_empty_query_string_dropped_with_data_collection(
     sentry_init, capture_events, asgi3_app
 ):
-    sentry_init(traces_sample_rate=1.0, _experiments={"data_collection": {}})
+    sentry_init(traces_sample_rate=1.0, data_collection={})
     app = SentryAsgiMiddleware(asgi3_app)
 
     events = capture_events()
@@ -1080,17 +1062,15 @@ async def test_get_request_data_empty_query_string_dropped_with_data_collection(
             id="defaults",
         ),
         pytest.param(
-            {"_experiments": {"data_collection": {}}},
+            {"data_collection": {}},
             "token=%5BFiltered%5D&theme=dark&lang=en&session=%5BFiltered%5D",
             "http://example.com/foo?token=%5BFiltered%5D&theme=dark&lang=en&session=%5BFiltered%5D",
             id="data_collection_denylist_default",
         ),
         pytest.param(
             {
-                "_experiments": {
-                    "data_collection": {
-                        "url_query_params": {"mode": "allowlist", "terms": ["theme"]}
-                    }
+                "data_collection": {
+                    "url_query_params": {"mode": "allowlist", "terms": ["theme"]}
                 }
             },
             "token=%5BFiltered%5D&theme=dark&lang=%5BFiltered%5D&session=%5BFiltered%5D",
@@ -1098,11 +1078,7 @@ async def test_get_request_data_empty_query_string_dropped_with_data_collection(
             id="data_collection_allowlist",
         ),
         pytest.param(
-            {
-                "_experiments": {
-                    "data_collection": {"url_query_params": {"mode": "off"}}
-                }
-            },
+            {"data_collection": {"url_query_params": {"mode": "off"}}},
             None,
             "http://example.com/foo",
             id="data_collection_off",
@@ -1110,9 +1086,7 @@ async def test_get_request_data_empty_query_string_dropped_with_data_collection(
         pytest.param(
             {
                 "send_default_pii": True,
-                "_experiments": {
-                    "data_collection": {"url_query_params": {"mode": "off"}}
-                },
+                "data_collection": {"url_query_params": {"mode": "off"}},
             },
             None,
             "http://example.com/foo",
@@ -1159,13 +1133,13 @@ async def test_get_request_attributes_query_data_collection(
 
 USER_INFO_CASES = [
     pytest.param(
-        {"_experiments": {"data_collection": {"user_info": False}}},
+        {"data_collection": {"user_info": False}},
         True,
         False,
         id="dc_user_info_false",
     ),
     pytest.param(
-        {"_experiments": {"data_collection": {}}},
+        {"data_collection": {}},
         True,
         True,
         id="dc_default_user_info",
@@ -1173,7 +1147,7 @@ USER_INFO_CASES = [
     pytest.param(
         {
             "send_default_pii": True,
-            "_experiments": {"data_collection": {"user_info": False}},
+            "data_collection": {"user_info": False},
         },
         True,
         False,
@@ -1192,7 +1166,7 @@ USER_INFO_CASES = [
         id="legacy_pii_false",
     ),
     pytest.param(
-        {"_experiments": {"data_collection": {}}},
+        {"data_collection": {}},
         False,
         False,
         id="no_client",
@@ -1438,24 +1412,24 @@ async def test_custom_transaction_name(
         pytest.param({"send_default_pii": True}, True, id="legacy_pii_true"),
         pytest.param({"send_default_pii": False}, False, id="legacy_pii_false"),
         pytest.param(
-            {"_experiments": {"data_collection": {}}},
+            {"data_collection": {}},
             True,
             id="dc_default_user_info",
         ),
         pytest.param(
-            {"_experiments": {"data_collection": {"user_info": True}}},
+            {"data_collection": {"user_info": True}},
             True,
             id="dc_user_info_true",
         ),
         pytest.param(
-            {"_experiments": {"data_collection": {"user_info": False}}},
+            {"data_collection": {"user_info": False}},
             False,
             id="dc_user_info_false",
         ),
         pytest.param(
             {
                 "send_default_pii": True,
-                "_experiments": {"data_collection": {"user_info": False}},
+                "data_collection": {"user_info": False},
             },
             False,
             id="dc_wins_over_pii",

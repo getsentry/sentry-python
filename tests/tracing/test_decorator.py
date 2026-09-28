@@ -100,7 +100,7 @@ def test_trace_decorator_span_streaming(sentry_init, capture_items):
     result = traced_function()
     assert result == "ok"
 
-    sentry_sdk.get_client().flush()
+    sentry_sdk.flush()
     spans = [item.payload for item in items]
 
     assert len(spans) == 1
@@ -129,7 +129,7 @@ def test_trace_decorator_arguments_span_streaming(sentry_init, capture_items):
     result = traced_function()
     assert result == "ok"
 
-    sentry_sdk.get_client().flush()
+    sentry_sdk.flush()
     spans = [item.payload for item in items]
 
     assert len(spans) == 1
@@ -157,7 +157,7 @@ def test_trace_decorator_inactive_span_streaming(sentry_init, capture_items):
     result = traced_function()
     assert result == "ok"
 
-    sentry_sdk.get_client().flush()
+    sentry_sdk.flush()
     spans = [item.payload for item in items]
 
     assert len(spans) == 2
@@ -185,7 +185,7 @@ async def test_trace_decorator_async_span_streaming(sentry_init, capture_items):
     result = await traced_function()
     assert result == "ok"
 
-    sentry_sdk.get_client().flush()
+    sentry_sdk.flush()
     spans = [item.payload for item in items]
 
     assert len(spans) == 1
@@ -217,7 +217,7 @@ async def test_trace_decorator_async_arguments_span_streaming(
     result = await traced_function()
     assert result == "ok"
 
-    sentry_sdk.get_client().flush()
+    sentry_sdk.flush()
     spans = [item.payload for item in items]
 
     assert len(spans) == 1
@@ -248,7 +248,7 @@ async def test_trace_decorator_async_inactive_span_streaming(
     result = await traced_function()
     assert result == "ok"
 
-    sentry_sdk.get_client().flush()
+    sentry_sdk.flush()
     spans = [item.payload for item in items]
 
     assert len(spans) == 2
@@ -879,10 +879,8 @@ def test_span_templates_ai_data_collection(
     sentry_init(
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={
-            "data_collection": {
-                "gen_ai": {"inputs": collect_inputs, "outputs": collect_outputs}
-            }
+        data_collection={
+            "gen_ai": {"inputs": collect_inputs, "outputs": collect_outputs}
         },
     )
 
