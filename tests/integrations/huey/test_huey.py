@@ -10,7 +10,7 @@ from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.huey import HueyIntegration
 from sentry_sdk.traces import SegmentNameSource, SpanStatus
 from sentry_sdk.utils import parse_version
-from tests.integrations.utils import DATA_COLLECTION_QUEUES_CASES_LEGACY
+from tests.integrations.utils import DATA_COLLECTION_QUEUES_CASES
 
 HUEY_VERSION = parse_version(HUEY_VERSION)
 
@@ -23,13 +23,13 @@ except ImportError:
 
 @pytest.fixture
 def init_huey(sentry_init):
-    def inner(init_kwargs=None):
+    def inner(data_collection=None):
         sentry_init_kwargs = {
             "integrations": [HueyIntegration()],
             "traces_sample_rate": 1.0,
-            "send_default_pii": True,
         }
-        sentry_init_kwargs.update(init_kwargs or {})
+        if data_collection is not None:
+            sentry_init_kwargs["data_collection"] = data_collection
         sentry_init(**sentry_init_kwargs)
 
         return MemoryHuey(name="sentry_sdk")
@@ -204,17 +204,17 @@ def test_task_lock(capture_items, init_huey, lock_name):
 
 
 @pytest.mark.parametrize(
-    "init_kwargs,expected_args,expected_kwargs",
-    DATA_COLLECTION_QUEUES_CASES_LEGACY,
+    "data_collection,expected_args,expected_kwargs",
+    DATA_COLLECTION_QUEUES_CASES,
 )
 def test_task_args_kwargs_data_collection(
     capture_items,
     init_huey,
-    init_kwargs,
+    data_collection,
     expected_args,
     expected_kwargs,
 ):
-    huey = init_huey(init_kwargs=init_kwargs)
+    huey = init_huey(data_collection=data_collection)
 
     @huey.task()
     def division(a, b):
