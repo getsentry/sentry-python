@@ -768,6 +768,65 @@ def test_event_processor_drop_records_client_report(
         sentry_sdk.scope.global_event_processors = old_processors
 
 
+@pytest.mark.tests_internal_exceptions
+def test_before_send_exception_records_callback_error(
+    sentry_init, capture_events, capture_record_lost_event_calls
+):
+    def bad_before_send(event, hint):
+        raise ValueError("before_send error")
+
+    sentry_init(before_send=bad_before_send, default_integrations=False)
+    events = capture_events()
+    record_lost_event_calls = capture_record_lost_event_calls()
+
+    capture_message("should be dropped")
+
+    assert len(events) == 0
+    assert ("callback_error", "error", None, 1) in record_lost_event_calls
+
+
+def test_before_send_returning_none_records_before_send(
+    sentry_init, capture_events, capture_record_lost_event_calls
+):
+    def dropping_before_send(event, hint):
+        return None
+
+    sentry_init(before_send=dropping_before_send)
+    events = capture_events()
+    record_lost_event_calls = capture_record_lost_event_calls()
+
+    capture_message("should be dropped")
+
+    assert len(events) == 0
+    assert ("before_send", "error", None, 1) in record_lost_event_calls
+
+
+@pytest.mark.tests_internal_exceptions
+def test_before_send_transaction_exception_records_callback_error(
+    sentry_init, capture_events, capture_record_lost_event_calls
+):
+    def bad_before_send_transaction(event, hint):
+        raise ValueError("before_send_transaction error")
+
+    sentry_init(
+        traces_sample_rate=1.0,
+        before_send_transaction=bad_before_send_transaction,
+        default_integrations=False,
+    )
+    events = capture_events()
+    record_lost_event_calls = capture_record_lost_event_calls()
+
+    with start_transaction(name="test"):
+        pass
+
+    assert not any(e.get("type") == "transaction" for e in events)
+    assert ("callback_error", "transaction", None, 1) in record_lost_event_calls
+    assert any(
+        reason == "callback_error" and category == "span"
+        for reason, category, _, _ in record_lost_event_calls
+    )
+
+
 @pytest.mark.parametrize(
     "installed_integrations, expected_name",
     [
