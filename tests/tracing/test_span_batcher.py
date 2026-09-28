@@ -420,7 +420,7 @@ def test_transport_format(sentry_init, capture_envelopes):
     with sentry_sdk.traces.start_span(name="test"):
         ...
 
-    sentry_sdk.get_client().flush()
+    sentry_sdk.flush()
 
     assert len(envelopes) == 1
     assert len(envelopes[0].items) == 1
