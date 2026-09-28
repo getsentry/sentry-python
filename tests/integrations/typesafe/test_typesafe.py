@@ -121,6 +121,9 @@ def test_system_one(
 
         assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "jev-latest"
 
+        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 12
+        assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 3
+
         assert json.loads(span["attributes"][SPANDATA.GEN_AI_INPUT_MESSAGES]) == {
             "type": "evaluation",
             "state": {
@@ -207,6 +210,9 @@ def test_system_one(
         assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "jev-latest"
 
         assert span["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "jev-latest"
+
+        assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 12
+        assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 3
 
         assert json.loads(span["data"][SPANDATA.GEN_AI_INPUT_MESSAGES]) == {
             "type": "evaluation",
@@ -324,6 +330,9 @@ async def test_system_one_async(
 
         assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "jev-latest"
 
+        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 12
+        assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 3
+
         assert json.loads(span["attributes"][SPANDATA.GEN_AI_INPUT_MESSAGES]) == {
             "type": "evaluation",
             "state": {
@@ -413,6 +422,9 @@ async def test_system_one_async(
         assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "jev-latest"
 
         assert span["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "jev-latest"
+
+        assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 12
+        assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 3
 
         assert json.loads(span["data"][SPANDATA.GEN_AI_INPUT_MESSAGES]) == {
             "type": "evaluation",
