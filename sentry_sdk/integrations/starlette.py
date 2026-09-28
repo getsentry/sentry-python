@@ -24,14 +24,12 @@ from sentry_sdk.integrations._wsgi_common import (
     request_body_within_bounds,
 )
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
-from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import SOURCE_FOR_STYLE, SegmentNameSource, Span
 from sentry_sdk.utils import (
     AnnotatedValue,
     capture_internal_exceptions,
     ensure_integration_enabled,
     event_from_exception,
-    has_data_collection_enabled,
     parse_version,
     transaction_from_function,
 )
@@ -341,10 +339,7 @@ def _add_user_to_sentry_scope(scope: "Dict[str, Any]") -> None:
         return
 
     client_options = sentry_sdk.get_client().options
-    if has_data_collection_enabled(client_options):
-        if not client_options["data_collection"]["user_info"]:
-            return
-    elif not should_send_default_pii():
+    if not client_options["data_collection"]["user_info"]:
         return
 
     user_info: "Dict[str, Any]" = {}
@@ -526,6 +521,9 @@ async def _wrap_async_handler(
 
     sentry_scope = sentry_sdk.get_isolation_scope()
     extractor = StarletteRequestExtractor(request)
+    attach_request_data = (
+        "incoming_request" in client.options["data_collection"]["http_bodies"]
+    )
 
     def _make_request_event_processor(
         req: "Any", integration: "Any"
@@ -538,16 +536,8 @@ async def _wrap_async_handler(
             if info:
                 if "cookies" in info:
                     request_info["cookies"] = info["cookies"]
-                if "data" in info:
-                    attach_request_data = True
-                    if has_data_collection_enabled(client.options):
-                        attach_request_data = (
-                            "incoming_request"
-                            in client.options["data_collection"]["http_bodies"]
-                        )
-
-                    if attach_request_data:
-                        request_info["data"] = info["data"]
+                if "data" in info and attach_request_data:
+                    request_info["data"] = info["data"]
             event["request"] = deepcopy(request_info)
 
             return event
@@ -565,13 +555,6 @@ async def _wrap_async_handler(
         current_span = sentry_sdk.get_current_span()
 
         if type(current_span) is Span:
-            attach_request_data = True
-            if has_data_collection_enabled(client.options):
-                attach_request_data = (
-                    "incoming_request"
-                    in client.options["data_collection"]["http_bodies"]
-                )
-
             if attach_request_data:
                 request_body = _get_cached_request_body_attribute(
                     client=client, request=request
@@ -727,17 +710,10 @@ class StarletteRequestExtractor:
         self: "StarletteRequestExtractor",
     ) -> "Optional[Dict[str, Any]]":
         client_options = sentry_sdk.get_client().options
-        cookies: "Optional[Dict[str, Any]]" = None
-
-        if has_data_collection_enabled(client_options):
-            cookies = _apply_key_value_collection_filtering(
-                items=self.cookies(),
-                behaviour=client_options["data_collection"]["cookies"],
-            )
-        elif should_send_default_pii():
-            cookies = self.cookies()
-
-        return cookies
+        return _apply_key_value_collection_filtering(
+            items=self.cookies(),
+            behaviour=client_options["data_collection"]["cookies"],
+        )
 
     def extract_request_info(
         self: "StarletteRequestExtractor",
@@ -748,15 +724,12 @@ class StarletteRequestExtractor:
 
         with capture_internal_exceptions():
             # Add cookies
-            if has_data_collection_enabled(client.options):
-                cookies = _apply_key_value_collection_filtering(
-                    items=self.cookies(),
-                    behaviour=client.options["data_collection"]["cookies"],
-                )
-                if cookies:
-                    request_info["cookies"] = cookies
-            elif should_send_default_pii():
-                request_info["cookies"] = self.cookies()
+            cookies = _apply_key_value_collection_filtering(
+                items=self.cookies(),
+                behaviour=client.options["data_collection"]["cookies"],
+            )
+            if cookies:
+                request_info["cookies"] = cookies
 
             # If there is no body, just return the cookies
             content_length = self.content_length()
