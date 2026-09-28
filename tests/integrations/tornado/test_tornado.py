@@ -9,8 +9,8 @@ from sentry_sdk import capture_message
 from sentry_sdk._types import SENSITIVE_DATA_SUBSTITUTE
 from sentry_sdk.integrations.tornado import TornadoIntegration
 from tests.integrations.utils import (
-    DATA_COLLECTION_REMOTE_ADDR_CASES_LEGACY,
-    DATA_COLLECTION_USER_INFO_CASES_LEGACY,
+    DATA_COLLECTION_REMOTE_ADDR_CASES,
+    DATA_COLLECTION_USER_INFO_CASES,
 )
 
 
@@ -84,10 +84,10 @@ COOKIE_HEADER = "jwt=tokenval; theme=dark; lang=en; identity=alice"
 
 
 @pytest.mark.parametrize(
-    "init_kwargs, expected_cookies",
+    "data_collection, expected_cookies",
     [
         pytest.param(
-            {"data_collection": {}},
+            {},
             {
                 "jwt": SENSITIVE_DATA_SUBSTITUTE,
                 "theme": "dark",
@@ -97,7 +97,7 @@ COOKIE_HEADER = "jwt=tokenval; theme=dark; lang=en; identity=alice"
             id="data_collection_default",
         ),
         pytest.param(
-            {"data_collection": {"cookies": {"mode": "denylist", "terms": []}}},
+            {"cookies": {"mode": "denylist", "terms": []}},
             {
                 "jwt": SENSITIVE_DATA_SUBSTITUTE,
                 "theme": "dark",
@@ -107,12 +107,12 @@ COOKIE_HEADER = "jwt=tokenval; theme=dark; lang=en; identity=alice"
             id="data_collection_denylist_empty_terms",
         ),
         pytest.param(
-            {"data_collection": {"cookies": {"mode": "off"}}},
+            {"cookies": {"mode": "off"}},
             None,
             id="data_collection_off",
         ),
         pytest.param(
-            {"data_collection": {"cookies": {"mode": "denylist"}}},
+            {"cookies": {"mode": "denylist"}},
             {
                 "jwt": SENSITIVE_DATA_SUBSTITUTE,
                 "theme": "dark",
@@ -122,7 +122,7 @@ COOKIE_HEADER = "jwt=tokenval; theme=dark; lang=en; identity=alice"
             id="data_collection_denylist_default",
         ),
         pytest.param(
-            {"data_collection": {"cookies": {"mode": "denylist", "terms": ["theme"]}}},
+            {"cookies": {"mode": "denylist", "terms": ["theme"]}},
             {
                 "jwt": SENSITIVE_DATA_SUBSTITUTE,
                 "theme": SENSITIVE_DATA_SUBSTITUTE,
@@ -132,7 +132,7 @@ COOKIE_HEADER = "jwt=tokenval; theme=dark; lang=en; identity=alice"
             id="data_collection_denylist_custom_terms",
         ),
         pytest.param(
-            {"data_collection": {"cookies": {"mode": "allowlist", "terms": ["theme"]}}},
+            {"cookies": {"mode": "allowlist", "terms": ["theme"]}},
             {
                 "jwt": SENSITIVE_DATA_SUBSTITUTE,
                 "theme": "dark",
@@ -142,11 +142,7 @@ COOKIE_HEADER = "jwt=tokenval; theme=dark; lang=en; identity=alice"
             id="data_collection_allowlist",
         ),
         pytest.param(
-            {
-                "data_collection": {
-                    "cookies": {"mode": "allowlist", "terms": ["identity"]}
-                }
-            },
+            {"cookies": {"mode": "allowlist", "terms": ["identity"]}},
             {
                 "jwt": SENSITIVE_DATA_SUBSTITUTE,
                 "theme": SENSITIVE_DATA_SUBSTITUTE,
@@ -158,9 +154,11 @@ COOKIE_HEADER = "jwt=tokenval; theme=dark; lang=en; identity=alice"
     ],
 )
 def test_cookie_data_collection(
-    tornado_testcase, sentry_init, capture_events, init_kwargs, expected_cookies
+    tornado_testcase, sentry_init, capture_events, data_collection, expected_cookies
 ):
-    sentry_init(integrations=[TornadoIntegration()], **init_kwargs)
+    sentry_init(
+        integrations=[TornadoIntegration()], data_collection=data_collection
+    )
     events = capture_events()
     client = tornado_testcase(Application([(r"/hi", CrashingHandler)]))
 
@@ -181,44 +179,32 @@ class QueryHandler(RequestHandler):
 
 _QUERY_PARAM_DATA_COLLECTION_CASES = [
     pytest.param(
-        {"data_collection": {"url_query_params": {"mode": "denylist", "terms": []}}},
+        {"url_query_params": {"mode": "denylist", "terms": []}},
         "toy=tennisball&color=red&auth=%5BFiltered%5D",
         id="data_collection_denylist_empty_terms",
     ),
     pytest.param(
-        {"data_collection": {"url_query_params": {"mode": "off"}}},
+        {"url_query_params": {"mode": "off"}},
         None,
         id="data_collection_off",
     ),
     pytest.param(
-        {"data_collection": {}},
+        {},
         "toy=tennisball&color=red&auth=%5BFiltered%5D",
         id="data_collection_denylist_default",
     ),
     pytest.param(
-        {
-            "data_collection": {
-                "url_query_params": {"mode": "denylist", "terms": ["toy"]}
-            }
-        },
+        {"url_query_params": {"mode": "denylist", "terms": ["toy"]}},
         "toy=%5BFiltered%5D&color=red&auth=%5BFiltered%5D",
         id="data_collection_denylist_custom_terms",
     ),
     pytest.param(
-        {
-            "data_collection": {
-                "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
-            }
-        },
+        {"url_query_params": {"mode": "allowlist", "terms": ["toy"]}},
         "toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D",
         id="data_collection_allowlist",
     ),
     pytest.param(
-        {
-            "data_collection": {
-                "url_query_params": {"mode": "allowlist", "terms": ["auth"]}
-            }
-        },
+        {"url_query_params": {"mode": "allowlist", "terms": ["auth"]}},
         "toy=%5BFiltered%5D&color=%5BFiltered%5D&auth=%5BFiltered%5D",
         id="data_collection_allowlist_sensitive_term",
     ),
@@ -226,16 +212,15 @@ _QUERY_PARAM_DATA_COLLECTION_CASES = [
 
 
 @pytest.mark.parametrize(
-    "init_kwargs, expected_query", _QUERY_PARAM_DATA_COLLECTION_CASES
+    "data_collection, expected_query", _QUERY_PARAM_DATA_COLLECTION_CASES
 )
 def test_url_query_data_collection(
-    tornado_testcase, sentry_init, capture_items, init_kwargs, expected_query
+    tornado_testcase, sentry_init, capture_items, data_collection, expected_query
 ):
-    init_kwargs = dict(init_kwargs)
     sentry_init(
         integrations=[TornadoIntegration()],
         traces_sample_rate=1.0,
-        **init_kwargs,
+        data_collection=data_collection,
     )
 
     items = capture_items("span")
@@ -576,12 +561,14 @@ def test_user_auth(tornado_testcase, sentry_init, capture_events):
 
 
 @pytest.mark.parametrize(
-    "init_kwargs, expect_user", DATA_COLLECTION_USER_INFO_CASES_LEGACY
+    "data_collection, expect_user", DATA_COLLECTION_USER_INFO_CASES
 )
 def test_user_auth_data_collection(
-    tornado_testcase, sentry_init, capture_events, init_kwargs, expect_user
+    tornado_testcase, sentry_init, capture_events, data_collection, expect_user
 ):
-    sentry_init(integrations=[TornadoIntegration()], **init_kwargs)
+    sentry_init(
+        integrations=[TornadoIntegration()], data_collection=data_collection
+    )
     events = capture_events()
 
     class UserHandler(RequestHandler):
@@ -821,15 +808,15 @@ def test_span_origin(
 
 
 @pytest.mark.parametrize(
-    "init_kwargs, expect_ip", DATA_COLLECTION_USER_INFO_CASES_LEGACY
+    "data_collection, expect_ip", DATA_COLLECTION_USER_INFO_CASES
 )
 def test_user_ip_address_on_all_spans(
-    tornado_testcase, sentry_init, capture_items, init_kwargs, expect_ip
+    tornado_testcase, sentry_init, capture_items, data_collection, expect_ip
 ):
     sentry_init(
         integrations=[TornadoIntegration()],
         traces_sample_rate=1.0,
-        **init_kwargs,
+        data_collection=data_collection,
     )
 
     items = capture_items("span")
@@ -850,15 +837,15 @@ def test_user_ip_address_on_all_spans(
 
 
 @pytest.mark.parametrize(
-    "init_kwargs, expect_ip", DATA_COLLECTION_USER_INFO_CASES_LEGACY
+    "data_collection, expect_ip", DATA_COLLECTION_USER_INFO_CASES
 )
 def test_client_address_span_attribute_data_collection(
-    tornado_testcase, sentry_init, capture_items, init_kwargs, expect_ip
+    tornado_testcase, sentry_init, capture_items, data_collection, expect_ip
 ):
     sentry_init(
         integrations=[TornadoIntegration()],
         traces_sample_rate=1.0,
-        **init_kwargs,
+        data_collection=data_collection,
     )
 
     items = capture_items("span")
@@ -881,12 +868,14 @@ def test_client_address_span_attribute_data_collection(
 
 
 @pytest.mark.parametrize(
-    "init_kwargs, expect_remote_addr", DATA_COLLECTION_REMOTE_ADDR_CASES_LEGACY
+    "data_collection, expect_remote_addr", DATA_COLLECTION_REMOTE_ADDR_CASES
 )
 def test_remote_addr_data_collection(
-    tornado_testcase, sentry_init, capture_events, init_kwargs, expect_remote_addr
+    tornado_testcase, sentry_init, capture_events, data_collection, expect_remote_addr
 ):
-    sentry_init(integrations=[TornadoIntegration()], **init_kwargs)
+    sentry_init(
+        integrations=[TornadoIntegration()], data_collection=data_collection
+    )
     events = capture_events()
     client = tornado_testcase(Application([(r"/hi", CrashingHandler)]))
 
