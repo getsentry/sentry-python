@@ -125,49 +125,45 @@ def test_system_one(
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 12
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 3
 
-        assert json.loads(span["attributes"][SPANDATA.GEN_AI_INPUT_MESSAGES]) == {
-            "type": "evaluation",
-            "state": {
-                "subject": "Charged twice this month",
-                "body": "I see two charges of $49. I only have one account. Please fix this ASAP.",
-            },
-            "questions": [
-                {
-                    "type": "noul",
-                    "name": "spam",
-                    "instructions": "Spam?",
+        assert json.loads(span["attributes"][SPANDATA.GEN_AI_INPUT_MESSAGES]) == [
+            {
+                "type": "evaluation",
+                "state": {
+                    "subject": "Charged twice this month",
+                    "body": "I see two charges of $49. I only have one account. Please fix this ASAP.",
                 },
-                {
-                    "type": "choice",
-                    "name": "tone",
-                    "instructions": "Tone?",
-                    "criteria": {"friendly": None, "hostile": None},
+                "questions": {
+                    "spam": {
+                        "type": "noul",
+                        "instructions": "Spam?",
+                    },
+                    "tone": {
+                        "type": "choice",
+                        "instructions": "Tone?",
+                        "criteria": {"friendly": None, "hostile": None},
+                    },
+                    "quality": {
+                        "type": "score",
+                        "instructions": "Quality?",
+                        "criteria": ["bad", "ok", "great"],
+                    },
+                    "spam_obj": {
+                        "type": "noul",
+                        "instructions": "Spam?",
+                    },
+                    "tone_obj": {
+                        "type": "choice",
+                        "instructions": "Tone?",
+                        "criteria": {"friendly": None, "hostile": None},
+                    },
+                    "quality_obj": {
+                        "type": "score",
+                        "instructions": "Quality?",
+                        "criteria": ["bad", "ok", "great"],
+                    },
                 },
-                {
-                    "type": "score",
-                    "name": "quality",
-                    "instructions": "Quality?",
-                    "criteria": ["bad", "ok", "great"],
-                },
-                {
-                    "type": "noul",
-                    "name": "spam_obj",
-                    "instructions": "Spam?",
-                },
-                {
-                    "type": "choice",
-                    "name": "tone_obj",
-                    "instructions": "Tone?",
-                    "criteria": {"friendly": None, "hostile": None},
-                },
-                {
-                    "type": "score",
-                    "name": "quality_obj",
-                    "instructions": "Quality?",
-                    "criteria": ["bad", "ok", "great"],
-                },
-            ],
-        }
+            }
+        ]
     else:
         items = capture_items("transaction")
 
@@ -215,49 +211,45 @@ def test_system_one(
         assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 12
         assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 3
 
-        assert json.loads(span["data"][SPANDATA.GEN_AI_INPUT_MESSAGES]) == {
-            "type": "evaluation",
-            "state": {
-                "subject": "Charged twice this month",
-                "body": "I see two charges of $49. I only have one account. Please fix this ASAP.",
-            },
-            "questions": [
-                {
-                    "type": "noul",
-                    "name": "spam",
-                    "instructions": "Spam?",
+        assert json.loads(span["data"][SPANDATA.GEN_AI_INPUT_MESSAGES]) == [
+            {
+                "type": "evaluation",
+                "state": {
+                    "subject": "Charged twice this month",
+                    "body": "I see two charges of $49. I only have one account. Please fix this ASAP.",
                 },
-                {
-                    "type": "choice",
-                    "name": "tone",
-                    "instructions": "Tone?",
-                    "criteria": {"friendly": None, "hostile": None},
+                "questions": {
+                    "spam": {
+                        "type": "noul",
+                        "instructions": "Spam?",
+                    },
+                    "tone": {
+                        "type": "choice",
+                        "instructions": "Tone?",
+                        "criteria": {"friendly": None, "hostile": None},
+                    },
+                    "quality": {
+                        "type": "score",
+                        "instructions": "Quality?",
+                        "criteria": ["bad", "ok", "great"],
+                    },
+                    "spam_obj": {
+                        "type": "noul",
+                        "instructions": "Spam?",
+                    },
+                    "tone_obj": {
+                        "type": "choice",
+                        "instructions": "Tone?",
+                        "criteria": {"friendly": None, "hostile": None},
+                    },
+                    "quality_obj": {
+                        "type": "score",
+                        "instructions": "Quality?",
+                        "criteria": ["bad", "ok", "great"],
+                    },
                 },
-                {
-                    "type": "score",
-                    "name": "quality",
-                    "instructions": "Quality?",
-                    "criteria": ["bad", "ok", "great"],
-                },
-                {
-                    "type": "noul",
-                    "name": "spam_obj",
-                    "instructions": "Spam?",
-                },
-                {
-                    "type": "choice",
-                    "name": "tone_obj",
-                    "instructions": "Tone?",
-                    "criteria": {"friendly": None, "hostile": None},
-                },
-                {
-                    "type": "score",
-                    "name": "quality_obj",
-                    "instructions": "Quality?",
-                    "criteria": ["bad", "ok", "great"],
-                },
-            ],
-        }
+            }
+        ]
 
 
 @pytest.mark.asyncio
@@ -335,49 +327,45 @@ async def test_system_one_async(
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 12
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 3
 
-        assert json.loads(span["attributes"][SPANDATA.GEN_AI_INPUT_MESSAGES]) == {
-            "type": "evaluation",
-            "state": {
-                "subject": "Charged twice this month",
-                "body": "I see two charges of $49. I only have one account. Please fix this ASAP.",
-            },
-            "questions": [
-                {
-                    "type": "noul",
-                    "name": "spam",
-                    "instructions": "Spam?",
+        assert json.loads(span["attributes"][SPANDATA.GEN_AI_INPUT_MESSAGES]) == [
+            {
+                "type": "evaluation",
+                "state": {
+                    "subject": "Charged twice this month",
+                    "body": "I see two charges of $49. I only have one account. Please fix this ASAP.",
                 },
-                {
-                    "type": "choice",
-                    "name": "tone",
-                    "instructions": "Tone?",
-                    "criteria": {"friendly": None, "hostile": None},
+                "questions": {
+                    "spam": {
+                        "type": "noul",
+                        "instructions": "Spam?",
+                    },
+                    "tone": {
+                        "type": "choice",
+                        "instructions": "Tone?",
+                        "criteria": {"friendly": None, "hostile": None},
+                    },
+                    "quality": {
+                        "type": "score",
+                        "instructions": "Quality?",
+                        "criteria": ["bad", "ok", "great"],
+                    },
+                    "spam_obj": {
+                        "type": "noul",
+                        "instructions": "Spam?",
+                    },
+                    "tone_obj": {
+                        "type": "choice",
+                        "instructions": "Tone?",
+                        "criteria": {"friendly": None, "hostile": None},
+                    },
+                    "quality_obj": {
+                        "type": "score",
+                        "instructions": "Quality?",
+                        "criteria": ["bad", "ok", "great"],
+                    },
                 },
-                {
-                    "type": "score",
-                    "name": "quality",
-                    "instructions": "Quality?",
-                    "criteria": ["bad", "ok", "great"],
-                },
-                {
-                    "type": "noul",
-                    "name": "spam_obj",
-                    "instructions": "Spam?",
-                },
-                {
-                    "type": "choice",
-                    "name": "tone_obj",
-                    "instructions": "Tone?",
-                    "criteria": {"friendly": None, "hostile": None},
-                },
-                {
-                    "type": "score",
-                    "name": "quality_obj",
-                    "instructions": "Quality?",
-                    "criteria": ["bad", "ok", "great"],
-                },
-            ],
-        }
+            }
+        ]
     else:
         items = capture_items("transaction")
 
@@ -428,46 +416,42 @@ async def test_system_one_async(
         assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 12
         assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 3
 
-        assert json.loads(span["data"][SPANDATA.GEN_AI_INPUT_MESSAGES]) == {
-            "type": "evaluation",
-            "state": {
-                "subject": "Charged twice this month",
-                "body": "I see two charges of $49. I only have one account. Please fix this ASAP.",
-            },
-            "questions": [
-                {
-                    "type": "noul",
-                    "name": "spam",
-                    "instructions": "Spam?",
+        assert json.loads(span["data"][SPANDATA.GEN_AI_INPUT_MESSAGES]) == [
+            {
+                "type": "evaluation",
+                "state": {
+                    "subject": "Charged twice this month",
+                    "body": "I see two charges of $49. I only have one account. Please fix this ASAP.",
                 },
-                {
-                    "type": "choice",
-                    "name": "tone",
-                    "instructions": "Tone?",
-                    "criteria": {"friendly": None, "hostile": None},
+                "questions": {
+                    "spam": {
+                        "type": "noul",
+                        "instructions": "Spam?",
+                    },
+                    "tone": {
+                        "type": "choice",
+                        "instructions": "Tone?",
+                        "criteria": {"friendly": None, "hostile": None},
+                    },
+                    "quality": {
+                        "type": "score",
+                        "instructions": "Quality?",
+                        "criteria": ["bad", "ok", "great"],
+                    },
+                    "spam_obj": {
+                        "type": "noul",
+                        "instructions": "Spam?",
+                    },
+                    "tone_obj": {
+                        "type": "choice",
+                        "instructions": "Tone?",
+                        "criteria": {"friendly": None, "hostile": None},
+                    },
+                    "quality_obj": {
+                        "type": "score",
+                        "instructions": "Quality?",
+                        "criteria": ["bad", "ok", "great"],
+                    },
                 },
-                {
-                    "type": "score",
-                    "name": "quality",
-                    "instructions": "Quality?",
-                    "criteria": ["bad", "ok", "great"],
-                },
-                {
-                    "type": "noul",
-                    "name": "spam_obj",
-                    "instructions": "Spam?",
-                },
-                {
-                    "type": "choice",
-                    "name": "tone_obj",
-                    "instructions": "Tone?",
-                    "criteria": {"friendly": None, "hostile": None},
-                },
-                {
-                    "type": "score",
-                    "name": "quality_obj",
-                    "instructions": "Quality?",
-                    "criteria": ["bad", "ok", "great"],
-                },
-            ],
-        }
+            }
+        ]
