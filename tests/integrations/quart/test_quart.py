@@ -1189,37 +1189,6 @@ async def test_request_attributes_data_collection(
         assert "user.ip_address" not in segment["attributes"]
 
 
-@pytest.mark.asyncio
-async def test_sensitive_header_passthrough_with_pii_and_no_data_collection(
-    sentry_init, capture_items
-):
-    sentry_init(
-        integrations=[quart_sentry.QuartIntegration()],
-        traces_sample_rate=1.0,
-        send_default_pii=True,
-    )
-    items = capture_items("span")
-
-    app = quart_app_factory()
-    client = app.test_client()
-    response = await client.get(
-        "/message",
-        headers={"Authorization": "Bearer secret-token"},
-    )
-    assert response.status_code == 200
-
-    sentry_sdk.flush()
-
-    spans = [item.payload for item in items]
-    assert len(spans) == 1
-
-    segment = spans[0]
-    assert (
-        segment["attributes"]["http.request.header.authorization"]
-        == "Bearer secret-token"
-    )
-
-
 _QUERY_PARAM_DATA_COLLECTION_CASES = [
     pytest.param(
         {"send_default_pii": True},

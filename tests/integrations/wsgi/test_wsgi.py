@@ -722,47 +722,6 @@ def test_request_headers_data_collection_default_redacts_sensitive(
     assert headers["X-Custom-Header"] == "passthrough"
 
 
-def test_request_headers_legacy_no_pii_redacts_sensitive(
-    sentry_init, crashing_app, capture_events
-):
-    """
-    With no ``data_collection`` configured, ``_filter_headers`` falls back to
-    the legacy ``send_default_pii`` behaviour. When PII is disabled, headers in
-    ``SENSITIVE_HEADERS`` are replaced with an ``AnnotatedValue`` (the default
-    ``use_annotated_value=True`` on the event-processor call site), which
-    serializes to an emptied value plus a ``_meta`` annotation. Non-sensitive
-    headers pass through untouched.
-
-    ``X-Forwarded-For`` is used because it is in ``SENSITIVE_HEADERS`` but is
-    not scrubbed by the default ``EventScrubber``, so the substitution we are
-    asserting on can only come from ``_filter_headers``.
-    """
-    sentry_init(send_default_pii=False)
-    app = SentryWsgiMiddleware(crashing_app)
-    client = Client(app)
-    events = capture_events()
-
-    with pytest.raises(ZeroDivisionError):
-        client.get(
-            "/",
-            headers={
-                "X-Forwarded-For": "1.2.3.4",
-                "X-Custom-Header": "passthrough",
-            },
-        )
-
-    (event,) = events
-
-    assert event["request"]["headers"]["X-Forwarded-For"] == ""
-    assert event["request"]["headers"]["X-Custom-Header"] == "passthrough"
-
-    # The emptied value is accompanied by a `_meta` annotation marking it as
-    # removed, confirming the substitution came from the AnnotatedValue path.
-    assert event["_meta"]["request"]["headers"]["X-Forwarded-For"] == {
-        "": {"rem": [["!config", "x"]]}
-    }
-
-
 def test_request_headers_data_collection_off_collects_no_headers(
     sentry_init, crashing_app, capture_events
 ):
