@@ -198,7 +198,7 @@ def test_tolerates_traces_sampler_returning_a_boolean_span_streaming(
         assert span.sampled is traces_sampler_return_value
 
 
-def test_traces_sampler_raising_unsamples(sentry_init, traces_sample_rate):
+def test_traces_sampler_raising_unsamples(sentry_init):
     sentry_init(
         traces_sampler=mock.Mock(side_effect=ValueError("boom")),
         traces_sample_rate=1.0,
