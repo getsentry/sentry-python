@@ -172,11 +172,9 @@ def _transform_questions(
 
 
 def _transform_evaluation_answers(
-    answers: dict[str, Answer],
-) -> list[Union[NoulEvaluationModel, ChoiceEvaluationModel, ScoreEvaluationModel]]:
-    items: list[
-        Union[NoulEvaluationModel, ChoiceEvaluationModel, ScoreEvaluationModel]
-    ] = []
+    answers: "dict[str, Answer]",
+) -> "list[Union[NoulEvaluationModel, ChoiceEvaluationModel, ScoreEvaluationModel]]":
+    items: "list[Union[NoulEvaluationModel, ChoiceEvaluationModel, ScoreEvaluationModel]]" = []
     for name, answer in answers.items():
         if isinstance(answer, NoulAnswer):
             items.append(
