@@ -1,5 +1,35 @@
 # Changelog
 
+## 2.71.0
+
+### New Features ✨
+
+#### Typesafe
+
+- Record `gen_ai.output.messages` by @alexander-alderman-webb in [#7720](https://github.com/getsentry/sentry-python/pull/7720)
+- Set token usage attributes by @alexander-alderman-webb in [#7719](https://github.com/getsentry/sentry-python/pull/7719)
+- Record `gen_ai.input.messages` by @alexander-alderman-webb in [#7718](https://github.com/getsentry/sentry-python/pull/7718)
+- Record `gen_ai.response.model` by @alexander-alderman-webb in [#7717](https://github.com/getsentry/sentry-python/pull/7717)
+- Add integration with `system_one()` patches by @alexander-alderman-webb in [#7716](https://github.com/getsentry/sentry-python/pull/7716)
+
+### Bug Fixes 🐛
+
+- Keep event if processor raises by @sentrivana in [#7701](https://github.com/getsentry/sentry-python/pull/7701)
+- Isolate user callbacks, emit client reports by @sentrivana in [#7692](https://github.com/getsentry/sentry-python/pull/7692)
+
+### Documentation 📚
+
+- Promote `data_collection` in changelog by @sentrivana in [#7565](https://github.com/getsentry/sentry-python/pull/7565)
+
+### Internal Changes 🔧
+
+- (aws-lambda) Add `.gitignore` to lambda handlers by @pabloDeputter in [#7638](https://github.com/getsentry/sentry-python/pull/7638)
+- (litellm) Set `LITELLM_LOCAL_MODEL_COST_MAP=true` by @alexander-alderman-webb in [#7630](https://github.com/getsentry/sentry-python/pull/7630)
+- (otlp) Adjust to `OTLPSpanExporter._headers` removal by @alexander-alderman-webb in [#7722](https://github.com/getsentry/sentry-python/pull/7722)
+- Use top-level flush API in tests by @sentrivana in [#7725](https://github.com/getsentry/sentry-python/pull/7725)
+- Unsample on sampler exception by @sentrivana in [#7723](https://github.com/getsentry/sentry-python/pull/7723)
+- Use `sentry_init` fixture by @sentrivana in [#7577](https://github.com/getsentry/sentry-python/pull/7577)
+
 ## 2.70.0
 
 ### New Features ✨
