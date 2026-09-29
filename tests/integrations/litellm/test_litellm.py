@@ -2401,7 +2401,6 @@ def test_chat_completion_data_collection(
     for key in expected_absent:
         assert key not in span_data, f"{key} should not have been collected"
 
-    # Data collection never gates non-PII attributes
     assert span_data[SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
     assert span_data[SPANDATA.GEN_AI_REQUEST_MODEL] == "gpt-3.5-turbo"
     assert span_data[SPANDATA.GEN_AI_RESPONSE_MODEL] == "gpt-3.5-turbo"
