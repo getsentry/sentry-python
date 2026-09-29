@@ -4,8 +4,6 @@ from copy import deepcopy
 import sentry_sdk
 from sentry_sdk._types import SENSITIVE_DATA_SUBSTITUTE
 from sentry_sdk.data_collection import _apply_key_value_collection_filtering
-from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.utils import AnnotatedValue, has_data_collection_enabled
 
 try:
     from django.http.request import RawPostDataException
