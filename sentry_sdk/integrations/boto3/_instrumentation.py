@@ -41,7 +41,11 @@ except ImportError:
 def _set_span_attributes(
     span: "Union[Span, StreamedSpan]", attributes: "Attributes"
 ) -> None:
-    """Will be removed in the major."""
+    """
+    Will be removed in the next major version (3.0). This helper makes
+    it easier to migrate to `StreamedSpan` without having to remove
+    multiple conditional blocks intertwined with other logic.
+    """
     if isinstance(span, StreamedSpan):
         span.set_attributes(attributes)
         return
