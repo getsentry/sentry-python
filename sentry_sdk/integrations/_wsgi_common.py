@@ -4,6 +4,7 @@ from copy import deepcopy
 import sentry_sdk
 from sentry_sdk._types import SENSITIVE_DATA_SUBSTITUTE
 from sentry_sdk.data_collection import _apply_key_value_collection_filtering
+from sentry_sdk.utils import AnnotatedValue
 
 try:
     from django.http.request import RawPostDataException
