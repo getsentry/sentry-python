@@ -299,8 +299,7 @@ def _instrument_streaming_body(
             with capture_internal_exceptions():
                 attributes = _get_error_attributes(error)
                 _set_span_attributes(streaming_span, attributes)
-                if isinstance(span, StreamedSpan):
-                    _set_span_attributes(span, attributes)
+                _set_span_attributes(span, attributes)
 
         _finish_span(streaming_span, error)
         _finish_span(span, error)
