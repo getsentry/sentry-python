@@ -110,6 +110,9 @@ def test_system_one(sentry_init, capture_items, typesafe_response):
 
     assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "jev-latest"
 
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 12
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 3
+
     assert json.loads(span["attributes"][SPANDATA.GEN_AI_INPUT_MESSAGES]) == [
         {
             "type": "evaluation",
@@ -145,6 +148,48 @@ def test_system_one(sentry_init, capture_items, typesafe_response):
                     "type": "score",
                     "instructions": "Quality?",
                     "criteria": ["bad", "ok", "great"],
+                },
+            },
+        }
+    ]
+
+    assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+        {
+            "type": "evaluation",
+            "answers": {
+                "spam": {
+                    "type": "noul",
+                    "noul": 0.98,
+                },
+                "tone": {
+                    "type": "choice",
+                    "choice": "friendly",
+                    "probabilities": {"friendly": 0.9, "hostile": 0.1},
+                    "confidence": 0.9,
+                },
+                "urgency": {
+                    "type": "score",
+                    "score": 1.7,
+                    "probabilities": {"0": 0.1, "1": 0.1, "2": 0.8},
+                    "confidence": 0.8,
+                    "legend": {"0": "can wait", "1": "this week", "2": "today"},
+                },
+                "spam_obj": {
+                    "type": "noul",
+                    "noul": 0.98,
+                },
+                "tone_obj": {
+                    "type": "choice",
+                    "choice": "friendly",
+                    "probabilities": {"friendly": 0.9, "hostile": 0.1},
+                    "confidence": 0.9,
+                },
+                "urgency_obj": {
+                    "type": "score",
+                    "score": 1.7,
+                    "probabilities": {"0": 0.1, "1": 0.1, "2": 0.8},
+                    "confidence": 0.8,
+                    "legend": {"0": "can wait", "1": "this week", "2": "today"},
                 },
             },
         }
@@ -213,6 +258,9 @@ async def test_system_one_async(sentry_init, capture_items, typesafe_response):
 
     assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "jev-latest"
 
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 12
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 3
+
     assert json.loads(span["attributes"][SPANDATA.GEN_AI_INPUT_MESSAGES]) == [
         {
             "type": "evaluation",
@@ -248,6 +296,48 @@ async def test_system_one_async(sentry_init, capture_items, typesafe_response):
                     "type": "score",
                     "instructions": "Quality?",
                     "criteria": ["bad", "ok", "great"],
+                },
+            },
+        }
+    ]
+
+    assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+        {
+            "type": "evaluation",
+            "answers": {
+                "spam": {
+                    "type": "noul",
+                    "noul": 0.98,
+                },
+                "tone": {
+                    "type": "choice",
+                    "choice": "friendly",
+                    "probabilities": {"friendly": 0.9, "hostile": 0.1},
+                    "confidence": 0.9,
+                },
+                "urgency": {
+                    "type": "score",
+                    "score": 1.7,
+                    "probabilities": {"0": 0.1, "1": 0.1, "2": 0.8},
+                    "confidence": 0.8,
+                    "legend": {"0": "can wait", "1": "this week", "2": "today"},
+                },
+                "spam_obj": {
+                    "type": "noul",
+                    "noul": 0.98,
+                },
+                "tone_obj": {
+                    "type": "choice",
+                    "choice": "friendly",
+                    "probabilities": {"friendly": 0.9, "hostile": 0.1},
+                    "confidence": 0.9,
+                },
+                "urgency_obj": {
+                    "type": "score",
+                    "score": 1.7,
+                    "probabilities": {"0": 0.1, "1": 0.1, "2": 0.8},
+                    "confidence": 0.8,
+                    "legend": {"0": "can wait", "1": "this week", "2": "today"},
                 },
             },
         }

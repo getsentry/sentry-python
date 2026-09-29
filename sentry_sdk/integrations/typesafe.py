@@ -6,6 +6,8 @@ from typing import TYPE_CHECKING, cast
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration
+from sentry_sdk.scope import should_send_default_pii
+from sentry_sdk.utils import has_data_collection_enabled
 
 if TYPE_CHECKING:
     from typing import (
@@ -41,12 +43,29 @@ if TYPE_CHECKING:
         state: NotRequired[JSONContent]
         questions: NotRequired[dict[str, Union[NoulModel, ChoiceModel, ScoreModel]]]
 
+    class NoulEvaluationModel(TypedDict):
+        type: Literal["noul"]
+        noul: float
+
+    class ChoiceEvaluationModel(TypedDict):
+        type: Literal["choice"]
+        choice: str
+        probabilities: dict[str, float]
+        confidence: float
+
+    class ScoreEvaluationModel(TypedDict):
+        type: Literal["score"]
+        score: float
+        probabilities: dict[int, float]
+        confidence: float
+        legend: dict[int, Union[str, dict[str, Any], list[Any]]]
+
 
 try:
-    from typesafe_sdk import Choice, Noul, Score
+    from typesafe_sdk import Choice, ChoiceAnswer, Noul, NoulAnswer, Score, ScoreAnswer
     from typesafe_sdk._core.client.aio.client import AsyncTypeSafeClient
     from typesafe_sdk._core.client.sync.client import TypeSafeClient
-    from typesafe_sdk._core.response_types import SystemOneResponse
+    from typesafe_sdk._core.response_types import Answer, SystemOneResponse
 except ImportError:
     raise DidNotEnable("typesafe-sdk not installed")
 
@@ -146,6 +165,42 @@ def _transform_questions(
     return transformed_questions
 
 
+def _transform_evaluation_answers(
+    answers: "dict[str, Answer]",
+) -> (
+    "dict[str, Union[NoulEvaluationModel, ChoiceEvaluationModel, ScoreEvaluationModel]]"
+):
+    items: "dict[str, Union[NoulEvaluationModel, ChoiceEvaluationModel, ScoreEvaluationModel]]" = {}
+    for name, answer in answers.items():
+        if isinstance(answer, NoulAnswer):
+            items[name] = {
+                "type": "noul",
+                "noul": answer.noul,
+            }
+            continue
+
+        if isinstance(answer, ChoiceAnswer):
+            items[name] = {
+                "type": "choice",
+                "choice": answer.choice,
+                "probabilities": answer.probabilities,
+                "confidence": answer.confidence,
+            }
+            continue
+
+        if isinstance(answer, ScoreAnswer):
+            items[name] = {
+                "type": "score",
+                "score": answer.score,
+                "probabilities": answer.probabilities,
+                "confidence": answer.confidence,
+                "legend": answer.legend,
+            }
+            continue
+
+    return items
+
+
 def _wrap_system_one(f: "Callable[..., Any]") -> "Callable[..., Any]":
     @wraps(f)
     def wrap_system_one(self: "TypeSafeClient", *args: "Any", **kwargs: "Any") -> "Any":
@@ -197,6 +252,37 @@ def _wrap_system_one(f: "Callable[..., Any]") -> "Callable[..., Any]":
                 return response
 
             span.set_attribute(SPANDATA.GEN_AI_RESPONSE_MODEL, response.model)
+
+            if response.usage.input_tokens is not None:
+                span.set_attribute(
+                    SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, response.usage.input_tokens
+                )
+
+            if response.usage.output_tokens is not None:
+                span.set_attribute(
+                    SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS, response.usage.output_tokens
+                )
+
+            if (
+                has_data_collection_enabled(client.options)
+                and client.options["data_collection"]["gen_ai"]["outputs"]
+            ) or (
+                not has_data_collection_enabled(client.options)
+                and should_send_default_pii()
+            ):
+                span.set_attribute(
+                    SPANDATA.GEN_AI_OUTPUT_MESSAGES,
+                    json.dumps(
+                        [
+                            {
+                                "type": "evaluation",
+                                "answers": _transform_evaluation_answers(
+                                    response.answers
+                                ),
+                            }
+                        ]
+                    ),
+                )
 
             return response
 
@@ -256,6 +342,37 @@ def _wrap_system_one_async(f: "Callable[..., Any]") -> "Callable[..., Any]":
                 return response
 
             span.set_attribute(SPANDATA.GEN_AI_RESPONSE_MODEL, response.model)
+
+            if response.usage.input_tokens is not None:
+                span.set_attribute(
+                    SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, response.usage.input_tokens
+                )
+
+            if response.usage.output_tokens is not None:
+                span.set_attribute(
+                    SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS, response.usage.output_tokens
+                )
+
+            if (
+                has_data_collection_enabled(client.options)
+                and client.options["data_collection"]["gen_ai"]["outputs"]
+            ) or (
+                not has_data_collection_enabled(client.options)
+                and should_send_default_pii()
+            ):
+                span.set_attribute(
+                    SPANDATA.GEN_AI_OUTPUT_MESSAGES,
+                    json.dumps(
+                        [
+                            {
+                                "type": "evaluation",
+                                "answers": _transform_evaluation_answers(
+                                    response.answers
+                                ),
+                            }
+                        ]
+                    ),
+                )
 
             return response
 
