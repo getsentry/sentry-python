@@ -912,6 +912,8 @@ class Scope:
                 self._transaction = transaction.name
                 if transaction.source:
                     self._transaction_info["source"] = transaction.source
+        elif span is None:
+            self._transaction = None
 
     @property
     def streamed_span(self) -> "Optional[StreamedSpan]":

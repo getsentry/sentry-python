@@ -1102,6 +1102,25 @@ def test_conversation_id_copy():
     assert scope2.get_conversation_id() == "modified-conv"
 
 
+def test_transaction_name_cleared_when_span_unset():
+    """Scope._transaction follows span lifecycle:
+    set by Transaction, preserved during child Span, cleared on None."""
+    from sentry_sdk.tracing import Transaction
+
+    scope = Scope()
+
+    txn = Transaction(name="my-txn")
+    scope.span = txn
+    assert scope._transaction == "my-txn"
+
+    child = txn.start_child(op="child")
+    scope.span = child
+    assert scope._transaction == "my-txn"
+
+    scope.span = None
+    assert scope._transaction is None
+
+
 def test_conversation_id_clear():
     """Test that conversation_id is cleared when scope.clear() is called."""
     scope = Scope()
