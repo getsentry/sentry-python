@@ -6,8 +6,6 @@ from typing import TYPE_CHECKING, cast
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration
-from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.utils import has_data_collection_enabled
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Iterable, Optional, TypeGuard, Union
@@ -245,15 +243,9 @@ def _wrap_complete(f: "Callable[..., Any]") -> "Callable[..., Any]":
             span.set_attribute(SPANDATA.GEN_AI_RESPONSE_STREAMING, False)
 
             messages = kwargs.get("messages")
-            if isinstance(messages, Sequence) and (
-                (
-                    has_data_collection_enabled(client.options)
-                    and client.options["data_collection"]["gen_ai"]["inputs"]
-                )
-                or (
-                    not has_data_collection_enabled(client.options)
-                    and should_send_default_pii()
-                )
+            if (
+                isinstance(messages, Sequence)
+                and client.options["data_collection"]["gen_ai"]["inputs"]
             ):
                 system_instructions = [
                     message for message in messages if _is_system_instruction(message)
@@ -320,13 +312,7 @@ def _wrap_complete(f: "Callable[..., Any]") -> "Callable[..., Any]":
                     SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, response.usage.total_tokens
                 )
 
-            if (
-                has_data_collection_enabled(client.options)
-                and client.options["data_collection"]["gen_ai"]["outputs"]
-            ) or (
-                not has_data_collection_enabled(client.options)
-                and should_send_default_pii()
-            ):
+            if client.options["data_collection"]["gen_ai"]["outputs"]:
                 output_messages: "list[OutputMessage]" = []
                 for choice in response.choices:
                     if choice.message is None:
@@ -375,15 +361,9 @@ def _wrap_complete_async(f: "Callable[..., Any]") -> "Callable[..., Any]":
             messages: "Optional[Union[Iterable[ChatCompletionRequestMessage], Iterable[ChatCompletionRequestMessageTypedDict]]]" = kwargs.get(
                 "messages"
             )
-            if isinstance(messages, Sequence) and (
-                (
-                    has_data_collection_enabled(client.options)
-                    and client.options["data_collection"]["gen_ai"]["inputs"]
-                )
-                or (
-                    not has_data_collection_enabled(client.options)
-                    and should_send_default_pii()
-                )
+            if (
+                isinstance(messages, Sequence)
+                and client.options["data_collection"]["gen_ai"]["inputs"]
             ):
                 system_instructions = [
                     message for message in messages if _is_system_instruction(message)
@@ -450,13 +430,7 @@ def _wrap_complete_async(f: "Callable[..., Any]") -> "Callable[..., Any]":
                     SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, response.usage.total_tokens
                 )
 
-            if (
-                has_data_collection_enabled(client.options)
-                and client.options["data_collection"]["gen_ai"]["outputs"]
-            ) or (
-                not has_data_collection_enabled(client.options)
-                and should_send_default_pii()
-            ):
+            if client.options["data_collection"]["gen_ai"]["outputs"]:
                 output_messages: "list[OutputMessage]" = []
                 for choice in response.choices:
                     if choice.message is None:
