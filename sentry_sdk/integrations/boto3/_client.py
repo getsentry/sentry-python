@@ -84,7 +84,7 @@ def _patch_botocore_client() -> None:
         Track a single API call, including retries, serialization, and endpoint
         resolution. For streaming responses, keep the span open until the
         response body is consumed or closed.
-        https://github.com/boto/botocore/blob/develop/botocore/client.py
+        https://github.com/boto/botocore/blob/358f8eec8c76201bb1a7a35644abcbc9036de7ed/botocore/client.py
         https://opentelemetry.io/docs/specs/semconv/rpc/rpc-spans/#rpc-client-span
         """
         client = sentry_sdk.get_client()
