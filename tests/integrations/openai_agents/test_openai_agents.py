@@ -1649,7 +1649,6 @@ def run_tool_agent(
                 integrations=[OpenAIAgentsIntegration()],
                 disabled_integrations=[StdlibIntegration],
                 traces_sample_rate=1.0,
-                data_collection={},
                 **init_kwargs,
             )
 
@@ -1689,6 +1688,53 @@ def simple_test_tool():
         return f"Tool executed with: {message}"
 
     return simple_test_tool
+
+
+@pytest.mark.parametrize(
+    "data_collection,expect_input,expect_output",
+    [
+        pytest.param(
+            {"gen_ai": {"inputs": True, "outputs": False}},
+            True,
+            False,
+            id="gen-ai-only-inputs-enabled",
+        ),
+        pytest.param(
+            {"gen_ai": {"inputs": False, "outputs": True}},
+            False,
+            True,
+            id="gen-ai-only-outputs-enabled",
+        ),
+    ],
+)
+@pytest.mark.asyncio
+async def test_tool_execution_span_data_collection(
+    run_tool_agent,
+    simple_test_tool,
+    data_collection,
+    expect_input,
+    expect_output,
+):
+    init_kwargs = {}
+    if data_collection is not None:
+        init_kwargs["data_collection"] = data_collection
+
+    _, tool_span_data = await run_tool_agent(
+        simple_test_tool,
+        **init_kwargs,
+    )
+
+    if expect_input:
+        assert tool_span_data[SPANDATA.GEN_AI_TOOL_INPUT] == '{"message": "hello"}'
+    else:
+        assert SPANDATA.GEN_AI_TOOL_INPUT not in tool_span_data
+
+    if expect_output:
+        assert (
+            tool_span_data[SPANDATA.GEN_AI_TOOL_OUTPUT] == "Tool executed with: hello"
+        )
+    else:
+        assert SPANDATA.GEN_AI_TOOL_OUTPUT not in tool_span_data
 
 
 @pytest.mark.asyncio
