@@ -90,7 +90,12 @@ async def test_agent_run_async(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
-        send_default_pii=True,
+        data_collection={
+            "gen_ai": {
+                "inputs": True,
+                "outputs": True,
+            }
+        },
     )
 
     test_agent = get_test_agent()
@@ -147,6 +152,7 @@ async def test_agent_run_async_model_error(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     def failing_model(messages, info):
@@ -183,7 +189,12 @@ def test_agent_run_sync(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
-        send_default_pii=True,
+        data_collection={
+            "gen_ai": {
+                "inputs": True,
+                "outputs": True,
+            }
+        },
     )
 
     test_agent = get_test_agent()
@@ -216,6 +227,7 @@ def test_agent_run_sync_model_error(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     def failing_model(messages, info):
@@ -252,7 +264,12 @@ async def test_agent_run_stream(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
-        send_default_pii=True,
+        data_collection={
+            "gen_ai": {
+                "inputs": True,
+                "outputs": True,
+            }
+        },
     )
 
     test_agent = get_test_agent()
@@ -313,7 +330,12 @@ async def test_agent_run_stream_events(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
-        send_default_pii=True,
+        data_collection={
+            "gen_ai": {
+                "inputs": True,
+                "outputs": True,
+            }
+        },
     )
 
     # Consume all events
@@ -355,7 +377,12 @@ async def test_agent_with_tools(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
-        send_default_pii=True,
+        data_collection={
+            "gen_ai": {
+                "inputs": True,
+                "outputs": True,
+            }
+        },
     )
 
     test_agent = get_test_agent()
@@ -424,7 +451,12 @@ async def test_agent_with_tool_model_retry(
             )
         ],
         traces_sample_rate=1.0,
-        send_default_pii=True,
+        data_collection={
+            "gen_ai": {
+                "inputs": True,
+                "outputs": True,
+            }
+        },
     )
 
     retries = 0
@@ -512,7 +544,12 @@ async def test_agent_with_tool_validation_error(
             )
         ],
         traces_sample_rate=1.0,
-        send_default_pii=True,
+        data_collection={
+            "gen_ai": {
+                "inputs": True,
+                "outputs": True,
+            }
+        },
     )
 
     test_agent = get_test_agent()
@@ -563,7 +600,12 @@ async def test_agent_with_tools_streaming(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
-        send_default_pii=True,
+        data_collection={
+            "gen_ai": {
+                "inputs": True,
+                "outputs": True,
+            }
+        },
     )
 
     test_agent = get_test_agent()
@@ -610,6 +652,7 @@ async def test_model_settings(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     test_agent_with_settings = get_test_agent_with_settings()
@@ -634,14 +677,9 @@ async def test_model_settings(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "send_default_pii",
-    [True, False],
-)
 async def test_system_prompt_attribute(
     sentry_init,
     capture_items,
-    send_default_pii,
 ):
     """
     Test that system prompts are included as the first message.
@@ -655,7 +693,12 @@ async def test_system_prompt_attribute(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
-        send_default_pii=send_default_pii,
+        data_collection={
+            "gen_ai": {
+                "inputs": True,
+                "outputs": True,
+            }
+        },
     )
     items = capture_items("span")
 
@@ -672,18 +715,55 @@ async def test_system_prompt_attribute(
 
     chat_span = chat_spans[0]
 
-    if send_default_pii:
-        system_instructions = chat_span["attributes"][
-            SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS
-        ]
-        assert json.loads(system_instructions) == [
-            {
-                "type": "text",
-                "content": "You are a helpful assistant specialized in testing.",
+    system_instructions = chat_span["attributes"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
+    assert json.loads(system_instructions) == [
+        {
+            "type": "text",
+            "content": "You are a helpful assistant specialized in testing.",
+        }
+    ]
+
+
+@pytest.mark.asyncio
+async def test_system_prompt_attribute_no_sensitive_data(
+    sentry_init,
+    capture_items,
+):
+    """
+    Test that system prompts are included as the first message.
+    """
+    agent = Agent(
+        "test",
+        name="test_system",
+        system_prompt="You are a helpful assistant specialized in testing.",
+    )
+
+    sentry_init(
+        integrations=[PydanticAIIntegration()],
+        traces_sample_rate=1.0,
+        data_collection={
+            "gen_ai": {
+                "inputs": False,
+                "outputs": False,
             }
-        ]
-    else:
-        assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in chat_span["attributes"]
+        },
+    )
+    items = capture_items("span")
+
+    await agent.run("Hello")
+
+    sentry_sdk.flush()
+    spans = [item.payload for item in items]
+
+    # The transaction IS the invoke_agent span, check for messages in chat spans instead
+    chat_spans = [
+        s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
+    ]
+    assert len(chat_spans) == 1
+
+    chat_span = chat_spans[0]
+
+    assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in chat_span["attributes"]
 
 
 @pytest.mark.asyncio
@@ -704,6 +784,7 @@ async def test_error_handling(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        data_collection={},
     )
     items = capture_items("span")
 
@@ -723,13 +804,15 @@ async def test_without_pii(
     capture_items,
     get_test_agent,
 ):
-    """
-    Test that PII is not captured when send_default_pii is False.
-    """
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
-        send_default_pii=False,
+        data_collection={
+            "gen_ai": {
+                "inputs": False,
+                "outputs": False,
+            }
+        },
     )
     items = capture_items("span")
 
@@ -756,13 +839,15 @@ async def test_without_pii_tools(
     capture_items,
     get_test_agent,
 ):
-    """
-    Test that tool input/output are not captured when send_default_pii is False.
-    """
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
-        send_default_pii=False,
+        data_collection={
+            "gen_ai": {
+                "inputs": False,
+                "outputs": False,
+            }
+        },
     )
 
     test_agent = get_test_agent()
@@ -804,6 +889,7 @@ async def test_multiple_agents_concurrent(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     test_agent = get_test_agent()
@@ -842,7 +928,12 @@ async def test_message_history(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
-        send_default_pii=True,
+        data_collection={
+            "gen_ai": {
+                "inputs": True,
+                "outputs": True,
+            }
+        },
     )
 
     # Second message with history
@@ -890,6 +981,7 @@ async def test_gen_ai_system(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     test_agent = get_test_agent()
@@ -922,6 +1014,7 @@ async def test_context_cleanup_after_run(sentry_init, get_test_agent):
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     # Verify context is not set before run
@@ -945,6 +1038,7 @@ def test_context_cleanup_after_run_sync(sentry_init, get_test_agent, sync_event_
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     # Verify context is not set before run
@@ -969,6 +1063,7 @@ async def test_context_cleanup_after_streaming(sentry_init, get_test_agent):
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     # Verify context is not set before run
@@ -995,6 +1090,7 @@ async def test_context_cleanup_on_error(sentry_init, get_test_agent):
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     test_agent = get_test_agent()
@@ -1029,6 +1125,7 @@ async def test_context_isolation_concurrent_agents(sentry_init, get_test_agent):
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     # Create a second agent
@@ -1086,7 +1183,12 @@ async def test_invoke_agent_with_list_user_prompt(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
-        send_default_pii=True,
+        data_collection={
+            "gen_ai": {
+                "inputs": True,
+                "outputs": True,
+            }
+        },
     )
     items = capture_items("span")
 
@@ -1103,14 +1205,9 @@ async def test_invoke_agent_with_list_user_prompt(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "send_default_pii",
-    [True, False],
-)
 async def test_invoke_agent_with_instructions(
     sentry_init,
     capture_items,
-    send_default_pii,
 ):
     """
     Test that invoke_agent span handles instructions correctly.
@@ -1130,7 +1227,12 @@ async def test_invoke_agent_with_instructions(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
-        send_default_pii=send_default_pii,
+        data_collection={
+            "gen_ai": {
+                "inputs": True,
+                "outputs": True,
+            }
+        },
     )
     items = capture_items("span")
 
@@ -1147,19 +1249,59 @@ async def test_invoke_agent_with_instructions(
 
     chat_span = chat_spans[0]
 
-    if send_default_pii:
-        system_instructions = chat_span["attributes"][
-            SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS
-        ]
-        assert json.loads(system_instructions) == [
-            {"type": "text", "content": "System prompt"},
-            {
-                "type": "text",
-                "content": f"Instruction 1{instructions_separator}Instruction 2",
-            },
-        ]
-    else:
-        assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in chat_span["attributes"]
+    system_instructions = chat_span["attributes"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
+    assert json.loads(system_instructions) == [
+        {"type": "text", "content": "System prompt"},
+        {
+            "type": "text",
+            "content": f"Instruction 1{instructions_separator}Instruction 2",
+        },
+    ]
+
+
+@pytest.mark.asyncio
+async def test_invoke_agent_with_instructions_no_sensitive_data(
+    sentry_init,
+    capture_items,
+):
+    """
+    Test that invoke_agent span handles instructions correctly.
+    """
+    from pydantic_ai import Agent
+
+    agent = Agent(
+        "test",
+        name="test_instructions",
+        instructions=["Instruction 1", "Instruction 2"],
+        system_prompt="System prompt",
+    )
+
+    sentry_init(
+        integrations=[PydanticAIIntegration()],
+        traces_sample_rate=1.0,
+        data_collection={
+            "gen_ai": {
+                "inputs": False,
+                "outputs": False,
+            }
+        },
+    )
+    items = capture_items("span")
+
+    await agent.run("Test input")
+
+    sentry_sdk.flush()
+    spans = [item.payload for item in items]
+
+    # The transaction IS the invoke_agent span, check for messages in chat spans instead
+    chat_spans = [
+        s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
+    ]
+    assert len(chat_spans) == 1
+
+    chat_span = chat_spans[0]
+
+    assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in chat_span["attributes"]
 
 
 @pytest.mark.asyncio
@@ -1176,6 +1318,7 @@ async def test_model_name_extraction_with_callable(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     # Test the utility function directly
@@ -1205,6 +1348,7 @@ async def test_model_name_extraction_fallback_to_str(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     # Test the utility function directly
@@ -1237,6 +1381,7 @@ async def test_usage_data_partial(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        data_collection={},
     )
     items = capture_items("span")
 
@@ -1274,6 +1419,7 @@ async def test_agent_data_from_scope(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        data_collection={},
     )
     items = capture_items("span")
 
@@ -1298,6 +1444,7 @@ async def test_available_tools_without_description(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     test_agent = get_test_agent()
@@ -1336,7 +1483,12 @@ async def test_output_with_tool_calls(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
-        send_default_pii=True,
+        data_collection={
+            "gen_ai": {
+                "inputs": True,
+                "outputs": True,
+            }
+        },
     )
 
     test_agent = get_test_agent()
@@ -1384,7 +1536,12 @@ async def test_message_formatting_with_different_parts(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
-        send_default_pii=True,
+        data_collection={
+            "gen_ai": {
+                "inputs": True,
+                "outputs": True,
+            }
+        },
     )
 
     # Create message history with different part types
@@ -1433,7 +1590,12 @@ async def test_update_invoke_agent_span_with_none_output(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
-        send_default_pii=True,
+        data_collection={
+            "gen_ai": {
+                "inputs": True,
+                "outputs": True,
+            }
+        },
     )
 
     span = sentry_sdk.start_span(name="test_span")
@@ -1459,6 +1621,7 @@ async def test_update_ai_client_span_with_none_response(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     span = sentry_sdk.start_span(name="test_span")
@@ -1483,6 +1646,7 @@ async def test_agent_without_name(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        data_collection={},
     )
     items = capture_items("span")
 
@@ -1506,7 +1670,12 @@ async def test_input_messages_error_handling(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
-        send_default_pii=True,
+        data_collection={
+            "gen_ai": {
+                "inputs": True,
+                "outputs": True,
+            }
+        },
     )
 
     span = sentry_sdk.start_span(name="test_span")
@@ -1535,6 +1704,7 @@ async def test_available_tools_error_handling(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     span = sentry_sdk.start_span(name="test_span")
@@ -1562,6 +1732,7 @@ async def test_set_usage_data_with_none_usage(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     span = sentry_sdk.start_span(name="test_span")
@@ -1587,6 +1758,7 @@ async def test_set_usage_data_with_partial_fields(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     span = sentry_sdk.start_span(name="test_span")
@@ -1626,7 +1798,12 @@ async def test_message_parts_with_tool_return(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
-        send_default_pii=True,
+        data_collection={
+            "gen_ai": {
+                "inputs": True,
+                "outputs": True,
+            }
+        },
     )
     items = capture_items("span")
 
@@ -1658,7 +1835,12 @@ async def test_message_parts_with_list_content(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
-        send_default_pii=True,
+        data_collection={
+            "gen_ai": {
+                "inputs": True,
+                "outputs": True,
+            }
+        },
     )
 
     span = sentry_sdk.start_span(name="test_span")
@@ -1689,7 +1871,12 @@ async def test_output_data_transformations(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
-        send_default_pii=True,
+        data_collection={
+            "gen_ai": {
+                "inputs": True,
+                "outputs": True,
+            }
+        },
     )
 
     def response_model(messages, info):
@@ -1769,7 +1956,12 @@ async def test_output_data_error_handling(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
-        send_default_pii=True,
+        data_collection={
+            "gen_ai": {
+                "inputs": True,
+                "outputs": True,
+            }
+        },
     )
 
     span = sentry_sdk.start_span(name="test_span")
@@ -1801,7 +1993,12 @@ async def test_message_with_system_prompt_part(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
-        send_default_pii=True,
+        data_collection={
+            "gen_ai": {
+                "inputs": True,
+                "outputs": True,
+            }
+        },
     )
 
     span = sentry_sdk.start_span(name="test_span")
@@ -1835,7 +2032,12 @@ async def test_message_with_instructions(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
-        send_default_pii=True,
+        data_collection={
+            "gen_ai": {
+                "inputs": True,
+                "outputs": True,
+            }
+        },
     )
 
     span = sentry_sdk.start_span(name="test_span")
@@ -1867,7 +2069,12 @@ async def test_set_input_messages_without_prompts(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
-        send_default_pii=True,
+        data_collection={
+            "gen_ai": {
+                "inputs": True,
+                "outputs": True,
+            }
+        },
     )
 
     span = sentry_sdk.start_span(name="test_span")
@@ -1893,6 +2100,7 @@ async def test_get_model_name_with_exception_in_callable(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     # Create model with callable name that raises exception
@@ -1918,6 +2126,7 @@ async def test_get_model_name_with_string_model(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     # Pass a string as model
@@ -1939,6 +2148,7 @@ async def test_get_model_name_with_none(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     # Pass None
@@ -1946,29 +2156,6 @@ async def test_get_model_name_with_none(
 
     # Should return None
     assert result is None
-
-
-@pytest.mark.asyncio
-async def test_should_send_prompts_without_pii(
-    sentry_init,
-):
-    """
-    Test that _should_send_inputs/_should_send_outputs return False when PII disabled.
-    """
-    from sentry_sdk.integrations.pydantic_ai.utils import (
-        _should_send_inputs,
-        _should_send_outputs,
-    )
-
-    sentry_init(
-        integrations=[PydanticAIIntegration()],
-        traces_sample_rate=1.0,
-        send_default_pii=False,  # PII disabled,
-    )
-
-    # Should return False
-    assert _should_send_inputs() is False
-    assert _should_send_outputs() is False
 
 
 @pytest.mark.asyncio
@@ -1986,6 +2173,7 @@ async def test_set_available_tools_without_toolset(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     span = sentry_sdk.start_span(name="test_span")
@@ -2015,6 +2203,7 @@ async def test_set_available_tools_with_schema(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     span = sentry_sdk.start_span(name="test_span")
@@ -2050,7 +2239,12 @@ async def test_execute_tool_span_creation(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
-        send_default_pii=True,
+        data_collection={
+            "gen_ai": {
+                "inputs": True,
+                "outputs": True,
+            }
+        },
     )
 
     # Create execute_tool span
@@ -2073,7 +2267,12 @@ async def test_execute_tool_span_with_mcp_type(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
-        send_default_pii=True,
+        data_collection={
+            "gen_ai": {
+                "inputs": True,
+                "outputs": True,
+            }
+        },
     )
 
     # Create execute_tool span with mcp type
@@ -2097,7 +2296,12 @@ async def test_execute_tool_span_without_prompts(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
-        send_default_pii=True,
+        data_collection={
+            "gen_ai": {
+                "inputs": True,
+                "outputs": True,
+            }
+        },
     )
 
     # Create execute_tool span
@@ -2118,7 +2322,12 @@ async def test_execute_tool_span_with_none_args(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
-        send_default_pii=True,
+        data_collection={
+            "gen_ai": {
+                "inputs": True,
+                "outputs": True,
+            }
+        },
     )
 
     # Create execute_tool span with None args
@@ -2140,6 +2349,7 @@ async def test_update_execute_tool_span_with_none_span(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     # Update with None span - should not raise
@@ -2164,7 +2374,12 @@ async def test_update_execute_tool_span_with_none_result(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
-        send_default_pii=True,
+        data_collection={
+            "gen_ai": {
+                "inputs": True,
+                "outputs": True,
+            }
+        },
     )
 
     # Create execute_tool span
@@ -2186,6 +2401,7 @@ async def test_tool_execution_without_span_context(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     # Create a simple agent with no tools (won't have function_toolset)
@@ -2218,7 +2434,12 @@ async def test_invoke_agent_span_with_callable_instruction(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
-        send_default_pii=True,
+        data_collection={
+            "gen_ai": {
+                "inputs": True,
+                "outputs": True,
+            }
+        },
     )
 
     # Create mock agent with callable instruction
@@ -2249,7 +2470,12 @@ async def test_invoke_agent_span_with_string_instructions(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
-        send_default_pii=True,
+        data_collection={
+            "gen_ai": {
+                "inputs": True,
+                "outputs": True,
+            }
+        },
     )
 
     # Create mock agent with string instruction
@@ -2276,6 +2502,7 @@ async def test_ai_client_span_with_streaming_flag(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     # Set streaming flag in scope
@@ -2302,6 +2529,7 @@ async def test_ai_client_span_gets_agent_from_scope(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     # Set agent in scope
@@ -2348,7 +2576,12 @@ async def test_binary_content_encoding_image(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
-        send_default_pii=True,
+        data_collection={
+            "gen_ai": {
+                "inputs": True,
+                "outputs": True,
+            }
+        },
     )
     items = capture_items("span")
 
@@ -2383,7 +2616,12 @@ async def test_binary_content_encoding_mixed_content(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
-        send_default_pii=True,
+        data_collection={
+            "gen_ai": {
+                "inputs": True,
+                "outputs": True,
+            }
+        },
     )
     items = capture_items("span")
 
@@ -2429,7 +2667,12 @@ async def test_binary_content_in_agent_run(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
-        send_default_pii=True,
+        data_collection={
+            "gen_ai": {
+                "inputs": True,
+                "outputs": True,
+            }
+        },
     )
 
     binary_content = BinaryContent(
@@ -2462,6 +2705,7 @@ async def test_set_usage_data_with_cache_tokens(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        data_collection={},
     )
     items = capture_items("span")
 
@@ -2539,7 +2783,12 @@ def test_image_url_base64_content_in_span(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
-        send_default_pii=True,
+        data_collection={
+            "gen_ai": {
+                "inputs": True,
+                "outputs": True,
+            }
+        },
     )
 
     found_image = False
@@ -2613,7 +2862,12 @@ async def test_invoke_agent_image_url(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
-        send_default_pii=True,
+        data_collection={
+            "gen_ai": {
+                "inputs": True,
+                "outputs": True,
+            }
+        },
     )
 
     agent = Agent("test", name="test_image_url_agent")
@@ -2664,7 +2918,12 @@ async def test_tool_description_in_execute_tool_span(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
-        send_default_pii=True,
+        data_collection={
+            "gen_ai": {
+                "inputs": True,
+                "outputs": True,
+            }
+        },
     )
     items = capture_items("span")
 
@@ -2710,238 +2969,6 @@ def _spans_by_op(items):
 
 
 @pytest.mark.parametrize(
-    "data_collection,send_default_pii,expect_inputs,expect_available_tools",
-    [
-        pytest.param(
-            {"gen_ai": {"inputs": True}},
-            False,
-            True,
-            True,
-            id="gen-ai-inputs-enabled-overrides-pii",
-        ),
-        pytest.param(
-            {"gen_ai": {"inputs": False}},
-            True,
-            False,
-            False,
-            id="gen-ai-inputs-disabled-overrides-pii-enabled",
-        ),
-        pytest.param(
-            {},
-            False,
-            True,
-            True,
-            id="gen-ai-omitted-defaults-to-enabled",
-        ),
-        pytest.param(
-            {"gen_ai": {"outputs": False}},
-            False,
-            True,
-            True,
-            id="gen-ai-outputs-disabled-does-not-affect-inputs",
-        ),
-        pytest.param(
-            None,
-            True,
-            True,
-            True,
-            id="no-data-collection-pii",
-        ),
-        pytest.param(
-            None,
-            False,
-            False,
-            True,
-            id="no-data-collection-pii-disabled",
-        ),
-    ],
-)
-@pytest.mark.asyncio
-async def test_data_collection_gen_ai_inputs_gates_request_messages_tool_inputs_and_available_tools(
-    sentry_init,
-    capture_items,
-    get_test_agent,
-    data_collection,
-    send_default_pii,
-    expect_inputs,
-    expect_available_tools,
-):
-    init_kwargs = {
-        "integrations": [PydanticAIIntegration()],
-        "traces_sample_rate": 1.0,
-        "send_default_pii": send_default_pii,
-    }
-    if data_collection is not None:
-        init_kwargs["data_collection"] = data_collection
-
-    sentry_init(**init_kwargs)
-
-    test_agent = get_test_agent()
-
-    @test_agent.tool_plain
-    def add_numbers(a: int, b: int) -> int:
-        return a + b
-
-    items = capture_items("span")
-
-    result = await test_agent.run("What is 5 + 3?")
-    assert result is not None
-
-    spans = _spans_by_op(items)
-
-    chat_spans = [data for op, data in spans if op == "gen_ai.chat"]
-    tool_spans = [data for op, data in spans if op == "gen_ai.execute_tool"]
-
-    assert len(chat_spans) >= 1
-    assert len(tool_spans) >= 1
-
-    for chat_span in chat_spans:
-        if expect_inputs:
-            assert SPANDATA.GEN_AI_REQUEST_MESSAGES in chat_span
-            assert (
-                "helpful test assistant"
-                in chat_span[SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
-            )
-        else:
-            assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in chat_span
-            assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in chat_span
-
-        # Non-PII data is unaffected by the gate
-        assert SPANDATA.GEN_AI_REQUEST_MODEL in chat_span
-
-    # Both the chat and the invoke_agent spans list the agent's available tools
-    for span_data in chat_spans:
-        if expect_available_tools:
-            assert "add_numbers" in span_data[SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS]
-        else:
-            assert SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS not in span_data
-
-    for tool_span in tool_spans:
-        if expect_inputs:
-            assert SPANDATA.GEN_AI_TOOL_INPUT in tool_span
-        else:
-            assert SPANDATA.GEN_AI_TOOL_INPUT not in tool_span
-
-        # Non-PII data is unaffected by the gate
-        assert tool_span[SPANDATA.GEN_AI_TOOL_NAME] == "add_numbers"
-
-
-@pytest.mark.parametrize(
-    "data_collection,send_default_pii,expect_outputs",
-    [
-        pytest.param(
-            {"gen_ai": {"outputs": True}},
-            False,
-            True,
-            id="gen-ai-outputs-enabled-overrides-pii",
-        ),
-        pytest.param(
-            {"gen_ai": {"outputs": False}},
-            True,
-            False,
-            id="gen-ai-outputs-disabled-overrides-pii-enabled",
-        ),
-        pytest.param(
-            {},
-            False,
-            True,
-            id="gen-ai-omitted-defaults-to-enabled",
-        ),
-        pytest.param(
-            {"gen_ai": {"inputs": False}},
-            False,
-            True,
-            id="gen-ai-inputs-disabled-does-not-affect-outputs",
-        ),
-        pytest.param(
-            None,
-            True,
-            True,
-            id="no-data-collection-pii",
-        ),
-        pytest.param(
-            None,
-            False,
-            False,
-            id="no-data-collection-pii-disabled",
-        ),
-    ],
-)
-@pytest.mark.asyncio
-async def test_data_collection_gen_ai_outputs_gates_response_text_and_tool_outputs(
-    sentry_init,
-    capture_items,
-    get_test_agent,
-    data_collection,
-    send_default_pii,
-    expect_outputs,
-):
-    init_kwargs = {
-        "integrations": [PydanticAIIntegration()],
-        "traces_sample_rate": 1.0,
-        "send_default_pii": send_default_pii,
-    }
-    if data_collection is not None:
-        init_kwargs["data_collection"] = data_collection
-
-    sentry_init(**init_kwargs)
-
-    test_agent = get_test_agent()
-
-    @test_agent.tool_plain
-    def add_numbers(a: int, b: int) -> int:
-        return a + b
-
-    items = capture_items("span")
-
-    result = await test_agent.run("What is 5 + 3?")
-    assert result is not None
-
-    spans = _spans_by_op(items)
-
-    # The invoke_agent span is either a child span or, when it is the segment
-    # span, the transaction itself.
-    invoke_agent_data = next(
-        (data for op, data in spans if op == "gen_ai.invoke_agent"), None
-    )
-
-    chat_spans = [data for op, data in spans if op == "gen_ai.chat"]
-    tool_spans = [data for op, data in spans if op == "gen_ai.execute_tool"]
-
-    assert len(chat_spans) >= 1
-    assert len(tool_spans) >= 1
-
-    if expect_outputs:
-        assert SPANDATA.GEN_AI_RESPONSE_TEXT in invoke_agent_data
-    else:
-        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in invoke_agent_data
-
-    # Every part of the output message follows the outputs gate, so the
-    # attribute is dropped entirely when outputs are disabled.
-    response_part_types = set()
-    for chat_span in chat_spans:
-        for message in json.loads(chat_span.get(SPANDATA.GEN_AI_OUTPUT_MESSAGES, "[]")):
-            for part in message["parts"]:
-                response_part_types.add(part["type"])
-
-    if expect_outputs:
-        assert "text" in response_part_types
-    else:
-        assert response_part_types == set()
-        for chat_span in chat_spans:
-            assert SPANDATA.GEN_AI_OUTPUT_MESSAGES not in chat_span
-
-    for tool_span in tool_spans:
-        if expect_outputs:
-            assert SPANDATA.GEN_AI_TOOL_OUTPUT in tool_span
-        else:
-            assert SPANDATA.GEN_AI_TOOL_OUTPUT not in tool_span
-
-        # Non-PII data is unaffected by the gate
-        assert tool_span[SPANDATA.GEN_AI_TOOL_NAME] == "add_numbers"
-
-
-@pytest.mark.parametrize(
     "gen_ai,expect_outputs",
     [
         pytest.param(
@@ -2953,16 +2980,6 @@ async def test_data_collection_gen_ai_outputs_gates_response_text_and_tool_outpu
             {"inputs": False, "outputs": True},
             True,
             id="gen-ai-inputs-disabled-does-not-affect-output-messages",
-        ),
-        pytest.param(
-            {"inputs": True, "outputs": True},
-            True,
-            id="gen-ai-inputs-and-outputs-enabled",
-        ),
-        pytest.param(
-            {"inputs": False, "outputs": False},
-            False,
-            id="gen-ai-inputs-and-outputs-disabled",
         ),
     ],
 )
