@@ -423,7 +423,7 @@ async def test_tool_definitions(
 
 
 @pytest.mark.asyncio
-async def test_agent_invocation_span_no_pii(
+async def test_agent_invocation_span_no_sensitive_data(
     sentry_init,
     capture_items,
     test_agent,
@@ -829,7 +829,7 @@ async def test_client_span_custom_model(
     assert ai_client_span["attributes"]["gen_ai.request.model"] == "my-custom-model"
 
 
-def test_agent_invocation_span_sync_no_pii(
+def test_agent_invocation_span_sync_no_sensitive_data(
     sentry_init,
     capture_items,
     test_agent,
