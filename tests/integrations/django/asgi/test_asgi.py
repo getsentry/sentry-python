@@ -113,7 +113,7 @@ async def test_async_views(
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
-        send_default_pii=True,
+        data_collection={},
     )
 
     comm = HttpCommunicator(application, "GET", "/async_message")
@@ -131,7 +131,6 @@ async def test_async_views(
         "cookies": {},
         "headers": {},
         "method": "GET",
-        "query_string": None,
         "url": "/async_message",
     }
 

@@ -93,19 +93,16 @@ class RequestExtractor:
         # the request body, which is why we default to True here.
         attach_request_body = True
 
-        if has_data_collection_enabled(client.options):
-            cookies = _apply_key_value_collection_filtering(
-                items=dict(self.cookies()),
-                behaviour=client.options["data_collection"]["cookies"],
-            )
-            if cookies:
-                request_info["cookies"] = cookies
+        cookies = _apply_key_value_collection_filtering(
+            items=dict(self.cookies()),
+            behaviour=client.options["data_collection"]["cookies"],
+        )
+        if cookies:
+            request_info["cookies"] = cookies
 
-            attach_request_body = (
-                "incoming_request" in client.options["data_collection"]["http_bodies"]
-            )
-        elif should_send_default_pii():
-            request_info["cookies"] = dict(self.cookies())
+        attach_request_body = (
+            "incoming_request" in client.options["data_collection"]["http_bodies"]
+        )
 
         if attach_request_body:
             if not request_body_within_bounds(client, content_length):
