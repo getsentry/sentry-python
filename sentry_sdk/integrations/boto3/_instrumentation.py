@@ -25,7 +25,7 @@ from sentry_sdk.utils import (
 )
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, Optional, Union
+    from typing import Any, Dict, Mapping, Optional, Union
 
     from sentry_sdk._types import Attributes
     from sentry_sdk.integrations.boto3._context import AwsCallContext
@@ -92,13 +92,8 @@ def _get_client_attributes(
     return attributes
 
 
-def _get_response_attributes(response: "Any") -> "Attributes":
-    if not isinstance(response, dict):
-        return {}
-
-    metadata = response.get("ResponseMetadata")
-    if not isinstance(metadata, dict):
-        return {}
+def _get_response_attributes(response: "Mapping[str, Any]") -> "Attributes":
+    metadata = response.get("ResponseMetadata", {})
     attributes: "Attributes" = {}
 
     # botocore injects HTTP status into `ResponseMetadata` after parsing.
@@ -107,18 +102,11 @@ def _get_response_attributes(response: "Any") -> "Attributes":
     if isinstance(status_code, int) and 100 <= status_code <= 599:
         attributes[SPANDATA.HTTP_STATUS_CODE] = status_code
 
-    retry_attempts = metadata.get("RetryAttempts")
-    if (
-        isinstance(retry_attempts, int)
-        # avoid emitting `resend_count=True`.
-        and not isinstance(retry_attempts, bool)
-        and retry_attempts > 0
-    ):
+    retry_attempts = metadata.get("RetryAttempts", 0)
+    if retry_attempts > 0:
         attributes[SPANDATA.HTTP_REQUEST_RESEND_COUNT] = retry_attempts
 
-    headers = metadata.get("HTTPHeaders")
-    if not isinstance(headers, dict):
-        headers = {}
+    headers = metadata.get("HTTPHeaders", {})
 
     request_id = next(
         (
@@ -157,11 +145,9 @@ def _get_error_type(exception: "BaseException") -> str:
         # `ClientError` wraps AWS service errors; `Error.Code` identifies the
         # actual service error, e.g. `AccessDeniedException`.
         # https://docs.aws.amazon.com/boto3/latest/guide/error-handling.html
-        error = exception.response.get("Error")
-        if isinstance(error, dict):
-            error_code = error.get("Code")
-            if isinstance(error_code, str) and error_code:
-                return error_code
+        error_code: "Optional[str]" = exception.response.get("Error", {}).get("Code")
+        if error_code:
+            return error_code
 
     # failures before a service response have no AWS error code.
     # https://opentelemetry.io/docs/specs/semconv/rpc/rpc-spans/
