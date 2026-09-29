@@ -137,20 +137,20 @@ class InterruptingChatModel(BaseChatModel):
         raise GraphBubbleUp("interrupt")
 
 
-@pytest.mark.parametrize(
-    "send_default_pii",
-    [True, False],
-)
 def test_pregel_invoke(
     sentry_init,
     capture_items,
-    send_default_pii,
 ):
     """Test Pregel.invoke() wrapper creates proper invoke_agent span."""
     sentry_init(
         integrations=[LanggraphIntegration()],
         traces_sample_rate=1.0,
-        send_default_pii=send_default_pii,
+        data_collection={
+            "gen_ai": {
+                "inputs": True,
+                "outputs": True,
+            }
+        },
     )
 
     test_state = {
@@ -205,52 +205,118 @@ def test_pregel_invoke(
     assert invoke_span["attributes"][SPANDATA.GEN_AI_PIPELINE_NAME] == "test_graph"
     assert invoke_span["attributes"][SPANDATA.GEN_AI_AGENT_NAME] == "test_graph"
 
-    if send_default_pii:
-        assert SPANDATA.GEN_AI_REQUEST_MESSAGES in invoke_span["attributes"]
-        assert SPANDATA.GEN_AI_RESPONSE_TEXT in invoke_span["attributes"]
+    assert SPANDATA.GEN_AI_REQUEST_MESSAGES in invoke_span["attributes"]
+    assert SPANDATA.GEN_AI_RESPONSE_TEXT in invoke_span["attributes"]
 
-        request_messages = invoke_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+    request_messages = invoke_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
 
-        if isinstance(request_messages, str):
-            request_messages = json.loads(request_messages)
-        assert len(request_messages) == 2
-        assert request_messages[0]["content"] == "Hello, can you help me?"
-        assert request_messages[1]["content"] == "Of course! How can I assist you?"
+    if isinstance(request_messages, str):
+        request_messages = json.loads(request_messages)
+    assert len(request_messages) == 2
+    assert request_messages[0]["content"] == "Hello, can you help me?"
+    assert request_messages[1]["content"] == "Of course! How can I assist you?"
 
-        response_text = invoke_span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
-        assert response_text == expected_assistant_response
+    response_text = invoke_span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+    assert response_text == expected_assistant_response
 
-        assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS in invoke_span["attributes"]
-        tool_calls_data = invoke_span["attributes"][SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS]
+    assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS in invoke_span["attributes"]
+    tool_calls_data = invoke_span["attributes"][SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS]
 
-        if isinstance(tool_calls_data, str):
-            tool_calls_data = json.loads(tool_calls_data)
+    if isinstance(tool_calls_data, str):
+        tool_calls_data = json.loads(tool_calls_data)
 
-        assert len(tool_calls_data) == 1
-        assert tool_calls_data[0]["id"] == "call_test_123"
-        assert tool_calls_data[0]["function"]["name"] == "search_tool"
-    else:
-        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in invoke_span.get("attributes", {})
-        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in invoke_span.get("attributes", {})
-        assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in invoke_span.get(
-            "attributes", {}
-        )
+    assert len(tool_calls_data) == 1
+    assert tool_calls_data[0]["id"] == "call_test_123"
+    assert tool_calls_data[0]["function"]["name"] == "search_tool"
 
 
-@pytest.mark.parametrize(
-    "send_default_pii",
-    [True, False],
-)
+def test_pregel_invoke_no_sensitive_data(
+    sentry_init,
+    capture_items,
+):
+    """Test Pregel.invoke() wrapper creates proper invoke_agent span."""
+    sentry_init(
+        integrations=[LanggraphIntegration()],
+        traces_sample_rate=1.0,
+        data_collection={
+            "gen_ai": {
+                "inputs": False,
+                "outputs": False,
+            }
+        },
+    )
+
+    test_state = {
+        "messages": [
+            MockMessage("Hello, can you help me?", name="user"),
+            MockMessage("Of course! How can I assist you?", name="assistant"),
+        ]
+    }
+
+    pregel = MockPregelInstance("test_graph")
+
+    expected_assistant_response = "I'll help you with that task!"
+    expected_tool_calls = [
+        {
+            "id": "call_test_123",
+            "type": "function",
+            "function": {"name": "search_tool", "arguments": '{"query": "help"}'},
+        }
+    ]
+
+    def original_invoke(self, *args, **kwargs):
+        input_messages = args[0].get("messages", [])
+        new_messages = input_messages + [
+            MockMessage(
+                content=expected_assistant_response,
+                name="assistant",
+                tool_calls=expected_tool_calls,
+            )
+        ]
+        return {"messages": new_messages}
+
+    items = capture_items("span")
+
+    wrapped_invoke = _wrap_pregel_invoke(original_invoke)
+    result = wrapped_invoke(pregel, test_state)
+
+    assert result is not None
+
+    sentry_sdk.flush()
+    spans = [item.payload for item in items]
+    invoke_spans = [
+        span
+        for span in spans
+        if span["attributes"]["sentry.op"] == OP.GEN_AI_INVOKE_AGENT
+    ]
+    assert len(invoke_spans) == 1
+
+    invoke_span = invoke_spans[0]
+    assert invoke_span["name"] == "invoke_agent test_graph"
+    assert invoke_span["attributes"]["sentry.origin"] == "auto.ai.langgraph"
+    assert invoke_span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "invoke_agent"
+    assert invoke_span["attributes"][SPANDATA.GEN_AI_PIPELINE_NAME] == "test_graph"
+    assert invoke_span["attributes"][SPANDATA.GEN_AI_AGENT_NAME] == "test_graph"
+
+    assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in invoke_span.get("attributes", {})
+    assert SPANDATA.GEN_AI_RESPONSE_TEXT not in invoke_span.get("attributes", {})
+    assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in invoke_span.get("attributes", {})
+
+
 def test_pregel_ainvoke(
     sentry_init,
     capture_items,
-    send_default_pii,
 ):
     """Test Pregel.ainvoke() async wrapper creates proper invoke_agent span."""
     sentry_init(
         integrations=[LanggraphIntegration()],
         traces_sample_rate=1.0,
-        send_default_pii=send_default_pii,
+        data_collection={
+            "gen_ai": {
+                "inputs": True,
+                "outputs": True,
+            }
+        },
     )
 
     test_state = {"messages": [MockMessage("What's the weather like?", name="user")]}
@@ -302,28 +368,91 @@ def test_pregel_ainvoke(
     assert invoke_span["attributes"][SPANDATA.GEN_AI_PIPELINE_NAME] == "async_graph"
     assert invoke_span["attributes"][SPANDATA.GEN_AI_AGENT_NAME] == "async_graph"
 
-    if send_default_pii:
-        assert SPANDATA.GEN_AI_REQUEST_MESSAGES in invoke_span["attributes"]
-        assert SPANDATA.GEN_AI_RESPONSE_TEXT in invoke_span["attributes"]
+    assert SPANDATA.GEN_AI_REQUEST_MESSAGES in invoke_span["attributes"]
+    assert SPANDATA.GEN_AI_RESPONSE_TEXT in invoke_span["attributes"]
 
-        response_text = invoke_span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
-        assert response_text == expected_assistant_response
+    response_text = invoke_span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+    assert response_text == expected_assistant_response
 
-        assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS in invoke_span["attributes"]
-        tool_calls_data = invoke_span["attributes"][SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS]
+    assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS in invoke_span["attributes"]
+    tool_calls_data = invoke_span["attributes"][SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS]
 
-        if isinstance(tool_calls_data, str):
-            tool_calls_data = json.loads(tool_calls_data)
+    if isinstance(tool_calls_data, str):
+        tool_calls_data = json.loads(tool_calls_data)
 
-        assert len(tool_calls_data) == 1
-        assert tool_calls_data[0]["id"] == "call_weather_456"
-        assert tool_calls_data[0]["function"]["name"] == "get_weather"
-    else:
-        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in invoke_span.get("attributes", {})
-        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in invoke_span.get("attributes", {})
-        assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in invoke_span.get(
-            "attributes", {}
-        )
+    assert len(tool_calls_data) == 1
+    assert tool_calls_data[0]["id"] == "call_weather_456"
+    assert tool_calls_data[0]["function"]["name"] == "get_weather"
+
+
+def test_pregel_ainvoke_no_sensitive_data(
+    sentry_init,
+    capture_items,
+):
+    """Test Pregel.ainvoke() async wrapper creates proper invoke_agent span."""
+    sentry_init(
+        integrations=[LanggraphIntegration()],
+        traces_sample_rate=1.0,
+        data_collection={
+            "gen_ai": {
+                "inputs": False,
+                "outputs": False,
+            }
+        },
+    )
+
+    test_state = {"messages": [MockMessage("What's the weather like?", name="user")]}
+    pregel = MockPregelInstance("async_graph")
+
+    expected_assistant_response = "It's sunny and 72°F today!"
+    expected_tool_calls = [
+        {
+            "id": "call_weather_456",
+            "type": "function",
+            "function": {"name": "get_weather", "arguments": '{"location": "current"}'},
+        }
+    ]
+
+    async def original_ainvoke(self, *args, **kwargs):
+        input_messages = args[0].get("messages", [])
+        new_messages = input_messages + [
+            MockMessage(
+                content=expected_assistant_response,
+                name="assistant",
+                tool_calls=expected_tool_calls,
+            )
+        ]
+        return {"messages": new_messages}
+
+    async def run_test():
+        wrapped_ainvoke = _wrap_pregel_ainvoke(original_ainvoke)
+        result = await wrapped_ainvoke(pregel, test_state)
+        return result
+
+    items = capture_items("span")
+
+    result = asyncio.run(run_test())
+    assert result is not None
+
+    sentry_sdk.flush()
+    spans = [item.payload for item in items]
+    invoke_spans = [
+        span
+        for span in spans
+        if span["attributes"]["sentry.op"] == OP.GEN_AI_INVOKE_AGENT
+    ]
+    assert len(invoke_spans) == 1
+
+    invoke_span = invoke_spans[0]
+    assert invoke_span["name"] == "invoke_agent async_graph"
+    assert invoke_span["attributes"]["sentry.origin"] == "auto.ai.langgraph"
+    assert invoke_span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "invoke_agent"
+    assert invoke_span["attributes"][SPANDATA.GEN_AI_PIPELINE_NAME] == "async_graph"
+    assert invoke_span["attributes"][SPANDATA.GEN_AI_AGENT_NAME] == "async_graph"
+
+    assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in invoke_span.get("attributes", {})
+    assert SPANDATA.GEN_AI_RESPONSE_TEXT not in invoke_span.get("attributes", {})
+    assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in invoke_span.get("attributes", {})
 
 
 def test_pregel_invoke_error(
@@ -334,7 +463,12 @@ def test_pregel_invoke_error(
     sentry_init(
         integrations=[LanggraphIntegration()],
         traces_sample_rate=1.0,
-        send_default_pii=True,
+        data_collection={
+            "gen_ai": {
+                "inputs": True,
+                "outputs": True,
+            }
+        },
     )
 
     test_state = {"messages": [MockMessage("This will fail")]}
@@ -370,7 +504,12 @@ def test_pregel_ainvoke_error(
     sentry_init(
         integrations=[LanggraphIntegration()],
         traces_sample_rate=1.0,
-        send_default_pii=True,
+        data_collection={
+            "gen_ai": {
+                "inputs": True,
+                "outputs": True,
+            }
+        },
     )
 
     test_state = {"messages": [MockMessage("This will fail async")]}
@@ -411,7 +550,12 @@ def test_pregel_invoke_with_different_graph_names(
     sentry_init(
         integrations=[LanggraphIntegration()],
         traces_sample_rate=1.0,
-        send_default_pii=True,
+        data_collection={
+            "gen_ai": {
+                "inputs": True,
+                "outputs": True,
+            }
+        },
     )
 
     pregel = MockPregelInstance(graph_name) if graph_name else MockPregelInstance()
@@ -503,7 +647,12 @@ def test_extraction_functions_complex_scenario(
     sentry_init(
         integrations=[LanggraphIntegration()],
         traces_sample_rate=1.0,
-        send_default_pii=True,
+        data_collection={
+            "gen_ai": {
+                "inputs": True,
+                "outputs": True,
+            }
+        },
     )
 
     pregel = MockPregelInstance("complex_graph")
@@ -582,7 +731,12 @@ def test_langgraph_message_role_mapping(
     sentry_init(
         integrations=[LanggraphIntegration()],
         traces_sample_rate=1.0,
-        send_default_pii=True,
+        data_collection={
+            "gen_ai": {
+                "inputs": True,
+                "outputs": True,
+            }
+        },
     )
 
     # Mock a langgraph message with mixed roles
@@ -648,6 +802,7 @@ def test_langgraph_message_role_mapping(
 def test_graph_bubble_up_ignored(sentry_init, capture_items):
     sentry_init(
         integrations=[LanggraphIntegration()],
+        data_collection={},
     )
 
     events = capture_items("event")
@@ -657,297 +812,3 @@ def test_graph_bubble_up_ignored(sentry_init, capture_items):
         model.invoke([HumanMessage(content="hi")])
 
     assert len(events) == 0
-
-
-def _invoke_span_data(items_or_events):
-    sentry_sdk.flush()
-    spans = [item.payload for item in items_or_events]
-    invoke_spans = [
-        span
-        for span in spans
-        if span["attributes"]["sentry.op"] == OP.GEN_AI_INVOKE_AGENT
-    ]
-    assert len(invoke_spans) == 1
-    return invoke_spans[0]["attributes"]
-
-
-@pytest.mark.parametrize(
-    "data_collection, send_default_pii, expect_inputs",
-    [
-        pytest.param(
-            {"gen_ai": {"inputs": True}},
-            False,
-            True,
-            id="gen-ai-inputs-enabled-overrides-pii-disabled",
-        ),
-        pytest.param(
-            {"gen_ai": {"inputs": False}},
-            True,
-            False,
-            id="gen-ai-inputs-disabled-overrides-pii-enabled",
-        ),
-        pytest.param(
-            {},
-            False,
-            True,
-            id="gen-ai-omitted-defaults-to-enabled",
-        ),
-        pytest.param(
-            {"gen_ai": {"outputs": False}},
-            False,
-            True,
-            id="gen-ai-outputs-disabled-does-not-affect-inputs",
-        ),
-        pytest.param(
-            None,
-            False,
-            False,
-            id="no-data-collection-falls-back-to-send-default-pii",
-        ),
-        pytest.param(
-            None,
-            True,
-            True,
-            id="no-data-collection-pii-enabled-collects",
-        ),
-    ],
-)
-def test_pregel_invoke_gates_request_messages_on_inputs_setting(
-    sentry_init,
-    capture_items,
-    data_collection,
-    send_default_pii,
-    expect_inputs,
-):
-    init_kwargs = {
-        "integrations": [LanggraphIntegration()],
-        "traces_sample_rate": 1.0,
-        "send_default_pii": send_default_pii,
-    }
-    if data_collection is not None:
-        init_kwargs["data_collection"] = data_collection
-
-    sentry_init(**init_kwargs)
-
-    test_state = {"messages": [MockMessage("Hello, can you help me?", name="user")]}
-    pregel = MockPregelInstance("test_graph")
-
-    def original_invoke(self, *args, **kwargs):
-        return {
-            "messages": args[0].get("messages", [])
-            + [
-                MockMessage(
-                    content="I'll help you with that task!",
-                    name="assistant",
-                )
-            ]
-        }
-
-    captured = capture_items("span")
-
-    wrapped_invoke = _wrap_pregel_invoke(original_invoke)
-    wrapped_invoke(pregel, test_state)
-
-    data = _invoke_span_data(captured)
-
-    if expect_inputs:
-        assert SPANDATA.GEN_AI_REQUEST_MESSAGES in data
-    else:
-        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in data
-
-
-@pytest.mark.parametrize(
-    "data_collection, send_default_pii, expect_outputs",
-    [
-        pytest.param(
-            {"gen_ai": {"outputs": True}},
-            False,
-            True,
-            id="gen-ai-outputs-enabled-overrides-pii-disabled",
-        ),
-        pytest.param(
-            {"gen_ai": {"outputs": False}},
-            True,
-            False,
-            id="gen-ai-outputs-disabled-overrides-pii-enabled",
-        ),
-        pytest.param(
-            {},
-            False,
-            True,
-            id="gen-ai-omitted-defaults-to-enabled",
-        ),
-        pytest.param(
-            {"gen_ai": {"inputs": False}},
-            False,
-            True,
-            id="gen-ai-inputs-disabled-does-not-affect-outputs",
-        ),
-        pytest.param(
-            None,
-            False,
-            False,
-            id="no-data-collection-falls-back-to-send-default-pii",
-        ),
-        pytest.param(
-            None,
-            True,
-            True,
-            id="no-data-collection-pii-enabled-collects",
-        ),
-    ],
-)
-def test_pregel_invoke_gates_response_text_and_tool_calls_on_outputs_setting(
-    sentry_init,
-    capture_items,
-    data_collection,
-    send_default_pii,
-    expect_outputs,
-):
-    init_kwargs = {
-        "integrations": [LanggraphIntegration()],
-        "traces_sample_rate": 1.0,
-        "send_default_pii": send_default_pii,
-    }
-    if data_collection is not None:
-        init_kwargs["data_collection"] = data_collection
-
-    sentry_init(**init_kwargs)
-
-    test_state = {"messages": [MockMessage("Hello, can you help me?", name="user")]}
-    pregel = MockPregelInstance("test_graph")
-    expected_assistant_response = "I'll help you with that task!"
-    expected_tool_calls = [
-        {
-            "id": "call_test_123",
-            "type": "function",
-            "function": {"name": "search_tool", "arguments": '{"query": "help"}'},
-        }
-    ]
-
-    def original_invoke(self, *args, **kwargs):
-        return {
-            "messages": args[0].get("messages", [])
-            + [
-                MockMessage(
-                    content=expected_assistant_response,
-                    name="assistant",
-                    tool_calls=expected_tool_calls,
-                )
-            ]
-        }
-
-    captured = capture_items("span")
-
-    wrapped_invoke = _wrap_pregel_invoke(original_invoke)
-    wrapped_invoke(pregel, test_state)
-
-    data = _invoke_span_data(captured)
-
-    if expect_outputs:
-        assert data[SPANDATA.GEN_AI_RESPONSE_TEXT] == expected_assistant_response
-        assert (
-            json.loads(data[SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS]) == expected_tool_calls
-        )
-    else:
-        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in data
-        assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in data
-
-
-@pytest.mark.parametrize(
-    "data_collection, send_default_pii, expect_inputs, expect_outputs",
-    [
-        pytest.param(
-            {"gen_ai": {"inputs": True, "outputs": False}},
-            False,
-            True,
-            False,
-            id="gen-ai-inputs-enabled-outputs-disabled",
-        ),
-        pytest.param(
-            {"gen_ai": {"inputs": False, "outputs": True}},
-            True,
-            False,
-            True,
-            id="gen-ai-inputs-disabled-outputs-enabled",
-        ),
-        pytest.param(
-            None,
-            False,
-            False,
-            False,
-            id="no-data-collection-falls-back-to-send-default-pii",
-        ),
-        pytest.param(
-            None,
-            True,
-            True,
-            True,
-            id="no-data-collection-pii-enabled-collects",
-        ),
-    ],
-)
-def test_pregel_ainvoke_gates_inputs_and_outputs_independently(
-    sentry_init,
-    capture_items,
-    data_collection,
-    send_default_pii,
-    expect_inputs,
-    expect_outputs,
-):
-    init_kwargs = {
-        "integrations": [LanggraphIntegration()],
-        "traces_sample_rate": 1.0,
-        "send_default_pii": send_default_pii,
-    }
-    if data_collection is not None:
-        init_kwargs["data_collection"] = data_collection
-
-    sentry_init(**init_kwargs)
-
-    test_state = {"messages": [MockMessage("What is the weather?", name="user")]}
-    pregel = MockPregelInstance("async_graph")
-    expected_assistant_response = "Let me check the weather for you!"
-    expected_tool_calls = [
-        {
-            "id": "call_weather_456",
-            "type": "function",
-            "function": {"name": "get_weather", "arguments": '{"location": "Berlin"}'},
-        }
-    ]
-
-    async def original_ainvoke(self, *args, **kwargs):
-        return {
-            "messages": args[0].get("messages", [])
-            + [
-                MockMessage(
-                    content=expected_assistant_response,
-                    name="assistant",
-                    tool_calls=expected_tool_calls,
-                )
-            ]
-        }
-
-    async def run_test():
-        wrapped_ainvoke = _wrap_pregel_ainvoke(original_ainvoke)
-        return await wrapped_ainvoke(pregel, test_state)
-
-    captured = capture_items("span")
-
-    asyncio.run(run_test())
-
-    data = _invoke_span_data(captured)
-
-    if expect_inputs:
-        assert SPANDATA.GEN_AI_REQUEST_MESSAGES in data
-    else:
-        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in data
-
-    if expect_outputs:
-        assert data[SPANDATA.GEN_AI_RESPONSE_TEXT] == expected_assistant_response
-        assert (
-            json.loads(data[SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS]) == expected_tool_calls
-        )
-    else:
-        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in data
-        assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in data
