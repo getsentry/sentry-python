@@ -644,6 +644,5 @@ def test_streaming_body_read_failure_finishes_stream_span(
     stream_spans = spans_by_op.get(OP.HTTP_CLIENT_STREAM, [])
 
     assert len(client_spans) == 1
-    if span_streaming:
-        _assert_one_failed_span(client_spans, span_streaming=True)
+    _assert_one_failed_span(client_spans, span_streaming)
     _assert_one_failed_span(stream_spans, span_streaming)
