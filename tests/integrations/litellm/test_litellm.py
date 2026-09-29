@@ -2310,14 +2310,12 @@ def test_convert_message_parts_image_url_missing_url():
     [
         pytest.param(
             {"gen_ai": {"inputs": True, "outputs": False}},
-            False,
             [SPANDATA.GEN_AI_REQUEST_MESSAGES],
             [SPANDATA.GEN_AI_RESPONSE_TEXT],
             id="gen-ai-inputs-enabled-outputs-disabled",
         ),
         pytest.param(
             {"gen_ai": {"inputs": False, "outputs": True}},
-            False,
             [SPANDATA.GEN_AI_RESPONSE_TEXT],
             [SPANDATA.GEN_AI_REQUEST_MESSAGES],
             id="gen-ai-outputs-enabled-inputs-disabled",
