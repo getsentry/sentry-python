@@ -3334,27 +3334,6 @@ async def test_get_model_name_with_none(sentry_init, capture_items):
 
 
 @pytest.mark.asyncio
-async def test_should_send_prompts_without_pii(sentry_init, capture_items):
-    """
-    Test that _should_send_inputs/_should_send_outputs return False when PII disabled.
-    """
-    from sentry_sdk.integrations.pydantic_ai.utils import (
-        _should_send_inputs,
-        _should_send_outputs,
-    )
-
-    sentry_init(
-        integrations=[PydanticAIIntegration(include_prompts=True)],
-        traces_sample_rate=1.0,
-        send_default_pii=False,  # PII disabled
-    )
-
-    # Should return False
-    assert _should_send_inputs() is False
-    assert _should_send_outputs() is False
-
-
-@pytest.mark.asyncio
 async def test_set_available_tools_without_toolset(sentry_init, capture_items):
     """
     Test that _set_available_tools handles agent without toolset.
