@@ -108,9 +108,6 @@ def _get_response_attributes(response: "Any") -> "Attributes":
         attributes[SPANDATA.HTTP_STATUS_CODE] = status_code
 
     retry_attempts = metadata.get("RetryAttempts")
-    # botocore represents retries as `attempts - 1`; OTel suggests "if and only if", so skip zero.
-    # https://github.com/boto/botocore/blob/358f8eec8c76201bb1a7a35644abcbc9036de7ed/botocore/endpoint.py#L221-L229
-    # https://opentelemetry.io/docs/specs/semconv/http/http-spans/#http-client-span
     if (
         isinstance(retry_attempts, int)
         # avoid emitting `resend_count=True`.
