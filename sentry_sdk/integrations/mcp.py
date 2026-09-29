@@ -279,7 +279,6 @@ async def _instrument_tool_call(
         if not isinstance(result, dict):
             return result
 
-        # Get integration to check PII settings
         integration = client.get_integration(MCPIntegration)
         if integration is None:
             return result
@@ -360,7 +359,6 @@ async def _instrument_prompt_get(
         if not isinstance(result, dict):
             return result
 
-        # Get integration to check PII settings
         integration = client.get_integration(MCPIntegration)
         if integration is None:
             return result
@@ -380,7 +378,6 @@ async def _instrument_prompt_get(
                     SPANDATA.MCP_PROMPT_RESULT_MESSAGE_COUNT, message_count
                 )
 
-            # Only set role and content for single-message prompts if PII is allowed
             if (
                 message_count == 1
                 and client.options["data_collection"]["gen_ai"]["inputs"]

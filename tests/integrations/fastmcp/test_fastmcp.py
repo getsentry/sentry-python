@@ -11,7 +11,6 @@ Tests focus on verifying Sentry integration behavior:
 - Span creation when tools/prompts/resources are called through MCP protocol
 - Span data accuracy (operation, name, origin, etc.)
 - Error capture and instrumentation
-- PII flag behavior
 - Request context data extraction
 - Transport detection (stdio, http, sse)
 

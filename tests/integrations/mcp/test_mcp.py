@@ -855,7 +855,6 @@ async def test_prompt_handler_streamable_http(sentry_init, capture_items, json_r
 
     # For multi-message prompts, count is always captured
     assert data[SPANDATA.MCP_PROMPT_RESULT_MESSAGE_COUNT] == 2
-    # Role/content are never captured for multi-message prompts (even with PII)
     assert SPANDATA.MCP_PROMPT_RESULT_MESSAGE_ROLE not in data
     assert SPANDATA.MCP_PROMPT_RESULT_MESSAGE_CONTENT not in data
 
@@ -929,7 +928,6 @@ async def test_prompt_handler_streamable_http_no_sensitive_data(
 
     # For multi-message prompts, count is always captured
     assert data[SPANDATA.MCP_PROMPT_RESULT_MESSAGE_COUNT] == 2
-    # Role/content are never captured for multi-message prompts (even with PII)
     assert SPANDATA.MCP_PROMPT_RESULT_MESSAGE_ROLE not in data
     assert SPANDATA.MCP_PROMPT_RESULT_MESSAGE_CONTENT not in data
 
