@@ -2632,7 +2632,6 @@ def test_generate_content_data_collection(
     for key in expected_absent:
         assert key not in span_data, f"{key} should not have been collected"
 
-    # Data collection never gates non-PII attributes
     assert span_data[SPANDATA.GEN_AI_PROVIDER_NAME] == "gcp.gemini"
     assert span_data[SPANDATA.GEN_AI_REQUEST_MODEL] == "gemini-1.5-flash"
     assert span_data[SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
