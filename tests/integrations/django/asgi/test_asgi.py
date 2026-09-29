@@ -88,7 +88,6 @@ async def test_basic(
     # to be installed manually (see myapp/asgi.py)
     assert event["transaction"] == "/view-exc"
     assert event["request"] == {
-        "cookies": {},
         "headers": {},
         "method": "GET",
         "query_string": "test=query",
@@ -128,7 +127,6 @@ async def test_async_views(
 
     assert event["transaction"] == "/async_message"
     assert event["request"] == {
-        "cookies": {},
         "headers": {},
         "method": "GET",
         "url": "/async_message",

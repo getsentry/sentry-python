@@ -151,7 +151,6 @@ def test_request_captured(
 
     assert event["transaction"] == "/message"
     assert event["request"] == {
-        "cookies": {},
         "env": {"SERVER_NAME": "localhost", "SERVER_PORT": "80"},
         "headers": {"Host": "localhost"},
         "method": "GET",
