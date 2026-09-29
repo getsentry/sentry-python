@@ -290,19 +290,21 @@ async def _instrument_tool_call(
             result_content = _extract_text_from_content_blocks(result["content"])
 
         if (
-            result_content is not None
-            and client.options["data_collection"]["gen_ai"]["outputs"]
+            result_content is None
+            or not client.options["data_collection"]["gen_ai"]["outputs"]
         ):
+            return result
+
+        span.set_attribute(
+            SPANDATA.MCP_TOOL_RESULT_CONTENT,
+            safe_serialize(result_content),
+        )
+        # Set content count if result is a dict
+        if isinstance(result_content, dict):
             span.set_attribute(
-                SPANDATA.MCP_TOOL_RESULT_CONTENT,
-                safe_serialize(result_content),
+                SPANDATA.MCP_TOOL_RESULT_CONTENT_COUNT,
+                len(result_content),
             )
-            # Set content count if result is a dict
-            if isinstance(result_content, dict):
-                span.set_attribute(
-                    SPANDATA.MCP_TOOL_RESULT_CONTENT_COUNT,
-                    len(result_content),
-                )
 
     return result
 
@@ -379,30 +381,32 @@ async def _instrument_prompt_get(
                 )
 
             if (
-                message_count == 1
-                and client.options["data_collection"]["gen_ai"]["inputs"]
-                and messages
+                message_count != 1
+                or not client.options["data_collection"]["gen_ai"]["inputs"]
+                or not messages
             ):
-                first_message = messages[0]
-                # Extract role
-                role = None
-                if "role" in first_message:
-                    role = first_message["role"]
+                return result
 
-                if role:
-                    span.set_attribute(SPANDATA.MCP_PROMPT_RESULT_MESSAGE_ROLE, role)
+            first_message = messages[0]
+            # Extract role
+            role = None
+            if "role" in first_message:
+                role = first_message["role"]
 
-                content_text = None
-                if "content" in first_message:
-                    msg_content = first_message["content"]
-                    if "text" in msg_content:
-                        content_text = msg_content["text"]
+            if role:
+                span.set_attribute(SPANDATA.MCP_PROMPT_RESULT_MESSAGE_ROLE, role)
 
-                if content_text:
-                    span.set_attribute(
-                        SPANDATA.MCP_PROMPT_RESULT_MESSAGE_CONTENT,
-                        content_text,
-                    )
+            content_text = None
+            if "content" in first_message:
+                msg_content = first_message["content"]
+                if "text" in msg_content:
+                    content_text = msg_content["text"]
+
+            if content_text:
+                span.set_attribute(
+                    SPANDATA.MCP_PROMPT_RESULT_MESSAGE_CONTENT,
+                    content_text,
+                )
         except Exception:
             # Silently ignore if we can't extract message info
             pass
