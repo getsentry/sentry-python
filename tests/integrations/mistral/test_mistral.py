@@ -60,6 +60,12 @@ def test_nonstreaming_chat(
     sentry_init(
         integrations=[MistralIntegration()],
         traces_sample_rate=1.0,
+        data_collection={
+            "gen_ai": {
+                "inputs": False,
+                "outputs": False,
+            },
+        },
     )
 
     client = Mistral(api_key="z")
@@ -121,6 +127,12 @@ async def test_nonstreaming_chat_async(
     sentry_init(
         integrations=[MistralIntegration()],
         traces_sample_rate=1.0,
+        data_collection={
+            "gen_ai": {
+                "inputs": False,
+                "outputs": False,
+            }
+        },
     )
 
     client = Mistral(api_key="z")
@@ -365,7 +377,6 @@ async def test_nonstreaming_chat_async(
         ),
     ),
 )
-@pytest.mark.parametrize("data_collection", [True, False])
 def test_input_attributes_nonstreaming_chat(
     sentry_init,
     capture_items,
@@ -374,20 +385,17 @@ def test_input_attributes_nonstreaming_chat(
     messages,
     expected_system_instructions,
     expected_input_messages,
-    data_collection,
 ):
-    if data_collection:
-        sentry_init(
-            integrations=[MistralIntegration()],
-            traces_sample_rate=1.0,
-            data_collection={},
-        )
-    else:
-        sentry_init(
-            integrations=[MistralIntegration()],
-            traces_sample_rate=1.0,
-            send_default_pii=True,
-        )
+    sentry_init(
+        integrations=[MistralIntegration()],
+        traces_sample_rate=1.0,
+        data_collection={
+            "gen_ai": {
+                "inputs": True,
+                "outputs": False,
+            }
+        },
+    )
 
     client = Mistral(api_key="z")
 
@@ -618,7 +626,6 @@ def test_input_attributes_nonstreaming_chat(
     ),
 )
 @pytest.mark.asyncio
-@pytest.mark.parametrize("data_collection", [True, False])
 async def test_input_attributes_nonstreaming_chat_async(
     sentry_init,
     capture_items,
@@ -627,20 +634,18 @@ async def test_input_attributes_nonstreaming_chat_async(
     messages,
     expected_system_instructions,
     expected_input_messages,
-    data_collection,
 ):
-    if data_collection:
-        sentry_init(
-            integrations=[MistralIntegration()],
-            traces_sample_rate=1.0,
-            data_collection={},
-        )
-    else:
-        sentry_init(
-            integrations=[MistralIntegration()],
-            traces_sample_rate=1.0,
-            send_default_pii=True,
-        )
+    sentry_init(
+        integrations=[MistralIntegration()],
+        traces_sample_rate=1.0,
+        data_collection={
+            "gen_ai": {
+                "inputs": True,
+                "outputs": False,
+            }
+        },
+    )
+
     client = Mistral(api_key="z")
 
     model_response = get_model_response(
@@ -677,26 +682,22 @@ async def test_input_attributes_nonstreaming_chat_async(
     )
 
 
-@pytest.mark.parametrize("data_collection", [True, False])
 def test_output_attributes_nonstreaming_chat(
     sentry_init,
     capture_items,
     get_model_response,
     mistral_response,
-    data_collection,
 ):
-    if data_collection:
-        sentry_init(
-            integrations=[MistralIntegration()],
-            traces_sample_rate=1.0,
-            data_collection={},
-        )
-    else:
-        sentry_init(
-            integrations=[MistralIntegration()],
-            traces_sample_rate=1.0,
-            send_default_pii=True,
-        )
+    sentry_init(
+        integrations=[MistralIntegration()],
+        traces_sample_rate=1.0,
+        data_collection={
+            "gen_ai": {
+                "inputs": False,
+                "outputs": True,
+            }
+        },
+    )
 
     client = Mistral(api_key="z")
 
@@ -742,26 +743,22 @@ def test_output_attributes_nonstreaming_chat(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("data_collection", [True, False])
 async def test_output_attributes_nonstreaming_chat_async(
     sentry_init,
     capture_items,
     get_model_response,
     mistral_response,
-    data_collection,
 ):
-    if data_collection:
-        sentry_init(
-            integrations=[MistralIntegration()],
-            traces_sample_rate=1.0,
-            data_collection={},
-        )
-    else:
-        sentry_init(
-            integrations=[MistralIntegration()],
-            traces_sample_rate=1.0,
-            send_default_pii=True,
-        )
+    sentry_init(
+        integrations=[MistralIntegration()],
+        traces_sample_rate=1.0,
+        data_collection={
+            "gen_ai": {
+                "inputs": False,
+                "outputs": True,
+            }
+        },
+    )
 
     client = Mistral(api_key="z")
 

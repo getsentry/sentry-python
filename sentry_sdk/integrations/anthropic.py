@@ -14,12 +14,10 @@ from sentry_sdk.ai.utils import (
 )
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
-from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import Span
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
-    has_data_collection_enabled,
     parse_version,
     reraise,
     safe_serialize,
@@ -466,33 +464,15 @@ def _set_common_input_data(
     if top_p is not None and _is_given(top_p):
         span.set_attribute(SPANDATA.GEN_AI_REQUEST_TOP_P, top_p)
 
-    client = sentry_sdk.get_client()
-
-    if has_data_collection_enabled(client.options):
-        if client.options["data_collection"]["gen_ai"]["inputs"]:
-            if tools is not None and _is_given(tools) and len(tools) > 0:  # type: ignore
-                span.set_attribute(
-                    SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS, safe_serialize(tools)
-                )
-    else:
-        # Tools were unconditionally added pre-data collection configuration.
-        # This can be removed once data collection is fully rolled out
+    if sentry_sdk.get_client().options["data_collection"]["gen_ai"]["inputs"]:
         if tools is not None and _is_given(tools) and len(tools) > 0:  # type: ignore
             span.set_attribute(
                 SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS, safe_serialize(tools)
             )
 
-    if messages is None or len(messages) == 0:  # type: ignore
-        return
+        if messages is None or len(messages) == 0:  # type: ignore
+            return
 
-    record_inputs = False
-    if has_data_collection_enabled(client.options):
-        if client.options["data_collection"]["gen_ai"]["inputs"]:
-            record_inputs = True
-    elif should_send_default_pii():
-        record_inputs = True
-
-    if record_inputs:
         if isinstance(system, str) or isinstance(system, Iterable):
             span.set_attribute(
                 SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
@@ -657,14 +637,7 @@ def _set_output_data(
     if finish_reason is not None:
         span.set_attribute(SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS, [finish_reason])
 
-    client = sentry_sdk.get_client()
-    record_outputs = False
-    if has_data_collection_enabled(client.options):
-        record_outputs = client.options["data_collection"]["gen_ai"]["outputs"]
-    elif should_send_default_pii():
-        record_outputs = True
-
-    if record_outputs:
+    if sentry_sdk.get_client().options["data_collection"]["gen_ai"]["outputs"]:
         output_messages: "dict[str, list[Any]]" = {
             "response": [],
             "tool": [],

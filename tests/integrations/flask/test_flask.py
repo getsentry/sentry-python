@@ -355,7 +355,7 @@ def test_flask_session_tracking(sentry_init, capture_envelopes, app):
         except ZeroDivisionError:
             pass
 
-    sentry_sdk.get_client().flush()
+    sentry_sdk.flush()
 
     (first_event, error_event, session) = envelopes
     first_event = first_event.get_event()

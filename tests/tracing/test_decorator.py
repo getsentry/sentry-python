@@ -27,7 +27,7 @@ def test_trace_decorator(sentry_init, capture_items):
     result = traced_function()
     assert result == "ok"
 
-    sentry_sdk.get_client().flush()
+    sentry_sdk.flush()
     spans = [item.payload for item in items]
 
     assert len(spans) == 1
@@ -54,7 +54,7 @@ def test_trace_decorator_arguments(sentry_init, capture_items):
     result = traced_function()
     assert result == "ok"
 
-    sentry_sdk.get_client().flush()
+    sentry_sdk.flush()
     spans = [item.payload for item in items]
 
     assert len(spans) == 1
@@ -81,7 +81,7 @@ def test_trace_decorator_inactive(sentry_init, capture_items):
     result = traced_function()
     assert result == "ok"
 
-    sentry_sdk.get_client().flush()
+    sentry_sdk.flush()
     spans = [item.payload for item in items]
 
     assert len(spans) == 2
@@ -108,7 +108,7 @@ async def test_trace_decorator_async(sentry_init, capture_items):
     result = await traced_function()
     assert result == "ok"
 
-    sentry_sdk.get_client().flush()
+    sentry_sdk.flush()
     spans = [item.payload for item in items]
 
     assert len(spans) == 1
@@ -137,7 +137,7 @@ async def test_trace_decorator_async_arguments(sentry_init, capture_items):
     result = await traced_function()
     assert result == "ok"
 
-    sentry_sdk.get_client().flush()
+    sentry_sdk.flush()
     spans = [item.payload for item in items]
 
     assert len(spans) == 1
@@ -165,7 +165,7 @@ async def test_trace_decorator_async_inactive(sentry_init, capture_items):
     result = await traced_function()
     assert result == "ok"
 
-    sentry_sdk.get_client().flush()
+    sentry_sdk.flush()
     spans = [item.payload for item in items]
 
     assert len(spans) == 2

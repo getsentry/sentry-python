@@ -12,12 +12,10 @@ from sentry_sdk.integrations import (
 )
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 from sentry_sdk.integrations.logging import ignore_logger_for_events
-from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import SOURCE_FOR_STYLE, SegmentNameSource
 from sentry_sdk.utils import (
     ensure_integration_enabled,
     event_from_exception,
-    has_data_collection_enabled,
     package_version,
     transaction_from_function,
 )
@@ -282,21 +280,16 @@ def patch_http_route_handle() -> None:
             request_info["content_length"] = len(scope.get("_body", b""))
             should_attach_request_body = True
 
-            if has_data_collection_enabled(client.options):
-                cookies = _apply_key_value_collection_filtering(
-                    items=extracted_request_data["cookies"],
-                    behaviour=client.options["data_collection"]["cookies"],
-                )
-                if cookies:
-                    request_info["cookies"] = cookies
+            cookies = _apply_key_value_collection_filtering(
+                items=extracted_request_data["cookies"],
+                behaviour=client.options["data_collection"]["cookies"],
+            )
+            if cookies:
+                request_info["cookies"] = cookies
 
-                should_attach_request_body = (
-                    "incoming_request"
-                    in client.options["data_collection"]["http_bodies"]
-                )
-            elif should_send_default_pii():
-                request_info["cookies"] = extracted_request_data["cookies"]
-
+            should_attach_request_body = (
+                "incoming_request" in client.options["data_collection"]["http_bodies"]
+            )
             if request_data is not None and should_attach_request_body:
                 request_info["data"] = request_data
 
@@ -326,10 +319,7 @@ def exception_handler(exc: Exception, scope: "LitestarScope") -> None:
     user_info: "Optional[dict[str, Any]]" = None
     client_options = sentry_sdk.get_client().options
 
-    if has_data_collection_enabled(client_options):
-        if client_options["data_collection"]["user_info"]:
-            user_info = retrieve_user_from_scope(scope)
-    elif should_send_default_pii():
+    if client_options["data_collection"]["user_info"]:
         user_info = retrieve_user_from_scope(scope)
 
     if user_info and isinstance(user_info, dict):
