@@ -172,7 +172,7 @@ def _get_error_type(exception: "BaseException") -> str:
     exception_name = exception_type.__qualname__
     exception_module = exception_type.__module__
     if exception_module not in ("builtins", "__builtins__"):
-        return "%s.%s" % (exception_module, exception_name)
+        return f"{exception_module}.{exception_name}"
     return exception_name
 
 
