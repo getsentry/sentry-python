@@ -312,22 +312,24 @@ def _wrap_complete(f: "Callable[..., Any]") -> "Callable[..., Any]":
                     SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, response.usage.total_tokens
                 )
 
-            if client.options["data_collection"]["gen_ai"]["outputs"]:
-                output_messages: "list[OutputMessage]" = []
-                for choice in response.choices:
-                    if choice.message is None:
-                        continue
+            if not client.options["data_collection"]["gen_ai"]["outputs"]:
+                return response
 
-                    transformed_message = _transform_output_message(choice.message)
-                    if transformed_message is None:
-                        continue
+            output_messages: "list[OutputMessage]" = []
+            for choice in response.choices:
+                if choice.message is None:
+                    continue
 
-                    output_messages.append(transformed_message)
+                transformed_message = _transform_output_message(choice.message)
+                if transformed_message is None:
+                    continue
 
-                span.set_attribute(
-                    SPANDATA.GEN_AI_OUTPUT_MESSAGES,
-                    json.dumps(output_messages),
-                )
+                output_messages.append(transformed_message)
+
+            span.set_attribute(
+                SPANDATA.GEN_AI_OUTPUT_MESSAGES,
+                json.dumps(output_messages),
+            )
 
             return response
 
@@ -430,22 +432,24 @@ def _wrap_complete_async(f: "Callable[..., Any]") -> "Callable[..., Any]":
                     SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, response.usage.total_tokens
                 )
 
-            if client.options["data_collection"]["gen_ai"]["outputs"]:
-                output_messages: "list[OutputMessage]" = []
-                for choice in response.choices:
-                    if choice.message is None:
-                        continue
+            if not client.options["data_collection"]["gen_ai"]["outputs"]:
+                return response
 
-                    transformed_message = _transform_output_message(choice.message)
-                    if transformed_message is None:
-                        continue
+            output_messages: "list[OutputMessage]" = []
+            for choice in response.choices:
+                if choice.message is None:
+                    continue
 
-                    output_messages.append(transformed_message)
+                transformed_message = _transform_output_message(choice.message)
+                if transformed_message is None:
+                    continue
 
-                span.set_attribute(
-                    SPANDATA.GEN_AI_OUTPUT_MESSAGES,
-                    json.dumps(output_messages),
-                )
+                output_messages.append(transformed_message)
+
+            span.set_attribute(
+                SPANDATA.GEN_AI_OUTPUT_MESSAGES,
+                json.dumps(output_messages),
+            )
 
             return response
 
