@@ -1417,7 +1417,8 @@ def test_original_request_not_scrubbed(sentry_init, capture_events):
     )
 
     event = events[0]
-    assert event["request"]["data"] == {"password": "[Filtered]"}
+    # Expectation in data collection is that the user scrubs this within `before_send`
+    assert event["request"]["data"] == {"password": "ohno"}
     assert event["request"]["headers"]["authorization"] == "[Filtered]"
     assert event["request"]["headers"]["proxy-authorization"] == "[Filtered]"
 
