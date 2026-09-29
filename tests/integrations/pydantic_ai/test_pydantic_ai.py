@@ -799,7 +799,7 @@ async def test_error_handling(
 
 
 @pytest.mark.asyncio
-async def test_without_pii(
+async def test_no_sensitive_data(
     sentry_init,
     capture_items,
     get_test_agent,
@@ -834,7 +834,7 @@ async def test_without_pii(
 
 
 @pytest.mark.asyncio
-async def test_without_pii_tools(
+async def test_tools_no_sensitive_data(
     sentry_init,
     capture_items,
     get_test_agent,
@@ -3033,7 +3033,6 @@ async def test_data_collection_gen_ai_output_message_parts_follow_outputs_gate(
         assert part_types == set()
 
     for chat_span in chat_spans:
-        # The response model is not PII, so it is recorded regardless of the gates
         assert SPANDATA.GEN_AI_RESPONSE_MODEL in chat_span
 
         if not expect_outputs:
