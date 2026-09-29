@@ -89,10 +89,6 @@ class RequestExtractor:
         content_length = self.content_length()
         request_info = event.get("request", {})
 
-        # Prior to data collection being implemented we unconditionally attached
-        # the request body, which is why we default to True here.
-        attach_request_body = True
-
         cookies = _apply_key_value_collection_filtering(
             items=dict(self.cookies()),
             behaviour=client.options["data_collection"]["cookies"],
