@@ -321,7 +321,12 @@ def _mock_responses(client, status_codes):
     return request_span_ids
 
 
-def _capture_boto3_spans_by_op(invoke_client_method, capture_items, span_streaming):
+def _capture_bot^o3_spans_by_op(
+    invoke_client_method,
+    capture_items,
+    span_streaming,
+    expected_origin=ORIGIN,
+):
     items = capture_items()
 
     if span_streaming:
@@ -333,14 +338,17 @@ def _capture_boto3_spans_by_op(invoke_client_method, capture_items, span_streami
             item.payload
             for item in items
             if item.type == "span"
-            and item.payload["attributes"].get(SPANDATA.SENTRY_ORIGIN) == ORIGIN
+            and item.payload["attributes"].get(SPANDATA.SENTRY_ORIGIN)
+            == expected_origin
         ]
     else:
         with sentry_sdk.start_transaction():
             invoke_client_method()
 
         transaction = next(item.payload for item in items if item.type == "transaction")
-        spans = [span for span in transaction["spans"] if span["origin"] == ORIGIN]
+        spans = [
+            span for span in transaction["spans"] if span["origin"] == expected_origin
+        ]
 
     spans_by_op = {}
     for span in spans:
@@ -398,8 +406,11 @@ def test_service_extension_customizes_client_span(
     span_streaming,
 ):
     class TestServiceExtension(_ServiceExtension):
-        def get_span_config(self, ctx):
-            return ("aws.test", None)
+        def get_span_op(self, ctx):
+            return "aws.test"
+
+        def get_span_origin(self, ctx):
+            return "auto.aws.test"
 
         def get_request_attributes(self, ctx):
             return {
@@ -437,6 +448,7 @@ def test_service_extension_customizes_client_span(
             lambda: client.head_object(**api_params),
             capture_items,
             span_streaming,
+            expected_origin="auto.aws.test",
         )
 
     spans = spans_by_op.get("aws.test", [])
@@ -447,6 +459,10 @@ def test_service_extension_customizes_client_span(
     assert attributes[SPANDATA.SENTRY_KIND] == "producer"
     assert attributes[SPANDATA.RPC_METHOD] == "HeadObject"
     assert attributes[SPANDATA.HTTP_STATUS_CODE] == 200
+    if span_streaming:
+        assert attributes[SPANDATA.SENTRY_ORIGIN] == "auto.aws.test"
+    else:
+        assert spans[0]["origin"] == "auto.aws.test"
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])

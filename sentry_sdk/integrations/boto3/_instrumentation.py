@@ -196,13 +196,14 @@ def _start_client_span(
 
     if service_ext is not None:
         with capture_internal_exceptions():
-            config = service_ext.get_span_config(ctx)
-            if config is not None:
-                service_op, service_origin = config
-                if isinstance(service_op, str) and service_op:
-                    span_op = service_op
-                if isinstance(service_origin, str) and service_origin:
-                    span_origin = service_origin
+            service_op = service_ext.get_span_op(ctx)
+            if service_op is not None:
+                span_op = service_op
+
+        with capture_internal_exceptions():
+            service_origin = service_ext.get_span_origin(ctx)
+            if service_origin is not None:
+                span_origin = service_origin
 
         with capture_internal_exceptions():
             attributes.update(service_ext.get_request_attributes(ctx))
