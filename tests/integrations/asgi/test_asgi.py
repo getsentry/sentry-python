@@ -167,18 +167,13 @@ def test_invalid_transaction_style(asgi3_app):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "should_send_pii",
-    [True, False],
-)
 async def test_capture_transaction(
     sentry_init,
     asgi3_app,
     capture_items,
-    should_send_pii,
 ):
     sentry_init(
-        send_default_pii=should_send_pii,
+        data_collection={},
         traces_sample_rate=1.0,
     )
     app = SentryAsgiMiddleware(asgi3_app)
@@ -202,13 +197,7 @@ async def test_capture_transaction(
     assert span["attributes"]["http.request.method"] == "GET"
     assert span["attributes"]["http.request.header.host"] == "localhost"
     assert span["attributes"]["http.request.header.user-agent"] == "ASGI-Test-Client"
-
-    if should_send_pii:
-        assert (
-            span["attributes"]["url.full"] == "http://localhost/some_url?somevalue=123"
-        )
-        assert span["attributes"]["url.path"] == "/some_url"
-        assert span["attributes"]["http.query"] == "somevalue=123"
+    assert span["attributes"]["url.full"] == "http://localhost/some_url?somevalue=123"
 
 
 @pytest.mark.asyncio
@@ -218,7 +207,7 @@ async def test_capture_transaction_with_error(
     capture_items,
 ):
     sentry_init(
-        send_default_pii=True,
+        data_collection={},
         traces_sample_rate=1.0,
     )
 
@@ -397,7 +386,7 @@ async def test_websocket(
     request,
 ):
     sentry_init(
-        send_default_pii=True,
+        data_collection={},
         traces_sample_rate=1.0,
     )
 
@@ -438,7 +427,7 @@ async def test_auto_session_tracking_with_aggregates(
     sentry_init, asgi3_app, capture_envelopes
 ):
     sentry_init(
-        send_default_pii=True,
+        data_collection={},
         traces_sample_rate=1.0,
     )
     app = SentryAsgiMiddleware(asgi3_app)
@@ -505,7 +494,7 @@ async def test_transaction_style(
     expected_source,
 ):
     sentry_init(
-        send_default_pii=True,
+        data_collection={},
         traces_sample_rate=1.0,
     )
     app = SentryAsgiMiddleware(asgi3_app, transaction_style=transaction_style)
@@ -783,7 +772,6 @@ async def test_get_request_attributes_url_with_filtered_host(
     # the host header value, but "url.full" must still resolve rather than embedding
     # the substituted value.
     sentry_init(
-        send_default_pii=True,
         traces_sample_rate=1.0,
         data_collection={
             "http_headers": {"request": {"mode": "allowlist", "terms": []}}
@@ -843,20 +831,6 @@ def _http_scope():
     "init_kwargs, request_url, expected_query, expected_url_full",
     [
         pytest.param(
-            {"send_default_pii": True},
-            "/foo?" + QUERY_STRING,
-            QUERY_STRING,
-            "http://example.com/foo?" + QUERY_STRING,
-            id="send_default_pii_true",
-        ),
-        pytest.param(
-            {"send_default_pii": False},
-            "/foo?" + QUERY_STRING,
-            None,
-            None,
-            id="send_default_pii_false",
-        ),
-        pytest.param(
             {},
             "/foo?" + QUERY_STRING,
             None,
@@ -887,16 +861,6 @@ def _http_scope():
             None,
             "http://example.com/foo",
             id="data_collection_off",
-        ),
-        pytest.param(
-            {
-                "send_default_pii": True,
-                "data_collection": {"url_query_params": {"mode": "off"}},
-            },
-            "/foo?" + QUERY_STRING,
-            None,
-            "http://example.com/foo",
-            id="data_collection_wins_over_send_default_pii",
         ),
         pytest.param(
             {"_experiments": {"data_collection": {}}},
@@ -956,27 +920,6 @@ USER_INFO_CASES = [
         True,
         True,
         id="dc_default_user_info",
-    ),
-    pytest.param(
-        {
-            "send_default_pii": True,
-            "data_collection": {"user_info": False},
-        },
-        True,
-        False,
-        id="dc_wins_over_pii",
-    ),
-    pytest.param(
-        {"send_default_pii": True},
-        True,
-        True,
-        id="legacy_pii_true",
-    ),
-    pytest.param(
-        {"send_default_pii": False},
-        True,
-        False,
-        id="legacy_pii_false",
     ),
     pytest.param(
         {"data_collection": {}},
@@ -1149,8 +1092,6 @@ async def test_custom_transaction_name(
 @pytest.mark.parametrize(
     "init_kwargs, expect_ip",
     [
-        pytest.param({"send_default_pii": True}, True, id="legacy_pii_true"),
-        pytest.param({"send_default_pii": False}, False, id="legacy_pii_false"),
         pytest.param(
             {"data_collection": {}},
             True,
@@ -1165,14 +1106,6 @@ async def test_custom_transaction_name(
             {"data_collection": {"user_info": False}},
             False,
             id="dc_user_info_false",
-        ),
-        pytest.param(
-            {
-                "send_default_pii": True,
-                "data_collection": {"user_info": False},
-            },
-            False,
-            id="dc_wins_over_pii",
         ),
     ],
 )

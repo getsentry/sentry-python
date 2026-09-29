@@ -171,7 +171,7 @@ async def test_async_views_concurrent_execution(
     settings.MIDDLEWARE = []
     sentry_init(
         integrations=[DjangoIntegration()],
-        send_default_pii=True,
+        data_collection={},
     )
 
     application = make_asgi_application()
@@ -211,7 +211,7 @@ async def test_async_middleware_that_is_function_concurrent_execution(
     ]
     sentry_init(
         integrations=[DjangoIntegration()],
-        send_default_pii=True,
+        data_collection={},
     )
 
     application = make_asgi_application()

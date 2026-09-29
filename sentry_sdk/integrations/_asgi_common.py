@@ -141,10 +141,7 @@ def _get_request_data(
 
     client = asgi_scope.get("client")
     if client:
-        if has_data_collection_enabled(client_options):
-            if client_options["data_collection"]["user_info"]:
-                request_data["env"] = {"REMOTE_ADDR": _get_ip(asgi_scope)}
-        elif should_send_default_pii():
+        if client_options["data_collection"]["user_info"]:
             request_data["env"] = {"REMOTE_ADDR": _get_ip(asgi_scope)}
 
     return request_data
