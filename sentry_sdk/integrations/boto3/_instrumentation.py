@@ -4,7 +4,12 @@ from urllib.parse import urlsplit
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA, SPANSTATUS
 from sentry_sdk.integrations import DidNotEnable
-from sentry_sdk.integrations.boto3.consts import AWS_RPC_SYSTEM_NAME, IDENTIFIER, ORIGIN
+from sentry_sdk.integrations.boto3.consts import (
+    AWS_RPC_SYSTEM_NAME,
+    DEFAULT_PORTS,
+    IDENTIFIER,
+    ORIGIN,
+)
 from sentry_sdk.traces import NoOpStreamedSpan, StreamedSpan
 from sentry_sdk.tracing import BAGGAGE_HEADER_NAME, Span
 from sentry_sdk.tracing_utils import (
@@ -47,14 +52,9 @@ def _get_server_attributes(endpoint_url: "Optional[str]") -> "Attributes":
     if not endpoint_url:
         return {}
 
-    default_ports = {
-        "http": 80,
-        "https": 443,
-    }
-
     try:
         parsed_url = urlsplit(endpoint_url)
-        if parsed_url.scheme not in default_ports or not parsed_url.hostname:
+        if parsed_url.scheme not in DEFAULT_PORTS or not parsed_url.hostname:
             return {}
 
         # `server.port` is only defined together with `server.address`.
@@ -62,7 +62,7 @@ def _get_server_attributes(endpoint_url: "Optional[str]") -> "Attributes":
         # https://opentelemetry.io/docs/specs/semconv/rpc/rpc-spans/
         return {
             SPANDATA.SERVER_ADDRESS: parsed_url.hostname,
-            SPANDATA.SERVER_PORT: parsed_url.port or default_ports[parsed_url.scheme],
+            SPANDATA.SERVER_PORT: parsed_url.port or DEFAULT_PORTS[parsed_url.scheme],
         }
 
     except (TypeError, UnicodeError, ValueError):
