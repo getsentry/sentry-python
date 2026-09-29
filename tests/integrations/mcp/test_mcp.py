@@ -142,6 +142,7 @@ async def test_tool_handler_constructor_registration(sentry_init, capture_items,
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     async def test_tool(ctx, params):
@@ -171,7 +172,6 @@ async def test_tool_handler_constructor_registration(sentry_init, capture_items,
     assert data[SPANDATA.MCP_TOOL_NAME] == "calculate"
     assert data[SPANDATA.MCP_METHOD_NAME] == "tools/call"
     assert data[SPANDATA.MCP_REQUEST_ID] == "req-ctor"
-    assert data["mcp.request.argument.x"] == "10"
 
 
 @pytest.mark.asyncio
@@ -185,6 +185,7 @@ async def test_mcpserver_high_level_tool_instrumented(
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     mcp_server = MCPServer("test-server")
@@ -216,6 +217,7 @@ async def test_wrapping_handler_is_idempotent(sentry_init, capture_items, stdio)
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     async def test_tool(ctx, params):
@@ -246,21 +248,21 @@ async def test_wrapping_handler_is_idempotent(sentry_init, capture_items, stdio)
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "send_default_pii",
-    [True, False],
-)
 async def test_tool_handler_stdio(
     sentry_init,
     capture_items,
-    send_default_pii,
     stdio,
 ):
     """Test that synchronous tool handlers create proper spans"""
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
-        send_default_pii=send_default_pii,
+        data_collection={
+            "gen_ai": {
+                "inputs": True,
+                "outputs": True,
+            }
+        },
     )
 
     server = Server("test-server")
@@ -312,33 +314,96 @@ async def test_tool_handler_stdio(
     assert data["mcp.request.argument.x"] == "10"
     assert data["mcp.request.argument.y"] == "5"
 
-    # Check PII-sensitive data is only present when both flags are True
-    if send_default_pii:
-        assert data[SPANDATA.MCP_TOOL_RESULT_CONTENT] == json.dumps(
-            {
-                "result": "success",
-                "value": 42,
-            }
-        )
-        assert data[SPANDATA.MCP_TOOL_RESULT_CONTENT_COUNT] == 2
-    else:
-        assert SPANDATA.MCP_TOOL_RESULT_CONTENT not in data
-        assert SPANDATA.MCP_TOOL_RESULT_CONTENT_COUNT not in data
+    assert data[SPANDATA.MCP_TOOL_RESULT_CONTENT] == json.dumps(
+        {
+            "result": "success",
+            "value": 42,
+        }
+    )
+    assert data[SPANDATA.MCP_TOOL_RESULT_CONTENT_COUNT] == 2
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "send_default_pii",
-    [True, False],
-)
-async def test_tool_handler_streamable_http(
-    sentry_init, capture_items, send_default_pii, json_rpc
+async def test_tool_handler_stdio_no_sensitive_data(
+    sentry_init,
+    capture_items,
+    stdio,
 ):
+    """Test that synchronous tool handlers create proper spans"""
+    sentry_init(
+        integrations=[MCPIntegration()],
+        traces_sample_rate=1.0,
+        data_collection={
+            "gen_ai": {
+                "inputs": False,
+                "outputs": False,
+            }
+        },
+    )
+
+    server = Server("test-server")
+
+    async def test_tool(ctx, params):
+        return CallToolResult(
+            content=[
+                TextContent(
+                    type="text",
+                    text=json.dumps({"result": "success", "value": 42}),
+                )
+            ],
+            structured_content={"result": "success", "value": 42},
+        )
+
+    server.add_request_handler("tools/call", CallToolRequestParams, test_tool)
+
+    items = capture_items("span")
+    result = await stdio(
+        server,
+        method="tools/call",
+        params={
+            "name": "calculate",
+            "arguments": {"x": 10, "y": 5},
+        },
+        request_id="req-123",
+    )
+    sentry_sdk.flush()
+
+    assert _get_response(result).result["structuredContent"] == {
+        "result": "success",
+        "value": 42,
+    }
+
+    span = _find_mcp_span(items, method_name="tools/call")
+    assert span is not None
+    assert span["name"] == "tools/call calculate"
+    data = span["attributes"]
+    assert data["sentry.op"] == OP.MCP_SERVER
+    assert data["sentry.origin"] == "auto.ai.mcp"
+
+    # Check span data
+    assert data[SPANDATA.MCP_TOOL_NAME] == "calculate"
+    assert data[SPANDATA.MCP_METHOD_NAME] == "tools/call"
+    assert data[SPANDATA.MCP_TRANSPORT] == "stdio"
+    assert data[SPANDATA.NETWORK_TRANSPORT] == "pipe"
+    assert data[SPANDATA.MCP_REQUEST_ID] == "req-123"
+    assert SPANDATA.MCP_SESSION_ID not in data
+
+    assert SPANDATA.MCP_TOOL_RESULT_CONTENT not in data
+    assert SPANDATA.MCP_TOOL_RESULT_CONTENT_COUNT not in data
+
+
+@pytest.mark.asyncio
+async def test_tool_handler_streamable_http(sentry_init, capture_items, json_rpc):
     """Test that async tool handlers create proper spans"""
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
-        send_default_pii=send_default_pii,
+        data_collection={
+            "gen_ai": {
+                "inputs": True,
+                "outputs": True,
+            }
+        },
     )
 
     server = Server("test-server")
@@ -399,13 +464,83 @@ async def test_tool_handler_streamable_http(
     assert data[SPANDATA.MCP_SESSION_ID] == session_id
     assert data["mcp.request.argument.data"] == "test"
 
-    # Check PII-sensitive data
-    if send_default_pii:
-        assert data[SPANDATA.MCP_TOOL_RESULT_CONTENT] == json.dumps(
-            {"status": "completed"}
+    assert data[SPANDATA.MCP_TOOL_RESULT_CONTENT] == json.dumps({"status": "completed"})
+
+
+@pytest.mark.asyncio
+async def test_tool_handler_streamable_http_no_sensitive_data(
+    sentry_init, capture_items, json_rpc
+):
+    """Test that async tool handlers create proper spans"""
+    sentry_init(
+        integrations=[MCPIntegration()],
+        traces_sample_rate=1.0,
+        data_collection={
+            "gen_ai": {
+                "inputs": False,
+                "outputs": False,
+            }
+        },
+    )
+
+    server = Server("test-server")
+
+    async def test_tool_async(ctx, params):
+        return CallToolResult(
+            content=[
+                TextContent(
+                    type="text",
+                    text=json.dumps({"status": "completed"}),
+                )
+            ]
         )
-    else:
-        assert SPANDATA.MCP_TOOL_RESULT_CONTENT not in data
+
+    server.add_request_handler("tools/call", CallToolRequestParams, test_tool_async)
+
+    session_manager = StreamableHTTPSessionManager(
+        app=server,
+        json_response=True,
+    )
+
+    app = Starlette(
+        routes=[
+            Mount("/mcp", app=session_manager.handle_request),
+        ],
+        lifespan=lambda app: session_manager.run(),
+    )
+    items = capture_items("span")
+    session_id, result = json_rpc(
+        app,
+        method="tools/call",
+        params={
+            "name": "process",
+            "arguments": {
+                "data": "test",
+            },
+        },
+        request_id="req-456",
+    )
+    sentry_sdk.flush()
+
+    assert result.json()["result"]["content"][0]["text"] == json.dumps(
+        {"status": "completed"}
+    )
+    span = _find_mcp_span(items, method_name="tools/call")
+    assert span is not None
+    assert span["name"] == "tools/call process"
+    data = span["attributes"]
+    assert data["sentry.op"] == OP.MCP_SERVER
+    assert data["sentry.origin"] == "auto.ai.mcp"
+
+    # Check span data
+    assert data[SPANDATA.MCP_TOOL_NAME] == "process"
+    assert data[SPANDATA.MCP_METHOD_NAME] == "tools/call"
+    assert data[SPANDATA.MCP_TRANSPORT] == "http"
+    assert data[SPANDATA.NETWORK_TRANSPORT] == "tcp"
+    assert data[SPANDATA.MCP_REQUEST_ID] == "req-456"
+    assert data[SPANDATA.MCP_SESSION_ID] == session_id
+
+    assert SPANDATA.MCP_TOOL_RESULT_CONTENT not in data
 
 
 @pytest.mark.asyncio
@@ -421,6 +556,7 @@ async def test_tool_handler_stateless_streamable_http(
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     server = Server("test-server")
@@ -468,6 +604,7 @@ async def test_tool_handler_with_error(sentry_init, capture_items, stdio):
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     server = Server("test-server")
@@ -507,21 +644,21 @@ async def test_tool_handler_with_error(sentry_init, capture_items, stdio):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "send_default_pii",
-    [True, False],
-)
 async def test_prompt_handler_stdio(
     sentry_init,
     capture_items,
-    send_default_pii,
     stdio,
 ):
     """Test that synchronous prompt handlers create proper spans"""
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
-        send_default_pii=send_default_pii,
+        data_collection={
+            "gen_ai": {
+                "inputs": True,
+                "outputs": True,
+            }
+        },
     )
 
     server = Server("test-server")
@@ -575,30 +712,94 @@ async def test_prompt_handler_stdio(
     # Message count is always captured
     assert data[SPANDATA.MCP_PROMPT_RESULT_MESSAGE_COUNT] == 1
 
-    # For single message prompts, role and content should be captured only with PII
-    if send_default_pii:
-        assert data[SPANDATA.MCP_PROMPT_RESULT_MESSAGE_ROLE] == "user"
-        assert (
-            data[SPANDATA.MCP_PROMPT_RESULT_MESSAGE_CONTENT] == "Tell me about Python"
-        )
-    else:
-        assert SPANDATA.MCP_PROMPT_RESULT_MESSAGE_ROLE not in data
-        assert SPANDATA.MCP_PROMPT_RESULT_MESSAGE_CONTENT not in data
+    assert data[SPANDATA.MCP_PROMPT_RESULT_MESSAGE_ROLE] == "user"
+    assert data[SPANDATA.MCP_PROMPT_RESULT_MESSAGE_CONTENT] == "Tell me about Python"
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "send_default_pii",
-    [True, False],
-)
-async def test_prompt_handler_streamable_http(
-    sentry_init, capture_items, send_default_pii, json_rpc
+async def test_prompt_handler_stdio_no_sensitive_data(
+    sentry_init,
+    capture_items,
+    stdio,
 ):
+    """Test that synchronous prompt handlers create proper spans"""
+    sentry_init(
+        integrations=[MCPIntegration()],
+        traces_sample_rate=1.0,
+        data_collection={
+            "gen_ai": {
+                "inputs": False,
+                "outputs": False,
+            }
+        },
+    )
+
+    server = Server("test-server")
+
+    prompt_result = GetPromptResult(
+        description="A helpful test prompt",
+        messages=[
+            PromptMessage(
+                role="user",
+                content=TextContent(type="text", text="Tell me about Python"),
+            ),
+        ],
+    )
+
+    async def test_prompt(ctx, params):
+        return prompt_result
+
+    server.add_request_handler("prompts/get", GetPromptRequestParams, test_prompt)
+
+    items = capture_items("span")
+    result = await stdio(
+        server,
+        method="prompts/get",
+        params={
+            "name": "code_help",
+            "arguments": {"language": "python"},
+        },
+        request_id="req-prompt",
+    )
+    sentry_sdk.flush()
+
+    assert _get_response(result).result["messages"][0]["role"] == "user"
+    assert (
+        _get_response(result).result["messages"][0]["content"]["text"]
+        == "Tell me about Python"
+    )
+    span = _find_mcp_span(items, method_name="prompts/get")
+    assert span is not None
+    assert span["name"] == "prompts/get code_help"
+    data = span["attributes"]
+    assert data["sentry.op"] == OP.MCP_SERVER
+    assert data["sentry.origin"] == "auto.ai.mcp"
+
+    # Check span data
+    assert data[SPANDATA.MCP_PROMPT_NAME] == "code_help"
+    assert data[SPANDATA.MCP_METHOD_NAME] == "prompts/get"
+    assert data[SPANDATA.MCP_TRANSPORT] == "stdio"
+    assert data[SPANDATA.MCP_REQUEST_ID] == "req-prompt"
+
+    # Message count is always captured
+    assert data[SPANDATA.MCP_PROMPT_RESULT_MESSAGE_COUNT] == 1
+
+    assert SPANDATA.MCP_PROMPT_RESULT_MESSAGE_ROLE not in data
+    assert SPANDATA.MCP_PROMPT_RESULT_MESSAGE_CONTENT not in data
+
+
+@pytest.mark.asyncio
+async def test_prompt_handler_streamable_http(sentry_init, capture_items, json_rpc):
     """Test that async prompt handlers create proper spans"""
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
-        send_default_pii=send_default_pii,
+        data_collection={
+            "gen_ai": {
+                "inputs": True,
+                "outputs": True,
+            }
+        },
     )
 
     server = Server("test-server")
@@ -654,7 +855,79 @@ async def test_prompt_handler_streamable_http(
 
     # For multi-message prompts, count is always captured
     assert data[SPANDATA.MCP_PROMPT_RESULT_MESSAGE_COUNT] == 2
-    # Role/content are never captured for multi-message prompts (even with PII)
+    assert SPANDATA.MCP_PROMPT_RESULT_MESSAGE_ROLE not in data
+    assert SPANDATA.MCP_PROMPT_RESULT_MESSAGE_CONTENT not in data
+
+
+@pytest.mark.asyncio
+async def test_prompt_handler_streamable_http_no_sensitive_data(
+    sentry_init, capture_items, json_rpc
+):
+    """Test that async prompt handlers create proper spans"""
+    sentry_init(
+        integrations=[MCPIntegration()],
+        traces_sample_rate=1.0,
+        data_collection={
+            "gen_ai": {
+                "inputs": False,
+                "outputs": False,
+            }
+        },
+    )
+
+    server = Server("test-server")
+
+    prompt_result = GetPromptResult(
+        description="A helpful test prompt",
+        messages=[
+            PromptMessage(
+                role="user",
+                content=TextContent(type="text", text="You are a helpful assistant"),
+            ),
+            PromptMessage(
+                role="user", content=TextContent(type="text", text="What is MCP?")
+            ),
+        ],
+    )
+
+    async def test_prompt_async(ctx, params):
+        return prompt_result
+
+    server.add_request_handler("prompts/get", GetPromptRequestParams, test_prompt_async)
+
+    session_manager = StreamableHTTPSessionManager(
+        app=server,
+        json_response=True,
+    )
+
+    app = Starlette(
+        routes=[
+            Mount("/mcp", app=session_manager.handle_request),
+        ],
+        lifespan=lambda app: session_manager.run(),
+    )
+    items = capture_items("span")
+    _, result = json_rpc(
+        app,
+        method="prompts/get",
+        params={
+            "name": "mcp_info",
+            "arguments": {},
+        },
+        request_id="req-async-prompt",
+    )
+    sentry_sdk.flush()
+
+    assert len(result.json()["result"]["messages"]) == 2
+    span = _find_mcp_span(items, method_name="prompts/get")
+    assert span is not None
+    assert span["name"] == "prompts/get mcp_info"
+    data = span["attributes"]
+    assert data["sentry.op"] == OP.MCP_SERVER
+    assert data["sentry.origin"] == "auto.ai.mcp"
+
+    # For multi-message prompts, count is always captured
+    assert data[SPANDATA.MCP_PROMPT_RESULT_MESSAGE_COUNT] == 2
     assert SPANDATA.MCP_PROMPT_RESULT_MESSAGE_ROLE not in data
     assert SPANDATA.MCP_PROMPT_RESULT_MESSAGE_CONTENT not in data
 
@@ -665,6 +938,7 @@ async def test_prompt_handler_with_error(sentry_init, capture_items, stdio):
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     server = Server("test-server")
@@ -705,6 +979,7 @@ async def test_resource_handler_stdio(sentry_init, capture_items, stdio):
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     server = Server("test-server")
@@ -761,6 +1036,7 @@ async def test_resource_handler_streamable_http(sentry_init, capture_items, json
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     server = Server("test-server")
@@ -823,6 +1099,7 @@ async def test_resource_handler_with_error(sentry_init, capture_items, stdio):
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     server = Server("test-server")
@@ -857,21 +1134,21 @@ async def test_resource_handler_with_error(sentry_init, capture_items, stdio):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "send_default_pii",
-    [True, False],
-)
 async def test_tool_result_extraction_tuple(
     sentry_init,
     capture_items,
-    send_default_pii,
     stdio,
 ):
     """Test extraction of tool results from tuple format (UnstructuredContent, StructuredContent)"""
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
-        send_default_pii=send_default_pii,
+        data_collection={
+            "gen_ai": {
+                "inputs": True,
+                "outputs": True,
+            }
+        },
     )
 
     server = Server("test-server")
@@ -900,35 +1177,79 @@ async def test_tool_result_extraction_tuple(
     assert span is not None
     data = span["attributes"]
 
-    if send_default_pii:
-        assert data[SPANDATA.MCP_TOOL_RESULT_CONTENT] == json.dumps(
-            {
-                "key": "value",
-                "count": 5,
-            }
-        )
-        assert data[SPANDATA.MCP_TOOL_RESULT_CONTENT_COUNT] == 2
-    else:
-        assert SPANDATA.MCP_TOOL_RESULT_CONTENT not in data
-        assert SPANDATA.MCP_TOOL_RESULT_CONTENT_COUNT not in data
+    assert data[SPANDATA.MCP_TOOL_RESULT_CONTENT] == json.dumps(
+        {
+            "key": "value",
+            "count": 5,
+        }
+    )
+    assert data[SPANDATA.MCP_TOOL_RESULT_CONTENT_COUNT] == 2
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "send_default_pii",
-    [True, False],
-)
+async def test_tool_result_extraction_tuple_no_sensitive_data(
+    sentry_init,
+    capture_items,
+    stdio,
+):
+    """Test extraction of tool results from tuple format (UnstructuredContent, StructuredContent)"""
+    sentry_init(
+        integrations=[MCPIntegration()],
+        traces_sample_rate=1.0,
+        data_collection={
+            "gen_ai": {
+                "inputs": False,
+                "outputs": False,
+            }
+        },
+    )
+
+    server = Server("test-server")
+
+    async def test_tool_tuple(ctx, params):
+        return CallToolResult(
+            content=[TextContent(type="text", text="Result text")],
+            structured_content={"key": "value", "count": 5},
+        )
+
+    server.add_request_handler("tools/call", CallToolRequestParams, test_tool_tuple)
+
+    items = capture_items("span")
+    await stdio(
+        server,
+        method="tools/call",
+        params={
+            "name": "calculate",
+            "arguments": {},
+        },
+        request_id="req-tuple",
+    )
+    sentry_sdk.flush()
+
+    span = _find_mcp_span(items, method_name="tools/call")
+    assert span is not None
+    data = span["attributes"]
+
+    assert SPANDATA.MCP_TOOL_RESULT_CONTENT not in data
+    assert SPANDATA.MCP_TOOL_RESULT_CONTENT_COUNT not in data
+
+
+@pytest.mark.asyncio
 async def test_tool_result_extraction_unstructured(
     sentry_init,
     capture_items,
-    send_default_pii,
     stdio,
 ):
     """Test extraction of tool results from UnstructuredContent (list of content blocks)"""
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
-        send_default_pii=send_default_pii,
+        data_collection={
+            "gen_ai": {
+                "inputs": True,
+                "outputs": True,
+            }
+        },
     )
 
     server = Server("test-server")
@@ -961,11 +1282,58 @@ async def test_tool_result_extraction_unstructured(
     assert span is not None
     data = span["attributes"]
 
-    # Should extract and join text from content blocks only with PII
-    if send_default_pii:
-        assert data[SPANDATA.MCP_TOOL_RESULT_CONTENT] == "First part Second part"
-    else:
-        assert SPANDATA.MCP_TOOL_RESULT_CONTENT not in data
+    assert data[SPANDATA.MCP_TOOL_RESULT_CONTENT] == "First part Second part"
+
+
+@pytest.mark.asyncio
+async def test_tool_result_extraction_unstructured_no_sensitive_data(
+    sentry_init,
+    capture_items,
+    stdio,
+):
+    """Test extraction of tool results from UnstructuredContent (list of content blocks)"""
+    sentry_init(
+        integrations=[MCPIntegration()],
+        traces_sample_rate=1.0,
+        data_collection={
+            "gen_ai": {
+                "inputs": False,
+                "outputs": False,
+            }
+        },
+    )
+
+    server = Server("test-server")
+
+    async def test_tool_unstructured(ctx, params):
+        return CallToolResult(
+            content=[
+                TextContent(type="text", text="First part"),
+                TextContent(type="text", text="Second part"),
+            ]
+        )
+
+    server.add_request_handler(
+        "tools/call", CallToolRequestParams, test_tool_unstructured
+    )
+
+    items = capture_items("span")
+    await stdio(
+        server,
+        method="tools/call",
+        params={
+            "name": "text_tool",
+            "arguments": {},
+        },
+        request_id="req-unstructured",
+    )
+    sentry_sdk.flush()
+
+    span = _find_mcp_span(items, method_name="tools/call")
+    assert span is not None
+    data = span["attributes"]
+
+    assert SPANDATA.MCP_TOOL_RESULT_CONTENT not in data
 
 
 @pytest.mark.asyncio
@@ -974,6 +1342,7 @@ async def test_multiple_handlers(sentry_init, capture_items, stdio):
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     server = Server("test-server")
@@ -1051,21 +1420,21 @@ async def test_multiple_handlers(sentry_init, capture_items, stdio):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "send_default_pii",
-    [True, False],
-)
 async def test_prompt_with_dict_result(
     sentry_init,
     capture_items,
-    send_default_pii,
     stdio,
 ):
     """Test prompt handler with dict result instead of GetPromptResult object"""
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
-        send_default_pii=send_default_pii,
+        data_collection={
+            "gen_ai": {
+                "inputs": True,
+                "outputs": True,
+            }
+        },
     )
 
     server = Server("test-server")
@@ -1101,13 +1470,63 @@ async def test_prompt_with_dict_result(
     # Message count is always captured
     assert data[SPANDATA.MCP_PROMPT_RESULT_MESSAGE_COUNT] == 1
 
-    # Role and content only captured with PII
-    if send_default_pii:
-        assert data[SPANDATA.MCP_PROMPT_RESULT_MESSAGE_ROLE] == "user"
-        assert data[SPANDATA.MCP_PROMPT_RESULT_MESSAGE_CONTENT] == "Hello from dict"
-    else:
-        assert SPANDATA.MCP_PROMPT_RESULT_MESSAGE_ROLE not in data
-        assert SPANDATA.MCP_PROMPT_RESULT_MESSAGE_CONTENT not in data
+    assert data[SPANDATA.MCP_PROMPT_RESULT_MESSAGE_ROLE] == "user"
+    assert data[SPANDATA.MCP_PROMPT_RESULT_MESSAGE_CONTENT] == "Hello from dict"
+
+
+@pytest.mark.asyncio
+async def test_prompt_with_dict_result_no_sensitive_data(
+    sentry_init,
+    capture_items,
+    stdio,
+):
+    """Test prompt handler with dict result instead of GetPromptResult object"""
+    sentry_init(
+        integrations=[MCPIntegration()],
+        traces_sample_rate=1.0,
+        data_collection={
+            "gen_ai": {
+                "inputs": False,
+                "outputs": False,
+            }
+        },
+    )
+
+    server = Server("test-server")
+
+    async def test_prompt_dict(ctx, params):
+        return GetPromptResult(
+            messages=[
+                PromptMessage(
+                    role="user",
+                    content=TextContent(type="text", text="Hello from dict"),
+                )
+            ]
+        )
+
+    server.add_request_handler("prompts/get", GetPromptRequestParams, test_prompt_dict)
+
+    items = capture_items("span")
+    await stdio(
+        server,
+        method="prompts/get",
+        params={
+            "name": "dict_prompt",
+            "arguments": {},
+        },
+        request_id="req-dict-prompt",
+    )
+    sentry_sdk.flush()
+
+    span = _find_mcp_span(items, method_name="prompts/get")
+    assert span is not None
+    data = span["attributes"]
+
+    # Message count is always captured
+    assert data[SPANDATA.MCP_PROMPT_RESULT_MESSAGE_COUNT] == 1
+
+    assert SPANDATA.MCP_PROMPT_RESULT_MESSAGE_ROLE not in data
+    assert SPANDATA.MCP_PROMPT_RESULT_MESSAGE_CONTENT not in data
 
 
 @pytest.mark.asyncio
@@ -1116,6 +1535,12 @@ async def test_tool_with_complex_arguments(sentry_init, capture_items, stdio):
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
+        data_collection={
+            "gen_ai": {
+                "inputs": True,
+                "outputs": True,
+            },
+        },
     )
 
     server = Server("test-server")
@@ -1169,6 +1594,7 @@ async def test_sse_transport_detection_v2(sentry_init, capture_items, json_rpc_s
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     server = Server("test-server")
@@ -1246,6 +1672,7 @@ async def test_streamable_http_scope_propagation(sentry_init, capture_items, jso
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     server = Server("test-server")
@@ -1288,310 +1715,3 @@ async def test_streamable_http_scope_propagation(sentry_init, capture_items, jso
     # The captured error shares the trace of the MCP span, proving the
     # handler executed under the propagated request scope.
     assert error_event["contexts"]["trace"]["trace_id"] == span["trace_id"]
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "data_collection, send_default_pii, expect_input",
-    [
-        pytest.param(
-            {"gen_ai": {"inputs": True}},
-            False,
-            True,
-            id="gen-ai-inputs-enabled-overrides-pii-disabled",
-        ),
-        pytest.param(
-            {"gen_ai": {"inputs": False}},
-            True,
-            False,
-            id="gen-ai-inputs-disabled-overrides-pii-enabled",
-        ),
-        pytest.param(
-            {},
-            False,
-            True,
-            id="gen-ai-omitted-defaults-to-enabled",
-        ),
-        pytest.param(
-            {"gen_ai": {"outputs": False}},
-            False,
-            True,
-            id="gen-ai-outputs-disabled-does-not-affect-inputs",
-        ),
-        pytest.param(
-            None,
-            False,
-            False,
-            id="no-data-collection-falls-back-to-send-default-pii",
-        ),
-        pytest.param(
-            None,
-            True,
-            True,
-            id="no-data-collection-pii-enabled-collects",
-        ),
-    ],
-)
-async def test_tool_data_collection_inputs(
-    sentry_init,
-    capture_items,
-    data_collection,
-    send_default_pii,
-    expect_input,
-    stdio,
-):
-    init_kwargs = {
-        "integrations": [MCPIntegration()],
-        "traces_sample_rate": 1.0,
-        "send_default_pii": send_default_pii,
-    }
-    if data_collection is not None:
-        init_kwargs["data_collection"] = data_collection
-
-    sentry_init(**init_kwargs)
-
-    server = Server("test-server")
-
-    async def test_tool(ctx, params):
-        return CallToolResult(
-            content=[TextContent(type="text", text="ok")],
-            structured_content={"result": "success"},
-        )
-
-    server.add_request_handler("tools/call", CallToolRequestParams, test_tool)
-
-    params = {
-        "name": "calculate",
-        "arguments": {"x": 10, "y": 5},
-    }
-    items = capture_items("span")
-    await stdio(server, method="tools/call", params=params, request_id="req-1")
-    sentry_sdk.flush()
-    span = _find_mcp_span(items, method_name="tools/call")
-    assert span is not None
-    data = span["attributes"]
-
-    # Arguments are only gated once data_collection is configured; without it they
-    # are set unconditionally, as they were before data_collection existed.
-    if expect_input or data_collection is None:
-        assert data["mcp.request.argument.x"] == "10"
-        assert data["mcp.request.argument.y"] == "5"
-    else:
-        assert "mcp.request.argument.x" not in data
-        assert "mcp.request.argument.y" not in data
-
-    # Non-sensitive identifying attributes are never gated
-    assert data[SPANDATA.MCP_TOOL_NAME] == "calculate"
-    assert data[SPANDATA.MCP_METHOD_NAME] == "tools/call"
-    assert data[SPANDATA.MCP_TRANSPORT] == "stdio"
-    assert data[SPANDATA.MCP_REQUEST_ID] == "req-1"
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "data_collection, send_default_pii, expect_output",
-    [
-        pytest.param(
-            {"gen_ai": {"outputs": True}},
-            False,
-            True,
-            id="gen-ai-outputs-enabled-overrides-pii-disabled",
-        ),
-        pytest.param(
-            {"gen_ai": {"outputs": False}},
-            True,
-            False,
-            id="gen-ai-outputs-disabled-overrides-pii-enabled",
-        ),
-        pytest.param(
-            {},
-            False,
-            True,
-            id="gen-ai-omitted-defaults-to-enabled",
-        ),
-        pytest.param(
-            {"gen_ai": {"inputs": False}},
-            False,
-            True,
-            id="gen-ai-inputs-disabled-does-not-affect-outputs",
-        ),
-        pytest.param(
-            None,
-            False,
-            False,
-            id="no-data-collection-falls-back-to-send-default-pii",
-        ),
-        pytest.param(
-            None,
-            True,
-            True,
-            id="no-data-collection-pii-enabled-collects",
-        ),
-    ],
-)
-async def test_tool_data_collection_outputs(
-    sentry_init,
-    capture_items,
-    data_collection,
-    send_default_pii,
-    expect_output,
-    stdio,
-):
-    """Tool result content is gated on data_collection.gen_ai.outputs"""
-    init_kwargs = {
-        "integrations": [MCPIntegration()],
-        "traces_sample_rate": 1.0,
-        "send_default_pii": send_default_pii,
-    }
-    if data_collection is not None:
-        init_kwargs["data_collection"] = data_collection
-
-    sentry_init(**init_kwargs)
-
-    server = Server("test-server")
-
-    async def test_tool(ctx, params):
-        return CallToolResult(
-            content=[
-                TextContent(
-                    type="text",
-                    text=json.dumps({"result": "success", "value": 42}),
-                )
-            ],
-            structured_content={"result": "success", "value": 42},
-        )
-
-    server.add_request_handler("tools/call", CallToolRequestParams, test_tool)
-
-    params = {
-        "name": "calculate",
-        "arguments": {"x": 10, "y": 5},
-    }
-    items = capture_items("span")
-    await stdio(server, method="tools/call", params=params, request_id="req-1")
-    sentry_sdk.flush()
-    span = _find_mcp_span(items, method_name="tools/call")
-    assert span is not None
-    data = span["attributes"]
-
-    if expect_output:
-        assert data[SPANDATA.MCP_TOOL_RESULT_CONTENT] == json.dumps(
-            {"result": "success", "value": 42}
-        )
-        assert data[SPANDATA.MCP_TOOL_RESULT_CONTENT_COUNT] == 2
-    else:
-        assert SPANDATA.MCP_TOOL_RESULT_CONTENT not in data
-        assert SPANDATA.MCP_TOOL_RESULT_CONTENT_COUNT not in data
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "data_collection, send_default_pii, expect_input",
-    [
-        pytest.param(
-            {"gen_ai": {"inputs": True}},
-            False,
-            True,
-            id="gen-ai-inputs-enabled-overrides-pii-disabled",
-        ),
-        pytest.param(
-            {"gen_ai": {"inputs": False}},
-            True,
-            False,
-            id="gen-ai-inputs-disabled-overrides-pii-enabled",
-        ),
-        pytest.param(
-            {},
-            False,
-            True,
-            id="gen-ai-omitted-defaults-to-enabled",
-        ),
-        pytest.param(
-            {"gen_ai": {"outputs": False}},
-            False,
-            True,
-            id="gen-ai-outputs-disabled-does-not-affect-inputs",
-        ),
-        pytest.param(
-            None,
-            False,
-            False,
-            id="no-data-collection-falls-back-to-send-default-pii",
-        ),
-        pytest.param(
-            None,
-            True,
-            True,
-            id="no-data-collection-pii-enabled-collects",
-        ),
-    ],
-)
-async def test_prompt_data_collection_inputs(
-    sentry_init,
-    capture_items,
-    data_collection,
-    send_default_pii,
-    expect_input,
-    stdio,
-):
-    """Prompt arguments and message content are gated on data_collection.gen_ai.inputs.
-
-    The prompt message content is the prompt fed to a model, so it is an input
-    even though it arrives on the handler's result.
-    """
-    init_kwargs = {
-        "integrations": [MCPIntegration()],
-        "traces_sample_rate": 1.0,
-        "send_default_pii": send_default_pii,
-    }
-    if data_collection is not None:
-        init_kwargs["data_collection"] = data_collection
-
-    sentry_init(**init_kwargs)
-
-    server = Server("test-server")
-
-    prompt_result = GetPromptResult(
-        description="A helpful test prompt",
-        messages=[
-            PromptMessage(
-                role="user",
-                content=TextContent(type="text", text="Tell me about Python"),
-            ),
-        ],
-    )
-
-    async def test_prompt(ctx, params):
-        return prompt_result
-
-    server.add_request_handler("prompts/get", GetPromptRequestParams, test_prompt)
-
-    params = {
-        "name": "code_help",
-        "arguments": {"language": "python"},
-    }
-    items = capture_items("span")
-    await stdio(server, method="prompts/get", params=params, request_id="req-prompt")
-    sentry_sdk.flush()
-    span = _find_mcp_span(items, method_name="prompts/get")
-    assert span is not None
-    data = span["attributes"]
-
-    # Arguments are only gated once data_collection is configured; without it they
-    # are set unconditionally, as they were before data_collection existed.
-    if expect_input or data_collection is None:
-        assert data["mcp.request.argument.language"] == "python"
-    else:
-        assert "mcp.request.argument.language" not in data
-
-    if expect_input:
-        assert data[SPANDATA.MCP_PROMPT_RESULT_MESSAGE_ROLE] == "user"
-        assert (
-            data[SPANDATA.MCP_PROMPT_RESULT_MESSAGE_CONTENT] == "Tell me about Python"
-        )
-    else:
-        assert SPANDATA.MCP_PROMPT_RESULT_MESSAGE_ROLE not in data
-        assert SPANDATA.MCP_PROMPT_RESULT_MESSAGE_CONTENT not in data
-
-    # The message count carries no prompt content, so it is never gated
-    assert data[SPANDATA.MCP_PROMPT_RESULT_MESSAGE_COUNT] == 1
