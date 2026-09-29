@@ -21,7 +21,7 @@ class _ServiceExtension:
         return None
 
     def get_request_attributes(self, ctx: "AwsCallContext") -> "Attributes":
-        """Return service-specific attributes available before the call."""
+        """Return service-specific attributes available before the request is made."""
         return {}
 
     def get_response_attributes(
