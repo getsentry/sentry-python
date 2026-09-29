@@ -464,14 +464,14 @@ def _set_common_input_data(
     if top_p is not None and _is_given(top_p):
         span.set_attribute(SPANDATA.GEN_AI_REQUEST_TOP_P, top_p)
 
-    if messages is None or len(messages) == 0:  # type: ignore
-        return
-
     if sentry_sdk.get_client().options["data_collection"]["gen_ai"]["inputs"]:
         if tools is not None and _is_given(tools) and len(tools) > 0:  # type: ignore
             span.set_attribute(
                 SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS, safe_serialize(tools)
             )
+
+        if messages is None or len(messages) == 0:  # type: ignore
+            return
 
         if isinstance(system, str) or isinstance(system, Iterable):
             span.set_attribute(
