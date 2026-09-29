@@ -6,8 +6,6 @@ from typing import TYPE_CHECKING, cast
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration
-from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.utils import has_data_collection_enabled
 
 if TYPE_CHECKING:
     from typing import (
@@ -263,26 +261,20 @@ def _wrap_system_one(f: "Callable[..., Any]") -> "Callable[..., Any]":
                     SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS, response.usage.output_tokens
                 )
 
-            if (
-                has_data_collection_enabled(client.options)
-                and client.options["data_collection"]["gen_ai"]["outputs"]
-            ) or (
-                not has_data_collection_enabled(client.options)
-                and should_send_default_pii()
-            ):
-                span.set_attribute(
-                    SPANDATA.GEN_AI_OUTPUT_MESSAGES,
-                    json.dumps(
-                        [
-                            {
-                                "type": "evaluation",
-                                "answers": _transform_evaluation_answers(
-                                    response.answers
-                                ),
-                            }
-                        ]
-                    ),
-                )
+            if not client.options["data_collection"]["gen_ai"]["outputs"]:
+                return response
+
+            span.set_attribute(
+                SPANDATA.GEN_AI_OUTPUT_MESSAGES,
+                json.dumps(
+                    [
+                        {
+                            "type": "evaluation",
+                            "answers": _transform_evaluation_answers(response.answers),
+                        }
+                    ]
+                ),
+            )
 
             return response
 
@@ -353,26 +345,20 @@ def _wrap_system_one_async(f: "Callable[..., Any]") -> "Callable[..., Any]":
                     SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS, response.usage.output_tokens
                 )
 
-            if (
-                has_data_collection_enabled(client.options)
-                and client.options["data_collection"]["gen_ai"]["outputs"]
-            ) or (
-                not has_data_collection_enabled(client.options)
-                and should_send_default_pii()
-            ):
-                span.set_attribute(
-                    SPANDATA.GEN_AI_OUTPUT_MESSAGES,
-                    json.dumps(
-                        [
-                            {
-                                "type": "evaluation",
-                                "answers": _transform_evaluation_answers(
-                                    response.answers
-                                ),
-                            }
-                        ]
-                    ),
-                )
+            if not client.options["data_collection"]["gen_ai"]["outputs"]:
+                return response
+
+            span.set_attribute(
+                SPANDATA.GEN_AI_OUTPUT_MESSAGES,
+                json.dumps(
+                    [
+                        {
+                            "type": "evaluation",
+                            "answers": _transform_evaluation_answers(response.answers),
+                        }
+                    ]
+                ),
+            )
 
             return response
 
