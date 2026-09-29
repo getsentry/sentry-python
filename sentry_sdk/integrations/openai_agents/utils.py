@@ -15,11 +15,9 @@ from sentry_sdk.ai.utils import (
 )
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable
-from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import Span
 from sentry_sdk.utils import (
     event_from_exception,
-    has_data_collection_enabled,
     safe_serialize,
 )
 
@@ -109,11 +107,9 @@ def _set_input_data(
     get_response_kwargs: "dict[str, Any]",
 ) -> None:
     client = sentry_sdk.get_client()
-    if has_data_collection_enabled(client.options):
-        if not client.options["data_collection"]["gen_ai"]["inputs"]:
-            return
-    elif not should_send_default_pii():
+    if not client.options["data_collection"]["gen_ai"]["inputs"]:
         return
+
     request_messages = []
 
     messages: "str | list[TResponseInputItem]" = get_response_kwargs.get("input", [])
@@ -184,13 +180,8 @@ def _set_input_data(
 
 def _set_output_data(span: "Span", result: "Any") -> None:
     client = sentry_sdk.get_client()
-    record_outputs = False
-    if has_data_collection_enabled(client.options):
-        record_outputs = client.options["data_collection"]["gen_ai"]["outputs"]
-    elif should_send_default_pii():
-        record_outputs = True
 
-    if not record_outputs:
+    if not client.options["data_collection"]["gen_ai"]["outputs"]:
         return
 
     output_messages: "dict[str, list[Any]]" = {
@@ -209,13 +200,13 @@ def _set_output_data(span: "Span", result: "Any") -> None:
                     # Unknown output message type, just return the json
                     output_messages["response"].append(output_message.dict())
 
-    if record_outputs and len(output_messages["tool"]) > 0:
+    if len(output_messages["tool"]) > 0:
         span.set_attribute(
             SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
             safe_serialize(output_messages["tool"]),
         )
 
-    if record_outputs and len(output_messages["response"]) > 0:
+    if len(output_messages["response"]) > 0:
         set_data_normalized(
             span, SPANDATA.GEN_AI_RESPONSE_TEXT, output_messages["response"]
         )
