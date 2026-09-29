@@ -1565,7 +1565,6 @@ def test_text_generation_data_collection(
     for key in expected_absent:
         assert key not in span_data, f"{key} should not have been collected"
 
-    # Data collection never gates non-PII attributes
     assert span_data[SPANDATA.GEN_AI_OPERATION_NAME] == "text_completion"
     assert span_data[SPANDATA.GEN_AI_REQUEST_MODEL] == "test-model"
     assert span_data[SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == "length"
@@ -1638,7 +1637,6 @@ def test_text_generation_streaming_data_collection(
     for key in expected_absent:
         assert key not in span_data, f"{key} should not have been collected"
 
-    # Data collection never gates non-PII attributes
     assert span_data[SPANDATA.GEN_AI_OPERATION_NAME] == "text_completion"
     assert span_data[SPANDATA.GEN_AI_REQUEST_MODEL] == "test-model"
     assert span_data[SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == "length"
@@ -1721,7 +1719,6 @@ def test_chat_completion_data_collection_tools(
     # This response carries only tool calls, so there is never any response text
     assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span_data
 
-    # Data collection never gates non-PII attributes
     assert span_data[SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
     assert span_data[SPANDATA.GEN_AI_REQUEST_MODEL] == "test-model"
     assert span_data[SPANDATA.GEN_AI_RESPONSE_MODEL] == "test-model-123"
@@ -1808,7 +1805,6 @@ def test_chat_completion_streaming_data_collection_tools(
     for key in expected_absent:
         assert key not in span_data, f"{key} should not have been collected"
 
-    # Data collection never gates non-PII attributes
     assert span_data[SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
     assert span_data[SPANDATA.GEN_AI_REQUEST_MODEL] == "test-model"
     assert span_data[SPANDATA.GEN_AI_RESPONSE_MODEL] == "test-model-123"
