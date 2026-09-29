@@ -58,7 +58,12 @@ def test_system_one(sentry_init, capture_items, typesafe_response):
     sentry_init(
         integrations=[TypeSafeIntegration()],
         traces_sample_rate=1.0,
-        data_collection={},
+        data_collection={
+            "gen_ai": {
+                "inputs": True,
+                "outputs": True,
+            }
+        },
     )
 
     client = TypeSafeClient(api_key="z")
@@ -201,7 +206,12 @@ async def test_system_one_async(sentry_init, capture_items, typesafe_response):
     sentry_init(
         integrations=[TypeSafeIntegration()],
         traces_sample_rate=1.0,
-        data_collection={},
+        data_collection={
+            "gen_ai": {
+                "inputs": True,
+                "outputs": True,
+            }
+        },
     )
 
     client = AsyncTypeSafeClient(api_key="z")
