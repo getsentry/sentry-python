@@ -133,12 +133,8 @@ class AioHttpIntegration(Integration):
                     Scope.set_custom_sampling_context({"aiohttp_request": request})
 
                     header_attributes: "dict[str, Any]" = {}
-                    for header, header_value in _filter_headers(
-                        headers,
-                        use_annotated_value=False,
-                    ).items():
+                    for header, header_value in _filter_headers(headers).items():
                         header_attributes[f"http.request.header.{header.lower()}"] = (
-                            # header_value will always be a string because we set `use_annotated_value` to false above
                             header_value
                         )
 
