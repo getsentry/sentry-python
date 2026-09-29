@@ -4,8 +4,7 @@ from copy import deepcopy
 import sentry_sdk
 from sentry_sdk._types import SENSITIVE_DATA_SUBSTITUTE
 from sentry_sdk.data_collection import _apply_key_value_collection_filtering
-from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.utils import AnnotatedValue, has_data_collection_enabled
+from sentry_sdk.utils import AnnotatedValue
 
 try:
     from django.http.request import RawPostDataException
@@ -89,23 +88,16 @@ class RequestExtractor:
         content_length = self.content_length()
         request_info = event.get("request", {})
 
-        # Prior to data collection being implemented we unconditionally attached
-        # the request body, which is why we default to True here.
-        attach_request_body = True
+        cookies = _apply_key_value_collection_filtering(
+            items=dict(self.cookies()),
+            behaviour=client.options["data_collection"]["cookies"],
+        )
+        if cookies:
+            request_info["cookies"] = cookies
 
-        if has_data_collection_enabled(client.options):
-            cookies = _apply_key_value_collection_filtering(
-                items=dict(self.cookies()),
-                behaviour=client.options["data_collection"]["cookies"],
-            )
-            if cookies:
-                request_info["cookies"] = cookies
-
-            attach_request_body = (
-                "incoming_request" in client.options["data_collection"]["http_bodies"]
-            )
-        elif should_send_default_pii():
-            request_info["cookies"] = dict(self.cookies())
+        attach_request_body = (
+            "incoming_request" in client.options["data_collection"]["http_bodies"]
+        )
 
         if attach_request_body:
             if not request_body_within_bounds(client, content_length):
