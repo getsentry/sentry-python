@@ -2,9 +2,7 @@ from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
-from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import Span, SpanStatus
-from sentry_sdk.utils import has_data_collection_enabled
 
 from ..consts import SPAN_ORIGIN
 from ..utils import _set_agent_data
@@ -45,10 +43,7 @@ def update_execute_tool_span(
     ):
         span.status = SpanStatus.ERROR
 
-    if has_data_collection_enabled(client.options):
-        if client.options["data_collection"]["gen_ai"]["outputs"]:
-            span.set_attribute(SPANDATA.GEN_AI_TOOL_OUTPUT, result)
-    elif should_send_default_pii():
+    if client.options["data_collection"]["gen_ai"]["outputs"]:
         span.set_attribute(SPANDATA.GEN_AI_TOOL_OUTPUT, result)
 
     # Add conversation ID from agent

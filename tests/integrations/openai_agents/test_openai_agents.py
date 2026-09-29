@@ -392,7 +392,11 @@ async def test_tool_definitions(
             integrations=[OpenAIAgentsIntegration()],
             disabled_integrations=[StdlibIntegration],
             traces_sample_rate=1.0,
-            send_default_pii=False,
+            data_collection={
+                "gen_ai": {
+                    "inputs": True,
+                }
+            },
         )
 
         items = capture_items("span")
@@ -442,7 +446,12 @@ async def test_agent_invocation_span_no_pii(
             integrations=[OpenAIAgentsIntegration()],
             disabled_integrations=[StdlibIntegration],
             traces_sample_rate=1.0,
-            send_default_pii=False,
+            data_collection={
+                "gen_ai": {
+                    "inputs": False,
+                    "outputs": False,
+                }
+            },
         )
 
         items = capture_items("span")
@@ -487,470 +496,6 @@ async def test_agent_invocation_span_no_pii(
     assert ai_client_span["attributes"]["gen_ai.request.model"] == "gpt-4"
     assert ai_client_span["attributes"]["gen_ai.request.temperature"] == 0.7
     assert ai_client_span["attributes"]["gen_ai.request.top_p"] == 1.0
-
-
-@pytest.mark.parametrize(
-    "init_kwargs,expect_messages",
-    [
-        pytest.param(
-            {"data_collection": {"gen_ai": {"inputs": True}}},
-            True,
-            id="gen_ai_inputs_true",
-        ),
-        pytest.param(
-            {"data_collection": {"gen_ai": {"inputs": False}}},
-            False,
-            id="gen_ai_inputs_false",
-        ),
-        pytest.param(
-            {"data_collection": {}},
-            True,
-            id="data_collection_defaults_to_enabled",
-        ),
-        pytest.param(
-            {
-                "send_default_pii": True,
-                "data_collection": {"gen_ai": {"inputs": False}},
-            },
-            False,
-            id="data_collection_wins_over_send_default_pii_true",
-        ),
-        pytest.param(
-            {
-                "send_default_pii": False,
-                "data_collection": {"gen_ai": {"inputs": True}},
-            },
-            True,
-            id="data_collection_wins_over_send_default_pii_false",
-        ),
-        pytest.param(
-            {"send_default_pii": True},
-            True,
-            id="legacy_send_default_pii_true",
-        ),
-        pytest.param(
-            {"send_default_pii": False},
-            False,
-            id="legacy_send_default_pii_false",
-        ),
-    ],
-)
-@pytest.mark.asyncio
-async def test_invoke_agent_span_data_collection_inputs(
-    sentry_init,
-    capture_items,
-    test_agent,
-    nonstreaming_responses_model_response,
-    get_model_response,
-    init_kwargs,
-    expect_messages,
-):
-    client = AsyncOpenAI(api_key="test-key")
-    model = OpenAIResponsesModel(model="gpt-4", openai_client=client)
-    agent = test_agent.clone(model=model)
-
-    response = get_model_response(
-        nonstreaming_responses_model_response, serialize_pydantic=True
-    )
-
-    system_message = {
-        "role": "system",
-        "content": [{"text": "You are a helpful test assistant.", "type": "text"}],
-    }
-    user_message = {
-        "role": "user",
-        "content": [{"text": "Test input", "type": "text"}],
-    }
-    expected_messages = [system_message, user_message]
-    with patch.object(
-        agent.model._client._client,
-        "send",
-        return_value=response,
-    ) as _:
-        sentry_init(
-            integrations=[OpenAIAgentsIntegration()],
-            disabled_integrations=[StdlibIntegration],
-            traces_sample_rate=1.0,
-            **init_kwargs,
-        )
-
-        items = capture_items("span")
-
-        result = await agents.Runner.run(
-            agent, "Test input", run_config=test_run_config
-        )
-
-        assert result is not None
-
-    sentry_sdk.flush()
-    spans = [item.payload for item in items]
-    invoke_agent_span = next(
-        span
-        for span in spans
-        if span["attributes"]["sentry.op"] == OP.GEN_AI_INVOKE_AGENT
-    )
-    span_data = invoke_agent_span["attributes"]
-
-    if expect_messages:
-        assert (
-            json.loads(span_data[SPANDATA.GEN_AI_REQUEST_MESSAGES]) == expected_messages
-        )
-    else:
-        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span_data
-
-
-@pytest.mark.parametrize(
-    "init_kwargs,expect_response_text",
-    [
-        pytest.param(
-            {"data_collection": {"gen_ai": {"outputs": True}}},
-            True,
-            id="gen_ai_outputs_true",
-        ),
-        pytest.param(
-            {"data_collection": {"gen_ai": {"outputs": False}}},
-            False,
-            id="gen_ai_outputs_false",
-        ),
-        pytest.param(
-            {"data_collection": {}},
-            True,
-            id="data_collection_defaults_to_enabled",
-        ),
-        pytest.param(
-            {
-                "send_default_pii": True,
-                "data_collection": {"gen_ai": {"outputs": False}},
-            },
-            False,
-            id="data_collection_wins_over_send_default_pii_true",
-        ),
-        pytest.param(
-            {
-                "send_default_pii": False,
-                "data_collection": {"gen_ai": {"outputs": True}},
-            },
-            True,
-            id="data_collection_wins_over_send_default_pii_false",
-        ),
-        pytest.param(
-            {"send_default_pii": True},
-            True,
-            id="legacy_send_default_pii_true",
-        ),
-        pytest.param(
-            {"send_default_pii": False},
-            False,
-            id="legacy_send_default_pii_false",
-        ),
-    ],
-)
-@pytest.mark.asyncio
-async def test_invoke_agent_span_data_collection_outputs(
-    sentry_init,
-    capture_items,
-    test_agent,
-    nonstreaming_responses_model_response,
-    get_model_response,
-    init_kwargs,
-    expect_response_text,
-):
-    client = AsyncOpenAI(api_key="test-key")
-    model = OpenAIResponsesModel(model="gpt-4", openai_client=client)
-    agent = test_agent.clone(model=model)
-
-    response = get_model_response(
-        nonstreaming_responses_model_response, serialize_pydantic=True
-    )
-    with patch.object(
-        agent.model._client._client,
-        "send",
-        return_value=response,
-    ) as _:
-        sentry_init(
-            integrations=[OpenAIAgentsIntegration()],
-            disabled_integrations=[StdlibIntegration],
-            traces_sample_rate=1.0,
-            **init_kwargs,
-        )
-
-        items = capture_items("span")
-
-        result = await agents.Runner.run(
-            agent, "Test input", run_config=test_run_config
-        )
-
-        assert result is not None
-
-    sentry_sdk.flush()
-    spans = [item.payload for item in items]
-    invoke_agent_span = next(
-        span
-        for span in spans
-        if span["attributes"]["sentry.op"] == OP.GEN_AI_INVOKE_AGENT
-    )
-    span_data = invoke_agent_span["attributes"]
-
-    if expect_response_text:
-        assert span_data[SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hello, how can I help you?"
-    else:
-        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span_data
-
-
-@pytest.mark.parametrize(
-    "data_collection,send_default_pii,expect_input",
-    [
-        pytest.param(
-            {"gen_ai": {"inputs": True}},
-            False,
-            True,
-            id="gen-ai-inputs-enabled-overrides-pii-disabled",
-        ),
-        pytest.param(
-            {"gen_ai": {"inputs": False}},
-            True,
-            False,
-            id="gen-ai-inputs-disabled-overrides-pii-enabled",
-        ),
-        pytest.param(
-            {},
-            False,
-            True,
-            id="gen-ai-omitted-defaults-to-enabled",
-        ),
-        pytest.param(
-            {"gen_ai": {"inputs": False}},
-            False,
-            False,
-            id="gen-ai-inputs-disabled-and-pii-disabled",
-        ),
-        pytest.param(
-            {"gen_ai": {"outputs": False}},
-            False,
-            True,
-            id="gen-ai-outputs-disabled-does-not-affect-inputs",
-        ),
-        pytest.param(
-            None,
-            False,
-            False,
-            id="no-data-collection-falls-back-to-send-default-pii",
-        ),
-        pytest.param(
-            None,
-            True,
-            True,
-            id="no-data-collection-pii-enabled-collects",
-        ),
-    ],
-)
-@pytest.mark.asyncio
-async def test_data_collection_inputs(
-    sentry_init,
-    capture_items,
-    test_agent,
-    simple_test_tool,
-    nonstreaming_responses_model_response,
-    get_model_response,
-    data_collection,
-    send_default_pii,
-    expect_input,
-):
-    client = AsyncOpenAI(api_key="test-key")
-    model = OpenAIResponsesModel(model="gpt-4", openai_client=client)
-    agent = test_agent.clone(model=model, tools=[simple_test_tool])
-
-    response = get_model_response(
-        nonstreaming_responses_model_response, serialize_pydantic=True
-    )
-
-    init_kwargs = {
-        "integrations": [OpenAIAgentsIntegration()],
-        "traces_sample_rate": 1.0,
-        "send_default_pii": send_default_pii,
-    }
-    init_kwargs["disabled_integrations"] = [StdlibIntegration]
-    if data_collection is not None:
-        init_kwargs["data_collection"] = data_collection
-
-    with patch.object(
-        agent.model._client._client,
-        "send",
-        return_value=response,
-    ) as _:
-        sentry_init(**init_kwargs)
-        items = capture_items("span")
-
-        result = await agents.Runner.run(
-            agent, "Test input", run_config=test_run_config
-        )
-
-        assert result is not None
-    sentry_sdk.flush()
-    spans = [item.payload for item in items]
-    ai_client_span = next(
-        span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-    )
-    span_data = ai_client_span["attributes"]
-
-    if expect_input:
-        assert "Test input" in span_data[SPANDATA.GEN_AI_REQUEST_MESSAGES]
-        assert (
-            "helpful test assistant" in span_data[SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
-        )
-    else:
-        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span_data
-        assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span_data
-
-    # Tool definitions are only gated once data_collection is configured; without it
-    # they are set unconditionally, as they were before data_collection existed.
-    if expect_input or data_collection is None:
-        assert "simple_test_tool" in span_data[SPANDATA.GEN_AI_TOOL_DEFINITIONS]
-    else:
-        assert SPANDATA.GEN_AI_TOOL_DEFINITIONS not in span_data
-
-    # Non-PII data is unaffected by the gate
-    assert span_data[SPANDATA.GEN_AI_REQUEST_MODEL] == "gpt-4"
-    assert span_data[SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-
-
-@pytest.mark.parametrize(
-    "data_collection,send_default_pii,expect_output",
-    [
-        pytest.param(
-            {"gen_ai": {"outputs": True}},
-            False,
-            True,
-            id="gen-ai-outputs-enabled-overrides-pii-disabled",
-        ),
-        pytest.param(
-            {"gen_ai": {"outputs": False}},
-            True,
-            False,
-            id="gen-ai-outputs-disabled-overrides-pii-enabled",
-        ),
-        pytest.param(
-            {},
-            False,
-            True,
-            id="gen-ai-omitted-defaults-to-enabled",
-        ),
-        pytest.param(
-            {"gen_ai": {"inputs": False, "outputs": False}},
-            False,
-            False,
-            id="gen-ai-inputs-and-outputs-disabled-and-pii-disabled",
-        ),
-        pytest.param(
-            {"gen_ai": {"inputs": False}},
-            False,
-            True,
-            id="gen-ai-inputs-disabled-keeps-outputs-and-tool-calls",
-        ),
-        pytest.param(
-            None,
-            False,
-            False,
-            id="no-data-collection-falls-back-to-send-default-pii",
-        ),
-        pytest.param(
-            None,
-            True,
-            True,
-            id="no-data-collection-pii-enabled-collects",
-        ),
-    ],
-)
-@pytest.mark.asyncio
-async def test_data_collection_outputs(
-    sentry_init,
-    capture_items,
-    test_agent,
-    simple_test_tool,
-    get_model_response,
-    nonstreaming_responses_tool_call_model_responses,
-    data_collection,
-    send_default_pii,
-    expect_output,
-):
-    client = AsyncOpenAI(api_key="test-key")
-    model = OpenAIResponsesModel(model="gpt-4", openai_client=client)
-    agent_with_tool = test_agent.clone(tools=[simple_test_tool], model=model)
-
-    usage = ResponseUsage(
-        input_tokens=10,
-        input_tokens_details=InputTokensDetails(
-            cached_tokens=0,
-            cache_write_tokens=0,
-        ),
-        output_tokens=5,
-        output_tokens_details=OutputTokensDetails(
-            reasoning_tokens=0,
-        ),
-        total_tokens=15,
-    )
-    responses = nonstreaming_responses_tool_call_model_responses(
-        tool_name="simple_test_tool",
-        arguments='{"message": "hello"}',
-        response_model="gpt-4",
-        response_text="Task completed using the tool",
-        response_ids=iter(["resp_tool_123", "resp_final_123"]),
-        usages=iter([usage, usage]),
-    )
-    tool_response = get_model_response(next(responses), serialize_pydantic=True)
-    final_response = get_model_response(next(responses), serialize_pydantic=True)
-
-    init_kwargs = {
-        "integrations": [OpenAIAgentsIntegration()],
-        "traces_sample_rate": 1.0,
-        "send_default_pii": send_default_pii,
-    }
-    init_kwargs["disabled_integrations"] = [StdlibIntegration]
-    if data_collection is not None:
-        init_kwargs["data_collection"] = data_collection
-
-    with patch.object(
-        agent_with_tool.model._client._client,
-        "send",
-        side_effect=[tool_response, final_response],
-    ) as _:
-        sentry_init(**init_kwargs)
-        items = capture_items("span")
-
-        await agents.Runner.run(
-            agent_with_tool,
-            "Please use the simple test tool",
-            run_config=test_run_config,
-        )
-    sentry_sdk.flush()
-    spans = [item.payload for item in items]
-    chat_span_data = [
-        span["attributes"]
-        for span in spans
-        if span["attributes"].get("sentry.op") == OP.GEN_AI_CHAT
-    ]
-
-    assert len(chat_span_data) == 2
-
-    if expect_output:
-        assert any(
-            "simple_test_tool" in data.get(SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS, "")
-            for data in chat_span_data
-        )
-        assert any(
-            "Task completed using the tool"
-            in str(data.get(SPANDATA.GEN_AI_RESPONSE_TEXT, ""))
-            for data in chat_span_data
-        )
-    else:
-        for data in chat_span_data:
-            assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in data
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in data
-
-    # Non-PII data is unaffected by the gate
-    for data in chat_span_data:
-        assert data[SPANDATA.GEN_AI_REQUEST_MODEL] == "gpt-4"
-        assert data[SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 5
 
 
 @pytest.mark.asyncio
@@ -1174,7 +719,12 @@ async def test_agent_invocation_span(
             integrations=[OpenAIAgentsIntegration()],
             disabled_integrations=[StdlibIntegration],
             traces_sample_rate=1.0,
-            send_default_pii=True,
+            data_collection={
+                "gen_ai": {
+                    "inputs": True,
+                    "outputs": True,
+                }
+            },
         )
 
         items = capture_items("span")
@@ -1257,6 +807,7 @@ async def test_client_span_custom_model(
             integrations=[OpenAIAgentsIntegration()],
             disabled_integrations=[StdlibIntegration],
             traces_sample_rate=1.0,
+            data_collection={},
         )
 
         items = capture_items("span")
@@ -1305,7 +856,12 @@ def test_agent_invocation_span_sync_no_pii(
             integrations=[OpenAIAgentsIntegration()],
             disabled_integrations=[StdlibIntegration],
             traces_sample_rate=1.0,
-            send_default_pii=False,
+            data_collection={
+                "gen_ai": {
+                    "inputs": False,
+                    "outputs": False,
+                }
+            },
         )
 
         items = capture_items("span")
@@ -1569,7 +1125,12 @@ def test_agent_invocation_span_sync(
             integrations=[OpenAIAgentsIntegration()],
             disabled_integrations=[StdlibIntegration],
             traces_sample_rate=1.0,
-            send_default_pii=True,
+            data_collection={
+                "gen_ai": {
+                    "inputs": True,
+                    "outputs": True,
+                }
+            },
         )
 
         items = capture_items("span")
@@ -1690,7 +1251,12 @@ async def test_tool_execution_span(
             integrations=[OpenAIAgentsIntegration()],
             disabled_integrations=[StdlibIntegration],
             traces_sample_rate=1.0,
-            send_default_pii=True,
+            data_collection={
+                "gen_ai": {
+                    "inputs": True,
+                    "outputs": True,
+                }
+            },
         )
 
         items = capture_items("span")
@@ -1957,7 +1523,12 @@ async def test_run_streamed_tool_execution_span(
             integrations=[OpenAIAgentsIntegration()],
             disabled_integrations=[StdlibIntegration],
             traces_sample_rate=1.0,
-            send_default_pii=True,
+            data_collection={
+                "gen_ai": {
+                    "inputs": True,
+                    "outputs": True,
+                }
+            },
         )
 
         items = capture_items("span")
@@ -2078,6 +1649,7 @@ def run_tool_agent(
                 integrations=[OpenAIAgentsIntegration()],
                 disabled_integrations=[StdlibIntegration],
                 traces_sample_rate=1.0,
+                data_collection={},
                 **init_kwargs,
             )
 
@@ -2119,128 +1691,14 @@ def simple_test_tool():
     return simple_test_tool
 
 
-@pytest.mark.parametrize(
-    "data_collection,send_default_pii,expect_input,expect_output",
-    [
-        pytest.param(
-            {"gen_ai": {"inputs": True, "outputs": True}},
-            False,
-            True,
-            True,
-            id="gen-ai-inputs-and-outputs-enabled-overrides-pii-disabled",
-        ),
-        pytest.param(
-            {"gen_ai": {"inputs": False, "outputs": False}},
-            True,
-            False,
-            False,
-            id="gen-ai-inputs-and-outputs-disabled-overrides-pii-enabled",
-        ),
-        pytest.param(
-            {"gen_ai": {"inputs": True, "outputs": False}},
-            False,
-            True,
-            False,
-            id="gen-ai-only-inputs-enabled",
-        ),
-        pytest.param(
-            {"gen_ai": {"inputs": False, "outputs": True}},
-            False,
-            False,
-            True,
-            id="gen-ai-only-outputs-enabled",
-        ),
-        pytest.param(
-            {},
-            False,
-            True,
-            True,
-            id="gen-ai-omitted-defaults-to-enabled",
-        ),
-        pytest.param(
-            {"gen_ai": {"inputs": False, "outputs": False}},
-            False,
-            False,
-            False,
-            id="gen-ai-inputs-and-outputs-disabled-and-pii-disabled",
-        ),
-        pytest.param(
-            None,
-            False,
-            False,
-            False,
-            id="no-gen-ai-data-collection-falls-back-to-send-default-pii",
-        ),
-        pytest.param(
-            None,
-            True,
-            True,
-            True,
-            id="no-gen-ai-data-collection-pii-enabled-collects",
-        ),
-    ],
-)
 @pytest.mark.asyncio
-async def test_tool_execution_span_data_collection(
-    run_tool_agent,
-    simple_test_tool,
-    data_collection,
-    send_default_pii,
-    expect_input,
-    expect_output,
-):
-    init_kwargs = {
-        "send_default_pii": send_default_pii,
-    }
-    if data_collection is not None:
-        init_kwargs["data_collection"] = data_collection
-
-    _, tool_span_data = await run_tool_agent(
-        simple_test_tool,
-        **init_kwargs,
-    )
-
-    if expect_input:
-        assert tool_span_data[SPANDATA.GEN_AI_TOOL_INPUT] == '{"message": "hello"}'
-    else:
-        assert SPANDATA.GEN_AI_TOOL_INPUT not in tool_span_data
-
-    if expect_output:
-        assert (
-            tool_span_data[SPANDATA.GEN_AI_TOOL_OUTPUT] == "Tool executed with: hello"
-        )
-    else:
-        assert SPANDATA.GEN_AI_TOOL_OUTPUT not in tool_span_data
-
-
-@pytest.mark.asyncio
-async def test_tool_execution_error_data_collection(
-    run_tool_agent,
-):
-    @agents.function_tool
-    def failing_tool(message: str) -> str:
-        """A tool that fails"""
-        raise ValueError("Tool execution failed")
-
-    tool_span, tool_span_data = await run_tool_agent(
-        failing_tool,
-        data_collection={"gen_ai": {"outputs": False}},
-    )
-
-    assert tool_span_data[SPANDATA.GEN_AI_TOOL_NAME] == "failing_tool"
-    assert tool_span["status"] == "error"
-    assert SPANDATA.GEN_AI_TOOL_OUTPUT not in tool_span_data
-
-
-@pytest.mark.asyncio
-async def test_tool_execution_span_non_pii_data_always_set(
+async def test_tool_execution_span_non_sensitive_data_always_set(
     run_tool_agent,
     simple_test_tool,
 ):
     _, tool_span_data = await run_tool_agent(
         simple_test_tool,
         run_kwargs={"conversation_id": "conv_tool_test_456"},
-        data_collection={"gen_ai": {"inputs": False, "outputs": False}},
     )
 
     assert tool_span_data[SPANDATA.GEN_AI_TOOL_NAME] == "simple_test_tool"
@@ -2285,6 +1743,7 @@ async def test_hosted_mcp_tool_propagation_header_streamed(
         integrations=[OpenAIAgentsIntegration()],
         traces_sample_rate=1.0,
         release="d08ebdb9309e1b004c6f52202de58a09c2268e42",
+        data_collection={},
     )
 
     request_headers = {"X-Stainless-Raw-Response": "stream"}
@@ -2452,6 +1911,7 @@ async def test_hosted_mcp_tool_propagation_headers(
         integrations=[OpenAIAgentsIntegration()],
         traces_sample_rate=1.0,
         release="d08ebdb9309e1b004c6f52202de58a09c2268e42",
+        data_collection={},
     )
 
     response = get_model_response(EXAMPLE_RESPONSE, serialize_pydantic=True)
@@ -2555,7 +2015,12 @@ async def test_model_behavior_error(
             integrations=[OpenAIAgentsIntegration()],
             disabled_integrations=[StdlibIntegration],
             traces_sample_rate=1.0,
-            send_default_pii=True,
+            data_collection={
+                "gen_ai": {
+                    "inputs": True,
+                    "outputs": True,
+                }
+            },
         )
 
         items = capture_items("span")
@@ -2603,6 +2068,7 @@ async def test_run_error_handling(
             ],
             disabled_integrations=[StdlibIntegration],
             traces_sample_rate=1.0,
+            data_collection={},
         )
 
         items = capture_items("event", "span")
@@ -2654,6 +2120,7 @@ async def test_run_streamed_error_handling(
             ],
             disabled_integrations=[StdlibIntegration],
             traces_sample_rate=1.0,
+            data_collection={},
         )
 
         items = capture_items("event", "span")
@@ -2716,7 +2183,12 @@ async def test_error_captures_input_data(
             ],
             disabled_integrations=[StdlibIntegration],
             traces_sample_rate=1.0,
-            send_default_pii=True,
+            data_collection={
+                "gen_ai": {
+                    "inputs": True,
+                    "outputs": True,
+                }
+            },
         )
 
         items = capture_items("event", "span")
@@ -2765,6 +2237,7 @@ async def test_span_status_error(
             ],
             disabled_integrations=[StdlibIntegration],
             traces_sample_rate=1.0,
+            data_collection={},
         )
 
         items = capture_items("event", "span")
@@ -2802,7 +2275,12 @@ def test_openai_agents_message_role_mapping(sentry_init, test_message, expected_
     sentry_init(
         integrations=[OpenAIAgentsIntegration()],
         traces_sample_rate=1.0,
-        send_default_pii=True,
+        data_collection={
+            "gen_ai": {
+                "inputs": True,
+                "outputs": True,
+            }
+        },
     )
 
     get_response_kwargs = {"input": [test_message]}
@@ -2900,7 +2378,12 @@ async def test_tool_execution_error_tracing(
             integrations=[OpenAIAgentsIntegration()],
             disabled_integrations=[StdlibIntegration],
             traces_sample_rate=1.0,
-            send_default_pii=True,
+            data_collection={
+                "gen_ai": {
+                    "inputs": True,
+                    "outputs": True,
+                }
+            },
         )
         items = capture_items("span")
 
@@ -2998,7 +2481,12 @@ async def test_ai_client_span_includes_response_model(
             integrations=[OpenAIAgentsIntegration()],
             disabled_integrations=[StdlibIntegration],
             traces_sample_rate=1.0,
-            send_default_pii=True,
+            data_collection={
+                "gen_ai": {
+                    "inputs": True,
+                    "outputs": True,
+                }
+            },
         )
         items = capture_items("span")
 
@@ -3088,6 +2576,7 @@ async def test_ai_client_span_response_model_with_chat_completions(
             integrations=[OpenAIAgentsIntegration()],
             disabled_integrations=[StdlibIntegration],
             traces_sample_rate=1.0,
+            data_collection={},
         )
 
         items = capture_items("span")
@@ -3174,7 +2663,12 @@ async def test_invoke_agent_span_includes_response_model(
             integrations=[OpenAIAgentsIntegration()],
             disabled_integrations=[StdlibIntegration],
             traces_sample_rate=1.0,
-            send_default_pii=True,
+            data_collection={
+                "gen_ai": {
+                    "inputs": True,
+                    "outputs": True,
+                }
+            },
         )
 
         items = capture_items("span")
@@ -3299,7 +2793,12 @@ async def test_invoke_agent_span_uses_last_response_model(
             integrations=[OpenAIAgentsIntegration()],
             disabled_integrations=[StdlibIntegration],
             traces_sample_rate=1.0,
-            send_default_pii=True,
+            data_collection={
+                "gen_ai": {
+                    "inputs": True,
+                    "outputs": True,
+                }
+            },
         )
 
         items = capture_items("span")
@@ -3341,7 +2840,12 @@ async def test_streaming_span_update_captures_response_data(
     sentry_init(
         integrations=[OpenAIAgentsIntegration()],
         traces_sample_rate=1.0,
-        send_default_pii=True,
+        data_collection={
+            "gen_ai": {
+                "inputs": True,
+                "outputs": True,
+            }
+        },
     )
 
     # Create a mock streaming response object (similar to what we'd get from ResponseCompletedEvent)
@@ -3410,6 +2914,7 @@ async def test_streaming_ttft_on_chat_span(
     sentry_init(
         integrations=[OpenAIAgentsIntegration()],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     request_headers = {"X-Stainless-Raw-Response": "stream"}
@@ -3552,6 +3057,7 @@ async def test_conversation_id_on_all_spans(
             integrations=[OpenAIAgentsIntegration()],
             disabled_integrations=[StdlibIntegration],
             traces_sample_rate=1.0,
+            data_collection={},
         )
 
         items = capture_items("span")
@@ -3685,6 +3191,7 @@ async def test_conversation_id_on_tool_span(
             integrations=[OpenAIAgentsIntegration()],
             disabled_integrations=[StdlibIntegration],
             traces_sample_rate=1.0,
+            data_collection={},
         )
 
         items = capture_items("span")
