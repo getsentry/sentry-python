@@ -39,8 +39,8 @@ def _start_client_span(
     if client.get_integration(IDENTIFIER) is None:
         return None
 
-    # use unknown if `service_id_hyphenized` so span name can still be created.
-    # e.g. "aws.unkown.GetObject"
+    # use unknown if `service_id_hyphenized` is not set so span name can still be created.
+    # e.g. "aws.unknown.GetObject"
     service_name = ctx.service_id_hyphenized or "unknown"
     span_name = f"aws.{service_name}.{ctx.operation_name}"
 
