@@ -917,7 +917,6 @@ def test_tool_execution_span(
 
     assert "5" in chat_spans[1]["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
 
-    # Verify tool calls are recorded when PII is enabled
     assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS in chat_spans[0].get("attributes", {})
     tool_calls_data = chat_spans[0]["attributes"][SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS]
     assert isinstance(tool_calls_data, str)
@@ -1092,7 +1091,6 @@ def test_tool_execution_span_no_sensitive_data(
     assert SPANDATA.GEN_AI_TOOL_INPUT not in tool_exec_span.get("attributes", {})
     assert SPANDATA.GEN_AI_TOOL_OUTPUT not in tool_exec_span.get("attributes", {})
 
-    # Verify tool calls are NOT recorded when PII is disabled
     assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in chat_spans[0].get(
         "attributes", {}
     )
@@ -1284,7 +1282,6 @@ def test_langchain_openai_tools_agent(
 
     assert "5" in chat_spans[1]["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
 
-    # Verify tool calls are recorded when PII is enabled
     assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS in chat_spans[0].get("attributes", {})
     tool_calls_data = chat_spans[0]["attributes"][SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS]
 
@@ -1440,7 +1437,6 @@ def test_langchain_openai_tools_agent_no_sensitive_data(
     assert SPANDATA.GEN_AI_TOOL_INPUT not in tool_exec_span.get("attributes", {})
     assert SPANDATA.GEN_AI_TOOL_OUTPUT not in tool_exec_span.get("attributes", {})
 
-    # Verify tool calls are NOT recorded when PII is disabled
     assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in chat_spans[0].get(
         "attributes", {}
     )
@@ -1666,7 +1662,6 @@ def test_langchain_openai_tools_agent_stream_no_sensitive_data(
     assert SPANDATA.GEN_AI_TOOL_INPUT not in tool_exec_span.get("attributes", {})
     assert SPANDATA.GEN_AI_TOOL_OUTPUT not in tool_exec_span.get("attributes", {})
 
-    # Verify tool calls are NOT recorded when PII is disabled
     assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in chat_spans[0].get(
         "attributes", {}
     )
@@ -1870,7 +1865,6 @@ def test_langchain_openai_tools_agent_stream(
 
     assert "5" in chat_spans[1]["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
 
-    # Verify tool calls are recorded when PII is enabled
     assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS in chat_spans[0].get("attributes", {})
     tool_calls_data = chat_spans[0]["attributes"][SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS]
 
@@ -3072,7 +3066,6 @@ def test_langchain_chat_data_collection(
     for key in expected_absent:
         assert key not in span_data, f"{key} should not have been collected"
 
-    # Data collection never gates non-PII attributes
     assert span_data[SPANDATA.GEN_AI_REQUEST_MODEL] == "gpt-3.5-turbo"
     assert span_data[SPANDATA.GEN_AI_PROVIDER_NAME] == "openai-chat"
     assert span_data[SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
@@ -3179,7 +3172,6 @@ def test_langchain_text_completion_data_collection(
     for key in expected_absent:
         assert key not in span_data, f"{key} should not have been collected"
 
-    # Data collection never gates non-PII attributes
     assert span_data[SPANDATA.GEN_AI_REQUEST_MODEL] == "gpt-3.5-turbo"
     assert span_data[SPANDATA.GEN_AI_PROVIDER_NAME] == "openai"
     assert span_data[SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
@@ -3358,7 +3350,6 @@ def test_langchain_data_collection_request_tool_call_params(
     else:
         assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in span_data
 
-    # Data collection never gates non-PII attributes
     assert span_data[SPANDATA.GEN_AI_REQUEST_MODEL] == "gpt-3.5-turbo"
 
 
@@ -3455,7 +3446,6 @@ def test_langchain_tool_execution_data_collection(
     for key in expected_absent:
         assert key not in span_data, f"{key} should not have been collected"
 
-    # Data collection never gates non-PII attributes
     assert span_data[SPANDATA.GEN_AI_TOOL_NAME] == "get_word_length"
     assert span_data[SPANDATA.GEN_AI_OPERATION_NAME] == "execute_tool"
 
@@ -3558,5 +3548,4 @@ def test_langchain_agent_executor_data_collection(
     for key in expected_absent:
         assert key not in span_data, f"{key} should not have been collected"
 
-    # Data collection never gates non-PII attributes
     assert span_data[SPANDATA.GEN_AI_OPERATION_NAME] == "invoke_agent"
