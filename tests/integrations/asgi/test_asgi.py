@@ -201,7 +201,6 @@ async def test_capture_transaction(
     assert span["attributes"]["network.protocol.name"] == "http"
     assert span["attributes"]["http.request.method"] == "GET"
     assert span["attributes"]["http.request.header.host"] == "localhost"
-    assert span["attributes"]["http.request.header.remote-addr"] == "127.0.0.1"
     assert span["attributes"]["http.request.header.user-agent"] == "ASGI-Test-Client"
 
     if should_send_pii:
@@ -675,6 +674,108 @@ def test_get_headers():
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "data_collection, expected_headers",
+    [
+        pytest.param(
+            {},
+            {
+                "http.request.header.authorization": "[Filtered]",
+                "http.request.header.x-custom-header": "passthrough",
+            },
+            id="default_redacts_sensitive_headers",
+        ),
+        pytest.param(
+            {"http_headers": {"request": {"mode": "off"}}},
+            None,
+            id="mode_off_collects_no_headers",
+        ),
+        pytest.param(
+            {"http_headers": {"request": {"mode": "allowlist", "terms": ["custom"]}}},
+            {
+                "http.request.header.x-custom-header": "passthrough",
+                "http.request.header.x-forwarded-for": "[Filtered]",
+                "http.request.header.host": "[Filtered]",
+            },
+            id="allowlist_redacts_all_but_allowed_terms",
+        ),
+        pytest.param(
+            {"http_headers": {"request": {"mode": "denylist", "terms": ["custom"]}}},
+            {
+                "http.request.header.x-custom-header": "[Filtered]",
+                "http.request.header.x-forwarded-for": "1.2.3.4",
+                "http.request.header.host": "localhost",
+            },
+            id="denylist_redacts_only_matched_terms",
+        ),
+    ],
+)
+async def test_request_headers_data_collection(
+    sentry_init, asgi3_app, capture_items, data_collection, expected_headers
+):
+    sentry_init(
+        traces_sample_rate=1.0,
+        data_collection=data_collection,
+    )
+    app = SentryAsgiMiddleware(asgi3_app)
+
+    items = capture_items("span")
+    async with TestClient(app) as client:
+        await client.get(
+            "/some_url",
+            headers={
+                "Authorization": "Bearer secret-token",
+                "X-Forwarded-For": "1.2.3.4",
+                "X-Custom-Header": "passthrough",
+            },
+        )
+
+    sentry_sdk.flush()
+
+    (span,) = [item.payload for item in items]
+    attributes = span["attributes"]
+
+    if expected_headers is None:
+        assert not any(key.startswith("http.request.header.") for key in attributes)
+    else:
+        for key, value in expected_headers.items():
+            assert attributes[key] == value
+
+
+@pytest.mark.asyncio
+async def test_request_headers_data_collection_cookie_always_redacted(
+    sentry_init, asgi3_app, capture_items
+):
+    sentry_init(
+        traces_sample_rate=1.0,
+        data_collection={
+            "http_headers": {
+                "request": {"mode": "allowlist", "terms": ["cookie", "custom"]}
+            }
+        },
+    )
+    app = SentryAsgiMiddleware(asgi3_app)
+
+    items = capture_items("span")
+    async with TestClient(app) as client:
+        await client.get(
+            "/some_url",
+            headers={
+                "Cookie": "sessionid=secret",
+                "X-Custom-Header": "passthrough",
+            },
+        )
+
+    sentry_sdk.flush()
+
+    (span,) = [item.payload for item in items]
+    attributes = span["attributes"]
+
+    assert attributes["http.request.header.cookie"] == "[Filtered]"
+    assert attributes["http.request.header.x-custom-header"] == "passthrough"
+
+
+@pytest.mark.asyncio
 async def test_get_request_attributes_url_with_filtered_host(
     sentry_init, capture_items, asgi3_app
 ):
@@ -711,7 +812,6 @@ async def test_get_request_attributes_url_with_headers_off(
     # "off" mode in data collection captures no headers at all, but "url.full" must
     # still resolve via the (uncaptured) host header rather than being dropped.
     sentry_init(
-        send_default_pii=True,
         traces_sample_rate=1.0,
         data_collection={"http_headers": {"request": {"mode": "off"}}},
     )

@@ -232,7 +232,7 @@ def test_non_dict_event(
 
     if has_request_data:
         request_data = {
-            "headers": {"Host": "x1.io", "X-Forwarded-Proto": "https"},
+            "headers": {"Host": "x1.io", "X-Forwarded-Proto": "[Filtered]"},
             "method": "GET",
             "url": "https://x1.io/1",
             "query_string": {

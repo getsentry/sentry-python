@@ -121,10 +121,7 @@ def _get_request_data(
 
         headers = _get_headers(asgi_scope)
 
-        request_data["headers"] = _filter_headers(
-            headers,
-            use_annotated_value=False,
-        )
+        request_data["headers"] = _filter_headers(headers)
 
         if has_data_collection_enabled(client_options):
             qs = _get_query(asgi_scope)
@@ -175,7 +172,7 @@ def _get_request_attributes(
 
         headers = _get_headers(asgi_scope)
 
-        filtered_headers = _filter_headers(headers, use_annotated_value=False)
+        filtered_headers = _filter_headers(headers)
         for header, value in filtered_headers.items():
             attributes[f"http.request.header.{header.lower()}"] = value
 
