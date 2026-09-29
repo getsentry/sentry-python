@@ -746,10 +746,6 @@ async def test_request_headers_data_collection(
 async def test_request_headers_data_collection_cookie_always_redacted(
     sentry_init, asgi3_app, capture_items
 ):
-    """
-    The ``cookie``/``set-cookie`` headers are always redacted in the
-    data-collection path, even when explicitly allowlisted.
-    """
     sentry_init(
         traces_sample_rate=1.0,
         data_collection={
