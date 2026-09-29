@@ -891,14 +891,13 @@ async def test_async_embeddings_create_with_list_input(
         ]
 
 
-def test_embeddings_no_pii(
+def test_embeddings_no_sensitive_data(
     sentry_init,
     capture_items,
     get_model_response,
     openai_embedding_model_response,
     clear_litellm_cache,
 ):
-    """Test that PII is not captured when disabled."""
     sentry_init(
         integrations=[LiteLLMIntegration()],
         disabled_integrations=[StdlibIntegration],
@@ -947,19 +946,17 @@ def test_embeddings_no_pii(
         span = spans[0]
 
         assert span["attributes"]["sentry.op"] == OP.GEN_AI_EMBEDDINGS
-        # Check that embeddings input is NOT captured when PII is disabled
         assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT not in span["attributes"]
 
 
 @pytest.mark.asyncio(loop_scope="session")
-async def test_async_embeddings_no_pii(
+async def test_async_embeddings_no_sensitive_data(
     sentry_init,
     capture_items,
     get_model_response,
     openai_embedding_model_response,
     clear_litellm_cache,
 ):
-    """Test that PII is not captured when disabled."""
     sentry_init(
         integrations=[LiteLLMIntegration()],
         disabled_integrations=[StdlibIntegration],
@@ -1009,7 +1006,6 @@ async def test_async_embeddings_no_pii(
         span = spans[0]
 
         assert span["attributes"]["sentry.op"] == OP.GEN_AI_EMBEDDINGS
-        # Check that embeddings input is NOT captured when PII is disabled
         assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT not in span["attributes"]
 
 
@@ -2307,3 +2303,108 @@ def test_convert_message_parts_image_url_missing_url():
     converted = _convert_message_parts(messages)
     # Should return item unchanged
     assert converted[0]["content"][0]["type"] == "image_url"
+
+
+@pytest.mark.parametrize(
+    "data_collection, expected_present, expected_absent",
+    [
+        pytest.param(
+            {"gen_ai": {"inputs": True, "outputs": False}},
+            False,
+            [SPANDATA.GEN_AI_REQUEST_MESSAGES],
+            [SPANDATA.GEN_AI_RESPONSE_TEXT],
+            id="gen-ai-inputs-enabled-outputs-disabled",
+        ),
+        pytest.param(
+            {"gen_ai": {"inputs": False, "outputs": True}},
+            False,
+            [SPANDATA.GEN_AI_RESPONSE_TEXT],
+            [SPANDATA.GEN_AI_REQUEST_MESSAGES],
+            id="gen-ai-outputs-enabled-inputs-disabled",
+        ),
+    ],
+)
+def test_chat_completion_data_collection(
+    reset_litellm_executor,
+    sentry_init,
+    capture_items,
+    get_model_response,
+    nonstreaming_chat_completions_model_response,
+    data_collection,
+    expected_present,
+    expected_absent,
+):
+    sentry_init_kwargs = dict(
+        integrations=[LiteLLMIntegration()],
+        disabled_integrations=[StdlibIntegration],
+        traces_sample_rate=1.0,
+    )
+    if data_collection is not None:
+        sentry_init_kwargs["data_collection"] = data_collection
+
+    sentry_init(**sentry_init_kwargs)
+
+    messages = [{"role": "user", "content": "Hello!"}]
+
+    client = OpenAI(api_key="test-key")
+
+    model_response = get_model_response(
+        nonstreaming_chat_completions_model_response(
+            response_id="chatcmpl-test",
+            response_model="gpt-3.5-turbo",
+            message_content="Test response",
+            created=1234567890,
+            usage=CompletionUsage(
+                prompt_tokens=10,
+                completion_tokens=20,
+                total_tokens=30,
+            ),
+        ),
+        serialize_pydantic=True,
+        request_headers={"X-Stainless-Raw-Response": "true"},
+    )
+
+    items = capture_items("span")
+
+    with mock.patch.object(
+        client.completions._client._client,
+        "send",
+        return_value=model_response,
+    ):
+        litellm.completion(
+            model="gpt-3.5-turbo",
+            messages=messages,
+            client=client,
+        )
+
+        litellm_utils.executor.shutdown(wait=True)
+
+    sentry_sdk.flush()
+    spans = [item.payload for item in items]
+    (span,) = [
+        x
+        for x in spans
+        if x["attributes"].get("sentry.op") == OP.GEN_AI_CHAT
+        and x["attributes"].get("sentry.origin") == "auto.ai.litellm"
+    ]
+    span_data = span["attributes"]
+
+    for key in expected_present:
+        assert key in span_data, f"{key} should have been collected"
+
+    if SPANDATA.GEN_AI_REQUEST_MESSAGES in expected_present:
+        assert json.loads(span_data[SPANDATA.GEN_AI_REQUEST_MESSAGES]) == messages
+
+    if SPANDATA.GEN_AI_RESPONSE_TEXT in expected_present:
+        response_text = json.loads(span_data[SPANDATA.GEN_AI_RESPONSE_TEXT])
+        assert response_text["role"] == "assistant"
+        assert response_text["content"] == "Test response"
+
+    for key in expected_absent:
+        assert key not in span_data, f"{key} should not have been collected"
+
+    # Data collection never gates non-PII attributes
+    assert span_data[SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+    assert span_data[SPANDATA.GEN_AI_REQUEST_MODEL] == "gpt-3.5-turbo"
+    assert span_data[SPANDATA.GEN_AI_RESPONSE_MODEL] == "gpt-3.5-turbo"
+    assert span_data[SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
