@@ -12,11 +12,7 @@ from sentry_sdk.traces import (
     Span,
     get_current_span,
 )
-from sentry_sdk.utils import (
-    has_data_collection_enabled,
-    parse_version,
-    transaction_from_function,
-)
+from sentry_sdk.utils import parse_version, transaction_from_function
 
 if TYPE_CHECKING:
     from typing import Any, Awaitable, Callable, Dict, Optional
@@ -142,16 +138,12 @@ async def _wrap_async_handler(
             if info:
                 if "cookies" in info:
                     request_info["cookies"] = info["cookies"]
-                if "data" in info:
-                    attach_request_data = True
-                    if has_data_collection_enabled(client.options):
-                        attach_request_data = (
-                            "incoming_request"
-                            in client.options["data_collection"]["http_bodies"]
-                        )
-
-                    if attach_request_data:
-                        request_info["data"] = info["data"]
+                attach_request_data = (
+                    "incoming_request"
+                    in client.options["data_collection"]["http_bodies"]
+                )
+                if "data" in info and attach_request_data:
+                    request_info["data"] = info["data"]
             event["request"] = deepcopy(request_info)
 
             return event
@@ -169,14 +161,7 @@ async def _wrap_async_handler(
         current_span = get_current_span()
 
         if type(current_span) is Span:
-            attach_request_data = True
-            if has_data_collection_enabled(client.options):
-                attach_request_data = (
-                    "incoming_request"
-                    in client.options["data_collection"]["http_bodies"]
-                )
-
-            if attach_request_data:
+            if "incoming_request" in client.options["data_collection"]["http_bodies"]:
                 request_body = _get_cached_request_body_attribute(
                     client=client, request=request
                 )

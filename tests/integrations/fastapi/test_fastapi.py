@@ -128,7 +128,7 @@ def fastapi_app_factory():
 async def test_request_info_json_body(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
-        send_default_pii=True,
+        data_collection={},
         integrations=[StarletteIntegration()],
     )
 
@@ -169,7 +169,7 @@ async def test_request_info_json_body(sentry_init, capture_items):
 async def test_formdata_request_body(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
-        send_default_pii=True,
+        data_collection={},
         max_request_body_size="always",
         integrations=[StarletteIntegration()],
     )
@@ -190,7 +190,7 @@ async def test_formdata_request_body(sentry_init, capture_items):
     (event,) = (item.payload for item in items if item.type == "event")
     assert event["request"]["data"].keys() == PARSED_FORM.keys()
     assert event["request"]["data"]["username"] == PARSED_FORM["username"]
-    assert event["request"]["data"]["password"] == "[Filtered]"
+    assert event["request"]["data"]["password"] == "hello123"
     assert event["request"]["data"]["photo"] == ""
 
     sentry_sdk.flush()
@@ -214,7 +214,7 @@ async def test_formdata_request_body(sentry_init, capture_items):
 async def test_request_body_too_big(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
-        send_default_pii=True,
+        data_collection={},
         integrations=[StarletteIntegration()],
     )
 
@@ -288,7 +288,6 @@ async def test_formdata_request_body_data_collection_http_bodies_empty(
 @pytest.mark.parametrize(
     "data_collection, expect_body",
     [
-        pytest.param(None, True, id="no_data_collection_experiment"),
         pytest.param({}, True, id="data_collection_http_bodies_default"),
         pytest.param(
             {"http_bodies": ["incoming_request"]},
@@ -343,7 +342,7 @@ async def test_response(sentry_init, capture_events):
     sentry_init(
         integrations=[StarletteIntegration(), FastApiIntegration()],
         traces_sample_rate=1.0,
-        send_default_pii=True,
+        data_collection={},
     )
 
     app = fastapi_app_factory()
@@ -400,6 +399,7 @@ def test_transaction_style(
     expected_source,
 ):
     sentry_init(
+        data_collection={},
         integrations=[
             StarletteIntegration(transaction_style=transaction_style),
             FastApiIntegration(transaction_style=transaction_style),
@@ -432,7 +432,7 @@ def test_legacy_setup(
     # Check that behaviour does not change
     # if the user just adds the new Integrations
     # and forgets to remove SentryAsgiMiddleware
-    sentry_init()
+    sentry_init(data_collection={})
     app = fastapi_app_factory()
     asgi_app = SentryAsgiMiddleware(app)
 
@@ -449,6 +449,7 @@ def test_legacy_setup(
 def test_active_thread_id(sentry_init, capture_items, endpoint):
     sentry_init(
         auto_enabling_integrations=False,  # Ensure httpx is not auto-enabled; its legacy start_span interferes with streaming mode
+        data_collection={},
         integrations=[StarletteIntegration(), FastApiIntegration()],
         traces_sample_rate=1.0,
     )
@@ -473,6 +474,7 @@ def test_active_thread_id(sentry_init, capture_items, endpoint):
 async def test_original_request_not_scrubbed(sentry_init, capture_events):
     sentry_init(
         auto_enabling_integrations=False,  # Ensure httpx is not auto-enabled; its legacy start_span interferes with streaming mode
+        data_collection={},
         integrations=[
             StarletteIntegration(),
             FastApiIntegration(),
@@ -506,7 +508,7 @@ async def test_original_request_not_scrubbed(sentry_init, capture_events):
     )
 
     event = events[0]
-    assert event["request"]["data"] == {"password": "[Filtered]"}
+    assert event["request"]["data"] == {"password": "secret"}
     assert event["request"]["headers"]["authorization"] == "[Filtered]"
     assert event["request"]["headers"]["proxy-authorization"] == "[Filtered]"
 
@@ -541,6 +543,7 @@ def test_transaction_name(
     """
     sentry_init(
         auto_enabling_integrations=False,  # Make sure that httpx integration is not added, because it adds tracing information to the starlette test clients request.
+        data_collection={},
         integrations=[
             StarletteIntegration(transaction_style=transaction_style),
             FastApiIntegration(transaction_style=transaction_style),
@@ -572,6 +575,7 @@ def test_http_route_with_prefix(
 ):
     sentry_init(
         auto_enabling_integrations=False,
+        data_collection={},
         integrations=[
             StarletteIntegration(transaction_style="url"),
             FastApiIntegration(transaction_style="url"),
@@ -608,6 +612,7 @@ def test_route_endpoint_equal_dependant_call(sentry_init):
     """
     sentry_init(
         auto_enabling_integrations=False,  # Make sure that httpx integration is not added, because it adds tracing information to the starlette test clients request.
+        data_collection={},
         integrations=[
             StarletteIntegration(),
             FastApiIntegration(),
@@ -663,6 +668,7 @@ def test_transaction_name_in_traces_sampler(
 
     sentry_init(
         auto_enabling_integrations=False,  # Make sure that httpx integration is not added, because it adds tracing information to the starlette test clients request.
+        data_collection={},
         integrations=[StarletteIntegration(transaction_style=transaction_style)],
         traces_sampler=dummy_traces_sampler,
         traces_sample_rate=1.0,
@@ -706,6 +712,7 @@ def test_transaction_name_in_middleware(
     """
     sentry_init(
         auto_enabling_integrations=False,  # Make sure that httpx integration is not added, because it adds tracing information to the starlette test clients request.
+        data_collection={},
         integrations=[
             StarletteIntegration(
                 transaction_style=transaction_style, middleware_spans=middleware_spans
@@ -753,6 +760,7 @@ def test_transaction_http_method_default(sentry_init, capture_items):
     sentry_init(
         auto_enabling_integrations=False,
         traces_sample_rate=1.0,
+        data_collection={},
         integrations=[
             StarletteIntegration(),
             FastApiIntegration(),
@@ -782,6 +790,7 @@ def test_transaction_http_method_custom(sentry_init, capture_items):
     sentry_init(
         auto_enabling_integrations=False,
         traces_sample_rate=1.0,
+        data_collection={},
         integrations=[
             StarletteIntegration(
                 http_methods_to_capture=(
@@ -818,7 +827,7 @@ def test_transaction_http_method_custom(sentry_init, capture_items):
 def test_request_url(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
-        send_default_pii=True,
+        data_collection={},
         integrations=[
             StarletteIntegration(),
         ],
@@ -860,7 +869,9 @@ def test_configurable_status_codes(
         starlette_integration = StarletteIntegration(**integration_kwargs)
         fastapi_integration = FastApiIntegration(**integration_kwargs)
 
-    sentry_init(integrations=[starlette_integration, fastapi_integration])
+    sentry_init(
+        data_collection={}, integrations=[starlette_integration, fastapi_integration]
+    )
 
     events = capture_events()
 
@@ -880,6 +891,7 @@ def test_configurable_status_codes(
 def test_app_host(sentry_init, capture_items, transaction_style):
     sentry_init(
         traces_sample_rate=1.0,
+        data_collection={},
         integrations=[
             StarletteIntegration(transaction_style=transaction_style),
             FastApiIntegration(transaction_style=transaction_style),
@@ -915,6 +927,7 @@ def test_app_host(sentry_init, capture_items, transaction_style):
 async def test_feature_flags(sentry_init, capture_events):
     sentry_init(
         traces_sample_rate=1.0,
+        data_collection={},
         integrations=[StarletteIntegration(), FastApiIntegration()],
     )
 
