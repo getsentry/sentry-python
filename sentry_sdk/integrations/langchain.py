@@ -363,25 +363,6 @@ class SentryLangchainCallback(BaseCallbackHandler):
                     unpack=False,
                 )
 
-            if client.options["data_collection"]["gen_ai"]["inputs"]:
-                function_call = all_params.get("function_call")
-                if function_call is not None:
-                    set_data_normalized(
-                        span,
-                        SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
-                        function_call,
-                        unpack=False,
-                    )
-
-                tool_calls = all_params.get("tool_calls")
-                if tool_calls is not None:
-                    set_data_normalized(
-                        span,
-                        SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
-                        tool_calls,
-                        unpack=False,
-                    )
-
             max_tokens = all_params.get("max_tokens")
             if max_tokens is not None:
                 set_data_normalized(
@@ -419,6 +400,24 @@ class SentryLangchainCallback(BaseCallbackHandler):
 
             if not client.options["data_collection"]["gen_ai"]["inputs"]:
                 return
+
+            function_call = all_params.get("function_call")
+            if function_call is not None:
+                set_data_normalized(
+                    span,
+                    SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
+                    function_call,
+                    unpack=False,
+                )
+
+            tool_calls = all_params.get("tool_calls")
+            if tool_calls is not None:
+                set_data_normalized(
+                    span,
+                    SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
+                    tool_calls,
+                    unpack=False,
+                )
 
             normalized_messages = [
                 {
@@ -498,25 +497,6 @@ class SentryLangchainCallback(BaseCallbackHandler):
                     unpack=False,
                 )
 
-            if client.options["data_collection"]["gen_ai"]["inputs"]:
-                function_call = all_params.get("function_call")
-                if function_call is not None:
-                    set_data_normalized(
-                        span,
-                        SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
-                        function_call,
-                        unpack=False,
-                    )
-
-                tool_calls = all_params.get("tool_calls")
-                if tool_calls is not None:
-                    set_data_normalized(
-                        span,
-                        SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
-                        tool_calls,
-                        unpack=False,
-                    )
-
             max_tokens = all_params.get("max_tokens")
             if max_tokens is not None:
                 set_data_normalized(
@@ -554,6 +534,24 @@ class SentryLangchainCallback(BaseCallbackHandler):
 
             if not client.options["data_collection"]["gen_ai"]["inputs"]:
                 return
+
+            function_call = all_params.get("function_call")
+            if function_call is not None:
+                set_data_normalized(
+                    span,
+                    SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
+                    function_call,
+                    unpack=False,
+                )
+
+            tool_calls = all_params.get("tool_calls")
+            if tool_calls is not None:
+                set_data_normalized(
+                    span,
+                    SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
+                    tool_calls,
+                    unpack=False,
+                )
 
             system_instructions = _get_system_instructions(messages)
             if len(system_instructions) > 0:
