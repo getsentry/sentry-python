@@ -52,7 +52,7 @@ async def test_basic(
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
-        send_default_pii=True,
+        data_collection={},
     )
 
     import channels  # type: ignore[import-not-found]
