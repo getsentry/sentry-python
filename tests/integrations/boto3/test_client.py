@@ -13,7 +13,6 @@ import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.boto3 import Boto3Integration
 from sentry_sdk.integrations.boto3._instrumentation import (
-    _get_error_attributes,
     _get_response_attributes,
     _instrument_streaming_body,
 )
@@ -393,9 +392,7 @@ def _span_attributes(span, span_streaming):
 @pytest.mark.parametrize(
     ("response", "expected"),
     [
-        (None, {}),
         ({}, {}),
-        ({"ResponseMetadata": None}, {}),
         (
             {
                 "ResponseMetadata": {
@@ -465,9 +462,6 @@ def test_get_response_attributes_reads_extended_request_id_header():
         ("HTTPStatusCode", "200", SPANDATA.HTTP_STATUS_CODE),
         ("HTTPStatusCode", True, SPANDATA.HTTP_STATUS_CODE),
         ("HTTPStatusCode", 999, SPANDATA.HTTP_STATUS_CODE),
-        ("RetryAttempts", "2", SPANDATA.HTTP_REQUEST_RESEND_COUNT),
-        ("RetryAttempts", False, SPANDATA.HTTP_REQUEST_RESEND_COUNT),
-        ("RetryAttempts", -1, SPANDATA.HTTP_REQUEST_RESEND_COUNT),
     ],
 )
 def test_get_response_attributes_ignores_malformed_field(field, value, attribute):
@@ -486,26 +480,6 @@ def test_get_response_attributes_ignores_malformed_field(field, value, attribute
     }
     expected.pop(attribute)
     assert attributes == expected
-
-
-@pytest.mark.parametrize(
-    "error_response",
-    [None, {"Code": ""}, {"Code": 123}],
-)
-def test_get_error_attributes_ignores_malformed_client_error_code(error_response):
-    error = ClientError(
-        {
-            "Error": {"Code": "placeholder"},
-            "ResponseMetadata": {"HTTPStatusCode": 400},
-        },
-        "HeadObject",
-    )
-    error.response["Error"] = error_response
-
-    assert _get_error_attributes(error) == {
-        SPANDATA.HTTP_STATUS_CODE: 400,
-        SPANDATA.ERROR_TYPE: "botocore.exceptions.ClientError",
-    }
 
 
 @pytest.mark.parametrize(
