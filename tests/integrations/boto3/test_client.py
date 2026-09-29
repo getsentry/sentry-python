@@ -13,7 +13,7 @@ import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.boto3 import Boto3Integration
 from sentry_sdk.integrations.boto3._instrumentation import _instrument_streaming_body
-from sentry_sdk.integrations.boto3.consts import ORIGIN
+from sentry_sdk.integrations.boto3.consts import AWS_RPC_SYSTEM_NAME, ORIGIN
 from sentry_sdk.integrations.stdlib import StdlibIntegration
 from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing import Span
@@ -447,7 +447,7 @@ def test_client_call_has_common_attributes(
     assert span["name" if span_streaming else "description"] == span_name
     assert attributes[SPANDATA.RPC_SERVICE] == rpc_service
     assert attributes[SPANDATA.RPC_METHOD] == rpc_method
-    assert attributes[SPANDATA.RPC_SYSTEM_NAME] == "aws-api"
+    assert attributes[SPANDATA.RPC_SYSTEM_NAME] == AWS_RPC_SYSTEM_NAME
     assert attributes[SPANDATA.CLOUD_REGION] == "eu-north-1"
     assert attributes[SPANDATA.SERVER_ADDRESS] == server_address
     assert attributes[SPANDATA.SERVER_PORT] == server_port
@@ -467,7 +467,7 @@ def test_client_call_attributes_are_available_at_span_creation(
                 "attributes": {
                     SPANDATA.RPC_METHOD: "HeadObject",
                     SPANDATA.RPC_SERVICE: "S3",
-                    SPANDATA.RPC_SYSTEM_NAME: "aws-api",
+                    SPANDATA.RPC_SYSTEM_NAME: AWS_RPC_SYSTEM_NAME,
                     SPANDATA.SERVER_ADDRESS: "s3.eu-north-1.amazonaws.com",
                     SPANDATA.SERVER_PORT: 443,
                 }

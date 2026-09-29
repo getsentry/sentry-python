@@ -4,7 +4,7 @@ from urllib.parse import urlsplit
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA, SPANSTATUS
 from sentry_sdk.integrations import DidNotEnable
-from sentry_sdk.integrations.boto3.consts import IDENTIFIER, ORIGIN
+from sentry_sdk.integrations.boto3.consts import AWS_RPC_SYSTEM_NAME, IDENTIFIER, ORIGIN
 from sentry_sdk.traces import NoOpStreamedSpan, StreamedSpan
 from sentry_sdk.tracing import BAGGAGE_HEADER_NAME, Span
 from sentry_sdk.tracing_utils import (
@@ -30,9 +30,6 @@ try:
     from botocore.response import StreamingBody
 except ImportError:
     raise DidNotEnable("botocore not installed")
-
-
-_AWS_RPC_SYSTEM_NAME = "aws-api"
 
 
 def _set_span_attributes(
@@ -103,7 +100,7 @@ def _start_client_span(
     span_name = f"aws.{service_name}.{ctx.operation_name}"
     attributes: "Attributes" = {
         SPANDATA.RPC_METHOD: ctx.operation_name,
-        SPANDATA.RPC_SYSTEM_NAME: _AWS_RPC_SYSTEM_NAME,
+        SPANDATA.RPC_SYSTEM_NAME: AWS_RPC_SYSTEM_NAME,
     }
     with capture_internal_exceptions():
         attributes.update(_get_client_attributes(ctx))
