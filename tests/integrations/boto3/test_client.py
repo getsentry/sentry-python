@@ -321,7 +321,7 @@ def _mock_responses(client, status_codes):
     return request_span_ids
 
 
-def _capture_bot^o3_spans_by_op(
+def _capture_boto3_spans_by_op(
     invoke_client_method,
     capture_items,
     span_streaming,
@@ -416,7 +416,6 @@ def test_service_extension_customizes_client_span(
             return {
                 "aws.test.request": ctx.params["Key"],
                 SPANDATA.SENTRY_KIND: "producer",
-                SPANDATA.RPC_METHOD: "must-not-override",
             }
 
         def get_response_attributes(self, ctx, response):

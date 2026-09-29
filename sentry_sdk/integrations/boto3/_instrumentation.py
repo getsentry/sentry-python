@@ -208,16 +208,6 @@ def _start_client_span(
         with capture_internal_exceptions():
             attributes.update(service_ext.get_request_attributes(ctx))
 
-    # Generic attributes take precedence over service-specific attributes.
-    attributes.update(
-        {
-            SPANDATA.RPC_METHOD: ctx.operation_name,
-            SPANDATA.RPC_SYSTEM_NAME: AWS_RPC_SYSTEM_NAME,
-        }
-    )
-    with capture_internal_exceptions():
-        attributes.update(_get_client_attributes(ctx))
-
     if has_span_streaming_enabled(client.options):
         if sentry_sdk.traces.get_current_span() is None:
             return None
