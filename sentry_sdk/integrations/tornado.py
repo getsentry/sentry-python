@@ -22,6 +22,7 @@ from sentry_sdk.utils import (
     CONTEXTVARS_ERROR_MESSAGE,
     HAS_REAL_CONTEXTVARS,
     AnnotatedValue,
+    _is_localhost,
     capture_internal_exceptions,
     ensure_integration_enabled,
     event_from_exception,
@@ -127,6 +128,15 @@ def _handle_request_impl(self: "RequestHandler") -> "Generator[None, None, None]
         processor = _make_event_processor(weak_handler)
         scope.add_event_processor(processor)
 
+        scope.set_attribute(
+            SPANDATA.SENTRY_IS_LOCALHOST,
+            _is_localhost(
+                client_ip=_get_client_ip(self.request),
+                host_header=self.request.headers.get("Host"),
+                forwarded_host_header=self.request.headers.get("X-Forwarded-Host"),
+            ),
+        )
+
         span_ctx: "ContextManager[Union[Span, StreamedSpan, None]]"
 
         if is_span_streaming_enabled:
@@ -196,6 +206,17 @@ def _handle_request_impl(self: "RequestHandler") -> "Generator[None, None, None]
                         status_int = self.get_status()
                         span.set_attribute(SPANDATA.HTTP_STATUS_CODE, status_int)
                         span.status = "error" if status_int >= 400 else "ok"
+
+
+def _get_client_ip(request: "Any") -> "Optional[str]":
+    x_forwarded_for = request.headers.get("X-Forwarded-For", "").split(",")[0].strip()
+    if x_forwarded_for:
+        return x_forwarded_for
+
+    if request.headers.get("X-Real-IP"):
+        return request.headers["X-Real-IP"]
+
+    return request.remote_ip
 
 
 def _get_request_attributes(request: "Any") -> "Dict[str, Any]":
