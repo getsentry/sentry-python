@@ -1501,8 +1501,10 @@ async def test_user_ip_address_on_all_spans(
         ("::1", ("example.com", 80), b"example.com", True),
         # Localhost host header with non-local IP
         ("203.0.113.50", ("example.com", 80), b"localhost:8000", True),
-        # Server bound to localhost
-        ("203.0.113.50", ("localhost", 8000), b"example.com", True),
+        # Server bound to localhost, but host header is public (reverse proxy)
+        ("203.0.113.50", ("localhost", 8000), b"example.com", False),
+        # Server bound to localhost, no host header (fallback to server)
+        ("203.0.113.50", ("localhost", 8000), None, True),
         # Non-local everything
         ("203.0.113.50", ("example.com", 80), b"example.com", False),
     ],
@@ -1546,7 +1548,8 @@ async def test_is_localhost_attribute(
             scope["client"] = (client_ip, 0)
             scope["server"] = server
             scope["headers"] = [(k, v) for k, v in scope["headers"] if k != b"host"]
-            scope["headers"].append((b"host", host_header))
+            if host_header is not None:
+                scope["headers"].append((b"host", host_header))
 
         await sentry_app(scope, receive, send)
 
