@@ -2229,7 +2229,7 @@ def _is_localhost(
 
     Based on the logic in relay's localhost filter.
     """
-    if client_ip is not None and client_ip in _LOCAL_IPS:
+    if client_ip is not None and client_ip.strip("[]") in _LOCAL_IPS:
         return True
 
     # URL host uses subdomain-aware matching
