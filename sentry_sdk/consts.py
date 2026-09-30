@@ -402,6 +402,48 @@ class SPANDATA:
     Example: "79b9da39-b7ae-508a-a6bc-864b2829c622"
     """
 
+    AWS_S3_BUCKET = "aws.s3.bucket"
+    """
+    The S3 bucket name the request refers to.
+    Example: "ot-demo-test"
+    """
+
+    AWS_S3_COPY_SOURCE = "aws.s3.copy_source"
+    """
+    The source object (in the form bucket/key) for the copy operation.
+    Example: "someFile.yml"
+    """
+
+    AWS_S3_DELETE = "aws.s3.delete"
+    """
+    The delete request container that specifies the objects to be deleted.
+    Example: "Objects=[{Key=string,VersionId=string},{Key=string,VersionId=string}],Quiet=boolean"
+    """
+
+    AWS_S3_KEY = "aws.s3.key"
+    """
+    The S3 object key the request refers to. Corresponds to the --key parameter of the S3 API operations.
+    Example: "someFile.yml"
+    """
+
+    AWS_S3_OBJECT_SIZE = "aws.s3.object_size"
+    """
+    The size of the S3 object in bytes.
+    Example: 434234
+    """
+
+    AWS_S3_PART_NUMBER = "aws.s3.part_number"
+    """
+    The part number of the part being uploaded in a multipart-upload operation. This is a positive integer between 1 and 10,000.
+    Example: 3456
+    """
+
+    AWS_S3_UPLOAD_ID = "aws.s3.upload_id"
+    """
+    Upload ID that identifies the multipart upload.
+    Example: "dfRtDYWFbkRONycy.Yxwh66Yjlx.cph0gtNBtJ"
+    """
+
     CACHE_HIT = "cache.hit"
     """
     A boolean indicating whether the requested data was found in the cache.
@@ -920,6 +962,12 @@ class SPANDATA:
     """
     The Query string present in the URL.
     Example: ?foo=bar&bar=baz
+    """
+
+    HTTP_RESPONSE_BODY_SIZE = "http.response.body.size"
+    """
+    The encoded body size of the response (in bytes).
+    Example: 123
     """
 
     HTTP_STATUS_CODE = "http.response.status_code"
