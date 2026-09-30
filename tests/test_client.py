@@ -1485,6 +1485,22 @@ def test_enable_tracing_deprecated(sentry_init, enable_tracing):
         sentry_init(enable_tracing=enable_tracing)
 
 
+def test_transaction_profiling_warns(sentry_init):
+    with pytest.warns(DeprecationWarning, match="Transaction-based profiling"):
+        sentry_init(profiles_sample_rate=1.0)
+
+
+def test_continuous_profiling_does_not_warn(sentry_init):
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        sentry_init(profile_session_sample_rate=1.0)
+
+    profiling_warnings = [
+        w for w in caught if "Transaction-based profiling" in str(w.message)
+    ]
+    assert profiling_warnings == []
+
+
 def test_ignore_spans_warns_without_streaming(sentry_init):
     with pytest.warns(UserWarning, match=r"`ignore_spans` parameter only works"):
         sentry_init(ignore_spans=["/health"], trace_lifecycle="static")
