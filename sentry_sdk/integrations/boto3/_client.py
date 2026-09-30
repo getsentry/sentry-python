@@ -108,7 +108,11 @@ def _patch_botocore_client() -> None:
         service_ext: "Optional[_ServiceExtension]" = None
         with capture_internal_exceptions():
             # resolve service extension for service-specific enrichment.
-            service_ext = _resolve_service(ctx.service_name)
+            service_ext = (
+                _resolve_service(ctx.service_name)
+                if ctx.service_name is not None
+                else None
+            )
 
         span: "Optional[Union[Span, StreamedSpan]]" = None
         with capture_internal_exceptions():
