@@ -89,13 +89,16 @@ def _add_mock_response(
 
 
 @pytest.fixture
-def mock_hf_text_generation_api(httpx_mock, httpx2_mock):
+def mock_hf_text_generation_api(httpx_mock, request):
     # type: () -> Any
     """Mock HuggingFace text generation API"""
 
     with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
         model_name = "test-model"
 
+        httpx2_mock = (
+            request.getfixturevalue("httpx2_mock") if HF_VERSION >= (2, 0, 0) else None
+        )
         _add_mock_response(
             httpx_mock,
             httpx2_mock,
@@ -146,7 +149,7 @@ def mock_hf_text_generation_api(httpx_mock, httpx2_mock):
 
 
 @pytest.fixture
-def mock_hf_api_with_errors(httpx_mock, httpx2_mock):
+def mock_hf_api_with_errors(httpx_mock, request):
     # type: () -> Any
     """Mock HuggingFace API that always raises errors for any request"""
 
@@ -154,6 +157,9 @@ def mock_hf_api_with_errors(httpx_mock, httpx2_mock):
         model_name = "test-model"
 
         # Mock model info endpoint with error
+        httpx2_mock = (
+            request.getfixturevalue("httpx2_mock") if HF_VERSION >= (2, 0, 0) else None
+        )
         _add_mock_response(
             httpx_mock,
             httpx2_mock,
@@ -206,13 +212,16 @@ def mock_hf_api_with_errors(httpx_mock, httpx2_mock):
 
 
 @pytest.fixture
-def mock_hf_text_generation_api_streaming(httpx_mock, httpx2_mock):
+def mock_hf_text_generation_api_streaming(httpx_mock, request):
     # type: () -> Any
     """Mock streaming HuggingFace text generation API"""
     with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
         model_name = "test-model"
 
         # Mock model info endpoint
+        httpx2_mock = (
+            request.getfixturevalue("httpx2_mock") if HF_VERSION >= (2, 0, 0) else None
+        )
         _add_mock_response(
             httpx_mock,
             httpx2_mock,
@@ -260,13 +269,16 @@ def mock_hf_text_generation_api_streaming(httpx_mock, httpx2_mock):
 
 
 @pytest.fixture
-def mock_hf_chat_completion_api(httpx_mock, httpx2_mock):
+def mock_hf_chat_completion_api(httpx_mock, request):
     # type: () -> Any
     """Mock HuggingFace chat completion API"""
     with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
         model_name = "test-model"
 
         # Mock model info endpoint
+        httpx2_mock = (
+            request.getfixturevalue("httpx2_mock") if HF_VERSION >= (2, 0, 0) else None
+        )
         _add_mock_response(
             httpx_mock,
             httpx2_mock,
@@ -327,13 +339,16 @@ def mock_hf_chat_completion_api(httpx_mock, httpx2_mock):
 
 
 @pytest.fixture
-def mock_hf_chat_completion_api_tools(httpx_mock, httpx2_mock):
+def mock_hf_chat_completion_api_tools(httpx_mock, request):
     # type: () -> Any
     """Mock HuggingFace chat completion API with tool calls."""
     with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
         model_name = "test-model"
 
         # Mock model info endpoint
+        httpx2_mock = (
+            request.getfixturevalue("httpx2_mock") if HF_VERSION >= (2, 0, 0) else None
+        )
         _add_mock_response(
             httpx_mock,
             httpx2_mock,
@@ -403,13 +418,16 @@ def mock_hf_chat_completion_api_tools(httpx_mock, httpx2_mock):
 
 
 @pytest.fixture
-def mock_hf_chat_completion_api_streaming(httpx_mock, httpx2_mock):
+def mock_hf_chat_completion_api_streaming(httpx_mock, request):
     # type: () -> Any
     """Mock streaming HuggingFace chat completion API"""
     with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
         model_name = "test-model"
 
         # Mock model info endpoint
+        httpx2_mock = (
+            request.getfixturevalue("httpx2_mock") if HF_VERSION >= (2, 0, 0) else None
+        )
         _add_mock_response(
             httpx_mock,
             httpx2_mock,
@@ -460,13 +478,16 @@ def mock_hf_chat_completion_api_streaming(httpx_mock, httpx2_mock):
 
 
 @pytest.fixture
-def mock_hf_chat_completion_api_streaming_tools(httpx_mock, httpx2_mock):
+def mock_hf_chat_completion_api_streaming_tools(httpx_mock, request):
     # type: () -> Any
     """Mock streaming HuggingFace chat completion API with tool calls."""
     with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
         model_name = "test-model"
 
         # Mock model info endpoint
+        httpx2_mock = (
+            request.getfixturevalue("httpx2_mock") if HF_VERSION >= (2, 0, 0) else None
+        )
         _add_mock_response(
             httpx_mock,
             httpx2_mock,
