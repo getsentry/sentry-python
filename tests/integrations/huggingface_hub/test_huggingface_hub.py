@@ -540,6 +540,7 @@ def mock_hf_chat_completion_api_streaming_tools(httpx_mock, request):
 @pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.httpx_mock(assert_all_requests_were_expected=False)
+@pytest.mark.httpx2_mock(assert_all_requests_were_expected=False)
 @pytest.mark.parametrize("send_default_pii", [True, False])
 @pytest.mark.parametrize("include_prompts", [True, False])
 def test_text_generation(
@@ -722,6 +723,7 @@ def test_text_generation(
 @pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.httpx_mock(assert_all_requests_were_expected=False)
+@pytest.mark.httpx2_mock(assert_all_requests_were_expected=False)
 @pytest.mark.parametrize("send_default_pii", [True, False])
 @pytest.mark.parametrize("include_prompts", [True, False])
 def test_text_generation_streaming(
@@ -903,6 +905,7 @@ def test_text_generation_streaming(
 @pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.httpx_mock(assert_all_requests_were_expected=False)
+@pytest.mark.httpx2_mock(assert_all_requests_were_expected=False)
 @pytest.mark.parametrize("send_default_pii", [True, False])
 @pytest.mark.parametrize("include_prompts", [True, False])
 def test_chat_completion(
@@ -1114,6 +1117,7 @@ def test_chat_completion(
 @pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.httpx_mock(assert_all_requests_were_expected=False)
+@pytest.mark.httpx2_mock(assert_all_requests_were_expected=False)
 @pytest.mark.parametrize("send_default_pii", [True, False])
 @pytest.mark.parametrize("include_prompts", [True, False])
 def test_chat_completion_streaming(
@@ -1331,6 +1335,7 @@ def test_chat_completion_streaming(
 @pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.httpx_mock(assert_all_requests_were_expected=False)
+@pytest.mark.httpx2_mock(assert_all_requests_were_expected=False)
 def test_chat_completion_api_error(
     sentry_init: "Any",
     capture_events: "Any",
@@ -1484,6 +1489,7 @@ def test_chat_completion_api_error(
 @pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.httpx_mock(assert_all_requests_were_expected=False)
+@pytest.mark.httpx2_mock(assert_all_requests_were_expected=False)
 def test_span_status_error(
     sentry_init: "Any",
     capture_events: "Any",
@@ -1580,6 +1586,7 @@ def test_span_status_error(
 @pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.httpx_mock(assert_all_requests_were_expected=False)
+@pytest.mark.httpx2_mock(assert_all_requests_were_expected=False)
 @pytest.mark.parametrize("send_default_pii", [True, False])
 @pytest.mark.parametrize("include_prompts", [True, False])
 def test_chat_completion_with_tools(
@@ -1788,6 +1795,7 @@ def test_chat_completion_with_tools(
 @pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.httpx_mock(assert_all_requests_were_expected=False)
+@pytest.mark.httpx2_mock(assert_all_requests_were_expected=False)
 @pytest.mark.parametrize("send_default_pii", [True, False])
 @pytest.mark.parametrize("include_prompts", [True, False])
 def test_chat_completion_streaming_with_tools(
@@ -2038,6 +2046,7 @@ DATA_COLLECTION_TOOLS = [
 
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.httpx_mock(assert_all_requests_were_expected=False)
+@pytest.mark.httpx2_mock(assert_all_requests_were_expected=False)
 @pytest.mark.parametrize(
     "data_collection,send_default_pii,include_prompts,expected_present,expected_absent",
     [
@@ -2192,6 +2201,7 @@ def test_text_generation_data_collection(
 
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.httpx_mock(assert_all_requests_were_expected=False)
+@pytest.mark.httpx2_mock(assert_all_requests_were_expected=False)
 @pytest.mark.parametrize(
     "data_collection,send_default_pii,include_prompts,expected_present,expected_absent",
     [
@@ -2348,6 +2358,7 @@ def test_text_generation_streaming_data_collection(
 
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.httpx_mock(assert_all_requests_were_expected=False)
+@pytest.mark.httpx2_mock(assert_all_requests_were_expected=False)
 @pytest.mark.parametrize(
     "data_collection,send_default_pii,include_prompts,expected_present,expected_absent",
     [
@@ -2521,6 +2532,7 @@ def test_chat_completion_data_collection_tools(
 
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.httpx_mock(assert_all_requests_were_expected=False)
+@pytest.mark.httpx2_mock(assert_all_requests_were_expected=False)
 @pytest.mark.parametrize(
     "data_collection,send_default_pii,include_prompts,expected_present,expected_absent",
     [
