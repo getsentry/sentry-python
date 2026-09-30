@@ -1311,7 +1311,7 @@ def test_uwsgi_warnings(sentry_init, recwarn, opt, missing_flags):
     uwsgi = mock.MagicMock()
     uwsgi.opt = opt
     with mock.patch.dict("sys.modules", uwsgi=uwsgi):
-        sentry_init(profiles_sample_rate=1.0)
+        sentry_init()
         if missing_flags:
             assert len(recwarn) == 1
             record = recwarn.pop()
@@ -1483,6 +1483,22 @@ def test_dropped_transaction(sentry_init, capture_record_lost_event_calls, test_
 def test_enable_tracing_deprecated(sentry_init, enable_tracing):
     with pytest.warns(DeprecationWarning):
         sentry_init(enable_tracing=enable_tracing)
+
+
+def test_transaction_profiling_warns(sentry_init):
+    with pytest.warns(DeprecationWarning, match="Transaction-based profiling"):
+        sentry_init(profiles_sample_rate=1.0)
+
+
+def test_continuous_profiling_does_not_warn(sentry_init):
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        sentry_init(profile_session_sample_rate=1.0)
+
+    profiling_warnings = [
+        w for w in caught if "Transaction-based profiling" in str(w.message)
+    ]
+    assert profiling_warnings == []
 
 
 def test_ignore_spans_warns_without_streaming(sentry_init):
