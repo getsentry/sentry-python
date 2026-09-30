@@ -2473,6 +2473,44 @@ async def test_is_localhost_attribute(
 
 
 @pytest.mark.asyncio
+async def test_user_agent_attribute(sentry_init, aiohttp_client, capture_items):
+    sentry_init(
+        integrations=[AioHttpIntegration()],
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+    )
+
+    async def hello(request):
+        with sentry_sdk.traces.start_span(name="child"):
+            pass
+        return web.Response(text="hello")
+
+    app = web.Application()
+    app.router.add_get("/", hello)
+
+    items = capture_items("span")
+
+    client = await aiohttp_client(app)
+    resp = await client.get("/", headers={"User-Agent": "TestBrowser/1.0"})
+    assert resp.status == 200
+
+    sentry_sdk.flush()
+
+    child_spans = [item.payload for item in items if not item.payload.get("is_segment")]
+    server_spans = [item.payload for item in items if item.payload.get("is_segment")]
+
+    assert len(server_spans) == 1
+    assert len(child_spans) == 1
+
+    assert (
+        server_spans[0]["attributes"][SPANDATA.USER_AGENT_ORIGINAL] == "TestBrowser/1.0"
+    )
+    assert (
+        child_spans[0]["attributes"][SPANDATA.USER_AGENT_ORIGINAL] == "TestBrowser/1.0"
+    )
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "init_kwargs, expect_remote_addr", DATA_COLLECTION_REMOTE_ADDR_CASES
 )
