@@ -7,6 +7,7 @@ from tornado.web import Application, HTTPError, RequestHandler
 import sentry_sdk
 from sentry_sdk import capture_message, start_transaction
 from sentry_sdk._types import SENSITIVE_DATA_SUBSTITUTE
+from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.tornado import TornadoIntegration
 from tests.integrations.utils import (
     DATA_COLLECTION_REMOTE_ADDR_CASES,
@@ -1136,8 +1137,6 @@ def test_is_localhost_span_attribute(
     host_header,
     is_localhost,
 ):
-    from sentry_sdk.consts import SPANDATA
-
     sentry_init(
         integrations=[TornadoIntegration()],
         traces_sample_rate=1.0,
