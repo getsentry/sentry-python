@@ -21,11 +21,11 @@ from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
     CONTEXTVARS_ERROR_MESSAGE,
     HAS_REAL_CONTEXTVARS,
+    _is_localhost,
     capture_internal_exceptions,
     ensure_integration_enabled,
     event_from_exception,
     has_data_collection_enabled,
-    is_localhost,
     parse_version,
     reraise,
 )
@@ -185,7 +185,7 @@ async def _context_enter(request: "Request") -> None:
 
     scope.set_attribute(
         SPANDATA.SENTRY_IS_LOCALHOST,
-        is_localhost(
+        _is_localhost(
             client_ip=request.remote_addr or None,
             url_host=urlsplit(request.url).hostname,
             host_header=request.headers.get("host"),
