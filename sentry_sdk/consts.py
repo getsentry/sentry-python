@@ -1164,6 +1164,14 @@ class SPANDATA:
     Example: "prod"
     """
 
+    SENTRY_IS_LOCALHOST = "sentry.is_localhost"
+    """
+    Indicates whether a telemetry item was sent on a host, device or browser on
+    a localhost URL or IP address.
+
+    Used in inbound filters.
+    """
+
     SENTRY_RELEASE = "sentry.release"
     """
     The Sentry release.
@@ -1192,6 +1200,13 @@ class SPANDATA:
     """
     A list of names identifying enabled integrations.
     Example: ["AtexitIntegration", "StdlibIntegration"]
+    """
+
+    USER_AGENT_ORIGINAL = "user_agent.original"
+    """
+    Value of the HTTP User-Agent header sent by the client.
+
+    Used in inbound filters.
     """
 
 
@@ -1238,6 +1253,7 @@ class OP:
     GEN_AI_CHAT = "gen_ai.chat"
     GEN_AI_CREATE_AGENT = "gen_ai.create_agent"
     GEN_AI_EMBEDDINGS = "gen_ai.embeddings"
+    GEN_AI_EVALUATE = "gen_ai.evaluate"
     GEN_AI_EXECUTE_TOOL = "gen_ai.execute_tool"
     GEN_AI_TEXT_COMPLETION = "gen_ai.text_completion"
     GEN_AI_HANDOFF = "gen_ai.handoff"
@@ -1848,4 +1864,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "2.70.0"
+VERSION = "2.71.0"

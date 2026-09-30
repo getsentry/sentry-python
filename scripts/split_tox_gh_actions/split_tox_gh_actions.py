@@ -95,6 +95,7 @@ GROUPS = {
         "mistral",
         "openai-base",
         "openai-notiktoken",
+        "typesafe",
     ],
     "Cloud": [
         "aws_lambda",

@@ -2418,6 +2418,62 @@ async def test_server_url_query_data_collection_event_processor(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
+    "forwarded_for, host_header, is_localhost",
+    [
+        pytest.param(None, None, True, id="loopback-ip"),
+        pytest.param(
+            "93.184.216.34", "localhost:8080", True, id="localhost-host-header"
+        ),
+        pytest.param("93.184.216.34", "example.com", False, id="non-local"),
+    ],
+)
+async def test_is_localhost_attribute(
+    sentry_init,
+    aiohttp_client,
+    capture_items,
+    forwarded_for,
+    host_header,
+    is_localhost,
+):
+    sentry_init(
+        integrations=[AioHttpIntegration()],
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+    )
+
+    async def hello(request):
+        with sentry_sdk.traces.start_span(name="child"):
+            pass
+        return web.Response(text="hello")
+
+    app = web.Application()
+    app.router.add_get("/", hello)
+
+    items = capture_items("span")
+
+    client = await aiohttp_client(app)
+    headers = {}
+    if host_header:
+        headers["Host"] = host_header
+    if forwarded_for:
+        headers["X-Forwarded-For"] = forwarded_for
+    resp = await client.get("/", headers=headers)
+    assert resp.status == 200
+
+    sentry_sdk.flush()
+
+    child_spans = [item.payload for item in items if not item.payload.get("is_segment")]
+    server_spans = [item.payload for item in items if item.payload.get("is_segment")]
+
+    assert len(server_spans) == 1
+    assert len(child_spans) == 1
+
+    assert server_spans[0]["attributes"][SPANDATA.SENTRY_IS_LOCALHOST] == is_localhost
+    assert child_spans[0]["attributes"][SPANDATA.SENTRY_IS_LOCALHOST] == is_localhost
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
     "init_kwargs, expect_remote_addr", DATA_COLLECTION_REMOTE_ADDR_CASES
 )
 async def test_remote_addr_data_collection(

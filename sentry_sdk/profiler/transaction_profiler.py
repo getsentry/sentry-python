@@ -290,12 +290,11 @@ class Profile:
                 sample_rate = options["profiles_sampler"](sampling_context)
             except Exception:
                 logger.warning(
-                    "[Profiling] profiles_sampler raised; falling back to profiles_sample_rate",
+                    "[Profiling] profiles_sampler raised; unsampling profile",
                     exc_info=True,
                 )
-                sample_rate = options["profiles_sample_rate"]
-                if sample_rate is None:
-                    sample_rate = options["_experiments"].get("profiles_sample_rate")
+                self.sampled = False
+                return
         elif options["profiles_sample_rate"] is not None:
             sample_rate = options["profiles_sample_rate"]
         else:
