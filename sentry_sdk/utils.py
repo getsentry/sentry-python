@@ -101,7 +101,7 @@ be affected by this limit if they have a custom recursion limit.
 """
 
 _LOCAL_IPS = frozenset({"127.0.0.1", "::1"})
-_LOCAL_DOMAINS = frozenset({"localhost", "127.0.0.1"})
+_LOCAL_DOMAINS = _LOCAL_IPS.union({"localhost"})
 
 
 def env_to_bool(value: "Any", *, strict: "Optional[bool]" = False) -> "bool | None":
@@ -2236,9 +2236,13 @@ def _is_localhost(
     if url_host is not None and _host_matches_local_domain(url_host):
         return True
 
-    for header_val in (host_header, forwarded_host_header):
-        if header_val is not None:
-            domain = header_val.split(":")[0]
+    for header in (host_header, forwarded_host_header):
+        if header is not None:
+            if header.startswith("["):
+                # Bracketed IPv6, e.g. [::1]:8080 or [::1]
+                domain = header.split("]")[0].strip("[]")
+            else:
+                domain = header.split(":")[0]
             if _host_matches_local_domain(domain):
                 return True
 
