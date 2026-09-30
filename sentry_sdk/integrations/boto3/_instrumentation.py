@@ -25,13 +25,14 @@ from sentry_sdk.utils import (
 )
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, Optional, Union
+    from typing import Any, Dict, Mapping, Optional, Union
 
     from sentry_sdk._types import Attributes
     from sentry_sdk.integrations.boto3._context import AwsCallContext
 
 try:
     from botocore.awsrequest import AWSRequest
+    from botocore.exceptions import ClientError
     from botocore.response import StreamingBody
 except ImportError:
     raise DidNotEnable("botocore not installed")
@@ -40,6 +41,11 @@ except ImportError:
 def _set_span_attributes(
     span: "Union[Span, StreamedSpan]", attributes: "Attributes"
 ) -> None:
+    """
+    Will be removed in the next major version (3.0). This helper makes
+    it easier to migrate to `StreamedSpan` without having to remove
+    multiple conditional blocks intertwined with other logic.
+    """
     if isinstance(span, StreamedSpan):
         span.set_attributes(attributes)
         return
@@ -83,6 +89,82 @@ def _get_client_attributes(
         attributes[SPANDATA.CLOUD_REGION] = ctx.region_name
 
     attributes.update(_get_server_attributes(ctx.endpoint_url))
+    return attributes
+
+
+def _get_response_attributes(response: "Mapping[str, Any]") -> "Attributes":
+    metadata = response.get("ResponseMetadata", {})
+    attributes: "Attributes" = {}
+
+    # botocore injects HTTP status into `ResponseMetadata` after parsing.
+    # https://github.com/boto/botocore/blob/358f8eec8c76201bb1a7a35644abcbc9036de7ed/botocore/parsers.py#L273-L284
+    status_code = metadata.get("HTTPStatusCode")
+    if isinstance(status_code, int) and 100 <= status_code <= 599:
+        attributes[SPANDATA.HTTP_STATUS_CODE] = status_code
+
+    retry_attempts = metadata.get("RetryAttempts", 0)
+    if retry_attempts > 0:
+        attributes[SPANDATA.HTTP_REQUEST_RESEND_COUNT] = retry_attempts
+
+    headers = metadata.get("HTTPHeaders", {})
+
+    request_id = next(
+        (
+            value
+            for value in (
+                metadata.get("RequestId"),
+                headers.get("x-amzn-requestid"),
+                headers.get("x-amzn-request-id"),
+                headers.get("x-amz-request-id"),
+            )
+            if isinstance(value, str) and value
+        ),
+        None,
+    )
+    if request_id is not None:
+        attributes[SPANDATA.AWS_REQUEST_ID] = request_id
+
+    # S3's `HostId` is the extended request ID returned in `x-amz-id-2`.
+    # https://docs.aws.amazon.com/AmazonS3/latest/developerguide/get-request-ids.html
+    extended_request_id = next(
+        (
+            value
+            for value in (metadata.get("HostId"), headers.get("x-amz-id-2"))
+            if isinstance(value, str) and value
+        ),
+        None,
+    )
+    if extended_request_id is not None:
+        attributes[SPANDATA.AWS_EXTENDED_REQUEST_ID] = extended_request_id
+
+    return attributes
+
+
+def _get_error_type(exception: "BaseException") -> str:
+    if isinstance(exception, ClientError):
+        # `ClientError` wraps AWS service errors; `Error.Code` identifies the
+        # actual service error, e.g. `AccessDeniedException`.
+        # https://docs.aws.amazon.com/boto3/latest/guide/error-handling.html
+        error_code: "Optional[str]" = exception.response.get("Error", {}).get("Code")
+        if error_code:
+            return error_code
+
+    # failures before a service response have no AWS error code.
+    # https://opentelemetry.io/docs/specs/semconv/rpc/rpc-spans/
+    exception_type = type(exception)
+    exception_name = exception_type.__qualname__
+    exception_module = exception_type.__module__
+    if exception_module not in ("builtins", "__builtins__"):
+        return f"{exception_module}.{exception_name}"
+    return exception_name
+
+
+def _get_error_attributes(exception: "BaseException") -> "Attributes":
+    attributes: "Attributes" = {}
+    if isinstance(exception, ClientError):
+        attributes.update(_get_response_attributes(exception.response))
+
+    attributes[SPANDATA.ERROR_TYPE] = _get_error_type(exception)
     return attributes
 
 
@@ -200,6 +282,12 @@ def _instrument_streaming_body(
 
         finished = True
         # finish stream span before boto span, and only once across read/close.
+        if error is not None:
+            with capture_internal_exceptions():
+                attributes = _get_error_attributes(error)
+                _set_span_attributes(streaming_span, attributes)
+                _set_span_attributes(span, attributes)
+
         _finish_span(streaming_span, error)
         _finish_span(span, error)
 
@@ -336,7 +424,7 @@ def _sentry_request_created(
     """
 
     client = sentry_sdk.get_client()
-    if client.get_integration("boto3") is None:
+    if client.get_integration(IDENTIFIER) is None:
         return
 
     with capture_internal_exceptions():
@@ -364,7 +452,7 @@ def _sentry_before_sign(
     request: "AWSRequest", signature_version: "Any", **kwargs: "Any"
 ) -> None:
     client = sentry_sdk.get_client()
-    if client.get_integration("boto3") is None:
+    if client.get_integration(IDENTIFIER) is None:
         return
 
     with capture_internal_exceptions():
