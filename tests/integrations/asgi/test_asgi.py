@@ -477,56 +477,35 @@ async def test_auto_session_tracking_with_aggregates(
     assert len(session_aggregates) == 1
 
 
-@pytest.mark.parametrize(
-    "url,transaction_style,expected_transaction,expected_source",
-    [
-        (
-            "/message",
-            "url",
-            "generic ASGI request",
-            "route",
-        ),
-        (
-            "/message",
-            "endpoint",
-            "tests.integrations.asgi.test_asgi.asgi3_app.<locals>.app",
-            "component",
-        ),
-    ],
-)
 @pytest.mark.asyncio
 async def test_transaction_style(
     sentry_init,
     asgi3_app,
     capture_items,
-    url,
-    transaction_style,
-    expected_transaction,
-    expected_source,
 ):
     sentry_init(
         send_default_pii=True,
         traces_sample_rate=1.0,
     )
-    app = SentryAsgiMiddleware(asgi3_app, transaction_style=transaction_style)
+    app = SentryAsgiMiddleware(asgi3_app)
 
     scope = {
         "endpoint": asgi3_app,
-        "route": url,
+        "route": "/message",
         "client": ("127.0.0.1", 60457),
     }
 
     async with TestClient(app, scope=scope) as client:
         items = capture_items("span")
-        await client.get(url)
+        await client.get("/message")
 
     sentry_sdk.flush()
 
     assert len(items) == 1
     span = items[0].payload
 
-    assert span["name"] == expected_transaction
-    assert span["attributes"]["sentry.segment.name.source"] == expected_source
+    assert span["name"] == "generic ASGI request"
+    assert span["attributes"]["sentry.segment.name.source"] == "route"
 
 
 def mock_asgi2_app():
@@ -1053,7 +1032,7 @@ async def test_transaction_name(
 
     items = capture_items("span")
 
-    app = SentryAsgiMiddleware(asgi3_app, transaction_style=transaction_style)
+    app = SentryAsgiMiddleware(asgi3_app)
 
     async with TestClient(app) as client:
         await client.get(request_url)
@@ -1070,29 +1049,8 @@ async def test_transaction_name(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "request_url, transaction_style,expected_transaction_name,expected_transaction_source",
-    [
-        (
-            "/message/123456",
-            "endpoint",
-            "/message/123456",
-            "url",
-        ),
-        (
-            "/message/123456",
-            "url",
-            "/message/123456",
-            "url",
-        ),
-    ],
-)
 async def test_transaction_name_in_traces_sampler(
     sentry_init,
-    request_url,
-    transaction_style,
-    expected_transaction_name,
-    expected_transaction_source,
     asgi3_app,
 ):
     """
@@ -1101,23 +1059,18 @@ async def test_transaction_name_in_traces_sampler(
     """
 
     def dummy_traces_sampler(sampling_context):
-        assert (
-            sampling_context["transaction_context"]["name"] == expected_transaction_name
-        )
-        assert (
-            sampling_context["transaction_context"]["source"]
-            == expected_transaction_source
-        )
+        assert sampling_context["transaction_context"]["name"] == "/message/123456"
+        assert sampling_context["transaction_context"]["source"] == "url"
 
     sentry_init(
         traces_sampler=dummy_traces_sampler,
         traces_sample_rate=1.0,
     )
 
-    app = SentryAsgiMiddleware(asgi3_app, transaction_style=transaction_style)
+    app = SentryAsgiMiddleware(asgi3_app)
 
     async with TestClient(app) as client:
-        await client.get(request_url)
+        await client.get("/message/123456")
 
 
 @pytest.mark.asyncio
