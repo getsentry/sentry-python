@@ -133,4 +133,4 @@ def _patch_botocore_client() -> None:
         return parsed
 
     BaseClient.__init__ = sentry_patched_init  # type: ignore
-    BaseClient._make_api_call =  sentry_patched_make_api_call  # type: ignore
+    BaseClient._make_api_call = sentry_patched_make_api_call  # type: ignore
