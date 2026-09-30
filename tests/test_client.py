@@ -1485,6 +1485,12 @@ def test_enable_tracing_deprecated(sentry_init, enable_tracing):
         sentry_init(enable_tracing=enable_tracing)
 
 
+@pytest.mark.parametrize("send_default_pii", [True, False])
+def test_send_default_pii_deprecated(sentry_init, send_default_pii):
+    with pytest.warns(DeprecationWarning):
+        sentry_init(send_default_pii=send_default_pii)
+
+
 def test_ignore_spans_warns_without_streaming(sentry_init):
     with pytest.warns(UserWarning, match=r"`ignore_spans` parameter only works"):
         sentry_init(ignore_spans=["/health"], trace_lifecycle="static")
