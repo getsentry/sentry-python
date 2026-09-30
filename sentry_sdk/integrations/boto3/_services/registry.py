@@ -8,14 +8,12 @@ if TYPE_CHECKING:
 
 # when py 3.15 drops, we might want to take a look at using
 # a lazy-loading approach using the new `lazy` keyword.
-# e.g. {"s3": _S3Extension}
+# e.g. {"s3": _S3Extension()}
 _SERVICE_EXTENSIONS: "Dict[str, _ServiceExtension]" = {}
 
 
 def _resolve_service(
     service_name: "str",
 ) -> "Optional[_ServiceExtension]":
-    if service_name in _SERVICE_EXTENSIONS:
-        return _SERVICE_EXTENSIONS[service_name]
     # preserve generic instrumentation when lookup fails.
-    return None
+    return _SERVICE_EXTENSIONS.get(service_name)
