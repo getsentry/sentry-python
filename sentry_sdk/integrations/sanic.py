@@ -193,6 +193,10 @@ async def _context_enter(request: "Request") -> None:
         ),
     )
 
+    user_agent = request.headers.get("user-agent")
+    if user_agent:
+        scope.set_attribute(SPANDATA.USER_AGENT_ORIGINAL, user_agent)
+
     if is_span_streaming_enabled:
         integration = client.get_integration(SanicIntegration)
         if (

@@ -137,6 +137,10 @@ def _handle_request_impl(self: "RequestHandler") -> "Generator[None, None, None]
             ),
         )
 
+        user_agent = headers.get("User-Agent")
+        if user_agent:
+            scope.set_attribute(SPANDATA.USER_AGENT_ORIGINAL, user_agent)
+
         span_ctx: "ContextManager[Union[Span, StreamedSpan, None]]"
 
         if is_span_streaming_enabled:
