@@ -1164,6 +1164,14 @@ class SPANDATA:
     Example: "prod"
     """
 
+    SENTRY_IS_LOCALHOST = "sentry.is_localhost"
+    """
+    Indicates whether a telemetry item was sent on a host, device or browser on
+    a localhost URL or IP address.
+
+    Used in inbound filters.
+    """
+
     SENTRY_RELEASE = "sentry.release"
     """
     The Sentry release.
