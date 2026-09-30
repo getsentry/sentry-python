@@ -1422,6 +1422,9 @@ def test_package_version_is_none():
         ({"client_ip": "10.0.0.1"}, False),
         ({"client_ip": "8.8.8.8"}, False),
         ({"client_ip": "::2"}, False),
+        # Bracketed IPv6 (e.g. from Sanic's Forwarded header parsing)
+        ({"client_ip": "[::1]"}, True),
+        ({"client_ip": "[::2]"}, False),
         # URL host (subdomain-aware matching)
         ({"url_host": "localhost"}, True),
         ({"url_host": "127.0.0.1"}, True),
