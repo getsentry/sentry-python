@@ -23,6 +23,7 @@ from sentry_sdk.utils import (
     get_error_message,
     get_git_revision,
     get_lines_from_file,
+    is_localhost,
     is_sentry_url,
     is_valid_sample_rate,
     logger,
@@ -1409,3 +1410,50 @@ def test_safe_serialize_object():
 
 def test_package_version_is_none():
     assert package_version("non_existent_package") is None
+
+
+@pytest.mark.parametrize(
+    "kwargs, expected",
+    [
+        # Client IP matches
+        ({"client_ip": "127.0.0.1"}, True),
+        ({"client_ip": "::1"}, True),
+        ({"client_ip": "192.168.1.1"}, False),
+        ({"client_ip": "10.0.0.1"}, False),
+        ({"client_ip": "8.8.8.8"}, False),
+        ({"client_ip": "::2"}, False),
+        # URL host (subdomain-aware matching)
+        ({"url_host": "localhost"}, True),
+        ({"url_host": "127.0.0.1"}, True),
+        ({"url_host": "foo.localhost"}, True),
+        ({"url_host": "bar.foo.localhost"}, True),
+        ({"url_host": "foolocalhost"}, False),
+        ({"url_host": "notlocalhost"}, False),
+        ({"url_host": "example.com"}, False),
+        # Host header (exact match after port strip, no subdomain matching)
+        ({"host_header": "localhost"}, True),
+        ({"host_header": "localhost:3000"}, True),
+        ({"host_header": "127.0.0.1:8080"}, True),
+        ({"host_header": "example.com"}, False),
+        ({"host_header": "localhost.example.com"}, False),
+        # X-Forwarded-Host header
+        ({"forwarded_host_header": "localhost"}, True),
+        ({"forwarded_host_header": "localhost:3000"}, True),
+        ({"forwarded_host_header": "127.0.0.1:8080"}, True),
+        ({"forwarded_host_header": "example.com"}, False),
+        # No args
+        ({}, False),
+        # All non-local
+        (
+            {
+                "client_ip": "8.8.8.8",
+                "url_host": "example.com",
+                "host_header": "example.com",
+                "forwarded_host_header": "example.com",
+            },
+            False,
+        ),
+    ],
+)
+def test_is_localhost(kwargs, expected):
+    assert is_localhost(**kwargs) is expected

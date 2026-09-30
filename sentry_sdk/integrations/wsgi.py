@@ -21,6 +21,7 @@ from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
     has_data_collection_enabled,
+    is_localhost,
     nullcontext,
     reraise,
 )
@@ -125,6 +126,18 @@ class SentryWsgiMiddleware:
                                 environ, self.use_x_forwarded_for
                             )
                         )
+
+                    scope.set_attribute(
+                        SPANDATA.SENTRY_IS_LOCALHOST,
+                        is_localhost(
+                            client_ip=get_client_ip(environ),
+                            url_host=environ.get("SERVER_NAME")
+                            if not environ.get("HTTP_HOST")
+                            else None,
+                            host_header=environ.get("HTTP_HOST"),
+                            forwarded_host_header=environ.get("HTTP_X_FORWARDED_HOST"),
+                        ),
+                    )
 
                     method = environ.get("REQUEST_METHOD", "").upper()
 
