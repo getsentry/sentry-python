@@ -427,7 +427,6 @@ def patch_asgi_app(root_path_in_path: "_RootPathInPath") -> None:
         middleware = SentryAsgiMiddleware(
             lambda *a, **kw: old_app(self, *a, **kw),
             mechanism_type=StarletteIntegration.identifier,
-            transaction_style=integration.transaction_style,
             span_origin=StarletteIntegration.origin,
             http_methods_to_capture=(
                 integration.http_methods_to_capture

@@ -76,7 +76,6 @@ class SentryStarliteASGIMiddleware(SentryAsgiMiddleware):
     ) -> None:
         super().__init__(
             app=app,
-            transaction_style="endpoint",
             mechanism_type="asgi",
             span_origin=span_origin,
             asgi_version=3,
