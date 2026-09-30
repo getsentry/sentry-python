@@ -22,10 +22,9 @@ from sentry_sdk.traces import NoOpStreamedSpan, StreamedSpan
 from sentry_sdk.utils import capture_internal_exceptions
 
 if TYPE_CHECKING:
-    from typing import Any, Iterator, Optional, Union
+    from typing import Any, Dict, Iterator, Optional, Union
 
     from sentry_sdk._types import Attributes
-    from sentry_sdk.integrations.boto3._services.base import _ServiceExtension
     from sentry_sdk.tracing import Span
 
 try:
@@ -40,12 +39,12 @@ def _activate_client_span(
     span: "Union[Span, StreamedSpan]",
 ) -> "Iterator[Union[Span, StreamedSpan]]":
     """
-    Activate the boto span temporarily during `_make_api_call()` without ending it.
+    Activate the client span temporarily during `_make_api_call()` without ending it.
 
     Botocore returns a `StreamingBody` before its bytes are consumed. Using the
     context manager would finish it as soon as `_make_api_call()` returns, so
     restore the caller's span here and let the `StreamingBody` wrapper finish
-    the boto span when body is consumed/closed.
+    the client span when the body is consumed or closed.
 
     faulty:                               desired:
            boto3  [_make_api_call]                boto3  [_make_api_call------]
@@ -80,13 +79,13 @@ def _patch_botocore_client() -> None:
 
     def sentry_patched_init(self: "BaseClient", *args: "Any", **kwargs: "Any") -> None:
         orig_init(self, *args, **kwargs)
-        meta = self.meta
-        meta.events.register("request-created", _sentry_request_created)
-        # run after other `before-sign` handlers so existing baggage is preserved.
-        meta.events.register_last("before-sign", _sentry_before_sign)
+        with capture_internal_exceptions():
+            self.meta.events.register("request-created", _sentry_request_created)
+            # run after other `before-sign` handlers so existing baggage is preserved.
+            self.meta.events.register_last("before-sign", _sentry_before_sign)
 
     def sentry_patched_make_api_call(
-        self: "BaseClient", operation_name: str, api_params: "Any"
+        self: "BaseClient", operation_name: str, api_params: "Dict[str, Any]"
     ) -> "Any":
         """
         Track a single API call, including retries, serialization, and endpoint
@@ -99,23 +98,13 @@ def _patch_botocore_client() -> None:
         if client.get_integration(IDENTIFIER) is None:
             return orig_make_api_call(self, operation_name, api_params)
 
-        ctx = AwsCallContext(operation_name, api_params)
-
-        # add optional metadata to context.
-        with capture_internal_exceptions():
-            ctx.add_metadata(self)
-
-        service_ext: "Optional[_ServiceExtension]" = None
-        with capture_internal_exceptions():
-            # resolve service extension for service-specific enrichment.
-            service_ext = (
-                _resolve_service(ctx.service_name)
-                if ctx.service_name is not None
-                else None
-            )
-
         span: "Optional[Union[Span, StreamedSpan]]" = None
         with capture_internal_exceptions():
+            ctx = AwsCallContext(operation_name, api_params)
+            with capture_internal_exceptions():
+                # add optional metadata to the context, e.g. service-name, region-name, etc.
+                ctx.add_metadata(self)
+            service_ext = _resolve_service(ctx.service_name)
             span = _start_client_span(ctx, service_ext)
 
         if span is None:
