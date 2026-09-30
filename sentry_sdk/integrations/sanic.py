@@ -25,6 +25,7 @@ from sentry_sdk.utils import (
     ensure_integration_enabled,
     event_from_exception,
     has_data_collection_enabled,
+    is_localhost,
     parse_version,
     reraise,
 )
@@ -181,6 +182,16 @@ async def _context_enter(request: "Request") -> None:
     scope = request.ctx._sentry_scope.__enter__()
     scope.clear_breadcrumbs()
     scope.add_event_processor(_make_request_processor(weak_request))
+
+    scope.set_attribute(
+        SPANDATA.SENTRY_IS_LOCALHOST,
+        is_localhost(
+            client_ip=request.remote_addr or None,
+            url_host=urlsplit(request.url).hostname,
+            host_header=request.headers.get("host"),
+            forwarded_host_header=request.headers.get("x-forwarded-host"),
+        ),
+    )
 
     if is_span_streaming_enabled:
         integration = client.get_integration(SanicIntegration)
