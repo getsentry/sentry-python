@@ -1,13 +1,3 @@
-"""Registry for the optional service extensions.
-
-The registry maps botocore service names, such as ``s3``, to extension
-classes. It is intentionally static: the number of extensions is small, and
-loading service modules dynamically would add complexity for little benefit.
-
-Not every AWS service needs an extension. When a service is not in this map,
-the caller receives ``None`` and keeps the generic instrumentation.
-"""
-
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
