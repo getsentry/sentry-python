@@ -46,6 +46,7 @@ from sentry_sdk.utils import (
     AnnotatedValue,
     _get_aws_sigv4_signed_headers_from_authorization_header,
     _get_aws_sigv4_signed_headers_from_url_query_string,
+    _is_localhost,
     _register_control_flow_exception,
     capture_internal_exceptions,
     ensure_integration_enabled,
@@ -145,6 +146,17 @@ class AioHttpIntegration(Integration):
                     scope.generate_propagation_context()
                     scope.clear_breadcrumbs()
                     scope.add_event_processor(_make_request_processor(weak_request))
+
+                    scope.set_attribute(
+                        SPANDATA.SENTRY_IS_LOCALHOST,
+                        _is_localhost(
+                            client_ip=_get_client_ip(request),
+                            host_header=request.headers.get("Host"),
+                            forwarded_host_header=request.headers.get(
+                                "X-Forwarded-Host"
+                            ),
+                        ),
+                    )
 
                     headers = dict(request.headers)
 
@@ -641,6 +653,17 @@ def _make_request_processor(
         return event
 
     return aiohttp_processor
+
+
+def _get_client_ip(request: "Request") -> "Optional[str]":
+    x_forwarded_for = request.headers.get("X-Forwarded-For", "").split(",")[0].strip()
+    if x_forwarded_for:
+        return x_forwarded_for
+
+    if request.headers.get("X-Real-IP"):
+        return request.headers["X-Real-IP"]
+
+    return request.remote
 
 
 def _capture_exception() -> "ExcInfo":
