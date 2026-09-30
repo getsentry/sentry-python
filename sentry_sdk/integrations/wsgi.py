@@ -131,7 +131,9 @@ class SentryWsgiMiddleware:
                         SPANDATA.SENTRY_IS_LOCALHOST,
                         _is_localhost(
                             client_ip=get_client_ip(environ),
-                            url_host=environ.get("SERVER_NAME"),
+                            url_host=environ.get("SERVER_NAME")
+                            if not environ.get("HTTP_HOST")
+                            else None,
                             host_header=environ.get("HTTP_HOST"),
                             forwarded_host_header=environ.get("HTTP_X_FORWARDED_HOST"),
                         ),
