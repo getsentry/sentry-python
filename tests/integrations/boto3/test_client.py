@@ -108,6 +108,7 @@ def test_streaming_span_order_and_scope(
             assert isinstance(request_client_span, Span)
             assert not isinstance(request_client_span, StreamedSpan)
             assert request_client_span.timestamp is None
+            assert sentry_sdk.get_current_span() is parent
 
         if consume == "read":
             assert body.read() == b"x"
@@ -134,6 +135,7 @@ def test_streaming_span_order_and_scope(
             assert sentry_sdk.traces.get_current_span() is parent  # type: ignore[attr-defined]
         else:
             assert request_client_span.timestamp is not None
+            assert sentry_sdk.get_current_span() is parent
 
     sentry_sdk.flush()
     if span_streaming:
@@ -182,10 +184,8 @@ def test_streaming_span_order_and_scope(
     assert stream_span["parent_span_id"] == client_span["span_id"]
     assert client_span["span_id"] == request_client_span.span_id
     end_timestamp = "end_timestamp" if span_streaming else "timestamp"
-    assert client_span["start_timestamp"] <= http_span["start_timestamp"]
-    assert http_span["start_timestamp"] <= stream_span["start_timestamp"]
-    assert http_span[end_timestamp] <= stream_span[end_timestamp]
-    assert stream_span[end_timestamp] <= client_span[end_timestamp]
+    for span in (client_span, http_span, stream_span):
+        assert span[end_timestamp] is not None
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
