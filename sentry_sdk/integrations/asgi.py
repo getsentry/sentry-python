@@ -246,6 +246,12 @@ class SentryAsgiMiddleware:
                         ),
                     )
 
+                    if headers.get("user-agent"):
+                        sentry_scope.set_attribute(
+                            SPANDATA.USER_AGENT_ORIGINAL,
+                            headers["user-agent"],
+                        )
+
                     ty = scope["type"]
                     (
                         transaction_name,
