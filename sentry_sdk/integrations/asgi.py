@@ -48,6 +48,7 @@ from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
     has_data_collection_enabled,
+    is_localhost,
     logger,
     nullcontext,
     qualname_from_function,
@@ -231,6 +232,18 @@ class SentryAsgiMiddleware:
                     sentry_scope._name = "asgi"
                     processor = partial(self.event_processor, asgi_scope=scope)
                     sentry_scope.add_event_processor(processor)
+
+                    headers = _get_headers(scope)
+                    server = scope.get("server")
+                    sentry_scope.set_attribute(
+                        SPANDATA.SENTRY_IS_LOCALHOST,
+                        is_localhost(
+                            client_ip=_get_ip(scope) if scope.get("client") else None,
+                            url_host=server[0] if server else None,
+                            host_header=headers.get("host"),
+                            forwarded_host_header=headers.get("x-forwarded-host"),
+                        ),
+                    )
 
                     ty = scope["type"]
                     (
