@@ -1202,6 +1202,13 @@ class SPANDATA:
     Example: ["AtexitIntegration", "StdlibIntegration"]
     """
 
+    USER_AGENT_ORIGINAL = "user_agent.original"
+    """
+    Value of the HTTP User-Agent header sent by the client.
+
+    Used in inbound filters.
+    """
+
 
 class SPANSTATUS:
     """

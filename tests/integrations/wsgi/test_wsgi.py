@@ -1361,7 +1361,7 @@ def test_error_event_no_user_ip_address_without_remote_addr(
         ),
     ],
 )
-def test_is_localhost_span_attribute(
+def test_is_localhost_attribute(
     sentry_init, capture_items, client_kwargs, is_localhost
 ):
     def dogpark(environ, start_response):
@@ -1384,3 +1384,30 @@ def test_is_localhost_span_attribute(
 
     assert server_span["attributes"]["sentry.is_localhost"] is is_localhost
     assert child_span["attributes"]["sentry.is_localhost"] is is_localhost
+
+
+def test_user_agent_attribute(sentry_init, capture_items):
+    def dogpark(environ, start_response):
+        with sentry_sdk.traces.start_span(name="child-span"):
+            pass
+        start_response("200 OK", [])
+        return ["woof"]
+
+    sentry_init(
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+    )
+
+    app = SentryWsgiMiddleware(dogpark)
+    client = Client(app)
+
+    items = capture_items("span")
+
+    client.get("/dogs/", headers={"User-Agent": "TestBrowser/1.0"})
+
+    sentry_sdk.flush()
+
+    child_span, server_span = [item.payload for item in items]
+
+    assert server_span["attributes"]["user_agent.original"] == "TestBrowser/1.0"
+    assert child_span["attributes"]["user_agent.original"] == "TestBrowser/1.0"

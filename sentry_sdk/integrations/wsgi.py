@@ -138,6 +138,10 @@ class SentryWsgiMiddleware:
                             forwarded_host_header=environ.get("HTTP_X_FORWARDED_HOST"),
                         ),
                     )
+                    if environ.get("HTTP_USER_AGENT"):
+                        scope.set_attribute(
+                            SPANDATA.USER_AGENT_ORIGINAL, environ["HTTP_USER_AGENT"]
+                        )
 
                     method = environ.get("REQUEST_METHOD", "").upper()
 
