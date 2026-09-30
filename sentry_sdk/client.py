@@ -403,6 +403,21 @@ def _get_options(*args: "Optional[str]", **kwargs: "Any") -> "Dict[str, Any]":
             stacklevel=2,
         )
 
+    if has_profiling_enabled(rv):
+        warnings.warn(
+            "Transaction-based profiling is deprecated and will be removed in the next major version of the SDK. "
+            "Please use continuous profiling instead: https://docs.sentry.io/platforms/python/profiling/",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        if has_span_streaming_enabled(rv):
+            warnings.warn(
+                "Transaction-based profiling has no effect when `trace_lifecycle` is set to `stream`. "
+                "Please use continuous profiling instead: https://docs.sentry.io/platforms/python/profiling/",
+                UserWarning,
+                stacklevel=2,
+            )
+
     return rv
 
 

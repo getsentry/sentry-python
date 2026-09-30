@@ -74,6 +74,7 @@ typing = [
     { name = "types-redis" },
     { name = "types-setuptools", specifier = "<71" },
     { name = "types-webob" },
+    { name = "typesafe-sdk", specifier = ">=0.7.2" },
     { name = "unleashclient", specifier = "<6" },
     { name = "urllib3", specifier = ">=1.26.11" },
     { name = "werkzeug" },
@@ -3134,6 +3135,22 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/76/a1/1a59336b438fc6dbc704e5c6cac5ff142695d7ad57d4277ac23c9ee49719/types_webob-1.8.11.20260827.tar.gz", hash = "sha256:bf64dd5fc0a8f96372614f7c7f064ef436a0ee32cb0b7b3e66682a15a0c65364", size = 24180, upload-time = "2026-08-27T12:06:25.517Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/38/98/4c6432692652554556ab468ac03cacadeb752fb736d9d85f86757fbda606/types_webob-1.8.11.20260827-py3-none-any.whl", hash = "sha256:11f34c64d2076013abd327c9a1d62e0a4f2ae07c59ceeec27a7e978f49d89f29", size = 28704, upload-time = "2026-08-27T12:06:24.675Z" },
+]
+
+[[package]]
+name = "typesafe-sdk"
+version = "0.7.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "httpx2" },
+    { name = "pydantic" },
+    { name = "pydantic-core" },
+    { name = "tenacity" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/42/ac/8bad2c02c038b85039cdb198ba106650d54bade0c0c986c68dc6e9cef8c3/typesafe_sdk-0.7.2.tar.gz", hash = "sha256:2434f4af5cdfc45d6ab5ff27048e8b257207f786b60456e69995e345b32e77e1", size = 23169, upload-time = "2026-09-26T21:20:24.988Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/99/5e/2b97ba9b0b77612e3a480ddb60c0c0325b4809ef57a7b565341d65ef7bec/typesafe_sdk-0.7.2-py3-none-any.whl", hash = "sha256:0a961148187d52e18276ed7f2d02617cfac48e3b97673cb631a8749397d43d1e", size = 36448, upload-time = "2026-09-26T21:20:23.511Z" },
 ]
 
 [[package]]

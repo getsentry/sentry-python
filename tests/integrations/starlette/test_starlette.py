@@ -1025,7 +1025,7 @@ def test_transaction_style(
     assert event["transaction_info"] == {"source": expected_source}
 
 
-def test_host_route_path_has_url_source(sentry_init, capture_events):
+def test_hosted_route_transaction_info(sentry_init, capture_events):
     sentry_init(
         integrations=[StarletteIntegration(transaction_style="url")],
         traces_sample_rate=1.0,
@@ -1046,8 +1046,13 @@ def test_host_route_path_has_url_source(sentry_init, capture_events):
     client.get("/users/123456", headers={"Host": "subapp"})
 
     (event,) = events
-    assert event["transaction"].endswith("/users/123456")
-    assert event["transaction_info"] == {"source": "url"}
+    # Starlette starting setting scope["route"] with https://github.com/Kludex/starlette/commit/9c594b56e8da9c3d8c35baa40f357e7bc94f6d02
+    if STARLETTE_VERSION >= (1, 7):
+        assert event["transaction"] == "/users/{user_id}"
+        assert event["transaction_info"] == {"source": "route"}
+    else:
+        assert event["transaction"].endswith("/users/123456")
+        assert event["transaction_info"] == {"source": "url"}
 
 
 @pytest.mark.parametrize(
