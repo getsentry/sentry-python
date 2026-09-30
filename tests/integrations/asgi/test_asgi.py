@@ -1229,3 +1229,77 @@ async def test_user_ip_address_on_all_spans(
     else:
         assert "user.ip_address" not in server_span["attributes"]
         assert "user.ip_address" not in child_span["attributes"]
+
+
+@pytest.mark.parametrize(
+    "client_ip, server, host_header, is_localhost",
+    [
+        # Loopback IP
+        ("127.0.0.1", ("example.com", 80), b"example.com", True),
+        # IPv6 loopback
+        ("::1", ("example.com", 80), b"example.com", True),
+        # Localhost host header with non-local IP
+        ("203.0.113.50", ("example.com", 80), b"localhost:8000", True),
+        # Server bound to localhost, but host header is public (reverse proxy)
+        ("203.0.113.50", ("localhost", 8000), b"example.com", False),
+        # Server bound to localhost, no host header (fallback to server)
+        ("203.0.113.50", ("localhost", 8000), None, True),
+        # Non-local everything
+        ("203.0.113.50", ("example.com", 80), b"example.com", False),
+    ],
+)
+@pytest.mark.asyncio
+async def test_is_localhost_attribute(
+    sentry_init,
+    capture_items,
+    client_ip,
+    server,
+    host_header,
+    is_localhost,
+):
+    async def app(scope, receive, send):
+        if scope["type"] == "lifespan":
+            while True:
+                message = await receive()
+                if message["type"] == "lifespan.startup":
+                    await send({"type": "lifespan.startup.complete"})
+                elif message["type"] == "lifespan.shutdown":
+                    await send({"type": "lifespan.shutdown.complete"})
+                    return
+
+        with sentry_sdk.traces.start_span(name="child-span"):
+            pass
+
+        await send(
+            {
+                "type": "http.response.start",
+                "status": 200,
+                "headers": [[b"content-type", b"text/plain"]],
+            }
+        )
+        await send({"type": "http.response.body", "body": b"Hello, world!"})
+
+    sentry_init(traces_sample_rate=1.0)
+
+    sentry_app = SentryAsgiMiddleware(app)
+
+    async def wrapped_app(scope, receive, send):
+        if scope["type"] != "lifespan":
+            scope["client"] = (client_ip, 0)
+            scope["server"] = server
+            scope["headers"] = [(k, v) for k, v in scope["headers"] if k != b"host"]
+            if host_header is not None:
+                scope["headers"].append((b"host", host_header))
+
+        await sentry_app(scope, receive, send)
+
+    async with TestClient(wrapped_app) as client:
+        items = capture_items("span")
+        await client.get("/some_url")
+
+    sentry_sdk.flush()
+
+    child_span, server_span = [item.payload for item in items]
+
+    assert server_span["attributes"]["sentry.is_localhost"] is is_localhost
+    assert child_span["attributes"]["sentry.is_localhost"] is is_localhost

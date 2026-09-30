@@ -35,6 +35,7 @@ from sentry_sdk.traces import (
 )
 from sentry_sdk.utils import (
     _get_installed_modules,
+    _is_localhost,
     capture_internal_exceptions,
     event_from_exception,
     has_data_collection_enabled,
@@ -201,6 +202,19 @@ class SentryAsgiMiddleware:
                     processor = partial(self.event_processor, asgi_scope=scope)
                     sentry_scope.add_event_processor(processor)
 
+                    headers = _get_headers(scope)
+                    sentry_scope.set_attribute(
+                        SPANDATA.SENTRY_IS_LOCALHOST,
+                        _is_localhost(
+                            client_ip=_get_ip(scope),
+                            url_host=scope.get("server")[0]
+                            if scope.get("server") and not headers.get("host")
+                            else None,
+                            host_header=headers.get("host"),
+                            forwarded_host_header=headers.get("x-forwarded-host"),
+                        ),
+                    )
+
                     ty = scope["type"]
                     (
                         transaction_name,
@@ -221,17 +235,14 @@ class SentryAsgiMiddleware:
                         "network.protocol.name": ty,
                     }
 
-                    if scope.get("client"):
+                    ip = _get_ip(scope)
+                    if ip:
                         client_options = sentry_sdk.get_client().options
                         if has_data_collection_enabled(client_options):
                             if client_options["data_collection"]["user_info"]:
-                                sentry_scope.set_attribute(
-                                    SPANDATA.USER_IP_ADDRESS, _get_ip(scope)
-                                )
+                                sentry_scope.set_attribute(SPANDATA.USER_IP_ADDRESS, ip)
                         elif should_send_default_pii():
-                            sentry_scope.set_attribute(
-                                SPANDATA.USER_IP_ADDRESS, _get_ip(scope)
-                            )
+                            sentry_scope.set_attribute(SPANDATA.USER_IP_ADDRESS, ip)
 
                     if ty in ("http", "websocket"):
                         if ty == "websocket" or method in self.http_methods_to_capture:
