@@ -1172,6 +1172,18 @@ class SPANDATA:
     Used in inbound filters.
     """
 
+    SENTRY_OP = "sentry.op"
+    """
+    The operation of a span.
+    Example: "http.client"
+    """
+
+    SENTRY_ORIGIN = "sentry.origin"
+    """
+    The origin of the instrumentation (e.g. span, log, etc.)
+    Example: "auto.http.otel.fastify"
+    """
+
     SENTRY_RELEASE = "sentry.release"
     """
     The Sentry release.
