@@ -1428,6 +1428,7 @@ def test_package_version_is_none():
         # URL host (subdomain-aware matching)
         ({"url_host": "localhost"}, True),
         ({"url_host": "127.0.0.1"}, True),
+        ({"url_host": "::1"}, True),
         ({"url_host": "foo.localhost"}, True),
         ({"url_host": "bar.foo.localhost"}, True),
         ({"url_host": "foolocalhost"}, False),
@@ -1437,6 +1438,8 @@ def test_package_version_is_none():
         ({"host_header": "localhost"}, True),
         ({"host_header": "localhost:3000"}, True),
         ({"host_header": "127.0.0.1:8080"}, True),
+        ({"host_header": "[::1]"}, True),
+        ({"host_header": "[::1]:8080"}, True),
         ({"host_header": "foo.localhost"}, True),
         ({"host_header": "foo.localhost:8080"}, True),
         ({"host_header": "example.com"}, False),
@@ -1445,6 +1448,7 @@ def test_package_version_is_none():
         ({"forwarded_host_header": "localhost"}, True),
         ({"forwarded_host_header": "localhost:3000"}, True),
         ({"forwarded_host_header": "127.0.0.1:8080"}, True),
+        ({"forwarded_host_header": "[::1]:8080"}, True),
         ({"forwarded_host_header": "foo.localhost"}, True),
         ({"forwarded_host_header": "example.com"}, False),
         # No args
