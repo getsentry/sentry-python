@@ -234,14 +234,14 @@ class SentryAsgiMiddleware:
                     sentry_scope.add_event_processor(processor)
 
                     headers = _get_headers(scope)
-                    host_header = headers.get("host")
-                    server = scope.get("server")
                     sentry_scope.set_attribute(
                         SPANDATA.SENTRY_IS_LOCALHOST,
                         _is_localhost(
                             client_ip=_get_ip(scope) if scope.get("client") else None,
-                            url_host=server[0] if server and not host_header else None,
-                            host_header=host_header,
+                            url_host=scope.get("server")[0]
+                            if scope.get("server") and not headers.get("host")
+                            else None,
+                            host_header=headers.get("host"),
                             forwarded_host_header=headers.get("x-forwarded-host"),
                         ),
                     )
