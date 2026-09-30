@@ -498,7 +498,6 @@ TEST_SUITE_CONFIG = {
                 "pytest-asyncio",
                 "python-multipart",
                 "requests",
-                "anyio<4.0.0",
                 "jinja2",
                 "httpx",
             ],
