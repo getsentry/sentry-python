@@ -18,10 +18,10 @@ from sentry_sdk.tracing import Span, TransactionSource
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
     ContextVar,
+    _is_localhost,
     capture_internal_exceptions,
     event_from_exception,
     has_data_collection_enabled,
-    is_localhost,
     nullcontext,
     reraise,
 )
@@ -129,7 +129,7 @@ class SentryWsgiMiddleware:
 
                     scope.set_attribute(
                         SPANDATA.SENTRY_IS_LOCALHOST,
-                        is_localhost(
+                        _is_localhost(
                             client_ip=get_client_ip(environ),
                             url_host=environ.get("SERVER_NAME")
                             if not environ.get("HTTP_HOST")

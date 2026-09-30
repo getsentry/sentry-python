@@ -2218,7 +2218,7 @@ def _host_matches_local_domain(host: str) -> bool:
     return False
 
 
-def is_localhost(
+def _is_localhost(
     client_ip: "Optional[str]" = None,
     url_host: "Optional[str]" = None,
     host_header: "Optional[str]" = None,
@@ -2236,11 +2236,10 @@ def is_localhost(
     if url_host is not None and _host_matches_local_domain(url_host):
         return True
 
-    # Host / X-Forwarded-Host headers: exact match after stripping port
     for header_val in (host_header, forwarded_host_header):
         if header_val is not None:
             domain = header_val.split(":")[0]
-            if domain in _LOCAL_DOMAINS:
+            if _host_matches_local_domain(domain):
                 return True
 
     return False

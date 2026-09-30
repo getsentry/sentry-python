@@ -13,6 +13,7 @@ from sentry_sdk.utils import (
     Components,
     Dsn,
     _get_installed_modules,
+    _is_localhost,
     datetime_from_isoformat,
     ensure_integration_enabled,
     env_to_bool,
@@ -23,7 +24,6 @@ from sentry_sdk.utils import (
     get_error_message,
     get_git_revision,
     get_lines_from_file,
-    is_localhost,
     is_sentry_url,
     is_valid_sample_rate,
     logger,
@@ -1430,16 +1430,19 @@ def test_package_version_is_none():
         ({"url_host": "foolocalhost"}, False),
         ({"url_host": "notlocalhost"}, False),
         ({"url_host": "example.com"}, False),
-        # Host header (exact match after port strip, no subdomain matching)
+        # Host header (subdomain-aware matching after port strip)
         ({"host_header": "localhost"}, True),
         ({"host_header": "localhost:3000"}, True),
         ({"host_header": "127.0.0.1:8080"}, True),
+        ({"host_header": "foo.localhost"}, True),
+        ({"host_header": "foo.localhost:8080"}, True),
         ({"host_header": "example.com"}, False),
         ({"host_header": "localhost.example.com"}, False),
         # X-Forwarded-Host header
         ({"forwarded_host_header": "localhost"}, True),
         ({"forwarded_host_header": "localhost:3000"}, True),
         ({"forwarded_host_header": "127.0.0.1:8080"}, True),
+        ({"forwarded_host_header": "foo.localhost"}, True),
         ({"forwarded_host_header": "example.com"}, False),
         # No args
         ({}, False),
@@ -1456,4 +1459,4 @@ def test_package_version_is_none():
     ],
 )
 def test_is_localhost(kwargs, expected):
-    assert is_localhost(**kwargs) is expected
+    assert _is_localhost(**kwargs) is expected
