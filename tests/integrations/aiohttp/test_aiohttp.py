@@ -49,10 +49,7 @@ async def test_basic(sentry_init, aiohttp_client, capture_events):
 
     (event,) = events
 
-    assert (
-        event["transaction"]
-        == "tests.integrations.aiohttp.test_aiohttp.test_basic.<locals>.hello"
-    )
+    assert event["transaction"] == "/"
 
     (exception,) = event["exception"]["values"]
     assert exception["type"] == "ZeroDivisionError"
@@ -325,10 +322,7 @@ async def test_tracing_unparseable_url(sentry_init, aiohttp_client, capture_item
 
     (span,) = [item.payload for item in items]
 
-    assert (
-        span["name"]
-        == "tests.integrations.aiohttp.test_aiohttp.test_tracing_unparseable_url.<locals>.hello"
-    )
+    assert span["name"] == "/"
 
 
 @pytest.mark.asyncio
@@ -1340,14 +1334,11 @@ async def test_tracing(sentry_init, aiohttp_client, capture_items):
     (server_span,) = [item.payload for item in items]
 
     assert server_span["is_segment"] is True
-    assert (
-        server_span["name"]
-        == "tests.integrations.aiohttp.test_aiohttp.test_tracing.<locals>.hello"
-    )
+    assert server_span["name"] == "/"
     assert server_span["attributes"]["sentry.op"] == "http.server"
     assert server_span["attributes"]["sentry.origin"] == "auto.http.aiohttp"
     assert server_span["attributes"]["http.response.status_code"] == 200
-    assert server_span["attributes"]["sentry.segment.name.source"] == "component"
+    assert server_span["attributes"]["sentry.segment.name.source"] == "route"
     assert server_span["status"] == "ok"
     # No query string on the request, so the attribute should be omitted.
     assert "url.query" not in server_span["attributes"]
@@ -1448,35 +1439,13 @@ async def test_sensitive_header_scrubbing(sentry_init, aiohttp_client, capture_i
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "url,transaction_style,expected_name,expected_source",
-    [
-        (
-            "/message",
-            "handler_name",
-            "tests.integrations.aiohttp.test_aiohttp."
-            "test_transaction_style.<locals>.hello",
-            "component",
-        ),
-        (
-            "/message",
-            "method_and_path_pattern",
-            "GET /{var}",
-            "route",
-        ),
-    ],
-)
 async def test_transaction_style(
     sentry_init,
     aiohttp_client,
     capture_items,
-    url,
-    transaction_style,
-    expected_name,
-    expected_source,
 ):
     sentry_init(
-        integrations=[AioHttpIntegration(transaction_style=transaction_style)],
+        integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
         data_collection={},
     )
@@ -1490,7 +1459,7 @@ async def test_transaction_style(
     items = capture_items("span")
 
     client = await aiohttp_client(app)
-    resp = await client.get(url)
+    resp = await client.get("/message")
     assert resp.status == 200
 
     sentry_sdk.flush()
@@ -1498,9 +1467,9 @@ async def test_transaction_style(
     assert len(items) == 1
     (server_segment,) = [item.payload for item in items]
 
-    assert server_segment["name"] == expected_name
+    assert server_segment["name"] == "/{var}"
     assert server_segment["is_segment"]
-    assert server_segment["attributes"]["sentry.segment.name.source"] == expected_source
+    assert server_segment["attributes"]["sentry.segment.name.source"] == "route"
 
 
 @pytest.mark.asyncio
@@ -1779,7 +1748,7 @@ async def test_user_ip_address_on_all_spans(
 
     child_span, server_span = [item.payload for item in items]
 
-    assert server_span["attributes"]["sentry.segment.name.source"] == "component"
+    assert server_span["attributes"]["sentry.segment.name.source"] == "route"
     assert "sentry.segment.name.source" not in child_span["attributes"]
 
     if expect_user_info:

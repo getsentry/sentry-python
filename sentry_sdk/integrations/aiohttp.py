@@ -23,7 +23,6 @@ from sentry_sdk.sessions import track_session
 from sentry_sdk.traces import (
     BAGGAGE_HEADER_NAME,
     SENTRY_TRACE_HEADER_NAME,
-    SOURCE_FOR_STYLE,
     SegmentNameSource,
     Span,
     SpanStatus,
@@ -47,7 +46,6 @@ from sentry_sdk.utils import (
     parse_url,
     parse_version,
     reraise,
-    transaction_from_function,
 )
 
 try:
@@ -74,25 +72,15 @@ if TYPE_CHECKING:
     from sentry_sdk.utils import ExcInfo
 
 
-TRANSACTION_STYLE_VALUES = ("handler_name", "method_and_path_pattern")
-
-
 class AioHttpIntegration(Integration):
     identifier = "aiohttp"
     origin = f"auto.http.{identifier}"
 
     def __init__(
         self,
-        transaction_style: str = "handler_name",
         *,
         failed_request_status_codes: "Set[int]" = _DEFAULT_FAILED_REQUEST_STATUS_CODES,
     ) -> None:
-        if transaction_style not in TRANSACTION_STYLE_VALUES:
-            raise ValueError(
-                "Invalid value for transaction_style: %s (must be in %s)"
-                % (transaction_style, TRANSACTION_STYLE_VALUES)
-            )
-        self.transaction_style = transaction_style
         self._failed_request_status_codes = failed_request_status_codes
 
     @staticmethod
@@ -269,21 +257,12 @@ class AioHttpIntegration(Integration):
             if server_span is not None and pattern is not None:
                 server_span.set_attribute(SPANDATA.HTTP_ROUTE, pattern)
 
-            name = None
+            current_scope = sentry_sdk.get_current_scope()
 
-            try:
-                if integration.transaction_style == "handler_name":
-                    name = transaction_from_function(rv.handler)
-                elif integration.transaction_style == "method_and_path_pattern":
-                    name = "{} {}".format(request.method, pattern)
-            except Exception:
-                pass
-
-            if name is not None:
-                current_scope = sentry_sdk.get_current_scope()
+            if pattern is not None:
                 current_scope.set_transaction_name(
-                    name,
-                    source=SOURCE_FOR_STYLE[integration.transaction_style],
+                    pattern,
+                    source=SegmentNameSource.ROUTE,
                 )
 
             return rv
