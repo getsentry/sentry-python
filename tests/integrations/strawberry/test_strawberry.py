@@ -722,10 +722,7 @@ def test_segment_no_operation_name(
     parse_span, validate_span, resolve_span, query_span, segment = spans
 
     assert segment["is_segment"] is True
-    if async_execution:
-        assert segment["name"] == "/graphql"
-    else:
-        assert segment["name"] == "graphql_view"
+    assert segment["name"] == "/graphql"
 
     assert query_span["attributes"]["sentry.op"] == OP.GRAPHQL_QUERY
     assert query_span["name"] == "query"
