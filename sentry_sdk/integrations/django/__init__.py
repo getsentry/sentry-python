@@ -18,7 +18,7 @@ from sentry_sdk.integrations._wsgi_common import (
 )
 from sentry_sdk.integrations.logging import ignore_logger_for_events
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
-from sentry_sdk.scope import add_global_event_processor, should_send_default_pii
+from sentry_sdk.scope import add_global_event_processor
 from sentry_sdk.serializer import add_global_repr_processor, add_repr_sequence_type
 from sentry_sdk.traces import SegmentNameSource
 from sentry_sdk.tracing_utils import (
@@ -31,7 +31,6 @@ from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
     event_from_exception,
-    has_data_collection_enabled,
     walk_exception_chain,
 )
 
@@ -512,10 +511,7 @@ def _after_get_response(request: "WSGIRequest") -> None:
     scope = sentry_sdk.get_current_scope()
     _attempt_resolve_again(request, scope)
 
-    if has_data_collection_enabled(client.options):
-        if client.options["data_collection"]["user_info"]:
-            _get_user_from_request_and_set_on_scope(request)
-    elif should_send_default_pii():
+    if client.options["data_collection"]["user_info"]:
         _get_user_from_request_and_set_on_scope(request)
 
 
@@ -563,11 +559,7 @@ def _make_wsgi_request_event_processor(
             DjangoRequestExtractor(request).extract_into_event(event)
 
         client_options = sentry_sdk.get_client().options
-        if has_data_collection_enabled(client_options):
-            if client_options["data_collection"]["user_info"]:
-                with capture_internal_exceptions():
-                    _set_user_info(request, event)
-        elif should_send_default_pii():
+        if client_options["data_collection"]["user_info"]:
             with capture_internal_exceptions():
                 _set_user_info(request, event)
 
