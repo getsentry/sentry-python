@@ -8,7 +8,7 @@ from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.integrations._wsgi_common import RequestExtractor
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
-from sentry_sdk.traces import SOURCE_FOR_STYLE as SEGMENT_SOURCE_FOR_STYLE
+from sentry_sdk.traces import SegmentNameSource
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
@@ -37,22 +37,9 @@ if TYPE_CHECKING:
     from sentry_sdk.utils import ExcInfo
 
 
-TRANSACTION_STYLE_VALUES = ("route_name", "route_pattern")
-
-
 class PyramidIntegration(Integration):
     identifier = "pyramid"
     origin = f"auto.http.{identifier}"
-
-    transaction_style = ""
-
-    def __init__(self, transaction_style: str = "route_name") -> None:
-        if transaction_style not in TRANSACTION_STYLE_VALUES:
-            raise ValueError(
-                "Invalid value for transaction_style: %s (must be in %s)"
-                % (transaction_style, TRANSACTION_STYLE_VALUES)
-            )
-        self.transaction_style = transaction_style
 
     @staticmethod
     def setup_once() -> None:
@@ -84,9 +71,12 @@ class PyramidIntegration(Integration):
                     SPANDATA.HTTP_ROUTE, request.matched_route.pattern
                 )
 
-            _set_transaction_name_and_source(
-                sentry_sdk.get_current_scope(), integration.transaction_style, request
-            )
+            try:
+                sentry_sdk.get_current_scope().set_transaction_name(
+                    request.matched_route.pattern, source=SegmentNameSource.ROUTE
+                )
+            except Exception:
+                pass
 
             scope = sentry_sdk.get_isolation_scope()
 
@@ -161,22 +151,6 @@ def _capture_exception(exc_info: "ExcInfo") -> None:
     )
 
     sentry_sdk.capture_event(event, hint=hint)
-
-
-def _set_transaction_name_and_source(
-    scope: "sentry_sdk.Scope", transaction_style: str, request: "Request"
-) -> None:
-    try:
-        name_for_style = {
-            "route_name": request.matched_route.name,
-            "route_pattern": request.matched_route.pattern,
-        }
-        scope.set_transaction_name(
-            name_for_style[transaction_style],
-            source=SEGMENT_SOURCE_FOR_STYLE[transaction_style],
-        )
-    except Exception:
-        pass
 
 
 class PyramidRequestExtractor(RequestExtractor):
