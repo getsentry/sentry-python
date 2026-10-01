@@ -41,6 +41,7 @@ def test_basic(sentry_init, capture_events):
         "type": "redis",
     }
 
+
 @pytest.mark.parametrize(
     "data_collection, expected_first_ten",
     [
@@ -87,6 +88,7 @@ def test_redis_pipeline_data_collection(
     assert pipeline_span["name"] == "redis.pipeline.execute"
     assert pipeline_span["attributes"]["sentry.op"] == "db.redis"
 
+
 def test_pii_data_redacted(
     sentry_init,
     capture_events,
@@ -125,7 +127,7 @@ def test_pii_data_redacted(
 @pytest.mark.parametrize(
     "data_collection, expected_description",
     [
-        ({"database_query_data": False}, "SET 'somekey1'"),
+        ({"database_query_data": False}, "SET 'somekey1' [Filtered]"),
         ({"database_query_data": True}, "SET 'somekey1' 'my secret string1'"),
         ({}, "SET 'somekey1' 'my secret string1'"),
     ],
@@ -164,6 +166,7 @@ def test_data_collection_database_query_data(
     assert set_span["name"] == expected_description
     assert set_span["attributes"][SPANDATA.DB_QUERY_TEXT] == expected_description
     assert set_span["attributes"]["sentry.op"] == "db.redis"
+
 
 def test_no_data_truncation_by_default(sentry_init, capture_items):
     sentry_init(
