@@ -4,7 +4,6 @@ from gql import Client, __version__, gql
 from gql.transport.exceptions import TransportQueryError
 from gql.transport.requests import RequestsHTTPTransport
 
-import sentry_sdk
 from sentry_sdk.integrations.gql import GQLIntegration
 from sentry_sdk.utils import parse_version
 
