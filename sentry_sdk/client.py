@@ -27,7 +27,6 @@ from sentry_sdk.integrations import setup_integrations
 from sentry_sdk.integrations.dedupe import DedupeIntegration
 from sentry_sdk.monitor import Monitor
 from sentry_sdk.profiler.continuous_profiler import setup_continuous_profiler
-from sentry_sdk.scrubber import EventScrubber
 from sentry_sdk.serializer import serialize
 from sentry_sdk.sessions import SessionFlusher
 from sentry_sdk.traces import Span, trace
@@ -49,7 +48,6 @@ from sentry_sdk.utils import (
     get_sdk_name,
     get_type_name,
     handle_in_app,
-    has_data_collection_enabled,
     logger,
 )
 
@@ -131,20 +129,6 @@ def _get_options(*args: "Optional[str]", **kwargs: "Any") -> "Dict[str, Any]":
         rv["project_root"] = project_root
 
     rv["data_collection"] = _resolve_data_collection(rv)
-
-    # Do not add the event scrubber if data collection is enabled as it can remove data that's
-    # collected under data collection config
-    if not has_data_collection_enabled(rv) and rv["event_scrubber"] is None:
-        rv["event_scrubber"] = EventScrubber(
-            send_default_pii=False
-            if rv["send_default_pii"] is None
-            else rv["send_default_pii"]
-        )
-    elif has_data_collection_enabled(rv) and rv["event_scrubber"]:
-        logger.warning(
-            "Event scrubbers are not enabled when data collection configuration is provided. Ignoring event_scrubber...",
-        )
-        rv["event_scrubber"] = None
 
     if rv["socket_options"] and not isinstance(rv["socket_options"], list):
         logger.warning(
@@ -570,11 +554,6 @@ class _Client(BaseClient):
             self.options["in_app_include"],
             self.options["project_root"],
         )
-
-        if event is not None:
-            event_scrubber = self.options["event_scrubber"]
-            if event_scrubber:
-                event_scrubber.scrub_event(event)
 
         if previous_total_breadcrumbs is not None:
             event["breadcrumbs"] = AnnotatedValue(

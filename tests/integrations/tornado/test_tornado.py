@@ -77,10 +77,7 @@ class ChildSpanHandler(RequestHandler):
 
 # Sent by every data-collection cookie test below. Mixes benign cookies
 # (``theme``, ``lang``) with ones whose names match the data-collection
-# sensitive denylist (``jwt``, ``identity``). Those two names are deliberately
-# NOT in the ``EventScrubber`` denylist (which matches keys exactly), so any
-# filtering we observe on them comes from the extractor's data-collection
-# logic, not the always-on scrubber.
+# sensitive denylist (``jwt``, ``identity``).
 COOKIE_HEADER = "jwt=tokenval; theme=dark; lang=en; identity=alice"
 
 

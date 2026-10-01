@@ -128,7 +128,7 @@ def fastapi_app_factory():
 async def test_request_info_json_body(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
-        send_default_pii=True,
+        data_collection={},
         integrations=[StarletteIntegration()],
     )
 
@@ -190,7 +190,8 @@ async def test_formdata_request_body(sentry_init, capture_items):
     (event,) = (item.payload for item in items if item.type == "event")
     assert event["request"]["data"].keys() == PARSED_FORM.keys()
     assert event["request"]["data"]["username"] == PARSED_FORM["username"]
-    assert event["request"]["data"]["password"] == "[Filtered]"
+    # Expectation in data collection is that the user scrubs this within `before_send`
+    assert event["request"]["data"]["password"] == "hello123"
     assert event["request"]["data"]["photo"] == ""
 
     sentry_sdk.flush()
@@ -214,7 +215,7 @@ async def test_formdata_request_body(sentry_init, capture_items):
 async def test_request_body_too_big(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
-        send_default_pii=True,
+        data_collection={},
         integrations=[StarletteIntegration()],
     )
 
@@ -343,7 +344,7 @@ async def test_response(sentry_init, capture_events):
     sentry_init(
         integrations=[StarletteIntegration(), FastApiIntegration()],
         traces_sample_rate=1.0,
-        send_default_pii=True,
+        data_collection={},
     )
 
     app = fastapi_app_factory()
@@ -491,7 +492,8 @@ async def test_original_request_not_scrubbed(sentry_init, capture_events):
     )
 
     event = events[0]
-    assert event["request"]["data"] == {"password": "[Filtered]"}
+    # Expectation in data collection is that the user scrubs this within `before_send`
+    assert event["request"]["data"] == {"password": "secret"}
     assert event["request"]["headers"]["authorization"] == "[Filtered]"
     assert event["request"]["headers"]["proxy-authorization"] == "[Filtered]"
 
@@ -728,7 +730,7 @@ def test_transaction_http_method_custom(sentry_init, capture_items):
 def test_request_url(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
-        send_default_pii=True,
+        data_collection={},
         integrations=[
             StarletteIntegration(),
         ],
