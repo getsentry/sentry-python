@@ -210,7 +210,7 @@ class SentryAsgiMiddleware:
                     (
                         transaction_name,
                         transaction_source,
-                    ) = self._get_transaction_name_and_source(scope)
+                    ) = self._get_segment_name_and_source(scope)
 
                     method = scope.get("method", "").upper()
 
@@ -351,7 +351,7 @@ class SentryAsgiMiddleware:
             ]
         )
         if not already_set:
-            name, source = self._get_transaction_name_and_source(asgi_scope)
+            name, source = self._get_segment_name_and_source(asgi_scope)
             event["transaction"] = name
             event["transaction_info"] = {"source": source}
 
@@ -363,7 +363,7 @@ class SentryAsgiMiddleware:
     # data to your liking it's recommended to use the `before_send` callback
     # for that.
 
-    def _get_transaction_name_and_source(
+    def _get_segment_name_and_source(
         self: "SentryAsgiMiddleware", asgi_scope: "Any"
     ) -> "Tuple[str, str]":
         name = None
@@ -390,38 +390,6 @@ class SentryAsgiMiddleware:
         if name is None:
             name = _DEFAULT_TRANSACTION_NAME
             source = SegmentNameSource.ROUTE
-            return name, source
-
-        return name, source
-
-    def _get_segment_name_and_source(
-        self: "SentryAsgiMiddleware", asgi_scope: "Any"
-    ) -> "Tuple[str, str]":
-        name = None
-        source = SegmentNameSource.ROUTE.value
-        ty = asgi_scope.get("type")
-
-        # FastAPI includes the route object in the scope to let Sentry extract the
-        # path from it for the transaction name
-        route = asgi_scope.get("route")
-        if route:
-            path = getattr(route, "path", None)
-            if path is not None:
-                name = path
-        else:
-            name = _get_url(
-                asgi_scope,
-                "http" if ty == "http" else "ws",
-                host=None,
-                path=_get_path(
-                    asgi_scope=asgi_scope, root_path_in_path=self.root_path_in_path
-                ),
-            )
-            source = SegmentNameSource.URL.value
-
-        if name is None:
-            name = _DEFAULT_TRANSACTION_NAME
-            source = SegmentNameSource.ROUTE.value
             return name, source
 
         return name, source
