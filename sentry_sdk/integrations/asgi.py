@@ -362,7 +362,7 @@ class SentryAsgiMiddleware:
         self: "SentryAsgiMiddleware", asgi_scope: "Any"
     ) -> "Tuple[str, str]":
         name = None
-        source = SegmentNameSource.URL
+        source = SegmentNameSource.ROUTE
 
         # FastAPI includes the route object in the scope to let Sentry extract the
         # path from it for the transaction name
@@ -380,6 +380,7 @@ class SentryAsgiMiddleware:
                     asgi_scope=asgi_scope, root_path_in_path=self.root_path_in_path
                 ),
             )
+            source = SegmentNameSource.URL
 
         if name is None:
             name = _DEFAULT_TRANSACTION_NAME
@@ -392,7 +393,7 @@ class SentryAsgiMiddleware:
         self: "SentryAsgiMiddleware", asgi_scope: "Any"
     ) -> "Tuple[str, str]":
         name = None
-        source = SegmentNameSource.URL
+        source = SegmentNameSource.ROUTE.value
         ty = asgi_scope.get("type")
 
         # FastAPI includes the route object in the scope to let Sentry extract the
