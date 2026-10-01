@@ -123,7 +123,7 @@ def test_streaming_span_order_and_scope(
     client_spans = [
         span
         for span in spans
-        if span["name"] == "aws.s3.GetObject"
+        if span["name"] == "S3.GetObject"
         and (
             span["attributes"].get(SPANDATA.SENTRY_ORIGIN) == ORIGIN
             and span["attributes"].get(SPANDATA.SENTRY_OP) == OP.HTTP_CLIENT
@@ -139,7 +139,7 @@ def test_streaming_span_order_and_scope(
     stream_spans = [
         span
         for span in spans
-        if span["name"] == "aws.s3.GetObject"
+        if span["name"] == "S3.GetObject"
         and (span["attributes"].get(SPANDATA.SENTRY_OP) == OP.HTTP_CLIENT_STREAM)
     ]
     assert len(client_spans) == 1
@@ -366,7 +366,7 @@ def test_service_extension_customizes_client_span(
             "s3",
             "head_object",
             {"Bucket": "bucket", "Key": "foo"},
-            "aws.s3.HeadObject",
+            "S3.HeadObject",
             "S3",
             "HeadObject",
             "http://localhost:4566",
@@ -377,11 +377,22 @@ def test_service_extension_customizes_client_span(
             "events",
             "list_event_buses",
             {},
-            "aws.eventbridge.ListEventBuses",
+            "EventBridge.ListEventBuses",
             "EventBridge",
             "ListEventBuses",
             None,
             "events.eu-north-1.amazonaws.com",
+            443,
+        ),
+        (
+            "apigateway",
+            "get_rest_apis",
+            {},
+            "API Gateway.GetRestApis",
+            "API Gateway",
+            "GetRestApis",
+            None,
+            "apigateway.eu-north-1.amazonaws.com",
             443,
         ),
     ],
