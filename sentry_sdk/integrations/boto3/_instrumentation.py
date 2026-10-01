@@ -226,8 +226,11 @@ def _instrument_streaming_body(span: "Span", parsed: "Dict[str, Any]") -> bool:
                 streaming_span.set_attributes(attributes)
                 span.set_attributes(attributes)
 
-        streaming_span.__exit__(type(error), error, error.__traceback__)
-        span.__exit__(type(error), error, error.__traceback__)
+            streaming_span.__exit__(type(error), error, error.__traceback__)
+            span.__exit__(type(error), error, error.__traceback__)
+        else:
+            streaming_span.end()
+            span.end()
 
     def content_length_reached() -> bool:
         content_length = getattr(body, "_content_length", None)
