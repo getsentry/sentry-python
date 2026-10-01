@@ -143,7 +143,7 @@ async def test_has_context(sentry_init, capture_events):
     assert response.status_code == 200
 
     (event,) = events
-    assert event["transaction"] == "hi"
+    assert event["transaction"] == "/message"
     assert "data" not in event["request"]
     assert event["request"]["url"] == "http://localhost/message"
 
@@ -545,10 +545,10 @@ async def test_tracing_success(sentry_init, capture_items):
 
     message, span = [item.payload for item in items]
 
-    assert span["name"] == "hi_tx"
+    assert span["name"] == "/message_tx"
 
     assert message["message"] == "hi"
-    assert message["transaction"] == "hi_tx"
+    assert message["transaction"] == "/message_tx"
     assert message["tags"]["view"] == "yes"
     assert message["tags"]["before_request"] == "yes"
 
@@ -576,9 +576,9 @@ async def test_tracing_error(sentry_init, capture_items):
 
     error_event, span = [item.payload for item in items]
 
-    assert span["name"] == "error"
+    assert span["name"] == "/error"
 
-    assert error_event["transaction"] == "error"
+    assert error_event["transaction"] == "/error"
     (exception,) = error_event["exception"]["values"]
     assert exception["type"] == "ZeroDivisionError"
 
@@ -608,7 +608,7 @@ async def test_class_based_views(sentry_init, capture_events):
     (event,) = events
 
     assert event["message"] == "hi"
-    assert event["transaction"] == "hello_class"
+    assert event["transaction"] == "/hello-class/"
 
 
 @pytest.mark.asyncio
@@ -657,31 +657,26 @@ async def test_basic(sentry_init, capture_items):
     assert segment["attributes"]["sentry.op"] == "http.server"
     assert segment["attributes"]["sentry.origin"] == "auto.http.quart"
     assert segment["attributes"]["http.request.method"] == "GET"
-    assert segment["name"] == "hi"
+    assert segment["name"] == "/message"
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "url,transaction_style,expected_name,expected_source",
+    "url,expected_name,expected_source",
     [
-        ("/message", "endpoint", "hi", "component"),
-        ("/message", "url", "/message", "route"),
-        ("/message/123456", "endpoint", "hi_with_id", "component"),
-        ("/message/123456", "url", "/message/<message_id>", "route"),
+        ("/message", "/message", "route"),
+        ("/message/123456", "/message/<message_id>", "route"),
     ],
 )
-async def test_transaction_style(
+async def test_segment_name_and_source(
     sentry_init,
     capture_items,
     url,
-    transaction_style,
     expected_name,
     expected_source,
 ):
     sentry_init(
-        integrations=[
-            quart_sentry.QuartIntegration(transaction_style=transaction_style)
-        ],
+        integrations=[quart_sentry.QuartIntegration()],
         traces_sample_rate=1.0,
         data_collection={},
     )
@@ -792,9 +787,9 @@ async def test_request_attributes(
         pytest.param(
             {},
             {
-                "authorization": "[Filtered]",
-                "custom": "passthrough",
-                "cookie": "[Filtered]",
+                "authorization": ["[Filtered]"],
+                "custom": ["passthrough"],
+                "cookie": ["[Filtered]"],
             },
             id="data_collection_default_redacts_auth_header",
         ),
@@ -806,9 +801,9 @@ async def test_request_attributes(
         pytest.param(
             {"http_headers": {"request": {"mode": "allowlist"}}},
             {
-                "authorization": "[Filtered]",
-                "custom": "[Filtered]",
-                "cookie": "[Filtered]",
+                "authorization": ["[Filtered]"],
+                "custom": ["[Filtered]"],
+                "cookie": ["[Filtered]"],
             },
             id="data_collection_allow_list_redacts_terms_that_do_not_appear",
         ),
@@ -819,36 +814,36 @@ async def test_request_attributes(
                 }
             },
             {
-                "authorization": "[Filtered]",
-                "custom": "[Filtered]",
-                "cookie": "[Filtered]",
+                "authorization": ["[Filtered]"],
+                "custom": ["[Filtered]"],
+                "cookie": ["[Filtered]"],
             },
             id="data_collection_allow_list_redacts_sensitive_terms_even_when_provided_by_user",
         ),
         pytest.param(
             {"http_headers": {"request": {"mode": "allowlist", "terms": ["custom"]}}},
             {
-                "authorization": "[Filtered]",
-                "custom": "passthrough",
-                "cookie": "[Filtered]",
+                "authorization": ["[Filtered]"],
+                "custom": ["passthrough"],
+                "cookie": ["[Filtered]"],
             },
             id="data_collection_allow_list_does_not_redact_provided_term",
         ),
         pytest.param(
             {"http_headers": {"request": {"mode": "denylist", "terms": ["custom"]}}},
             {
-                "authorization": "[Filtered]",
-                "custom": "[Filtered]",
-                "cookie": "[Filtered]",
+                "authorization": ["[Filtered]"],
+                "custom": ["[Filtered]"],
+                "cookie": ["[Filtered]"],
             },
             id="data_collection_deny_list_redacts_sensitive_terms_when_provided_by_user",
         ),
         pytest.param(
             {"http_headers": {"request": {"mode": "allowlist", "terms": ["cookie"]}}},
             {
-                "authorization": "[Filtered]",
-                "custom": "[Filtered]",
-                "cookie": "[Filtered]",
+                "authorization": ["[Filtered]"],
+                "custom": ["[Filtered]"],
+                "cookie": ["[Filtered]"],
             },
             id="data_collection_cookie_is_always_redacted_even_when_allow_listed",
         ),
@@ -934,7 +929,7 @@ async def test_quart_auth_user_id(
     spans = [item.payload for item in items]
     assert len(spans) == 2
 
-    segment = next(s for s in spans if s["name"] == "hi")
+    segment = next(s for s in spans if s["name"] == "/message")
     if expect_user_info and user_id is not None:
         assert segment["attributes"]["user.id"] == user_id
     else:

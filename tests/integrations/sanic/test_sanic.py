@@ -772,3 +772,83 @@ def test_remote_addr_data_collection(
         assert event["request"]["env"] == {"REMOTE_ADDR": ""}
     else:
         assert "env" not in event["request"]
+
+
+@pytest.mark.parametrize(
+    "forwarded_for, host_header, is_localhost",
+    [
+        # Loopback IP
+        ("127.0.0.1", "example.com", True),
+        # IPv6 loopback (quoted brackets per RFC 7239)
+        ('"[::1]"', "example.com", True),
+        # Localhost host header with non-local IP
+        ("203.0.113.50", "localhost:8000", True),
+        # Non-local everything
+        ("203.0.113.50", "example.com", False),
+    ],
+)
+def test_is_localhost_span_attribute(
+    sentry_init, app, capture_items, forwarded_for, host_header, is_localhost
+):
+    app.config.FORWARDED_SECRET = "test"
+
+    @app.route("/child-span")
+    def child_span_handler_localhost(request):
+        with sentry_sdk.start_span(name="child-span"):
+            pass
+        return response.text("ok")
+
+    sentry_init(
+        integrations=[SanicIntegration()],
+        default_integrations=False,
+        traces_sample_rate=1.0,
+    )
+
+    items = capture_items("span")
+
+    c = get_client(app)
+    with c as client:
+        client.get(
+            "/child-span",
+            headers={
+                "Forwarded": f"for={forwarded_for};secret=test",
+                "Host": host_header,
+            },
+        )
+
+    sentry_sdk.flush()
+
+    child_span, server_span = [item.payload for item in items]
+
+    assert server_span["attributes"]["sentry.is_localhost"] is is_localhost
+    assert child_span["attributes"]["sentry.is_localhost"] is is_localhost
+
+
+def test_user_agent_attribute(sentry_init, app, capture_items):
+    @app.route("/child-span")
+    def child_span_handler_ua(request):
+        with sentry_sdk.start_span(name="child-span"):
+            pass
+        return response.text("ok")
+
+    sentry_init(
+        integrations=[SanicIntegration()],
+        default_integrations=False,
+        traces_sample_rate=1.0,
+    )
+
+    items = capture_items("span")
+
+    c = get_client(app)
+    with c as client:
+        client.get(
+            "/child-span",
+            headers={"User-Agent": "TestBrowser/1.0"},
+        )
+
+    sentry_sdk.flush()
+
+    child_span, server_span = [item.payload for item in items]
+
+    assert server_span["attributes"]["user_agent.original"] == "TestBrowser/1.0"
+    assert child_span["attributes"]["user_agent.original"] == "TestBrowser/1.0"

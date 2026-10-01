@@ -13,6 +13,7 @@ from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_ve
 from sentry_sdk.integrations._wsgi_common import RequestExtractor, _filter_headers
 from sentry_sdk.traces import SegmentNameSource
 from sentry_sdk.utils import (
+    _is_localhost,
     capture_internal_exceptions,
     ensure_integration_enabled,
     event_from_exception,
@@ -133,8 +134,22 @@ async def _context_enter(request: "Request") -> None:
     sentry_sdk.continue_trace(dict(request.headers))
     scope.set_custom_sampling_context({"sanic_request": request})
 
+    scope.set_attribute(
+        SPANDATA.SENTRY_IS_LOCALHOST,
+        _is_localhost(
+            client_ip=request.remote_addr or None,
+            url_host=urlsplit(request.url).hostname,
+            host_header=request.headers.get("host"),
+            forwarded_host_header=request.headers.get("x-forwarded-host"),
+        ),
+    )
+
     if request.remote_addr and client.options["data_collection"]["user_info"]:
         scope.set_attribute(SPANDATA.USER_IP_ADDRESS, request.remote_addr)
+
+    user_agent = request.headers.get("user-agent")
+    if user_agent:
+        scope.set_attribute(SPANDATA.USER_AGENT_ORIGINAL, user_agent)
 
     span = sentry_sdk.start_span(
         # Unless the request results in a 404 error, the name and source
@@ -247,7 +262,7 @@ def _get_request_attributes(request: "Request") -> "Dict[str, Any]":
 
     headers = _filter_headers(dict(request.headers))
     for header, value in headers.items():
-        attributes[f"{SPANDATA.HTTP_REQUEST_HEADER}.{header.lower()}"] = value
+        attributes[f"{SPANDATA.HTTP_REQUEST_HEADER}.{header.lower()}"] = [value]
 
     urlparts = urlsplit(request.url)
     client_options = sentry_sdk.get_client().options

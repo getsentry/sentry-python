@@ -86,7 +86,7 @@ def _get_query(asgi_scope: "Any") -> "Optional[str]":
     return urllib.parse.unquote(qs.decode("latin-1"))
 
 
-def _get_ip(asgi_scope: "Any") -> str:
+def _get_ip(asgi_scope: "Any") -> "Optional[str]":
     """
     Extract IP Address from the ASGI scope based on request headers with fallback to scope client.
     """
@@ -101,7 +101,10 @@ def _get_ip(asgi_scope: "Any") -> str:
     except KeyError:
         pass
 
-    return asgi_scope.get("client")[0]
+    if asgi_scope.get("client"):
+        return asgi_scope["client"][0]
+
+    return None
 
 
 def _get_request_data(
@@ -164,7 +167,7 @@ def _get_request_attributes(
 
         filtered_headers = _filter_headers(headers)
         for header, value in filtered_headers.items():
-            attributes[f"http.request.header.{header.lower()}"] = value
+            attributes[f"http.request.header.{header.lower()}"] = [value]
 
         filtered_query_string = None
         query = _get_query(asgi_scope)

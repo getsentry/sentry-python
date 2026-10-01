@@ -23,7 +23,6 @@ from sentry_sdk.sessions import track_session
 from sentry_sdk.traces import (
     BAGGAGE_HEADER_NAME,
     SENTRY_TRACE_HEADER_NAME,
-    SOURCE_FOR_STYLE,
     SegmentNameSource,
     Span,
     SpanStatus,
@@ -38,6 +37,7 @@ from sentry_sdk.utils import (
     AnnotatedValue,
     _get_aws_sigv4_signed_headers_from_authorization_header,
     _get_aws_sigv4_signed_headers_from_url_query_string,
+    _is_localhost,
     _register_control_flow_exception,
     capture_internal_exceptions,
     ensure_integration_enabled,
@@ -46,7 +46,6 @@ from sentry_sdk.utils import (
     parse_url,
     parse_version,
     reraise,
-    transaction_from_function,
 )
 
 try:
@@ -73,25 +72,15 @@ if TYPE_CHECKING:
     from sentry_sdk.utils import ExcInfo
 
 
-TRANSACTION_STYLE_VALUES = ("handler_name", "method_and_path_pattern")
-
-
 class AioHttpIntegration(Integration):
     identifier = "aiohttp"
     origin = f"auto.http.{identifier}"
 
     def __init__(
         self,
-        transaction_style: str = "handler_name",
         *,
         failed_request_status_codes: "Set[int]" = _DEFAULT_FAILED_REQUEST_STATUS_CODES,
     ) -> None:
-        if transaction_style not in TRANSACTION_STYLE_VALUES:
-            raise ValueError(
-                "Invalid value for transaction_style: %s (must be in %s)"
-                % (transaction_style, TRANSACTION_STYLE_VALUES)
-            )
-        self.transaction_style = transaction_style
         self._failed_request_status_codes = failed_request_status_codes
 
     @staticmethod
@@ -127,6 +116,21 @@ class AioHttpIntegration(Integration):
                     scope.clear_breadcrumbs()
                     scope.add_event_processor(_make_request_processor(weak_request))
 
+                    scope.set_attribute(
+                        SPANDATA.SENTRY_IS_LOCALHOST,
+                        _is_localhost(
+                            client_ip=_get_client_ip(request),
+                            host_header=request.headers.get("Host"),
+                            forwarded_host_header=request.headers.get(
+                                "X-Forwarded-Host"
+                            ),
+                        ),
+                    )
+
+                    user_agent = request.headers.get("User-Agent")
+                    if user_agent:
+                        scope.set_attribute(SPANDATA.USER_AGENT_ORIGINAL, user_agent)
+
                     headers = dict(request.headers)
 
                     sentry_sdk.continue_trace(headers)
@@ -134,9 +138,9 @@ class AioHttpIntegration(Integration):
 
                     header_attributes: "dict[str, Any]" = {}
                     for header, header_value in _filter_headers(headers).items():
-                        header_attributes[f"http.request.header.{header.lower()}"] = (
+                        header_attributes[f"http.request.header.{header.lower()}"] = [
                             header_value
-                        )
+                        ]
 
                     url_attributes = {}
                     client_address_attributes = {}
@@ -253,21 +257,12 @@ class AioHttpIntegration(Integration):
             if server_span is not None and pattern is not None:
                 server_span.set_attribute(SPANDATA.HTTP_ROUTE, pattern)
 
-            name = None
+            current_scope = sentry_sdk.get_current_scope()
 
-            try:
-                if integration.transaction_style == "handler_name":
-                    name = transaction_from_function(rv.handler)
-                elif integration.transaction_style == "method_and_path_pattern":
-                    name = "{} {}".format(request.method, pattern)
-            except Exception:
-                pass
-
-            if name is not None:
-                current_scope = sentry_sdk.get_current_scope()
+            if pattern is not None:
                 current_scope.set_transaction_name(
-                    name,
-                    source=SOURCE_FOR_STYLE[integration.transaction_style],
+                    pattern,
+                    source=SegmentNameSource.ROUTE,
                 )
 
             return rv
@@ -491,6 +486,17 @@ def _make_request_processor(
         return event
 
     return aiohttp_processor
+
+
+def _get_client_ip(request: "Request") -> "Optional[str]":
+    x_forwarded_for = request.headers.get("X-Forwarded-For", "").split(",")[0].strip()
+    if x_forwarded_for:
+        return x_forwarded_for
+
+    if request.headers.get("X-Real-IP"):
+        return request.headers["X-Real-IP"]
+
+    return request.remote
 
 
 def _capture_exception() -> "ExcInfo":

@@ -87,9 +87,9 @@ def _wrap_func(func: "F") -> "F":
             if hasattr(gcp_event, "headers"):
                 headers = gcp_event.headers
                 for header, header_value in _filter_headers(headers).items():
-                    header_attributes[f"http.request.header.{header.lower()}"] = (
+                    header_attributes[f"http.request.header.{header.lower()}"] = [
                         header_value
-                    )
+                    ]
 
             additional_attributes = {}
             if hasattr(gcp_event, "method"):
