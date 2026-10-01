@@ -142,7 +142,7 @@ async def _request_websocket_started(app: "Quart", **kwargs: "Any") -> None:
     # to actually start the transaction
     try:
         sentry_sdk.get_current_scope().set_transaction_name(
-            name=request.url_rule.rule,
+            name=request_websocket.url_rule.rule,
             source=SegmentNameSource.ROUTE,
         )
     except Exception:
