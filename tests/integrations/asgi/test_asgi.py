@@ -827,13 +827,6 @@ def _http_scope():
     "init_kwargs, request_url, expected_query, expected_url_full",
     [
         pytest.param(
-            {},
-            "/foo?" + QUERY_STRING,
-            None,
-            None,
-            id="defaults",
-        ),
-        pytest.param(
             {"data_collection": {}},
             "/foo?" + QUERY_STRING,
             "token=%5BFiltered%5D&theme=dark&lang=en&session=%5BFiltered%5D",
@@ -859,7 +852,7 @@ def _http_scope():
             id="data_collection_off",
         ),
         pytest.param(
-            {"_experiments": {"data_collection": {}}},
+            {"data_collection": {}},
             "/foo",
             None,
             "http://example.com/foo",

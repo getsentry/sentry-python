@@ -5,8 +5,6 @@ from typing import TYPE_CHECKING
 import sentry_sdk
 from sentry_sdk.data_collection import _apply_data_collection_filtering_to_query_string
 from sentry_sdk.integrations._wsgi_common import _filter_headers
-from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.utils import has_data_collection_enabled
 
 if TYPE_CHECKING:
     from typing import Any, Dict, Optional, Union
@@ -171,64 +169,36 @@ def _get_request_attributes(
         for header, value in filtered_headers.items():
             attributes[f"http.request.header.{header.lower()}"] = [value]
 
-        if has_data_collection_enabled(client_options):
-            filtered_query_string = None
-            query = _get_query(asgi_scope)
+        filtered_query_string = None
+        query = _get_query(asgi_scope)
 
-            if query:
-                filtered_query_string = (
-                    _apply_data_collection_filtering_to_query_string(
-                        query_string=query,
-                        behaviour=client_options["data_collection"]["url_query_params"],
-                    )
-                )
-                if filtered_query_string:
-                    attributes["http.query"] = filtered_query_string
-
-            path = _get_path(asgi_scope=asgi_scope, root_path_in_path=root_path_in_path)
-            attributes["url.path"] = path
-
-            url_without_query_string = _get_url(
-                asgi_scope,
-                "http" if ty == "http" else "ws",
-                headers.get("host"),
-                path=path,
+        if query:
+            filtered_query_string = _apply_data_collection_filtering_to_query_string(
+                query_string=query,
+                behaviour=client_options["data_collection"]["url_query_params"],
             )
+            if filtered_query_string:
+                attributes["http.query"] = filtered_query_string
 
-            attributes["url.full"] = (
-                f"{url_without_query_string}?{filtered_query_string}"
-                if filtered_query_string is not None
-                else url_without_query_string
-            )
+        path = _get_path(asgi_scope=asgi_scope, root_path_in_path=root_path_in_path)
+        attributes["url.path"] = path
 
-        elif should_send_default_pii():
-            query = _get_query(asgi_scope)
-            if query:
-                attributes["http.query"] = query
+        url_without_query_string = _get_url(
+            asgi_scope,
+            "http" if ty == "http" else "ws",
+            headers.get("host"),
+            path=path,
+        )
 
-            path = _get_path(asgi_scope=asgi_scope, root_path_in_path=root_path_in_path)
-            attributes["url.path"] = path
-
-            url_without_query_string = _get_url(
-                asgi_scope,
-                "http" if ty == "http" else "ws",
-                headers.get("host"),
-                path=path,
-            )
-            query_string = _get_query(asgi_scope)
-            attributes["url.full"] = (
-                f"{url_without_query_string}?{query_string}"
-                if query_string is not None
-                else url_without_query_string
-            )
+        attributes["url.full"] = (
+            f"{url_without_query_string}?{filtered_query_string}"
+            if filtered_query_string is not None
+            else url_without_query_string
+        )
 
     asgi_scope_client = asgi_scope.get("client")
     if asgi_scope_client:
-        if has_data_collection_enabled(client_options):
-            if client_options["data_collection"]["user_info"]:
-                ip = _get_ip(asgi_scope)
-                attributes["client.address"] = ip
-        elif should_send_default_pii():
+        if client_options["data_collection"]["user_info"]:
             ip = _get_ip(asgi_scope)
             attributes["client.address"] = ip
 
