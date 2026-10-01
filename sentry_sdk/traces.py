@@ -75,19 +75,6 @@ LOW_QUALITY_SEGMENT_SOURCES = [
 ]
 
 
-SOURCE_FOR_STYLE = {
-    "endpoint": SegmentNameSource.COMPONENT,
-    "function_name": SegmentNameSource.COMPONENT,
-    "handler_name": SegmentNameSource.COMPONENT,
-    "method_and_path_pattern": SegmentNameSource.ROUTE,
-    "path": SegmentNameSource.URL,
-    "route_name": SegmentNameSource.COMPONENT,
-    "route_pattern": SegmentNameSource.ROUTE,
-    "uri_template": SegmentNameSource.ROUTE,
-    "url": SegmentNameSource.ROUTE,
-}
-
-
 # Sentinel value for an unset parent_span to be able to distinguish it from
 # a None set by the user
 _DEFAULT_PARENT_SPAN = object()
