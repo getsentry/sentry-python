@@ -23,40 +23,27 @@ class AwsCallContext:
         "params",
     )
 
-    def __init__(self, operation_name: str, params: "Any") -> None:
-        self.operation_name: str = operation_name
-        self.params: "Dict[str, Any]" = {}
+    def __init__(self, operation_name: str, params: "Dict[str, Any]") -> None:
+        self.operation_name: "str" = operation_name
+        self.params: "Dict[str, Any]" = dict(params)
         self.service_name: "Optional[str]" = None
         self.service_id: "Optional[str]" = None
         self.service_id_hyphenized: "Optional[str]" = None
         self.region_name: "Optional[str]" = None
         self.endpoint_url: "Optional[str]" = None
 
-        if isinstance(params, dict):
-            with capture_internal_exceptions():
-                self.params = dict(params)
-
     def add_metadata(self, client: "BaseClient") -> None:
-        def _get_attr(obj: "Any", name: str) -> "Any":
-            if obj is None:
-                return None
+        with capture_internal_exceptions():
+            service_model = client.meta.service_model
+            # botocore's internal identifier, e.g. `apigateway`.
+            self.service_name = service_model.service_name
+            service_id = service_model.service_id
+            # modeled AWS service identity used in span names, e.g. `API Gateway`.
+            self.service_id = str(service_id)
+            self.service_id_hyphenized = service_id.hyphenize()
 
-            with capture_internal_exceptions():
-                return getattr(obj, name)
+        with capture_internal_exceptions():
+            self.region_name = client.meta.region_name
 
-        client_meta = _get_attr(client, "meta")
-        service_model = _get_attr(client_meta, "service_model")
-
-        # botocore's internal identifier, e.g. `apigateway`.
-        self.service_name = _get_attr(service_model, "service_name")
-
-        # modeled AWS service identity used in span names, e.g. `API Gateway`.
-        service_id = _get_attr(service_model, "service_id")
-        if service_id is not None:
-            with capture_internal_exceptions():
-                self.service_id = str(service_id)
-            with capture_internal_exceptions():
-                self.service_id_hyphenized = service_id.hyphenize()
-
-        self.region_name = _get_attr(client_meta, "region_name")
-        self.endpoint_url = _get_attr(client_meta, "endpoint_url")
+        with capture_internal_exceptions():
+            self.endpoint_url = client.meta.endpoint_url
