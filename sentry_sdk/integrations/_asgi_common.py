@@ -126,19 +126,14 @@ def _get_request_data(
 
         request_data["headers"] = _filter_headers(headers)
 
-        if has_data_collection_enabled(client_options):
-            qs = _get_query(asgi_scope)
-            if qs:
-                filtered_query_string = (
-                    _apply_data_collection_filtering_to_query_string(
-                        query_string=qs,
-                        behaviour=client_options["data_collection"]["url_query_params"],
-                    )
-                )
-                if filtered_query_string:
-                    request_data["query_string"] = filtered_query_string
-        else:
-            request_data["query_string"] = _get_query(asgi_scope)
+        qs = _get_query(asgi_scope)
+        if qs:
+            filtered_query_string = _apply_data_collection_filtering_to_query_string(
+                query_string=qs,
+                behaviour=client_options["data_collection"]["url_query_params"],
+            )
+            if filtered_query_string:
+                request_data["query_string"] = filtered_query_string
 
         request_data["url"] = _get_url(
             asgi_scope,
@@ -149,10 +144,7 @@ def _get_request_data(
 
     client = asgi_scope.get("client")
     if client:
-        if has_data_collection_enabled(client_options):
-            if client_options["data_collection"]["user_info"]:
-                request_data["env"] = {"REMOTE_ADDR": _get_ip(asgi_scope)}
-        elif should_send_default_pii():
+        if client_options["data_collection"]["user_info"]:
             request_data["env"] = {"REMOTE_ADDR": _get_ip(asgi_scope)}
 
     return request_data
