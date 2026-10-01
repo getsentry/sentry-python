@@ -1365,7 +1365,6 @@ class ClientConstructor:
             MATCH_ALL
         ],
         functions_to_trace: "Sequence[Dict[str, str]]" = [],  # noqa: B006
-        event_scrubber: "Optional[sentry_sdk.scrubber.EventScrubber]" = None,
         max_value_length: "Optional[int]" = DEFAULT_MAX_VALUE_LENGTH,
         enable_backpressure_handling: bool = True,
         error_sampler: "Optional[Callable[[Event, Hint], Union[float, bool]]]" = None,
@@ -1497,13 +1496,6 @@ class ClientConstructor:
                 )
 
             See https://docs.sentry.io/platforms/python/configuration/options/#data_collection for more details.
-
-        :param event_scrubber: Scrubs the event payload for sensitive information such as cookies, sessions, and
-            passwords from a `denylist`.
-
-            It can additionally be used to scrub from another `pii_denylist` if `send_default_pii` is disabled.
-
-            See how to `configure the scrubber here <https://docs.sentry.io/data-management/sensitive-data/#event-scrubber>`_.
 
         :param include_source_context: When enabled, source context will be included in events sent to Sentry.
 

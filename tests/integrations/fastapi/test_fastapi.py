@@ -190,7 +190,8 @@ async def test_formdata_request_body(sentry_init, capture_items):
     (event,) = (item.payload for item in items if item.type == "event")
     assert event["request"]["data"].keys() == PARSED_FORM.keys()
     assert event["request"]["data"]["username"] == PARSED_FORM["username"]
-    assert event["request"]["data"]["password"] == "[Filtered]"
+    # Expectation in data collection is that the user scrubs this within `before_send`
+    assert event["request"]["data"]["password"] == "hello123"
     assert event["request"]["data"]["photo"] == ""
 
     sentry_sdk.flush()
@@ -491,7 +492,8 @@ async def test_original_request_not_scrubbed(sentry_init, capture_events):
     )
 
     event = events[0]
-    assert event["request"]["data"] == {"password": "[Filtered]"}
+    # Expectation in data collection is that the user scrubs this within `before_send`
+    assert event["request"]["data"] == {"password": "secret"}
     assert event["request"]["headers"]["authorization"] == "[Filtered]"
     assert event["request"]["headers"]["proxy-authorization"] == "[Filtered]"
 
