@@ -5,7 +5,6 @@ import sentry_sdk
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.integrations.boto3._context import AwsCallContext
 from sentry_sdk.integrations.boto3._instrumentation import (
-    _finish_span,
     _get_error_attributes,
     _get_response_attributes,
     _instrument_streaming_body,
@@ -109,7 +108,7 @@ def _patch_botocore_client() -> None:
                 with capture_internal_exceptions():
                     span.set_attributes(_get_response_attributes(parsed))
         except BaseException as error:
-            _finish_span(span, error)
+            span.__exit__(type(error), error, error.__traceback__)
             raise
 
         streaming_body_instrumented = False
@@ -118,7 +117,7 @@ def _patch_botocore_client() -> None:
 
         # `StreamingBody`s finish their span when consumed or closed.
         if not streaming_body_instrumented:
-            _finish_span(span)
+            span.end()
         return parsed
 
     BaseClient.__init__ = sentry_patched_init  # type: ignore
