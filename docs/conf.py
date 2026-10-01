@@ -6,12 +6,12 @@ from datetime import datetime
 # prevent circular imports
 import sphinx.builders.html
 import sphinx.builders.latex
-import sphinx.builders.linkcheck
 import sphinx.builders.texinfo
 import sphinx.builders.text
 import sphinx.domains.c  # noqa: F401
 import sphinx.domains.cpp  # noqa: F401
 import sphinx.ext.autodoc  # noqa: F401
+import sphinx.ext.intersphinx  # noqa: F401
 import urllib3.exceptions  # noqa: F401
 
 typing.TYPE_CHECKING = True
@@ -49,6 +49,7 @@ extensions = [
     "sphinx_autodoc_typehints",
     "sphinx.ext.viewcode",
     "sphinx.ext.githubpages",
+    "sphinx.ext.intersphinx",
 ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -193,3 +194,5 @@ epub_title = project
 
 # A list of files that should not be packed into the epub file.
 epub_exclude_files = ["search.html"]
+
+intersphinx_mapping = {"python": ("https://docs.python.org/3", None)}
