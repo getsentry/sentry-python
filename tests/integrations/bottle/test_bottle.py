@@ -488,28 +488,25 @@ def test_basic(sentry_init, capture_items):
     assert segment["attributes"]["sentry.origin"] == "auto.http.bottle"
     assert segment["attributes"]["http.request.method"] == "GET"
     assert segment["attributes"]["http.response.status_code"] == 200
-    assert segment["name"].endswith("hi")
+    assert segment["name"] == "/message"
 
 
 @pytest.mark.parametrize(
-    "url,transaction_style,expected_name,expected_source",
+    "url,expected_name,expected_source",
     [
-        ("/message", "endpoint", "hi", "component"),
-        ("/message", "url", "/message", "route"),
-        ("/message/123456", "url", "/message/<message_id>", "route"),
-        ("/message-named-route", "endpoint", "hi", "component"),
+        ("/message", "/message", "route"),
+        ("/message/123456", "/message/<message_id>", "route"),
     ],
 )
-def test_transaction_style(
+def test_segment_name_and_source(
     sentry_init,
     capture_items,
     url,
-    transaction_style,
     expected_name,
     expected_source,
 ):
     sentry_init(
-        integrations=[BottleIntegration(transaction_style=transaction_style)],
+        integrations=[BottleIntegration()],
         traces_sample_rate=1.0,
     )
     items = capture_items("span")
