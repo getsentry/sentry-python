@@ -35,9 +35,6 @@ API Docs
 .. autoclass:: sentry_sdk.attachments.Attachment
    :members:
 
-.. autoclass:: sentry_sdk.scrubber.EventScrubber
-   :members:
-
 .. autoclass:: sentry_sdk.monitor.Monitor
    :members:
 

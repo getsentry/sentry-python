@@ -478,7 +478,7 @@ def test_traces_sampler_exception_unsamples(sentry_init, capture_items):
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="test"):
+    with sentry_sdk.start_span(name="test"):
         ...
 
     sentry_sdk.flush()

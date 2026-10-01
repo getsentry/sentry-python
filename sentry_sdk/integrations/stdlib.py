@@ -279,7 +279,15 @@ def _install_httplib() -> None:
         breadcrumb[SPANDATA.HTTP_REQUEST_METHOD] = method
         breadcrumb.update(url_attributes)
 
-        if sentry_sdk.get_current_span() is not None:
+        parent_span = sentry_sdk.get_current_span()
+        if parent_span is not None:
+            is_inactive_boto3_span = (
+                client.get_integration("boto3") is not None
+                and parent_span.get_attributes().get(SPANDATA.SENTRY_ORIGIN)
+                == getattr(client.get_integration("boto3"), "origin", None)
+                and not getattr(parent_span, "active", True)
+            )
+            # fmt: off
             span = sentry_sdk.start_span(
                 name="%s %s"
                 % (
@@ -291,7 +299,11 @@ def _install_httplib() -> None:
                     "sentry.op": OP.HTTP_CLIENT,
                     SPANDATA.HTTP_REQUEST_METHOD: method,
                 },
+                # boto3 integration owns span's lifecycle; keep child inactive so it
+                # can't restore boto3 span later on.
+                active = not is_inactive_boto3_span,
             )
+            # fmt: on
 
             for key, value in url_attributes.items():
                 span.set_attribute(key, value)

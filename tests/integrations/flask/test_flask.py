@@ -85,34 +85,29 @@ def test_has_context(sentry_init, app, capture_events):
     assert response.status_code == 200
 
     (event,) = events
-    assert event["transaction"] == "hi"
+    assert event["transaction"] == "/message"
     assert "data" not in event["request"]
     assert event["request"]["url"] == "http://localhost/message"
 
 
 @pytest.mark.parametrize(
-    "url,transaction_style,expected_transaction,expected_source",
+    "url,expected_transaction,expected_source",
     [
-        ("/message", "endpoint", "hi", "component"),
-        ("/message", "url", "/message", "route"),
-        ("/message/123456", "endpoint", "hi_with_id", "component"),
-        ("/message/123456", "url", "/message/<int:message_id>", "route"),
+        ("/message", "/message", "route"),
+        ("/message/123456", "/message/<int:message_id>", "route"),
     ],
 )
-def test_transaction_or_segment_style(
+def test_segment_name_and_source(
     sentry_init,
     app,
     capture_events,
     capture_items,
     url,
-    transaction_style,
     expected_transaction,
     expected_source,
 ):
     sentry_init(
-        integrations=[
-            flask_sentry.FlaskIntegration(transaction_style=transaction_style)
-        ],
+        integrations=[flask_sentry.FlaskIntegration()],
         traces_sample_rate=1.0,
     )
 
@@ -282,7 +277,7 @@ def test_flask_login_configured(
     sentry_sdk.flush()
 
     spans = [i.payload for i in items if i.type == "span"]
-    segment = next(s for s in spans if s["name"] == "hi")
+    segment = next(s for s in spans if s["name"] == "/message")
 
     if send_default_pii and user_id is not None:
         assert segment["attributes"]["user.id"] == str(user_id)
@@ -812,12 +807,12 @@ def test_tracing_success(
     (segment,) = spans
     (message_event,) = message_events
 
-    assert segment["name"] == "hi_tx"
+    assert segment["name"] == "/message_tx"
     assert segment["status"] == SpanStatus.OK
     assert segment["attributes"]["sentry.origin"] == "auto.http.flask"
 
     assert message_event["message"] == "hi"
-    assert message_event["transaction"] == "hi_tx"
+    assert message_event["transaction"] == "/message_tx"
     assert message_event["tags"]["view"] == "yes"
     assert message_event["tags"]["before_request"] == "yes"
 
@@ -850,10 +845,10 @@ def test_tracing_error(sentry_init, capture_events, capture_items, app):
     (segment,) = spans
     (error_event,) = error_events
 
-    assert segment["name"] == "error"
+    assert segment["name"] == "/error"
     assert segment["status"] == SpanStatus.ERROR
 
-    assert error_event["transaction"] == "error"
+    assert error_event["transaction"] == "/error"
     (exception,) = error_event["exception"]["values"]
     assert exception["type"] == "ZeroDivisionError"
 
@@ -896,7 +891,7 @@ def test_class_based_views(sentry_init, app, capture_events):
     (event,) = events
 
     assert event["message"] == "hi"
-    assert event["transaction"] == "hello_class"
+    assert event["transaction"] == "/hello-class/"
 
 
 @pytest.mark.parametrize(
@@ -944,13 +939,17 @@ def test_dont_override_sentry_trace_context(sentry_init, app):
         assert response.data == b"hi"
 
 
-def test_request_not_modified_by_reference(sentry_init, capture_events, app):
+def test_request_not_modified_by_reference(
+    sentry_init, capture_events, app, monkeypatch
+):
     sentry_init(
         integrations=[
             flask_sentry.FlaskIntegration(),
             LoggingIntegration(event_level=logging.ERROR),
-        ]
+        ],
+        data_collection={},
     )
+    monkeypatch.setattr(flask_sentry, "flask_login", None)
 
     @app.route("/", methods=["POST"])
     def index():
@@ -974,7 +973,9 @@ def test_request_not_modified_by_reference(sentry_init, capture_events, app):
 
     (event,) = events
 
-    assert event["request"]["data"]["password"] == "[Filtered]"
+    # In data collection, request bodies need to be handled in the before_send
+    # callback, so it's expected that the event will contain the raw value.
+    assert event["request"]["data"]["password"] == "ohno"
     assert event["request"]["headers"]["Authorization"] == "[Filtered]"
     assert event["request"]["headers"]["Proxy-Authorization"] == "[Filtered]"
 
@@ -1409,7 +1410,7 @@ def test_flask_login_user_identity_span_attributes_data_collection(
     sentry_sdk.flush()
 
     spans = [item.payload for item in items]
-    segment = next(s for s in spans if s["name"] == "hi")
+    segment = next(s for s in spans if s["name"] == "/message")
 
     if expect_user:
         assert segment["attributes"]["user.id"] == "42"

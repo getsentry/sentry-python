@@ -15,6 +15,7 @@ from sentry_sdk.integrations.logging import ignore_logger_for_events
 from sentry_sdk.traces import SegmentNameSource
 from sentry_sdk.utils import (
     AnnotatedValue,
+    _is_localhost,
     capture_internal_exceptions,
     ensure_integration_enabled,
     event_from_exception,
@@ -96,8 +97,21 @@ def _handle_request_impl(self: "RequestHandler") -> "Generator[None, None, None]
         sentry_sdk.continue_trace(dict(headers))
         scope.set_custom_sampling_context({"tornado_request": self.request})
 
+        scope.set_attribute(
+            SPANDATA.SENTRY_IS_LOCALHOST,
+            _is_localhost(
+                client_ip=_get_client_ip(self.request),
+                host_header=self.request.headers.get("Host"),
+                forwarded_host_header=self.request.headers.get("X-Forwarded-Host"),
+            ),
+        )
+
         if self.request.remote_ip and client.options["data_collection"]["user_info"]:
             scope.set_attribute(SPANDATA.USER_IP_ADDRESS, self.request.remote_ip)
+
+        user_agent = headers.get("User-Agent")
+        if user_agent:
+            scope.set_attribute(SPANDATA.USER_AGENT_ORIGINAL, user_agent)
 
         with sentry_sdk.start_span(
             name=_DEFAULT_ROOT_SPAN_NAME,
@@ -132,6 +146,17 @@ def _handle_request_impl(self: "RequestHandler") -> "Generator[None, None, None]
                     span.status = "error" if status_int >= 400 else "ok"
 
 
+def _get_client_ip(request: "Any") -> "Optional[str]":
+    x_forwarded_for = request.headers.get("X-Forwarded-For", "").split(",")[0].strip()
+    if x_forwarded_for:
+        return x_forwarded_for
+
+    if request.headers.get("X-Real-IP"):
+        return request.headers["X-Real-IP"]
+
+    return request.remote_ip
+
+
 def _get_request_attributes(request: "Any") -> "Dict[str, Any]":
     attributes = {}  # type: Dict[str, Any]
     client_options = sentry_sdk.get_client().options
@@ -139,9 +164,9 @@ def _get_request_attributes(request: "Any") -> "Dict[str, Any]":
     if request.method:
         attributes[SPANDATA.HTTP_REQUEST_METHOD] = request.method.upper()
 
-    headers = _filter_headers(dict(request.headers), use_annotated_value=False)
+    headers = _filter_headers(dict(request.headers))
     for header, value in headers.items():
-        attributes[f"{SPANDATA.HTTP_REQUEST_HEADER}.{header.lower()}"] = value
+        attributes[f"{SPANDATA.HTTP_REQUEST_HEADER}.{header.lower()}"] = [value]
 
     attributes["url.path"] = request.path
 

@@ -10,8 +10,7 @@ from sentry_sdk.data_collection import _apply_data_collection_filtering_to_query
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations._wsgi_common import _filter_headers
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
-from sentry_sdk.traces import SOURCE_FOR_STYLE as SEGMENT_SOURCE_FOR_STYLE
-from sentry_sdk.traces import Span, get_current_span
+from sentry_sdk.traces import SegmentNameSource, Span, get_current_span
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
@@ -49,22 +48,10 @@ try:
 except ImportError:
     raise DidNotEnable("Quart is not installed or incompatible")
 
-TRANSACTION_STYLE_VALUES = ("endpoint", "url")
-
 
 class QuartIntegration(Integration):
     identifier = "quart"
     origin = f"auto.http.{identifier}"
-
-    transaction_style = ""
-
-    def __init__(self, transaction_style: str = "endpoint") -> None:
-        if transaction_style not in TRANSACTION_STYLE_VALUES:
-            raise ValueError(
-                "Invalid value for transaction_style: %s (must be in %s)"
-                % (transaction_style, TRANSACTION_STYLE_VALUES)
-            )
-        self.transaction_style = transaction_style
 
     @staticmethod
     def setup_once() -> None:
@@ -131,25 +118,6 @@ def patch_scaffold_route() -> None:
     Scaffold.route = _sentry_route
 
 
-def _set_transaction_name_and_source(
-    scope: "sentry_sdk.Scope", transaction_style: str, request: "Request"
-) -> None:
-    try:
-        name_for_style = {
-            "url": request.url_rule.rule,
-            "endpoint": request.url_rule.endpoint,
-        }
-
-        source = SEGMENT_SOURCE_FOR_STYLE[transaction_style]
-
-        scope.set_transaction_name(
-            name=name_for_style[transaction_style],
-            source=source,
-        )
-    except Exception:
-        pass
-
-
 async def _request_websocket_started(app: "Quart", **kwargs: "Any") -> None:
     integration = sentry_sdk.get_client().get_integration(QuartIntegration)
     if integration is None:
@@ -172,9 +140,13 @@ async def _request_websocket_started(app: "Quart", **kwargs: "Any") -> None:
 
     # Set the transaction name here, but rely on ASGI middleware
     # to actually start the transaction
-    _set_transaction_name_and_source(
-        sentry_sdk.get_current_scope(), integration.transaction_style, request_websocket
-    )
+    try:
+        sentry_sdk.get_current_scope().set_transaction_name(
+            name=request_websocket.url_rule.rule,
+            source=SegmentNameSource.ROUTE,
+        )
+    except Exception:
+        pass
 
     scope = sentry_sdk.get_isolation_scope()
 
@@ -186,9 +158,9 @@ async def _request_websocket_started(app: "Quart", **kwargs: "Any") -> None:
         header_attributes: "dict[str, Any]" = {}
 
         for header, header_value in _filter_headers(
-            dict(request_websocket.headers), use_annotated_value=False
+            dict(request_websocket.headers)
         ).items():
-            header_attributes[f"http.request.header.{header.lower()}"] = header_value
+            header_attributes[f"http.request.header.{header.lower()}"] = [header_value]
 
         segment.set_attributes(header_attributes)
 

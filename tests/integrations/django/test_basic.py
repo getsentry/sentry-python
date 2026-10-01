@@ -140,7 +140,7 @@ def test_request_captured(
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
-        send_default_pii=True,
+        data_collection={},
     )
     items = capture_items("event")
     content, status, headers = unpack_werkzeug_response(client.get(reverse("message")))
@@ -151,35 +151,11 @@ def test_request_captured(
 
     assert event["transaction"] == "/message"
     assert event["request"] == {
-        "cookies": {},
         "env": {"SERVER_NAME": "localhost", "SERVER_PORT": "80"},
         "headers": {"Host": "localhost"},
         "method": "GET",
-        "query_string": "",
         "url": "http://localhost/message",
     }
-
-
-def test_transaction_with_class_view(
-    sentry_init,
-    client,
-    capture_items,
-):
-    sentry_init(
-        integrations=[DjangoIntegration(transaction_style="function_name")],
-        send_default_pii=True,
-    )
-    items = capture_items("event")
-    content, status, headers = unpack_werkzeug_response(
-        client.head(reverse("classbased"))
-    )
-    assert status.lower() == "200 ok"
-
-    (event,) = (item.payload for item in items)
-    assert (
-        event["transaction"] == "tests.integrations.django.myapp.views.ClassBasedView"
-    )
-    assert event["message"] == "hi"
 
 
 def test_has_trace_if_performance_enabled(
@@ -857,31 +833,23 @@ def test_set_db_data_custom_backend():
 
 
 @pytest.mark.parametrize(
-    "transaction_style,client_url,expected_transaction,expected_source,expected_response",
+    "client_url,expected_transaction,expected_source,expected_response",
     [
-        (
-            "function_name",
-            "/message",
-            "tests.integrations.django.myapp.views.message",
-            "component",
-            b"ok",
-        ),
-        ("url", "/message", "/message", "route", b"ok"),
-        ("url", "/404", "/404", "url", b"404"),
+        ("/message", "/message", "route", b"ok"),
+        ("/404", "/404", "url", b"404"),
     ],
 )
-def test_transaction_style(
+def test_segment_name(
     sentry_init,
     client,
     capture_items,
-    transaction_style,
     client_url,
     expected_transaction,
     expected_source,
     expected_response,
 ):
     sentry_init(
-        integrations=[DjangoIntegration(transaction_style=transaction_style)],
+        integrations=[DjangoIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
     )
@@ -902,31 +870,23 @@ def test_transaction_style(
 
 
 @pytest.mark.parametrize(
-    "transaction_style,client_url,expected_transaction,expected_source,expected_response",
+    "client_url,expected_transaction,expected_source,expected_response",
     [
-        (
-            "function_name",
-            "/message",
-            "tests.integrations.django.myapp.views.message",
-            "component",
-            b"ok",
-        ),
-        ("url", "/message", "/message", "route", b"ok"),
-        ("url", "/404", "/404", "url", b"404"),
+        ("/message", "/message", "route", b"ok"),
+        ("/404", "/404", "url", b"404"),
     ],
 )
-def test_transaction_style_tracing_disabled(
+def test_segment_name_tracing_disabled(
     sentry_init,
     client,
     capture_items,
-    transaction_style,
     client_url,
     expected_transaction,
     expected_source,
     expected_response,
 ):
     sentry_init(
-        integrations=[DjangoIntegration(transaction_style=transaction_style)],
+        integrations=[DjangoIntegration()],
         send_default_pii=True,
     )
     items = capture_items("event")

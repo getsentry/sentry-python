@@ -232,7 +232,7 @@ def test_non_dict_event(
 
     if has_request_data:
         request_data = {
-            "headers": {"Host": "x1.io", "X-Forwarded-Proto": "https"},
+            "headers": {"Host": "x1.io", "X-Forwarded-Proto": "[Filtered]"},
             "method": "GET",
             "url": "https://x1.io/1",
             "query_string": {
@@ -376,17 +376,17 @@ def test_request_data_with_data_collection_allowlist(lambda_client, test_environ
 
     assert _get_span_attr(attrs, "http.request.method") == "GET"
     # Allowlisted, non-sensitive headers pass through.
-    assert _get_span_attr(attrs, "http.request.header.user-agent") == "custom"
-    assert _get_span_attr(attrs, "http.request.header.x-allow-me") == "yes"
+    assert _get_span_attr(attrs, "http.request.header.user-agent") == ["custom"]
+    assert _get_span_attr(attrs, "http.request.header.x-allow-me") == ["yes"]
     # Not allowlisted -> filtered.
-    assert _get_span_attr(attrs, "http.request.header.host") == "[Filtered]"
-    assert (
-        _get_span_attr(attrs, "http.request.header.x-forwarded-proto") == "[Filtered]"
-    )
+    assert _get_span_attr(attrs, "http.request.header.host") == ["[Filtered]"]
+    assert _get_span_attr(attrs, "http.request.header.x-forwarded-proto") == [
+        "[Filtered]"
+    ]
     # Allowlisted but sensitive -> still filtered.
-    assert _get_span_attr(attrs, "http.request.header.authorization") == "[Filtered]"
+    assert _get_span_attr(attrs, "http.request.header.authorization") == ["[Filtered]"]
     # Not allowlisted, and cookies are always filtered.
-    assert _get_span_attr(attrs, "http.request.header.cookie") == "[Filtered]"
+    assert _get_span_attr(attrs, "http.request.header.cookie") == ["[Filtered]"]
 
 
 def test_request_data_with_data_collection_denylist(lambda_client, test_environment):
@@ -431,20 +431,19 @@ def test_request_data_with_data_collection_denylist(lambda_client, test_environm
 
     assert _get_span_attr(attrs, "http.request.method") == "GET"
     # Not denied by any term -> pass through.
-    assert (
-        _get_span_attr(attrs, "http.request.header.host")
-        == "iwsz2c7uwi.execute-api.us-east-1.amazonaws.com"
-    )
-    assert _get_span_attr(attrs, "http.request.header.x-custom") == "keep-me"
+    assert _get_span_attr(attrs, "http.request.header.host") == [
+        "iwsz2c7uwi.execute-api.us-east-1.amazonaws.com"
+    ]
+    assert _get_span_attr(attrs, "http.request.header.x-custom") == ["keep-me"]
     # Denied by custom terms.
-    assert _get_span_attr(attrs, "http.request.header.user-agent") == "[Filtered]"
-    assert (
-        _get_span_attr(attrs, "http.request.header.x-forwarded-proto") == "[Filtered]"
-    )
+    assert _get_span_attr(attrs, "http.request.header.user-agent") == ["[Filtered]"]
+    assert _get_span_attr(attrs, "http.request.header.x-forwarded-proto") == [
+        "[Filtered]"
+    ]
     # Denied by the built-in sensitive denylist.
-    assert _get_span_attr(attrs, "http.request.header.authorization") == "[Filtered]"
+    assert _get_span_attr(attrs, "http.request.header.authorization") == ["[Filtered]"]
     # Cookies are always filtered.
-    assert _get_span_attr(attrs, "http.request.header.cookie") == "[Filtered]"
+    assert _get_span_attr(attrs, "http.request.header.cookie") == ["[Filtered]"]
 
 
 def test_request_data_with_data_collection_off(lambda_client, test_environment):
@@ -841,10 +840,10 @@ def test_request_attributes(lambda_client, test_environment):
         _get_span_attr(attrs, "url.query")
         == "foo=bar&a-complicated-value=a%3Db%26c%3Dd"
     )
-    assert (
-        _get_span_attr(attrs, "http.request.header.content-type") == "application/json"
-    )
-    assert _get_span_attr(attrs, "http.request.header.accept") == "text/html"
+    assert _get_span_attr(attrs, "http.request.header.content-type") == [
+        "application/json"
+    ]
+    assert _get_span_attr(attrs, "http.request.header.accept") == ["text/html"]
     assert _get_span_attr(attrs, "faas.name") == "BasicOkSpanStreamingDataCollection"
     assert _get_span_attr(attrs, "cloud.provider") == "aws"
     assert _get_span_attr(attrs, "cloud.platform") == "aws_lambda"

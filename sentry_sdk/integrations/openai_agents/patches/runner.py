@@ -4,10 +4,8 @@ from functools import wraps
 import sentry_sdk
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable
-from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.utils import (
     capture_internal_exceptions,
-    has_data_collection_enabled,
     reraise,
 )
 
@@ -56,10 +54,7 @@ class _SentryRunHooks(RunHooks[TContext]):
         context._sentry_execute_tool_span = span
 
         client = sentry_sdk.get_client()
-        if has_data_collection_enabled(client.options):
-            if not client.options["data_collection"]["gen_ai"]["inputs"]:
-                return
-        elif not should_send_default_pii():
+        if not client.options["data_collection"]["gen_ai"]["inputs"]:
             return
 
         span.set_attribute(SPANDATA.GEN_AI_TOOL_INPUT, context.tool_arguments)

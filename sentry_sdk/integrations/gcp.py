@@ -86,13 +86,10 @@ def _wrap_func(func: "F") -> "F":
             header_attributes: "dict[str, Any]" = {}
             if hasattr(gcp_event, "headers"):
                 headers = gcp_event.headers
-                for header, header_value in _filter_headers(
-                    headers, use_annotated_value=False
-                ).items():
-                    header_attributes[f"http.request.header.{header.lower()}"] = (
-                        # header_value will always be a string because we set `use_annotated_value` to false above
+                for header, header_value in _filter_headers(headers).items():
+                    header_attributes[f"http.request.header.{header.lower()}"] = [
                         header_value
-                    )
+                    ]
 
             additional_attributes = {}
             if hasattr(gcp_event, "method"):

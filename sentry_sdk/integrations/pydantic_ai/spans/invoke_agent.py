@@ -12,8 +12,6 @@ from ..consts import SPAN_ORIGIN
 from ..utils import (
     _set_agent_data,
     _set_model_data,
-    _should_send_inputs,
-    _should_send_outputs,
 )
 from .utils import (
     _serialize_binary_content_item,
@@ -60,76 +58,78 @@ def invoke_agent_span(
     _set_model_data(span, agent, model, model_settings)
 
     # Add user prompt and system prompts if available and prompts are enabled
-    if _should_send_inputs():
-        messages = []
+    if not sentry_sdk.get_client().options["data_collection"]["gen_ai"]["inputs"]:
+        return span
 
-        # Add system prompts (both instructions and system_prompt)
-        system_texts = []
+    messages = []
 
-        if agent:
-            # Check for system_prompt
-            system_prompts = getattr(agent, "_system_prompts", None) or []
-            for prompt in system_prompts:
-                if isinstance(prompt, str):
-                    system_texts.append(prompt)
+    # Add system prompts (both instructions and system_prompt)
+    system_texts = []
 
-            # Check for instructions (stored in _instructions)
-            instructions = getattr(agent, "_instructions", None)
-            if instructions:
-                if isinstance(instructions, str):
-                    system_texts.append(instructions)
-                elif isinstance(instructions, (list, tuple)):
-                    for instr in instructions:
-                        if isinstance(instr, str):
-                            system_texts.append(instr)
-                        elif callable(instr):
-                            # Skip dynamic/callable instructions
-                            pass
+    if agent:
+        # Check for system_prompt
+        system_prompts = getattr(agent, "_system_prompts", None) or []
+        for prompt in system_prompts:
+            if isinstance(prompt, str):
+                system_texts.append(prompt)
 
-        # Add all system texts as system messages
-        for system_text in system_texts:
+        # Check for instructions (stored in _instructions)
+        instructions = getattr(agent, "_instructions", None)
+        if instructions:
+            if isinstance(instructions, str):
+                system_texts.append(instructions)
+            elif isinstance(instructions, (list, tuple)):
+                for instr in instructions:
+                    if isinstance(instr, str):
+                        system_texts.append(instr)
+                    elif callable(instr):
+                        # Skip dynamic/callable instructions
+                        pass
+
+    # Add all system texts as system messages
+    for system_text in system_texts:
+        messages.append(
+            {
+                "content": [{"text": system_text, "type": "text"}],
+                "role": "system",
+            }
+        )
+
+    # Add user prompt
+    if user_prompt:
+        if isinstance(user_prompt, str):
             messages.append(
                 {
-                    "content": [{"text": system_text, "type": "text"}],
-                    "role": "system",
+                    "content": [{"text": user_prompt, "type": "text"}],
+                    "role": "user",
                 }
             )
-
-        # Add user prompt
-        if user_prompt:
-            if isinstance(user_prompt, str):
+        elif isinstance(user_prompt, list):
+            # Handle list of user content
+            content = []
+            for item in user_prompt:
+                if isinstance(item, str):
+                    content.append({"text": item, "type": "text"})
+                elif ImageUrl is not None and isinstance(item, ImageUrl):
+                    content.append(_serialize_image_url_item(item))
+                elif BinaryContent is not None and isinstance(item, BinaryContent):
+                    content.append(_serialize_binary_content_item(item))
+            if content:
                 messages.append(
                     {
-                        "content": [{"text": user_prompt, "type": "text"}],
+                        "content": content,
                         "role": "user",
                     }
                 )
-            elif isinstance(user_prompt, list):
-                # Handle list of user content
-                content = []
-                for item in user_prompt:
-                    if isinstance(item, str):
-                        content.append({"text": item, "type": "text"})
-                    elif ImageUrl is not None and isinstance(item, ImageUrl):
-                        content.append(_serialize_image_url_item(item))
-                    elif BinaryContent is not None and isinstance(item, BinaryContent):
-                        content.append(_serialize_binary_content_item(item))
-                if content:
-                    messages.append(
-                        {
-                            "content": content,
-                            "role": "user",
-                        }
-                    )
 
-        if messages:
-            normalized_messages = normalize_message_roles(messages)
-            set_data_normalized(
-                span,
-                SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                normalized_messages,
-                unpack=False,
-            )
+    if messages:
+        normalized_messages = normalize_message_roles(messages)
+        set_data_normalized(
+            span,
+            SPANDATA.GEN_AI_REQUEST_MESSAGES,
+            normalized_messages,
+            unpack=False,
+        )
 
     return span
 
@@ -146,7 +146,10 @@ def update_invoke_agent_span(
     output = getattr(result, "output", None)
 
     # Set response text if prompts are enabled
-    if _should_send_outputs() and output:
-        set_data_normalized(
-            span, SPANDATA.GEN_AI_RESPONSE_TEXT, str(output), unpack=False
-        )
+    if (
+        not sentry_sdk.get_client().options["data_collection"]["gen_ai"]["outputs"]
+        or not output
+    ):
+        return
+
+    set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, str(output), unpack=False)

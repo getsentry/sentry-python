@@ -6,9 +6,8 @@ from sentry_sdk.ai.utils import (
     set_data_normalized,
 )
 from sentry_sdk.consts import OP, SPANDATA
-from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import Span
-from sentry_sdk.utils import has_data_collection_enabled, safe_serialize
+from sentry_sdk.utils import safe_serialize
 
 from ..consts import SPAN_ORIGIN
 from ..utils import _set_agent_data
@@ -33,14 +32,7 @@ def invoke_agent_span(
         },
     )
 
-    record_inputs = False
-    if has_data_collection_enabled(client_options):
-        if client_options["data_collection"]["gen_ai"]["inputs"]:
-            record_inputs = True
-    elif should_send_default_pii():
-        record_inputs = True
-
-    if record_inputs:
+    if client_options["data_collection"]["gen_ai"]["inputs"]:
         messages = []
         if agent.instructions:
             message = (
@@ -89,12 +81,7 @@ def update_invoke_agent_span(
     output: "Any" = None,
 ) -> None:
     client = sentry_sdk.get_client()
-    if has_data_collection_enabled(client.options):
-        if client.options["data_collection"]["gen_ai"]["outputs"]:
-            set_data_normalized(
-                span, SPANDATA.GEN_AI_RESPONSE_TEXT, output, unpack=False
-            )
-    elif should_send_default_pii():
+    if client.options["data_collection"]["gen_ai"]["outputs"]:
         set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, output, unpack=False)
 
     # Add conversation ID from agent
