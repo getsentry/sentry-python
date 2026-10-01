@@ -160,7 +160,7 @@ async def _request_websocket_started(app: "Quart", **kwargs: "Any") -> None:
         for header, header_value in _filter_headers(
             dict(request_websocket.headers)
         ).items():
-            header_attributes[f"http.request.header.{header.lower()}"] = header_value
+            header_attributes[f"http.request.header.{header.lower()}"] = [header_value]
 
         segment.set_attributes(header_attributes)
 

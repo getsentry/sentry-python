@@ -167,9 +167,9 @@ def _wrap_handler(handler: "F") -> "F":
 
             header_attributes: "dict[str, Any]" = {}
             for header, header_value in _filter_headers(headers).items():
-                header_attributes[f"http.request.header.{header.lower()}"] = (
+                header_attributes[f"http.request.header.{header.lower()}"] = [
                     header_value
-                )
+                ]
 
             additional_attributes: "dict[str, Any]" = {}
             if "httpMethod" in request_data:
