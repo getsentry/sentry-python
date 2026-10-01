@@ -49,10 +49,7 @@ async def test_basic(sentry_init, aiohttp_client, capture_events):
 
     (event,) = events
 
-    assert (
-        event["transaction"]
-        == "tests.integrations.aiohttp.test_aiohttp.test_basic.<locals>.hello"
-    )
+    assert event["transaction"] == "/"
 
     (exception,) = event["exception"]["values"]
     assert exception["type"] == "ZeroDivisionError"
@@ -325,10 +322,7 @@ async def test_tracing_unparseable_url(sentry_init, aiohttp_client, capture_item
 
     (span,) = [item.payload for item in items]
 
-    assert (
-        span["name"]
-        == "tests.integrations.aiohttp.test_aiohttp.test_tracing_unparseable_url.<locals>.hello"
-    )
+    assert span["name"] == "/"
 
 
 @pytest.mark.asyncio
@@ -1340,14 +1334,11 @@ async def test_tracing(sentry_init, aiohttp_client, capture_items):
     (server_span,) = [item.payload for item in items]
 
     assert server_span["is_segment"] is True
-    assert (
-        server_span["name"]
-        == "tests.integrations.aiohttp.test_aiohttp.test_tracing.<locals>.hello"
-    )
+    assert server_span["name"] == "/"
     assert server_span["attributes"]["sentry.op"] == "http.server"
     assert server_span["attributes"]["sentry.origin"] == "auto.http.aiohttp"
     assert server_span["attributes"]["http.response.status_code"] == 200
-    assert server_span["attributes"]["sentry.segment.name.source"] == "component"
+    assert server_span["attributes"]["sentry.segment.name.source"] == "route"
     assert server_span["status"] == "ok"
     # No query string on the request, so the attribute should be omitted.
     assert "url.query" not in server_span["attributes"]
@@ -1438,47 +1429,23 @@ async def test_sensitive_header_scrubbing(sentry_init, aiohttp_client, capture_i
 
     # Data collection always substitutes sensitive headers with
     # SENSITIVE_DATA_SUBSTITUTE ("[Filtered]"). The original token must not leak.
-    assert (
-        server_span["attributes"]["http.request.header.authorization"]
-        == SENSITIVE_DATA_SUBSTITUTE
-    )
+    assert server_span["attributes"]["http.request.header.authorization"] == [
+        SENSITIVE_DATA_SUBSTITUTE
+    ]
     # Non-sensitive headers pass through untouched.
-    assert (
-        server_span["attributes"]["http.request.header.x-custom-header"]
-        == "passthrough"
-    )
+    assert server_span["attributes"]["http.request.header.x-custom-header"] == [
+        "passthrough"
+    ]
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "url,transaction_style,expected_name,expected_source",
-    [
-        (
-            "/message",
-            "handler_name",
-            "tests.integrations.aiohttp.test_aiohttp."
-            "test_transaction_style.<locals>.hello",
-            "component",
-        ),
-        (
-            "/message",
-            "method_and_path_pattern",
-            "GET /{var}",
-            "route",
-        ),
-    ],
-)
 async def test_transaction_style(
     sentry_init,
     aiohttp_client,
     capture_items,
-    url,
-    transaction_style,
-    expected_name,
-    expected_source,
 ):
     sentry_init(
-        integrations=[AioHttpIntegration(transaction_style=transaction_style)],
+        integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
         data_collection={},
     )
@@ -1492,7 +1459,7 @@ async def test_transaction_style(
     items = capture_items("span")
 
     client = await aiohttp_client(app)
-    resp = await client.get(url)
+    resp = await client.get("/message")
     assert resp.status == 200
 
     sentry_sdk.flush()
@@ -1500,9 +1467,9 @@ async def test_transaction_style(
     assert len(items) == 1
     (server_segment,) = [item.payload for item in items]
 
-    assert server_segment["name"] == expected_name
+    assert server_segment["name"] == "/{var}"
     assert server_segment["is_segment"]
-    assert server_segment["attributes"]["sentry.segment.name.source"] == expected_source
+    assert server_segment["attributes"]["sentry.segment.name.source"] == "route"
 
 
 @pytest.mark.asyncio
@@ -1781,7 +1748,7 @@ async def test_user_ip_address_on_all_spans(
 
     child_span, server_span = [item.payload for item in items]
 
-    assert server_span["attributes"]["sentry.segment.name.source"] == "component"
+    assert server_span["attributes"]["sentry.segment.name.source"] == "route"
     assert "sentry.segment.name.source" not in child_span["attributes"]
 
     if expect_user_info:
@@ -1962,3 +1929,95 @@ async def test_remote_addr_data_collection(
         assert event["request"]["env"] == {"REMOTE_ADDR": "127.0.0.1"}
     else:
         assert "env" not in event["request"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "forwarded_for, host_header, is_localhost",
+    [
+        pytest.param(None, None, True, id="loopback-ip"),
+        pytest.param(
+            "93.184.216.34", "localhost:8080", True, id="localhost-host-header"
+        ),
+        pytest.param("93.184.216.34", "example.com", False, id="non-local"),
+    ],
+)
+async def test_is_localhost_attribute(
+    sentry_init,
+    aiohttp_client,
+    capture_items,
+    forwarded_for,
+    host_header,
+    is_localhost,
+):
+    sentry_init(
+        integrations=[AioHttpIntegration()],
+        traces_sample_rate=1.0,
+    )
+
+    async def hello(request):
+        with sentry_sdk.start_span(name="child"):
+            pass
+        return web.Response(text="hello")
+
+    app = web.Application()
+    app.router.add_get("/", hello)
+
+    items = capture_items("span")
+
+    client = await aiohttp_client(app)
+    headers = {}
+    if host_header:
+        headers["Host"] = host_header
+    if forwarded_for:
+        headers["X-Forwarded-For"] = forwarded_for
+    resp = await client.get("/", headers=headers)
+    assert resp.status == 200
+
+    sentry_sdk.flush()
+
+    child_spans = [item.payload for item in items if not item.payload.get("is_segment")]
+    server_spans = [item.payload for item in items if item.payload.get("is_segment")]
+
+    assert len(server_spans) == 1
+    assert len(child_spans) == 1
+
+    assert server_spans[0]["attributes"][SPANDATA.SENTRY_IS_LOCALHOST] == is_localhost
+    assert child_spans[0]["attributes"][SPANDATA.SENTRY_IS_LOCALHOST] == is_localhost
+
+
+@pytest.mark.asyncio
+async def test_user_agent_attribute(sentry_init, aiohttp_client, capture_items):
+    sentry_init(
+        integrations=[AioHttpIntegration()],
+        traces_sample_rate=1.0,
+    )
+
+    async def hello(request):
+        with sentry_sdk.start_span(name="child"):
+            pass
+        return web.Response(text="hello")
+
+    app = web.Application()
+    app.router.add_get("/", hello)
+
+    items = capture_items("span")
+
+    client = await aiohttp_client(app)
+    resp = await client.get("/", headers={"User-Agent": "TestBrowser/1.0"})
+    assert resp.status == 200
+
+    sentry_sdk.flush()
+
+    child_spans = [item.payload for item in items if not item.payload.get("is_segment")]
+    server_spans = [item.payload for item in items if item.payload.get("is_segment")]
+
+    assert len(server_spans) == 1
+    assert len(child_spans) == 1
+
+    assert (
+        server_spans[0]["attributes"][SPANDATA.USER_AGENT_ORIGINAL] == "TestBrowser/1.0"
+    )
+    assert (
+        child_spans[0]["attributes"][SPANDATA.USER_AGENT_ORIGINAL] == "TestBrowser/1.0"
+    )
