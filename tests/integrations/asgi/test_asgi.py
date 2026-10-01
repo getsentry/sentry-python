@@ -156,16 +156,6 @@ def asgi3_custom_transaction_app():
     return app
 
 
-def test_invalid_transaction_style(asgi3_app):
-    with pytest.raises(ValueError) as exp:
-        SentryAsgiMiddleware(asgi3_app, transaction_style="URL")
-
-    assert (
-        str(exp.value)
-        == "Invalid value for transaction_style: URL (must be in ('endpoint', 'url'))"
-    )
-
-
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "should_send_pii",

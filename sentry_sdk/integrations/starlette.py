@@ -24,14 +24,13 @@ from sentry_sdk.integrations._wsgi_common import (
     request_body_within_bounds,
 )
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
-from sentry_sdk.traces import SOURCE_FOR_STYLE, SegmentNameSource, Span
+from sentry_sdk.traces import SegmentNameSource, Span
 from sentry_sdk.utils import (
     AnnotatedValue,
     capture_internal_exceptions,
     ensure_integration_enabled,
     event_from_exception,
     parse_version,
-    transaction_from_function,
 )
 
 if TYPE_CHECKING:
@@ -86,28 +85,17 @@ else:
 
 _DEFAULT_TRANSACTION_NAME = "generic Starlette request"
 
-TRANSACTION_STYLE_VALUES = ("endpoint", "url")
-
 
 class StarletteIntegration(Integration):
     identifier = "starlette"
     origin = f"auto.http.{identifier}"
 
-    transaction_style = ""
-
     def __init__(
         self,
-        transaction_style: str = "url",
         failed_request_status_codes: "Set[int]" = _DEFAULT_FAILED_REQUEST_STATUS_CODES,
         middleware_spans: bool = False,
         http_methods_to_capture: "tuple[str, ...]" = DEFAULT_HTTP_METHODS_TO_CAPTURE,
     ):
-        if transaction_style not in TRANSACTION_STYLE_VALUES:
-            raise ValueError(
-                "Invalid value for transaction_style: %s (must be in %s)"
-                % (transaction_style, TRANSACTION_STYLE_VALUES)
-            )
-        self.transaction_style = transaction_style
         self.middleware_spans = middleware_spans
         self.http_methods_to_capture = tuple(map(str.upper, http_methods_to_capture))
 
@@ -161,14 +149,10 @@ def _enable_span_for_middleware(
             server_span.set_attribute(SPANDATA.HTTP_ROUTE, route_path)
 
         # Update transaction name with middleware name
-        name, source = _get_transaction_from_middleware(
-            app, integration, route_path=route_path, name_source=name_source
-        )
-
-        if name is not None:
+        if route_path is not None:
             sentry_sdk.get_current_scope().set_transaction_name(
-                name,
-                source=source,
+                route_path,
+                source=name_source,
             )
 
         if not integration.middleware_spans:
@@ -510,12 +494,9 @@ async def _wrap_async_handler(
     ):
         server_span.set_attribute(SPANDATA.HTTP_ROUTE, route_path)
 
-    _set_transaction_name_and_source(
-        sentry_sdk.get_current_scope(),
-        integration.transaction_style,
-        endpoint=request.scope.get("endpoint"),
-        route_path=route_path,
-        name_source=name_source,
+    sentry_sdk.get_current_scope().set_transaction_name(
+        route_path if route_path is not None else _DEFAULT_TRANSACTION_NAME,
+        source=name_source,
     )
 
     sentry_scope = sentry_sdk.get_isolation_scope()
@@ -610,12 +591,9 @@ def patch_request_response() -> None:
                 ):
                     server_span.set_attribute(SPANDATA.HTTP_ROUTE, route_path)
 
-                _set_transaction_name_and_source(
-                    sentry_sdk.get_current_scope(),
-                    integration.transaction_style,
-                    endpoint=request.scope.get("endpoint"),
-                    route_path=route_path,
-                    name_source=name_source,
+                sentry_sdk.get_current_scope().set_transaction_name(
+                    route_path if route_path is not None else _DEFAULT_TRANSACTION_NAME,
+                    source=name_source,
                 )
 
                 extractor = StarletteRequestExtractor(request)
@@ -816,44 +794,3 @@ def _http_route_and_source_from_router(
                 return scope.get("path"), SegmentNameSource.URL
 
     return None, SegmentNameSource.ROUTE
-
-
-def _set_transaction_name_and_source(
-    scope: "sentry_sdk.Scope",
-    transaction_style: str,
-    endpoint: "Optional[Callable[..., Any]]",
-    route_path: "Optional[str]",
-    name_source: "SegmentNameSource",
-) -> None:
-    name = None
-    source = SOURCE_FOR_STYLE[transaction_style]
-
-    if transaction_style == "endpoint" and endpoint:
-        name = transaction_from_function(endpoint) or None
-
-    elif transaction_style == "url":
-        name, source = route_path, name_source
-
-    if name is None:
-        name = _DEFAULT_TRANSACTION_NAME
-        source = SegmentNameSource.ROUTE
-
-    scope.set_transaction_name(name, source=source)
-
-
-def _get_transaction_from_middleware(
-    app: "Any",
-    integration: "StarletteIntegration",
-    route_path: "Optional[str]",
-    name_source: "SegmentNameSource",
-) -> "Tuple[Optional[str], Optional[str]]":
-    name = None
-    source = None
-
-    if integration.transaction_style == "endpoint":
-        name = transaction_from_function(app.__class__)
-        source = SegmentNameSource.COMPONENT
-    elif integration.transaction_style == "url":
-        name, source = route_path, name_source
-
-    return name, source
