@@ -85,24 +85,21 @@ def test_has_context(
 
 
 @pytest.mark.parametrize(
-    "url,transaction_style,expected_transaction,expected_source",
+    "url,expected_transaction,expected_source",
     [
-        ("/message", "uri_template", "/message", "route"),
-        ("/message", "path", "/message", "url"),
-        ("/message/123456", "uri_template", "/message/{message_id:int}", "route"),
-        ("/message/123456", "path", "/message/123456", "url"),
+        ("/message", "/message", "route"),
+        ("/message/123456", "/message/{message_id:int}", "route"),
     ],
 )
-def test_transaction_style(
+def test_segment_name_and_source(
     sentry_init,
     make_client,
     capture_items,
     url,
-    transaction_style,
     expected_transaction,
     expected_source,
 ):
-    integration = FalconIntegration(transaction_style=transaction_style)
+    integration = FalconIntegration()
     sentry_init(
         integrations=[integration],
         traces_sample_rate=1.0,
