@@ -753,7 +753,12 @@ def test_django_connect_breadcrumbs(
 
     assert event["breadcrumbs"]["values"][-2:] == [
         {"message": "connect", "category": "query", "type": "default"},
-        {"message": "select 1", "category": "query", "data": {}, "type": "default"},
+        {
+            "message": "select 1",
+            "category": "query",
+            "data": {"db.paramstyle": "format"},
+            "type": "default",
+        },
     ]
 
 
