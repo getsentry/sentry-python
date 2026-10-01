@@ -839,7 +839,7 @@ def test_set_db_data_custom_backend():
         ("/404", "/404", "url", b"404"),
     ],
 )
-def test_transaction_style(
+def test_segment_name(
     sentry_init,
     client,
     capture_items,
@@ -876,7 +876,7 @@ def test_transaction_style(
         ("/404", "/404", "url", b"404"),
     ],
 )
-def test_transaction_style_tracing_disabled(
+def test_segment_name_tracing_disabled(
     sentry_init,
     client,
     capture_items,
