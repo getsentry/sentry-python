@@ -905,6 +905,33 @@ def test_is_localhost_span_attribute(
     assert child_spans[0]["attributes"][SPANDATA.SENTRY_IS_LOCALHOST] == is_localhost
 
 
+def test_user_agent_attribute(tornado_testcase, sentry_init, capture_items):
+    sentry_init(
+        integrations=[TornadoIntegration()],
+        traces_sample_rate=1.0,
+    )
+
+    items = capture_items("span")
+
+    client = tornado_testcase(Application([(r"/hi", ChildSpanHandler)]))
+    client.fetch("/hi", headers={"User-Agent": "TestBrowser/1.0"})
+
+    sentry_sdk.flush()
+
+    child_spans = [item.payload for item in items if not item.payload.get("is_segment")]
+    server_spans = [item.payload for item in items if item.payload.get("is_segment")]
+
+    assert len(server_spans) == 1
+    assert len(child_spans) == 1
+
+    assert (
+        server_spans[0]["attributes"][SPANDATA.USER_AGENT_ORIGINAL] == "TestBrowser/1.0"
+    )
+    assert (
+        child_spans[0]["attributes"][SPANDATA.USER_AGENT_ORIGINAL] == "TestBrowser/1.0"
+    )
+
+
 @pytest.mark.parametrize(
     "data_collection, expect_remote_addr", DATA_COLLECTION_REMOTE_ADDR_CASES
 )

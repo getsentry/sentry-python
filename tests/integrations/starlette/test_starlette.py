@@ -827,7 +827,7 @@ def test_segment_name_and_source(
     assert event["transaction_info"] == {"source": expected_source}
 
 
-def test_host_route_path_has_url_source(sentry_init, capture_items):
+def test_hosted_route_transaction_info(sentry_init, capture_items):
     sentry_init(
         integrations=[StarletteIntegration()],
         traces_sample_rate=1.0,
@@ -850,18 +850,20 @@ def test_host_route_path_has_url_source(sentry_init, capture_items):
 
     sentry_sdk.flush()
 
-    events = [item.payload for item in items if item.type == "event"]
-    assert len(events) == 1
-    assert events[0]["transaction"].endswith("/users/123456")
-
     segments = [
         item.payload
         for item in items
         if item.type == "span" and item.payload.get("is_segment")
     ]
     assert len(segments) == 1
-    assert segments[0]["name"].endswith("/users/123456")
-    assert segments[0]["attributes"]["sentry.segment.name.source"] == "url"
+
+    # Starlette starting setting scope["route"] with https://github.com/Kludex/starlette/commit/9c594b56e8da9c3d8c35baa40f357e7bc94f6d02
+    if STARLETTE_VERSION >= (1, 7):
+        assert segments[0]["name"].endswith("/users/{user_id}")
+        assert segments[0]["attributes"]["sentry.segment.name.source"] == "route"
+    else:
+        assert segments[0]["name"].endswith("/users/123456")
+        assert segments[0]["attributes"]["sentry.segment.name.source"] == "url"
 
 
 @pytest.mark.parametrize(

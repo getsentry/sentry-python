@@ -147,6 +147,10 @@ async def _context_enter(request: "Request") -> None:
     if request.remote_addr and client.options["data_collection"]["user_info"]:
         scope.set_attribute(SPANDATA.USER_IP_ADDRESS, request.remote_addr)
 
+    user_agent = request.headers.get("user-agent")
+    if user_agent:
+        scope.set_attribute(SPANDATA.USER_AGENT_ORIGINAL, user_agent)
+
     span = sentry_sdk.start_span(
         # Unless the request results in a 404 error, the name and source
         # will get overwritten in _set_transaction

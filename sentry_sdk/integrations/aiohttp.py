@@ -139,6 +139,10 @@ class AioHttpIntegration(Integration):
                         ),
                     )
 
+                    user_agent = request.headers.get("User-Agent")
+                    if user_agent:
+                        scope.set_attribute(SPANDATA.USER_AGENT_ORIGINAL, user_agent)
+
                     headers = dict(request.headers)
 
                     sentry_sdk.continue_trace(headers)

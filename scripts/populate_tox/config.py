@@ -235,6 +235,7 @@ TEST_SUITE_CONFIG = {
         "package": "huggingface_hub",
         "deps": {
             "*": ["responses", "pytest-httpx"],
+            ">=2": ["httpx2-pytest"],
         },
     },
     "langchain-base": {
@@ -472,12 +473,13 @@ TEST_SUITE_CONFIG = {
                 "pytest-asyncio",
                 "python-multipart",
                 "requests",
-                "anyio<4.0.0",
                 "jinja2",
                 "httpx",
             ],
             # See the comment on FastAPI's httpx bound for more info
             "<0.37.2": ["httpx<0.28.0"],
+            # Starlette <0.21 uses anyio.start_blocking_portal which was removed in anyio 4.
+            "<0.21": ["anyio<4"],
         },
     },
     "starlite": {
