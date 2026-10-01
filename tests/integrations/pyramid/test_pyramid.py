@@ -112,29 +112,26 @@ def test_has_context(route, get_client, sentry_init, capture_events):
         "method": "GET",
         "url": "http://localhost/context_message/yoo",
     }
-    assert event["transaction"] == "hi2"
+    assert event["transaction"] == "/context_message/{msg}"
 
 
 @pytest.mark.parametrize(
-    "url,transaction_style,expected_transaction,expected_source",
+    "url,expected_transaction,expected_source",
     [
-        ("/message", "route_name", "hi", "component"),
-        ("/message", "route_pattern", "/message", "route"),
-        ("/message/123456", "route_name", "hi_with_id", "component"),
-        ("/message/123456", "route_pattern", "/message/{message_id}", "route"),
+        ("/message", "/message", "route"),
+        ("/message/123456", "/message/{message_id}", "route"),
     ],
 )
-def test_transaction_style(
+def test_segment_name_and_source(
     sentry_init,
     get_client,
     capture_items,
     url,
-    transaction_style,
     expected_transaction,
     expected_source,
 ):
     sentry_init(
-        integrations=[PyramidIntegration(transaction_style=transaction_style)],
+        integrations=[PyramidIntegration()],
         traces_sample_rate=1.0,
     )
 
@@ -504,7 +501,7 @@ def test_tracing_error(
     (segment,) = spans
     (error_event,) = error_events
 
-    assert segment["name"] == "tracing_error"
+    assert segment["name"] == "/tracing-error"
     assert segment["status"] == SpanStatus.ERROR
     assert segment["attributes"]["sentry.origin"] == "auto.http.pyramid"
 
