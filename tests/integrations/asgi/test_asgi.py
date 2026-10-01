@@ -168,7 +168,7 @@ def asgi3_app_with_span():
                     await send({"type": "lifespan.shutdown.complete"})
                     return
 
-        with sentry_sdk.traces.start_span(name="child-span"):
+        with sentry_sdk.start_span(name="child-span"):
             pass
 
         await send(

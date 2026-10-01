@@ -1086,7 +1086,7 @@ def test_is_localhost_attribute(
     sentry_init, capture_items, client_kwargs, is_localhost
 ):
     def dogpark(environ, start_response):
-        with sentry_sdk.traces.start_span(name="child-span"):
+        with sentry_sdk.start_span(name="child-span"):
             pass
         start_response("200 OK", [])
         return ["woof"]
@@ -1110,7 +1110,7 @@ def test_is_localhost_attribute(
 
 def test_user_agent_attribute(sentry_init, capture_items):
     def dogpark(environ, start_response):
-        with sentry_sdk.traces.start_span(name="child-span"):
+        with sentry_sdk.start_span(name="child-span"):
             pass
         start_response("200 OK", [])
         return ["woof"]
