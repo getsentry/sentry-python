@@ -152,10 +152,9 @@ def _start_client_span(
     if sentry_sdk.get_current_span() is None:
         return None
 
-    # use "unknown" if `service_id_hyphenized` is not set so span name can still be created.
-    # e.g. "aws.unknown.GetObject"
-    service_name = ctx.service_id_hyphenized or "unknown"
-    span_name = f"aws.{service_name}.{ctx.operation_name}"
+    # https://opentelemetry.io/docs/specs/semconv/cloud-providers/aws-sdk/#aws-sdk-spans
+    service_name = ctx.service_id or "unknown"
+    span_name = f"{service_name}.{ctx.operation_name}"
     attributes: "Attributes" = {
         SPANDATA.RPC_METHOD: ctx.operation_name,
         SPANDATA.RPC_SYSTEM_NAME: AWS_RPC_SYSTEM_NAME,
