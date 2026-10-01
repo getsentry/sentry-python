@@ -212,8 +212,8 @@ async def test_capture_transaction(
 
     assert span["attributes"]["network.protocol.name"] == "http"
     assert span["attributes"]["http.request.method"] == "GET"
-    assert span["attributes"]["http.request.header.host"] == "localhost"
-    assert span["attributes"]["http.request.header.user-agent"] == "ASGI-Test-Client"
+    assert span["attributes"]["http.request.header.host"] == ["localhost"]
+    assert span["attributes"]["http.request.header.user-agent"] == ["ASGI-Test-Client"]
     assert span["attributes"]["url.full"] == "http://localhost/some_url?somevalue=123"
 
 
