@@ -22,7 +22,6 @@ def test_clickhouse_client_breadcrumbs(sentry_init, capture_events) -> None:
     sentry_init(
         integrations=[ClickhouseDriverIntegration()],
         data_collection={},
-        _experiments={"record_sql_params": True},
     )
     events = capture_events()
 
@@ -522,9 +521,6 @@ def test_clickhouse_client_spans(
 ):
     sentry_init(
         integrations=[ClickhouseDriverIntegration()],
-        _experiments={
-            "record_sql_params": True,
-        },
         traces_sample_rate=1.0,
         data_collection={},
     )
@@ -758,9 +754,6 @@ def test_clickhouse_dbapi_spans(
 ):
     sentry_init(
         integrations=[ClickhouseDriverIntegration()],
-        _experiments={
-            "record_sql_params": True,
-        },
         traces_sample_rate=1.0,
         data_collection={},
     )

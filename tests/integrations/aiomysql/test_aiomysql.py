@@ -102,7 +102,7 @@ def _connect_args():
 async def test_connect(sentry_init, capture_events) -> None:
     sentry_init(
         integrations=[AioMySQLIntegration()],
-        _experiments={"record_sql_params": True},
+        data_collection={"database_query_data": True},
     )
     events = capture_events()
 
@@ -123,7 +123,7 @@ async def test_connect(sentry_init, capture_events) -> None:
 async def test_execute(sentry_init, capture_events) -> None:
     sentry_init(
         integrations=[AioMySQLIntegration()],
-        _experiments={"record_sql_params": True},
+        data_collection={"database_query_data": True},
     )
     events = capture_events()
 
@@ -177,7 +177,6 @@ async def test_execute(sentry_init, capture_events) -> None:
 async def test_execute_many(sentry_init, capture_events) -> None:
     sentry_init(
         integrations=[AioMySQLIntegration()],
-        _experiments={"record_sql_params": True},
     )
     events = capture_events()
 
@@ -354,7 +353,7 @@ async def test_execute_many_non_insert(sentry_init, capture_events) -> None:
     """Test executemany with non-INSERT queries (falls back to row-by-row)."""
     sentry_init(
         integrations=[AioMySQLIntegration()],
-        _experiments={"record_sql_params": True},
+        data_collection={"database_query_data": True},
     )
     events = capture_events()
 
@@ -403,7 +402,6 @@ async def test_execute_many_non_insert(sentry_init, capture_events) -> None:
 async def test_record_params(sentry_init, capture_events) -> None:
     sentry_init(
         integrations=[AioMySQLIntegration(record_params=True)],
-        _experiments={"record_sql_params": True},
     )
     events = capture_events()
 
@@ -562,7 +560,7 @@ async def test_execute_record_params_with_data_collection_default(
 async def test_cursor_context_manager(sentry_init, capture_events) -> None:
     sentry_init(
         integrations=[AioMySQLIntegration()],
-        _experiments={"record_sql_params": True},
+        data_collection={"database_query_data": True},
     )
     events = capture_events()
 
@@ -604,7 +602,7 @@ async def test_cursor_context_manager(sentry_init, capture_events) -> None:
 async def test_cursor_async_iteration(sentry_init, capture_events) -> None:
     sentry_init(
         integrations=[AioMySQLIntegration()],
-        _experiments={"record_sql_params": True},
+        data_collection={"database_query_data": True},
     )
     events = capture_events()
 
@@ -637,7 +635,7 @@ async def test_cursor_async_iteration(sentry_init, capture_events) -> None:
 async def test_connection_pool(sentry_init, capture_events) -> None:
     sentry_init(
         integrations=[AioMySQLIntegration()],
-        _experiments={"record_sql_params": True},
+        data_collection={"database_query_data": True},
     )
     events = capture_events()
 

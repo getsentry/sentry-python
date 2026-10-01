@@ -102,9 +102,7 @@ async def test_connect(
 ) -> None:
     sentry_init(
         integrations=[AsyncPGIntegration()],
-        _experiments={
-            "record_sql_params": True,
-        },
+        data_collection={"database_query_data": True},
     )
 
     items = capture_items("event")
@@ -131,9 +129,7 @@ async def test_execute(
 ) -> None:
     sentry_init(
         integrations=[AsyncPGIntegration()],
-        _experiments={
-            "record_sql_params": True,
-        },
+        data_collection={"database_query_data": True},
     )
 
     items = capture_items("event")
@@ -203,9 +199,7 @@ async def test_execute_many(
 ) -> None:
     sentry_init(
         integrations=[AsyncPGIntegration()],
-        _experiments={
-            "record_sql_params": True,
-        },
+        data_collection={"database_query_data": True},
     )
 
     items = capture_items("event")
@@ -244,7 +238,7 @@ async def test_execute_many(
 async def test_record_params(sentry_init, capture_events) -> None:
     sentry_init(
         integrations=[AsyncPGIntegration(record_params=True)],
-        _experiments={"record_sql_params": True},
+        data_collection={"database_query_data": True},
     )
     events = capture_events()
 
@@ -284,7 +278,7 @@ async def test_record_params(sentry_init, capture_events) -> None:
 async def test_cursor(sentry_init, capture_events) -> None:
     sentry_init(
         integrations=[AsyncPGIntegration()],
-        _experiments={"record_sql_params": True},
+        data_collection={"database_query_data": True},
     )
     events = capture_events()
 
@@ -338,7 +332,7 @@ async def test_cursor(sentry_init, capture_events) -> None:
 async def test_cursor_manual(sentry_init, capture_events) -> None:
     sentry_init(
         integrations=[AsyncPGIntegration()],
-        _experiments={"record_sql_params": True},
+        data_collection={"database_query_data": True},
     )
     events = capture_events()
 
@@ -400,7 +394,7 @@ async def test_cursor_manual(sentry_init, capture_events) -> None:
 async def test_prepared_stmt(sentry_init, capture_events) -> None:
     sentry_init(
         integrations=[AsyncPGIntegration()],
-        _experiments={"record_sql_params": True},
+        data_collection={"database_query_data": True},
     )
     events = capture_events()
 
@@ -449,7 +443,7 @@ async def test_prepared_stmt(sentry_init, capture_events) -> None:
 async def test_connection_pool(sentry_init, capture_events) -> None:
     sentry_init(
         integrations=[AsyncPGIntegration()],
-        _experiments={"record_sql_params": True},
+        data_collection={"database_query_data": True},
     )
     events = capture_events()
 
