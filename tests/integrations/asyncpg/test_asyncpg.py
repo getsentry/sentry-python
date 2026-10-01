@@ -237,7 +237,7 @@ async def test_execute_many(
 @pytest.mark.asyncio
 async def test_record_params(sentry_init, capture_events) -> None:
     sentry_init(
-        integrations=[AsyncPGIntegration(record_params=True)],
+        integrations=[AsyncPGIntegration()],
         data_collection={"database_query_data": True},
     )
     events = capture_events()

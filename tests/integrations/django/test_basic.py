@@ -728,7 +728,7 @@ def test_django_connect_breadcrumbs(
     """
     sentry_init(
         integrations=[DjangoIntegration()],
-        send_default_pii=True,
+        data_collection={"database_query_data": True},
     )
 
     from django.db import connections
@@ -766,7 +766,7 @@ def test_db_connection_span_data(
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
-        send_default_pii=True,
+        data_collection={"database_query_data": True},
         traces_sample_rate=1.0,
     )
 
