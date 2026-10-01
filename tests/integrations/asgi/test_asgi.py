@@ -468,7 +468,7 @@ async def test_auto_session_tracking_with_aggregates(
 
 
 @pytest.mark.asyncio
-async def test_transaction_style(
+async def test_fallback_segment_name_and_source(
     sentry_init,
     asgi3_app,
     capture_items,
@@ -987,29 +987,8 @@ async def test_get_request_attributes_client_address_user_info(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "request_url,transaction_style,expected_transaction_name,expected_transaction_source",
-    [
-        (
-            "/message/123456",
-            "endpoint",
-            "/message/123456",
-            "url",
-        ),
-        (
-            "/message/123456",
-            "url",
-            "/message/123456",
-            "url",
-        ),
-    ],
-)
-async def test_transaction_name(
+async def test_segment_name_and_source(
     sentry_init,
-    request_url,
-    transaction_style,
-    expected_transaction_name,
-    expected_transaction_source,
     asgi3_app,
     capture_items,
 ):
@@ -1025,17 +1004,15 @@ async def test_transaction_name(
     app = SentryAsgiMiddleware(asgi3_app)
 
     async with TestClient(app) as client:
-        await client.get(request_url)
+        await client.get("/message/123456")
 
     sentry_sdk.flush()
 
     assert len(items) == 1
     span = items[0].payload
 
-    assert span["name"] == expected_transaction_name
-    assert (
-        span["attributes"]["sentry.segment.name.source"] == expected_transaction_source
-    )
+    assert span["name"] == "/message/123456"
+    assert span["attributes"]["sentry.segment.name.source"] == "url"
 
 
 @pytest.mark.asyncio

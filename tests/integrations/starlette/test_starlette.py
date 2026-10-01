@@ -805,7 +805,7 @@ def test_user_info_data_collection(
         ),
     ],
 )
-def test_transaction_style(
+def test_segment_name_and_source(
     sentry_init,
     capture_events,
     url,

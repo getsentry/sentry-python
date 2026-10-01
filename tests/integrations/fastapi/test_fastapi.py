@@ -377,7 +377,7 @@ async def test_response(sentry_init, capture_events):
         ),
     ],
 )
-def test_transaction_style(
+def test_segment_name_and_source(
     sentry_init,
     capture_events,
     url,
