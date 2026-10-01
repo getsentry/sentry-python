@@ -95,7 +95,7 @@ def _get_view_function_response(
 
                 header_attrs: "Dict[str, Any]" = {}
                 for header, value in _filter_headers(headers).items():
-                    header_attrs[f"http.request.header.{header.lower()}"] = value
+                    header_attrs[f"http.request.header.{header.lower()}"] = [value]
 
                 additional_attrs: "Dict[str, Any]" = {}
                 if "method" in request_dict:

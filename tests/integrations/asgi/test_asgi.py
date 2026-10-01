@@ -227,8 +227,8 @@ async def test_capture_transaction(
 
     assert span["attributes"]["network.protocol.name"] == "http"
     assert span["attributes"]["http.request.method"] == "GET"
-    assert span["attributes"]["http.request.header.host"] == "localhost"
-    assert span["attributes"]["http.request.header.user-agent"] == "ASGI-Test-Client"
+    assert span["attributes"]["http.request.header.host"] == ["localhost"]
+    assert span["attributes"]["http.request.header.user-agent"] == ["ASGI-Test-Client"]
 
     if should_send_pii:
         assert (
@@ -707,8 +707,8 @@ def test_get_headers():
         pytest.param(
             {},
             {
-                "http.request.header.authorization": "[Filtered]",
-                "http.request.header.x-custom-header": "passthrough",
+                "http.request.header.authorization": ["[Filtered]"],
+                "http.request.header.x-custom-header": ["passthrough"],
             },
             id="default_redacts_sensitive_headers",
         ),
@@ -720,18 +720,18 @@ def test_get_headers():
         pytest.param(
             {"http_headers": {"request": {"mode": "allowlist", "terms": ["custom"]}}},
             {
-                "http.request.header.x-custom-header": "passthrough",
-                "http.request.header.x-forwarded-for": "[Filtered]",
-                "http.request.header.host": "[Filtered]",
+                "http.request.header.x-custom-header": ["passthrough"],
+                "http.request.header.x-forwarded-for": ["[Filtered]"],
+                "http.request.header.host": ["[Filtered]"],
             },
             id="allowlist_redacts_all_but_allowed_terms",
         ),
         pytest.param(
             {"http_headers": {"request": {"mode": "denylist", "terms": ["custom"]}}},
             {
-                "http.request.header.x-custom-header": "[Filtered]",
-                "http.request.header.x-forwarded-for": "1.2.3.4",
-                "http.request.header.host": "localhost",
+                "http.request.header.x-custom-header": ["[Filtered]"],
+                "http.request.header.x-forwarded-for": ["1.2.3.4"],
+                "http.request.header.host": ["localhost"],
             },
             id="denylist_redacts_only_matched_terms",
         ),
@@ -798,8 +798,8 @@ async def test_request_headers_data_collection_cookie_always_redacted(
     (span,) = [item.payload for item in items]
     attributes = span["attributes"]
 
-    assert attributes["http.request.header.cookie"] == "[Filtered]"
-    assert attributes["http.request.header.x-custom-header"] == "passthrough"
+    assert attributes["http.request.header.cookie"] == ["[Filtered]"]
+    assert attributes["http.request.header.x-custom-header"] == ["passthrough"]
 
 
 @pytest.mark.asyncio
@@ -828,7 +828,7 @@ async def test_get_request_attributes_url_with_filtered_host(
     assert len(items) == 1
     attributes = items[0].payload["attributes"]
 
-    assert attributes["http.request.header.host"] == "[Filtered]"
+    assert attributes["http.request.header.host"] == ["[Filtered]"]
     assert attributes["url.full"] == "http://example.com/foo?somevalue=123"
 
 

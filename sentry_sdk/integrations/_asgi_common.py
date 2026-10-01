@@ -177,7 +177,7 @@ def _get_request_attributes(
 
         filtered_headers = _filter_headers(headers)
         for header, value in filtered_headers.items():
-            attributes[f"http.request.header.{header.lower()}"] = value
+            attributes[f"http.request.header.{header.lower()}"] = [value]
 
         if has_data_collection_enabled(client_options):
             filtered_query_string = None

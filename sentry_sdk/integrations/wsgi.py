@@ -417,7 +417,7 @@ def _get_request_attributes(
 
     headers = _filter_headers(dict(_get_headers(environ)))
     for header, value in headers.items():
-        attributes[f"http.request.header.{header.lower()}"] = value
+        attributes[f"http.request.header.{header.lower()}"] = [value]
 
     url_scheme = environ.get("wsgi.url_scheme")
     if url_scheme:

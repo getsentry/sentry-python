@@ -1438,15 +1438,13 @@ async def test_sensitive_header_scrubbing(sentry_init, aiohttp_client, capture_i
 
     # Data collection always substitutes sensitive headers with
     # SENSITIVE_DATA_SUBSTITUTE ("[Filtered]"). The original token must not leak.
-    assert (
-        server_span["attributes"]["http.request.header.authorization"]
-        == SENSITIVE_DATA_SUBSTITUTE
-    )
+    assert server_span["attributes"]["http.request.header.authorization"] == [
+        SENSITIVE_DATA_SUBSTITUTE
+    ]
     # Non-sensitive headers pass through untouched.
-    assert (
-        server_span["attributes"]["http.request.header.x-custom-header"]
-        == "passthrough"
-    )
+    assert server_span["attributes"]["http.request.header.x-custom-header"] == [
+        "passthrough"
+    ]
 
 
 @pytest.mark.asyncio

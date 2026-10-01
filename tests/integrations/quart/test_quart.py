@@ -792,9 +792,9 @@ async def test_request_attributes(
         pytest.param(
             {},
             {
-                "authorization": "[Filtered]",
-                "custom": "passthrough",
-                "cookie": "[Filtered]",
+                "authorization": ["[Filtered]"],
+                "custom": ["passthrough"],
+                "cookie": ["[Filtered]"],
             },
             id="data_collection_default_redacts_auth_header",
         ),
@@ -806,9 +806,9 @@ async def test_request_attributes(
         pytest.param(
             {"http_headers": {"request": {"mode": "allowlist"}}},
             {
-                "authorization": "[Filtered]",
-                "custom": "[Filtered]",
-                "cookie": "[Filtered]",
+                "authorization": ["[Filtered]"],
+                "custom": ["[Filtered]"],
+                "cookie": ["[Filtered]"],
             },
             id="data_collection_allow_list_redacts_terms_that_do_not_appear",
         ),
@@ -819,36 +819,36 @@ async def test_request_attributes(
                 }
             },
             {
-                "authorization": "[Filtered]",
-                "custom": "[Filtered]",
-                "cookie": "[Filtered]",
+                "authorization": ["[Filtered]"],
+                "custom": ["[Filtered]"],
+                "cookie": ["[Filtered]"],
             },
             id="data_collection_allow_list_redacts_sensitive_terms_even_when_provided_by_user",
         ),
         pytest.param(
             {"http_headers": {"request": {"mode": "allowlist", "terms": ["custom"]}}},
             {
-                "authorization": "[Filtered]",
-                "custom": "passthrough",
-                "cookie": "[Filtered]",
+                "authorization": ["[Filtered]"],
+                "custom": ["passthrough"],
+                "cookie": ["[Filtered]"],
             },
             id="data_collection_allow_list_does_not_redact_provided_term",
         ),
         pytest.param(
             {"http_headers": {"request": {"mode": "denylist", "terms": ["custom"]}}},
             {
-                "authorization": "[Filtered]",
-                "custom": "[Filtered]",
-                "cookie": "[Filtered]",
+                "authorization": ["[Filtered]"],
+                "custom": ["[Filtered]"],
+                "cookie": ["[Filtered]"],
             },
             id="data_collection_deny_list_redacts_sensitive_terms_when_provided_by_user",
         ),
         pytest.param(
             {"http_headers": {"request": {"mode": "allowlist", "terms": ["cookie"]}}},
             {
-                "authorization": "[Filtered]",
-                "custom": "[Filtered]",
-                "cookie": "[Filtered]",
+                "authorization": ["[Filtered]"],
+                "custom": ["[Filtered]"],
+                "cookie": ["[Filtered]"],
             },
             id="data_collection_cookie_is_always_redacted_even_when_allow_listed",
         ),

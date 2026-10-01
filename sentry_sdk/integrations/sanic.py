@@ -262,7 +262,7 @@ def _get_request_attributes(request: "Request") -> "Dict[str, Any]":
 
     headers = _filter_headers(dict(request.headers))
     for header, value in headers.items():
-        attributes[f"{SPANDATA.HTTP_REQUEST_HEADER}.{header.lower()}"] = value
+        attributes[f"{SPANDATA.HTTP_REQUEST_HEADER}.{header.lower()}"] = [value]
 
     urlparts = urlsplit(request.url)
     client_options = sentry_sdk.get_client().options
