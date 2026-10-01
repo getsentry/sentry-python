@@ -12,12 +12,12 @@ from sentry_sdk.tracing_utils import (
     add_sentry_baggage_to_headers,
     should_propagate_trace,
 )
-from sentry_sdk.utils import logger
+from sentry_sdk.utils import capture_internal_exceptions, logger
 
 from ..spans import ai_client_span, update_ai_client_span
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Union
+    from typing import Any, Callable, Optional, Union
 
     from sentry_sdk.tracing import Span
 
@@ -56,6 +56,35 @@ def _inject_trace_propagation_headers(
                 headers[key] = value
 
 
+class _ResponseModelRecordingStream:
+    """
+    Proxies a provider chunk stream returned by `_fetch_response(stream=True)` and records
+    the model reported on each chunk.
+
+    Streamed Chat Completions responses (also used by the LiteLLM model) are synthesized by
+    the Agents SDK with `model` set to the requested model name, e.g. an Azure deployment
+    name. Only the provider chunks carry the model that actually responded.
+    """
+
+    def __init__(self, stream: "Any", record: "Callable[[str], None]") -> None:
+        self._sentry_stream = stream
+        self._sentry_record = record
+
+    def __getattr__(self, name: str) -> "Any":
+        return getattr(self._sentry_stream, name)
+
+    def __aiter__(self) -> "_ResponseModelRecordingStream":
+        return self
+
+    async def __anext__(self) -> "Any":
+        chunk = await self._sentry_stream.__anext__()
+        with capture_internal_exceptions():
+            chunk_model = getattr(chunk, "model", None)
+            if chunk_model:
+                self._sentry_record(str(chunk_model))
+        return chunk
+
+
 def _get_model(
     original_get_model: "Callable[..., agents.Model]",
     agent: "agents.Agent",
@@ -71,19 +100,49 @@ def _get_model(
     # because we only patch its direct methods, all underlying data can remain unchanged.
     model = copy.copy(original_get_model(agent, run_config))
 
-    # Capture the request model name for spans (agent.model can be None when using defaults)
-    request_model_name = model.model if hasattr(model, "model") else str(model)
-    agent._sentry_request_model = request_model_name  # type: ignore[attr-defined]
+    # The resolved model honors `RunConfig.model` and has provider prefixes such as "litellm/"
+    # stripped, so it is the source of truth for the request model (agent.model can be None
+    # when using defaults, or overridden by the run config).
+    resolved_model_name = getattr(model, "model", None)
+    request_model_name = (
+        str(resolved_model_name) if resolved_model_name is not None else None
+    )
+    agent._sentry_request_model = request_model_name or str(model)  # type: ignore[attr-defined]
 
-    # Wrap _fetch_response if it exists (for OpenAI models) to capture response model
+    # The model copy is created per turn, so this state is not shared between concurrent runs.
+    # It holds the model reported by the provider for the in-flight request.
+    response_model_state: "dict[str, Optional[str]]" = {"model": None}
+
+    def _record_response_model(response_model: str) -> None:
+        response_model_state["model"] = response_model
+
+    def _pop_response_model() -> "Optional[str]":
+        response_model = response_model_state["model"]
+        response_model_state["model"] = None
+        return response_model
+
+    # Wrap _fetch_response if it exists (for OpenAI and LiteLLM models) to capture the response model
     if hasattr(model, "_fetch_response"):
         original_fetch_response = model._fetch_response
 
         @wraps(original_fetch_response)
         async def wrapped_fetch_response(*args: "Any", **kwargs: "Any") -> "Any":
             response = await original_fetch_response(*args, **kwargs)
-            if hasattr(response, "model") and response.model:
-                agent._sentry_response_model = str(response.model)  # type: ignore[attr-defined]
+            with capture_internal_exceptions():
+                if hasattr(response, "model") and response.model:
+                    _record_response_model(str(response.model))
+                elif (
+                    isinstance(response, tuple)
+                    and len(response) == 2
+                    and hasattr(type(response[1]), "__anext__")
+                ):
+                    # Streamed Chat Completions return (synthesized Response, chunk stream).
+                    return (
+                        response[0],
+                        _ResponseModelRecordingStream(
+                            response[1], _record_response_model
+                        ),
+                    )
             return response
 
         model._fetch_response = wrapped_fetch_response
@@ -99,16 +158,15 @@ def _get_model(
                 tool for tool in mcp_tools if isinstance(tool, HostedMCPTool)
             ]
 
-        with ai_client_span(agent, kwargs) as span:
+        _pop_response_model()
+        with ai_client_span(agent, kwargs, request_model=request_model_name) as span:
             for hosted_tool in hosted_tools:
                 _inject_trace_propagation_headers(hosted_tool, span=span)
 
             result = await original_get_response(*args, **kwargs)
 
-            # Get response model captured from _fetch_response and clean up
-            response_model = getattr(agent, "_sentry_response_model", None)
-            if response_model:
-                delattr(agent, "_sentry_response_model")
+            # Get response model captured from _fetch_response
+            response_model = _pop_response_model()
 
             update_ai_client_span(span, result, response_model, agent)
 
@@ -137,7 +195,10 @@ def _get_model(
                         tool for tool in mcp_tools if isinstance(tool, HostedMCPTool)
                     ]
 
-            with ai_client_span(agent, span_kwargs) as span:
+            _pop_response_model()
+            with ai_client_span(
+                agent, span_kwargs, request_model=request_model_name
+            ) as span:
                 for hosted_tool in hosted_tools:
                     _inject_trace_propagation_headers(hosted_tool, span=span)
 
@@ -167,7 +228,9 @@ def _get_model(
 
                 # Update span with response data (usage, output, model)
                 if streaming_response:
-                    response_model = (
+                    # Prefer the model reported by provider chunks: the terminal response of
+                    # streamed Chat Completions only echoes the requested model name.
+                    response_model = _pop_response_model() or (
                         str(streaming_response.model)
                         if hasattr(streaming_response, "model")
                         and streaming_response.model

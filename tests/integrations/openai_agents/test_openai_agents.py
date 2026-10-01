@@ -7483,3 +7483,160 @@ async def test_runner_run_streamed_with_starting_agent_kwarg(
 
     (transaction,) = events
     assert transaction["transaction"] == "test_agent workflow"
+
+
+def _get_chat_spans(items):
+    """Return (name, attributes) for chat spans, whether sent as span items or in a transaction."""
+    chat_spans = []
+    for item in items:
+        if item.type == "span":
+            if item.payload["attributes"].get("sentry.op") == OP.GEN_AI_CHAT:
+                chat_spans.append((item.payload["name"], item.payload["attributes"]))
+        elif item.type == "transaction":
+            for span in item.payload["spans"]:
+                if span["op"] == OP.GEN_AI_CHAT:
+                    chat_spans.append((span["description"], span["data"]))
+    return chat_spans
+
+
+def _mock_openai_client(handler):
+    return AsyncOpenAI(
+        api_key="z",
+        http_client=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
+    )
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+@pytest.mark.asyncio
+async def test_ai_client_span_request_model_uses_run_config_model(
+    sentry_init,
+    capture_items,
+    test_agent,
+    stream_gen_ai_spans,
+    span_streaming,
+):
+    """
+    `RunConfig.model` takes precedence over `Agent.model`, so the chat span must report the
+    model that was actually requested.
+    """
+
+    def handler(request):
+        assert json.loads(request.content)["model"] == "gpt-4.1-mini"
+        return httpx.Response(
+            200,
+            json=EXAMPLE_RESPONSE.model_copy(
+                update={"model": "gpt-4.1-mini-2025-04-14"}
+            ).model_dump(mode="json", exclude_none=True),
+        )
+
+    run_config = agents.RunConfig(
+        model=OpenAIResponsesModel(
+            model="gpt-4.1-mini", openai_client=_mock_openai_client(handler)
+        ),
+        tracing_disabled=True,
+    )
+
+    sentry_init(
+        integrations=[OpenAIAgentsIntegration()],
+        disabled_integrations=[StdlibIntegration],
+        traces_sample_rate=1.0,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
+    items = capture_items("span", "transaction")
+
+    # test_agent.model is "gpt-4"
+    await agents.Runner.run(test_agent, "Test input", run_config=run_config)
+    sentry_sdk.flush()
+
+    ((name, attributes),) = _get_chat_spans(items)
+    assert name == "chat gpt-4.1-mini"
+    assert attributes[SPANDATA.GEN_AI_REQUEST_MODEL] == "gpt-4.1-mini"
+    assert attributes[SPANDATA.GEN_AI_RESPONSE_MODEL] == "gpt-4.1-mini-2025-04-14"
+
+
+@pytest.mark.skipif(
+    parse_version(OPENAI_AGENTS_VERSION) < (0, 7, 0),
+    reason="Chat Completions streaming in older openai-agents is incompatible with the tested openai versions",
+)
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+@pytest.mark.asyncio
+async def test_ai_client_span_response_model_from_streamed_chat_completions(
+    sentry_init,
+    capture_items,
+    stream_gen_ai_spans,
+    span_streaming,
+):
+    """
+    For streamed Chat Completions, the Agents SDK synthesizes the final response with the
+    requested model name (e.g. an Azure deployment name). The response model must come from
+    the provider chunks, since it is used to calculate model costs.
+    """
+
+    def chunk(**kwargs):
+        return {
+            "id": "chatcmpl-test",
+            "object": "chat.completion.chunk",
+            "created": 10000000,
+            "model": "gpt-4o-2024-08-06",
+            **kwargs,
+        }
+
+    def handler(request):
+        chunks = [
+            chunk(
+                choices=[
+                    {
+                        "index": 0,
+                        "delta": {"role": "assistant", "content": "Hello"},
+                        "finish_reason": None,
+                    }
+                ]
+            ),
+            chunk(choices=[{"index": 0, "delta": {}, "finish_reason": "stop"}]),
+            chunk(
+                choices=[],
+                usage={
+                    "prompt_tokens": 10,
+                    "completion_tokens": 20,
+                    "total_tokens": 30,
+                },
+            ),
+        ]
+        body = "".join(f"data: {json.dumps(c)}\n\n" for c in chunks)
+        return httpx.Response(
+            200,
+            content=(body + "data: [DONE]\n\n").encode("utf-8"),
+            headers={"Content-Type": "text/event-stream"},
+        )
+
+    agent = Agent(
+        name="test_agent",
+        model=agents.OpenAIChatCompletionsModel(
+            model="my-azure-deployment", openai_client=_mock_openai_client(handler)
+        ),
+        model_settings=ModelSettings(include_usage=True),
+    )
+
+    sentry_init(
+        integrations=[OpenAIAgentsIntegration()],
+        disabled_integrations=[StdlibIntegration],
+        traces_sample_rate=1.0,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
+    items = capture_items("span", "transaction")
+
+    result = agents.Runner.run_streamed(agent, "Test input", run_config=test_run_config)
+    async for _event in result.stream_events():
+        pass
+    sentry_sdk.flush()
+
+    ((name, attributes),) = _get_chat_spans(items)
+    assert name == "chat my-azure-deployment"
+    assert attributes[SPANDATA.GEN_AI_REQUEST_MODEL] == "my-azure-deployment"
+    assert attributes[SPANDATA.GEN_AI_RESPONSE_MODEL] == "gpt-4o-2024-08-06"
+    assert attributes[SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert attributes[SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20

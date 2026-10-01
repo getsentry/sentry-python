@@ -48,9 +48,23 @@ def _capture_exception(exc: "Any") -> None:
     sentry_sdk.capture_event(event, hint=hint)
 
 
+def _get_agent_model_name(agent: "agents.Agent") -> "Optional[str]":
+    if isinstance(agent.model, Model) and hasattr(agent.model, "model"):
+        return agent.model.model
+    if isinstance(agent.model, str):
+        return agent.model
+    return getattr(agent, "_sentry_request_model", None)
+
+
 def _set_agent_data(
-    span: "Union[sentry_sdk.tracing.Span, StreamedSpan]", agent: "agents.Agent"
+    span: "Union[sentry_sdk.tracing.Span, StreamedSpan]",
+    agent: "agents.Agent",
+    request_model: "Optional[str]" = None,
 ) -> None:
+    """
+    `request_model` is the name of the model instance the runner resolved for this call. When
+    given, it takes precedence over `agent.model`, which `RunConfig.model` can override.
+    """
     set_on_span = (
         span.set_attribute if isinstance(span, StreamedSpan) else span.set_data
     )
@@ -64,14 +78,7 @@ def _set_agent_data(
     if agent.model_settings.max_tokens:
         set_on_span(SPANDATA.GEN_AI_REQUEST_MAX_TOKENS, agent.model_settings.max_tokens)
 
-    model_name: "Optional[str]" = None
-    if isinstance(agent.model, Model) and hasattr(agent.model, "model"):
-        model_name = agent.model.model
-    elif isinstance(agent.model, str):
-        model_name = agent.model
-    elif hasattr(agent, "_sentry_request_model"):
-        model_name = agent._sentry_request_model
-
+    model_name = request_model or _get_agent_model_name(agent)
     if model_name:
         set_on_span(SPANDATA.GEN_AI_REQUEST_MODEL, model_name)
 
