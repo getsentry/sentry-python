@@ -827,7 +827,7 @@ def test_error_event_has_transaction_name(sentry_init, capture_events):
     transaction name set by the event processor, even though the inline
     set_transaction_name call happens after the handler returns.
     """
-    sentry_init(integrations=[BottleIntegration(transaction_style="url")])
+    sentry_init(integrations=[BottleIntegration()])
     events = capture_events()
 
     app = Bottle()
