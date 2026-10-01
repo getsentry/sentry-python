@@ -6,6 +6,7 @@ from datetime import datetime
 # prevent circular imports
 import sphinx.builders.html
 import sphinx.builders.latex
+import sphinx.builders.linkcheck
 import sphinx.builders.texinfo
 import sphinx.builders.text
 import sphinx.domains.c  # noqa: F401
