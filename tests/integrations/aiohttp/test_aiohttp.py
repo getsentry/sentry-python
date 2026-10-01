@@ -49,7 +49,7 @@ async def test_basic(sentry_init, aiohttp_client, capture_events):
 
     (event,) = events
 
-    assert event["transaction"] == "GET /"
+    assert event["transaction"] == "/"
 
     (exception,) = event["exception"]["values"]
     assert exception["type"] == "ZeroDivisionError"
@@ -322,7 +322,7 @@ async def test_tracing_unparseable_url(sentry_init, aiohttp_client, capture_item
 
     (span,) = [item.payload for item in items]
 
-    assert span["name"] == "GET /"
+    assert span["name"] == "/"
 
 
 @pytest.mark.asyncio
@@ -1334,7 +1334,7 @@ async def test_tracing(sentry_init, aiohttp_client, capture_items):
     (server_span,) = [item.payload for item in items]
 
     assert server_span["is_segment"] is True
-    assert server_span["name"] == "GET /"
+    assert server_span["name"] == "/"
     assert server_span["attributes"]["sentry.op"] == "http.server"
     assert server_span["attributes"]["sentry.origin"] == "auto.http.aiohttp"
     assert server_span["attributes"]["http.response.status_code"] == 200
@@ -1469,7 +1469,7 @@ async def test_transaction_style(
     assert len(items) == 1
     (server_segment,) = [item.payload for item in items]
 
-    assert server_segment["name"] == "GET /{var}"
+    assert server_segment["name"] == "/{var}"
     assert server_segment["is_segment"]
     assert server_segment["attributes"]["sentry.segment.name.source"] == "route"
 

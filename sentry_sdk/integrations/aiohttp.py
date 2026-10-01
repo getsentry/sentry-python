@@ -253,12 +253,11 @@ class AioHttpIntegration(Integration):
             if server_span is not None and pattern is not None:
                 server_span.set_attribute(SPANDATA.HTTP_ROUTE, pattern)
 
-            name = "{} {}".format(request.method, pattern)
+            current_scope = sentry_sdk.get_current_scope()
 
-            if name is not None:
-                current_scope = sentry_sdk.get_current_scope()
+            if pattern is not None:
                 current_scope.set_transaction_name(
-                    name,
+                    pattern,
                     source=SegmentNameSource.ROUTE,
                 )
 
