@@ -791,44 +791,29 @@ def test_user_info_data_collection(
 
 
 @pytest.mark.parametrize(
-    "url,transaction_style,expected_transaction,expected_source",
+    "url,expected_transaction,expected_source",
     [
         (
             "/message",
-            "url",
             "/message",
             "route",
         ),
         (
-            "/message",
-            "endpoint",
-            "tests.integrations.starlette.test_starlette.starlette_app_factory.<locals>._message",
-            "component",
-        ),
-        (
             "/message/123456",
-            "url",
             "/message/{message_id}",
             "route",
         ),
-        (
-            "/message/123456",
-            "endpoint",
-            "tests.integrations.starlette.test_starlette.starlette_app_factory.<locals>._message_with_id",
-            "component",
-        ),
     ],
 )
-def test_transaction_style(
+def test_segment_name_and_source(
     sentry_init,
     capture_events,
     url,
-    transaction_style,
     expected_transaction,
     expected_source,
 ):
     sentry_init(
-        integrations=[StarletteIntegration(transaction_style=transaction_style)],
+        integrations=[StarletteIntegration()],
     )
     starlette_app = starlette_app_factory()
 
@@ -844,7 +829,7 @@ def test_transaction_style(
 
 def test_hosted_route_transaction_info(sentry_init, capture_items):
     sentry_init(
-        integrations=[StarletteIntegration(transaction_style="url")],
+        integrations=[StarletteIntegration()],
         traces_sample_rate=1.0,
     )
 
@@ -1341,7 +1326,7 @@ def test_active_thread_id(sentry_init, capture_items, endpoint):
 def test_http_route(sentry_init, capture_items, endpoint):
     sentry_init(
         auto_enabling_integrations=False,
-        integrations=[StarletteIntegration(transaction_style="url")],
+        integrations=[StarletteIntegration()],
         traces_sample_rate=1.0,
     )
     app = starlette_app_factory()
@@ -1367,7 +1352,7 @@ def test_segment_name_is_route_resolved_name_static(
 ):
     sentry_init(
         auto_enabling_integrations=False,
-        integrations=[StarletteIntegration(transaction_style="url")],
+        integrations=[StarletteIntegration()],
         traces_sample_rate=1.0,
     )
     items = capture_items("span")
@@ -1454,29 +1439,8 @@ def test_template_tracing_meta(sentry_init, capture_events):
     assert rendered_baggage == baggage
 
 
-@pytest.mark.parametrize(
-    "request_url,transaction_style,expected_transaction_name,expected_transaction_source",
-    [
-        (
-            "/message/123456",
-            "endpoint",
-            "tests.integrations.starlette.test_starlette.starlette_app_factory.<locals>._message_with_id",
-            "component",
-        ),
-        (
-            "/message/123456",
-            "url",
-            "/message/{message_id}",
-            "route",
-        ),
-    ],
-)
 def test_transaction_name(
     sentry_init,
-    request_url,
-    transaction_style,
-    expected_transaction_name,
-    expected_transaction_source,
     capture_items,
 ):
     """
@@ -1484,7 +1448,7 @@ def test_transaction_name(
     """
     sentry_init(
         auto_enabling_integrations=False,  # Make sure that httpx integration is not added, because it adds tracing information to the starlette test clients request.
-        integrations=[StarletteIntegration(transaction_style=transaction_style)],
+        integrations=[StarletteIntegration()],
         traces_sample_rate=1.0,
     )
 
@@ -1492,42 +1456,18 @@ def test_transaction_name(
 
     app = starlette_app_factory()
     client = TestClient(app)
-    client.get(request_url)
+    client.get("/message/123456")
 
     sentry_sdk.flush()
 
     segments = [item.payload for item in items if item.payload.get("is_segment")]
     assert len(segments) == 1
-    assert segments[0]["name"] == expected_transaction_name
-    assert (
-        segments[0]["attributes"]["sentry.segment.name.source"]
-        == expected_transaction_source
-    )
+    assert segments[0]["name"] == "/message/{message_id}"
+    assert segments[0]["attributes"]["sentry.segment.name.source"] == "route"
 
 
-@pytest.mark.parametrize(
-    "request_url,transaction_style,expected_transaction_name,expected_transaction_source",
-    [
-        (
-            "/message/123456",
-            "endpoint",
-            "http://testserver/message/123456",
-            "url",
-        ),
-        (
-            "/message/123456",
-            "url",
-            "http://testserver/message/123456",
-            "url",
-        ),
-    ],
-)
 def test_transaction_name_in_traces_sampler(
     sentry_init,
-    request_url,
-    transaction_style,
-    expected_transaction_name,
-    expected_transaction_source,
 ):
     """
     Tests that a custom traces_sampler has a meaningful transaction name.
@@ -1536,50 +1476,27 @@ def test_transaction_name_in_traces_sampler(
 
     def dummy_traces_sampler(sampling_context):
         assert (
-            sampling_context["transaction_context"]["name"] == expected_transaction_name
+            sampling_context["transaction_context"]["name"]
+            == "http://testserver/message/123456"
         )
-        assert (
-            sampling_context["transaction_context"]["source"]
-            == expected_transaction_source
-        )
+        assert sampling_context["transaction_context"]["source"] == "url"
 
     sentry_init(
         auto_enabling_integrations=False,  # Make sure that httpx integration is not added, because it adds tracing information to the starlette test clients request.
-        integrations=[StarletteIntegration(transaction_style=transaction_style)],
+        integrations=[StarletteIntegration()],
         traces_sampler=dummy_traces_sampler,
         traces_sample_rate=1.0,
     )
 
     app = starlette_app_factory()
     client = TestClient(app)
-    client.get(request_url)
+    client.get("/message/123456")
 
 
 @pytest.mark.parametrize("middleware_spans", [False, True])
-@pytest.mark.parametrize(
-    "request_url,transaction_style,expected_transaction_name,expected_transaction_source",
-    [
-        (
-            "/message/123456",
-            "endpoint",
-            "starlette.middleware.trustedhost.TrustedHostMiddleware",
-            "component",
-        ),
-        (
-            "/message/123456",
-            "url",
-            "http://testserver/message/123456",
-            "url",
-        ),
-    ],
-)
 def test_transaction_name_in_middleware(
     sentry_init,
     middleware_spans,
-    request_url,
-    transaction_style,
-    expected_transaction_name,
-    expected_transaction_source,
     capture_items,
 ):
     """
@@ -1588,9 +1505,7 @@ def test_transaction_name_in_middleware(
     sentry_init(
         auto_enabling_integrations=False,  # Make sure that httpx integration is not added, because it adds tracing information to the starlette test clients request.
         integrations=[
-            StarletteIntegration(
-                transaction_style=transaction_style, middleware_spans=middleware_spans
-            ),
+            StarletteIntegration(middleware_spans=middleware_spans),
         ],
         traces_sample_rate=1.0,
     )
@@ -1606,17 +1521,14 @@ def test_transaction_name_in_middleware(
 
     app = starlette_app_factory(middleware=middleware)
     client = TestClient(app)
-    client.get(request_url)
+    client.get("/message/123456")
 
     sentry_sdk.flush()
 
     segments = [item.payload for item in items if item.payload.get("is_segment")]
     assert len(segments) == 1
-    assert segments[0]["name"] == expected_transaction_name
-    assert (
-        segments[0]["attributes"]["sentry.segment.name.source"]
-        == expected_transaction_source
-    )
+    assert segments[0]["name"] == "http://testserver/message/123456"
+    assert segments[0]["attributes"]["sentry.segment.name.source"] == "url"
 
 
 def test_span_origin(sentry_init, capture_items):
