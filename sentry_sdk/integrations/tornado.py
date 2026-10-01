@@ -109,6 +109,10 @@ def _handle_request_impl(self: "RequestHandler") -> "Generator[None, None, None]
         if self.request.remote_ip and client.options["data_collection"]["user_info"]:
             scope.set_attribute(SPANDATA.USER_IP_ADDRESS, self.request.remote_ip)
 
+        user_agent = headers.get("User-Agent")
+        if user_agent:
+            scope.set_attribute(SPANDATA.USER_AGENT_ORIGINAL, user_agent)
+
         with sentry_sdk.start_span(
             name=_DEFAULT_ROOT_SPAN_NAME,
             attributes={

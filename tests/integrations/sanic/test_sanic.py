@@ -822,3 +822,33 @@ def test_is_localhost_span_attribute(
 
     assert server_span["attributes"]["sentry.is_localhost"] is is_localhost
     assert child_span["attributes"]["sentry.is_localhost"] is is_localhost
+
+
+def test_user_agent_attribute(sentry_init, app, capture_items):
+    @app.route("/child-span")
+    def child_span_handler_ua(request):
+        with sentry_sdk.start_span(name="child-span"):
+            pass
+        return response.text("ok")
+
+    sentry_init(
+        integrations=[SanicIntegration()],
+        default_integrations=False,
+        traces_sample_rate=1.0,
+    )
+
+    items = capture_items("span")
+
+    c = get_client(app)
+    with c as client:
+        client.get(
+            "/child-span",
+            headers={"User-Agent": "TestBrowser/1.0"},
+        )
+
+    sentry_sdk.flush()
+
+    child_span, server_span = [item.payload for item in items]
+
+    assert server_span["attributes"]["user_agent.original"] == "TestBrowser/1.0"
+    assert child_span["attributes"]["user_agent.original"] == "TestBrowser/1.0"
