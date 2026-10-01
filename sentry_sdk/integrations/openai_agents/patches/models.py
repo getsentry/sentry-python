@@ -61,9 +61,13 @@ class _ResponseModelRecordingStream:
     Proxies a provider chunk stream returned by `_fetch_response(stream=True)` and records
     the model reported on each chunk.
 
-    Streamed Chat Completions responses (also used by the LiteLLM model) are synthesized by
-    the Agents SDK with `model` set to the requested model name, e.g. an Azure deployment
-    name. Only the provider chunks carry the model that actually responded.
+    The default `OpenAIResponsesModel` is not affected: its terminal streaming event carries
+    the model that responded. This only applies to the opt-in Chat Completions code paths,
+    i.e. an explicit `OpenAIChatCompletionsModel` (commonly used with Azure OpenAI and
+    OpenAI-compatible providers), `set_default_openai_api("chat_completions")`, and
+    `LitellmModel`. For those, the Agents SDK synthesizes the streamed response with `model`
+    set to the requested model name, e.g. an Azure deployment name, so only the provider
+    chunks carry the model that actually responded.
     """
 
     def __init__(self, stream: "Any", record: "Callable[[str], None]") -> None:
