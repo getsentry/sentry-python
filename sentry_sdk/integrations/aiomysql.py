@@ -13,7 +13,6 @@ from sentry_sdk.tracing_utils import (
 )
 from sentry_sdk.utils import (
     capture_internal_exceptions,
-    has_data_collection_enabled,
     parse_version,
 )
 

@@ -173,13 +173,16 @@ async def test_execute(
         },
         {
             "category": "query",
-            "data": {},
+            "data": {
+                "db.params": ["Bob", "secret_pw", "datetime.date(1984, 3, 1)"],
+                "db.paramstyle": "format",
+            },
             "message": "INSERT INTO users(name, password, dob) VALUES($1, $2, $3)",
             "type": "default",
         },
         {
             "category": "query",
-            "data": {},
+            "data": {"db.params": ["Bob"], "db.paramstyle": "format"},
             "message": "SELECT * FROM users WHERE name = $1",
             "type": "default",
         },
@@ -227,7 +230,14 @@ async def test_execute_many(
         CRUMBS_CONNECT,
         {
             "category": "query",
-            "data": {"db.executemany": True},
+            "data": {
+                "db.params": [
+                    ["Bob", "secret_pw", "datetime.date(1984, 3, 1)"],
+                    ["Alice", "pw", "datetime.date(1990, 12, 25)"],
+                ],
+                "db.paramstyle": "format",
+                "db.executemany": True,
+            },
             "message": "INSERT INTO users(name, password, dob) VALUES($1, $2, $3)",
             "type": "default",
         },
@@ -313,7 +323,14 @@ async def test_cursor(sentry_init, capture_events) -> None:
         CRUMBS_CONNECT,
         {
             "category": "query",
-            "data": {"db.executemany": True},
+            "data": {
+                "db.params": [
+                    ["Bob", "secret_pw", "datetime.date(1984, 3, 1)"],
+                    ["Alice", "pw", "datetime.date(1990, 12, 25)"],
+                ],
+                "db.paramstyle": "format",
+                "db.executemany": True,
+            },
             "message": "INSERT INTO users(name, password, dob) VALUES($1, $2, $3)",
             "type": "default",
         },
@@ -369,7 +386,14 @@ async def test_cursor_manual(sentry_init, capture_events) -> None:
         CRUMBS_CONNECT,
         {
             "category": "query",
-            "data": {"db.executemany": True},
+            "data": {
+                "db.params": [
+                    ["Bob", "secret_pw", "datetime.date(1984, 3, 1)"],
+                    ["Alice", "pw", "datetime.date(1990, 12, 25)"],
+                ],
+                "db.paramstyle": "format",
+                "db.executemany": True,
+            },
             "message": "INSERT INTO users(name, password, dob) VALUES($1, $2, $3)",
             "type": "default",
         },
@@ -426,7 +450,14 @@ async def test_prepared_stmt(sentry_init, capture_events) -> None:
         CRUMBS_CONNECT,
         {
             "category": "query",
-            "data": {"db.executemany": True},
+            "data": {
+                "db.params": [
+                    ["Bob", "secret_pw", "datetime.date(1984, 3, 1)"],
+                    ["Alice", "pw", "datetime.date(1990, 12, 25)"],
+                ],
+                "db.paramstyle": "format",
+                "db.executemany": True,
+            },
             "message": "INSERT INTO users(name, password, dob) VALUES($1, $2, $3)",
             "type": "default",
         },
@@ -479,7 +510,10 @@ async def test_connection_pool(sentry_init, capture_events) -> None:
         *[CRUMBS_CONNECT] * pool_size,
         {
             "category": "query",
-            "data": {},
+            "data": {
+                "db.params": ["Bob", "secret_pw", "datetime.date(1984, 3, 1)"],
+                "db.paramstyle": "format",
+            },
             "message": "INSERT INTO users(name, password, dob) VALUES($1, $2, $3)",
             "type": "default",
         },
@@ -491,7 +525,7 @@ async def test_connection_pool(sentry_init, capture_events) -> None:
         },
         {
             "category": "query",
-            "data": {},
+            "data": {"db.params": ["Bob"], "db.paramstyle": "format"},
             "message": "SELECT * FROM users WHERE name = $1",
             "type": "default",
         },
