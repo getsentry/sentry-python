@@ -664,6 +664,57 @@ def test_global_dependency_preserves_existing_dependencies(sentry_init):
     assert calls == [True]
 
 
+def test_global_dependency_runs_before_existing_dependencies(sentry_init):
+    seen_transaction_names = []
+
+    def custom_dependency():
+        transaction = sentry_sdk.get_current_scope().transaction
+        seen_transaction_names.append(transaction.name if transaction else None)
+
+    sentry_init(
+        auto_enabling_integrations=False,
+        integrations=[StarletteIntegration(), FastApiIntegration()],
+    )
+
+    app = FastAPI(dependencies=[Depends(custom_dependency)])
+
+    @app.get("/items/{item_id}")
+    async def _get_item(item_id: int):
+        return {"item_id": item_id}
+
+    response = TestClient(app).get("/items/123")
+
+    assert response.status_code == 200
+    assert seen_transaction_names == ["/items/{item_id}"]
+
+
+@pytest.mark.skipif(
+    FASTAPI_VERSION < (0, 121),
+    reason="FastAPI < 0.121 uses Starlette's request_response implementation",
+)
+def test_global_dependency_captures_request_data(sentry_init, capture_events):
+    sentry_init(
+        auto_enabling_integrations=False,
+        integrations=[StarletteIntegration(), FastApiIntegration()],
+        send_default_pii=True,
+    )
+
+    app = FastAPI()
+
+    @app.post("/message")
+    async def _message():
+        capture_message("request body captured")
+        return {"message": "ok"}
+
+    events = capture_events()
+
+    response = TestClient(app).post("/message", json=BODY_JSON)
+
+    assert response.status_code == 200
+    (event,) = events
+    assert event["request"]["data"] == BODY_JSON
+
+
 def test_global_dependency_does_not_break_websockets(sentry_init):
     sentry_init(integrations=[FastApiIntegration()])
 
