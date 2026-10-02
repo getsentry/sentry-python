@@ -610,6 +610,27 @@ def test_active_thread_id(sentry_init, capture_envelopes, teardown_profiling, en
 
 
 @pytest.mark.parametrize("endpoint", ["/sync/thread_ids", "/async/thread_ids"])
+def test_global_dependency_preserves_existing_dependencies(sentry_init):
+    calls = []
+
+    def custom_dependency():
+        calls.append(True)
+
+    sentry_init(integrations=[FastApiIntegration()])
+
+    app = FastAPI(dependencies=[Depends(custom_dependency)])
+
+    @app.get("/")
+    async def _root():
+        return {"message": "ok"}
+
+    client = TestClient(app)
+    response = client.get("/")
+
+    assert response.json() == {"message": "ok"}
+    assert calls == [True]
+
+
 def test_global_dependency_does_not_break_websockets(sentry_init):
     sentry_init(integrations=[FastApiIntegration()])
 
