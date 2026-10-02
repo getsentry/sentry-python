@@ -673,6 +673,8 @@ def patch_request_response() -> None:
                     return old_func(*args, **kwargs)
 
                 _update_active_thread()
+                current_scope = sentry_sdk.get_current_scope()
+                sentry_scope = sentry_sdk.get_isolation_scope()
 
                 request = args[0]
 
