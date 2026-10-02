@@ -609,7 +609,6 @@ def test_active_thread_id(sentry_init, capture_envelopes, teardown_profiling, en
         assert str(data["active"]) == trace_context["data"]["thread.id"]
 
 
-@pytest.mark.parametrize("endpoint", ["/sync/thread_ids", "/async/thread_ids"])
 def test_global_dependency_preserves_existing_dependencies(sentry_init):
     calls = []
 
@@ -647,6 +646,7 @@ def test_global_dependency_does_not_break_websockets(sentry_init):
         assert websocket.receive_text() == "ok"
 
 
+@pytest.mark.parametrize("endpoint", ["/sync/thread_ids", "/async/thread_ids"])
 def test_active_thread_id_span_streaming(sentry_init, capture_items, endpoint):
     sentry_init(
         auto_enabling_integrations=False,  # Ensure httpx is not auto-enabled; its legacy start_span interferes with streaming mode
