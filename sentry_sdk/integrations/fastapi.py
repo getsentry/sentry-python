@@ -1,11 +1,13 @@
+from copy import deepcopy
 from functools import wraps
 from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable
+from sentry_sdk.traces import StreamedSpan, get_current_span
 from sentry_sdk.tracing import SOURCE_FOR_STYLE, TransactionSource
-from sentry_sdk.utils import transaction_from_function
+from sentry_sdk.utils import has_data_collection_enabled, transaction_from_function
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Optional
@@ -13,6 +15,8 @@ if TYPE_CHECKING:
 try:
     from sentry_sdk.integrations.starlette import (
         StarletteIntegration,
+        StarletteRequestExtractor,
+        _get_cached_request_body_attribute,
         _is_async_callable,
         _wrap_sync_handler,
     )
@@ -37,12 +41,15 @@ class FastApiIntegration(StarletteIntegration):
         patch_fastapi_init()
 
 
-async def _sentry_fastapi_dependency(request: "HTTPConnection") -> None:
+async def _sentry_fastapi_dependency(request: "HTTPConnection"):
     if not isinstance(request, Request):
+        yield
         return
 
-    integration = sentry_sdk.get_client().get_integration(FastApiIntegration)
+    client = sentry_sdk.get_client()
+    integration = client.get_integration(FastApiIntegration)
     if integration is None:
+        yield
         return
 
     current_scope = sentry_sdk.get_current_scope()
@@ -68,6 +75,8 @@ async def _sentry_fastapi_dependency(request: "HTTPConnection") -> None:
         route_path=route_path,
     )
 
+    # FastAPI 0.137+ may execute the dependant stored on the effective route
+    # context instead of the original APIRoute.
     dependant = getattr(route, "dependant", None)
     if (
         dependant is not None
@@ -76,7 +85,59 @@ async def _sentry_fastapi_dependency(request: "HTTPConnection") -> None:
     ):
         dependant.call = _wrap_sync_handler(dependant.call)
 
-    sentry_sdk.get_isolation_scope()._name = FastApiIntegration.identifier
+    sentry_scope = sentry_sdk.get_isolation_scope()
+    extractor = StarletteRequestExtractor(request)
+    info = await extractor.extract_request_info()
+
+    def _make_request_event_processor(
+        request_info: "dict[str, Any]",
+    ) -> "Callable[[Any, dict[str, Any]], Any]":
+        def event_processor(
+            event: "dict[str, Any]", hint: "dict[str, Any]"
+        ) -> "dict[str, Any]":
+            event_request = event.get("request", {})
+            if info:
+                if "cookies" in info:
+                    event_request["cookies"] = info["cookies"]
+                if "data" in info:
+                    attach_request_data = True
+                    if has_data_collection_enabled(client.options):
+                        attach_request_data = (
+                            "incoming_request"
+                            in client.options["data_collection"]["http_bodies"]
+                        )
+
+                    if attach_request_data:
+                        event_request["data"] = info["data"]
+            event["request"] = deepcopy(event_request)
+            return event
+
+        return event_processor
+
+    sentry_scope._name = FastApiIntegration.identifier
+    sentry_scope.add_event_processor(_make_request_event_processor(info))
+
+    try:
+        yield
+    finally:
+        current_span = get_current_span()
+        if type(current_span) is StreamedSpan:
+            attach_request_data = True
+            if has_data_collection_enabled(client.options):
+                attach_request_data = (
+                    "incoming_request"
+                    in client.options["data_collection"]["http_bodies"]
+                )
+
+            if attach_request_data:
+                request_body = _get_cached_request_body_attribute(
+                    client=client, request=request
+                )
+                if request_body:
+                    current_span._segment.set_attribute(
+                        SPANDATA.HTTP_REQUEST_BODY_DATA,
+                        request_body,
+                    )
 
 
 def patch_fastapi_init() -> None:
@@ -92,8 +153,8 @@ def patch_fastapi_init() -> None:
             dependencies = []
 
         kwargs["dependencies"] = [
-            *dependencies,
             fastapi.Depends(_sentry_fastapi_dependency),
+            *dependencies,
         ]
 
         old_fastapi_init(self, *args, **kwargs)
@@ -123,4 +184,3 @@ def _set_transaction_name_and_source(
         source = SOURCE_FOR_STYLE[transaction_style]
 
     scope.set_transaction_name(name, source=source)
-
