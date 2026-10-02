@@ -689,10 +689,6 @@ def test_global_dependency_runs_before_existing_dependencies(sentry_init):
     assert seen_transaction_names == ["/items/{item_id}"]
 
 
-@pytest.mark.skipif(
-    FASTAPI_VERSION < (0, 121),
-    reason="FastAPI < 0.121 uses Starlette's request_response implementation",
-)
 def test_global_dependency_captures_request_data(sentry_init, capture_events):
     sentry_init(
         auto_enabling_integrations=False,
