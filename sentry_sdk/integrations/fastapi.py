@@ -46,21 +46,16 @@ async def _sentry_fastapi_dependency(request: "HTTPConnection") -> None:
         return
 
     current_scope = sentry_sdk.get_current_scope()
-    route = request.scope.get("route")
+    effective_route_context = request.scope.get("fastapi", {}).get(
+        "effective_route_context"
+    )
+    route = effective_route_context or request.scope.get("route")
 
     route_path = None
     if route:
-        effective_route_context = request.scope.get("fastapi", {}).get(
-            "effective_route_context"
-        )
-        context_path = getattr(effective_route_context, "path", None)
-
-        if context_path:
-            route_path = context_path
-        else:
-            path = getattr(route, "path", None)
-            if path is not None:
-                route_path = path
+        path = getattr(route, "path", None)
+        if path is not None:
+            route_path = path
 
     server_span = current_scope._server_segment_span
     if server_span is not None and route_path is not None:
