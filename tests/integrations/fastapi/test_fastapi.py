@@ -713,7 +713,11 @@ def test_global_dependency_captures_request_data(sentry_init, capture_events):
 
 
 def test_global_dependency_request_processors_are_isolated(sentry_init, capture_events):
-    sentry_init(integrations=[FastApiIntegration()], send_default_pii=True)
+    sentry_init(
+        auto_enabling_integrations=False,
+        integrations=[FastApiIntegration()],
+        send_default_pii=True,
+    )
 
     app = FastAPI()
 
@@ -726,11 +730,11 @@ def test_global_dependency_request_processors_are_isolated(sentry_init, capture_
     client = TestClient(app)
 
     assert client.get("/", cookies={"request": "one"}).status_code == 200
-    assert client.get("/", cookies={"request": "two"}).status_code == 200
+    assert client.get("/").status_code == 200
 
-    assert [event["request"]["cookies"] for event in events] == [
+    assert [event["request"].get("cookies") for event in events] == [
         {"request": "one"},
-        {"request": "two"},
+        None,
     ]
 
 
