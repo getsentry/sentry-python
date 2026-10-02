@@ -321,7 +321,17 @@ def test_capture_checkin_sdk_not_initialized():
         status=None,
         duration=None,
     )
-    assert check_in_id == "112233"
+    assert check_in_id is None
+
+
+def test_capture_checkin_dropped_by_before_send(sentry_init, capture_envelopes):
+    sentry_init(before_send=lambda event, hint: None)
+    envelopes = capture_envelopes()
+
+    check_in_id = capture_checkin(monitor_slug="abc123", status="in_progress")
+
+    assert check_in_id is None
+    assert envelopes == []
 
 
 def test_scope_data_in_checkin(sentry_init, capture_envelopes):
