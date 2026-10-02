@@ -638,7 +638,9 @@ def test_active_thread_id_with_prefixed_router(
         for item in envelopes[0].items
         if item.type == "transaction"
     )
-    assert response.json()["active"] == transaction["contexts"]["trace"]["data"]["thread.id"]
+    assert (
+        response.json()["active"] == transaction["contexts"]["trace"]["data"]["thread.id"]
+    )
 
 
 def test_global_dependency_preserves_existing_dependencies(sentry_init):
