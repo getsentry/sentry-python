@@ -1,10 +1,8 @@
 import sentry_sdk
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
-from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.utils import (
     ensure_integration_enabled,
     event_from_exception,
-    has_data_collection_enabled,
     parse_version,
 )
 
@@ -61,10 +59,7 @@ def _data_from_document(document: "DocumentNode") -> "EventDataType":
         data: "EventDataType" = {"query": print_ast(document)}
 
         if operation_ast is not None:
-            if has_data_collection_enabled(client_options):
-                if client_options["data_collection"]["graphql"]["variables"]:
-                    data["variables"] = operation_ast.variable_definitions
-            elif should_send_default_pii():
+            if client_options["data_collection"]["graphql"]["variables"]:
                 data["variables"] = operation_ast.variable_definitions
 
             if operation_ast.name is not None:
@@ -155,29 +150,7 @@ def _make_gql_event_processor(
         )
 
         client_options = sentry_sdk.get_client().options
-        if has_data_collection_enabled(client_options):
-            if client_options["data_collection"]["graphql"]["document"]:
-                if GraphQLRequest is not None and isinstance(
-                    document_or_request, GraphQLRequest
-                ):
-                    # In v4.0.0, gql moved to using GraphQLRequest instead of
-                    # DocumentNode in execute
-                    # https://github.com/graphql-python/gql/pull/556
-                    document = document_or_request.document
-                else:
-                    document = document_or_request
-
-                request["data"] = _data_from_document(document)
-                contexts = event.setdefault("contexts", {})
-                response = contexts.setdefault("response", {})
-                response.update(
-                    {
-                        "data": {"errors": errors},
-                        "type": response,
-                    }
-                )
-
-        elif should_send_default_pii():
+        if client_options["data_collection"]["graphql"]["document"]:
             if GraphQLRequest is not None and isinstance(
                 document_or_request, GraphQLRequest
             ):
