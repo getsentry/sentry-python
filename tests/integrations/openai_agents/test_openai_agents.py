@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import os
+import warnings
 from unittest import mock
 from unittest.mock import MagicMock, patch
 
@@ -27,6 +28,7 @@ from agents.tool import HostedMCPTool
 from agents.version import __version__ as OPENAI_AGENTS_VERSION
 from openai import AsyncOpenAI, InternalServerError
 from openai.types.responses.tool_param import CodeInterpreter, ImageGeneration
+from pydantic.warnings import PydanticDeprecatedSince20
 
 from sentry_sdk.integrations import DidNotEnable
 
@@ -82,6 +84,7 @@ from openai.types.responses import (
     Response,
     ResponseCompletedEvent,
     ResponseCreatedEvent,
+    ResponseOutputRefusal,
     ResponseTextDeltaEvent,
     ResponseUsage,
 )
@@ -3424,6 +3427,100 @@ async def test_tool_execution_span(
         assert ai_client_span2["data"]["gen_ai.usage.output_tokens.reasoning"] == 0
         assert ai_client_span2["data"]["gen_ai.usage.output_tokens"] == 10
         assert ai_client_span2["data"]["gen_ai.usage.total_tokens"] == 25
+
+
+@pytest.mark.asyncio
+async def test_response_output_serialization_emits_no_pydantic_deprecation_warning(
+    sentry_init,
+    capture_items,
+    test_agent,
+    simple_test_tool,
+    get_model_response,
+    nonstreaming_responses_tool_call_model_responses,
+):
+    client = AsyncOpenAI(api_key="test-key")
+    model = OpenAIResponsesModel(model="gpt-4", openai_client=client)
+    agent_with_tool = test_agent.clone(tools=[simple_test_tool], model=model)
+
+    usage = ResponseUsage(
+        input_tokens=10,
+        input_tokens_details=InputTokensDetails(
+            cached_tokens=0,
+            cache_write_tokens=0,
+        ),
+        output_tokens=5,
+        output_tokens_details=OutputTokensDetails(
+            reasoning_tokens=0,
+        ),
+        total_tokens=15,
+    )
+    responses = nonstreaming_responses_tool_call_model_responses(
+        tool_name="simple_test_tool",
+        arguments='{"message": "hello"}',
+        response_model="gpt-4",
+        response_text="Task completed using the tool",
+        response_ids=iter(["resp_tool_123", "resp_final_123"]),
+        usages=iter([usage, usage]),
+    )
+    tool_call_response = next(responses)
+    # `openai-agents` can raise `ModelRefusalError` when a refusal ends the run.
+    tool_call_response.output.append(
+        ResponseOutputMessage(
+            id="msg_refusal",
+            type="message",
+            status="completed",
+            content=[
+                ResponseOutputRefusal(
+                    refusal="Refused by the model",
+                    type="refusal",
+                )
+            ],
+            role="assistant",
+        )
+    )
+    final_response = next(responses)
+
+    sentry_init(
+        integrations=[OpenAIAgentsIntegration()],
+        disabled_integrations=[StdlibIntegration],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    items = capture_items("span")
+
+    with patch.object(
+        agent_with_tool.model._client._client,
+        "send",
+        side_effect=[
+            get_model_response(tool_call_response, serialize_pydantic=True),
+            get_model_response(final_response, serialize_pydantic=True),
+        ],
+    ):
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            await agents.Runner.run(
+                agent_with_tool,
+                "Please use the simple test tool",
+                run_config=test_run_config,
+            )
+
+    assert not [
+        warning
+        for warning in caught
+        if issubclass(warning.category, PydanticDeprecatedSince20)
+    ]
+
+    tool_call_span = next(
+        item.payload
+        for item in items
+        if item.payload["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    )
+    assert (
+        "simple_test_tool" in tool_call_span["attributes"]["gen_ai.response.tool_calls"]
+    )
+    assert (
+        "Refused by the model" in tool_call_span["attributes"]["gen_ai.response.text"]
+    )
 
 
 @pytest.mark.parametrize("user_hooks", [True, False])
