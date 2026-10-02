@@ -56,13 +56,14 @@ async def _sentry_fastapi_dependency(request: "HTTPConnection"):
     effective_route_context = request.scope.get("fastapi", {}).get(
         "effective_route_context"
     )
-    route = effective_route_context or request.scope.get("route")
+    route = request.scope.get("route")
 
     route_path = None
-    if route:
-        path = getattr(route, "path", None)
-        if path is not None:
-            route_path = path
+    if effective_route_context is not None:
+        route_path = getattr(effective_route_context, "path", None)
+
+    if route_path is None and route is not None:
+        route_path = getattr(route, "path", None)
 
     server_span = current_scope._server_segment_span
     if server_span is not None and route_path is not None:
@@ -75,9 +76,11 @@ async def _sentry_fastapi_dependency(request: "HTTPConnection"):
         route_path=route_path,
     )
 
-    # FastAPI 0.137+ may execute the dependant stored on the effective route
-    # context instead of the original APIRoute.
-    dependant = getattr(route, "dependant", None)
+    # FastAPI may execute the dependant stored on the effective route context
+    # instead of the original APIRoute.
+    dependant = getattr(effective_route_context, "dependant", None)
+    if dependant is None:
+        dependant = getattr(route, "dependant", None)
     if (
         dependant is not None
         and dependant.call is not None
