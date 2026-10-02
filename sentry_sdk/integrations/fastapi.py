@@ -38,6 +38,10 @@ class FastApiIntegration(StarletteIntegration):
 
     @staticmethod
     def setup_once() -> None:
+        # FastAPI uses the Starlette ASGI lifecycle, so make sure the
+        # request-scoped isolation scope is installed even when the FastAPI
+        # integration is enabled without the Starlette integration.
+        StarletteIntegration.setup_once()
         patch_fastapi_init()
 
 
