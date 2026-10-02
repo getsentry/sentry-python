@@ -463,16 +463,27 @@ def patch_middlewares() -> None:
         Middleware.__init__ = _sentry_middleware_init  # type: ignore[method-assign]
 
 
+def _get_starlette_integration() -> "Optional[StarletteIntegration]":
+    client = sentry_sdk.get_client()
+    integration = client.get_integration(StarletteIntegration)
+    if integration is None:
+        integration = client.get_integration("fastapi")
+    return integration  # type: ignore[return-value]
+
+
 def patch_asgi_app(root_path_in_path: "_RootPathInPath") -> None:
     """
     Instrument Starlette ASGI app using the SentryAsgiMiddleware.
     """
     old_app = Starlette.__call__
 
+    if getattr(old_app, "_sentry_is_patched", False):
+        return
+
     async def _sentry_patched_asgi_app(
         self: "Starlette", scope: "StarletteScope", receive: "Receive", send: "Send"
     ) -> None:
-        integration = sentry_sdk.get_client().get_integration(StarletteIntegration)
+        integration = _get_starlette_integration()
         if integration is None:
             return await old_app(self, scope, receive, send)
 
@@ -481,17 +492,14 @@ def patch_asgi_app(root_path_in_path: "_RootPathInPath") -> None:
             mechanism_type=StarletteIntegration.identifier,
             transaction_style=integration.transaction_style,
             span_origin=StarletteIntegration.origin,
-            http_methods_to_capture=(
-                integration.http_methods_to_capture
-                if integration
-                else DEFAULT_HTTP_METHODS_TO_CAPTURE
-            ),
+            http_methods_to_capture=integration.http_methods_to_capture,
             asgi_version=3,
             root_path_in_path=root_path_in_path,
         )
 
         return await middleware(scope, receive, send)
 
+    _sentry_patched_asgi_app._sentry_is_patched = True  # type: ignore[attr-defined]
     Starlette.__call__ = _sentry_patched_asgi_app  # type: ignore[method-assign]
 
 
