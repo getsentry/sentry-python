@@ -1,5 +1,6 @@
 import sys
 from copy import deepcopy
+from functools import wraps
 from typing import TYPE_CHECKING
 
 import sentry_sdk
@@ -19,7 +20,7 @@ try:
         StarletteIntegration,
         StarletteRequestExtractor,
         _get_cached_request_body_attribute,
-        _wrap_sync_handler,
+        _update_active_thread,
     )
 except DidNotEnable:
     raise DidNotEnable("Starlette is not installed")
@@ -209,25 +210,3 @@ async def _wrap_async_handler(
                         SPANDATA.HTTP_REQUEST_BODY_DATA,
                         request_body,
                     )
-
-
-def patch_get_request_handler() -> None:
-    old_get_request_handler = fastapi.routing.get_request_handler
-
-    def _sentry_get_request_handler(*args: "Any", **kwargs: "Any") -> "Any":
-        dependant = kwargs.get("dependant")
-        if (
-            dependant
-            and dependant.call is not None
-            and not iscoroutinefunction(dependant.call)
-        ):
-            dependant.call = _wrap_sync_handler(dependant.call)
-
-        old_app = old_get_request_handler(*args, **kwargs)
-
-        async def _sentry_app(*args: "Any", **kwargs: "Any") -> "Any":
-            return await _wrap_async_handler(old_app, *args, **kwargs)
-
-        return _sentry_app
-
-    fastapi.routing.get_request_handler = _sentry_get_request_handler
