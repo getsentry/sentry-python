@@ -30,6 +30,8 @@ try:
 except ImportError:
     raise DidNotEnable("FastAPI is not installed")
 
+from starlette.requests import HTTPConnection, Request
+
 
 _DEFAULT_TRANSACTION_NAME = "generic FastAPI request"
 
@@ -46,7 +48,42 @@ class FastApiIntegration(StarletteIntegration):
 
     @staticmethod
     def setup_once() -> None:
-        patch_get_request_handler()
+        patch_fastapi_init()
+
+
+def _sentry_fastapi_dependency(request: "HTTPConnection") -> None:
+    if not isinstance(request, Request):
+        return
+
+    endpoint = request.scope.get("endpoint")
+    if endpoint is not None and iscoroutinefunction(endpoint):
+        return
+
+    _update_active_thread()
+
+
+def patch_fastapi_init() -> None:
+    old_fastapi_init = fastapi.FastAPI.__init__
+
+    if getattr(old_fastapi_init, "_sentry_is_patched", False):
+        return
+
+    @wraps(old_fastapi_init)
+    def _sentry_fastapi_init(self: "Any", *args: "Any", **kwargs: "Any") -> None:
+        dependencies = kwargs.get("dependencies")
+        if dependencies is None:
+            dependencies = []
+
+        kwargs["dependencies"] = [
+            *dependencies,
+            fastapi.Depends(_sentry_fastapi_dependency),
+        ]
+
+        old_fastapi_init(self, *args, **kwargs)
+
+    _sentry_fastapi_init._sentry_is_patched = True  # type: ignore[attr-defined]
+    fastapi.FastAPI.__init__ = _sentry_fastapi_init
+
 
 
 def _set_transaction_name_and_source(
