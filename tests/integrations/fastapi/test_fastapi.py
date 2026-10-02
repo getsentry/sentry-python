@@ -712,6 +712,28 @@ def test_global_dependency_captures_request_data(sentry_init, capture_events):
     assert event["request"]["data"] == BODY_JSON
 
 
+def test_global_dependency_request_processors_are_isolated(sentry_init, capture_events):
+    sentry_init(integrations=[FastApiIntegration()], send_default_pii=True)
+
+    app = FastAPI()
+
+    @app.get("/")
+    async def _root():
+        capture_message("request")
+        return {"message": "ok"}
+
+    events = capture_events()
+    client = TestClient(app)
+
+    assert client.get("/", cookies={"request": "one"}).status_code == 200
+    assert client.get("/", cookies={"request": "two"}).status_code == 200
+
+    assert [event["request"]["cookies"] for event in events] == [
+        {"request": "one"},
+        {"request": "two"},
+    ]
+
+
 def test_global_dependency_does_not_break_websockets(sentry_init):
     sentry_init(integrations=[FastApiIntegration()])
 
