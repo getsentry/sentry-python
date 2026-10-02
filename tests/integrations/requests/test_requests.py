@@ -11,11 +11,10 @@ from tests.conftest import ApproxDict, create_mock_http_server
 PORT = create_mock_http_server()
 
 
-@pytest.mark.parametrize("send_default_pii", [True, False])
-def test_crumb_capture(sentry_init, capture_events, send_default_pii):
+def test_crumb_capture(sentry_init, capture_events):
     sentry_init(
         integrations=[StdlibIntegration()],
-        send_default_pii=send_default_pii,
+        data_collection={},
     )
     events = capture_events()
 
@@ -28,21 +27,13 @@ def test_crumb_capture(sentry_init, capture_events, send_default_pii):
     assert crumb["type"] == "http"
     assert crumb["category"] == "httplib"
 
-    if send_default_pii:
-        assert crumb["data"] == ApproxDict(
-            {
-                SPANDATA.URL_FULL: url,
-                SPANDATA.HTTP_REQUEST_METHOD: "GET",
-                SPANDATA.HTTP_STATUS_CODE: response.status_code,
-            }
-        )
-    else:
-        assert crumb["data"] == ApproxDict(
-            {
-                SPANDATA.HTTP_REQUEST_METHOD: "GET",
-                SPANDATA.HTTP_STATUS_CODE: response.status_code,
-            }
-        )
+    assert crumb["data"] == ApproxDict(
+        {
+            SPANDATA.URL_FULL: url,
+            SPANDATA.HTTP_REQUEST_METHOD: "GET",
+            SPANDATA.HTTP_STATUS_CODE: response.status_code,
+        }
+    )
 
 
 @pytest.mark.parametrize(
@@ -55,13 +46,10 @@ def test_crumb_capture(sentry_init, capture_events, send_default_pii):
         (500, "error"),
     ],
 )
-@pytest.mark.parametrize("send_default_pii", [True, False])
-def test_crumb_capture_client_error(
-    sentry_init, capture_events, status_code, level, send_default_pii
-):
+def test_crumb_capture_client_error(sentry_init, capture_events, status_code, level):
     sentry_init(
         integrations=[StdlibIntegration()],
-        send_default_pii=send_default_pii,
+        data_collection={},
     )
 
     events = capture_events()
@@ -83,28 +71,20 @@ def test_crumb_capture_client_error(
     else:
         assert crumb["level"] == level
 
-    if send_default_pii:
-        assert crumb["data"] == ApproxDict(
-            {
-                SPANDATA.URL_FULL: url,
-                SPANDATA.HTTP_REQUEST_METHOD: "GET",
-                SPANDATA.HTTP_STATUS_CODE: response.status_code,
-            }
-        )
-    else:
-        assert crumb["data"] == ApproxDict(
-            {
-                SPANDATA.HTTP_REQUEST_METHOD: "GET",
-                SPANDATA.HTTP_STATUS_CODE: response.status_code,
-            }
-        )
+    assert crumb["data"] == ApproxDict(
+        {
+            SPANDATA.URL_FULL: url,
+            SPANDATA.HTTP_REQUEST_METHOD: "GET",
+            SPANDATA.HTTP_STATUS_CODE: response.status_code,
+        }
+    )
 
 
 @pytest.mark.tests_internal_exceptions
 def test_omit_url_data_if_parsing_fails(sentry_init, capture_events):
     sentry_init(
         integrations=[StdlibIntegration()],
-        send_default_pii=True,
+        data_collection={},
     )
 
     events = capture_events()
