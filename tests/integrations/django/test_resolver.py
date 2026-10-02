@@ -68,10 +68,6 @@ def test_resolver_re_path_multiple_groups():
     assert result == "/api/{project_id}/product/{pid}/"
 
 
-@pytest.mark.skipif(
-    django.VERSION < (2, 0),
-    reason="Django>=2.0 required for <converter:parameter> patterns",
-)
 def test_resolver_path_group():
     url_conf = (path("api/v2/<int:project_id>/store/", lambda x: ""),)
     resolver = RavenResolver()
@@ -79,10 +75,6 @@ def test_resolver_path_group():
     assert result == "/api/v2/{project_id}/store/"
 
 
-@pytest.mark.skipif(
-    django.VERSION < (2, 0),
-    reason="Django>=2.0 required for <converter:parameter> patterns",
-)
 def test_resolver_path_multiple_groups():
     url_conf = (path("api/v2/<str:project_id>/product/<int:pid>", lambda x: ""),)
     resolver = RavenResolver()
@@ -90,10 +82,6 @@ def test_resolver_path_multiple_groups():
     assert result == "/api/v2/{project_id}/product/{pid}"
 
 
-@pytest.mark.skipif(
-    django.VERSION < (2, 0),
-    reason="Django>=2.0 required for <converter:parameter> patterns",
-)
 @pytest.mark.skipif(
     django.VERSION > (5, 1),
     reason="get_converter removed in 5.1",
@@ -130,10 +118,6 @@ def test_resolver_path_complex_path():
         assert result == "/api/v3/{my_path}"
 
 
-@pytest.mark.skipif(
-    django.VERSION < (2, 0),
-    reason="Django>=2.0 required for <converter:parameter> patterns",
-)
 def test_resolver_path_no_converter():
     url_conf = (path("api/v4/<project_id>", lambda x: ""),)
     resolver = RavenResolver()
@@ -141,10 +125,6 @@ def test_resolver_path_no_converter():
     assert result == "/api/v4/{project_id}"
 
 
-@pytest.mark.skipif(
-    django.VERSION < (2, 0),
-    reason="Django>=2.0 required for path patterns",
-)
 def test_resolver_path_with_i18n():
     url_conf = (path(pgettext_lazy("url", "pgettext"), lambda x: ""),)
     resolver = RavenResolver()

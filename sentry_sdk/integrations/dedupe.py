@@ -1,13 +1,14 @@
 import weakref
+from contextvars import ContextVar
 from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk.integrations import Integration
 from sentry_sdk.scope import add_global_event_processor
-from sentry_sdk.utils import ContextVar, logger
+from sentry_sdk.utils import logger
 
 if TYPE_CHECKING:
-    from typing import Optional
+    from typing import Any, Optional
 
     from sentry_sdk._types import Event, Hint
 
@@ -16,7 +17,7 @@ class DedupeIntegration(Integration):
     identifier = "dedupe"
 
     def __init__(self) -> None:
-        self._last_seen = ContextVar("last-seen")
+        self._last_seen: "ContextVar[Any]" = ContextVar("last-seen")
 
     @staticmethod
     def setup_once() -> None:

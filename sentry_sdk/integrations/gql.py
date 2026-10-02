@@ -31,7 +31,7 @@ try:
         GraphQLRequest = None
 
 except ImportError:
-    raise DidNotEnable("gql is not installed")
+    raise DidNotEnable("gql is not installed or incompatible")
 
 from typing import TYPE_CHECKING
 

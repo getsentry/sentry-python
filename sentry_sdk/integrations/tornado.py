@@ -1,9 +1,7 @@
 import contextlib
 import weakref
-from inspect import iscoroutinefunction
 
 import sentry_sdk
-from sentry_sdk.api import continue_trace
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.data_collection import _apply_data_collection_filtering_to_query_string
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
@@ -13,38 +11,30 @@ from sentry_sdk.integrations._wsgi_common import (
     _is_json_content_type,
     request_body_within_bounds,
 )
-from sentry_sdk.integrations.logging import ignore_logger
-from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.traces import SegmentNameSource, StreamedSpan
-from sentry_sdk.tracing import TransactionSource
-from sentry_sdk.tracing_utils import has_span_streaming_enabled
+from sentry_sdk.integrations.logging import ignore_logger_for_events
+from sentry_sdk.traces import SegmentNameSource
 from sentry_sdk.utils import (
-    CONTEXTVARS_ERROR_MESSAGE,
-    HAS_REAL_CONTEXTVARS,
     AnnotatedValue,
     _is_localhost,
     capture_internal_exceptions,
     ensure_integration_enabled,
     event_from_exception,
-    has_data_collection_enabled,
     parse_url,
     transaction_from_function,
 )
 
 try:
     from tornado import version_info as TORNADO_VERSION
-    from tornado.gen import coroutine
     from tornado.web import HTTPError, RequestHandler
 except ImportError:
-    raise DidNotEnable("Tornado not installed")
+    raise DidNotEnable("Tornado not installed or incompatible")
 
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, ContextManager, Dict, Generator, Optional, Union
+    from typing import Any, Callable, Dict, Generator, Optional, Union
 
     from sentry_sdk._types import Event, EventProcessor
-    from sentry_sdk.tracing import Span
 
 
 class TornadoIntegration(Integration):
@@ -55,38 +45,15 @@ class TornadoIntegration(Integration):
     def setup_once() -> None:
         _check_minimum_version(TornadoIntegration, TORNADO_VERSION)
 
-        if not HAS_REAL_CONTEXTVARS:
-            # Tornado is async. We better have contextvars or we're going to leak
-            # state between requests.
-            raise DidNotEnable(
-                "The tornado integration for Sentry requires Python 3.7+ or the aiocontextvars package"
-                + CONTEXTVARS_ERROR_MESSAGE
-            )
-
-        ignore_logger("tornado.access")
+        ignore_logger_for_events("tornado.access")
 
         old_execute = RequestHandler._execute
 
-        awaitable = iscoroutinefunction(old_execute)
-
-        if awaitable:
-            # Starting Tornado 6 RequestHandler._execute method is a standard Python coroutine (async/await)
-            # In that case our method should be a coroutine function too
-            async def sentry_execute_request_handler(
-                self: "RequestHandler", *args: "Any", **kwargs: "Any"
-            ) -> "Any":
-                with _handle_request_impl(self):
-                    return await old_execute(self, *args, **kwargs)
-
-        else:
-
-            @coroutine  # type: ignore
-            def sentry_execute_request_handler(
-                self: "RequestHandler", *args: "Any", **kwargs: "Any"
-            ) -> "Any":
-                with _handle_request_impl(self):
-                    result = yield from old_execute(self, *args, **kwargs)
-                    return result
+        async def sentry_execute_request_handler(
+            self: "RequestHandler", *args: "Any", **kwargs: "Any"
+        ) -> "Any":
+            with _handle_request_impl(self):
+                return await old_execute(self, *args, **kwargs)
 
         RequestHandler._execute = sentry_execute_request_handler
 
@@ -119,7 +86,6 @@ def _handle_request_impl(self: "RequestHandler") -> "Generator[None, None, None]
 
     weak_handler = weakref.ref(self)
     client = sentry_sdk.get_client()
-    is_span_streaming_enabled = has_span_streaming_enabled(client.options)
 
     with sentry_sdk.isolation_scope() as scope:
         headers = self.request.headers
@@ -127,6 +93,9 @@ def _handle_request_impl(self: "RequestHandler") -> "Generator[None, None, None]
         scope.clear_breadcrumbs()
         processor = _make_event_processor(weak_handler)
         scope.add_event_processor(processor)
+
+        sentry_sdk.continue_trace(dict(headers))
+        scope.set_custom_sampling_context({"tornado_request": self.request})
 
         scope.set_attribute(
             SPANDATA.SENTRY_IS_LOCALHOST,
@@ -137,79 +106,44 @@ def _handle_request_impl(self: "RequestHandler") -> "Generator[None, None, None]
             ),
         )
 
+        if self.request.remote_ip and client.options["data_collection"]["user_info"]:
+            scope.set_attribute(SPANDATA.USER_IP_ADDRESS, self.request.remote_ip)
+
         user_agent = headers.get("User-Agent")
         if user_agent:
             scope.set_attribute(SPANDATA.USER_AGENT_ORIGINAL, user_agent)
 
-        span_ctx: "ContextManager[Union[Span, StreamedSpan, None]]"
-
-        if is_span_streaming_enabled:
-            sentry_sdk.traces.continue_trace(dict(headers))
-            scope.set_custom_sampling_context({"tornado_request": self.request})
-
-            if self.request.remote_ip:
-                if has_data_collection_enabled(client.options):
-                    if client.options["data_collection"]["user_info"]:
-                        scope.set_attribute(
-                            SPANDATA.USER_IP_ADDRESS, self.request.remote_ip
-                        )
-                elif should_send_default_pii():
-                    scope.set_attribute(
-                        SPANDATA.USER_IP_ADDRESS, self.request.remote_ip
-                    )
-
-            span_ctx = sentry_sdk.traces.start_span(
-                name=_DEFAULT_ROOT_SPAN_NAME,
-                attributes={
-                    "sentry.op": OP.HTTP_SERVER,
-                    "sentry.origin": TornadoIntegration.origin,
-                    "sentry.segment.name.source": SegmentNameSource.ROUTE,
-                },
-                parent_span=None,
-            )
-        else:
-            transaction = continue_trace(
-                headers,
-                op=OP.HTTP_SERVER,
-                # Like with all other integrations, this is our
-                # fallback transaction in case there is no route.
-                # sentry_urldispatcher_resolve is responsible for
-                # setting a transaction name later.
-                name=_DEFAULT_ROOT_SPAN_NAME,
-                source=TransactionSource.ROUTE,
-                origin=TornadoIntegration.origin,
-            )
-            span_ctx = sentry_sdk.start_transaction(
-                transaction,
-                custom_sampling_context={"tornado_request": self.request},
-            )
-
-        with span_ctx as span:
+        with sentry_sdk.start_span(
+            name=_DEFAULT_ROOT_SPAN_NAME,
+            attributes={
+                "sentry.op": OP.HTTP_SERVER,
+                "sentry.origin": TornadoIntegration.origin,
+                "sentry.segment.name.source": SegmentNameSource.ROUTE,
+            },
+            parent_span=None,
+        ) as span:
             try:
                 yield
             finally:
-                if type(span) is StreamedSpan:
-                    with capture_internal_exceptions():
-                        for attr, value in _get_request_attributes(
-                            self.request
-                        ).items():
-                            span.set_attribute(attr, value)
+                with capture_internal_exceptions():
+                    for attr, value in _get_request_attributes(self.request).items():
+                        span.set_attribute(attr, value)
 
-                    with capture_internal_exceptions():
-                        method = getattr(self, self.request.method.lower(), None)
-                        if method is not None:
-                            span_name = transaction_from_function(method)
-                            if span_name:
-                                span.name = span_name
-                                span.set_attribute(
-                                    "sentry.segment.name.source",
-                                    SegmentNameSource.COMPONENT,
-                                )
+                with capture_internal_exceptions():
+                    method = getattr(self, self.request.method.lower(), None)
+                    if method is not None:
+                        span_name = transaction_from_function(method)
+                        if span_name:
+                            span.name = span_name
+                            span.set_attribute(
+                                "sentry.segment.name.source",
+                                SegmentNameSource.COMPONENT,
+                            )
 
-                    with capture_internal_exceptions():
-                        status_int = self.get_status()
-                        span.set_attribute(SPANDATA.HTTP_STATUS_CODE, status_int)
-                        span.status = "error" if status_int >= 400 else "ok"
+                with capture_internal_exceptions():
+                    status_int = self.get_status()
+                    span.set_attribute(SPANDATA.HTTP_STATUS_CODE, status_int)
+                    span.status = "error" if status_int >= 400 else "ok"
 
 
 def _get_client_ip(request: "Any") -> "Optional[str]":
@@ -230,51 +164,35 @@ def _get_request_attributes(request: "Any") -> "Dict[str, Any]":
     if request.method:
         attributes[SPANDATA.HTTP_REQUEST_METHOD] = request.method.upper()
 
-    headers = _filter_headers(dict(request.headers), use_annotated_value=False)
+    headers = _filter_headers(dict(request.headers))
     for header, value in headers.items():
-        attributes[f"{SPANDATA.HTTP_REQUEST_HEADER}.{header.lower()}"] = value
+        attributes[f"{SPANDATA.HTTP_REQUEST_HEADER}.{header.lower()}"] = [value]
 
-    if has_data_collection_enabled(client_options):
-        attributes["url.path"] = request.path
+    attributes["url.path"] = request.path
 
-        filtered_query = None
-        if request.query:
-            filtered_query = _apply_data_collection_filtering_to_query_string(
-                query_string=request.query,
-                behaviour=client_options["data_collection"]["url_query_params"],
-            )
-            if filtered_query:
-                attributes[SPANDATA.URL_QUERY] = filtered_query
-
-        parsed_url = parse_url(request.full_url())
-        attributes[SPANDATA.URL_FULL] = (
-            f"{parsed_url.url}?{filtered_query}" if filtered_query else parsed_url.url
+    filtered_query = None
+    if request.query:
+        filtered_query = _apply_data_collection_filtering_to_query_string(
+            query_string=request.query,
+            behaviour=client_options["data_collection"]["url_query_params"],
         )
+        if filtered_query:
+            attributes[SPANDATA.URL_QUERY] = filtered_query
 
-        if request.remote_ip:
-            if client_options["data_collection"]["user_info"]:
-                attributes[SPANDATA.CLIENT_ADDRESS] = request.remote_ip
+    parsed_url = parse_url(request.full_url())
+    attributes[SPANDATA.URL_FULL] = (
+        f"{parsed_url.url}?{filtered_query}" if filtered_query else parsed_url.url
+    )
 
-    elif should_send_default_pii():
-        attributes[SPANDATA.URL_FULL] = request.full_url()
-        attributes["url.path"] = request.path
-
-        if request.query:
-            attributes[SPANDATA.URL_QUERY] = request.query
-
-        if request.remote_ip:
-            attributes[SPANDATA.CLIENT_ADDRESS] = request.remote_ip
+    if request.remote_ip and client_options["data_collection"]["user_info"]:
+        attributes[SPANDATA.CLIENT_ADDRESS] = request.remote_ip
 
     if request.protocol:
         attributes[SPANDATA.NETWORK_PROTOCOL_NAME] = request.protocol
 
-    # The request data was unconditionally set pre-data collection which is
-    # why we're defaulting to True
-    record_incoming_request_data = True
-    if has_data_collection_enabled(client_options):
-        record_incoming_request_data = (
-            "incoming_request" in client_options["data_collection"]["http_bodies"]
-        )
+    record_incoming_request_data = (
+        "incoming_request" in client_options["data_collection"]["http_bodies"]
+    )
 
     if record_incoming_request_data:
         with capture_internal_exceptions():
@@ -328,7 +246,7 @@ def _make_event_processor(
         with capture_internal_exceptions():
             method = getattr(handler, handler.request.method.lower())
             event["transaction"] = transaction_from_function(method) or ""
-            event["transaction_info"] = {"source": TransactionSource.COMPONENT}
+            event["transaction_info"] = {"source": SegmentNameSource.COMPONENT}
 
         client_options = sentry_sdk.get_client().options
         with capture_internal_exceptions():
@@ -343,38 +261,21 @@ def _make_event_processor(
                 request.path,
             )
 
-            if has_data_collection_enabled(client_options):
-                if request.query:
-                    filtered_query = _apply_data_collection_filtering_to_query_string(
-                        query_string=request.query,
-                        behaviour=client_options["data_collection"]["url_query_params"],
-                    )
-                    if filtered_query:
-                        request_info["query_string"] = filtered_query
-            else:
-                request_info["query_string"] = request.query
+            if request.query:
+                filtered_query = _apply_data_collection_filtering_to_query_string(
+                    query_string=request.query,
+                    behaviour=client_options["data_collection"]["url_query_params"],
+                )
+                if filtered_query:
+                    request_info["query_string"] = filtered_query
 
             request_info["method"] = request.method
 
-            # REMOTE_ADDR was unconditionally set pre-data collection, so it
-            # continues to be set when data collection is not enabled.
-            if (
-                not has_data_collection_enabled(client_options)
-                or client_options["data_collection"]["user_info"]
-            ):
+            if client_options["data_collection"]["user_info"]:
                 request_info["env"] = {"REMOTE_ADDR": request.remote_ip}
             request_info["headers"] = _filter_headers(dict(request.headers))
 
-        if has_data_collection_enabled(client_options):
-            if client_options["data_collection"]["user_info"]:
-                try:
-                    current_user = handler.current_user
-                except Exception:
-                    current_user = None
-
-                if current_user:
-                    event.setdefault("user", {}).setdefault("is_authenticated", True)
-        elif should_send_default_pii():
+        if client_options["data_collection"]["user_info"]:
             try:
                 current_user = handler.current_user
             except Exception:

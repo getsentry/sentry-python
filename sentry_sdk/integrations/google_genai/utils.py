@@ -25,19 +25,11 @@ from sentry_sdk.ai.utils import (
     normalize_message_roles,
     set_data_normalized,
     transform_google_content_part,
-    truncate_and_annotate_messages,
 )
 from sentry_sdk.consts import OP, SPANDATA
-from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.traces import StreamedSpan
-from sentry_sdk.tracing_utils import (
-    has_span_streaming_enabled,
-    should_truncate_gen_ai_input,
-)
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
-    has_data_collection_enabled,
     safe_serialize,
 )
 
@@ -57,7 +49,7 @@ if TYPE_CHECKING:
     )
 
     from sentry_sdk._types import TextPart
-    from sentry_sdk.tracing import Span
+    from sentry_sdk.traces import Span
 
 _is_PIL_available = False
 try:
@@ -685,32 +677,18 @@ def _capture_tool_input(
     return tool_input
 
 
-def _create_tool_span(
-    tool_name: str, tool_doc: "Optional[str]"
-) -> "Union[Span, StreamedSpan]":
+def _create_tool_span(tool_name: str, tool_doc: "Optional[str]") -> "Span":
     """Create a span for tool execution."""
-    span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
-    if span_streaming:
-        span = sentry_sdk.traces.start_span(
-            name=f"execute_tool {tool_name}",
-            attributes={
-                "sentry.op": OP.GEN_AI_EXECUTE_TOOL,
-                "sentry.origin": ORIGIN,
-                SPANDATA.GEN_AI_TOOL_NAME: tool_name,
-            },
-        )
-        if tool_doc:
-            span.set_attribute(SPANDATA.GEN_AI_TOOL_DESCRIPTION, tool_doc)
-        return span
-
     span = sentry_sdk.start_span(
-        op=OP.GEN_AI_EXECUTE_TOOL,
         name=f"execute_tool {tool_name}",
-        origin=ORIGIN,
+        attributes={
+            "sentry.op": OP.GEN_AI_EXECUTE_TOOL,
+            "sentry.origin": ORIGIN,
+            SPANDATA.GEN_AI_TOOL_NAME: tool_name,
+        },
     )
-    span.set_data(SPANDATA.GEN_AI_TOOL_NAME, tool_name)
     if tool_doc:
-        span.set_data(SPANDATA.GEN_AI_TOOL_DESCRIPTION, tool_doc)
+        span.set_attribute(SPANDATA.GEN_AI_TOOL_DESCRIPTION, tool_doc)
     return span
 
 
@@ -728,22 +706,21 @@ def wrapped_tool(tool: "Tool | Callable[..., Any]") -> "Tool | Callable[..., Any
         @wraps(tool)
         async def async_wrapped(*args: "Any", **kwargs: "Any") -> "Any":
             with _create_tool_span(tool_name, tool_doc) as span:
-                set_on_span = (
-                    span.set_attribute
-                    if isinstance(span, StreamedSpan)
-                    else span.set_data
-                )
                 # Capture tool input
                 tool_input = _capture_tool_input(args, kwargs, tool)
                 with capture_internal_exceptions():
-                    set_on_span(SPANDATA.GEN_AI_TOOL_INPUT, safe_serialize(tool_input))
+                    span.set_attribute(
+                        SPANDATA.GEN_AI_TOOL_INPUT, safe_serialize(tool_input)
+                    )
 
                 try:
                     result = await tool(*args, **kwargs)
 
                     # Capture tool output
                     with capture_internal_exceptions():
-                        set_on_span(SPANDATA.GEN_AI_TOOL_OUTPUT, safe_serialize(result))
+                        span.set_attribute(
+                            SPANDATA.GEN_AI_TOOL_OUTPUT, safe_serialize(result)
+                        )
 
                     return result
                 except Exception as exc:
@@ -756,22 +733,21 @@ def wrapped_tool(tool: "Tool | Callable[..., Any]") -> "Tool | Callable[..., Any
         @wraps(tool)
         def sync_wrapped(*args: "Any", **kwargs: "Any") -> "Any":
             with _create_tool_span(tool_name, tool_doc) as span:
-                set_on_span = (
-                    span.set_attribute
-                    if isinstance(span, StreamedSpan)
-                    else span.set_data
-                )
                 # Capture tool input
                 tool_input = _capture_tool_input(args, kwargs, tool)
                 with capture_internal_exceptions():
-                    set_on_span(SPANDATA.GEN_AI_TOOL_INPUT, safe_serialize(tool_input))
+                    span.set_attribute(
+                        SPANDATA.GEN_AI_TOOL_INPUT, safe_serialize(tool_input)
+                    )
 
                 try:
                     result = tool(*args, **kwargs)
 
                     # Capture tool output
                     with capture_internal_exceptions():
-                        set_on_span(SPANDATA.GEN_AI_TOOL_OUTPUT, safe_serialize(result))
+                        span.set_attribute(
+                            SPANDATA.GEN_AI_TOOL_OUTPUT, safe_serialize(result)
+                        )
 
                     return result
                 except Exception as exc:
@@ -919,7 +895,7 @@ def _transform_system_instructions(
 
 
 def set_span_data_for_request(
-    span: "Union[Span, StreamedSpan]",
+    span: "Span",
     integration: "Any",
     model: str,
     contents: "ContentListUnion",
@@ -927,14 +903,11 @@ def set_span_data_for_request(
 ) -> None:
     """Set span data for the request."""
     client = sentry_sdk.get_client()
-    set_on_span = (
-        span.set_attribute if isinstance(span, StreamedSpan) else span.set_data
-    )
-    set_on_span(SPANDATA.GEN_AI_SYSTEM, GEN_AI_SYSTEM)
-    set_on_span(SPANDATA.GEN_AI_REQUEST_MODEL, model)
+    span.set_attribute(SPANDATA.GEN_AI_PROVIDER_NAME, GEN_AI_SYSTEM)
+    span.set_attribute(SPANDATA.GEN_AI_REQUEST_MODEL, model)
 
     if kwargs.get("stream", False):
-        set_on_span(SPANDATA.GEN_AI_RESPONSE_STREAMING, True)
+        span.set_attribute(SPANDATA.GEN_AI_RESPONSE_STREAMING, True)
 
     config: "Optional[GenerateContentConfig]" = kwargs.get("config")
 
@@ -944,16 +917,7 @@ def set_span_data_for_request(
         if tools:
             formatted_tools = _format_tools_for_span(tools)
             if formatted_tools:
-                if has_data_collection_enabled(client.options):
-                    if client.options["data_collection"]["gen_ai"]["inputs"]:
-                        set_data_normalized(
-                            span,
-                            SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
-                            formatted_tools,
-                            unpack=False,
-                        )
-                else:
-                    # To remove once data collection has been fully rolled out
+                if client.options["data_collection"]["gen_ai"]["inputs"]:
                     set_data_normalized(
                         span,
                         SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
@@ -962,10 +926,7 @@ def set_span_data_for_request(
                     )
 
     record_inputs = False
-    if has_data_collection_enabled(client.options):
-        if client.options["data_collection"]["gen_ai"]["inputs"]:
-            record_inputs = True
-    elif should_send_default_pii() and integration.include_prompts:
+    if client.options["data_collection"]["gen_ai"]["inputs"]:
         record_inputs = True
 
     if record_inputs:
@@ -979,7 +940,7 @@ def set_span_data_for_request(
             system_instructions = config.get("system_instruction")
 
         if system_instructions is not None:
-            set_on_span(
+            span.set_attribute(
                 SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
                 json.dumps(_transform_system_instructions(system_instructions)),
             )
@@ -990,20 +951,12 @@ def set_span_data_for_request(
 
         if messages:
             normalized_messages = normalize_message_roles(messages)
-            client = sentry_sdk.get_client()
-            scope = sentry_sdk.get_current_scope()
-            messages_data = (
-                truncate_and_annotate_messages(normalized_messages, span, scope)
-                if should_truncate_gen_ai_input(client.options)
-                else normalized_messages
+            set_data_normalized(
+                span,
+                SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                normalized_messages,
+                unpack=False,
             )
-            if messages_data is not None:
-                set_data_normalized(
-                    span,
-                    SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                    messages_data,
-                    unpack=False,
-                )
 
     # Extract parameters directly from config (not nested under generation_config)
     for param, span_key in [
@@ -1018,11 +971,11 @@ def set_span_data_for_request(
         if hasattr(config, param):
             value = getattr(config, param)
             if value is not None:
-                set_on_span(span_key, value)
+                span.set_attribute(span_key, value)
 
 
 def set_span_data_for_response(
-    span: "Union[Span, StreamedSpan]",
+    span: "Span",
     integration: "Any",
     response: "GenerateContentResponse",
 ) -> None:
@@ -1030,9 +983,6 @@ def set_span_data_for_response(
         return
 
     client = sentry_sdk.get_client()
-    set_on_span = (
-        span.set_attribute if isinstance(span, StreamedSpan) else span.set_data
-    )
 
     finish_reasons = extract_finish_reasons(response)
     if finish_reasons:
@@ -1042,59 +992,54 @@ def set_span_data_for_response(
 
     response_id = getattr(response, "response_id", None)
     if response_id is not None:
-        set_on_span(SPANDATA.GEN_AI_RESPONSE_ID, response_id)
+        span.set_attribute(SPANDATA.GEN_AI_RESPONSE_ID, response_id)
 
     model_version = getattr(response, "model_version", None)
     if model_version is not None:
-        set_on_span(SPANDATA.GEN_AI_RESPONSE_MODEL, model_version)
+        span.set_attribute(SPANDATA.GEN_AI_RESPONSE_MODEL, model_version)
 
     usage_data = extract_usage_data(response)
 
     if usage_data["input_tokens"]:
-        set_on_span(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, usage_data["input_tokens"])
+        span.set_attribute(
+            SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, usage_data["input_tokens"]
+        )
 
     if usage_data["input_tokens_cached"]:
-        set_on_span(
-            SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED,
+        span.set_attribute(
+            SPANDATA.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
             usage_data["input_tokens_cached"],
         )
 
     if usage_data["output_tokens"]:
-        set_on_span(SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS, usage_data["output_tokens"])
+        span.set_attribute(
+            SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS, usage_data["output_tokens"]
+        )
 
     if usage_data["output_tokens_reasoning"]:
-        set_on_span(
-            SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS_REASONING,
+        span.set_attribute(
+            SPANDATA.GEN_AI_USAGE_REASONING_OUTPUT_TOKENS,
             usage_data["output_tokens_reasoning"],
         )
 
     if usage_data["total_tokens"]:
-        set_on_span(SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, usage_data["total_tokens"])
+        span.set_attribute(
+            SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, usage_data["total_tokens"]
+        )
 
     tool_calls = extract_tool_calls(response)
     if tool_calls:
-        if has_data_collection_enabled(client.options):
-            if client.options["data_collection"]["gen_ai"]["outputs"]:
-                set_on_span(
-                    SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS, safe_serialize(tool_calls)
-                )
-        else:
-            # Before data collection was introduced, this was set unconditionally
-            set_on_span(SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS, safe_serialize(tool_calls))
-
-    if has_data_collection_enabled(client.options):
         if client.options["data_collection"]["gen_ai"]["outputs"]:
-            response_texts = _extract_response_text(response)
-            if response_texts:
-                set_on_span(
-                    SPANDATA.GEN_AI_RESPONSE_TEXT, safe_serialize(response_texts)
-                )
-    elif should_send_default_pii() and integration.include_prompts:
-        # TODO: Delete this block once data collection has been completely rolled out
+            span.set_attribute(
+                SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS, safe_serialize(tool_calls)
+            )
+
+    if client.options["data_collection"]["gen_ai"]["outputs"]:
         response_texts = _extract_response_text(response)
         if response_texts:
-            # Format as JSON string array as per documentation
-            set_on_span(SPANDATA.GEN_AI_RESPONSE_TEXT, safe_serialize(response_texts))
+            span.set_attribute(
+                SPANDATA.GEN_AI_RESPONSE_TEXT, safe_serialize(response_texts)
+            )
 
 
 def prepare_generate_content_args(
@@ -1129,7 +1074,7 @@ def prepare_embed_content_args(
 
 
 def set_span_data_for_embed_request(
-    span: "Union[Span, StreamedSpan]",
+    span: "Span",
     integration: "Any",
     contents: "Any",
     kwargs: "dict[str, Any]",
@@ -1137,14 +1082,7 @@ def set_span_data_for_embed_request(
     """Set span data for embedding request."""
     client = sentry_sdk.get_client()
 
-    record_inputs = False
-    if has_data_collection_enabled(client.options):
-        if client.options["data_collection"]["gen_ai"]["inputs"]:
-            record_inputs = True
-    elif should_send_default_pii() and integration.include_prompts:
-        record_inputs = True
-
-    if record_inputs:
+    if client.options["data_collection"]["gen_ai"]["inputs"]:
         if contents:
             # For embeddings, contents is typically a list of strings/texts
             input_texts = []
@@ -1172,7 +1110,7 @@ def set_span_data_for_embed_request(
 
 
 def set_span_data_for_embed_response(
-    span: "Union[Span, StreamedSpan]",
+    span: "Span",
     integration: "Any",
     response: "EmbedContentResponse",
 ) -> None:
@@ -1193,7 +1131,4 @@ def set_span_data_for_embed_response(
 
         # Set token count if we found any
         if total_tokens > 0:
-            if isinstance(span, StreamedSpan):
-                span.set_attribute(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, total_tokens)
-            else:
-                span.set_data(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, total_tokens)
+            span.set_attribute(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, total_tokens)

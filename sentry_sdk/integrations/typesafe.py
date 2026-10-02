@@ -4,14 +4,8 @@ from functools import wraps
 from typing import TYPE_CHECKING, cast
 
 import sentry_sdk
-from sentry_sdk.ai.utils import get_start_span_function
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration
-from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.tracing_utils import (
-    has_data_collection_enabled,
-    has_span_streaming_enabled,
-)
 
 if TYPE_CHECKING:
     from typing import (
@@ -221,38 +215,19 @@ def _wrap_system_one(f: "Callable[..., Any]") -> "Callable[..., Any]":
         ):
             model = self._config.default_model
 
-        if has_span_streaming_enabled(client.options):
-            span = sentry_sdk.traces.start_span(
-                name=f"evaluate {model}".strip(),
-                attributes={
-                    "sentry.op": OP.GEN_AI_EVALUATE,
-                    "sentry.origin": TypeSafeIntegration.origin,
-                    SPANDATA.GEN_AI_PROVIDER_NAME: "typesafe",
-                    SPANDATA.GEN_AI_OPERATION_NAME: "evaluate",
-                },
-            )
-            set_on_span = span.set_attribute
-        else:
-            span = get_start_span_function()(
-                op=OP.GEN_AI_EVALUATE,
-                name=f"evaluate {model}".strip(),
-                origin=TypeSafeIntegration.origin,
-            )
-            span.set_data(SPANDATA.GEN_AI_PROVIDER_NAME, "typesafe")
-            span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "evaluate")
-            set_on_span = span.set_data
-
-        with span:
+        with sentry_sdk.start_span(
+            name=f"evaluate {model}".strip(),
+            attributes={
+                "sentry.op": OP.GEN_AI_EVALUATE,
+                "sentry.origin": TypeSafeIntegration.origin,
+                SPANDATA.GEN_AI_PROVIDER_NAME: "typesafe",
+                SPANDATA.GEN_AI_OPERATION_NAME: "evaluate",
+            },
+        ) as span:
             if model is not None:
-                set_on_span(SPANDATA.GEN_AI_REQUEST_MODEL, model)
+                span.set_attribute(SPANDATA.GEN_AI_REQUEST_MODEL, model)
 
-            if (
-                has_data_collection_enabled(client.options)
-                and client.options["data_collection"]["gen_ai"]["inputs"]
-            ) or (
-                not has_data_collection_enabled(client.options)
-                and should_send_default_pii()
-            ):
+            if client.options["data_collection"]["gen_ai"]["inputs"]:
                 input_message: "InputMessageModel" = {
                     "type": "evaluation",
                 }
@@ -265,45 +240,41 @@ def _wrap_system_one(f: "Callable[..., Any]") -> "Callable[..., Any]":
                 if isinstance(questions, Mapping):
                     input_message["questions"] = _transform_questions(questions)
 
-                set_on_span(SPANDATA.GEN_AI_INPUT_MESSAGES, json.dumps([input_message]))
+                span.set_attribute(
+                    SPANDATA.GEN_AI_INPUT_MESSAGES, json.dumps([input_message])
+                )
 
             response = f(self, *args, **kwargs)
 
             if not isinstance(response, SystemOneResponse):
                 return response
 
-            set_on_span(SPANDATA.GEN_AI_RESPONSE_MODEL, response.model)
+            span.set_attribute(SPANDATA.GEN_AI_RESPONSE_MODEL, response.model)
 
             if response.usage.input_tokens is not None:
-                set_on_span(
+                span.set_attribute(
                     SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, response.usage.input_tokens
                 )
 
             if response.usage.output_tokens is not None:
-                set_on_span(
+                span.set_attribute(
                     SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS, response.usage.output_tokens
                 )
 
-            if (
-                has_data_collection_enabled(client.options)
-                and client.options["data_collection"]["gen_ai"]["outputs"]
-            ) or (
-                not has_data_collection_enabled(client.options)
-                and should_send_default_pii()
-            ):
-                set_on_span(
-                    SPANDATA.GEN_AI_OUTPUT_MESSAGES,
-                    json.dumps(
-                        [
-                            {
-                                "type": "evaluation",
-                                "answers": _transform_evaluation_answers(
-                                    response.answers
-                                ),
-                            }
-                        ]
-                    ),
-                )
+            if not client.options["data_collection"]["gen_ai"]["outputs"]:
+                return response
+
+            span.set_attribute(
+                SPANDATA.GEN_AI_OUTPUT_MESSAGES,
+                json.dumps(
+                    [
+                        {
+                            "type": "evaluation",
+                            "answers": _transform_evaluation_answers(response.answers),
+                        }
+                    ]
+                ),
+            )
 
             return response
 
@@ -328,38 +299,19 @@ def _wrap_system_one_async(f: "Callable[..., Any]") -> "Callable[..., Any]":
         ):
             model = self._config.default_model
 
-        if has_span_streaming_enabled(client.options):
-            span = sentry_sdk.traces.start_span(
-                name=f"evaluate {model}".strip(),
-                attributes={
-                    "sentry.op": OP.GEN_AI_EVALUATE,
-                    "sentry.origin": TypeSafeIntegration.origin,
-                    SPANDATA.GEN_AI_PROVIDER_NAME: "typesafe",
-                    SPANDATA.GEN_AI_OPERATION_NAME: "evaluate",
-                },
-            )
-            set_on_span = span.set_attribute
-        else:
-            span = get_start_span_function()(
-                op=OP.GEN_AI_EVALUATE,
-                name=f"evaluate {model}".strip(),
-                origin=TypeSafeIntegration.origin,
-            )
-            span.set_data(SPANDATA.GEN_AI_PROVIDER_NAME, "typesafe")
-            span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "evaluate")
-            set_on_span = span.set_data
-
-        with span:
+        with sentry_sdk.start_span(
+            name=f"evaluate {model}".strip(),
+            attributes={
+                "sentry.op": OP.GEN_AI_EVALUATE,
+                "sentry.origin": TypeSafeIntegration.origin,
+                SPANDATA.GEN_AI_PROVIDER_NAME: "typesafe",
+                SPANDATA.GEN_AI_OPERATION_NAME: "evaluate",
+            },
+        ) as span:
             if model is not None:
-                set_on_span(SPANDATA.GEN_AI_REQUEST_MODEL, model)
+                span.set_attribute(SPANDATA.GEN_AI_REQUEST_MODEL, model)
 
-            if (
-                has_data_collection_enabled(client.options)
-                and client.options["data_collection"]["gen_ai"]["inputs"]
-            ) or (
-                not has_data_collection_enabled(client.options)
-                and should_send_default_pii()
-            ):
+            if client.options["data_collection"]["gen_ai"]["inputs"]:
                 input_message: "InputMessageModel" = {
                     "type": "evaluation",
                 }
@@ -372,45 +324,41 @@ def _wrap_system_one_async(f: "Callable[..., Any]") -> "Callable[..., Any]":
                 if isinstance(questions, Mapping):
                     input_message["questions"] = _transform_questions(questions)
 
-                set_on_span(SPANDATA.GEN_AI_INPUT_MESSAGES, json.dumps([input_message]))
+                span.set_attribute(
+                    SPANDATA.GEN_AI_INPUT_MESSAGES, json.dumps([input_message])
+                )
 
             response = await f(self, *args, **kwargs)
 
             if not isinstance(response, SystemOneResponse):
                 return response
 
-            set_on_span(SPANDATA.GEN_AI_RESPONSE_MODEL, response.model)
+            span.set_attribute(SPANDATA.GEN_AI_RESPONSE_MODEL, response.model)
 
             if response.usage.input_tokens is not None:
-                set_on_span(
+                span.set_attribute(
                     SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, response.usage.input_tokens
                 )
 
             if response.usage.output_tokens is not None:
-                set_on_span(
+                span.set_attribute(
                     SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS, response.usage.output_tokens
                 )
 
-            if (
-                has_data_collection_enabled(client.options)
-                and client.options["data_collection"]["gen_ai"]["outputs"]
-            ) or (
-                not has_data_collection_enabled(client.options)
-                and should_send_default_pii()
-            ):
-                set_on_span(
-                    SPANDATA.GEN_AI_OUTPUT_MESSAGES,
-                    json.dumps(
-                        [
-                            {
-                                "type": "evaluation",
-                                "answers": _transform_evaluation_answers(
-                                    response.answers
-                                ),
-                            }
-                        ]
-                    ),
-                )
+            if not client.options["data_collection"]["gen_ai"]["outputs"]:
+                return response
+
+            span.set_attribute(
+                SPANDATA.GEN_AI_OUTPUT_MESSAGES,
+                json.dumps(
+                    [
+                        {
+                            "type": "evaluation",
+                            "answers": _transform_evaluation_answers(response.answers),
+                        }
+                    ]
+                ),
+            )
 
             return response
 

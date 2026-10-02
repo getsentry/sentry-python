@@ -54,572 +54,301 @@ def typesafe_response():
     )
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
-def test_system_one(
-    sentry_init,
-    capture_items,
-    typesafe_response,
-    stream_gen_ai_spans,
-    span_streaming,
-):
+def test_system_one(sentry_init, capture_items, typesafe_response):
     sentry_init(
         integrations=[TypeSafeIntegration()],
         traces_sample_rate=1.0,
-        send_default_pii=True,
-        stream_gen_ai_spans=stream_gen_ai_spans,
-        trace_lifecycle="stream" if span_streaming else "static",
+        data_collection={
+            "gen_ai": {
+                "inputs": True,
+                "outputs": True,
+            }
+        },
     )
 
     client = TypeSafeClient(api_key="z")
 
-    if span_streaming or stream_gen_ai_spans:
-        items = capture_items("span")
+    items = capture_items("span")
 
-        with mock.patch.object(
-            TypeSafeClient, "_request", return_value=typesafe_response
-        ), sentry_sdk.start_transaction(name="typesafe"):
-            client.system_one(
-                state={
-                    "subject": "Charged twice this month",
-                    "body": "I see two charges of $49. I only have one account. Please fix this ASAP.",
+    with mock.patch.object(TypeSafeClient, "_request", return_value=typesafe_response):
+        client.system_one(
+            state={
+                "subject": "Charged twice this month",
+                "body": "I see two charges of $49. I only have one account. Please fix this ASAP.",
+            },
+            questions={
+                "spam": {"type": "noul", "instructions": "Spam?"},
+                "tone": {
+                    "type": "choice",
+                    "instructions": "Tone?",
+                    "criteria": {"friendly": None, "hostile": None},
                 },
-                questions={
-                    "spam": {"type": "noul", "instructions": "Spam?"},
-                    "tone": {
-                        "type": "choice",
-                        "instructions": "Tone?",
-                        "criteria": {"friendly": None, "hostile": None},
-                    },
-                    "quality": {
-                        "type": "score",
-                        "instructions": "Quality?",
-                        "criteria": ["bad", "ok", "great"],
-                    },
-                    "spam_obj": Noul(instructions="Spam?"),
-                    "tone_obj": Choice(
-                        instructions="Tone?",
-                        criteria={"friendly": None, "hostile": None},
-                    ),
-                    "quality_obj": Score(
-                        instructions="Quality?", criteria=["bad", "ok", "great"]
-                    ),
+                "quality": {
+                    "type": "score",
+                    "instructions": "Quality?",
+                    "criteria": ["bad", "ok", "great"],
                 },
-            )
-
-        sentry_sdk.flush()
-        spans = [item.payload for item in items]
-        (span,) = (
-            span
-            for span in spans
-            if span["attributes"].get("sentry.op") == OP.GEN_AI_EVALUATE
+                "spam_obj": Noul(instructions="Spam?"),
+                "tone_obj": Choice(
+                    instructions="Tone?",
+                    criteria={"friendly": None, "hostile": None},
+                ),
+                "quality_obj": Score(
+                    instructions="Quality?", criteria=["bad", "ok", "great"]
+                ),
+            },
         )
-        assert span["name"] == "evaluate jev-latest"
 
-        assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "typesafe"
-        assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "evaluate"
-        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "jev-latest"
+    sentry_sdk.flush()
 
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "jev-latest"
+    spans = [item.payload for item in items]
+    (span,) = (
+        span
+        for span in spans
+        if span["attributes"].get("sentry.op") == OP.GEN_AI_EVALUATE
+    )
+    assert span["name"] == "evaluate jev-latest"
 
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 12
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 3
+    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "typesafe"
+    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "evaluate"
+    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "jev-latest"
 
-        assert json.loads(span["attributes"][SPANDATA.GEN_AI_INPUT_MESSAGES]) == [
-            {
-                "type": "evaluation",
-                "state": {
-                    "subject": "Charged twice this month",
-                    "body": "I see two charges of $49. I only have one account. Please fix this ASAP.",
+    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "jev-latest"
+
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 12
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 3
+
+    assert json.loads(span["attributes"][SPANDATA.GEN_AI_INPUT_MESSAGES]) == [
+        {
+            "type": "evaluation",
+            "state": {
+                "subject": "Charged twice this month",
+                "body": "I see two charges of $49. I only have one account. Please fix this ASAP.",
+            },
+            "questions": {
+                "spam": {
+                    "type": "noul",
+                    "instructions": "Spam?",
                 },
-                "questions": {
-                    "spam": {
-                        "type": "noul",
-                        "instructions": "Spam?",
-                    },
-                    "tone": {
-                        "type": "choice",
-                        "instructions": "Tone?",
-                        "criteria": {"friendly": None, "hostile": None},
-                    },
-                    "quality": {
-                        "type": "score",
-                        "instructions": "Quality?",
-                        "criteria": ["bad", "ok", "great"],
-                    },
-                    "spam_obj": {
-                        "type": "noul",
-                        "instructions": "Spam?",
-                    },
-                    "tone_obj": {
-                        "type": "choice",
-                        "instructions": "Tone?",
-                        "criteria": {"friendly": None, "hostile": None},
-                    },
-                    "quality_obj": {
-                        "type": "score",
-                        "instructions": "Quality?",
-                        "criteria": ["bad", "ok", "great"],
-                    },
+                "tone": {
+                    "type": "choice",
+                    "instructions": "Tone?",
+                    "criteria": {"friendly": None, "hostile": None},
                 },
-            }
-        ]
-
-        assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
-            {
-                "type": "evaluation",
-                "answers": {
-                    "spam": {
-                        "type": "noul",
-                        "noul": 0.98,
-                    },
-                    "tone": {
-                        "type": "choice",
-                        "choice": "friendly",
-                        "probabilities": {"friendly": 0.9, "hostile": 0.1},
-                        "confidence": 0.9,
-                    },
-                    "urgency": {
-                        "type": "score",
-                        "score": 1.7,
-                        "probabilities": {"0": 0.1, "1": 0.1, "2": 0.8},
-                        "confidence": 0.8,
-                        "legend": {"0": "can wait", "1": "this week", "2": "today"},
-                    },
-                    "spam_obj": {
-                        "type": "noul",
-                        "noul": 0.98,
-                    },
-                    "tone_obj": {
-                        "type": "choice",
-                        "choice": "friendly",
-                        "probabilities": {"friendly": 0.9, "hostile": 0.1},
-                        "confidence": 0.9,
-                    },
-                    "urgency_obj": {
-                        "type": "score",
-                        "score": 1.7,
-                        "probabilities": {"0": 0.1, "1": 0.1, "2": 0.8},
-                        "confidence": 0.8,
-                        "legend": {"0": "can wait", "1": "this week", "2": "today"},
-                    },
+                "quality": {
+                    "type": "score",
+                    "instructions": "Quality?",
+                    "criteria": ["bad", "ok", "great"],
                 },
-            }
-        ]
-    else:
-        items = capture_items("transaction")
-
-        with mock.patch.object(
-            TypeSafeClient, "_request", return_value=typesafe_response
-        ), sentry_sdk.start_transaction(name="typesafe"):
-            client.system_one(
-                state={
-                    "subject": "Charged twice this month",
-                    "body": "I see two charges of $49. I only have one account. Please fix this ASAP.",
+                "spam_obj": {
+                    "type": "noul",
+                    "instructions": "Spam?",
                 },
-                questions={
-                    "spam": {"type": "noul", "instructions": "Spam?"},
-                    "tone": {
-                        "type": "choice",
-                        "instructions": "Tone?",
-                        "criteria": {"friendly": None, "hostile": None},
-                    },
-                    "quality": {
-                        "type": "score",
-                        "instructions": "Quality?",
-                        "criteria": ["bad", "ok", "great"],
-                    },
-                    "spam_obj": Noul(instructions="Spam?"),
-                    "tone_obj": Choice(
-                        instructions="Tone?",
-                        criteria={"friendly": None, "hostile": None},
-                    ),
-                    "quality_obj": Score(
-                        instructions="Quality?", criteria=["bad", "ok", "great"]
-                    ),
+                "tone_obj": {
+                    "type": "choice",
+                    "instructions": "Tone?",
+                    "criteria": {"friendly": None, "hostile": None},
                 },
-            )
-
-        (transaction,) = [item.payload for item in items]
-        (span,) = transaction["spans"]
-        assert span["description"] == "evaluate jev-latest"
-
-        assert span["data"][SPANDATA.GEN_AI_PROVIDER_NAME] == "typesafe"
-        assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "evaluate"
-        assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "jev-latest"
-
-        assert span["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "jev-latest"
-
-        assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 12
-        assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 3
-
-        assert json.loads(span["data"][SPANDATA.GEN_AI_INPUT_MESSAGES]) == [
-            {
-                "type": "evaluation",
-                "state": {
-                    "subject": "Charged twice this month",
-                    "body": "I see two charges of $49. I only have one account. Please fix this ASAP.",
+                "quality_obj": {
+                    "type": "score",
+                    "instructions": "Quality?",
+                    "criteria": ["bad", "ok", "great"],
                 },
-                "questions": {
-                    "spam": {
-                        "type": "noul",
-                        "instructions": "Spam?",
-                    },
-                    "tone": {
-                        "type": "choice",
-                        "instructions": "Tone?",
-                        "criteria": {"friendly": None, "hostile": None},
-                    },
-                    "quality": {
-                        "type": "score",
-                        "instructions": "Quality?",
-                        "criteria": ["bad", "ok", "great"],
-                    },
-                    "spam_obj": {
-                        "type": "noul",
-                        "instructions": "Spam?",
-                    },
-                    "tone_obj": {
-                        "type": "choice",
-                        "instructions": "Tone?",
-                        "criteria": {"friendly": None, "hostile": None},
-                    },
-                    "quality_obj": {
-                        "type": "score",
-                        "instructions": "Quality?",
-                        "criteria": ["bad", "ok", "great"],
-                    },
-                },
-            }
-        ]
+            },
+        }
+    ]
 
-        assert json.loads(span["data"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
-            {
-                "type": "evaluation",
-                "answers": {
-                    "spam": {
-                        "type": "noul",
-                        "noul": 0.98,
-                    },
-                    "tone": {
-                        "type": "choice",
-                        "choice": "friendly",
-                        "probabilities": {"friendly": 0.9, "hostile": 0.1},
-                        "confidence": 0.9,
-                    },
-                    "urgency": {
-                        "type": "score",
-                        "score": 1.7,
-                        "probabilities": {"0": 0.1, "1": 0.1, "2": 0.8},
-                        "confidence": 0.8,
-                        "legend": {"0": "can wait", "1": "this week", "2": "today"},
-                    },
-                    "spam_obj": {
-                        "type": "noul",
-                        "noul": 0.98,
-                    },
-                    "tone_obj": {
-                        "type": "choice",
-                        "choice": "friendly",
-                        "probabilities": {"friendly": 0.9, "hostile": 0.1},
-                        "confidence": 0.9,
-                    },
-                    "urgency_obj": {
-                        "type": "score",
-                        "score": 1.7,
-                        "probabilities": {"0": 0.1, "1": 0.1, "2": 0.8},
-                        "confidence": 0.8,
-                        "legend": {"0": "can wait", "1": "this week", "2": "today"},
-                    },
+    assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+        {
+            "type": "evaluation",
+            "answers": {
+                "spam": {
+                    "type": "noul",
+                    "noul": 0.98,
                 },
-            }
-        ]
+                "tone": {
+                    "type": "choice",
+                    "choice": "friendly",
+                    "probabilities": {"friendly": 0.9, "hostile": 0.1},
+                    "confidence": 0.9,
+                },
+                "urgency": {
+                    "type": "score",
+                    "score": 1.7,
+                    "probabilities": {"0": 0.1, "1": 0.1, "2": 0.8},
+                    "confidence": 0.8,
+                    "legend": {"0": "can wait", "1": "this week", "2": "today"},
+                },
+                "spam_obj": {
+                    "type": "noul",
+                    "noul": 0.98,
+                },
+                "tone_obj": {
+                    "type": "choice",
+                    "choice": "friendly",
+                    "probabilities": {"friendly": 0.9, "hostile": 0.1},
+                    "confidence": 0.9,
+                },
+                "urgency_obj": {
+                    "type": "score",
+                    "score": 1.7,
+                    "probabilities": {"0": 0.1, "1": 0.1, "2": 0.8},
+                    "confidence": 0.8,
+                    "legend": {"0": "can wait", "1": "this week", "2": "today"},
+                },
+            },
+        }
+    ]
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
-async def test_system_one_async(
-    sentry_init,
-    capture_items,
-    typesafe_response,
-    stream_gen_ai_spans,
-    span_streaming,
-):
+async def test_system_one_async(sentry_init, capture_items, typesafe_response):
     sentry_init(
         integrations=[TypeSafeIntegration()],
         traces_sample_rate=1.0,
-        send_default_pii=True,
-        stream_gen_ai_spans=stream_gen_ai_spans,
-        trace_lifecycle="stream" if span_streaming else "static",
+        data_collection={
+            "gen_ai": {
+                "inputs": True,
+                "outputs": True,
+            }
+        },
     )
 
     client = AsyncTypeSafeClient(api_key="z")
 
-    if span_streaming or stream_gen_ai_spans:
-        items = capture_items("span")
+    items = capture_items("span")
 
-        with mock.patch.object(
-            AsyncTypeSafeClient,
-            "_request",
-            new_callable=mock.AsyncMock,
-            return_value=typesafe_response,
-        ), sentry_sdk.start_transaction(name="typesafe"):
-            await client.system_one(
-                state={
-                    "subject": "Charged twice this month",
-                    "body": "I see two charges of $49. I only have one account. Please fix this ASAP.",
+    with mock.patch.object(
+        AsyncTypeSafeClient,
+        "_request",
+        new_callable=mock.AsyncMock,
+        return_value=typesafe_response,
+    ):
+        await client.system_one(
+            state={
+                "subject": "Charged twice this month",
+                "body": "I see two charges of $49. I only have one account. Please fix this ASAP.",
+            },
+            questions={
+                "spam": {"type": "noul", "instructions": "Spam?"},
+                "tone": {
+                    "type": "choice",
+                    "instructions": "Tone?",
+                    "criteria": {"friendly": None, "hostile": None},
                 },
-                questions={
-                    "spam": {"type": "noul", "instructions": "Spam?"},
-                    "tone": {
-                        "type": "choice",
-                        "instructions": "Tone?",
-                        "criteria": {"friendly": None, "hostile": None},
-                    },
-                    "quality": {
-                        "type": "score",
-                        "instructions": "Quality?",
-                        "criteria": ["bad", "ok", "great"],
-                    },
-                    "spam_obj": Noul(instructions="Spam?"),
-                    "tone_obj": Choice(
-                        instructions="Tone?",
-                        criteria={"friendly": None, "hostile": None},
-                    ),
-                    "quality_obj": Score(
-                        instructions="Quality?", criteria=["bad", "ok", "great"]
-                    ),
+                "quality": {
+                    "type": "score",
+                    "instructions": "Quality?",
+                    "criteria": ["bad", "ok", "great"],
                 },
-            )
-
-        sentry_sdk.flush()
-        spans = [item.payload for item in items]
-        (span,) = (
-            span
-            for span in spans
-            if span["attributes"].get("sentry.op") == OP.GEN_AI_EVALUATE
+                "spam_obj": Noul(instructions="Spam?"),
+                "tone_obj": Choice(
+                    instructions="Tone?",
+                    criteria={"friendly": None, "hostile": None},
+                ),
+                "quality_obj": Score(
+                    instructions="Quality?", criteria=["bad", "ok", "great"]
+                ),
+            },
         )
-        assert span["name"] == "evaluate jev-latest"
 
-        assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "typesafe"
-        assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "evaluate"
-        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "jev-latest"
+    sentry_sdk.flush()
 
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "jev-latest"
+    spans = [item.payload for item in items]
+    (span,) = (
+        span
+        for span in spans
+        if span["attributes"].get("sentry.op") == OP.GEN_AI_EVALUATE
+    )
+    assert span["name"] == "evaluate jev-latest"
 
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 12
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 3
+    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "typesafe"
+    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "evaluate"
+    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "jev-latest"
 
-        assert json.loads(span["attributes"][SPANDATA.GEN_AI_INPUT_MESSAGES]) == [
-            {
-                "type": "evaluation",
-                "state": {
-                    "subject": "Charged twice this month",
-                    "body": "I see two charges of $49. I only have one account. Please fix this ASAP.",
+    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "jev-latest"
+
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 12
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 3
+
+    assert json.loads(span["attributes"][SPANDATA.GEN_AI_INPUT_MESSAGES]) == [
+        {
+            "type": "evaluation",
+            "state": {
+                "subject": "Charged twice this month",
+                "body": "I see two charges of $49. I only have one account. Please fix this ASAP.",
+            },
+            "questions": {
+                "spam": {
+                    "type": "noul",
+                    "instructions": "Spam?",
                 },
-                "questions": {
-                    "spam": {
-                        "type": "noul",
-                        "instructions": "Spam?",
-                    },
-                    "tone": {
-                        "type": "choice",
-                        "instructions": "Tone?",
-                        "criteria": {"friendly": None, "hostile": None},
-                    },
-                    "quality": {
-                        "type": "score",
-                        "instructions": "Quality?",
-                        "criteria": ["bad", "ok", "great"],
-                    },
-                    "spam_obj": {
-                        "type": "noul",
-                        "instructions": "Spam?",
-                    },
-                    "tone_obj": {
-                        "type": "choice",
-                        "instructions": "Tone?",
-                        "criteria": {"friendly": None, "hostile": None},
-                    },
-                    "quality_obj": {
-                        "type": "score",
-                        "instructions": "Quality?",
-                        "criteria": ["bad", "ok", "great"],
-                    },
+                "tone": {
+                    "type": "choice",
+                    "instructions": "Tone?",
+                    "criteria": {"friendly": None, "hostile": None},
                 },
-            }
-        ]
-
-        assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
-            {
-                "type": "evaluation",
-                "answers": {
-                    "spam": {
-                        "type": "noul",
-                        "noul": 0.98,
-                    },
-                    "tone": {
-                        "type": "choice",
-                        "choice": "friendly",
-                        "probabilities": {"friendly": 0.9, "hostile": 0.1},
-                        "confidence": 0.9,
-                    },
-                    "urgency": {
-                        "type": "score",
-                        "score": 1.7,
-                        "probabilities": {"0": 0.1, "1": 0.1, "2": 0.8},
-                        "confidence": 0.8,
-                        "legend": {"0": "can wait", "1": "this week", "2": "today"},
-                    },
-                    "spam_obj": {
-                        "type": "noul",
-                        "noul": 0.98,
-                    },
-                    "tone_obj": {
-                        "type": "choice",
-                        "choice": "friendly",
-                        "probabilities": {"friendly": 0.9, "hostile": 0.1},
-                        "confidence": 0.9,
-                    },
-                    "urgency_obj": {
-                        "type": "score",
-                        "score": 1.7,
-                        "probabilities": {"0": 0.1, "1": 0.1, "2": 0.8},
-                        "confidence": 0.8,
-                        "legend": {"0": "can wait", "1": "this week", "2": "today"},
-                    },
+                "quality": {
+                    "type": "score",
+                    "instructions": "Quality?",
+                    "criteria": ["bad", "ok", "great"],
                 },
-            }
-        ]
-    else:
-        items = capture_items("transaction")
-
-        with mock.patch.object(
-            AsyncTypeSafeClient,
-            "_request",
-            new_callable=mock.AsyncMock,
-            return_value=typesafe_response,
-        ), sentry_sdk.start_transaction(name="typesafe"):
-            await client.system_one(
-                state={
-                    "subject": "Charged twice this month",
-                    "body": "I see two charges of $49. I only have one account. Please fix this ASAP.",
+                "spam_obj": {
+                    "type": "noul",
+                    "instructions": "Spam?",
                 },
-                questions={
-                    "spam": {"type": "noul", "instructions": "Spam?"},
-                    "tone": {
-                        "type": "choice",
-                        "instructions": "Tone?",
-                        "criteria": {"friendly": None, "hostile": None},
-                    },
-                    "quality": {
-                        "type": "score",
-                        "instructions": "Quality?",
-                        "criteria": ["bad", "ok", "great"],
-                    },
-                    "spam_obj": Noul(instructions="Spam?"),
-                    "tone_obj": Choice(
-                        instructions="Tone?",
-                        criteria={"friendly": None, "hostile": None},
-                    ),
-                    "quality_obj": Score(
-                        instructions="Quality?", criteria=["bad", "ok", "great"]
-                    ),
+                "tone_obj": {
+                    "type": "choice",
+                    "instructions": "Tone?",
+                    "criteria": {"friendly": None, "hostile": None},
                 },
-            )
-
-        (transaction,) = [item.payload for item in items]
-        (span,) = transaction["spans"]
-        assert span["description"] == "evaluate jev-latest"
-
-        assert span["data"][SPANDATA.GEN_AI_PROVIDER_NAME] == "typesafe"
-        assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "evaluate"
-        assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "jev-latest"
-
-        assert span["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "jev-latest"
-
-        assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 12
-        assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 3
-
-        assert json.loads(span["data"][SPANDATA.GEN_AI_INPUT_MESSAGES]) == [
-            {
-                "type": "evaluation",
-                "state": {
-                    "subject": "Charged twice this month",
-                    "body": "I see two charges of $49. I only have one account. Please fix this ASAP.",
+                "quality_obj": {
+                    "type": "score",
+                    "instructions": "Quality?",
+                    "criteria": ["bad", "ok", "great"],
                 },
-                "questions": {
-                    "spam": {
-                        "type": "noul",
-                        "instructions": "Spam?",
-                    },
-                    "tone": {
-                        "type": "choice",
-                        "instructions": "Tone?",
-                        "criteria": {"friendly": None, "hostile": None},
-                    },
-                    "quality": {
-                        "type": "score",
-                        "instructions": "Quality?",
-                        "criteria": ["bad", "ok", "great"],
-                    },
-                    "spam_obj": {
-                        "type": "noul",
-                        "instructions": "Spam?",
-                    },
-                    "tone_obj": {
-                        "type": "choice",
-                        "instructions": "Tone?",
-                        "criteria": {"friendly": None, "hostile": None},
-                    },
-                    "quality_obj": {
-                        "type": "score",
-                        "instructions": "Quality?",
-                        "criteria": ["bad", "ok", "great"],
-                    },
-                },
-            }
-        ]
+            },
+        }
+    ]
 
-        assert json.loads(span["data"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
-            {
-                "type": "evaluation",
-                "answers": {
-                    "spam": {
-                        "type": "noul",
-                        "noul": 0.98,
-                    },
-                    "tone": {
-                        "type": "choice",
-                        "choice": "friendly",
-                        "probabilities": {"friendly": 0.9, "hostile": 0.1},
-                        "confidence": 0.9,
-                    },
-                    "urgency": {
-                        "type": "score",
-                        "score": 1.7,
-                        "probabilities": {"0": 0.1, "1": 0.1, "2": 0.8},
-                        "confidence": 0.8,
-                        "legend": {"0": "can wait", "1": "this week", "2": "today"},
-                    },
-                    "spam_obj": {
-                        "type": "noul",
-                        "noul": 0.98,
-                    },
-                    "tone_obj": {
-                        "type": "choice",
-                        "choice": "friendly",
-                        "probabilities": {"friendly": 0.9, "hostile": 0.1},
-                        "confidence": 0.9,
-                    },
-                    "urgency_obj": {
-                        "type": "score",
-                        "score": 1.7,
-                        "probabilities": {"0": 0.1, "1": 0.1, "2": 0.8},
-                        "confidence": 0.8,
-                        "legend": {"0": "can wait", "1": "this week", "2": "today"},
-                    },
+    assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+        {
+            "type": "evaluation",
+            "answers": {
+                "spam": {
+                    "type": "noul",
+                    "noul": 0.98,
                 },
-            }
-        ]
+                "tone": {
+                    "type": "choice",
+                    "choice": "friendly",
+                    "probabilities": {"friendly": 0.9, "hostile": 0.1},
+                    "confidence": 0.9,
+                },
+                "urgency": {
+                    "type": "score",
+                    "score": 1.7,
+                    "probabilities": {"0": 0.1, "1": 0.1, "2": 0.8},
+                    "confidence": 0.8,
+                    "legend": {"0": "can wait", "1": "this week", "2": "today"},
+                },
+                "spam_obj": {
+                    "type": "noul",
+                    "noul": 0.98,
+                },
+                "tone_obj": {
+                    "type": "choice",
+                    "choice": "friendly",
+                    "probabilities": {"friendly": 0.9, "hostile": 0.1},
+                    "confidence": 0.9,
+                },
+                "urgency_obj": {
+                    "type": "score",
+                    "score": 1.7,
+                    "probabilities": {"0": 0.1, "1": 0.1, "2": 0.8},
+                    "confidence": 0.8,
+                    "legend": {"0": "can wait", "1": "this week", "2": "today"},
+                },
+            },
+        }
+    ]

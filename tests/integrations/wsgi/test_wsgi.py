@@ -45,7 +45,7 @@ class ExitingIterable:
 
 
 def test_basic(sentry_init, crashing_app, capture_events):
-    sentry_init(send_default_pii=True)
+    sentry_init(data_collection={})
     app = SentryWsgiMiddleware(crashing_app)
     client = Client(app)
     events = capture_events()
@@ -56,12 +56,10 @@ def test_basic(sentry_init, crashing_app, capture_events):
     (event,) = events
 
     assert event["transaction"] == "generic WSGI request"
-
     assert event["request"] == {
         "env": {"SERVER_NAME": "localhost", "SERVER_PORT": "80"},
         "headers": {"Host": "localhost"},
         "method": "GET",
-        "query_string": "",
         "url": "http://localhost/",
     }
 
@@ -140,14 +138,12 @@ def test_keyboard_interrupt_is_captured(sentry_init, capture_events):
     assert event["level"] == "error"
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
 def test_transaction_with_error(
     sentry_init,
     crashing_app,
     capture_events,
     capture_items,
     DictionaryContaining,  # noqa:N803
-    span_streaming,
 ):
     def dogpark(environ, start_response):
         raise ValueError("Fetch aborted. The ball was not returned.")
@@ -155,32 +151,23 @@ def test_transaction_with_error(
     sentry_init(
         send_default_pii=True,
         traces_sample_rate=1.0,
-        trace_lifecycle="stream" if span_streaming else "static",
     )
     app = SentryWsgiMiddleware(dogpark)
     client = Client(app)
 
-    if span_streaming:
-        items = capture_items("event", "span")
-    else:
-        events = capture_events()
+    items = capture_items("event", "span")
 
     with pytest.raises(ValueError):
         client.get("http://dogs.are.great/sit/stay/rollover/")
 
     sentry_sdk.flush()
 
-    if span_streaming:
-        assert len(items) == 2
-        assert items[0].type == "event"
-        assert items[1].type == "span"
+    assert len(items) == 2
+    assert items[0].type == "event"
+    assert items[1].type == "span"
 
-        error_event = items[0].payload
-        span_item = items[1].payload
-    else:
-        error_event, envelope = events
-
-        assert error_event["transaction"] == "generic WSGI request"
+    error_event = items[0].payload
+    span_item = items[1].payload
 
     assert error_event["contexts"]["trace"]["op"] == "http.server"
     assert error_event["exception"]["values"][0]["type"] == "ValueError"
@@ -191,30 +178,17 @@ def test_transaction_with_error(
         == "Fetch aborted. The ball was not returned."
     )
 
-    if span_streaming:
-        assert span_item["trace_id"] == error_event["contexts"]["trace"]["trace_id"]
-        assert span_item["span_id"] == error_event["contexts"]["trace"]["span_id"]
-        assert span_item["status"] == "error"
-    else:
-        assert envelope["type"] == "transaction"
-
-        # event trace context is a subset of envelope trace context
-        assert envelope["contexts"]["trace"] == DictionaryContaining(
-            error_event["contexts"]["trace"]
-        )
-        assert envelope["contexts"]["trace"]["status"] == "internal_error"
-        assert envelope["transaction"] == error_event["transaction"]
-        assert envelope["request"] == error_event["request"]
+    assert span_item["trace_id"] == error_event["contexts"]["trace"]["trace_id"]
+    assert span_item["span_id"] == error_event["contexts"]["trace"]["span_id"]
+    assert span_item["status"] == "error"
 
 
 @pytest.mark.parametrize("send_pii", [True, False])
-@pytest.mark.parametrize("span_streaming", [True, False])
 def test_transaction_no_error(
     sentry_init,
     capture_events,
     capture_items,
     DictionaryContaining,  # noqa:N803
-    span_streaming,
     send_pii,
 ):
     def dogpark(environ, start_response):
@@ -224,65 +198,44 @@ def test_transaction_no_error(
     sentry_init(
         send_default_pii=send_pii,
         traces_sample_rate=1.0,
-        trace_lifecycle="stream" if span_streaming else "static",
     )
     app = SentryWsgiMiddleware(dogpark)
     client = Client(app)
 
-    if span_streaming:
-        items = capture_items("span")
-    else:
-        events = capture_events()
+    items = capture_items("span")
 
     client.get("/dogs/are/great?toy=tennisball")
 
     sentry_sdk.flush()
 
-    if span_streaming:
-        assert len(items) == 1
-        span = items[0].payload
+    assert len(items) == 1
+    span = items[0].payload
 
-        assert span["is_segment"] is True
-        assert span["name"] == "generic WSGI request"
-        assert span["attributes"]["sentry.op"] == "http.server"
-        assert span["attributes"]["sentry.segment.name.source"] == "route"
-        assert span["attributes"]["http.request.method"] == "GET"
-        assert span["attributes"]["http.response.status_code"] == 200
-        assert span["status"] == "ok"
+    assert span["is_segment"] is True
+    assert span["name"] == "generic WSGI request"
+    assert span["attributes"]["sentry.op"] == "http.server"
+    assert span["attributes"]["sentry.segment.name.source"] == "route"
+    assert span["attributes"]["http.request.method"] == "GET"
+    assert span["attributes"]["http.response.status_code"] == 200
+    assert span["status"] == "ok"
 
-        if send_pii:
-            assert (
-                span["attributes"]["url.full"]
-                == "http://localhost/dogs/are/great?toy=tennisball"
-            )
-            assert span["attributes"]["url.path"] == "/dogs/are/great"
-            assert span["attributes"]["http.query"] == "toy=tennisball"
-        else:
-            assert "url.path" not in span["attributes"]
-            assert "url.full" not in span["attributes"]
-            assert "http.query" not in span["attributes"]
-
-    else:
-        envelope = events[0]
-
-        assert envelope["type"] == "transaction"
-        assert envelope["transaction"] == "generic WSGI request"
-        assert envelope["contexts"]["trace"]["op"] == "http.server"
-        assert envelope["request"] == DictionaryContaining(
-            {
-                "method": "GET",
-                "url": "http://localhost/dogs/are/great",
-                "query_string": "toy=tennisball",
-            }
+    if send_pii:
+        assert (
+            span["attributes"]["url.full"]
+            == "http://localhost/dogs/are/great?toy=tennisball"
         )
+        assert span["attributes"]["url.path"] == "/dogs/are/great"
+        assert span["attributes"]["http.query"] == "toy=tennisball"
+    else:
+        assert "url.path" not in span["attributes"]
+        assert "url.full" not in span["attributes"]
+        assert "http.query" not in span["attributes"]
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
 def test_has_trace_if_performance_enabled(
     sentry_init,
     capture_events,
     capture_items,
-    span_streaming,
 ):
     def dogpark(environ, start_response):
         capture_message("Attempting to fetch the ball")
@@ -290,60 +243,38 @@ def test_has_trace_if_performance_enabled(
 
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream" if span_streaming else "static",
     )
     app = SentryWsgiMiddleware(dogpark)
     client = Client(app)
 
-    if span_streaming:
-        items = capture_items("event", "span")
-    else:
-        events = capture_events()
+    items = capture_items("event", "span")
 
     with pytest.raises(ValueError):
         client.get("http://dogs.are.great/sit/stay/rollover/")
 
     sentry_sdk.flush()
 
-    if span_streaming:
-        msg_event, error_event, span_item = items
+    msg_event, error_event, span_item = items
 
-        assert msg_event.type == "event"
-        msg_event = msg_event.payload
-        assert msg_event["contexts"]["trace"]
-        assert "trace_id" in msg_event["contexts"]["trace"]
+    assert msg_event.type == "event"
+    msg_event = msg_event.payload
+    assert msg_event["contexts"]["trace"]
+    assert "trace_id" in msg_event["contexts"]["trace"]
 
-        assert error_event.type == "event"
-        error_event = error_event.payload
-        assert error_event["contexts"]["trace"]
-        assert "trace_id" in error_event["contexts"]["trace"]
+    assert error_event.type == "event"
+    error_event = error_event.payload
+    assert error_event["contexts"]["trace"]
+    assert "trace_id" in error_event["contexts"]["trace"]
 
-        assert span_item.type == "span"
-        span_item = span_item.payload
-        assert span_item["trace_id"] is not None
+    assert span_item.type == "span"
+    span_item = span_item.payload
+    assert span_item["trace_id"] is not None
 
-        assert (
-            msg_event["contexts"]["trace"]["trace_id"]
-            == error_event["contexts"]["trace"]["trace_id"]
-            == span_item["trace_id"]
-        )
-    else:
-        msg_event, error_event, transaction_event = events
-
-        assert msg_event["contexts"]["trace"]
-        assert "trace_id" in msg_event["contexts"]["trace"]
-
-        assert error_event["contexts"]["trace"]
-        assert "trace_id" in error_event["contexts"]["trace"]
-
-        assert transaction_event["contexts"]["trace"]
-        assert "trace_id" in transaction_event["contexts"]["trace"]
-
-        assert (
-            msg_event["contexts"]["trace"]["trace_id"]
-            == error_event["contexts"]["trace"]["trace_id"]
-            == transaction_event["contexts"]["trace"]["trace_id"]
-        )
+    assert (
+        msg_event["contexts"]["trace"]["trace_id"]
+        == error_event["contexts"]["trace"]["trace_id"]
+        == span_item["trace_id"]
+    )
 
 
 def test_has_trace_if_performance_disabled(
@@ -371,12 +302,10 @@ def test_has_trace_if_performance_disabled(
     assert "trace_id" in error_event["contexts"]["trace"]
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
 def test_trace_from_headers_if_performance_enabled(
     sentry_init,
     capture_events,
     capture_items,
-    span_streaming,
 ):
     def dogpark(environ, start_response):
         capture_message("Attempting to fetch the ball")
@@ -384,15 +313,11 @@ def test_trace_from_headers_if_performance_enabled(
 
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream" if span_streaming else "static",
     )
     app = SentryWsgiMiddleware(dogpark)
     client = Client(app)
 
-    if span_streaming:
-        items = capture_items("event", "span")
-    else:
-        events = capture_events()
+    items = capture_items("event", "span")
 
     trace_id = "582b43a4192642f0b136d5159a501701"
     sentry_trace_header = "{}-{}-{}".format(trace_id, "6e8f22c393e68f19", 1)
@@ -405,27 +330,11 @@ def test_trace_from_headers_if_performance_enabled(
 
     sentry_sdk.flush()
 
-    if span_streaming:
-        msg_event, error_event, span_item = items
+    msg_event, error_event, span_item = items
 
-        assert msg_event.payload["contexts"]["trace"]["trace_id"] == trace_id
-        assert error_event.payload["contexts"]["trace"]["trace_id"] == trace_id
-        assert span_item.payload["trace_id"] == trace_id
-    else:
-        msg_event, error_event, transaction_event = events
-
-        assert msg_event["contexts"]["trace"]
-        assert "trace_id" in msg_event["contexts"]["trace"]
-
-        assert error_event["contexts"]["trace"]
-        assert "trace_id" in error_event["contexts"]["trace"]
-
-        assert transaction_event["contexts"]["trace"]
-        assert "trace_id" in transaction_event["contexts"]["trace"]
-
-        assert msg_event["contexts"]["trace"]["trace_id"] == trace_id
-        assert error_event["contexts"]["trace"]["trace_id"] == trace_id
-        assert transaction_event["contexts"]["trace"]["trace_id"] == trace_id
+    assert msg_event.payload["contexts"]["trace"]["trace_id"] == trace_id
+    assert error_event.payload["contexts"]["trace"]["trace_id"] == trace_id
+    assert span_item.payload["trace_id"] == trace_id
 
 
 def test_trace_from_headers_if_performance_disabled(
@@ -461,11 +370,9 @@ def test_trace_from_headers_if_performance_disabled(
     assert error_event["contexts"]["trace"]["trace_id"] == trace_id
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
 def test_traces_sampler_gets_correct_values_in_sampling_context(
     sentry_init,
     DictionaryContaining,  # noqa:N803
-    span_streaming,
 ):
     def app(environ, start_response):
         start_response("200 OK", [])
@@ -475,7 +382,6 @@ def test_traces_sampler_gets_correct_values_in_sampling_context(
     sentry_init(
         send_default_pii=True,
         traces_sampler=traces_sampler,
-        trace_lifecycle="stream" if span_streaming else "static",
     )
     app = SentryWsgiMiddleware(app)
     client = Client(app)
@@ -501,9 +407,9 @@ def test_traces_sampler_gets_correct_values_in_sampling_context(
     )
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
 def test_session_mode_defaults_to_request_mode_in_wsgi_handler(
-    capture_envelopes, sentry_init, span_streaming
+    capture_envelopes,
+    sentry_init,
 ):
     """
     Test that ensures that even though the default `session_mode` for
@@ -519,7 +425,6 @@ def test_session_mode_defaults_to_request_mode_in_wsgi_handler(
     sentry_init(
         send_default_pii=True,
         traces_sampler=traces_sampler,
-        trace_lifecycle="stream" if span_streaming else "static",
     )
     app = SentryWsgiMiddleware(app)
     envelopes = capture_envelopes()
@@ -543,9 +448,9 @@ def test_session_mode_defaults_to_request_mode_in_wsgi_handler(
     assert aggregates[0]["exited"] == 1
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
 def test_auto_session_tracking_with_aggregates(
-    sentry_init, capture_envelopes, span_streaming
+    sentry_init,
+    capture_envelopes,
 ):
     """
     Test for correct session aggregates in auto session tracking.
@@ -562,7 +467,6 @@ def test_auto_session_tracking_with_aggregates(
     sentry_init(
         send_default_pii=True,
         traces_sampler=traces_sampler,
-        trace_lifecycle="stream" if span_streaming else "static",
     )
     app = SentryWsgiMiddleware(sample_app)
     envelopes = capture_envelopes()
@@ -583,10 +487,7 @@ def test_auto_session_tracking_with_aggregates(
         for item in envelope.items:
             count_item_types[item.type] += 1
 
-    if span_streaming:
-        assert count_item_types["span"] == 3
-    else:
-        assert count_item_types["transaction"] == 3
+    assert count_item_types["span"] == 3
     assert count_item_types["event"] == 1
     assert count_item_types["sessions"] == 1
 
@@ -600,35 +501,7 @@ def test_auto_session_tracking_with_aggregates(
     assert sum(agg.get("crashed", 0) for agg in session_aggregates) == 1
 
 
-@mock.patch("sentry_sdk.profiler.transaction_profiler.PROFILE_MINIMUM_SAMPLES", 0)
-def test_profile_sent(
-    sentry_init,
-    capture_envelopes,
-    teardown_profiling,
-):
-    def test_app(environ, start_response):
-        start_response("200 OK", [])
-        return ["Go get the ball! Good dog!"]
-
-    sentry_init(
-        traces_sample_rate=1.0,
-        _experiments={"profiles_sample_rate": 1.0},
-    )
-    app = SentryWsgiMiddleware(test_app)
-    envelopes = capture_envelopes()
-
-    client = Client(app)
-    client.get("/")
-
-    envelopes = [envelope for envelope in envelopes]
-    assert len(envelopes) == 1
-
-    profiles = [item for item in envelopes[0].items if item.type == "profile"]
-    assert len(profiles) == 1
-
-
-@pytest.mark.parametrize("span_streaming", [True, False])
-def test_span_origin_manual(sentry_init, capture_events, capture_items, span_streaming):
+def test_span_origin_manual(sentry_init, capture_events, capture_items):
     def dogpark(environ, start_response):
         start_response("200 OK", [])
         return ["Go get the ball! Good dog!"]
@@ -636,30 +509,21 @@ def test_span_origin_manual(sentry_init, capture_events, capture_items, span_str
     sentry_init(
         send_default_pii=True,
         traces_sample_rate=1.0,
-        trace_lifecycle="stream" if span_streaming else "static",
     )
     app = SentryWsgiMiddleware(dogpark)
 
-    if span_streaming:
-        items = capture_items("span")
-    else:
-        events = capture_events()
+    items = capture_items("span")
 
     client = Client(app)
     client.get("/dogs/are/great/")
 
     sentry_sdk.flush()
 
-    if span_streaming:
-        assert len(items) == 1
-        assert items[0].payload["attributes"]["sentry.origin"] == "manual"
-    else:
-        (event,) = events
-        assert event["contexts"]["trace"]["origin"] == "manual"
+    assert len(items) == 1
+    assert items[0].payload["attributes"]["sentry.origin"] == "manual"
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
-def test_span_origin_custom(sentry_init, capture_events, capture_items, span_streaming):
+def test_span_origin_custom(sentry_init, capture_events, capture_items):
     def dogpark(environ, start_response):
         start_response("200 OK", [])
         return ["Go get the ball! Good dog!"]
@@ -667,29 +531,21 @@ def test_span_origin_custom(sentry_init, capture_events, capture_items, span_str
     sentry_init(
         send_default_pii=True,
         traces_sample_rate=1.0,
-        trace_lifecycle="stream" if span_streaming else "static",
     )
     app = SentryWsgiMiddleware(
         dogpark,
         span_origin="auto.dogpark.deluxe",
     )
 
-    if span_streaming:
-        items = capture_items("span")
-    else:
-        events = capture_events()
+    items = capture_items("span")
 
     client = Client(app)
     client.get("/dogs/are/great/")
 
     sentry_sdk.flush()
 
-    if span_streaming:
-        assert len(items) == 1
-        assert items[0].payload["attributes"]["sentry.origin"] == "auto.dogpark.deluxe"
-    else:
-        (event,) = events
-        assert event["contexts"]["trace"]["origin"] == "auto.dogpark.deluxe"
+    assert len(items) == 1
+    assert items[0].payload["attributes"]["sentry.origin"] == "auto.dogpark.deluxe"
 
 
 @pytest.mark.parametrize(
@@ -830,175 +686,68 @@ def test_get_request_url_x_forwarded_proto(environ, use_x_forwarded_for, expecte
     assert get_request_url(environ, use_x_forwarded_for) == expected_url
 
 
-@pytest.mark.parametrize("send_default_pii", [True, False])
-def test_request_headers_data_collection_default_redacts_sensitive(
-    sentry_init, crashing_app, capture_events, send_default_pii
-):
-    """
-    When ``data_collection`` is configured (here as ``{}``, i.e. spec
-    defaults), the WSGI event processor routes request headers through the
-    data-collection filtering path. Sensitive headers are redacted regardless
-    of ``send_default_pii`` -- the value of that legacy option must not change
-    the outcome.
-    """
-    sentry_init(
-        send_default_pii=send_default_pii,
-        data_collection={},
-    )
-    app = SentryWsgiMiddleware(crashing_app)
-    client = Client(app)
-    events = capture_events()
-
-    with pytest.raises(ZeroDivisionError):
-        client.get(
-            "/",
-            headers={
-                "Authorization": "Bearer secret-token",
+@pytest.mark.parametrize(
+    "data_collection, request_headers, expected_headers",
+    [
+        pytest.param(
+            {},
+            {"Authorization": "Bearer secret-token", "X-Custom-Header": "passthrough"},
+            {
+                "Authorization": "[Filtered]",
                 "X-Custom-Header": "passthrough",
+                "Host": "localhost",
             },
-        )
-
-    (event,) = events
-    headers = event["request"]["headers"]
-
-    assert headers["Authorization"] == "[Filtered]"
-    assert headers["X-Custom-Header"] == "passthrough"
-
-
-def test_request_headers_legacy_no_pii_redacts_sensitive(
-    sentry_init, crashing_app, capture_events
-):
-    """
-    With no ``data_collection`` configured, ``_filter_headers`` falls back to
-    the legacy ``send_default_pii`` behaviour. When PII is disabled, headers in
-    ``SENSITIVE_HEADERS`` are replaced with an ``AnnotatedValue`` (the default
-    ``use_annotated_value=True`` on the event-processor call site), which
-    serializes to an emptied value plus a ``_meta`` annotation. Non-sensitive
-    headers pass through untouched.
-
-    ``X-Forwarded-For`` is used because it is in ``SENSITIVE_HEADERS`` but is
-    not scrubbed by the default ``EventScrubber``, so the substitution we are
-    asserting on can only come from ``_filter_headers``.
-    """
-    sentry_init(send_default_pii=False)
-    app = SentryWsgiMiddleware(crashing_app)
-    client = Client(app)
-    events = capture_events()
-
-    with pytest.raises(ZeroDivisionError):
-        client.get(
-            "/",
-            headers={
+            id="default_redacts_sensitive",
+        ),
+        pytest.param(
+            {"http_headers": {"request": {"mode": "off"}}},
+            {"X-Forwarded-For": "1.2.3.4", "X-Custom-Header": "passthrough"},
+            {},
+            id="off_collects_no_headers",
+        ),
+        # Only headers matching an allowlist term (partial, case-insensitive)
+        # keep their value; every other key is kept but redacted.
+        pytest.param(
+            {"http_headers": {"request": {"mode": "allowlist", "terms": ["custom"]}}},
+            {"X-Forwarded-For": "1.2.3.4", "X-Custom-Header": "passthrough"},
+            {
+                "X-Custom-Header": "passthrough",
+                "X-Forwarded-For": "[Filtered]",
+                "Host": "[Filtered]",
+            },
+            id="allowlist_redacts_all_but_allowed_terms",
+        ),
+        pytest.param(
+            {"http_headers": {"request": {"mode": "denylist", "terms": ["custom"]}}},
+            {"X-Forwarded-For": "1.2.3.4", "X-Custom-Header": "passthrough"},
+            {
+                "X-Custom-Header": "[Filtered]",
                 "X-Forwarded-For": "1.2.3.4",
-                "X-Custom-Header": "passthrough",
+                "Host": "localhost",
             },
-        )
-
-    (event,) = events
-
-    assert event["request"]["headers"]["X-Forwarded-For"] == ""
-    assert event["request"]["headers"]["X-Custom-Header"] == "passthrough"
-
-    # The emptied value is accompanied by a `_meta` annotation marking it as
-    # removed, confirming the substitution came from the AnnotatedValue path.
-    assert event["_meta"]["request"]["headers"]["X-Forwarded-For"] == {
-        "": {"rem": [["!config", "x"]]}
-    }
-
-
-def test_request_headers_data_collection_off_collects_no_headers(
-    sentry_init, crashing_app, capture_events
+            id="denylist_redacts_only_matched_terms",
+        ),
+    ],
+)
+def test_request_headers_data_collection(
+    sentry_init,
+    crashing_app,
+    capture_events,
+    data_collection,
+    request_headers,
+    expected_headers,
 ):
-    """
-    With ``http_headers.request`` mode set to ``off``, no request headers are
-    collected at all -- the filtering returns an empty mapping.
-    """
-    sentry_init(
-        data_collection={"http_headers": {"request": {"mode": "off"}}},
-    )
+    sentry_init(data_collection=data_collection)
     app = SentryWsgiMiddleware(crashing_app)
     client = Client(app)
     events = capture_events()
 
     with pytest.raises(ZeroDivisionError):
-        client.get(
-            "/",
-            headers={
-                "X-Forwarded-For": "1.2.3.4",
-                "X-Custom-Header": "passthrough",
-            },
-        )
+        client.get("/", headers=request_headers)
 
     (event,) = events
 
-    assert event["request"]["headers"] == {}
-
-
-def test_request_headers_data_collection_allowlist_redacts_all_but_allowed_terms(
-    sentry_init, crashing_app, capture_events
-):
-    """
-    An ``allowlist`` allows through only headers matching a configured term
-    (partial, case-insensitive); every other header key is kept but its value
-    is redacted.
-    """
-    sentry_init(
-        data_collection={
-            "http_headers": {"request": {"mode": "allowlist", "terms": ["custom"]}}
-        },
-    )
-    app = SentryWsgiMiddleware(crashing_app)
-    client = Client(app)
-    events = capture_events()
-
-    with pytest.raises(ZeroDivisionError):
-        client.get(
-            "/",
-            headers={
-                "X-Forwarded-For": "1.2.3.4",
-                "X-Custom-Header": "passthrough",
-            },
-        )
-
-    (event,) = events
-    headers = event["request"]["headers"]
-
-    assert headers["X-Custom-Header"] == "passthrough"
-    assert headers["X-Forwarded-For"] == "[Filtered]"
-    assert headers["Host"] == "[Filtered]"
-
-
-def test_request_headers_data_collection_denylist_redacts_only_matched_terms(
-    sentry_init, crashing_app, capture_events
-):
-    """
-    A ``denylist`` passes headers through by default, redacting only those
-    matching a configured term (partial, case-insensitive).
-    """
-    sentry_init(
-        data_collection={
-            "http_headers": {"request": {"mode": "denylist", "terms": ["custom"]}}
-        },
-    )
-    app = SentryWsgiMiddleware(crashing_app)
-    client = Client(app)
-    events = capture_events()
-
-    with pytest.raises(ZeroDivisionError):
-        client.get(
-            "/",
-            headers={
-                "X-Forwarded-For": "1.2.3.4",
-                "X-Custom-Header": "passthrough",
-            },
-        )
-
-    (event,) = events
-    headers = event["request"]["headers"]
-
-    assert headers["X-Custom-Header"] == "[Filtered]"
-    assert headers["X-Forwarded-For"] == "1.2.3.4"
-    assert headers["Host"] == "localhost"
+    assert event["request"]["headers"] == expected_headers
 
 
 def test_request_headers_data_collection_cookie_always_redacted(
@@ -1040,35 +789,6 @@ def test_request_headers_data_collection_cookie_always_redacted(
     headers = event["request"]["headers"]
 
     assert headers["Cookie"] == "[Filtered]"
-    assert headers["X-Custom-Header"] == "passthrough"
-
-
-def test_request_headers_legacy_pii_passes_headers_through(
-    sentry_init, crashing_app, capture_events
-):
-    """
-    With no ``data_collection`` configured and ``send_default_pii`` enabled,
-    the legacy path returns all headers unchanged -- including those in
-    ``SENSITIVE_HEADERS``.
-    """
-    sentry_init(send_default_pii=True)
-    app = SentryWsgiMiddleware(crashing_app)
-    client = Client(app)
-    events = capture_events()
-
-    with pytest.raises(ZeroDivisionError):
-        client.get(
-            "/",
-            headers={
-                "X-Forwarded-For": "1.2.3.4",
-                "X-Custom-Header": "passthrough",
-            },
-        )
-
-    (event,) = events
-    headers = event["request"]["headers"]
-
-    assert headers["X-Forwarded-For"] == "1.2.3.4"
     assert headers["X-Custom-Header"] == "passthrough"
 
 
@@ -1207,7 +927,6 @@ def test_span_http_query_data_collection(
 
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         **init_kwargs,
     )
     app = SentryWsgiMiddleware(dogpark)
@@ -1230,7 +949,7 @@ def test_span_http_query_data_collection(
 @pytest.mark.parametrize("send_default_pii", [True, False])
 def test_user_ip_address_on_all_spans(sentry_init, capture_items, send_default_pii):
     def dogpark(environ, start_response):
-        with sentry_sdk.traces.start_span(name="child-span"):
+        with sentry_sdk.start_span(name="child-span"):
             pass
         start_response("200 OK", [])
         return ["Go get the ball! Good dog!"]
@@ -1238,7 +957,6 @@ def test_user_ip_address_on_all_spans(sentry_init, capture_items, send_default_p
     sentry_init(
         send_default_pii=send_default_pii,
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
     app = SentryWsgiMiddleware(dogpark)
     client = Client(app)
@@ -1259,22 +977,19 @@ def test_user_ip_address_on_all_spans(sentry_init, capture_items, send_default_p
         assert "user.ip_address" not in child_span["attributes"]
 
 
-@pytest.mark.parametrize("init_kwargs, expect_ip", DATA_COLLECTION_USER_INFO_CASES)
+@pytest.mark.parametrize("data_collection, expect_ip", DATA_COLLECTION_USER_INFO_CASES)
 def test_user_info_span_attributes_data_collection(
-    sentry_init, capture_items, init_kwargs, expect_ip
+    sentry_init, capture_items, data_collection, expect_ip
 ):
     def dogpark(environ, start_response):
-        with sentry_sdk.traces.start_span(name="child-span"):
+        with sentry_sdk.start_span(name="child-span"):
             pass
         start_response("200 OK", [])
         return ["Go get the ball! Good dog!"]
 
-    init_kwargs = dict(init_kwargs)  # shallow copy so we can mutate
-
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
-        **init_kwargs,
+        data_collection=data_collection,
     )
     app = SentryWsgiMiddleware(dogpark)
     client = Client(app)
@@ -1297,11 +1012,11 @@ def test_user_info_span_attributes_data_collection(
         assert "client.address" not in server_span["attributes"]
 
 
-@pytest.mark.parametrize("init_kwargs, expect_ip", DATA_COLLECTION_USER_INFO_CASES)
+@pytest.mark.parametrize("data_collection, expect_ip", DATA_COLLECTION_USER_INFO_CASES)
 def test_user_info_error_event_data_collection(
-    sentry_init, crashing_app, capture_events, init_kwargs, expect_ip
+    sentry_init, crashing_app, capture_events, data_collection, expect_ip
 ):
-    sentry_init(**init_kwargs)
+    sentry_init(data_collection=data_collection)
     app = SentryWsgiMiddleware(crashing_app)
     client = Client(app)
     events = capture_events()
@@ -1365,12 +1080,13 @@ def test_is_localhost_attribute(
     sentry_init, capture_items, client_kwargs, is_localhost
 ):
     def dogpark(environ, start_response):
-        with sentry_sdk.traces.start_span(name="child-span"):
+        with sentry_sdk.start_span(name="child-span"):
             pass
         start_response("200 OK", [])
         return ["woof"]
 
-    sentry_init(traces_sample_rate=1.0, trace_lifecycle="stream")
+    sentry_init(traces_sample_rate=1.0)
+
     app = SentryWsgiMiddleware(dogpark)
     client = Client(app)
 
@@ -1388,14 +1104,13 @@ def test_is_localhost_attribute(
 
 def test_user_agent_attribute(sentry_init, capture_items):
     def dogpark(environ, start_response):
-        with sentry_sdk.traces.start_span(name="child-span"):
+        with sentry_sdk.start_span(name="child-span"):
             pass
         start_response("200 OK", [])
         return ["woof"]
 
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
     )
 
     app = SentryWsgiMiddleware(dogpark)

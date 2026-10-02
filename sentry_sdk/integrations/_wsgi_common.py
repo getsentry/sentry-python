@@ -4,8 +4,7 @@ from copy import deepcopy
 import sentry_sdk
 from sentry_sdk._types import SENSITIVE_DATA_SUBSTITUTE
 from sentry_sdk.data_collection import _apply_key_value_collection_filtering
-from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.utils import AnnotatedValue, has_data_collection_enabled, logger
+from sentry_sdk.utils import AnnotatedValue
 
 try:
     from django.http.request import RawPostDataException
@@ -20,7 +19,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from typing import Any, Dict, Mapping, MutableMapping, Optional, Union
 
-    from sentry_sdk._types import Event, HttpStatusCodeRange
+    from sentry_sdk._types import Event
 
 
 SENSITIVE_ENV_KEYS = (
@@ -89,23 +88,16 @@ class RequestExtractor:
         content_length = self.content_length()
         request_info = event.get("request", {})
 
-        # Prior to data collection being implemented we unconditionally attached
-        # the request body, which is why we default to True here.
-        attach_request_body = True
+        cookies = _apply_key_value_collection_filtering(
+            items=dict(self.cookies()),
+            behaviour=client.options["data_collection"]["cookies"],
+        )
+        if cookies:
+            request_info["cookies"] = cookies
 
-        if has_data_collection_enabled(client.options):
-            cookies = _apply_key_value_collection_filtering(
-                items=dict(self.cookies()),
-                behaviour=client.options["data_collection"]["cookies"],
-            )
-            if cookies:
-                request_info["cookies"] = cookies
-
-            attach_request_body = (
-                "incoming_request" in client.options["data_collection"]["http_bodies"]
-            )
-        elif should_send_default_pii():
-            request_info["cookies"] = dict(self.cookies())
+        attach_request_body = (
+            "incoming_request" in client.options["data_collection"]["http_bodies"]
+        )
 
         if attach_request_body:
             if not request_body_within_bounds(client, content_length):
@@ -221,71 +213,18 @@ def _is_json_content_type(ct: "Optional[str]") -> bool:
 
 def _filter_headers(
     headers: "Mapping[str, str]",
-    use_annotated_value: bool = True,
-) -> "Mapping[str, Union[AnnotatedValue, str]]":
+) -> "Mapping[str, str]":
     client_options = sentry_sdk.get_client().options
 
-    if has_data_collection_enabled(client_options):
-        data_collection_configuration = client_options["data_collection"]
+    data_collection_configuration = client_options["data_collection"]
 
-        filtered = _apply_key_value_collection_filtering(
-            items=headers,
-            behaviour=data_collection_configuration["http_headers"]["request"],
-        )
+    filtered = _apply_key_value_collection_filtering(
+        items=headers,
+        behaviour=data_collection_configuration["http_headers"]["request"],
+    )
 
-        for key in filtered:
-            if isinstance(key, str) and key.lower() in ("cookie", "set-cookie"):
-                filtered[key] = SENSITIVE_DATA_SUBSTITUTE
+    for key in filtered:
+        if isinstance(key, str) and key.lower() in ("cookie", "set-cookie"):
+            filtered[key] = SENSITIVE_DATA_SUBSTITUTE
 
-        return filtered
-    else:
-        if should_send_default_pii():
-            return headers
-
-        substitute: "Union[AnnotatedValue, str]" = (
-            SENSITIVE_DATA_SUBSTITUTE
-            if not use_annotated_value
-            else AnnotatedValue.removed_because_over_size_limit()
-        )
-
-        return {
-            k: (
-                v
-                if k.upper().replace("-", "_") not in SENSITIVE_HEADERS
-                else substitute
-            )
-            for k, v in headers.items()
-        }
-
-
-def _in_http_status_code_range(
-    code: object, code_ranges: "list[HttpStatusCodeRange]"
-) -> bool:
-    for target in code_ranges:
-        if isinstance(target, int):
-            if code == target:
-                return True
-            continue
-
-        try:
-            if code in target:
-                return True
-        except TypeError:
-            logger.warning(
-                "failed_request_status_codes has to be a list of integers or containers"
-            )
-
-    return False
-
-
-class HttpCodeRangeContainer:
-    """
-    Wrapper to make it possible to use list[HttpStatusCodeRange] as a Container[int].
-    Used for backwards compatibility with the old `failed_request_status_codes` option.
-    """
-
-    def __init__(self, code_ranges: "list[HttpStatusCodeRange]") -> None:
-        self._code_ranges = code_ranges
-
-    def __contains__(self, item: object) -> bool:
-        return _in_http_status_code_range(item, self._code_ranges)
+    return filtered

@@ -11,15 +11,12 @@ from sentry_sdk.integrations import (
 )
 from sentry_sdk.integrations._wsgi_common import RequestExtractor
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
-from sentry_sdk.traces import SOURCE_FOR_STYLE as SEGMENT_SOURCE_FOR_STYLE
-from sentry_sdk.tracing import SOURCE_FOR_STYLE as TRANSACTION_SOURCE_FOR_STYLE
-from sentry_sdk.tracing_utils import has_span_streaming_enabled
+from sentry_sdk.traces import SegmentNameSource
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
     event_from_exception,
     parse_version,
-    transaction_from_function,
 )
 
 if TYPE_CHECKING:
@@ -44,30 +41,18 @@ try:
         request as bottle_request,
     )
 except ImportError:
-    raise DidNotEnable("Bottle not installed")
-
-
-TRANSACTION_STYLE_VALUES = ("endpoint", "url")
+    raise DidNotEnable("Bottle not installed or incompatible")
 
 
 class BottleIntegration(Integration):
     identifier = "bottle"
     origin = f"auto.http.{identifier}"
 
-    transaction_style = ""
-
     def __init__(
         self,
-        transaction_style: str = "endpoint",
         *,
         failed_request_status_codes: "Set[int]" = _DEFAULT_FAILED_REQUEST_STATUS_CODES,
     ) -> None:
-        if transaction_style not in TRANSACTION_STYLE_VALUES:
-            raise ValueError(
-                "Invalid value for transaction_style: %s (must be in %s)"
-                % (transaction_style, TRANSACTION_STYLE_VALUES)
-            )
-        self.transaction_style = transaction_style
         self.failed_request_status_codes = failed_request_status_codes
 
     @staticmethod
@@ -129,9 +114,11 @@ class BottleIntegration(Integration):
                 if route_path is not None:
                     server_span.set_attribute(SPANDATA.HTTP_ROUTE, route_path)
 
-            if has_span_streaming_enabled(sentry_sdk.get_client().options):
-                _set_segment_name_and_source(
-                    transaction_style=integration.transaction_style
+            name = _get_transaction_name(bottle_request)
+            if name:
+                sentry_sdk.get_current_scope().set_transaction_name(
+                    name,
+                    source=SegmentNameSource.ROUTE,
                 )
 
             return res
@@ -195,57 +182,20 @@ class BottleRequestExtractor(RequestExtractor):
         return file.content_length
 
 
-def _set_segment_name_and_source(transaction_style: str) -> None:
+def _get_transaction_name(request: "Any") -> str:
     try:
-        if transaction_style == "url":
-            name = bottle_request.route.rule or "bottle request"
-        else:
-            name = (
-                bottle_request.route.name
-                or transaction_from_function(bottle_request.route.callback)
-                or "bottle request"
-            )
-
-        sentry_sdk.get_current_scope().set_transaction_name(
-            name,
-            source=SEGMENT_SOURCE_FOR_STYLE[transaction_style],
-        )
+        return request.route.rule or "bottle request"
     except RuntimeError:
-        pass
-
-
-def _set_transaction_name_and_source(
-    event: "Event", transaction_style: str, request: "Any"
-) -> None:
-    name = ""
-
-    if transaction_style == "url":
-        try:
-            name = request.route.rule or ""
-        except RuntimeError:
-            pass
-
-    elif transaction_style == "endpoint":
-        try:
-            name = (
-                request.route.name
-                or transaction_from_function(request.route.callback)
-                or ""
-            )
-        except RuntimeError:
-            pass
-
-    event["transaction"] = name
-    event["transaction_info"] = {
-        "source": TRANSACTION_SOURCE_FOR_STYLE[transaction_style]
-    }
+        return "bottle request"
 
 
 def _make_request_event_processor(
     app: "Bottle", request: "LocalRequest", integration: "BottleIntegration"
 ) -> "EventProcessor":
     def event_processor(event: "Event", hint: "dict[str, Any]") -> "Event":
-        _set_transaction_name_and_source(event, integration.transaction_style, request)
+        name = _get_transaction_name(request)
+        event["transaction"] = name
+        event["transaction_info"] = {"source": SegmentNameSource.ROUTE}
 
         with capture_internal_exceptions():
             BottleRequestExtractor(request).extract_into_event(event)

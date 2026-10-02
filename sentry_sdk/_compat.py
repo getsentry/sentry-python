@@ -61,30 +61,26 @@ def check_uwsgi_thread_support() -> bool:
     lazy_mode = enabled("lazy-apps") or enabled("lazy")
 
     if lazy_mode and not threads_enabled:
-        from warnings import warn
+        from sentry_sdk.utils import logger
 
-        warn(
-            Warning(
-                "IMPORTANT: "
-                "We detected the use of uWSGI without thread support. "
-                "This might lead to unexpected issues. "
-                'Please run uWSGI with "--enable-threads" for full support.'
-            )
+        logger.warning(
+            "IMPORTANT: "
+            "We detected the use of uWSGI without thread support. "
+            "This might lead to unexpected issues. "
+            'Please run uWSGI with "--enable-threads" for full support.'
         )
 
         return False
 
     elif not lazy_mode and (not threads_enabled or not fork_hooks_on):
-        from warnings import warn
+        from sentry_sdk.utils import logger
 
-        warn(
-            Warning(
-                "IMPORTANT: "
-                "We detected the use of uWSGI in preforking mode without "
-                "thread support. This might lead to crashing workers. "
-                'Please run uWSGI with both "--enable-threads" and '
-                '"--py-call-uwsgi-fork-hooks" for full support.'
-            )
+        logger.warning(
+            "IMPORTANT: "
+            "We detected the use of uWSGI in preforking mode without "
+            "thread support. This might lead to crashing workers. "
+            'Please run uWSGI with both "--enable-threads" and '
+            '"--py-call-uwsgi-fork-hooks" for full support.'
         )
 
         return False

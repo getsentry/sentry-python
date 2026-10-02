@@ -9,7 +9,7 @@ from sentry_sdk.integrations._wsgi_common import (
 )
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.tracing import SOURCE_FOR_STYLE
+from sentry_sdk.traces import SegmentNameSource
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
@@ -42,33 +42,22 @@ try:
     )
     from markupsafe import Markup
 except ImportError:
-    raise DidNotEnable("Flask is not installed")
+    raise DidNotEnable("Flask is not installed or incompatible")
 
 try:
     import blinker  # noqa
 except ImportError:
-    raise DidNotEnable("blinker is not installed")
-
-TRANSACTION_STYLE_VALUES = ("endpoint", "url")
+    raise DidNotEnable("blinker is not installed or incompatible")
 
 
 class FlaskIntegration(Integration):
     identifier = "flask"
     origin = f"auto.http.{identifier}"
 
-    transaction_style = ""
-
     def __init__(
         self,
-        transaction_style: str = "endpoint",
         http_methods_to_capture: "tuple[str, ...]" = DEFAULT_HTTP_METHODS_TO_CAPTURE,
     ) -> None:
-        if transaction_style not in TRANSACTION_STYLE_VALUES:
-            raise ValueError(
-                "Invalid value for transaction_style: %s (must be in %s)"
-                % (transaction_style, TRANSACTION_STYLE_VALUES)
-            )
-        self.transaction_style = transaction_style
         self.http_methods_to_capture = tuple(map(str.upper, http_methods_to_capture))
 
     @staticmethod
@@ -127,22 +116,6 @@ def _add_sentry_trace(
     context["sentry_trace_meta"] = trace_meta
 
 
-def _set_transaction_name_and_source(
-    scope: "sentry_sdk.Scope", transaction_style: str, request: "Request"
-) -> None:
-    try:
-        name_for_style = {
-            "url": request.url_rule.rule,
-            "endpoint": request.url_rule.endpoint,
-        }
-        scope.set_transaction_name(
-            name_for_style[transaction_style],
-            source=SOURCE_FOR_STYLE[transaction_style],
-        )
-    except Exception:
-        pass
-
-
 def _request_started(app: "Flask", **kwargs: "Any") -> None:
     client = sentry_sdk.get_client()
     integration = client.get_integration(FlaskIntegration)
@@ -163,9 +136,13 @@ def _request_started(app: "Flask", **kwargs: "Any") -> None:
 
     # Set the transaction name and source here,
     # but rely on WSGI middleware to actually start the transaction
-    _set_transaction_name_and_source(
-        sentry_sdk.get_current_scope(), integration.transaction_style, request
-    )
+    try:
+        sentry_sdk.get_current_scope().set_transaction_name(
+            request.url_rule.rule,
+            source=SegmentNameSource.ROUTE,
+        )
+    except Exception:
+        pass
 
     scope = sentry_sdk.get_isolation_scope()
 

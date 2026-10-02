@@ -6,12 +6,13 @@ Based on Tom Christie's `sentry-asgi <https://github.com/encode/sentry-asgi>`.
 
 import inspect
 import sys
+from contextlib import nullcontext
+from contextvars import ContextVar
 from copy import deepcopy
 from functools import partial
 from typing import TYPE_CHECKING
 
 import sentry_sdk
-from sentry_sdk.api import continue_trace
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations._asgi_common import (
     _get_headers,
@@ -25,49 +26,32 @@ from sentry_sdk.integrations._asgi_common import (
 from sentry_sdk.integrations._wsgi_common import (
     DEFAULT_HTTP_METHODS_TO_CAPTURE,
 )
-from sentry_sdk.scope import Scope, should_send_default_pii
+from sentry_sdk.scope import Scope
 from sentry_sdk.sessions import track_session
 from sentry_sdk.traces import (
-    SOURCE_FOR_STYLE as SEGMENT_SOURCE_FOR_STYLE,
-)
-from sentry_sdk.traces import (
     SegmentNameSource,
-    StreamedSpan,
+    Span,
 )
-from sentry_sdk.tracing import (
-    SOURCE_FOR_STYLE,
-    Transaction,
-    TransactionSource,
-)
-from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
-    CONTEXTVARS_ERROR_MESSAGE,
-    HAS_REAL_CONTEXTVARS,
-    ContextVar,
     _get_installed_modules,
     _is_localhost,
     capture_internal_exceptions,
     event_from_exception,
-    has_data_collection_enabled,
     logger,
-    nullcontext,
-    qualname_from_function,
     reraise,
-    transaction_from_function,
 )
 
 if TYPE_CHECKING:
-    from typing import Any, ContextManager, Dict, Optional, Tuple, Union
+    from typing import Any, ContextManager, Dict, Optional, Tuple
 
     from sentry_sdk._types import Attributes, Event, Hint
-    from sentry_sdk.tracing import Span
 
 
-_asgi_middleware_applied = ContextVar("sentry_asgi_middleware_applied")
+_asgi_middleware_applied: "ContextVar[bool]" = ContextVar(
+    "sentry_asgi_middleware_applied"
+)
 
 _DEFAULT_TRANSACTION_NAME = "generic ASGI request"
-
-TRANSACTION_STYLE_VALUES = ("endpoint", "url")
 
 
 # Vendored: https://github.com/Kludex/uvicorn/blob/b224045f5900b7f766743bcb16ba9fc3adea2606/uvicorn/_compat.py#L10-L13
@@ -105,7 +89,6 @@ class SentryAsgiMiddleware:
     __slots__ = (
         "app",
         "__call__",
-        "transaction_style",
         "mechanism_type",
         "span_origin",
         "http_methods_to_capture",
@@ -115,8 +98,6 @@ class SentryAsgiMiddleware:
     def __init__(
         self,
         app: "Any",
-        unsafe_context_data: bool = False,
-        transaction_style: str = "endpoint",
         mechanism_type: str = "asgi",
         span_origin: str = "manual",
         http_methods_to_capture: "Tuple[str, ...]" = DEFAULT_HTTP_METHODS_TO_CAPTURE,
@@ -128,21 +109,7 @@ class SentryAsgiMiddleware:
         data to sent events and basic handling for exceptions bubbling up
         through the middleware.
 
-        :param unsafe_context_data: Disable errors when a proper contextvars installation could not be found. We do not recommend changing this from the default.
         """
-        if not unsafe_context_data and not HAS_REAL_CONTEXTVARS:
-            # We better have contextvars or we're going to leak state between
-            # requests.
-            raise RuntimeError(
-                "The ASGI middleware for Sentry requires Python 3.7+ "
-                "or the aiocontextvars package." + CONTEXTVARS_ERROR_MESSAGE
-            )
-        if transaction_style not in TRANSACTION_STYLE_VALUES:
-            raise ValueError(
-                "Invalid value for transaction_style: %s (must be in %s)"
-                % (transaction_style, TRANSACTION_STYLE_VALUES)
-            )
-
         asgi_middleware_while_using_starlette_or_fastapi = (
             mechanism_type == "asgi" and "starlette" in _get_installed_modules()
         )
@@ -153,7 +120,6 @@ class SentryAsgiMiddleware:
                 "See https://docs.sentry.io/platforms/python/guides/asgi/ for more information."
             )
 
-        self.transaction_style = transaction_style
         self.mechanism_type = mechanism_type
         self.span_origin = span_origin
         self.app = app
@@ -207,22 +173,10 @@ class SentryAsgiMiddleware:
                     return await self.app(scope, receive, send)
 
             except Exception as exc:
-                suppress_chained_exceptions = (
-                    sentry_sdk.get_client()
-                    .options.get("_experiments", {})
-                    .get("suppress_asgi_chained_exceptions", True)
-                )
-                if suppress_chained_exceptions:
-                    self._capture_lifespan_exception(exc)
-                    raise exc from None
-
                 exc_info = sys.exc_info()
                 with capture_internal_exceptions():
                     self._capture_lifespan_exception(exc)
                 reraise(*exc_info)
-
-        client = sentry_sdk.get_client()
-        span_streaming = has_span_streaming_enabled(client.options)
 
         _asgi_middleware_applied.set(True)
         try:
@@ -255,104 +209,53 @@ class SentryAsgiMiddleware:
                     (
                         transaction_name,
                         transaction_source,
-                    ) = self._get_transaction_name_and_source(
-                        self.transaction_style,
-                        scope,
-                    )
+                    ) = self._get_segment_name_and_source(scope)
 
                     method = scope.get("method", "").upper()
 
-                    span_ctx: "ContextManager[Union[Span, StreamedSpan, None]]"
-                    if span_streaming:
-                        segment: "Optional[StreamedSpan]" = None
-                        attributes: "Attributes" = {
-                            "sentry.segment.name.source": getattr(
-                                transaction_source, "value", transaction_source
-                            ),
-                            "sentry.origin": self.span_origin,
-                            "network.protocol.name": ty,
-                        }
+                    span: "Optional[ContextManager[Optional[Span]]]" = None
+                    attributes: "Attributes" = {
+                        "sentry.segment.name.source": getattr(
+                            transaction_source, "value", transaction_source
+                        ),
+                        "sentry.origin": self.span_origin,
+                        "network.protocol.name": ty,
+                    }
 
-                        ip = _get_ip(scope)
-                        if ip:
-                            client_options = sentry_sdk.get_client().options
-                            if has_data_collection_enabled(client_options):
-                                if client_options["data_collection"]["user_info"]:
-                                    sentry_scope.set_attribute(
-                                        SPANDATA.USER_IP_ADDRESS, ip
-                                    )
-                            elif should_send_default_pii():
-                                sentry_scope.set_attribute(SPANDATA.USER_IP_ADDRESS, ip)
+                    ip = _get_ip(scope)
+                    if ip:
+                        client_options = sentry_sdk.get_client().options
+                        if client_options["data_collection"]["user_info"]:
+                            sentry_scope.set_attribute(SPANDATA.USER_IP_ADDRESS, ip)
 
-                        if ty in ("http", "websocket"):
-                            if (
-                                ty == "websocket"
-                                or method in self.http_methods_to_capture
-                            ):
-                                sentry_sdk.traces.continue_trace(_get_headers(scope))
-
-                                Scope.set_custom_sampling_context({"asgi_scope": scope})
-
-                                attributes["sentry.op"] = f"{ty}.server"
-                                segment = sentry_sdk.traces.start_span(
-                                    name=transaction_name,
-                                    attributes=attributes,
-                                    parent_span=None,
-                                )
-                                sentry_scope.get_current_scope()._server_segment_span = segment
-                        else:
-                            sentry_sdk.traces.new_trace()
+                    if ty in ("http", "websocket"):
+                        if ty == "websocket" or method in self.http_methods_to_capture:
+                            sentry_sdk.continue_trace(_get_headers(scope))
 
                             Scope.set_custom_sampling_context({"asgi_scope": scope})
 
-                            attributes["sentry.op"] = OP.HTTP_SERVER
-                            segment = sentry_sdk.traces.start_span(
+                            attributes["sentry.op"] = f"{ty}.server"
+                            span = sentry_sdk.start_span(
                                 name=transaction_name,
                                 attributes=attributes,
                                 parent_span=None,
                             )
-                            sentry_scope.get_current_scope()._server_segment_span = (
-                                segment
-                            )
-
-                        span_ctx = segment or nullcontext()
-
+                            sentry_scope.get_current_scope()._server_segment_span = span
                     else:
-                        transaction = None
-                        if ty in ("http", "websocket"):
-                            if (
-                                ty == "websocket"
-                                or method in self.http_methods_to_capture
-                            ):
-                                transaction = continue_trace(
-                                    _get_headers(scope),
-                                    op="{}.server".format(ty),
-                                    name=transaction_name,
-                                    source=transaction_source,
-                                    origin=self.span_origin,
-                                )
-                        else:
-                            transaction = Transaction(
-                                op=OP.HTTP_SERVER,
-                                name=transaction_name,
-                                source=transaction_source,
-                                origin=self.span_origin,
-                            )
+                        sentry_sdk.new_trace()
 
-                        if transaction:
-                            transaction.set_tag("asgi.type", ty)
+                        Scope.set_custom_sampling_context({"asgi_scope": scope})
 
-                        span_ctx = (
-                            sentry_sdk.start_transaction(
-                                transaction,
-                                custom_sampling_context={"asgi_scope": scope},
-                            )
-                            if transaction is not None
-                            else nullcontext()
+                        attributes["sentry.op"] = OP.HTTP_SERVER
+                        span = sentry_sdk.start_span(
+                            name=transaction_name,
+                            attributes=attributes,
+                            parent_span=None,
                         )
+                        sentry_scope.get_current_scope()._server_segment_span = span
 
-                    with span_ctx as span:
-                        if isinstance(span, StreamedSpan):
+                    with span or nullcontext() as span:
+                        if span is not None:
                             for attribute, value in _get_request_attributes(
                                 scope,
                                 root_path_in_path=self.root_path_in_path,
@@ -370,18 +273,13 @@ class SentryAsgiMiddleware:
                                         and "status" in event
                                     )
                                     if is_http_response:
-                                        if isinstance(span, StreamedSpan):
-                                            span.status = (
-                                                "error"
-                                                if event["status"] >= 400
-                                                else "ok"
-                                            )
-                                            span.set_attribute(
-                                                "http.response.status_code",
-                                                event["status"],
-                                            )
-                                        else:
-                                            span.set_http_status(event["status"])
+                                        span.status = (
+                                            "error" if event["status"] >= 400 else "ok"
+                                        )
+                                        span.set_attribute(
+                                            "http.response.status_code",
+                                            event["status"],
+                                        )
 
                                 return await send(event)
 
@@ -395,22 +293,13 @@ class SentryAsgiMiddleware:
                                 )
 
                         except Exception as exc:
-                            suppress_chained_exceptions = (
-                                sentry_sdk.get_client()
-                                .options.get("_experiments", {})
-                                .get("suppress_asgi_chained_exceptions", True)
-                            )
-                            if suppress_chained_exceptions:
-                                self._capture_request_exception(exc)
-                                raise exc from None
-
                             exc_info = sys.exc_info()
                             with capture_internal_exceptions():
                                 self._capture_request_exception(exc)
                             reraise(*exc_info)
 
                         finally:
-                            if isinstance(span, StreamedSpan):
+                            if span is not None:
                                 already_set = (
                                     span is not None
                                     and span.name != _DEFAULT_TRANSACTION_NAME
@@ -426,9 +315,7 @@ class SentryAsgiMiddleware:
                                 with capture_internal_exceptions():
                                     if not already_set:
                                         name, source = (
-                                            self._get_segment_name_and_source(
-                                                self.transaction_style, scope
-                                            )
+                                            self._get_segment_name_and_source(scope)
                                         )
                                         span.name = name
                                         span.set_attribute(
@@ -454,15 +341,13 @@ class SentryAsgiMiddleware:
             and transaction != _DEFAULT_TRANSACTION_NAME
             and transaction_source
             in [
-                TransactionSource.COMPONENT,
-                TransactionSource.ROUTE,
-                TransactionSource.CUSTOM,
+                SegmentNameSource.COMPONENT,
+                SegmentNameSource.ROUTE,
+                SegmentNameSource.CUSTOM,
             ]
         )
         if not already_set:
-            name, source = self._get_transaction_name_and_source(
-                self.transaction_style, asgi_scope
-            )
+            name, source = self._get_segment_name_and_source(asgi_scope)
             event["transaction"] = name
             event["transaction_info"] = {"source": source}
 
@@ -474,104 +359,33 @@ class SentryAsgiMiddleware:
     # data to your liking it's recommended to use the `before_send` callback
     # for that.
 
-    def _get_transaction_name_and_source(
-        self: "SentryAsgiMiddleware", transaction_style: str, asgi_scope: "Any"
-    ) -> "Tuple[str, str]":
-        name = None
-        source = SOURCE_FOR_STYLE[transaction_style]
-        ty = asgi_scope.get("type")
-
-        if transaction_style == "endpoint":
-            endpoint = asgi_scope.get("endpoint")
-            # Webframeworks like Starlette mutate the ASGI env once routing is
-            # done, which is sometime after the request has started. If we have
-            # an endpoint, overwrite our generic transaction name.
-            if endpoint:
-                name = transaction_from_function(endpoint) or ""
-            else:
-                name = _get_url(
-                    asgi_scope,
-                    "http" if ty == "http" else "ws",
-                    host=None,
-                    path=_get_path(
-                        asgi_scope=asgi_scope, root_path_in_path=self.root_path_in_path
-                    ),
-                )
-                source = TransactionSource.URL
-
-        elif transaction_style == "url":
-            # FastAPI includes the route object in the scope to let Sentry extract the
-            # path from it for the transaction name
-            route = asgi_scope.get("route")
-            if route:
-                path = getattr(route, "path", None)
-                if path is not None:
-                    name = path
-            else:
-                name = _get_url(
-                    asgi_scope,
-                    "http" if ty == "http" else "ws",
-                    host=None,
-                    path=_get_path(
-                        asgi_scope=asgi_scope, root_path_in_path=self.root_path_in_path
-                    ),
-                )
-                source = TransactionSource.URL
-
-        if name is None:
-            name = _DEFAULT_TRANSACTION_NAME
-            source = TransactionSource.ROUTE
-            return name, source
-
-        return name, source
-
     def _get_segment_name_and_source(
-        self: "SentryAsgiMiddleware", segment_style: str, asgi_scope: "Any"
+        self: "SentryAsgiMiddleware", asgi_scope: "Any"
     ) -> "Tuple[str, str]":
         name = None
-        source = SEGMENT_SOURCE_FOR_STYLE[segment_style].value
-        ty = asgi_scope.get("type")
+        source = SegmentNameSource.ROUTE
 
-        if segment_style == "endpoint":
-            endpoint = asgi_scope.get("endpoint")
-            # Webframeworks like Starlette mutate the ASGI env once routing is
-            # done, which is sometime after the request has started. If we have
-            # an endpoint, overwrite our generic transaction name.
-            if endpoint:
-                name = qualname_from_function(endpoint) or ""
-            else:
-                name = _get_url(
-                    asgi_scope,
-                    "http" if ty == "http" else "ws",
-                    host=None,
-                    path=_get_path(
-                        asgi_scope=asgi_scope, root_path_in_path=self.root_path_in_path
-                    ),
-                )
-                source = SegmentNameSource.URL.value
-
-        elif segment_style == "url":
-            # FastAPI includes the route object in the scope to let Sentry extract the
-            # path from it for the transaction name
-            route = asgi_scope.get("route")
-            if route:
-                path = getattr(route, "path", None)
-                if path is not None:
-                    name = path
-            else:
-                name = _get_url(
-                    asgi_scope,
-                    "http" if ty == "http" else "ws",
-                    host=None,
-                    path=_get_path(
-                        asgi_scope=asgi_scope, root_path_in_path=self.root_path_in_path
-                    ),
-                )
-                source = SegmentNameSource.URL.value
+        # FastAPI includes the route object in the scope to let Sentry extract the
+        # path from it for the transaction name
+        route = asgi_scope.get("route")
+        if route:
+            path = getattr(route, "path", None)
+            if path is not None:
+                name = path
+        else:
+            name = _get_url(
+                asgi_scope,
+                "http" if asgi_scope.get("type") == "http" else "ws",
+                host=None,
+                path=_get_path(
+                    asgi_scope=asgi_scope, root_path_in_path=self.root_path_in_path
+                ),
+            )
+            source = SegmentNameSource.URL
 
         if name is None:
             name = _DEFAULT_TRANSACTION_NAME
-            source = SegmentNameSource.ROUTE.value
+            source = SegmentNameSource.ROUTE
             return name, source
 
         return name, source

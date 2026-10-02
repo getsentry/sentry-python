@@ -4,12 +4,13 @@ from functools import wraps
 from typing import TYPE_CHECKING
 
 import sentry_sdk
-from sentry_sdk.integrations import Integration
-from sentry_sdk.integrations.logging import ignore_logger
+from sentry_sdk.integrations import Integration, _check_minimum_version
+from sentry_sdk.integrations.logging import ignore_logger_for_events
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
     event_from_exception,
+    parse_version,
     reraise,
 )
 
@@ -32,10 +33,14 @@ class BeamIntegration(Integration):
 
     @staticmethod
     def setup_once() -> None:
+        from apache_beam import __version__ as BEAM_VERSION  # type: ignore
         from apache_beam.transforms.core import DoFn, ParDo  # type: ignore
 
-        ignore_logger("root")
-        ignore_logger("bundle_processor.create")
+        version = parse_version(BEAM_VERSION)
+        _check_minimum_version(BeamIntegration, version)
+
+        ignore_logger_for_events("root")
+        ignore_logger_for_events("bundle_processor.create")
 
         function_patches = ["process", "start_bundle", "finish_bundle", "setup"]
         for func_name in function_patches:

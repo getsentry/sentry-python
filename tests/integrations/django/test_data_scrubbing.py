@@ -22,81 +22,6 @@ def client():
 
 @pytest.mark.forked
 @pytest_mark_django_db_decorator()
-def test_scrub_django_session_cookies_removed(
-    sentry_init,
-    client,
-    capture_items,
-):
-    sentry_init(
-        integrations=[DjangoIntegration()],
-        send_default_pii=False,
-    )
-    items = capture_items("event")
-    werkzeug_set_cookie(client, "localhost", "sessionid", "123")
-    werkzeug_set_cookie(client, "localhost", "csrftoken", "456")
-    werkzeug_set_cookie(client, "localhost", "foo", "bar")
-    client.get(reverse("view_exc"))
-
-    (event,) = (item.payload for item in items)
-    assert "cookies" not in event["request"]
-
-
-@pytest.mark.forked
-@pytest_mark_django_db_decorator()
-def test_scrub_django_session_cookies_filtered(
-    sentry_init,
-    client,
-    capture_items,
-):
-    sentry_init(
-        integrations=[DjangoIntegration()],
-        send_default_pii=True,
-    )
-    items = capture_items("event")
-    werkzeug_set_cookie(client, "localhost", "sessionid", "123")
-    werkzeug_set_cookie(client, "localhost", "csrftoken", "456")
-    werkzeug_set_cookie(client, "localhost", "foo", "bar")
-    client.get(reverse("view_exc"))
-
-    (event,) = (item.payload for item in items)
-    assert event["request"]["cookies"] == {
-        "sessionid": "[Filtered]",
-        "csrftoken": "[Filtered]",
-        "foo": "bar",
-    }
-
-
-@pytest.mark.forked
-@pytest_mark_django_db_decorator()
-def test_scrub_django_custom_session_cookies_filtered(
-    sentry_init,
-    client,
-    capture_items,
-    settings,
-):
-    settings.SESSION_COOKIE_NAME = "my_sess"
-    settings.CSRF_COOKIE_NAME = "csrf_secret"
-
-    sentry_init(
-        integrations=[DjangoIntegration()],
-        send_default_pii=True,
-    )
-    items = capture_items("event")
-    werkzeug_set_cookie(client, "localhost", "my_sess", "123")
-    werkzeug_set_cookie(client, "localhost", "csrf_secret", "456")
-    werkzeug_set_cookie(client, "localhost", "foo", "bar")
-    client.get(reverse("view_exc"))
-
-    (event,) = (item.payload for item in items)
-    assert event["request"]["cookies"] == {
-        "my_sess": "[Filtered]",
-        "csrf_secret": "[Filtered]",
-        "foo": "bar",
-    }
-
-
-@pytest.mark.forked
-@pytest_mark_django_db_decorator()
 @pytest.mark.parametrize(
     "cookies_to_set, data_collection, expected_cookies",
     [
@@ -182,32 +107,6 @@ def test_data_collection_cookies(
         assert "cookies" not in event["request"]
     else:
         assert event["request"]["cookies"] == expected_cookies
-
-
-@pytest.mark.forked
-@pytest_mark_django_db_decorator()
-def test_data_collection_cookies_precedence_over_send_default_pii(
-    sentry_init, client, capture_items
-):
-    # ``data_collection`` is the single source of truth: even with
-    # ``send_default_pii=False``, the configured cookie behaviour still applies.
-    sentry_init(
-        integrations=[DjangoIntegration()],
-        send_default_pii=False,
-        data_collection={"cookies": {"mode": "denylist"}},
-    )
-    items = capture_items("event")
-    werkzeug_set_cookie(client, "localhost", "sessionid", "123")
-    werkzeug_set_cookie(client, "localhost", "csrftoken", "456")
-    werkzeug_set_cookie(client, "localhost", "foo", "bar")
-    client.get(reverse("view_exc"))
-
-    (event,) = (item.payload for item in items)
-    assert event["request"]["cookies"] == {
-        "sessionid": "[Filtered]",
-        "csrftoken": "[Filtered]",
-        "foo": "bar",
-    }
 
 
 # Query string used across the query-param filtering tests below. ``auth`` is a
@@ -317,7 +216,6 @@ def test_span_http_query_data_collection(
     sentry_init(
         integrations=[DjangoIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
         **init_kwargs,
     )
 
@@ -371,15 +269,14 @@ def test_empty_query_string_is_dropped_with_data_collection(
 
 @pytest.mark.forked
 @pytest_mark_django_db_decorator()
-@pytest.mark.parametrize("init_kwargs, expect_ip", DATA_COLLECTION_USER_INFO_CASES)
+@pytest.mark.parametrize("data_collection, expect_ip", DATA_COLLECTION_USER_INFO_CASES)
 def test_user_info_span_attributes_data_collection(
-    sentry_init, client, capture_items, init_kwargs, expect_ip
+    sentry_init, client, capture_items, data_collection, expect_ip
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
-        **init_kwargs,
+        data_collection=data_collection,
     )
 
     items = capture_items("span")
@@ -403,15 +300,16 @@ def test_user_info_span_attributes_data_collection(
 
 @pytest.mark.forked
 @pytest_mark_django_db_decorator()
-@pytest.mark.parametrize("init_kwargs, expect_user", DATA_COLLECTION_USER_INFO_CASES)
+@pytest.mark.parametrize(
+    "data_collection, expect_user", DATA_COLLECTION_USER_INFO_CASES
+)
 def test_user_identity_span_attributes_data_collection(
-    sentry_init, client, capture_items, init_kwargs, expect_user
+    sentry_init, client, capture_items, data_collection, expect_user
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream",
-        **init_kwargs,
+        data_collection=data_collection,
     )
 
     unpack_werkzeug_response(client.get(reverse("mylogin")))
@@ -435,11 +333,11 @@ def test_user_identity_span_attributes_data_collection(
 
 @pytest.mark.forked
 @pytest_mark_django_db_decorator()
-@pytest.mark.parametrize("init_kwargs, expect_ip", DATA_COLLECTION_USER_INFO_CASES)
+@pytest.mark.parametrize("data_collection, expect_ip", DATA_COLLECTION_USER_INFO_CASES)
 def test_user_info_error_event_data_collection(
-    sentry_init, client, capture_events, init_kwargs, expect_ip
+    sentry_init, client, capture_events, data_collection, expect_ip
 ):
-    sentry_init(integrations=[DjangoIntegration()], **init_kwargs)
+    sentry_init(integrations=[DjangoIntegration()], data_collection=data_collection)
     events = capture_events()
 
     client.get(reverse("view_exc"), environ_base={"REMOTE_ADDR": "127.0.0.1"})
@@ -456,11 +354,13 @@ def test_user_info_error_event_data_collection(
 
 @pytest.mark.forked
 @pytest_mark_django_db_decorator()
-@pytest.mark.parametrize("init_kwargs, expect_user", DATA_COLLECTION_USER_INFO_CASES)
+@pytest.mark.parametrize(
+    "data_collection, expect_user", DATA_COLLECTION_USER_INFO_CASES
+)
 def test_user_identity_error_event_data_collection(
-    sentry_init, client, capture_events, init_kwargs, expect_user
+    sentry_init, client, capture_events, data_collection, expect_user
 ):
-    sentry_init(integrations=[DjangoIntegration()], **init_kwargs)
+    sentry_init(integrations=[DjangoIntegration()], data_collection=data_collection)
     events = capture_events()
 
     client.get(reverse("mylogin"))
