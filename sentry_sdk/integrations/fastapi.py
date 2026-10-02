@@ -27,10 +27,9 @@ except DidNotEnable:
 
 try:
     import fastapi  # type: ignore
+    from starlette.requests import HTTPConnection, Request
 except ImportError:
     raise DidNotEnable("FastAPI is not installed")
-
-from starlette.requests import HTTPConnection, Request
 
 
 _DEFAULT_TRANSACTION_NAME = "generic FastAPI request"
@@ -83,7 +82,6 @@ def patch_fastapi_init() -> None:
 
     _sentry_fastapi_init._sentry_is_patched = True  # type: ignore[attr-defined]
     fastapi.FastAPI.__init__ = _sentry_fastapi_init
-
 
 
 def _set_transaction_name_and_source(
