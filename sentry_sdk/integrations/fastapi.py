@@ -90,7 +90,7 @@ async def _sentry_fastapi_dependency(request: "HTTPConnection"):
     info = await extractor.extract_request_info()
 
     def _make_request_event_processor(
-        request_info: "dict[str, Any]",
+        info: "dict[str, Any]",
     ) -> "Callable[[Any, dict[str, Any]], Any]":
         def event_processor(
             event: "dict[str, Any]", hint: "dict[str, Any]"
