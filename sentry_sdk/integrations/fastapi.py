@@ -8,7 +8,6 @@ from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.traces import StreamedSpan, get_current_span
 from sentry_sdk.tracing import SOURCE_FOR_STYLE, TransactionSource
-from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import has_data_collection_enabled, transaction_from_function
 
 if TYPE_CHECKING:
