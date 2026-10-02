@@ -11,7 +11,7 @@ from sentry_sdk.integrations.wsgi import (
     _ScopedResponse,
     get_request_url,
 )
-from tests.integrations.utils import DATA_COLLECTION_USER_INFO_CASES_LEGACY
+from tests.integrations.utils import DATA_COLLECTION_USER_INFO_CASES
 
 
 @pytest.fixture
@@ -977,11 +977,9 @@ def test_user_ip_address_on_all_spans(sentry_init, capture_items, send_default_p
         assert "user.ip_address" not in child_span["attributes"]
 
 
-@pytest.mark.parametrize(
-    "init_kwargs, expect_ip", DATA_COLLECTION_USER_INFO_CASES_LEGACY
-)
+@pytest.mark.parametrize("data_collection, expect_ip", DATA_COLLECTION_USER_INFO_CASES)
 def test_user_info_span_attributes_data_collection(
-    sentry_init, capture_items, init_kwargs, expect_ip
+    sentry_init, capture_items, data_collection, expect_ip
 ):
     def dogpark(environ, start_response):
         with sentry_sdk.start_span(name="child-span"):
@@ -989,11 +987,9 @@ def test_user_info_span_attributes_data_collection(
         start_response("200 OK", [])
         return ["Go get the ball! Good dog!"]
 
-    init_kwargs = dict(init_kwargs)  # shallow copy so we can mutate
-
     sentry_init(
         traces_sample_rate=1.0,
-        **init_kwargs,
+        data_collection=data_collection,
     )
     app = SentryWsgiMiddleware(dogpark)
     client = Client(app)
@@ -1016,13 +1012,11 @@ def test_user_info_span_attributes_data_collection(
         assert "client.address" not in server_span["attributes"]
 
 
-@pytest.mark.parametrize(
-    "init_kwargs, expect_ip", DATA_COLLECTION_USER_INFO_CASES_LEGACY
-)
+@pytest.mark.parametrize("data_collection, expect_ip", DATA_COLLECTION_USER_INFO_CASES)
 def test_user_info_error_event_data_collection(
-    sentry_init, crashing_app, capture_events, init_kwargs, expect_ip
+    sentry_init, crashing_app, capture_events, data_collection, expect_ip
 ):
-    sentry_init(**init_kwargs)
+    sentry_init(data_collection=data_collection)
     app = SentryWsgiMiddleware(crashing_app)
     client = Client(app)
     events = capture_events()
