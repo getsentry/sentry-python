@@ -648,6 +648,19 @@ def _update_active_thread() -> None:
         sentry_scope.profile.update_active_thread_id()
 
 
+def _wrap_sync_handler(handler: "Callable[..., Any]") -> "Callable[..., Any]":
+    if getattr(handler, "_sentry_active_thread_is_patched", False):
+        return handler
+
+    @functools.wraps(handler)
+    def _sentry_sync_handler(*args: "Any", **kwargs: "Any") -> "Any":
+        _update_active_thread()
+        return handler(*args, **kwargs)
+
+    _sentry_sync_handler._sentry_active_thread_is_patched = True  # type: ignore[attr-defined]
+    return _sentry_sync_handler
+
+
 def patch_request_response() -> None:
     old_request_response = starlette.routing.request_response
 
