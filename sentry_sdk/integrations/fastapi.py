@@ -68,7 +68,6 @@ async def _sentry_fastapi_dependency(request: "HTTPConnection") -> None:
         route_path=route_path,
     )
 
-    route = request.scope.get("route")
     dependant = getattr(route, "dependant", None)
     if (
         dependant is not None
