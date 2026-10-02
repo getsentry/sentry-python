@@ -1,4 +1,3 @@
-import sys
 from functools import wraps
 from typing import TYPE_CHECKING
 
@@ -34,9 +33,7 @@ class FastApiIntegration(StarletteIntegration):
         patch_fastapi_init()
 
 
-async def _sentry_fastapi_dependency(
-    request: "HTTPConnection" = None,
-) -> None:
+async def _sentry_fastapi_dependency(request: "HTTPConnection") -> None:
     if not isinstance(request, Request):
         return
 
