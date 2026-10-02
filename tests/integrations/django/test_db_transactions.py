@@ -645,7 +645,7 @@ def test_db_atomic_executemany(
 ):
     sentry_init(
         integrations=[DjangoIntegration(db_transaction_spans=True)],
-        send_default_pii=True,
+        data_collection={},
         traces_sample_rate=1.0,
     )
     items = capture_items("span")
@@ -729,7 +729,7 @@ def test_db_atomic_rollback_execute(
 ):
     sentry_init(
         integrations=[DjangoIntegration(db_transaction_spans=True)],
-        send_default_pii=True,
+        data_collection={},
         traces_sample_rate=1.0,
     )
 
@@ -793,7 +793,7 @@ def test_db_atomic_rollback_executemany(
 ):
     sentry_init(
         integrations=[DjangoIntegration(db_transaction_spans=True)],
-        send_default_pii=True,
+        data_collection={},
         traces_sample_rate=1.0,
     )
     items = capture_items("span")
@@ -879,7 +879,7 @@ def test_db_atomic_execute_exception(
 ):
     sentry_init(
         integrations=[DjangoIntegration(db_transaction_spans=True)],
-        send_default_pii=True,
+        data_collection={},
         traces_sample_rate=1.0,
     )
 
@@ -942,7 +942,7 @@ def test_db_atomic_executemany_exception(
 ):
     sentry_init(
         integrations=[DjangoIntegration(db_transaction_spans=True)],
-        send_default_pii=True,
+        data_collection={},
         traces_sample_rate=1.0,
     )
     items = capture_items("span")
