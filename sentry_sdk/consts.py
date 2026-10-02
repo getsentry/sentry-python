@@ -65,7 +65,6 @@ if TYPE_CHECKING:
         "Experiments",
         {
             "max_flags": Optional[int],
-            "record_sql_params": Optional[bool],
             "continuous_profiling_auto_start": Optional[bool],
             "transport_zlib_compression_level": Optional[int],
             "transport_compression_level": Optional[int],

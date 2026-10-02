@@ -257,9 +257,7 @@ async def test_async_middleware_spans(
     sentry_init(
         integrations=[DjangoIntegration(middleware_spans=True)],
         traces_sample_rate=1.0,
-        _experiments={
-            "record_sql_params": True,
-        },
+        data_collection={"database_query_data": True},
     )
 
     application = make_asgi_application()

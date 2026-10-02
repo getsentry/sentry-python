@@ -474,8 +474,7 @@ def test_sql_queries(
 ):
     sentry_init(
         integrations=[DjangoIntegration()] if with_integration else [],
-        send_default_pii=True,
-        _experiments={"record_sql_params": True},
+        data_collection={"database_query_data": True},
     )
 
     from django.db import connection
@@ -509,8 +508,7 @@ def test_sql_dict_query_params(
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
-        send_default_pii=True,
-        _experiments={"record_sql_params": True},
+        data_collection={"database_query_data": True},
     )
 
     from django.db import connections
@@ -586,10 +584,7 @@ def test_sql_psycopg2_string_composition(
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
-        send_default_pii=True,
-        _experiments={
-            "record_sql_params": True,
-        },
+        data_collection={"database_query_data": True},
     )
     from django.db import connections
 
@@ -624,10 +619,7 @@ def test_sql_psycopg2_placeholders(
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
-        send_default_pii=True,
-        _experiments={
-            "record_sql_params": True,
-        },
+        data_collection={"database_query_data": True},
     )
     from django.db import connections
 
@@ -736,7 +728,7 @@ def test_django_connect_breadcrumbs(
     """
     sentry_init(
         integrations=[DjangoIntegration()],
-        send_default_pii=True,
+        data_collection={"database_query_data": True},
     )
 
     from django.db import connections
@@ -761,7 +753,12 @@ def test_django_connect_breadcrumbs(
 
     assert event["breadcrumbs"]["values"][-2:] == [
         {"message": "connect", "category": "query", "type": "default"},
-        {"message": "select 1", "category": "query", "data": {}, "type": "default"},
+        {
+            "message": "select 1",
+            "category": "query",
+            "data": {"db.paramstyle": "format"},
+            "type": "default",
+        },
     ]
 
 
@@ -774,7 +771,7 @@ def test_db_connection_span_data(
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
-        send_default_pii=True,
+        data_collection={"database_query_data": True},
         traces_sample_rate=1.0,
     )
 
