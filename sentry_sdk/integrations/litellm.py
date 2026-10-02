@@ -297,7 +297,6 @@ class LiteLLMIntegration(Integration):
     # Initialize Sentry with the LiteLLM integration
     sentry_sdk.init(
         dsn="your-dsn",
-        send_default_pii=True
         integrations=[
             sentry_sdk.integrations.LiteLLMIntegration(
                 include_prompts=True  # Set to False to exclude message content
