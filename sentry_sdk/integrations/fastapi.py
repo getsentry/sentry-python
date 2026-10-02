@@ -21,6 +21,7 @@ try:
         StarletteIntegration,
         StarletteRequestExtractor,
         _get_cached_request_body_attribute,
+        _update_active_thread,
     )
 except DidNotEnable:
     raise DidNotEnable("Starlette is not installed")
@@ -195,22 +196,7 @@ def patch_get_request_handler() -> None:
 
             @wraps(old_call)
             def _sentry_call(*args: "Any", **kwargs: "Any") -> "Any":
-                current_scope = sentry_sdk.get_current_scope()
-
-                client = sentry_sdk.get_client()
-                if has_span_streaming_enabled(client.options):
-                    current_span = current_scope.streamed_span
-
-                    if type(current_span) is StreamedSpan:
-                        segment = current_span._segment
-                        segment._update_active_thread()
-
-                elif current_scope.transaction is not None:
-                    current_scope.transaction.update_active_thread()
-
-                sentry_scope = sentry_sdk.get_isolation_scope()
-                if sentry_scope.profile is not None:
-                    sentry_scope.profile.update_active_thread_id()
+                _update_active_thread()
 
                 return old_call(*args, **kwargs)
 
