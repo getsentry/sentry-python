@@ -12,12 +12,14 @@ import starlette
 from fastapi import (
     APIRouter,
     Body,
+    Depends,
     FastAPI,
     File,
     Form,
     HTTPException,
     Request,
     UploadFile,
+    WebSocket,
 )
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.testclient import TestClient
@@ -608,6 +610,22 @@ def test_active_thread_id(sentry_init, capture_envelopes, teardown_profiling, en
 
 
 @pytest.mark.parametrize("endpoint", ["/sync/thread_ids", "/async/thread_ids"])
+def test_global_dependency_does_not_break_websockets(sentry_init):
+    sentry_init(integrations=[FastApiIntegration()])
+
+    app = FastAPI()
+
+    @app.websocket("/ws")
+    async def websocket_endpoint(websocket: WebSocket):
+        await websocket.accept()
+        await websocket.send_text("ok")
+
+    client = TestClient(app)
+
+    with client.websocket_connect("/ws") as websocket:
+        assert websocket.receive_text() == "ok"
+
+
 def test_active_thread_id_span_streaming(sentry_init, capture_items, endpoint):
     sentry_init(
         auto_enabling_integrations=False,  # Ensure httpx is not auto-enabled; its legacy start_span interferes with streaming mode
