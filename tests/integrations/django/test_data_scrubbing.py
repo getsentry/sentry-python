@@ -7,7 +7,7 @@ from sentry_sdk.integrations.django import DjangoIntegration
 from tests.conftest import unpack_werkzeug_response, werkzeug_set_cookie
 from tests.integrations.django.myapp.wsgi import application
 from tests.integrations.django.utils import pytest_mark_django_db_decorator
-from tests.integrations.utils import DATA_COLLECTION_USER_INFO_CASES_LEGACY
+from tests.integrations.utils import DATA_COLLECTION_USER_INFO_CASES
 
 try:
     from django.urls import reverse
@@ -269,16 +269,14 @@ def test_empty_query_string_is_dropped_with_data_collection(
 
 @pytest.mark.forked
 @pytest_mark_django_db_decorator()
-@pytest.mark.parametrize(
-    "init_kwargs, expect_ip", DATA_COLLECTION_USER_INFO_CASES_LEGACY
-)
+@pytest.mark.parametrize("data_collection, expect_ip", DATA_COLLECTION_USER_INFO_CASES)
 def test_user_info_span_attributes_data_collection(
-    sentry_init, client, capture_items, init_kwargs, expect_ip
+    sentry_init, client, capture_items, data_collection, expect_ip
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
         traces_sample_rate=1.0,
-        **init_kwargs,
+        data_collection=data_collection,
     )
 
     items = capture_items("span")
@@ -303,15 +301,15 @@ def test_user_info_span_attributes_data_collection(
 @pytest.mark.forked
 @pytest_mark_django_db_decorator()
 @pytest.mark.parametrize(
-    "init_kwargs, expect_user", DATA_COLLECTION_USER_INFO_CASES_LEGACY
+    "data_collection, expect_user", DATA_COLLECTION_USER_INFO_CASES
 )
 def test_user_identity_span_attributes_data_collection(
-    sentry_init, client, capture_items, init_kwargs, expect_user
+    sentry_init, client, capture_items, data_collection, expect_user
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
         traces_sample_rate=1.0,
-        **init_kwargs,
+        data_collection=data_collection,
     )
 
     unpack_werkzeug_response(client.get(reverse("mylogin")))
@@ -335,13 +333,11 @@ def test_user_identity_span_attributes_data_collection(
 
 @pytest.mark.forked
 @pytest_mark_django_db_decorator()
-@pytest.mark.parametrize(
-    "init_kwargs, expect_ip", DATA_COLLECTION_USER_INFO_CASES_LEGACY
-)
+@pytest.mark.parametrize("data_collection, expect_ip", DATA_COLLECTION_USER_INFO_CASES)
 def test_user_info_error_event_data_collection(
-    sentry_init, client, capture_events, init_kwargs, expect_ip
+    sentry_init, client, capture_events, data_collection, expect_ip
 ):
-    sentry_init(integrations=[DjangoIntegration()], **init_kwargs)
+    sentry_init(integrations=[DjangoIntegration()], data_collection=data_collection)
     events = capture_events()
 
     client.get(reverse("view_exc"), environ_base={"REMOTE_ADDR": "127.0.0.1"})
@@ -359,12 +355,12 @@ def test_user_info_error_event_data_collection(
 @pytest.mark.forked
 @pytest_mark_django_db_decorator()
 @pytest.mark.parametrize(
-    "init_kwargs, expect_user", DATA_COLLECTION_USER_INFO_CASES_LEGACY
+    "data_collection, expect_user", DATA_COLLECTION_USER_INFO_CASES
 )
 def test_user_identity_error_event_data_collection(
-    sentry_init, client, capture_events, init_kwargs, expect_user
+    sentry_init, client, capture_events, data_collection, expect_user
 ):
-    sentry_init(integrations=[DjangoIntegration()], **init_kwargs)
+    sentry_init(integrations=[DjangoIntegration()], data_collection=data_collection)
     events = capture_events()
 
     client.get(reverse("mylogin"))

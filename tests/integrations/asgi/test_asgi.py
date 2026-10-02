@@ -11,6 +11,7 @@ from sentry_sdk.integrations._asgi_common import (
 )
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware, _looks_like_asgi3
 from sentry_sdk.traces import SegmentNameSource
+from tests.integrations.utils import DATA_COLLECTION_USER_INFO_CASES
 
 
 @pytest.fixture
@@ -1029,36 +1030,17 @@ async def test_custom_transaction_name(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "init_kwargs, expect_ip",
-    [
-        pytest.param(
-            {"data_collection": {}},
-            True,
-            id="dc_default_user_info",
-        ),
-        pytest.param(
-            {"data_collection": {"user_info": True}},
-            True,
-            id="dc_user_info_true",
-        ),
-        pytest.param(
-            {"data_collection": {"user_info": False}},
-            False,
-            id="dc_user_info_false",
-        ),
-    ],
-)
+@pytest.mark.parametrize("data_collection, expect_ip", DATA_COLLECTION_USER_INFO_CASES)
 async def test_user_ip_address_on_all_spans(
     sentry_init,
     capture_items,
-    init_kwargs,
+    data_collection,
     expect_ip,
     asgi3_app_with_span,
 ):
     sentry_init(
         traces_sample_rate=1.0,
-        **init_kwargs,
+        data_collection=data_collection,
     )
 
     app = SentryAsgiMiddleware(asgi3_app_with_span)
