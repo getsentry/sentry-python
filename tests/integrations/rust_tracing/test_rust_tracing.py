@@ -463,21 +463,15 @@ def test_record_in_ignored_span(
 
 
 @pytest.mark.parametrize(
-    "send_default_pii, include_tracing_fields, tracing_fields_expected",
+    "include_tracing_fields, tracing_fields_expected",
     [
-        (True, True, True),
-        (True, False, False),
-        (True, None, True),
-        (False, True, True),
-        (False, False, False),
-        (False, None, False),
+        (True, True),
+        (False, False),
+        (None, False),
     ],
 )
 def test_include_tracing_fields(
-    sentry_init,
-    send_default_pii,
-    include_tracing_fields,
-    tracing_fields_expected,
+    sentry_init, include_tracing_fields, tracing_fields_expected
 ):
     rust_tracing = FakeRustTracing()
     integration = RustTracingIntegration(
@@ -489,7 +483,6 @@ def test_include_tracing_fields(
     sentry_init(
         integrations=[integration],
         traces_sample_rate=1.0,
-        send_default_pii=send_default_pii,
     )
     with sentry_sdk.start_span(name="custom parent"):
         rust_tracing.new_span(RustTracingLevel.Info, 3)
