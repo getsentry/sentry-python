@@ -630,6 +630,24 @@ async def _wrap_async_handler(
                     )
 
 
+def _update_active_thread() -> None:
+    client = sentry_sdk.get_client()
+    current_scope = sentry_sdk.get_current_scope()
+
+    span_streaming = has_span_streaming_enabled(client.options)
+    if span_streaming:
+        current_span = current_scope.streamed_span
+
+        if type(current_span) is StreamedSpan:
+            current_span._segment._update_active_thread()
+    elif current_scope.transaction is not None:
+        current_scope.transaction.update_active_thread()
+
+    sentry_scope = sentry_sdk.get_isolation_scope()
+    if sentry_scope.profile is not None:
+        sentry_scope.profile.update_active_thread_id()
+
+
 def patch_request_response() -> None:
     old_request_response = starlette.routing.request_response
 
@@ -654,20 +672,7 @@ def patch_request_response() -> None:
                 if integration is None:
                     return old_func(*args, **kwargs)
 
-                current_scope = sentry_sdk.get_current_scope()
-
-                span_streaming = has_span_streaming_enabled(client.options)
-                if span_streaming:
-                    current_span = current_scope.streamed_span
-
-                    if type(current_span) is StreamedSpan:
-                        current_span._segment._update_active_thread()
-                elif current_scope.transaction is not None:
-                    current_scope.transaction.update_active_thread()
-
-                sentry_scope = sentry_sdk.get_isolation_scope()
-                if sentry_scope.profile is not None:
-                    sentry_scope.profile.update_active_thread_id()
+                _update_active_thread()
 
                 request = args[0]
 
