@@ -11,7 +11,11 @@ if TYPE_CHECKING:
     from typing import Any, Callable, Optional
 
 try:
-    from sentry_sdk.integrations.starlette import StarletteIntegration
+    from sentry_sdk.integrations.starlette import (
+        StarletteIntegration,
+        _is_async_callable,
+        _wrap_sync_handler,
+    )
 except DidNotEnable:
     raise DidNotEnable("Starlette is not installed")
 
@@ -68,6 +72,15 @@ async def _sentry_fastapi_dependency(request: "HTTPConnection") -> None:
         endpoint=request.scope.get("endpoint"),
         route_path=route_path,
     )
+
+    route = request.scope.get("route")
+    dependant = getattr(route, "dependant", None)
+    if (
+        dependant is not None
+        and dependant.call is not None
+        and not _is_async_callable(dependant.call)
+    ):
+        dependant.call = _wrap_sync_handler(dependant.call)
 
     sentry_sdk.get_isolation_scope()._name = FastApiIntegration.identifier
 
