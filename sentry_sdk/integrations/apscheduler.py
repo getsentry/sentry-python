@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk.crons import MonitorStatus, capture_checkin
+from sentry_sdk.crons.utils import _get_interval_schedule
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.utils import (
     capture_internal_exceptions,
@@ -18,7 +19,7 @@ from sentry_sdk.utils import (
 if TYPE_CHECKING:
     from typing import Any, Dict, List, Optional, Tuple
 
-    from sentry_sdk._types import MonitorConfig, MonitorConfigScheduleUnit
+    from sentry_sdk._types import MonitorConfig
 
     # check_in_id, monitor_slug, monitor_config, start
     PendingCheckIn = Tuple[str, str, MonitorConfig, float]
@@ -209,13 +210,6 @@ def _get_crontab(trigger: "CronTrigger") -> "Optional[str]":
     return f"{minute} {hour} {day} {month} {day_of_week}"
 
 
-_INTERVAL_UNITS: "Tuple[Tuple[MonitorConfigScheduleUnit, int], ...]" = (
-    ("day", 60 * 60 * 24),
-    ("hour", 60 * 60),
-    ("minute", 60),
-)
-
-
 def _get_monitor_config(trigger: "Any") -> "Optional[MonitorConfig]":
     if isinstance(trigger, CronTrigger):
         crontab = _get_crontab(trigger)
@@ -227,17 +221,10 @@ def _get_monitor_config(trigger: "Any") -> "Optional[MonitorConfig]":
         }
 
     if isinstance(trigger, IntervalTrigger):
-        seconds = trigger.interval.total_seconds()
-        for unit, unit_seconds in _INTERVAL_UNITS:
-            if seconds >= unit_seconds and seconds % unit_seconds == 0:
-                return {
-                    "schedule": {
-                        "type": "interval",
-                        "value": int(seconds // unit_seconds),
-                        "unit": unit,
-                    },
-                }
-        return None
+        schedule = _get_interval_schedule(trigger.interval.total_seconds())
+        if schedule is None:
+            return None
+        return {"schedule": schedule}
 
     # DateTrigger (one-off) and combining triggers have no schedule to monitor.
     return None
