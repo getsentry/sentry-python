@@ -169,7 +169,7 @@ async def test_request_info_json_body(sentry_init, capture_items):
 async def test_formdata_request_body(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
-        send_default_pii=True,
+        data_collection={},
         max_request_body_size="always",
         integrations=[StarletteIntegration()],
     )

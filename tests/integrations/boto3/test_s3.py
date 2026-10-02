@@ -48,7 +48,7 @@ def test_basic(
     assert len(spans) == 2
     span = spans[0]
     assert span["attributes"]["sentry.op"] == "http.client"
-    assert span["name"] == "aws.s3.ListObjects"
+    assert span["name"] == "S3.ListObjects"
 
 
 def test_streaming(sentry_init, capture_items):
@@ -79,11 +79,11 @@ def test_streaming(sentry_init, capture_items):
 
     stream_span, client_span, parent_span = spans
     assert stream_span["attributes"]["sentry.op"] == "http.client.stream"
-    assert stream_span["name"] == "aws.s3.GetObject"
+    assert stream_span["name"] == "S3.GetObject"
     assert stream_span["parent_span_id"] == client_span["span_id"]
 
     assert client_span["attributes"]["sentry.op"] == "http.client"
-    assert client_span["name"] == "aws.s3.GetObject"
+    assert client_span["name"] == "S3.GetObject"
     assert client_span["parent_span_id"] == parent_span["span_id"]
 
     assert parent_span["name"] == "custom parent"
@@ -137,11 +137,11 @@ def test_streaming_close(sentry_init, capture_items):
 
     stream_span, client_span, parent_span = spans
     assert stream_span["attributes"]["sentry.op"] == "http.client.stream"
-    assert stream_span["name"] == "aws.s3.GetObject"
+    assert stream_span["name"] == "S3.GetObject"
     assert stream_span["parent_span_id"] == client_span["span_id"]
 
     assert client_span["attributes"]["sentry.op"] == "http.client"
-    assert client_span["name"] == "aws.s3.GetObject"
+    assert client_span["name"] == "S3.GetObject"
     assert client_span["parent_span_id"] == parent_span["span_id"]
 
     assert parent_span["name"] == "custom parent"
