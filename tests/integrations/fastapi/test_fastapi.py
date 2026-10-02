@@ -609,6 +609,38 @@ def test_active_thread_id(sentry_init, capture_envelopes, teardown_profiling, en
         assert str(data["active"]) == trace_context["data"]["thread.id"]
 
 
+def test_active_thread_id_with_prefixed_router(
+    sentry_init, capture_envelopes
+):
+    sentry_init(
+        auto_enabling_integrations=False,
+        integrations=[StarletteIntegration(), FastApiIntegration()],
+        traces_sample_rate=1.0,
+    )
+
+    app = FastAPI()
+    router = APIRouter()
+
+    @router.get("/sync")
+    def _sync():
+        return {"active": str(threading.current_thread().ident)}
+
+    app.include_router(router, prefix="/api")
+
+    envelopes = capture_envelopes()
+    response = TestClient(app).get("/api/sync")
+
+    assert response.status_code == 200
+    assert len(envelopes) == 1
+
+    transaction = next(
+        item.payload.json
+        for item in envelopes[0].items
+        if item.type == "transaction"
+    )
+    assert response.json()["active"] == transaction["contexts"]["trace"]["data"]["thread.id"]
+
+
 def test_global_dependency_preserves_existing_dependencies(sentry_init):
     calls = []
 
