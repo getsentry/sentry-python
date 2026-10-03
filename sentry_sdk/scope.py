@@ -904,6 +904,10 @@ class Scope:
     @span.setter
     def span(self, span: "Optional[Span]") -> None:
         self._span = span
+        if span is None:
+            self._transaction = None
+            self._transaction_info = {}
+            return
         # XXX: this differs from the implementation in JS, there Scope.setSpan
         # does not set Scope._transactionName.
         if isinstance(span, Transaction):

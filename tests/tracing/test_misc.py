@@ -428,6 +428,9 @@ def test_start_transaction_updates_scope_name_source(sentry_init):
         assert scope._transaction == "foobar"
         assert scope._transaction_info == {"source": "route"}
 
+    assert scope._transaction is None
+    assert scope._transaction_info == {}
+
 
 @pytest.mark.parametrize("sampled", (True, None))
 def test_transaction_dropped_debug_not_started(sentry_init, sampled):
