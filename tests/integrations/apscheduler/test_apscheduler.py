@@ -51,6 +51,7 @@ def _run_once(envelopes, trigger, func=ok_job, executor="debug", **job_kwargs):
     )
     job_kwargs.setdefault("id", "my-job")
     job_kwargs.setdefault("next_run_time", _utcnow())
+    job_kwargs.setdefault("misfire_grace_time", None)
     scheduler.add_job(func, trigger, **job_kwargs)
     scheduler.start()
     try:
@@ -291,6 +292,7 @@ def test_asyncio_scheduler(sentry_init, capture_envelopes):
             CronTrigger(minute="*/5", timezone="UTC"),
             id="my-async-job",
             next_run_time=_utcnow(),
+            misfire_grace_time=None,
         )
         scheduler.start()
         try:
