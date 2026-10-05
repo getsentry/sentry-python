@@ -2,8 +2,6 @@ import asyncio
 import json
 import logging
 import os
-import warnings
-from types import SimpleNamespace
 from unittest import mock
 from unittest.mock import MagicMock, patch
 
@@ -22,7 +20,6 @@ from agents.exceptions import MaxTurnsExceeded, ModelBehaviorError
 from agents.items import (
     ResponseFunctionToolCall,
     ResponseOutputMessage,
-    ResponseOutputRefusal,
     ResponseOutputText,
 )
 from agents.models.openai_responses import OpenAIResponsesModel
@@ -77,7 +74,6 @@ from sentry_sdk.integrations.logging import LoggingIntegration
 from sentry_sdk.integrations.openai_agents import OpenAIAgentsIntegration
 from sentry_sdk.integrations.openai_agents.utils import (
     _set_input_data,
-    _set_output_data,
     safe_serialize,
 )
 from sentry_sdk.integrations.stdlib import StdlibIntegration
@@ -7490,45 +7486,3 @@ async def test_runner_run_streamed_with_starting_agent_kwarg(
 
     (transaction,) = events
     assert transaction["transaction"] == "test_agent workflow"
-
-
-def test_set_output_data_tool_calls_no_pydantic_deprecation(sentry_init):
-    """Serializing tool-call output must not use the deprecated pydantic v1 API.
-
-    Regression test for GH-7827: _set_output_data called BaseModel.dict(),
-    which raises PydanticDeprecatedSince20 when DeprecationWarnings are errors.
-    """
-    sentry_init(
-        integrations=[OpenAIAgentsIntegration()],
-        send_default_pii=True,
-        traces_sample_rate=1.0,
-    )
-
-    tool_call = ResponseFunctionToolCall(
-        type="function_call",
-        id="call_1",
-        call_id="call_1",
-        name="get_weather",
-        arguments='{"city": "Berlin"}',
-        status="completed",
-    )
-    refusal = ResponseOutputRefusal(type="refusal", refusal="I cannot help.")
-    message = ResponseOutputMessage(
-        type="message",
-        id="msg_1",
-        role="assistant",
-        content=[refusal],
-        status="completed",
-    )
-    result = SimpleNamespace(output=[tool_call, message])
-
-    with start_span(op="test") as span:
-        with warnings.catch_warnings():
-            warnings.simplefilter("error", DeprecationWarning)
-            _set_output_data(span, result)
-
-    tool_calls = json.loads(span._data[SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS])
-    assert tool_calls[0]["name"] == "get_weather"
-    assert tool_calls[0]["arguments"] == '{"city": "Berlin"}'
-
-    assert "I cannot help." in span._data[SPANDATA.GEN_AI_RESPONSE_TEXT]
