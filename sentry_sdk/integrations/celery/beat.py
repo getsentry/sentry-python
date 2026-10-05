@@ -86,7 +86,7 @@ def _get_monitor_config(
                 logger.warning(
                     "Sentry Crons only supports intervals of whole minutes. Monitor '%s' has an interval of %s seconds. Use the `exclude_beat_tasks` option in the celery integration to exclude it.",
                     monitor_name,
-                    seconds,
+                    int(seconds),
                 )
             return {}
 
