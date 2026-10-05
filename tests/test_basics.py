@@ -671,10 +671,13 @@ def test_dedupe_does_not_retain_builtin_exceptions(sentry_init):
         payload_ref = weakref.ref(payload)
         raise ValueError("boom")
 
-    try:
-        fail()
-    except ValueError as e:
-        sentry_sdk.capture_exception(e)
+    def capture():
+        try:
+            fail()
+        except ValueError as e:
+            sentry_sdk.capture_exception(e)
+
+    capture()
 
     gc.collect()
     assert payload_ref() is None
