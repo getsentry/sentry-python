@@ -719,7 +719,7 @@ def wrapped_tool(tool: "Tool | Callable[..., Any]") -> "Tool | Callable[..., Any
                     # Capture tool output
                     with capture_internal_exceptions():
                         span.set_attribute(
-                            SPANDATA.GEN_AI_TOOL_OUTPUT, safe_serialize(result)
+                            SPANDATA.GEN_AI_TOOL_CALL_RESULT, safe_serialize(result)
                         )
 
                     return result
@@ -746,7 +746,7 @@ def wrapped_tool(tool: "Tool | Callable[..., Any]") -> "Tool | Callable[..., Any
                     # Capture tool output
                     with capture_internal_exceptions():
                         span.set_attribute(
-                            SPANDATA.GEN_AI_TOOL_OUTPUT, safe_serialize(result)
+                            SPANDATA.GEN_AI_TOOL_CALL_RESULT, safe_serialize(result)
                         )
 
                     return result

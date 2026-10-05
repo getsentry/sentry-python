@@ -44,7 +44,7 @@ def update_execute_tool_span(
         span.status = SpanStatus.ERROR
 
     if client.options["data_collection"]["gen_ai"]["outputs"]:
-        span.set_attribute(SPANDATA.GEN_AI_TOOL_OUTPUT, result)
+        span.set_attribute(SPANDATA.GEN_AI_TOOL_CALL_RESULT, result)
 
     # Add conversation ID from agent
     conv_id = getattr(agent, "_sentry_conversation_id", None)
