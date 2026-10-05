@@ -343,7 +343,7 @@ async def _instrument_prompt_get(
         _set_span_input_data(
             span,
             handler_name,
-            SPANDATA.MCP_PROMPT_NAME,
+            SPANDATA.GEN_AI_PROMPT_NAME,
             "prompts/get",
             arguments,
             request_id,

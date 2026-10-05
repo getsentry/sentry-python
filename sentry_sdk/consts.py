@@ -576,6 +576,12 @@ class SPANDATA:
     Example: "qa-pipeline"
     """
 
+    GEN_AI_PROMPT_NAME = "gen_ai.prompt.name"
+    """
+    The name of the prompt that uniquely identifies it.
+    Example: "summarize_text"
+    """
+
     GEN_AI_RESPONSE_FINISH_REASONS = "gen_ai.response.finish_reasons"
     """
     The reason why the model stopped generating.
@@ -1093,6 +1099,9 @@ class SPANDATA:
 
     MCP_PROMPT_NAME = "mcp.prompt.name"
     """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_PROMPT_NAME instead.
+
     The name of the MCP prompt being retrieved.
     Example: "code_review"
     """

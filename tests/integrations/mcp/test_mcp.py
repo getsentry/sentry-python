@@ -703,7 +703,7 @@ async def test_prompt_handler_stdio(
     assert data["sentry.origin"] == "auto.ai.mcp"
 
     # Check span data
-    assert data[SPANDATA.MCP_PROMPT_NAME] == "code_help"
+    assert data[SPANDATA.GEN_AI_PROMPT_NAME] == "code_help"
     assert data[SPANDATA.MCP_METHOD_NAME] == "prompts/get"
     assert data[SPANDATA.MCP_TRANSPORT] == "stdio"
     assert data[SPANDATA.MCP_REQUEST_ID] == "req-prompt"
@@ -776,7 +776,7 @@ async def test_prompt_handler_stdio_no_sensitive_data(
     assert data["sentry.origin"] == "auto.ai.mcp"
 
     # Check span data
-    assert data[SPANDATA.MCP_PROMPT_NAME] == "code_help"
+    assert data[SPANDATA.GEN_AI_PROMPT_NAME] == "code_help"
     assert data[SPANDATA.MCP_METHOD_NAME] == "prompts/get"
     assert data[SPANDATA.MCP_TRANSPORT] == "stdio"
     assert data[SPANDATA.MCP_REQUEST_ID] == "req-prompt"
