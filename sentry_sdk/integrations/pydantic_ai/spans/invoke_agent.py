@@ -55,7 +55,7 @@ def invoke_agent_span(
     )
 
     _set_agent_data(span, agent)
-    _set_model_data(span, agent, model, model_settings)
+    _set_model_data(span, agent, model)
 
     # Add user prompt and system prompts if available and prompts are enabled
     if not sentry_sdk.get_client().options["data_collection"]["gen_ai"]["inputs"]:

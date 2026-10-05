@@ -13,8 +13,6 @@ if TYPE_CHECKING:
 
     from pydantic_ai import Agent
     from pydantic_ai.models import AbstractModel, Model
-    from pydantic_ai.realtime.settings import RealtimeModelSettings
-    from pydantic_ai.settings import ModelSettings
 
 
 def _set_agent_data(span: "Span", agent: "Optional[Agent]") -> None:
@@ -59,7 +57,6 @@ def _set_model_data(
     span: "Span",
     agent: "Optional[Agent]",
     model: "Union[Model, AbstractModel]",
-    model_settings: "Optional[Union[ModelSettings, RealtimeModelSettings]]",
 ) -> None:
     """Set model-related data on a span.
 
@@ -82,34 +79,6 @@ def _set_model_data(
         model_name = _get_model_name(model_obj)
         if model_name:
             span.set_attribute(SPANDATA.GEN_AI_REQUEST_MODEL, model_name)
-
-    # Extract model settings
-    settings = model_settings
-    if not settings and agent and hasattr(agent, "model_settings"):
-        settings = agent.model_settings
-
-    if settings:
-        settings_map = {
-            "max_tokens": SPANDATA.GEN_AI_REQUEST_MAX_TOKENS,
-            "temperature": SPANDATA.GEN_AI_REQUEST_TEMPERATURE,
-            "top_p": SPANDATA.GEN_AI_REQUEST_TOP_P,
-            "frequency_penalty": SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY,
-            "presence_penalty": SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY,
-        }
-
-        # ModelSettings is a TypedDict (dict at runtime), so use dict access
-        if isinstance(settings, dict):
-            for setting_name, spandata_key in settings_map.items():
-                value = settings.get(setting_name)
-                if value is not None:
-                    span.set_attribute(spandata_key, value)  # type: ignore[arg-type]
-        else:
-            # Fallback for object-style settings
-            for setting_name, spandata_key in settings_map.items():
-                if hasattr(settings, setting_name):
-                    value = getattr(settings, setting_name)
-                    if value is not None:
-                        span.set_attribute(spandata_key, value)
 
 
 def _set_available_tools(span: "Span", agent: "Optional[Agent[Any, Any]]") -> None:

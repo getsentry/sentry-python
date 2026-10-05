@@ -290,7 +290,36 @@ def ai_client_context(
     )
 
     _set_agent_data(context.span, agent)
-    _set_model_data(context.span, agent, model, model_settings)
+    _set_model_data(context.span, agent, model)
+
+    # Extract model settings
+    settings = model_settings
+    if not settings and agent and hasattr(agent, "model_settings"):
+        settings = agent.model_settings
+
+    if settings:
+        settings_map = {
+            "max_tokens": SPANDATA.GEN_AI_REQUEST_MAX_TOKENS,
+            "temperature": SPANDATA.GEN_AI_REQUEST_TEMPERATURE,
+            "top_p": SPANDATA.GEN_AI_REQUEST_TOP_P,
+            "frequency_penalty": SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY,
+            "presence_penalty": SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY,
+        }
+
+        # ModelSettings is a TypedDict (dict at runtime), so use dict access
+        if isinstance(settings, dict):
+            for setting_name, spandata_key in settings_map.items():
+                value = settings.get(setting_name)
+                if value is not None:
+                    context.span.set_attribute(spandata_key, value)  # type: ignore[arg-type]
+        else:
+            # Fallback for object-style settings
+            for setting_name, spandata_key in settings_map.items():
+                if hasattr(settings, setting_name):
+                    value = getattr(settings, setting_name)
+                    if value is not None:
+                        context.span.set_attribute(spandata_key, value)
+
     _set_available_tools(context.span, agent)
 
     # Set input messages (full conversation history)
