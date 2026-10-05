@@ -1117,6 +1117,9 @@ class SPANDATA:
 
     MCP_TOOL_RESULT_CONTENT = "mcp.tool.result.content"
     """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_TOOL_CALL_RESULT instead.
+
     The result/output content from an MCP tool execution.
     Example: "The weather is sunny"
     """
