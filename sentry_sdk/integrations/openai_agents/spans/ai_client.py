@@ -15,6 +15,7 @@ try:
         HostedMCPTool,
         ImageGenerationTool,
         LocalShellTool,
+        Model,
         WebSearchTool,
     )
 except ImportError:
@@ -215,6 +216,17 @@ def ai_client_context(
             SPANDATA.GEN_AI_OPERATION_NAME: "chat",
         },
     )
+
+    model_name: "Optional[str]" = None
+    if isinstance(agent.model, Model) and hasattr(agent.model, "model"):
+        model_name = agent.model.model
+    elif isinstance(agent.model, str):
+        model_name = agent.model
+    elif hasattr(agent, "_sentry_request_model"):
+        model_name = agent._sentry_request_model
+
+    if model_name:
+        context.span.set_attribute(SPANDATA.GEN_AI_REQUEST_MODEL, model_name)
 
     _set_agent_data(context.span, agent)
 

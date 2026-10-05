@@ -484,7 +484,6 @@ async def test_agent_invocation_span_no_sensitive_data(
     assert invoke_agent_span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "openai"
     assert invoke_agent_span["attributes"]["gen_ai.agent.name"] == "test_agent"
     assert invoke_agent_span["attributes"]["gen_ai.request.max_tokens"] == 100
-    assert invoke_agent_span["attributes"]["gen_ai.request.model"] == "gpt-4"
     assert invoke_agent_span["attributes"]["gen_ai.request.temperature"] == 0.7
     assert invoke_agent_span["attributes"]["gen_ai.request.top_p"] == 1.0
 
@@ -765,7 +764,6 @@ async def test_agent_invocation_span(
     assert invoke_agent_span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "openai"
     assert invoke_agent_span["attributes"]["gen_ai.agent.name"] == "test_agent"
     assert invoke_agent_span["attributes"]["gen_ai.request.max_tokens"] == 100
-    assert invoke_agent_span["attributes"]["gen_ai.request.model"] == "gpt-4"
     assert invoke_agent_span["attributes"]["gen_ai.request.temperature"] == 0.7
     assert invoke_agent_span["attributes"]["gen_ai.request.top_p"] == 1.0
 
@@ -888,7 +886,6 @@ def test_agent_invocation_span_sync_no_sensitive_data(
     assert invoke_agent_span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "openai"
     assert invoke_agent_span["attributes"]["gen_ai.agent.name"] == "test_agent"
     assert invoke_agent_span["attributes"]["gen_ai.request.max_tokens"] == 100
-    assert invoke_agent_span["attributes"]["gen_ai.request.model"] == "gpt-4"
     assert invoke_agent_span["attributes"]["gen_ai.request.temperature"] == 0.7
     assert invoke_agent_span["attributes"]["gen_ai.request.top_p"] == 1.0
 
@@ -1153,7 +1150,6 @@ def test_agent_invocation_span_sync(
     assert invoke_agent_span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "openai"
     assert invoke_agent_span["attributes"]["gen_ai.agent.name"] == "test_agent"
     assert invoke_agent_span["attributes"]["gen_ai.request.max_tokens"] == 100
-    assert invoke_agent_span["attributes"]["gen_ai.request.model"] == "gpt-4"
     assert invoke_agent_span["attributes"]["gen_ai.request.temperature"] == 0.7
     assert invoke_agent_span["attributes"]["gen_ai.request.top_p"] == 1.0
 
@@ -1303,7 +1299,6 @@ async def test_tool_execution_span(
     assert agent_span["attributes"]["gen_ai.operation.name"] == "invoke_agent"
 
     assert agent_span["attributes"]["gen_ai.request.max_tokens"] == 100
-    assert agent_span["attributes"]["gen_ai.request.model"] == "gpt-4"
     assert agent_span["attributes"]["gen_ai.request.temperature"] == 0.7
     assert agent_span["attributes"]["gen_ai.request.top_p"] == 1.0
     assert agent_span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "openai"
@@ -1370,7 +1365,6 @@ async def test_tool_execution_span(
     assert tool_span["attributes"]["gen_ai.operation.name"] == "execute_tool"
 
     assert tool_span["attributes"]["gen_ai.request.max_tokens"] == 100
-    assert tool_span["attributes"]["gen_ai.request.model"] == "gpt-4"
     assert tool_span["attributes"]["gen_ai.request.temperature"] == 0.7
     assert tool_span["attributes"]["gen_ai.request.top_p"] == 1.0
     assert tool_span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "openai"
@@ -1563,7 +1557,6 @@ async def test_run_streamed_tool_execution_span(
     assert agent_span["attributes"]["gen_ai.operation.name"] == "invoke_agent"
 
     assert agent_span["attributes"]["gen_ai.request.max_tokens"] == 100
-    assert agent_span["attributes"]["gen_ai.request.model"] == "gpt-4"
     assert agent_span["attributes"]["gen_ai.request.temperature"] == 0.7
     assert agent_span["attributes"]["gen_ai.request.top_p"] == 1.0
     assert agent_span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "openai"
@@ -1573,7 +1566,6 @@ async def test_run_streamed_tool_execution_span(
     assert tool_span["attributes"]["gen_ai.operation.name"] == "execute_tool"
 
     assert tool_span["attributes"]["gen_ai.request.max_tokens"] == 100
-    assert tool_span["attributes"]["gen_ai.request.model"] == "gpt-4"
     assert tool_span["attributes"]["gen_ai.request.temperature"] == 0.7
     assert tool_span["attributes"]["gen_ai.request.top_p"] == 1.0
     assert tool_span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "openai"
