@@ -737,7 +737,9 @@ def _set_common_output_data(
                                 output_messages["response"].append(output_message.text)  # type: ignore[union-attr]
                             except AttributeError:
                                 # Unknown output message type, just return the json
-                                output_messages["response"].append(output_message.dict())
+                                output_messages["response"].append(
+                                    output_message.dict()
+                                )
 
                 if len(output_messages["tool"]) > 0:
                     set_data_normalized(
