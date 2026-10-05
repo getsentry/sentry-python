@@ -102,9 +102,7 @@ async def test_connect(
 ) -> None:
     sentry_init(
         integrations=[AsyncPGIntegration()],
-        _experiments={
-            "record_sql_params": True,
-        },
+        data_collection={"database_query_data": True},
     )
 
     items = capture_items("event")
@@ -131,9 +129,7 @@ async def test_execute(
 ) -> None:
     sentry_init(
         integrations=[AsyncPGIntegration()],
-        _experiments={
-            "record_sql_params": True,
-        },
+        data_collection={"database_query_data": True},
     )
 
     items = capture_items("event")
@@ -177,13 +173,16 @@ async def test_execute(
         },
         {
             "category": "query",
-            "data": {},
+            "data": {
+                "db.params": ["Bob", "secret_pw", "datetime.date(1984, 3, 1)"],
+                "db.paramstyle": "format",
+            },
             "message": "INSERT INTO users(name, password, dob) VALUES($1, $2, $3)",
             "type": "default",
         },
         {
             "category": "query",
-            "data": {},
+            "data": {"db.params": ["Bob"], "db.paramstyle": "format"},
             "message": "SELECT * FROM users WHERE name = $1",
             "type": "default",
         },
@@ -203,9 +202,7 @@ async def test_execute_many(
 ) -> None:
     sentry_init(
         integrations=[AsyncPGIntegration()],
-        _experiments={
-            "record_sql_params": True,
-        },
+        data_collection={"database_query_data": True},
     )
 
     items = capture_items("event")
@@ -233,46 +230,13 @@ async def test_execute_many(
         CRUMBS_CONNECT,
         {
             "category": "query",
-            "data": {"db.executemany": True},
-            "message": "INSERT INTO users(name, password, dob) VALUES($1, $2, $3)",
-            "type": "default",
-        },
-    ]
-
-
-@pytest.mark.asyncio
-async def test_record_params(sentry_init, capture_events) -> None:
-    sentry_init(
-        integrations=[AsyncPGIntegration(record_params=True)],
-        _experiments={"record_sql_params": True},
-    )
-    events = capture_events()
-
-    conn: Connection = await connect(PG_CONNECTION_URI)
-
-    await conn.execute(
-        "INSERT INTO users(name, password, dob) VALUES($1, $2, $3)",
-        "Bob",
-        "secret_pw",
-        datetime.date(1984, 3, 1),
-    )
-
-    await conn.close()
-
-    capture_message("hi")
-
-    (event,) = events
-
-    for crumb in event["breadcrumbs"]["values"]:
-        del crumb["timestamp"]
-
-    assert event["breadcrumbs"]["values"] == [
-        CRUMBS_CONNECT,
-        {
-            "category": "query",
             "data": {
-                "db.params": ["Bob", "secret_pw", "datetime.date(1984, 3, 1)"],
+                "db.params": [
+                    ["Bob", "secret_pw", "datetime.date(1984, 3, 1)"],
+                    ["Alice", "pw", "datetime.date(1990, 12, 25)"],
+                ],
                 "db.paramstyle": "format",
+                "db.executemany": True,
             },
             "message": "INSERT INTO users(name, password, dob) VALUES($1, $2, $3)",
             "type": "default",
@@ -284,7 +248,7 @@ async def test_record_params(sentry_init, capture_events) -> None:
 async def test_cursor(sentry_init, capture_events) -> None:
     sentry_init(
         integrations=[AsyncPGIntegration()],
-        _experiments={"record_sql_params": True},
+        data_collection={"database_query_data": True},
     )
     events = capture_events()
 
@@ -319,7 +283,14 @@ async def test_cursor(sentry_init, capture_events) -> None:
         CRUMBS_CONNECT,
         {
             "category": "query",
-            "data": {"db.executemany": True},
+            "data": {
+                "db.params": [
+                    ["Bob", "secret_pw", "datetime.date(1984, 3, 1)"],
+                    ["Alice", "pw", "datetime.date(1990, 12, 25)"],
+                ],
+                "db.paramstyle": "format",
+                "db.executemany": True,
+            },
             "message": "INSERT INTO users(name, password, dob) VALUES($1, $2, $3)",
             "type": "default",
         },
@@ -338,7 +309,7 @@ async def test_cursor(sentry_init, capture_events) -> None:
 async def test_cursor_manual(sentry_init, capture_events) -> None:
     sentry_init(
         integrations=[AsyncPGIntegration()],
-        _experiments={"record_sql_params": True},
+        data_collection={"database_query_data": True},
     )
     events = capture_events()
 
@@ -375,7 +346,14 @@ async def test_cursor_manual(sentry_init, capture_events) -> None:
         CRUMBS_CONNECT,
         {
             "category": "query",
-            "data": {"db.executemany": True},
+            "data": {
+                "db.params": [
+                    ["Bob", "secret_pw", "datetime.date(1984, 3, 1)"],
+                    ["Alice", "pw", "datetime.date(1990, 12, 25)"],
+                ],
+                "db.paramstyle": "format",
+                "db.executemany": True,
+            },
             "message": "INSERT INTO users(name, password, dob) VALUES($1, $2, $3)",
             "type": "default",
         },
@@ -400,7 +378,7 @@ async def test_cursor_manual(sentry_init, capture_events) -> None:
 async def test_prepared_stmt(sentry_init, capture_events) -> None:
     sentry_init(
         integrations=[AsyncPGIntegration()],
-        _experiments={"record_sql_params": True},
+        data_collection={"database_query_data": True},
     )
     events = capture_events()
 
@@ -432,7 +410,14 @@ async def test_prepared_stmt(sentry_init, capture_events) -> None:
         CRUMBS_CONNECT,
         {
             "category": "query",
-            "data": {"db.executemany": True},
+            "data": {
+                "db.params": [
+                    ["Bob", "secret_pw", "datetime.date(1984, 3, 1)"],
+                    ["Alice", "pw", "datetime.date(1990, 12, 25)"],
+                ],
+                "db.paramstyle": "format",
+                "db.executemany": True,
+            },
             "message": "INSERT INTO users(name, password, dob) VALUES($1, $2, $3)",
             "type": "default",
         },
@@ -449,7 +434,7 @@ async def test_prepared_stmt(sentry_init, capture_events) -> None:
 async def test_connection_pool(sentry_init, capture_events) -> None:
     sentry_init(
         integrations=[AsyncPGIntegration()],
-        _experiments={"record_sql_params": True},
+        data_collection={"database_query_data": True},
     )
     events = capture_events()
 
@@ -485,7 +470,10 @@ async def test_connection_pool(sentry_init, capture_events) -> None:
         *[CRUMBS_CONNECT] * pool_size,
         {
             "category": "query",
-            "data": {},
+            "data": {
+                "db.params": ["Bob", "secret_pw", "datetime.date(1984, 3, 1)"],
+                "db.paramstyle": "format",
+            },
             "message": "INSERT INTO users(name, password, dob) VALUES($1, $2, $3)",
             "type": "default",
         },
@@ -497,7 +485,7 @@ async def test_connection_pool(sentry_init, capture_events) -> None:
         },
         {
             "category": "query",
-            "data": {},
+            "data": {"db.params": ["Bob"], "db.paramstyle": "format"},
             "message": "SELECT * FROM users WHERE name = $1",
             "type": "default",
         },
@@ -595,36 +583,6 @@ async def test_query_source_enabled(
     assert connect_span["name"] == "connect"
 
     _assert_query_source(insert_span, "test_query_source_enabled")
-
-
-@pytest.mark.asyncio
-async def test_query_source(sentry_init, capture_items):
-    sentry_init(
-        integrations=[AsyncPGIntegration()],
-        traces_sample_rate=1.0,
-        enable_db_query_source=True,
-        db_query_source_threshold_ms=0,
-    )
-
-    items = capture_items("span")
-    with sentry_sdk.start_span(name="test_segment"):
-        conn: Connection = await connect(PG_CONNECTION_URI)
-
-        await conn.execute(
-            "INSERT INTO users(name, password, dob) VALUES ('Alice', 'secret', '1990-12-25')",
-        )
-
-        await conn.close()
-
-    sentry_sdk.flush()
-
-    spans = [item.payload for item in items]
-
-    assert len(spans) == 3
-
-    _, insert_span, _ = spans
-
-    _assert_query_source(insert_span, "test_query_source")
 
 
 @pytest.mark.asyncio
@@ -1111,7 +1069,7 @@ async def test_cursor_fetch_methods_create_spans(
         assert span["attributes"]["sentry.op"] == OP.DB_CURSOR_FETCH
         assert span["attributes"]["sentry.origin"] == "auto.db.asyncpg"
 
-    _assert_query_source(
-        span,
-        "test_cursor_fetch_methods_create_spans",
-    )
+        _assert_query_source(
+            span,
+            "test_cursor_fetch_methods_create_spans",
+        )

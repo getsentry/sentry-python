@@ -21,9 +21,7 @@ def test_orm_queries(
 ):
     sentry_init(
         integrations=[SqlalchemyIntegration()],
-        _experiments={
-            "record_sql_params": True,
-        },
+        data_collection={"database_query_data": True},
     )
 
     Base = declarative_base()  # noqa: N806
@@ -87,9 +85,7 @@ def test_transactions(
 ):
     sentry_init(
         integrations=[SqlalchemyIntegration()],
-        _experiments={
-            "record_sql_params": True,
-        },
+        data_collection={"database_query_data": True},
         traces_sample_rate=1.0,
     )
 
@@ -170,9 +166,7 @@ def test_transactions_no_engine_url(
 ):
     sentry_init(
         integrations=[SqlalchemyIntegration()],
-        _experiments={
-            "record_sql_params": True,
-        },
+        data_collection={"database_query_data": True},
         traces_sample_rate=1.0,
     )
 

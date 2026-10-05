@@ -13,7 +13,6 @@ from sentry_sdk.tracing_utils import (
 )
 from sentry_sdk.utils import (
     capture_internal_exceptions,
-    has_data_collection_enabled,
     parse_version,
 )
 
@@ -28,10 +27,6 @@ except ImportError:
 class AioMySQLIntegration(Integration):
     identifier = "aiomysql"
     origin = f"auto.db.{identifier}"
-    _record_params = False
-
-    def __init__(self, *, record_params: bool = False):
-        AioMySQLIntegration._record_params = record_params
 
     @staticmethod
     def setup_once() -> None:
@@ -84,12 +79,7 @@ def _wrap_execute(f: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]
         integration = sentry_sdk.get_client().get_integration(AioMySQLIntegration)
 
         client = sentry_sdk.get_client()
-        should_record_params = False
-        if has_data_collection_enabled(client.options):
-            if client.options["data_collection"]["database_query_data"]:
-                should_record_params = True
-        else:
-            should_record_params = integration._record_params if integration else False
+        should_record_params = client.options["data_collection"]["database_query_data"]
 
         params_list = params if integration and should_record_params else None
         param_style = "pyformat" if params_list else None
@@ -134,12 +124,7 @@ def _wrap_executemany(f: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable
 
         integration = sentry_sdk.get_client().get_integration(AioMySQLIntegration)
         client = sentry_sdk.get_client()
-        should_record_params = False
-        if has_data_collection_enabled(client.options):
-            if client.options["data_collection"]["database_query_data"]:
-                should_record_params = True
-        else:
-            should_record_params = integration._record_params if integration else False
+        should_record_params = client.options["data_collection"]["database_query_data"]
 
         params_list = seq_of_params if integration and should_record_params else None
         param_style = "pyformat" if params_list else None
