@@ -1087,6 +1087,9 @@ class SPANDATA:
 
     MCP_TOOL_NAME = "mcp.tool.name"
     """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_TOOL_NAME instead.
+
     The name of the MCP tool being called.
     Example: "get_weather"
     """
