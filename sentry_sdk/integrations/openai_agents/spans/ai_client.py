@@ -15,6 +15,7 @@ try:
         HostedMCPTool,
         ImageGenerationTool,
         LocalShellTool,
+        Model,
         WebSearchTool,
     )
 except ImportError:
@@ -44,7 +45,6 @@ except ImportError:
 
 from ..consts import SPAN_ORIGIN
 from ..utils import (
-    _set_agent_data,
     _set_input_data,
     _set_output_data,
     _set_usage_data,
@@ -216,7 +216,19 @@ def ai_client_context(
         },
     )
 
-    _set_agent_data(context.span, agent)
+    context.span.set_attribute(SPANDATA.GEN_AI_PROVIDER_NAME, "openai")
+    context.span.set_attribute(SPANDATA.GEN_AI_AGENT_NAME, agent.name)
+
+    request_model_name: "Optional[str]" = None
+    if isinstance(agent.model, Model) and hasattr(agent.model, "model"):
+        request_model_name = agent.model.model
+    elif isinstance(agent.model, str):
+        request_model_name = agent.model
+    elif hasattr(agent, "_sentry_request_model"):
+        request_model_name = agent._sentry_request_model
+
+    if request_model_name:
+        context.span.set_attribute(SPANDATA.GEN_AI_REQUEST_MODEL, request_model_name)
 
     if agent.model_settings.max_tokens:
         context.span.set_attribute(

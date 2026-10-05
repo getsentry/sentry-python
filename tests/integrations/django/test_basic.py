@@ -56,7 +56,7 @@ def test_view_exceptions(
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
-        send_default_pii=True,
+        data_collection={},
     )
     exceptions = capture_exceptions()
     items = capture_items("event")
@@ -85,7 +85,7 @@ def test_ensures_x_forwarded_header_is_honored_in_sdk_when_enabled_in_django(
 
     sentry_init(
         integrations=[DjangoIntegration()],
-        send_default_pii=True,
+        data_collection={},
     )
     exceptions = capture_exceptions()
     items = capture_items("event")
@@ -111,7 +111,7 @@ def test_ensures_x_forwarded_header_is_not_honored_when_unenabled_in_django(
     """
     sentry_init(
         integrations=[DjangoIntegration()],
-        send_default_pii=True,
+        data_collection={},
     )
     exceptions = capture_exceptions()
     items = capture_items("event")
@@ -125,7 +125,7 @@ def test_ensures_x_forwarded_header_is_not_honored_when_unenabled_in_django(
 
 
 def test_middleware_exceptions(sentry_init, client, capture_exceptions):
-    sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
+    sentry_init(integrations=[DjangoIntegration()], data_collection={})
     exceptions = capture_exceptions()
     client.get(reverse("middleware_exc"))
 
@@ -313,7 +313,7 @@ def test_user_captured(
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
-        send_default_pii=True,
+        data_collection={},
     )
     items = capture_items("event")
     content, status, headers = unpack_werkzeug_response(client.get(reverse("mylogin")))
@@ -343,7 +343,7 @@ def test_materialized_user_captured(
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
-        send_default_pii=True,
+        data_collection={},
         traces_sample_rate=1.0,
     )
 
@@ -440,13 +440,12 @@ def test_custom_error_handler_request_context(
         "env": {"SERVER_NAME": "localhost", "SERVER_PORT": "80"},
         "headers": {"Host": "localhost"},
         "method": "POST",
-        "query_string": "",
         "url": "http://localhost/404",
     }
 
 
 def test_500(sentry_init, client):
-    sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
+    sentry_init(integrations=[DjangoIntegration()], data_collection={})
 
     content, status, headers = unpack_werkzeug_response(client.get("/view-exc"))
     assert status.lower() == "500 internal server error"
@@ -474,7 +473,7 @@ def test_sql_queries(
 ):
     sentry_init(
         integrations=[DjangoIntegration()] if with_integration else [],
-        send_default_pii=True,
+        data_collection={},
         _experiments={"record_sql_params": True},
     )
 
@@ -509,7 +508,7 @@ def test_sql_dict_query_params(
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
-        send_default_pii=True,
+        data_collection={},
         _experiments={"record_sql_params": True},
     )
 
@@ -586,7 +585,7 @@ def test_sql_psycopg2_string_composition(
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
-        send_default_pii=True,
+        data_collection={},
         _experiments={
             "record_sql_params": True,
         },
@@ -624,7 +623,7 @@ def test_sql_psycopg2_placeholders(
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
-        send_default_pii=True,
+        data_collection={},
         _experiments={
             "record_sql_params": True,
         },
@@ -695,7 +694,7 @@ def test_django_connect_trace(
     """
     sentry_init(
         integrations=[DjangoIntegration()],
-        send_default_pii=True,
+        data_collection={},
         traces_sample_rate=1.0,
     )
 
@@ -736,7 +735,7 @@ def test_django_connect_breadcrumbs(
     """
     sentry_init(
         integrations=[DjangoIntegration()],
-        send_default_pii=True,
+        data_collection={},
     )
 
     from django.db import connections
@@ -761,7 +760,12 @@ def test_django_connect_breadcrumbs(
 
     assert event["breadcrumbs"]["values"][-2:] == [
         {"message": "connect", "category": "query", "type": "default"},
-        {"message": "select 1", "category": "query", "data": {}, "type": "default"},
+        {
+            "message": "select 1",
+            "category": "query",
+            "data": {"db.paramstyle": "format"},
+            "type": "default",
+        },
     ]
 
 
@@ -774,7 +778,7 @@ def test_db_connection_span_data(
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
-        send_default_pii=True,
+        data_collection={},
         traces_sample_rate=1.0,
     )
 
@@ -851,7 +855,7 @@ def test_segment_name(
     sentry_init(
         integrations=[DjangoIntegration()],
         traces_sample_rate=1.0,
-        send_default_pii=True,
+        data_collection={},
     )
     items = capture_items("event", "span")
 
@@ -887,7 +891,7 @@ def test_segment_name_tracing_disabled(
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
-        send_default_pii=True,
+        data_collection={},
     )
     items = capture_items("event")
 
@@ -1221,7 +1225,7 @@ def test_rest_framework_basic(
     pytest.importorskip("rest_framework")
     sentry_init(
         integrations=[DjangoIntegration()],
-        send_default_pii=True,
+        data_collection={},
     )
     exceptions = capture_exceptions()
     items = capture_items("event")

@@ -117,34 +117,20 @@ QUERY_STRING = "toy=tennisball&color=red&auth=secret"
 @pytest.mark.forked
 @pytest_mark_django_db_decorator()
 @pytest.mark.parametrize(
-    "init_kwargs, expected_query_string",
+    "data_collection, expected_query_string",
     [
         pytest.param(
-            {"send_default_pii": True},
-            "toy=tennisball&color=red&auth=secret",
-            id="legacy_send_default_pii_true",
-        ),
-        pytest.param(
-            {"send_default_pii": False},
-            "toy=tennisball&color=red&auth=secret",
-            id="legacy_send_default_pii_false",
-        ),
-        pytest.param(
-            {"data_collection": {}},
+            {},
             "toy=tennisball&color=red&auth=%5BFiltered%5D",
             id="data_collection_denylist_default",
         ),
         pytest.param(
-            {
-                "data_collection": {
-                    "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
-                }
-            },
+            {"url_query_params": {"mode": "allowlist", "terms": ["toy"]}},
             "toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D",
             id="data_collection_allowlist",
         ),
         pytest.param(
-            {"data_collection": {"url_query_params": {"mode": "off"}}},
+            {"url_query_params": {"mode": "off"}},
             None,
             id="data_collection_off",
         ),
@@ -154,10 +140,10 @@ def test_query_string_data_collection(
     sentry_init,
     client,
     capture_events,
-    init_kwargs,
+    data_collection,
     expected_query_string,
 ):
-    sentry_init(integrations=[DjangoIntegration()], **init_kwargs)
+    sentry_init(integrations=[DjangoIntegration()], data_collection=data_collection)
     events = capture_events()
 
     client.get(reverse("view_exc") + "?" + QUERY_STRING)
@@ -173,34 +159,20 @@ def test_query_string_data_collection(
 @pytest.mark.forked
 @pytest_mark_django_db_decorator()
 @pytest.mark.parametrize(
-    "init_kwargs, expected_query",
+    "data_collection, expected_query",
     [
         pytest.param(
-            {"send_default_pii": True},
-            "toy=tennisball&color=red&auth=secret",
-            id="legacy_send_default_pii_true",
-        ),
-        pytest.param(
-            {"send_default_pii": False},
-            None,
-            id="legacy_send_default_pii_false",
-        ),
-        pytest.param(
-            {"data_collection": {}},
+            {},
             "toy=tennisball&color=red&auth=%5BFiltered%5D",
             id="data_collection_denylist_default",
         ),
         pytest.param(
-            {
-                "data_collection": {
-                    "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
-                }
-            },
+            {"url_query_params": {"mode": "allowlist", "terms": ["toy"]}},
             "toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D",
             id="data_collection_allowlist",
         ),
         pytest.param(
-            {"data_collection": {"url_query_params": {"mode": "off"}}},
+            {"url_query_params": {"mode": "off"}},
             None,
             id="data_collection_off",
         ),
@@ -210,13 +182,13 @@ def test_span_http_query_data_collection(
     sentry_init,
     client,
     capture_items,
-    init_kwargs,
+    data_collection,
     expected_query,
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
         traces_sample_rate=1.0,
-        **init_kwargs,
+        data_collection=data_collection,
     )
 
     items = capture_items("span")
@@ -232,20 +204,6 @@ def test_span_http_query_data_collection(
         assert SPANDATA.HTTP_QUERY not in root_span["attributes"]
     else:
         assert root_span["attributes"][SPANDATA.HTTP_QUERY] == expected_query
-
-
-@pytest.mark.forked
-@pytest_mark_django_db_decorator()
-def test_query_string_empty_legacy_emits_empty_string(
-    sentry_init, client, capture_events
-):
-    sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
-    events = capture_events()
-
-    client.get(reverse("view_exc"))
-
-    (event,) = events
-    assert event["request"]["query_string"] == ""
 
 
 @pytest.mark.forked

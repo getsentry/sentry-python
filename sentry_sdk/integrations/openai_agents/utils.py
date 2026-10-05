@@ -14,7 +14,6 @@ from sentry_sdk.ai.utils import (
     set_data_normalized,
 )
 from sentry_sdk.consts import SPANDATA
-from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.traces import Span
 from sentry_sdk.utils import (
     event_from_exception,
@@ -22,17 +21,11 @@ from sentry_sdk.utils import (
 )
 
 if TYPE_CHECKING:
-    from typing import Any, Optional
+    from typing import Any
 
     from agents import TResponseInputItem, Usage
 
     from sentry_sdk._types import TextPart
-
-try:
-    import agents
-    from agents import Model
-except ImportError:
-    raise DidNotEnable("OpenAI Agents not installed")
 
 
 def _capture_exception(exc: "Any") -> None:
@@ -42,25 +35,6 @@ def _capture_exception(exc: "Any") -> None:
         mechanism={"type": "openai_agents", "handled": False},
     )
     sentry_sdk.capture_event(event, hint=hint)
-
-
-def _set_agent_data(span: "Span", agent: "agents.Agent") -> None:
-    span.set_attribute(
-        SPANDATA.GEN_AI_PROVIDER_NAME, "openai"
-    )  # See footnote for  https://opentelemetry.io/docs/specs/semconv/registry/attributes/gen-ai/#gen-ai-system for explanation why.
-
-    span.set_attribute(SPANDATA.GEN_AI_AGENT_NAME, agent.name)
-
-    model_name: "Optional[str]" = None
-    if isinstance(agent.model, Model) and hasattr(agent.model, "model"):
-        model_name = agent.model.model
-    elif isinstance(agent.model, str):
-        model_name = agent.model
-    elif hasattr(agent, "_sentry_request_model"):
-        model_name = agent._sentry_request_model
-
-    if model_name:
-        span.set_attribute(SPANDATA.GEN_AI_REQUEST_MODEL, model_name)
 
 
 def _set_usage_data(span: "Span", usage: "Usage") -> None:
