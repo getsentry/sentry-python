@@ -1091,7 +1091,7 @@ def test_tool_execution_span_no_sensitive_data(
     assert SPANDATA.GEN_AI_TOOL_CALL_ARGUMENTS not in tool_exec_span.get(
         "attributes", {}
     )
-    assert SPANDATA.GEN_AI_TOOL_OUTPUT not in tool_exec_span.get("attributes", {})
+    assert SPANDATA.GEN_AI_TOOL_CALL_RESULT not in tool_exec_span.get("attributes", {})
 
     assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in chat_spans[0].get(
         "attributes", {}
@@ -1267,7 +1267,7 @@ def test_langchain_openai_tools_agent(
 
     assert "5" in chat_spans[0]["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
     assert "word" in tool_exec_span["attributes"][SPANDATA.GEN_AI_TOOL_CALL_ARGUMENTS]
-    assert 5 == int(tool_exec_span["attributes"][SPANDATA.GEN_AI_TOOL_OUTPUT])
+    assert 5 == int(tool_exec_span["attributes"][SPANDATA.GEN_AI_TOOL_CALL_RESULT])
 
     assert json.loads(
         chat_spans[0]["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
@@ -1439,7 +1439,7 @@ def test_langchain_openai_tools_agent_no_sensitive_data(
     assert SPANDATA.GEN_AI_TOOL_CALL_ARGUMENTS not in tool_exec_span.get(
         "attributes", {}
     )
-    assert SPANDATA.GEN_AI_TOOL_OUTPUT not in tool_exec_span.get("attributes", {})
+    assert SPANDATA.GEN_AI_TOOL_CALL_RESULT not in tool_exec_span.get("attributes", {})
 
     assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in chat_spans[0].get(
         "attributes", {}
@@ -1666,7 +1666,7 @@ def test_langchain_openai_tools_agent_stream_no_sensitive_data(
     assert SPANDATA.GEN_AI_TOOL_CALL_ARGUMENTS not in tool_exec_span.get(
         "attributes", {}
     )
-    assert SPANDATA.GEN_AI_TOOL_OUTPUT not in tool_exec_span.get("attributes", {})
+    assert SPANDATA.GEN_AI_TOOL_CALL_RESULT not in tool_exec_span.get("attributes", {})
 
     assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in chat_spans[0].get(
         "attributes", {}
@@ -1854,7 +1854,7 @@ def test_langchain_openai_tools_agent_stream(
 
     assert "5" in chat_spans[0]["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
     assert "word" in tool_exec_span["attributes"][SPANDATA.GEN_AI_TOOL_CALL_ARGUMENTS]
-    assert 5 == int(tool_exec_span["attributes"][SPANDATA.GEN_AI_TOOL_OUTPUT])
+    assert 5 == int(tool_exec_span["attributes"][SPANDATA.GEN_AI_TOOL_CALL_RESULT])
 
     assert json.loads(
         chat_spans[0]["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
@@ -3365,12 +3365,12 @@ def test_langchain_data_collection_request_tool_call_params(
         pytest.param(
             {"gen_ai": {"inputs": True, "outputs": False}},
             {SPANDATA.GEN_AI_TOOL_CALL_ARGUMENTS: {"word": "eudca"}},
-            [SPANDATA.GEN_AI_TOOL_OUTPUT],
+            [SPANDATA.GEN_AI_TOOL_CALL_RESULT],
             id="gen-ai-inputs-enabled-outputs-disabled",
         ),
         pytest.param(
             {"gen_ai": {"inputs": False, "outputs": True}},
-            {SPANDATA.GEN_AI_TOOL_OUTPUT: 5},
+            {SPANDATA.GEN_AI_TOOL_CALL_RESULT: 5},
             [SPANDATA.GEN_AI_TOOL_CALL_ARGUMENTS],
             id="gen-ai-outputs-enabled-inputs-disabled",
         ),
