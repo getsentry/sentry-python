@@ -1,14 +1,17 @@
 import datetime
+import gc
 import importlib
 import logging
 import os
 import sys
 import time
 from collections import Counter
+import weakref
 
 import pytest
 
 import sentry_sdk
+from sentry_sdk.integrations.dedupe import DedupeIntegration
 import sentry_sdk.scope
 from sentry_sdk import (
     add_breadcrumb,
@@ -643,6 +646,38 @@ def test_dedupe_drops_exception_when_seen_a_second_time(sentry_init, capture_eve
             capture_exception()
 
     assert len(events) == 1
+
+
+def test_dedupe_does_not_retain_builtin_exceptions(sentry_init):
+    """
+    There was a different approach that used to be used by DedupeIntegration
+    that used a weakref to hold a reference to a seen exception, and then do a comparison
+    on an incoming exception with that weakref to determine if it was a duplicate.
+
+    Built in exceptions such as ValueError couldn't be used with weakref, so we would instead
+    hold a strong reference to that exception. However, this led to memory leaks as described in
+    https://github.com/getsentry/sentry-python/issues/6094
+    """
+    sentry_init(default_integrations=False, integrations=[DedupeIntegration()])
+
+    class Payload:
+        pass
+
+    payload_ref = None
+
+    def fail():
+        nonlocal payload_ref
+        payload = Payload()
+        payload_ref = weakref.ref(payload)
+        raise ValueError("boom")
+
+    try:
+        fail()
+    except ValueError as e:
+        sentry_sdk.capture_exception(e)
+
+    gc.collect()
+    assert payload_ref() is None
 
 
 def test_event_processor_drop_records_client_report(
