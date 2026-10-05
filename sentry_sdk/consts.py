@@ -73,7 +73,6 @@ if TYPE_CHECKING:
             "transport_num_pools": Optional[int],
             "transport_http2": Optional[bool],
             "transport_async": Optional[bool],
-            "data_collection": Optional[DataCollectionUserOptions],
         },
         total=False,
     )
