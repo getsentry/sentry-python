@@ -163,6 +163,8 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 - The `trace_ignore_status_codes` option was removed.
 - `add_attachment` no longer accepts an `add_to_transactions` argument.
 - The `stream_gen_ai_spans` option was removed. All spans are streamed now.
+- The experimental `record_sql_params` option was removed. Use the `database_query_data` setting of `data_collection` instead.
+- The `record_params` option of `AsyncPGIntegration` and `AioMySQLIntegration` was removed. Use the `database_query_data` setting of `data_collection` instead.
 
 
 ## Deprecated
