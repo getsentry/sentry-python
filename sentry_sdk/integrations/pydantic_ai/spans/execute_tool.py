@@ -53,7 +53,7 @@ def execute_tool_span(
     ):
         return span
 
-    span.set_attribute(SPANDATA.GEN_AI_TOOL_INPUT, safe_serialize(tool_args))
+    span.set_attribute(SPANDATA.GEN_AI_TOOL_CALL_ARGUMENTS, safe_serialize(tool_args))
 
     return span
 

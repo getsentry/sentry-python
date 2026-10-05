@@ -1375,7 +1375,10 @@ async def test_tool_execution_span(
     assert tool_span["attributes"]["gen_ai.request.top_p"] == 1.0
     assert tool_span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "openai"
     assert tool_span["attributes"]["gen_ai.tool.description"] == "A simple tool"
-    assert tool_span["attributes"]["gen_ai.tool.input"] == '{"message": "hello"}'
+    assert (
+        tool_span["attributes"][SPANDATA.GEN_AI_TOOL_CALL_ARGUMENTS]
+        == '{"message": "hello"}'
+    )
     assert tool_span["attributes"]["gen_ai.tool.name"] == "simple_test_tool"
     assert tool_span["attributes"]["gen_ai.tool.output"] == "Tool executed with: hello"
     assert ai_client_span2["name"] == "chat gpt-4"
@@ -1578,7 +1581,10 @@ async def test_run_streamed_tool_execution_span(
     assert tool_span["attributes"]["gen_ai.request.top_p"] == 1.0
     assert tool_span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "openai"
     assert tool_span["attributes"]["gen_ai.tool.description"] == "A simple tool"
-    assert tool_span["attributes"]["gen_ai.tool.input"] == '{"message": "hello"}'
+    assert (
+        tool_span["attributes"][SPANDATA.GEN_AI_TOOL_CALL_ARGUMENTS]
+        == '{"message": "hello"}'
+    )
     assert tool_span["attributes"]["gen_ai.tool.name"] == "simple_test_tool"
     assert tool_span["attributes"]["gen_ai.tool.output"] == "Tool executed with: hello"
 
@@ -1725,9 +1731,12 @@ async def test_tool_execution_span_data_collection(
     )
 
     if expect_input:
-        assert tool_span_data[SPANDATA.GEN_AI_TOOL_INPUT] == '{"message": "hello"}'
+        assert (
+            tool_span_data[SPANDATA.GEN_AI_TOOL_CALL_ARGUMENTS]
+            == '{"message": "hello"}'
+        )
     else:
-        assert SPANDATA.GEN_AI_TOOL_INPUT not in tool_span_data
+        assert SPANDATA.GEN_AI_TOOL_CALL_ARGUMENTS not in tool_span_data
 
     if expect_output:
         assert (
