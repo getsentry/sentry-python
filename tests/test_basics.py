@@ -1,16 +1,16 @@
+import datetime
 import gc
 import importlib
 import logging
 import os
 import sys
 import time
-from collections import Counter
 import weakref
+from collections import Counter
 
 import pytest
 
 import sentry_sdk
-from sentry_sdk.integrations.dedupe import DedupeIntegration
 import sentry_sdk.scope
 from sentry_sdk import (
     add_breadcrumb,
@@ -29,6 +29,7 @@ from sentry_sdk.integrations import (
     Integration,
     setup_integrations,
 )
+from sentry_sdk.integrations.dedupe import DedupeIntegration
 from sentry_sdk.integrations.logging import LoggingIntegration
 from sentry_sdk.integrations.stdlib import StdlibIntegration
 from sentry_sdk.scope import add_global_event_processor
