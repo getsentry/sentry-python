@@ -1,9 +1,15 @@
 import asyncio
 import threading
 from datetime import datetime, timedelta, timezone
+from unittest import mock
 
 import pytest
-from apscheduler.events import EVENT_JOB_ERROR, EVENT_JOB_EXECUTED, EVENT_JOB_MISSED
+from apscheduler.events import (
+    EVENT_JOB_ERROR,
+    EVENT_JOB_EXECUTED,
+    EVENT_JOB_MAX_INSTANCES,
+    EVENT_JOB_MISSED,
+)
 from apscheduler.executors.pool import ProcessPoolExecutor, ThreadPoolExecutor
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -11,6 +17,7 @@ from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.date import DateTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
+from sentry_sdk.integrations import apscheduler as apscheduler_integration
 from sentry_sdk.integrations.apscheduler import APSchedulerIntegration
 
 
@@ -136,9 +143,28 @@ def test_generated_job_id_uses_job_name(sentry_init, capture_envelopes):
     sentry_init(integrations=[APSchedulerIntegration(monitor_jobs=True)])
     envelopes = capture_envelopes()
 
-    check_ins = _run_once(envelopes, CronTrigger(minute="*/5", timezone="UTC"), id=None)
+    with mock.patch.object(apscheduler_integration.logger, "warning") as warning:
+        check_ins = _run_once(
+            envelopes, CronTrigger(minute="*/5", timezone="UTC"), id=None
+        )
 
     assert [c["monitor_slug"] for c in check_ins] == ["ok_job", "ok_job"]
+    warning.assert_called_once()
+    assert "has no explicit `id`" in warning.call_args[0][0]
+
+
+def test_generated_job_id_warns_once(monkeypatch):
+    monkeypatch.setattr(apscheduler_integration, "_warned_job_ids", set())
+
+    class FakeJob:
+        id = "0123456789abcdef0123456789abcdef"
+        name = "ok_job"
+
+    with mock.patch.object(apscheduler_integration.logger, "warning") as warning:
+        apscheduler_integration._warn_generated_id(FakeJob())
+        apscheduler_integration._warn_generated_id(FakeJob())
+
+    warning.assert_called_once()
 
 
 @pytest.mark.parametrize(
@@ -202,6 +228,41 @@ def test_cron_trigger_timezone(sentry_init, capture_envelopes):
     assert check_ins[0]["monitor_config"]["timezone"] == "Europe/Vienna"
 
 
+def _fixed_offset_cron_trigger():
+    try:
+        return CronTrigger(hour=9, timezone=timezone(timedelta(hours=2)))
+    except TypeError:
+        # APScheduler < 3.7 only takes pytz timezones.
+        import pytz
+
+        return CronTrigger(hour=9, timezone=pytz.FixedOffset(120))
+
+
+def test_cron_trigger_without_iana_timezone(sentry_init, capture_envelopes):
+    sentry_init(integrations=[APSchedulerIntegration(monitor_jobs=True)])
+    envelopes = capture_envelopes()
+
+    # Sentry rejects timezones like "UTC+02:00", and without one it would
+    # read the crontab as UTC.
+    check_ins = _run_once(envelopes, _fixed_offset_cron_trigger())
+
+    assert check_ins == []
+
+
+@pytest.mark.parametrize(
+    "tz, expected",
+    [
+        ("UTC", "UTC"),
+        ("Europe/Vienna", "Europe/Vienna"),
+        (timezone.utc, "UTC"),
+        (timezone(timedelta(hours=2)), None),
+        ("local", None),
+    ],
+)
+def test_get_timezone_name(tz, expected):
+    assert apscheduler_integration._get_timezone_name(tz) == expected
+
+
 @pytest.mark.parametrize(
     "interval_kwargs, expected",
     [
@@ -258,6 +319,48 @@ def test_thread_pool_executor(sentry_init, capture_envelopes):
         executor=ThreadPoolExecutor(),
     )
 
+    assert [c["status"] for c in check_ins] == ["in_progress", "ok"]
+    assert check_ins[0]["check_in_id"] == check_ins[1]["check_in_id"]
+
+
+def test_max_instances_skip_sends_no_check_in(sentry_init, capture_envelopes):
+    sentry_init(integrations=[APSchedulerIntegration(monitor_jobs=True)])
+    envelopes = capture_envelopes()
+
+    started = threading.Event()
+    release = threading.Event()
+    skipped = threading.Event()
+    finished = threading.Event()
+
+    def blocking_job():
+        started.set()
+        assert release.wait(timeout=10)
+
+    scheduler = BackgroundScheduler(timezone="UTC")
+    scheduler.add_executor(ThreadPoolExecutor(), alias="default")
+    scheduler.add_listener(lambda event: skipped.set(), EVENT_JOB_MAX_INSTANCES)
+    scheduler.add_listener(lambda event: finished.set(), EVENT_JOB_EXECUTED)
+    scheduler.add_job(
+        blocking_job,
+        CronTrigger(minute="*/5", timezone="UTC"),
+        id="my-job",
+        next_run_time=_utcnow(),
+        misfire_grace_time=None,
+        max_instances=1,
+    )
+    scheduler.start()
+    try:
+        assert started.wait(timeout=10)
+        # Due again while the first run is still going.
+        scheduler.modify_job("my-job", next_run_time=_utcnow())
+        assert skipped.wait(timeout=10)
+        release.set()
+        assert finished.wait(timeout=10)
+    finally:
+        release.set()
+        scheduler.shutdown(wait=True)
+
+    check_ins = _check_ins(envelopes)
     assert [c["status"] for c in check_ins] == ["in_progress", "ok"]
     assert check_ins[0]["check_in_id"] == check_ins[1]["check_in_id"]
 

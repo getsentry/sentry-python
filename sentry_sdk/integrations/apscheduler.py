@@ -1,7 +1,7 @@
 import re
 import threading
 import weakref
-from functools import wraps
+from functools import lru_cache, wraps
 from typing import TYPE_CHECKING
 
 import sentry_sdk
@@ -17,12 +17,9 @@ from sentry_sdk.utils import (
 )
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, List, Optional, Tuple
+    from typing import Any, Dict, FrozenSet, List, Optional, Set, Tuple
 
     from sentry_sdk._types import MonitorConfig
-
-    # check_in_id, monitor_slug, monitor_config, start
-    PendingCheckIn = Tuple[str, str, MonitorConfig, float]
 
 try:
     from apscheduler.events import (
@@ -30,7 +27,7 @@ try:
         EVENT_JOB_EXECUTED,
         EVENT_JOB_MISSED,
     )
-    from apscheduler.executors.base import BaseExecutor
+    from apscheduler.executors.base import BaseExecutor, MaxInstancesReachedError
     from apscheduler.triggers.cron import CronTrigger
     from apscheduler.triggers.cron.expressions import (
         AllExpression,
@@ -38,7 +35,7 @@ try:
     )
     from apscheduler.triggers.interval import IntervalTrigger
 except ImportError:
-    raise DidNotEnable("APScheduler 3.x is not installed")
+    raise DidNotEnable("APScheduler is not installed, or is not version 3.x")
 
 
 class APSchedulerIntegration(Integration):
@@ -62,9 +59,30 @@ class APSchedulerIntegration(Integration):
         _patch_submit_job()
 
 
+class _PendingCheckIn:
+    __slots__ = ("monitor_slug", "monitor_config", "start", "opened", "check_in_id")
+
+    def __init__(
+        self, monitor_slug: str, monitor_config: "MonitorConfig", start: float
+    ) -> None:
+        self.monitor_slug = monitor_slug
+        self.monitor_config = monitor_config
+        self.start = start
+        self.opened = False
+        self.check_in_id: "Optional[str]" = None
+
+    def open(self) -> None:
+        self.opened = True
+        self.check_in_id = capture_checkin(
+            monitor_slug=self.monitor_slug,
+            monitor_config=self.monitor_config,
+            status=MonitorStatus.IN_PROGRESS,
+        )
+
+
 class _CronsListener:
     """
-    Closes the check-ins opened in `_patch_submit_job`.
+    Tracks the check-ins of submitted runs and closes them.
 
     Executors dispatch one `EVENT_JOB_EXECUTED`, `EVENT_JOB_ERROR` or
     `EVENT_JOB_MISSED` per submitted run time, in the scheduler's process, for
@@ -75,25 +93,24 @@ class _CronsListener:
 
     def __init__(self) -> None:
         self.lock = threading.Lock()
-        # Open check-ins, keyed by (job id, scheduled run time).
-        self.pending: "Dict[Tuple[str, Any], PendingCheckIn]" = {}
+        # Keyed by (job id, scheduled run time).
+        self.pending: "Dict[Tuple[str, Any], _PendingCheckIn]" = {}
 
-    def add(
-        self,
-        job_id: str,
-        run_time: "Any",
-        check_in_id: str,
-        monitor_slug: str,
-        monitor_config: "MonitorConfig",
-        start: float,
-    ) -> None:
+    def add(self, job_id: str, run_time: "Any", pending: "_PendingCheckIn") -> None:
         with self.lock:
-            self.pending[(job_id, run_time)] = (
-                check_in_id,
-                monitor_slug,
-                monitor_config,
-                start,
-            )
+            self.pending[(job_id, run_time)] = pending
+
+    def open(self, job_id: str, run_time: "Any") -> None:
+        # Under the lock, so `in_progress` is always sent before `finish`
+        # sends the closing check-in.
+        with self.lock:
+            pending = self.pending.get((job_id, run_time))
+            if pending is not None and not pending.opened:
+                pending.open()
+
+    def discard(self, job_id: str, run_time: "Any") -> None:
+        with self.lock:
+            self.pending.pop((job_id, run_time), None)
 
     def finish(self, job_id: str, run_time: "Any", status: str) -> None:
         with self.lock:
@@ -101,12 +118,15 @@ class _CronsListener:
         if pending is None:
             return
 
-        check_in_id, monitor_slug, monitor_config, start = pending
+        # Synchronous executors finish the run before `submit_job` returns.
+        if not pending.opened:
+            pending.open()
+
         capture_checkin(
-            monitor_slug=monitor_slug,
-            monitor_config=monitor_config,
-            check_in_id=check_in_id,
-            duration=now() - start,
+            monitor_slug=pending.monitor_slug,
+            monitor_config=pending.monitor_config,
+            check_in_id=pending.check_in_id,
+            duration=now() - pending.start,
             status=status,
         )
 
@@ -140,13 +160,61 @@ def _get_listener(scheduler: "Any") -> "_CronsListener":
 # APScheduler assigns `uuid4().hex` when a job is added without an `id`.
 _GENERATED_JOB_ID = re.compile(r"[0-9a-f]{32}")
 
+# Generated job ids already warned about.
+_warned_job_ids: "Set[str]" = set()
+
+
+def _has_generated_id(job: "Any") -> bool:
+    return _GENERATED_JOB_ID.fullmatch(job.id) is not None
+
 
 def _get_monitor_slug(job: "Any") -> str:
     # Generated ids change on every restart, which would create a new monitor
     # each time. Fall back to the job name (the function name by default).
-    if _GENERATED_JOB_ID.fullmatch(job.id):
+    if _has_generated_id(job):
         return job.name
     return job.id
+
+
+def _warn_generated_id(job: "Any") -> None:
+    if job.id in _warned_job_ids:
+        return
+    _warned_job_ids.add(job.id)
+    logger.warning(
+        "APScheduler job %r has no explicit `id`, so its name is used as its "
+        "monitor slug, and jobs with the same name share a monitor. Pass `id` "
+        "to `add_job` to give it its own monitor.",
+        job.name,
+    )
+
+
+@lru_cache(maxsize=None)
+def _get_known_timezones() -> "FrozenSet[str]":
+    try:
+        from zoneinfo import available_timezones
+    except ImportError:
+        try:
+            from backports.zoneinfo import available_timezones  # type: ignore
+        except ImportError:
+            try:
+                import pytz  # type: ignore
+            except ImportError:
+                return frozenset(("UTC",))
+            # A lazy list that frozenset() alone would read as empty.
+            return frozenset(name for name in pytz.all_timezones)
+    return frozenset(available_timezones())
+
+
+def _get_timezone_name(timezone: "Any") -> "Optional[str]":
+    """
+    Return the IANA name of the timezone, or None if it has none, e.g.
+    `datetime.timezone(timedelta(hours=2))` ("UTC+02:00"), `pytz.FixedOffset`
+    or tzlocal's "local".
+    """
+    name = str(timezone)
+    if name in _get_known_timezones():
+        return name
+    return None
 
 
 def _get_crontab_day_of_week(field: "Any") -> "Optional[str]":
@@ -215,9 +283,13 @@ def _get_monitor_config(trigger: "Any") -> "Optional[MonitorConfig]":
         crontab = _get_crontab(trigger)
         if crontab is None:
             return None
+        # Without a timezone Sentry would read the crontab as UTC.
+        timezone = _get_timezone_name(trigger.timezone)
+        if timezone is None:
+            return None
         return {
             "schedule": {"type": "crontab", "value": crontab},
-            "timezone": str(trigger.timezone),
+            "timezone": timezone,
         }
 
     if isinstance(trigger, IntervalTrigger):
@@ -244,23 +316,24 @@ def _begin_check_ins(
     if monitor_config is None:
         logger.debug(
             "Not monitoring APScheduler job %r: its trigger %r can't be "
-            "expressed as a Sentry Crons schedule.",
+            "expressed as a Sentry Crons schedule, or its timezone has no "
+            "IANA name.",
             job.id,
             job.trigger,
         )
         return None
+
+    if _has_generated_id(job):
+        _warn_generated_id(job)
 
     listener = _get_listener(executor._scheduler)
     start = now()
 
     # Each run time gets its own execution event, so its own check-in.
     for run_time in run_times:
-        check_in_id = capture_checkin(
-            monitor_slug=monitor_slug,
-            monitor_config=monitor_config,
-            status=MonitorStatus.IN_PROGRESS,
+        listener.add(
+            job.id, run_time, _PendingCheckIn(monitor_slug, monitor_config, start)
         )
-        listener.add(job.id, run_time, check_in_id, monitor_slug, monitor_config, start)
 
     return listener
 
@@ -273,6 +346,8 @@ def _patch_submit_job() -> None:
 
     `submit_job` is called in the scheduler's process for every executor type
     and is the last place where the `Job` (and so its trigger) is at hand.
+    The check-ins are opened only once it accepts the job, so runs skipped
+    because of `max_instances` get none.
     """
     old_submit_job = BaseExecutor.submit_job
 
@@ -289,14 +364,27 @@ def _patch_submit_job() -> None:
             listener = _begin_check_ins(integration, self, job, run_times)
 
         try:
-            return old_submit_job(self, job, run_times, *args, **kwargs)
+            result = old_submit_job(self, job, run_times, *args, **kwargs)
+        except MaxInstancesReachedError:
+            # The run is skipped, not failed.
+            if listener is not None:
+                with capture_internal_exceptions():
+                    for run_time in run_times:
+                        listener.discard(job.id, run_time)
+            raise
         except BaseException:
-            # Not submitted (e.g. `max_instances` reached), so no execution
-            # event will close the check-ins.
+            # Not submitted, so no execution event will close the check-ins.
             if listener is not None:
                 with capture_internal_exceptions():
                     for run_time in run_times:
                         listener.finish(job.id, run_time, MonitorStatus.ERROR)
             raise
+
+        if listener is not None:
+            with capture_internal_exceptions():
+                for run_time in run_times:
+                    listener.open(job.id, run_time)
+
+        return result
 
     BaseExecutor.submit_job = sentry_submit_job
