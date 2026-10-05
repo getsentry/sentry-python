@@ -65,7 +65,6 @@ if TYPE_CHECKING:
         "Experiments",
         {
             "max_flags": Optional[int],
-            "record_sql_params": Optional[bool],
             "continuous_profiling_auto_start": Optional[bool],
             "transport_zlib_compression_level": Optional[int],
             "transport_compression_level": Optional[int],
@@ -1093,6 +1092,9 @@ class SPANDATA:
 
     MCP_TOOL_NAME = "mcp.tool.name"
     """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_TOOL_NAME instead.
+
     The name of the MCP tool being called.
     Example: "get_weather"
     """
@@ -1126,6 +1128,9 @@ class SPANDATA:
 
     MCP_TOOL_RESULT_CONTENT = "mcp.tool.result.content"
     """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_TOOL_CALL_RESULT instead.
+
     The result/output content from an MCP tool execution.
     Example: "The weather is sunny"
     """

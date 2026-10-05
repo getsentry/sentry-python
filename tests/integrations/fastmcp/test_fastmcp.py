@@ -312,12 +312,12 @@ async def test_fastmcp_tool_sync(
     assert span["attributes"]["sentry.op"] == OP.MCP_SERVER
     assert span["attributes"]["sentry.origin"] == "auto.ai.mcp"
     assert span["name"] == "tools/call add_numbers"
-    assert span["attributes"][SPANDATA.MCP_TOOL_NAME] == "add_numbers"
+    assert span["attributes"][SPANDATA.GEN_AI_TOOL_NAME] == "add_numbers"
     assert span["attributes"][SPANDATA.MCP_METHOD_NAME] == "tools/call"
     assert span["attributes"][SPANDATA.MCP_TRANSPORT] == "stdio"
     assert span["attributes"][SPANDATA.MCP_REQUEST_ID] == "req-123"
 
-    assert SPANDATA.MCP_TOOL_RESULT_CONTENT in span["attributes"]
+    assert SPANDATA.GEN_AI_TOOL_CALL_RESULT in span["attributes"]
 
 
 @pytest.mark.asyncio
@@ -369,12 +369,12 @@ async def test_fastmcp_tool_sync_no_sensitive_data(
     assert span["attributes"]["sentry.op"] == OP.MCP_SERVER
     assert span["attributes"]["sentry.origin"] == "auto.ai.mcp"
     assert span["name"] == "tools/call add_numbers"
-    assert span["attributes"][SPANDATA.MCP_TOOL_NAME] == "add_numbers"
+    assert span["attributes"][SPANDATA.GEN_AI_TOOL_NAME] == "add_numbers"
     assert span["attributes"][SPANDATA.MCP_METHOD_NAME] == "tools/call"
     assert span["attributes"][SPANDATA.MCP_TRANSPORT] == "stdio"
     assert span["attributes"][SPANDATA.MCP_REQUEST_ID] == "req-123"
 
-    assert SPANDATA.MCP_TOOL_RESULT_CONTENT not in span["attributes"]
+    assert SPANDATA.GEN_AI_TOOL_CALL_RESULT not in span["attributes"]
 
 
 @pytest.mark.parametrize("FastMCP", fastmcp_implementations, ids=fastmcp_ids)
@@ -441,13 +441,13 @@ async def test_fastmcp_tool_async(sentry_init, capture_items, FastMCP, json_rpc)
     assert span["attributes"]["sentry.op"] == OP.MCP_SERVER
     assert span["attributes"]["sentry.origin"] == "auto.ai.mcp"
     assert span["name"] == "tools/call multiply_numbers"
-    assert span["attributes"][SPANDATA.MCP_TOOL_NAME] == "multiply_numbers"
+    assert span["attributes"][SPANDATA.GEN_AI_TOOL_NAME] == "multiply_numbers"
     assert span["attributes"][SPANDATA.MCP_METHOD_NAME] == "tools/call"
     assert span["attributes"][SPANDATA.MCP_TRANSPORT] == "http"
     assert span["attributes"][SPANDATA.MCP_REQUEST_ID] == "req-456"
     assert span["attributes"][SPANDATA.MCP_SESSION_ID] == session_id
 
-    assert SPANDATA.MCP_TOOL_RESULT_CONTENT in span["attributes"]
+    assert SPANDATA.GEN_AI_TOOL_CALL_RESULT in span["attributes"]
 
 
 @pytest.mark.parametrize("FastMCP", fastmcp_implementations, ids=fastmcp_ids)
@@ -516,13 +516,13 @@ async def test_fastmcp_tool_async_no_sensitive_data(
     assert span["attributes"]["sentry.op"] == OP.MCP_SERVER
     assert span["attributes"]["sentry.origin"] == "auto.ai.mcp"
     assert span["name"] == "tools/call multiply_numbers"
-    assert span["attributes"][SPANDATA.MCP_TOOL_NAME] == "multiply_numbers"
+    assert span["attributes"][SPANDATA.GEN_AI_TOOL_NAME] == "multiply_numbers"
     assert span["attributes"][SPANDATA.MCP_METHOD_NAME] == "tools/call"
     assert span["attributes"][SPANDATA.MCP_TRANSPORT] == "http"
     assert span["attributes"][SPANDATA.MCP_REQUEST_ID] == "req-456"
     assert span["attributes"][SPANDATA.MCP_SESSION_ID] == session_id
 
-    assert SPANDATA.MCP_TOOL_RESULT_CONTENT not in span["attributes"]
+    assert SPANDATA.GEN_AI_TOOL_CALL_RESULT not in span["attributes"]
 
 
 @pytest.mark.asyncio
@@ -625,8 +625,8 @@ async def test_fastmcp_tool_with_complex_return(
     tool_spans = [s for s in spans if s["attributes"].get("sentry.op") == OP.MCP_SERVER]
     assert len(tool_spans) == 1
     assert tool_spans[0]["attributes"]["sentry.op"] == OP.MCP_SERVER
-    assert tool_spans[0]["attributes"][SPANDATA.MCP_TOOL_NAME] == "get_user_data"
-    assert SPANDATA.MCP_TOOL_RESULT_CONTENT in tool_spans[0]["attributes"]
+    assert tool_spans[0]["attributes"][SPANDATA.GEN_AI_TOOL_NAME] == "get_user_data"
+    assert SPANDATA.GEN_AI_TOOL_CALL_RESULT in tool_spans[0]["attributes"]
 
 
 # =============================================================================
