@@ -57,7 +57,7 @@ class _SentryRunHooks(RunHooks[TContext]):
         if not client.options["data_collection"]["gen_ai"]["inputs"]:
             return
 
-        span.set_attribute(SPANDATA.GEN_AI_TOOL_INPUT, context.tool_arguments)
+        span.set_attribute(SPANDATA.GEN_AI_TOOL_CALL_ARGUMENTS, context.tool_arguments)
 
     async def on_tool_end(
         self,
