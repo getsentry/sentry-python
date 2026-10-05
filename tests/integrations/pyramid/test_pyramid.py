@@ -15,7 +15,7 @@ from sentry_sdk.integrations.pyramid import PyramidIntegration
 from sentry_sdk.serializer import MAX_DATABAG_BREADTH
 from sentry_sdk.traces import SpanStatus
 from tests.conftest import unpack_werkzeug_response
-from tests.integrations.utils import DATA_COLLECTION_USER_INFO_CASES_LEGACY
+from tests.integrations.utils import DATA_COLLECTION_USER_INFO_CASES
 
 
 def hi(request):
@@ -65,7 +65,7 @@ def get_client(pyramid_config):
 def test_view_exceptions(
     get_client, route, sentry_init, capture_events, capture_exceptions
 ):
-    sentry_init(integrations=[PyramidIntegration()])
+    sentry_init(integrations=[PyramidIntegration()], data_collection={})
     events = capture_events()
     exceptions = capture_exceptions()
 
@@ -133,6 +133,7 @@ def test_segment_name_and_source(
     sentry_init(
         integrations=[PyramidIntegration()],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     items = capture_items("event", "span")
@@ -157,6 +158,7 @@ def test_http_route(
     sentry_init(
         integrations=[PyramidIntegration()],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     items = capture_items("span")
@@ -308,7 +310,7 @@ def test_bad_request_not_captured(
 ):
     import pyramid.httpexceptions as exc
 
-    sentry_init(integrations=[PyramidIntegration()])
+    sentry_init(integrations=[PyramidIntegration()], data_collection={})
     events = capture_events()
 
     @route("/")
@@ -329,7 +331,7 @@ def test_bad_request_not_captured(
 def test_errorhandler_ok(
     sentry_init, pyramid_config, capture_exceptions, route, get_client
 ):
-    sentry_init(integrations=[PyramidIntegration()])
+    sentry_init(integrations=[PyramidIntegration()], data_collection={})
     errors = capture_exceptions()
 
     @route("/")
@@ -350,7 +352,7 @@ def test_errorhandler_ok(
 def test_errorhandler_500(
     sentry_init, pyramid_config, capture_exceptions, route, get_client
 ):
-    sentry_init(integrations=[PyramidIntegration()])
+    sentry_init(integrations=[PyramidIntegration()], data_collection={})
     errors = capture_exceptions()
 
     @route("/")
@@ -375,7 +377,7 @@ def test_errorhandler_500(
 def test_error_in_errorhandler(
     sentry_init, pyramid_config, capture_events, route, get_client
 ):
-    sentry_init(integrations=[PyramidIntegration()])
+    sentry_init(integrations=[PyramidIntegration()], data_collection={})
 
     @route("/")
     def index(request):
@@ -452,7 +454,7 @@ def tween_factory(handler, registry):
 
 
 def test_tween_ok(sentry_init, pyramid_config, capture_exceptions, route, get_client):
-    sentry_init(integrations=[PyramidIntegration()])
+    sentry_init(integrations=[PyramidIntegration()], data_collection={})
     errors = capture_exceptions()
 
     @route("/")
@@ -479,6 +481,7 @@ def test_tracing_error(
     sentry_init(
         integrations=[PyramidIntegration()],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     items = capture_items("event", "span")
@@ -518,6 +521,7 @@ def test_span_origin(
     sentry_init(
         integrations=[PyramidIntegration()],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     items = capture_items("event", "span")
@@ -534,20 +538,20 @@ def test_span_origin(
 
 
 @pytest.mark.parametrize(
-    "init_kwargs, expect_user", DATA_COLLECTION_USER_INFO_CASES_LEGACY
+    "data_collection, expect_user", DATA_COLLECTION_USER_INFO_CASES
 )
 def test_span_sets_user_id_on_segment(
     sentry_init,
     pyramid_config,
     capture_items,
     get_client,
-    init_kwargs,
+    data_collection,
     expect_user,
 ):
     sentry_init(
         integrations=[PyramidIntegration()],
         traces_sample_rate=1.0,
-        **init_kwargs,
+        data_collection=data_collection,
     )
 
     class AuthenticationPolicy:
@@ -575,7 +579,7 @@ def test_span_sets_user_id_on_segment(
 
 
 @pytest.mark.parametrize(
-    "init_kwargs, expect_user", DATA_COLLECTION_USER_INFO_CASES_LEGACY
+    "data_collection, expect_user", DATA_COLLECTION_USER_INFO_CASES
 )
 def test_user_id_error_event_data_collection(
     sentry_init,
@@ -583,10 +587,10 @@ def test_user_id_error_event_data_collection(
     capture_events,
     route,
     get_client,
-    init_kwargs,
+    data_collection,
     expect_user,
 ):
-    sentry_init(integrations=[PyramidIntegration()], **init_kwargs)
+    sentry_init(integrations=[PyramidIntegration()], data_collection=data_collection)
     events = capture_events()
 
     class AuthenticationPolicy:

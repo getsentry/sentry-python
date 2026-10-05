@@ -56,22 +56,3 @@ DATA_COLLECTION_QUEUES_CASES = [
         id="data_collection_queues_off",
     ),
 ]
-
-
-DATA_COLLECTION_USER_INFO_CASES_LEGACY = [
-    pytest.param({"data_collection": case.values[0]}, case.values[1], id=case.id)
-    for case in DATA_COLLECTION_USER_INFO_CASES
-]
-DATA_COLLECTION_REMOTE_ADDR_CASES_LEGACY = [
-    pytest.param({"data_collection": case.values[0]}, case.values[1], id=case.id)
-    for case in DATA_COLLECTION_REMOTE_ADDR_CASES
-]
-DATA_COLLECTION_QUEUES_CASES_LEGACY = [
-    pytest.param(
-        {"data_collection": case.values[0]},
-        case.values[1],
-        case.values[2],
-        id=case.id,
-    )
-    for case in DATA_COLLECTION_QUEUES_CASES
-]

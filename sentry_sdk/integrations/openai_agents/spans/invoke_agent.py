@@ -10,7 +10,6 @@ from sentry_sdk.traces import Span
 from sentry_sdk.utils import safe_serialize
 
 from ..consts import SPAN_ORIGIN
-from ..utils import _set_agent_data
 
 if TYPE_CHECKING:
     from typing import Any, Optional
@@ -70,7 +69,7 @@ def invoke_agent_span(
                 unpack=False,
             )
 
-    _set_agent_data(span, agent)
+    span.set_attribute(SPANDATA.GEN_AI_AGENT_NAME, agent.name)
 
     return span
 

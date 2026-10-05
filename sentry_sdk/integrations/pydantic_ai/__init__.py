@@ -127,7 +127,6 @@ def register_hooks(hooks: "Hooks") -> None:
         with sentry_sdk.isolation_scope(), invoke_agent_span(
             user_prompt=ctx.prompt,
             agent=ctx.agent,
-            model=ctx.model,
             model_settings=ctx.model_settings,
         ) as span:
             try:

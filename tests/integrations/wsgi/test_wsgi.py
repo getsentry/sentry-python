@@ -11,7 +11,7 @@ from sentry_sdk.integrations.wsgi import (
     _ScopedResponse,
     get_request_url,
 )
-from tests.integrations.utils import DATA_COLLECTION_USER_INFO_CASES_LEGACY
+from tests.integrations.utils import DATA_COLLECTION_USER_INFO_CASES
 
 
 @pytest.fixture
@@ -69,7 +69,7 @@ def test_basic(sentry_init, crashing_app, capture_events):
 def test_script_name_is_respected(
     sentry_init, crashing_app, capture_events, script_name, path_info
 ):
-    sentry_init(send_default_pii=True)
+    sentry_init(data_collection={})
     app = SentryWsgiMiddleware(crashing_app)
     client = Client(app)
     events = capture_events()
@@ -86,7 +86,7 @@ def test_script_name_is_respected(
 @pytest.fixture(params=[0, None])
 def test_systemexit_zero_is_ignored(sentry_init, capture_events, request):
     zero_code = request.param
-    sentry_init(send_default_pii=True)
+    sentry_init(data_collection={})
     iterable = ExitingIterable(lambda: SystemExit(zero_code))
     app = SentryWsgiMiddleware(IterableApp(iterable))
     client = Client(app)
@@ -101,7 +101,7 @@ def test_systemexit_zero_is_ignored(sentry_init, capture_events, request):
 @pytest.fixture(params=["", "foo", 1, 2])
 def test_systemexit_nonzero_is_captured(sentry_init, capture_events, request):
     nonzero_code = request.param
-    sentry_init(send_default_pii=True)
+    sentry_init(data_collection={})
     iterable = ExitingIterable(lambda: SystemExit(nonzero_code))
     app = SentryWsgiMiddleware(IterableApp(iterable))
     client = Client(app)
@@ -120,7 +120,7 @@ def test_systemexit_nonzero_is_captured(sentry_init, capture_events, request):
 
 
 def test_keyboard_interrupt_is_captured(sentry_init, capture_events):
-    sentry_init(send_default_pii=True)
+    sentry_init(data_collection={})
     iterable = ExitingIterable(lambda: KeyboardInterrupt())
     app = SentryWsgiMiddleware(IterableApp(iterable))
     client = Client(app)
@@ -149,7 +149,7 @@ def test_transaction_with_error(
         raise ValueError("Fetch aborted. The ball was not returned.")
 
     sentry_init(
-        send_default_pii=True,
+        data_collection={},
         traces_sample_rate=1.0,
     )
     app = SentryWsgiMiddleware(dogpark)
@@ -183,20 +183,31 @@ def test_transaction_with_error(
     assert span_item["status"] == "error"
 
 
-@pytest.mark.parametrize("send_pii", [True, False])
+@pytest.mark.parametrize(
+    "data_collection, expect_query",
+    [
+        pytest.param({}, True, id="data_collection_default"),
+        pytest.param(
+            {"url_query_params": {"mode": "off"}},
+            False,
+            id="data_collection_query_off",
+        ),
+    ],
+)
 def test_transaction_no_error(
     sentry_init,
     capture_events,
     capture_items,
     DictionaryContaining,  # noqa:N803
-    send_pii,
+    data_collection,
+    expect_query,
 ):
     def dogpark(environ, start_response):
         start_response("200 OK", [])
         return ["Go get the ball! Good dog!"]
 
     sentry_init(
-        send_default_pii=send_pii,
+        data_collection=data_collection,
         traces_sample_rate=1.0,
     )
     app = SentryWsgiMiddleware(dogpark)
@@ -219,16 +230,15 @@ def test_transaction_no_error(
     assert span["attributes"]["http.response.status_code"] == 200
     assert span["status"] == "ok"
 
-    if send_pii:
+    assert span["attributes"]["url.path"] == "/dogs/are/great"
+    if expect_query:
         assert (
             span["attributes"]["url.full"]
             == "http://localhost/dogs/are/great?toy=tennisball"
         )
-        assert span["attributes"]["url.path"] == "/dogs/are/great"
         assert span["attributes"]["http.query"] == "toy=tennisball"
     else:
-        assert "url.path" not in span["attributes"]
-        assert "url.full" not in span["attributes"]
+        assert span["attributes"]["url.full"] == "http://localhost/dogs/are/great"
         assert "http.query" not in span["attributes"]
 
 
@@ -242,6 +252,7 @@ def test_has_trace_if_performance_enabled(
         raise ValueError("Fetch aborted. The ball was not returned.")
 
     sentry_init(
+        data_collection={},
         traces_sample_rate=1.0,
     )
     app = SentryWsgiMiddleware(dogpark)
@@ -285,7 +296,7 @@ def test_has_trace_if_performance_disabled(
         capture_message("Attempting to fetch the ball")
         raise ValueError("Fetch aborted. The ball was not returned.")
 
-    sentry_init()
+    sentry_init(data_collection={})
     app = SentryWsgiMiddleware(dogpark)
     client = Client(app)
     events = capture_events()
@@ -312,6 +323,7 @@ def test_trace_from_headers_if_performance_enabled(
         raise ValueError("Fetch aborted. The ball was not returned.")
 
     sentry_init(
+        data_collection={},
         traces_sample_rate=1.0,
     )
     app = SentryWsgiMiddleware(dogpark)
@@ -345,7 +357,7 @@ def test_trace_from_headers_if_performance_disabled(
         capture_message("Attempting to fetch the ball")
         raise ValueError("Fetch aborted. The ball was not returned.")
 
-    sentry_init()
+    sentry_init(data_collection={})
     app = SentryWsgiMiddleware(dogpark)
     client = Client(app)
     events = capture_events()
@@ -380,7 +392,7 @@ def test_traces_sampler_gets_correct_values_in_sampling_context(
 
     traces_sampler = mock.Mock(return_value=True)
     sentry_init(
-        send_default_pii=True,
+        data_collection={},
         traces_sampler=traces_sampler,
     )
     app = SentryWsgiMiddleware(app)
@@ -423,7 +435,7 @@ def test_session_mode_defaults_to_request_mode_in_wsgi_handler(
 
     traces_sampler = mock.Mock(return_value=True)
     sentry_init(
-        send_default_pii=True,
+        data_collection={},
         traces_sampler=traces_sampler,
     )
     app = SentryWsgiMiddleware(app)
@@ -465,7 +477,7 @@ def test_auto_session_tracking_with_aggregates(
 
     traces_sampler = mock.Mock(return_value=True)
     sentry_init(
-        send_default_pii=True,
+        data_collection={},
         traces_sampler=traces_sampler,
     )
     app = SentryWsgiMiddleware(sample_app)
@@ -507,7 +519,7 @@ def test_span_origin_manual(sentry_init, capture_events, capture_items):
         return ["Go get the ball! Good dog!"]
 
     sentry_init(
-        send_default_pii=True,
+        data_collection={},
         traces_sample_rate=1.0,
     )
     app = SentryWsgiMiddleware(dogpark)
@@ -529,7 +541,7 @@ def test_span_origin_custom(sentry_init, capture_events, capture_items):
         return ["Go get the ball! Good dog!"]
 
     sentry_init(
-        send_default_pii=True,
+        data_collection={},
         traces_sample_rate=1.0,
     )
     app = SentryWsgiMiddleware(
@@ -560,7 +572,7 @@ def test_span_origin_custom(sentry_init, capture_events, capture_items):
 def test_file_response_wrapping(
     sentry_init, has_file_wrapper, has_fileno, expect_wrapped
 ):
-    sentry_init()
+    sentry_init(data_collection={})
 
     response_mock = mock.MagicMock()
     if not has_fileno:
@@ -733,14 +745,16 @@ def test_request_headers_data_collection(
     sentry_init,
     crashing_app,
     capture_events,
+    capture_items,
     data_collection,
     request_headers,
     expected_headers,
 ):
-    sentry_init(data_collection=data_collection)
+    sentry_init(data_collection=data_collection, traces_sample_rate=1.0)
     app = SentryWsgiMiddleware(crashing_app)
     client = Client(app)
     events = capture_events()
+    items = capture_items("span")
 
     with pytest.raises(ZeroDivisionError):
         client.get("/", headers=request_headers)
@@ -749,9 +763,21 @@ def test_request_headers_data_collection(
 
     assert event["request"]["headers"] == expected_headers
 
+    sentry_sdk.flush()
+    (span,) = [item.payload for item in items]
+    span_headers = {
+        key: value
+        for key, value in span["attributes"].items()
+        if key.startswith("http.request.header.")
+    }
+    assert span_headers == {
+        f"http.request.header.{key.lower()}": [value]
+        for key, value in expected_headers.items()
+    }
+
 
 def test_request_headers_data_collection_cookie_always_redacted(
-    sentry_init, crashing_app, capture_events
+    sentry_init, crashing_app, capture_events, capture_items
 ):
     """
     The ``cookie``/``set-cookie`` headers are always redacted in the
@@ -763,6 +789,7 @@ def test_request_headers_data_collection_cookie_always_redacted(
     ``Client`` manages its own cookie jar and strips the ``Cookie`` header.
     """
     sentry_init(
+        traces_sample_rate=1.0,
         data_collection={
             "http_headers": {
                 "request": {"mode": "allowlist", "terms": ["cookie", "custom"]}
@@ -771,6 +798,7 @@ def test_request_headers_data_collection_cookie_always_redacted(
     )
     app = SentryWsgiMiddleware(crashing_app)
     events = capture_events()
+    items = capture_items("span")
 
     environ = {
         "REQUEST_METHOD": "GET",
@@ -791,65 +819,44 @@ def test_request_headers_data_collection_cookie_always_redacted(
     assert headers["Cookie"] == "[Filtered]"
     assert headers["X-Custom-Header"] == "passthrough"
 
+    sentry_sdk.flush()
+    (span,) = [item.payload for item in items]
+    assert span["attributes"]["http.request.header.cookie"] == ["[Filtered]"]
+    assert span["attributes"]["http.request.header.x-custom-header"] == ["passthrough"]
+
 
 @pytest.mark.parametrize(
-    "init_kwargs, expected_query_string",
+    "data_collection, expected_query_string",
     [
-        # No data_collection: the legacy path always sets the query string
-        # unchanged, regardless of send_default_pii.
-        pytest.param(
-            {"send_default_pii": True},
-            "toy=tennisball&color=red&auth=secret",
-            id="send_default_pii_true",
-        ),
-        pytest.param(
-            {"send_default_pii": False},
-            "toy=tennisball&color=red&auth=secret",
-            id="send_default_pii_false",
-        ),
+        # The default denylist redacts the sensitive ``auth`` parameter.
         pytest.param(
             {},
-            "toy=tennisball&color=red&auth=secret",
-            id="defaults",
-        ),
-        # data_collection configured: query string is routed through filtering.
-        # Spec defaults -> denylist: only the sensitive ``auth`` is redacted.
-        pytest.param(
-            {"data_collection": {}},
             "toy=tennisball&color=red&auth=%5BFiltered%5D",
             id="data_collection_denylist_default",
         ),
         pytest.param(
-            {
-                "data_collection": {
-                    "url_query_params": {"mode": "denylist", "terms": ["toy"]}
-                }
-            },
+            {"url_query_params": {"mode": "denylist", "terms": ["toy"]}},
             "toy=%5BFiltered%5D&color=red&auth=%5BFiltered%5D",
             id="data_collection_denylist_custom_terms",
         ),
         # allowlist with only ``toy`` allowed: ``color`` is redacted even though
         # it is not sensitive, proving the redaction comes from the allowlist.
         pytest.param(
-            {
-                "data_collection": {
-                    "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
-                }
-            },
+            {"url_query_params": {"mode": "allowlist", "terms": ["toy"]}},
             "toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D",
             id="data_collection_allowlist",
         ),
         pytest.param(
-            {"data_collection": {"url_query_params": {"mode": "off"}}},
+            {"url_query_params": {"mode": "off"}},
             None,
             id="data_collection_off",
         ),
     ],
 )
 def test_query_string_data_collection(
-    sentry_init, crashing_app, capture_events, init_kwargs, expected_query_string
+    sentry_init, crashing_app, capture_events, data_collection, expected_query_string
 ):
-    sentry_init(**init_kwargs)
+    sentry_init(data_collection=data_collection)
     app = SentryWsgiMiddleware(crashing_app)
     client = Client(app)
     events = capture_events()
@@ -866,60 +873,34 @@ def test_query_string_data_collection(
 
 
 @pytest.mark.parametrize(
-    "init_kwargs, expected_query",
+    "data_collection, expected_query",
     [
-        # No data_collection: the ``http.query`` attribute follows the legacy
-        # send_default_pii gate.
-        pytest.param(
-            {"send_default_pii": True},
-            "toy=tennisball&color=red&auth=secret",
-            id="send_default_pii_true",
-        ),
-        pytest.param(
-            {"send_default_pii": False},
-            None,
-            id="send_default_pii_false",
-        ),
         pytest.param(
             {},
-            None,
-            id="defaults",
-        ),
-        # data_collection configured: attribute is routed through filtering.
-        pytest.param(
-            {"data_collection": {}},
             "toy=tennisball&color=red&auth=%5BFiltered%5D",
             id="data_collection_denylist_default",
         ),
         pytest.param(
-            {
-                "data_collection": {
-                    "url_query_params": {"mode": "denylist", "terms": ["toy"]}
-                }
-            },
+            {"url_query_params": {"mode": "denylist", "terms": ["toy"]}},
             "toy=%5BFiltered%5D&color=red&auth=%5BFiltered%5D",
             id="data_collection_denylist_custom_terms",
         ),
         # allowlist with only ``toy`` allowed: ``color`` is redacted even though
         # it is not sensitive, proving the redaction comes from the allowlist.
         pytest.param(
-            {
-                "data_collection": {
-                    "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
-                }
-            },
+            {"url_query_params": {"mode": "allowlist", "terms": ["toy"]}},
             "toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D",
             id="data_collection_allowlist",
         ),
         pytest.param(
-            {"data_collection": {"url_query_params": {"mode": "off"}}},
+            {"url_query_params": {"mode": "off"}},
             None,
             id="data_collection_off",
         ),
     ],
 )
 def test_span_http_query_data_collection(
-    sentry_init, capture_items, init_kwargs, expected_query
+    sentry_init, capture_items, data_collection, expected_query
 ):
     def dogpark(environ, start_response):
         start_response("200 OK", [])
@@ -927,7 +908,7 @@ def test_span_http_query_data_collection(
 
     sentry_init(
         traces_sample_rate=1.0,
-        **init_kwargs,
+        data_collection=data_collection,
     )
     app = SentryWsgiMiddleware(dogpark)
     client = Client(app)
@@ -942,46 +923,19 @@ def test_span_http_query_data_collection(
 
     if expected_query is None:
         assert "http.query" not in span["attributes"]
+        assert span["attributes"]["url.full"] == "http://localhost/dogs/are/great"
     else:
         assert span["attributes"]["http.query"] == expected_query
+        assert (
+            span["attributes"]["url.full"]
+            == f"http://localhost/dogs/are/great?{expected_query}"
+        )
+    assert span["attributes"]["url.path"] == "/dogs/are/great"
 
 
-@pytest.mark.parametrize("send_default_pii", [True, False])
-def test_user_ip_address_on_all_spans(sentry_init, capture_items, send_default_pii):
-    def dogpark(environ, start_response):
-        with sentry_sdk.start_span(name="child-span"):
-            pass
-        start_response("200 OK", [])
-        return ["Go get the ball! Good dog!"]
-
-    sentry_init(
-        send_default_pii=send_default_pii,
-        traces_sample_rate=1.0,
-    )
-    app = SentryWsgiMiddleware(dogpark)
-    client = Client(app)
-
-    items = capture_items("span")
-
-    client.get("/dogs/are/great/", environ_base={"REMOTE_ADDR": "127.0.0.1"})
-
-    sentry_sdk.flush()
-
-    child_span, server_span = [item.payload for item in items]
-
-    if send_default_pii:
-        assert server_span["attributes"]["user.ip_address"] == "127.0.0.1"
-        assert child_span["attributes"]["user.ip_address"] == "127.0.0.1"
-    else:
-        assert "user.ip_address" not in server_span["attributes"]
-        assert "user.ip_address" not in child_span["attributes"]
-
-
-@pytest.mark.parametrize(
-    "init_kwargs, expect_ip", DATA_COLLECTION_USER_INFO_CASES_LEGACY
-)
+@pytest.mark.parametrize("data_collection, expect_ip", DATA_COLLECTION_USER_INFO_CASES)
 def test_user_info_span_attributes_data_collection(
-    sentry_init, capture_items, init_kwargs, expect_ip
+    sentry_init, capture_items, data_collection, expect_ip
 ):
     def dogpark(environ, start_response):
         with sentry_sdk.start_span(name="child-span"):
@@ -989,11 +943,9 @@ def test_user_info_span_attributes_data_collection(
         start_response("200 OK", [])
         return ["Go get the ball! Good dog!"]
 
-    init_kwargs = dict(init_kwargs)  # shallow copy so we can mutate
-
     sentry_init(
         traces_sample_rate=1.0,
-        **init_kwargs,
+        data_collection=data_collection,
     )
     app = SentryWsgiMiddleware(dogpark)
     client = Client(app)
@@ -1016,13 +968,11 @@ def test_user_info_span_attributes_data_collection(
         assert "client.address" not in server_span["attributes"]
 
 
-@pytest.mark.parametrize(
-    "init_kwargs, expect_ip", DATA_COLLECTION_USER_INFO_CASES_LEGACY
-)
+@pytest.mark.parametrize("data_collection, expect_ip", DATA_COLLECTION_USER_INFO_CASES)
 def test_user_info_error_event_data_collection(
-    sentry_init, crashing_app, capture_events, init_kwargs, expect_ip
+    sentry_init, crashing_app, capture_events, data_collection, expect_ip
 ):
-    sentry_init(**init_kwargs)
+    sentry_init(data_collection=data_collection)
     app = SentryWsgiMiddleware(crashing_app)
     client = Client(app)
     events = capture_events()
@@ -1091,7 +1041,7 @@ def test_is_localhost_attribute(
         start_response("200 OK", [])
         return ["woof"]
 
-    sentry_init(traces_sample_rate=1.0)
+    sentry_init(data_collection={}, traces_sample_rate=1.0)
 
     app = SentryWsgiMiddleware(dogpark)
     client = Client(app)
@@ -1116,6 +1066,7 @@ def test_user_agent_attribute(sentry_init, capture_items):
         return ["woof"]
 
     sentry_init(
+        data_collection={},
         traces_sample_rate=1.0,
     )
 
