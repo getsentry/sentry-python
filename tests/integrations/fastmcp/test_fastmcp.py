@@ -696,7 +696,7 @@ async def test_fastmcp_prompt_sync(
         span = prompt_spans[0]
         assert span["attributes"]["sentry.origin"] == "auto.ai.mcp"
         assert span["name"] == "prompts/get code_help_prompt"
-        assert span["attributes"][SPANDATA.MCP_PROMPT_NAME] == "code_help_prompt"
+        assert span["attributes"][SPANDATA.GEN_AI_PROMPT_NAME] == "code_help_prompt"
 
         assert SPANDATA.MCP_PROMPT_RESULT_MESSAGE_CONTENT in span["attributes"]
 
@@ -763,7 +763,7 @@ async def test_fastmcp_prompt_sync_no_sensitive_data(
         span = prompt_spans[0]
         assert span["attributes"]["sentry.origin"] == "auto.ai.mcp"
         assert span["name"] == "prompts/get code_help_prompt"
-        assert span["attributes"][SPANDATA.MCP_PROMPT_NAME] == "code_help_prompt"
+        assert span["attributes"][SPANDATA.GEN_AI_PROMPT_NAME] == "code_help_prompt"
 
         assert SPANDATA.MCP_PROMPT_RESULT_MESSAGE_CONTENT not in span["attributes"]
 
