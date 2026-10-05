@@ -11,7 +11,6 @@ from sentry_sdk.traces import Span
 from ..consts import SPAN_ORIGIN
 from ..utils import (
     _set_agent_data,
-    _set_model_data,
 )
 from .utils import (
     _serialize_binary_content_item,
@@ -53,7 +52,6 @@ def invoke_agent_span(
     )
 
     _set_agent_data(span, agent)
-    _set_model_data(span, agent, model_settings)
 
     # Add user prompt and system prompts if available and prompts are enabled
     if not sentry_sdk.get_client().options["data_collection"]["gen_ai"]["inputs"]:
