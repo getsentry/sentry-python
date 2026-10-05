@@ -216,6 +216,8 @@ def ai_client_context(
         },
     )
 
+    context.span.set_attribute(SPANDATA.GEN_AI_PROVIDER_NAME, "openai")
+
     _set_agent_data(context.span, agent)
 
     if client_options["data_collection"]["gen_ai"]["inputs"]:
