@@ -7,7 +7,7 @@ from sentry_sdk.integrations.django import DjangoIntegration
 from tests.conftest import unpack_werkzeug_response, werkzeug_set_cookie
 from tests.integrations.django.myapp.wsgi import application
 from tests.integrations.django.utils import pytest_mark_django_db_decorator
-from tests.integrations.utils import DATA_COLLECTION_USER_INFO_CASES_LEGACY
+from tests.integrations.utils import DATA_COLLECTION_USER_INFO_CASES
 
 try:
     from django.urls import reverse
@@ -117,34 +117,20 @@ QUERY_STRING = "toy=tennisball&color=red&auth=secret"
 @pytest.mark.forked
 @pytest_mark_django_db_decorator()
 @pytest.mark.parametrize(
-    "init_kwargs, expected_query_string",
+    "data_collection, expected_query_string",
     [
         pytest.param(
-            {"send_default_pii": True},
-            "toy=tennisball&color=red&auth=secret",
-            id="legacy_send_default_pii_true",
-        ),
-        pytest.param(
-            {"send_default_pii": False},
-            "toy=tennisball&color=red&auth=secret",
-            id="legacy_send_default_pii_false",
-        ),
-        pytest.param(
-            {"data_collection": {}},
+            {},
             "toy=tennisball&color=red&auth=%5BFiltered%5D",
             id="data_collection_denylist_default",
         ),
         pytest.param(
-            {
-                "data_collection": {
-                    "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
-                }
-            },
+            {"url_query_params": {"mode": "allowlist", "terms": ["toy"]}},
             "toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D",
             id="data_collection_allowlist",
         ),
         pytest.param(
-            {"data_collection": {"url_query_params": {"mode": "off"}}},
+            {"url_query_params": {"mode": "off"}},
             None,
             id="data_collection_off",
         ),
@@ -154,10 +140,10 @@ def test_query_string_data_collection(
     sentry_init,
     client,
     capture_events,
-    init_kwargs,
+    data_collection,
     expected_query_string,
 ):
-    sentry_init(integrations=[DjangoIntegration()], **init_kwargs)
+    sentry_init(integrations=[DjangoIntegration()], data_collection=data_collection)
     events = capture_events()
 
     client.get(reverse("view_exc") + "?" + QUERY_STRING)
@@ -173,34 +159,20 @@ def test_query_string_data_collection(
 @pytest.mark.forked
 @pytest_mark_django_db_decorator()
 @pytest.mark.parametrize(
-    "init_kwargs, expected_query",
+    "data_collection, expected_query",
     [
         pytest.param(
-            {"send_default_pii": True},
-            "toy=tennisball&color=red&auth=secret",
-            id="legacy_send_default_pii_true",
-        ),
-        pytest.param(
-            {"send_default_pii": False},
-            None,
-            id="legacy_send_default_pii_false",
-        ),
-        pytest.param(
-            {"data_collection": {}},
+            {},
             "toy=tennisball&color=red&auth=%5BFiltered%5D",
             id="data_collection_denylist_default",
         ),
         pytest.param(
-            {
-                "data_collection": {
-                    "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
-                }
-            },
+            {"url_query_params": {"mode": "allowlist", "terms": ["toy"]}},
             "toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D",
             id="data_collection_allowlist",
         ),
         pytest.param(
-            {"data_collection": {"url_query_params": {"mode": "off"}}},
+            {"url_query_params": {"mode": "off"}},
             None,
             id="data_collection_off",
         ),
@@ -210,13 +182,13 @@ def test_span_http_query_data_collection(
     sentry_init,
     client,
     capture_items,
-    init_kwargs,
+    data_collection,
     expected_query,
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
         traces_sample_rate=1.0,
-        **init_kwargs,
+        data_collection=data_collection,
     )
 
     items = capture_items("span")
@@ -232,20 +204,6 @@ def test_span_http_query_data_collection(
         assert SPANDATA.HTTP_QUERY not in root_span["attributes"]
     else:
         assert root_span["attributes"][SPANDATA.HTTP_QUERY] == expected_query
-
-
-@pytest.mark.forked
-@pytest_mark_django_db_decorator()
-def test_query_string_empty_legacy_emits_empty_string(
-    sentry_init, client, capture_events
-):
-    sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
-    events = capture_events()
-
-    client.get(reverse("view_exc"))
-
-    (event,) = events
-    assert event["request"]["query_string"] == ""
 
 
 @pytest.mark.forked
@@ -269,16 +227,14 @@ def test_empty_query_string_is_dropped_with_data_collection(
 
 @pytest.mark.forked
 @pytest_mark_django_db_decorator()
-@pytest.mark.parametrize(
-    "init_kwargs, expect_ip", DATA_COLLECTION_USER_INFO_CASES_LEGACY
-)
+@pytest.mark.parametrize("data_collection, expect_ip", DATA_COLLECTION_USER_INFO_CASES)
 def test_user_info_span_attributes_data_collection(
-    sentry_init, client, capture_items, init_kwargs, expect_ip
+    sentry_init, client, capture_items, data_collection, expect_ip
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
         traces_sample_rate=1.0,
-        **init_kwargs,
+        data_collection=data_collection,
     )
 
     items = capture_items("span")
@@ -303,15 +259,15 @@ def test_user_info_span_attributes_data_collection(
 @pytest.mark.forked
 @pytest_mark_django_db_decorator()
 @pytest.mark.parametrize(
-    "init_kwargs, expect_user", DATA_COLLECTION_USER_INFO_CASES_LEGACY
+    "data_collection, expect_user", DATA_COLLECTION_USER_INFO_CASES
 )
 def test_user_identity_span_attributes_data_collection(
-    sentry_init, client, capture_items, init_kwargs, expect_user
+    sentry_init, client, capture_items, data_collection, expect_user
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
         traces_sample_rate=1.0,
-        **init_kwargs,
+        data_collection=data_collection,
     )
 
     unpack_werkzeug_response(client.get(reverse("mylogin")))
@@ -335,13 +291,11 @@ def test_user_identity_span_attributes_data_collection(
 
 @pytest.mark.forked
 @pytest_mark_django_db_decorator()
-@pytest.mark.parametrize(
-    "init_kwargs, expect_ip", DATA_COLLECTION_USER_INFO_CASES_LEGACY
-)
+@pytest.mark.parametrize("data_collection, expect_ip", DATA_COLLECTION_USER_INFO_CASES)
 def test_user_info_error_event_data_collection(
-    sentry_init, client, capture_events, init_kwargs, expect_ip
+    sentry_init, client, capture_events, data_collection, expect_ip
 ):
-    sentry_init(integrations=[DjangoIntegration()], **init_kwargs)
+    sentry_init(integrations=[DjangoIntegration()], data_collection=data_collection)
     events = capture_events()
 
     client.get(reverse("view_exc"), environ_base={"REMOTE_ADDR": "127.0.0.1"})
@@ -359,12 +313,12 @@ def test_user_info_error_event_data_collection(
 @pytest.mark.forked
 @pytest_mark_django_db_decorator()
 @pytest.mark.parametrize(
-    "init_kwargs, expect_user", DATA_COLLECTION_USER_INFO_CASES_LEGACY
+    "data_collection, expect_user", DATA_COLLECTION_USER_INFO_CASES
 )
 def test_user_identity_error_event_data_collection(
-    sentry_init, client, capture_events, init_kwargs, expect_user
+    sentry_init, client, capture_events, data_collection, expect_user
 ):
-    sentry_init(integrations=[DjangoIntegration()], **init_kwargs)
+    sentry_init(integrations=[DjangoIntegration()], data_collection=data_collection)
     events = capture_events()
 
     client.get(reverse("mylogin"))

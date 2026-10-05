@@ -5,6 +5,7 @@ import sentry_sdk
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.integrations.boto3._context import AwsCallContext
 from sentry_sdk.integrations.boto3._instrumentation import (
+    _finish_span,
     _get_error_attributes,
     _get_response_attributes,
     _instrument_streaming_body,
@@ -12,15 +13,21 @@ from sentry_sdk.integrations.boto3._instrumentation import (
     _sentry_request_created,
     _start_client_span,
 )
+from sentry_sdk.integrations.boto3._services.registry import (
+    _resolve_service,
+)
 from sentry_sdk.integrations.boto3.consts import IDENTIFIER
 from sentry_sdk.traces import NoOpSpan, Span
 from sentry_sdk.utils import capture_internal_exceptions
 
 if TYPE_CHECKING:
-    from typing import Any, Iterator, Optional
+    from typing import Any, Dict, Iterator, Optional
+
+    from sentry_sdk._types import Attributes
 
 try:
     from botocore.client import BaseClient
+    from botocore.exceptions import ClientError
 except ImportError:
     raise DidNotEnable("botocore not installed")
 
@@ -30,12 +37,12 @@ def _activate_client_span(
     span: "Span",
 ) -> "Iterator[Span]":
     """
-    Activate the boto span temporarily during `_make_api_call()` without ending it.
+    Activate the client span temporarily during `_make_api_call()` without ending it.
 
     Botocore returns a `StreamingBody` before its bytes are consumed. Using the
     context manager would finish it as soon as `_make_api_call()` returns, so
     restore the caller's span here and let the `StreamingBody` wrapper finish
-    the boto span when body is consumed/closed.
+    the client span when the body is consumed or closed.
 
     faulty:                               desired:
            boto3  [_make_api_call]                boto3  [_make_api_call------]
@@ -47,13 +54,12 @@ def _activate_client_span(
         return
 
     scope = sentry_sdk.get_current_scope()
-
-    previous_streamed_span = scope.span
+    previous_span = scope.span
     scope.span = span
     try:
         yield span
     finally:
-        scope.span = previous_streamed_span
+        scope.span = previous_span
 
 
 def _patch_botocore_client() -> None:
@@ -62,13 +68,13 @@ def _patch_botocore_client() -> None:
 
     def sentry_patched_init(self: "BaseClient", *args: "Any", **kwargs: "Any") -> None:
         orig_init(self, *args, **kwargs)
-        meta = self.meta
-        meta.events.register("request-created", _sentry_request_created)
-        # run after other `before-sign` handlers so existing baggage is preserved.
-        meta.events.register_last("before-sign", _sentry_before_sign)
+        with capture_internal_exceptions():
+            self.meta.events.register("request-created", _sentry_request_created)
+            # run after other `before-sign` handlers so existing baggage is preserved.
+            self.meta.events.register_last("before-sign", _sentry_before_sign)
 
     def sentry_patched_make_api_call(
-        self: "BaseClient", operation_name: str, api_params: "Any"
+        self: "BaseClient", operation_name: str, api_params: "Dict[str, Any]"
     ) -> "Any":
         """
         Track a single API call, including retries, serialization, and endpoint
@@ -81,15 +87,14 @@ def _patch_botocore_client() -> None:
         if client.get_integration(IDENTIFIER) is None:
             return orig_make_api_call(self, operation_name, api_params)
 
-        ctx = AwsCallContext(operation_name, api_params)
-
-        # add optional metadata to context.
-        with capture_internal_exceptions():
-            ctx.add_metadata(self)
-
         span: "Optional[Span]" = None
         with capture_internal_exceptions():
-            span = _start_client_span(ctx)
+            ctx = AwsCallContext(operation_name, api_params)
+            with capture_internal_exceptions():
+                # add optional metadata to the context, e.g. service-name, region-name, etc.
+                ctx.add_metadata(self)
+            service_ext = _resolve_service(ctx.service_name)
+            span = _start_client_span(ctx, service_ext)
 
         if span is None:
             return orig_make_api_call(self, operation_name, api_params)
@@ -97,18 +102,33 @@ def _patch_botocore_client() -> None:
         # activate without finishing; a streaming response may outlive the call.
         span_ctx = _activate_client_span(span)
 
+        attributes: "Attributes" = {}
         try:
             with span_ctx:
                 try:
                     parsed = orig_make_api_call(self, operation_name, api_params)
                 except BaseException as error:
+                    if service_ext is not None and isinstance(error, ClientError):
+                        with capture_internal_exceptions():
+                            attributes.update(
+                                service_ext.get_response_attributes(ctx, error.response)
+                            )
                     with capture_internal_exceptions():
-                        span.set_attributes(_get_error_attributes(error))
+                        attributes.update(_get_error_attributes(error))
+                    with capture_internal_exceptions():
+                        span.set_attributes(attributes)
                     raise
+                if service_ext is not None:
+                    with capture_internal_exceptions():
+                        attributes.update(
+                            service_ext.get_response_attributes(ctx, parsed)
+                        )
                 with capture_internal_exceptions():
-                    span.set_attributes(_get_response_attributes(parsed))
+                    attributes.update(_get_response_attributes(parsed))
+                with capture_internal_exceptions():
+                    span.set_attributes(attributes)
         except BaseException as error:
-            span.__exit__(type(error), error, error.__traceback__)
+            _finish_span(span, error)
             raise
 
         streaming_body_instrumented = False
@@ -117,7 +137,7 @@ def _patch_botocore_client() -> None:
 
         # `StreamingBody`s finish their span when consumed or closed.
         if not streaming_body_instrumented:
-            span.end()
+            _finish_span(span)
         return parsed
 
     BaseClient.__init__ = sentry_patched_init  # type: ignore

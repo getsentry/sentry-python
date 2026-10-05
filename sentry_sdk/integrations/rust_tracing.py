@@ -36,7 +36,6 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, Optional
 
 import sentry_sdk
 from sentry_sdk.integrations import Integration
-from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.utils import SENSITIVE_DATA_SUBSTITUTE
 
 if TYPE_CHECKING:
@@ -161,14 +160,9 @@ class RustTracingLayer:
         """
         By default, the values of tracing fields are not included in case they
         contain PII. A user may override that by passing `True` for the
-        `include_tracing_fields` keyword argument of this integration or by
-        setting `send_default_pii` to `True` in their Sentry client options.
+        `include_tracing_fields` keyword argument of this integration.
         """
-        return (
-            should_send_default_pii()
-            if self.include_tracing_fields is None
-            else self.include_tracing_fields
-        )
+        return bool(self.include_tracing_fields)
 
     def on_event(self, event: str, sentry_span: "Span") -> None:
         deserialized_event = json.loads(event)
