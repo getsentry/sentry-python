@@ -1,9 +1,11 @@
 import datetime
+import gc
 import importlib
 import logging
 import os
 import sys
 import time
+import weakref
 from collections import Counter
 
 import pytest
@@ -27,6 +29,7 @@ from sentry_sdk.integrations import (
     Integration,
     setup_integrations,
 )
+from sentry_sdk.integrations.dedupe import DedupeIntegration
 from sentry_sdk.integrations.logging import LoggingIntegration
 from sentry_sdk.integrations.stdlib import StdlibIntegration
 from sentry_sdk.scope import add_global_event_processor
@@ -611,17 +614,73 @@ def test_dedupe_doesnt_take_into_account_dropped_exception(sentry_init, capture_
     sentry_init(before_send=before_send)
     events = capture_events()
 
-    exc = ValueError("aha!")
     for _ in range(2):
         # The first ValueError will be dropped by before_send. The second
         # ValueError will be accepted by before_send, and should be sent to
         # Sentry.
         try:
-            raise exc
+            raise ValueError("aha!")
         except Exception:
             capture_exception()
 
     assert len(events) == 1
+
+
+def test_dedupe_drops_exception_when_seen_a_second_time(sentry_init, capture_events):
+    """
+    This test is intended to emulate behavior seen in frameworks like Django,
+    where an exception is raised in a view and then is re-raised in middleware.
+
+    In cases like that we don't want to send a second event for that exception.
+    """
+    sentry_init()
+    events = capture_events()
+
+    test = None
+    for _ in range(2):
+        try:
+            if test is None:
+                test = ValueError("foo")
+            raise test
+        except Exception:
+            capture_exception()
+
+    assert len(events) == 1
+
+
+def test_dedupe_does_not_retain_builtin_exceptions(sentry_init):
+    """
+    There was a different approach that used to be used by DedupeIntegration
+    that used a weakref to hold a reference to a seen exception, and then do a comparison
+    on an incoming exception with that weakref to determine if it was a duplicate.
+
+    Built in exceptions such as ValueError couldn't be used with weakref, so we would instead
+    hold a strong reference to that exception. However, this led to memory leaks as described in
+    https://github.com/getsentry/sentry-python/issues/6094
+    """
+    sentry_init(default_integrations=False, integrations=[DedupeIntegration()])
+
+    class Payload:
+        pass
+
+    payload_ref = None
+
+    def fail():
+        nonlocal payload_ref
+        payload = Payload()
+        payload_ref = weakref.ref(payload)
+        raise ValueError("boom")
+
+    def capture():
+        try:
+            fail()
+        except ValueError as e:
+            sentry_sdk.capture_exception(e)
+
+    capture()
+
+    gc.collect()
+    assert payload_ref() is None
 
 
 def test_event_processor_drop_records_client_report(
