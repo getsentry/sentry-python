@@ -78,11 +78,6 @@ def _set_model_data(
         if hasattr(model_obj, "system"):
             span.set_attribute(SPANDATA.GEN_AI_PROVIDER_NAME, model_obj.system)
 
-        # Set model name
-        model_name = _get_model_name(model_obj)
-        if model_name:
-            span.set_attribute(SPANDATA.GEN_AI_REQUEST_MODEL, model_name)
-
     # Extract model settings
     settings = model_settings
     if not settings and agent and hasattr(agent, "model_settings"):

@@ -290,6 +290,18 @@ def ai_client_context(
     )
 
     _set_agent_data(context.span, agent)
+
+    # Extract model information
+    model_obj = model
+    if not model_obj and agent and hasattr(agent, "model"):
+        model_obj = agent.model
+
+    if model_obj:
+        # Set model name
+        model_name = _get_model_name(model_obj)
+        if model_name:
+            context.span.set_attribute(SPANDATA.GEN_AI_REQUEST_MODEL, model_name)
+
     _set_model_data(context.span, agent, model, model_settings)
     _set_available_tools(context.span, agent)
 
