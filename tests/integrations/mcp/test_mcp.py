@@ -169,7 +169,7 @@ async def test_tool_handler_constructor_registration(sentry_init, capture_items,
     assert span is not None
     data = span["attributes"]
 
-    assert data[SPANDATA.MCP_TOOL_NAME] == "calculate"
+    assert data[SPANDATA.GEN_AI_TOOL_NAME] == "calculate"
     assert data[SPANDATA.MCP_METHOD_NAME] == "tools/call"
     assert data[SPANDATA.MCP_REQUEST_ID] == "req-ctor"
 
@@ -305,7 +305,7 @@ async def test_tool_handler_stdio(
     assert data["sentry.origin"] == "auto.ai.mcp"
 
     # Check span data
-    assert data[SPANDATA.MCP_TOOL_NAME] == "calculate"
+    assert data[SPANDATA.GEN_AI_TOOL_NAME] == "calculate"
     assert data[SPANDATA.MCP_METHOD_NAME] == "tools/call"
     assert data[SPANDATA.MCP_TRANSPORT] == "stdio"
     assert data[SPANDATA.NETWORK_TRANSPORT] == "pipe"
@@ -381,7 +381,7 @@ async def test_tool_handler_stdio_no_sensitive_data(
     assert data["sentry.origin"] == "auto.ai.mcp"
 
     # Check span data
-    assert data[SPANDATA.MCP_TOOL_NAME] == "calculate"
+    assert data[SPANDATA.GEN_AI_TOOL_NAME] == "calculate"
     assert data[SPANDATA.MCP_METHOD_NAME] == "tools/call"
     assert data[SPANDATA.MCP_TRANSPORT] == "stdio"
     assert data[SPANDATA.NETWORK_TRANSPORT] == "pipe"
@@ -456,7 +456,7 @@ async def test_tool_handler_streamable_http(sentry_init, capture_items, json_rpc
     assert data["sentry.origin"] == "auto.ai.mcp"
 
     # Check span data
-    assert data[SPANDATA.MCP_TOOL_NAME] == "process"
+    assert data[SPANDATA.GEN_AI_TOOL_NAME] == "process"
     assert data[SPANDATA.MCP_METHOD_NAME] == "tools/call"
     assert data[SPANDATA.MCP_TRANSPORT] == "http"
     assert data[SPANDATA.NETWORK_TRANSPORT] == "tcp"
@@ -533,7 +533,7 @@ async def test_tool_handler_streamable_http_no_sensitive_data(
     assert data["sentry.origin"] == "auto.ai.mcp"
 
     # Check span data
-    assert data[SPANDATA.MCP_TOOL_NAME] == "process"
+    assert data[SPANDATA.GEN_AI_TOOL_NAME] == "process"
     assert data[SPANDATA.MCP_METHOD_NAME] == "tools/call"
     assert data[SPANDATA.MCP_TRANSPORT] == "http"
     assert data[SPANDATA.NETWORK_TRANSPORT] == "tcp"
