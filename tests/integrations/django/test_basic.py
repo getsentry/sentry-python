@@ -440,7 +440,6 @@ def test_custom_error_handler_request_context(
         "env": {"SERVER_NAME": "localhost", "SERVER_PORT": "80"},
         "headers": {"Host": "localhost"},
         "method": "POST",
-        "query_string": "",
         "url": "http://localhost/404",
     }
 
@@ -474,8 +473,7 @@ def test_sql_queries(
 ):
     sentry_init(
         integrations=[DjangoIntegration()] if with_integration else [],
-        data_collection={},
-        _experiments={"record_sql_params": True},
+        data_collection={"database_query_data": True},
     )
 
     from django.db import connection
@@ -509,8 +507,7 @@ def test_sql_dict_query_params(
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
-        data_collection={},
-        _experiments={"record_sql_params": True},
+        data_collection={"database_query_data": True},
     )
 
     from django.db import connections
@@ -586,10 +583,7 @@ def test_sql_psycopg2_string_composition(
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
-        data_collection={},
-        _experiments={
-            "record_sql_params": True,
-        },
+        data_collection={"database_query_data": True},
     )
     from django.db import connections
 
@@ -624,10 +618,7 @@ def test_sql_psycopg2_placeholders(
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
-        data_collection={},
-        _experiments={
-            "record_sql_params": True,
-        },
+        data_collection={"database_query_data": True},
     )
     from django.db import connections
 
@@ -736,7 +727,7 @@ def test_django_connect_breadcrumbs(
     """
     sentry_init(
         integrations=[DjangoIntegration()],
-        data_collection={},
+        data_collection={"database_query_data": True},
     )
 
     from django.db import connections
@@ -779,7 +770,7 @@ def test_db_connection_span_data(
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
-        data_collection={},
+        data_collection={"database_query_data": True},
         traces_sample_rate=1.0,
     )
 

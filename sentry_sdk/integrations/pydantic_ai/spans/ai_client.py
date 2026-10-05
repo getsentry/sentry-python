@@ -15,7 +15,6 @@ from ..utils import (
     _get_model_name,
     _set_agent_data,
     _set_available_tools,
-    _set_model_data,
 )
 from .utils import (
     _serialize_binary_content_item,
@@ -290,7 +289,50 @@ def ai_client_context(
     )
 
     _set_agent_data(context.span, agent)
-    _set_model_data(context.span, agent, model, model_settings)
+
+    # Extract model information
+    model_obj = model
+    if not model_obj and agent and hasattr(agent, "model"):
+        model_obj = agent.model
+
+    if model_obj:
+        # Set system from model
+        if hasattr(model_obj, "system"):
+            context.span.set_attribute(SPANDATA.GEN_AI_PROVIDER_NAME, model_obj.system)
+
+        # Set model name
+        model_name = _get_model_name(model_obj)
+        if model_name:
+            context.span.set_attribute(SPANDATA.GEN_AI_REQUEST_MODEL, model_name)
+
+    # Extract model settings
+    settings = model_settings
+    if not settings and agent and hasattr(agent, "model_settings"):
+        settings = agent.model_settings
+
+    if settings:
+        settings_map = {
+            "max_tokens": SPANDATA.GEN_AI_REQUEST_MAX_TOKENS,
+            "temperature": SPANDATA.GEN_AI_REQUEST_TEMPERATURE,
+            "top_p": SPANDATA.GEN_AI_REQUEST_TOP_P,
+            "frequency_penalty": SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY,
+            "presence_penalty": SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY,
+        }
+
+        # ModelSettings is a TypedDict (dict at runtime), so use dict access
+        if isinstance(settings, dict):
+            for setting_name, spandata_key in settings_map.items():
+                value = settings.get(setting_name)
+                if value is not None:
+                    context.span.set_attribute(spandata_key, value)  # type: ignore[arg-type]
+        else:
+            # Fallback for object-style settings
+            for setting_name, spandata_key in settings_map.items():
+                if hasattr(settings, setting_name):
+                    value = getattr(settings, setting_name)
+                    if value is not None:
+                        context.span.set_attribute(spandata_key, value)
+
     _set_available_tools(context.span, agent)
 
     # Set input messages (full conversation history)

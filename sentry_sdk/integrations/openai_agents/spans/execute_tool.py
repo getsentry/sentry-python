@@ -5,7 +5,6 @@ from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.traces import Span, SpanStatus
 
 from ..consts import SPAN_ORIGIN
-from ..utils import _set_agent_data
 
 if TYPE_CHECKING:
     from typing import Any
@@ -36,7 +35,7 @@ def update_execute_tool_span(
 ) -> None:
     client = sentry_sdk.get_client()
 
-    _set_agent_data(span, agent)
+    span.set_attribute(SPANDATA.GEN_AI_AGENT_NAME, agent.name)
 
     if isinstance(result, str) and result.startswith(
         "An error occurred while running the tool"

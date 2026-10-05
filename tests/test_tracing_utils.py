@@ -336,35 +336,9 @@ def _get_query_breadcrumb_data(
             id="data_collection_default_records_params",
         ),
         pytest.param(
-            {"_experiments": {"record_sql_params": True}},
-            {"db.params": [1, 2], "db.paramstyle": "format"},
-            id="legacy_record_sql_params_on_records_params",
-        ),
-        pytest.param(
-            {"_experiments": {"record_sql_params": False}},
-            {},
-            id="legacy_record_sql_params_off_strips_params",
-        ),
-        pytest.param(
             {},
             {},
             id="no_options_strips_params",
-        ),
-        pytest.param(
-            {
-                "_experiments": {"record_sql_params": True},
-                "data_collection": {"database_query_data": False},
-            },
-            {},
-            id="data_collection_off_takes_precedence_over_legacy_on",
-        ),
-        pytest.param(
-            {
-                "_experiments": {"record_sql_params": False},
-                "data_collection": {"database_query_data": True},
-            },
-            {"db.params": [1, 2], "db.paramstyle": "format"},
-            id="data_collection_on_takes_precedence_over_legacy_off",
         ),
     ),
 )

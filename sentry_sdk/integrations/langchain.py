@@ -735,7 +735,7 @@ class SentryLangchainCallback(BaseCallbackHandler):
 
             set_data_normalized(
                 span,
-                SPANDATA.GEN_AI_TOOL_INPUT,
+                SPANDATA.GEN_AI_TOOL_CALL_ARGUMENTS,
                 kwargs.get("inputs", [input_str]),
             )
 
