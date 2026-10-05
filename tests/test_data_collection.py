@@ -153,15 +153,6 @@ def _get(dc, path):
         ),
         pytest.param(
             {
-                "data_collection": {},
-                "include_local_variables": False,
-                "include_source_context": False,
-            },
-            {"stack_frame_variables": True, "frame_context_lines": 5},
-            id="explicit_data_collection_ignores_legacy_include_local_variables",
-        ),
-        pytest.param(
-            {
                 "data_collection": {
                     "cookies": {"mode": "off"},
                     "url_query_params": {"mode": "allowlist", "terms": ["page"]},
@@ -310,16 +301,6 @@ def _get(dc, path):
             {"data_collection": {"frame_context_lines": None}},
             {"frame_context_lines": 5},
             id="frame_context_lines_none_falls_back_to_spec_default",
-        ),
-        pytest.param(
-            {"include_local_variables": False, "include_source_context": False},
-            {"stack_frame_variables": False, "frame_context_lines": 0},
-            id="legacy_include_local_variables_off_disables_stack_frame_variables",
-        ),
-        pytest.param(
-            {"include_local_variables": True, "include_source_context": True},
-            {"stack_frame_variables": True, "frame_context_lines": 5},
-            id="legacy_include_local_variables_on_enables_stack_frame_variables",
         ),
     ],
 )

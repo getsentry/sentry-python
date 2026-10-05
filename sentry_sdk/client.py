@@ -377,11 +377,7 @@ class _Client(BaseClient):
                 # data_collection explicitly).
                 if not self.options["data_collection"]["provided_by_user"]:
                     self.options["data_collection"] = _map_from_send_default_pii(
-                        send_default_pii=True,
-                        include_local_variables=self.options["include_local_variables"]
-                        is not False,
-                        include_source_context=self.options["include_source_context"]
-                        is not False,
+                        send_default_pii=True
                     )
 
             self.session_flusher = SessionFlusher(capture_func=_capture_envelope)
@@ -524,9 +520,6 @@ class _Client(BaseClient):
                     "values": [
                         {
                             "stacktrace": current_stacktrace(
-                                include_local_variables=self.options.get(
-                                    "include_local_variables", True
-                                ),
                                 max_value_length=self.options.get(
                                     "max_value_length", DEFAULT_MAX_VALUE_LENGTH
                                 ),

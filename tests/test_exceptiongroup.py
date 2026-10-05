@@ -45,8 +45,6 @@ def test_exceptiongroup():
     (event, _) = event_from_exception(
         exception_group,
         client_options={
-            "include_local_variables": True,
-            "include_source_context": True,
             "max_value_length": 1024,
         },
         mechanism={"type": "test_suite", "handled": False},
@@ -161,8 +159,6 @@ def test_exceptiongroup_simple():
     (event, _) = event_from_exception(
         exception_group,
         client_options={
-            "include_local_variables": True,
-            "include_source_context": True,
             "max_value_length": 1024,
         },
         mechanism={"type": "test_suite", "handled": False},
@@ -206,8 +202,6 @@ def test_exception_chain_cause():
     (event, _) = event_from_exception(
         exception_chain_cause,
         client_options={
-            "include_local_variables": True,
-            "include_source_context": True,
             "max_value_length": 1024,
         },
         mechanism={"type": "test_suite", "handled": False},
@@ -250,8 +244,6 @@ def test_exception_chain_context():
     (event, _) = event_from_exception(
         exception_chain_context,
         client_options={
-            "include_local_variables": True,
-            "include_source_context": True,
             "max_value_length": 1024,
         },
         mechanism={"type": "test_suite", "handled": False},
@@ -293,8 +285,6 @@ def test_simple_exception():
     (event, _) = event_from_exception(
         simple_excpetion,
         client_options={
-            "include_local_variables": True,
-            "include_source_context": True,
             "max_value_length": 1024,
         },
         mechanism={"type": "test_suite", "handled": False},
@@ -342,8 +332,6 @@ def test_exception_group_chained_with_context():
     (event, _) = event_from_exception(
         exc,
         client_options={
-            "include_local_variables": True,
-            "include_source_context": True,
             "max_value_length": 1024,
         },
         mechanism={"type": "test_suite", "handled": False},
@@ -445,8 +433,6 @@ def test_exceptiongroup_starlette_collapse():
     (event, _) = event_from_exception(
         exception_group,
         client_options={
-            "include_local_variables": True,
-            "include_source_context": True,
             "max_value_length": 1024,
         },
         mechanism={"type": "test_suite", "handled": False},
@@ -516,8 +502,6 @@ def test_cyclic_exception_group_cause():
     (event, _) = event_from_exception(
         group,
         client_options={
-            "include_local_variables": True,
-            "include_source_context": True,
             "max_value_length": 1024,
         },
         mechanism={"type": "test_suite", "handled": False},
@@ -554,8 +538,6 @@ def test_deeply_nested_cyclic_exception_group():
     (event, _) = event_from_exception(
         outer_group,
         client_options={
-            "include_local_variables": True,
-            "include_source_context": True,
             "max_value_length": 1024,
         },
         mechanism={"type": "test_suite", "handled": False},
