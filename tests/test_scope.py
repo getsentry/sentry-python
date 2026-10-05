@@ -1125,6 +1125,7 @@ def test_transaction_name_cleared_when_span_unset():
     transaction = Transaction(name="my-transaction")
     scope.span = transaction
     assert scope._transaction == "my-transaction"
+    assert scope._transaction_info.get("source")  # info follows the name
 
     child = transaction.start_child(op="child")
     scope.span = child
@@ -1132,6 +1133,7 @@ def test_transaction_name_cleared_when_span_unset():
 
     scope.span = None
     assert scope._transaction is None
+    assert scope._transaction_info == {}  # no stale source left behind
 
 
 def test_transaction_name_survives_nested_span_exit():

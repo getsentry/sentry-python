@@ -914,6 +914,10 @@ class Scope:
                     self._transaction_info["source"] = transaction.source
         elif span is None:
             self._transaction = None
+            # The transaction source describes the transaction name; leaving
+            # it behind would stamp stale transaction_info on later events
+            # that no longer carry a transaction.
+            self._transaction_info = {}
 
     @property
     def streamed_span(self) -> "Optional[StreamedSpan]":
