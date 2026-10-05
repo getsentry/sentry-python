@@ -2452,7 +2452,7 @@ async def test_invoke_agent_span_with_callable_instruction(
     mock_agent._instructions = ["Static instruction", mock_callable]
 
     # Create span
-    span = invoke_agent_span("Test prompt", mock_agent, None, None)
+    span = invoke_agent_span("Test prompt", mock_agent, None)
     span.end()
 
 
@@ -2485,7 +2485,7 @@ async def test_invoke_agent_span_with_string_instructions(
     mock_agent._instructions = "Single instruction string"
 
     # Create span
-    span = invoke_agent_span("Test prompt", mock_agent, None, None)
+    span = invoke_agent_span("Test prompt", mock_agent, None)
     span.end()
 
 

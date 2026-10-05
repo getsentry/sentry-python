@@ -11,7 +11,6 @@ from sentry_sdk.traces import Span
 from ..consts import SPAN_ORIGIN
 from ..utils import (
     _set_agent_data,
-    _set_model_data,
 )
 from .utils import (
     _serialize_binary_content_item,
@@ -22,7 +21,6 @@ if TYPE_CHECKING:
     from typing import Any, Optional, Sequence, Union
 
     from pydantic_ai import Agent, UserContent
-    from pydantic_ai.models import AbstractModel
     from pydantic_ai.realtime.settings import RealtimeModelSettings
     from pydantic_ai.settings import ModelSettings
 
@@ -36,7 +34,6 @@ except ImportError:
 def invoke_agent_span(
     user_prompt: "Optional[Union[str, Sequence[UserContent]]]",
     agent: "Optional[Agent]",
-    model: "AbstractModel",
     model_settings: "Optional[Union[ModelSettings, RealtimeModelSettings]]",
 ) -> "Span":
     """Create a span for invoking the agent."""
@@ -55,7 +52,6 @@ def invoke_agent_span(
     )
 
     _set_agent_data(span, agent)
-    _set_model_data(span, agent, model)
 
     # Add user prompt and system prompts if available and prompts are enabled
     if not sentry_sdk.get_client().options["data_collection"]["gen_ai"]["inputs"]:
