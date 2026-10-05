@@ -218,6 +218,33 @@ def ai_client_context(
 
     _set_agent_data(context.span, agent)
 
+    if agent.model_settings.max_tokens:
+        context.span.set_attribute(
+            SPANDATA.GEN_AI_REQUEST_MAX_TOKENS, agent.model_settings.max_tokens
+        )
+
+    if agent.model_settings.presence_penalty:
+        context.span.set_attribute(
+            SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY,
+            agent.model_settings.presence_penalty,
+        )
+
+    if agent.model_settings.temperature:
+        context.span.set_attribute(
+            SPANDATA.GEN_AI_REQUEST_TEMPERATURE, agent.model_settings.temperature
+        )
+
+    if agent.model_settings.top_p:
+        context.span.set_attribute(
+            SPANDATA.GEN_AI_REQUEST_TOP_P, agent.model_settings.top_p
+        )
+
+    if agent.model_settings.frequency_penalty:
+        context.span.set_attribute(
+            SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY,
+            agent.model_settings.frequency_penalty,
+        )
+
     if client_options["data_collection"]["gen_ai"]["inputs"]:
         context.span.set_attribute(
             SPANDATA.GEN_AI_TOOL_DEFINITIONS,

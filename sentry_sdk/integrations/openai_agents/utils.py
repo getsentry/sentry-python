@@ -51,11 +51,6 @@ def _set_agent_data(span: "Span", agent: "agents.Agent") -> None:
 
     span.set_attribute(SPANDATA.GEN_AI_AGENT_NAME, agent.name)
 
-    if agent.model_settings.max_tokens:
-        span.set_attribute(
-            SPANDATA.GEN_AI_REQUEST_MAX_TOKENS, agent.model_settings.max_tokens
-        )
-
     model_name: "Optional[str]" = None
     if isinstance(agent.model, Model) and hasattr(agent.model, "model"):
         model_name = agent.model.model
@@ -66,26 +61,6 @@ def _set_agent_data(span: "Span", agent: "agents.Agent") -> None:
 
     if model_name:
         span.set_attribute(SPANDATA.GEN_AI_REQUEST_MODEL, model_name)
-
-    if agent.model_settings.presence_penalty:
-        span.set_attribute(
-            SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY,
-            agent.model_settings.presence_penalty,
-        )
-
-    if agent.model_settings.temperature:
-        span.set_attribute(
-            SPANDATA.GEN_AI_REQUEST_TEMPERATURE, agent.model_settings.temperature
-        )
-
-    if agent.model_settings.top_p:
-        span.set_attribute(SPANDATA.GEN_AI_REQUEST_TOP_P, agent.model_settings.top_p)
-
-    if agent.model_settings.frequency_penalty:
-        span.set_attribute(
-            SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY,
-            agent.model_settings.frequency_penalty,
-        )
 
 
 def _set_usage_data(span: "Span", usage: "Usage") -> None:
