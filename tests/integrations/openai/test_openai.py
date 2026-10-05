@@ -2568,6 +2568,86 @@ def test_streaming_chat_completion(
             pass  # if tiktoken is not installed, we can't guarantee token usage will be calculated properly
 
 
+@pytest.mark.parametrize("consume", ["break_then_close", "with_block"])
+def test_streaming_chat_completion_span_finished_on_early_exit(
+    sentry_init,
+    capture_events,
+    get_model_response,
+    server_side_event_chunks,
+    consume,
+):
+    # https://github.com/getsentry/sentry-python/issues/7847
+    # Closing a stream early (or leaving a `with` block after one chunk) must
+    # still finish the gen_ai.chat span.
+    sentry_init(
+        integrations=[OpenAIIntegration()],
+        disabled_integrations=[StdlibIntegration],
+        traces_sample_rate=1.0,
+        # Keep gen_ai spans on the transaction so the assertion below sees them.
+        stream_gen_ai_spans=False,
+    )
+
+    client = OpenAI(api_key="z")
+    returned_stream = get_model_response(
+        server_side_event_chunks(
+            [
+                ChatCompletionChunk(
+                    id="1",
+                    choices=[
+                        DeltaChoice(
+                            index=0,
+                            delta=ChoiceDelta(content="hel"),
+                            finish_reason=None,
+                        )
+                    ],
+                    created=100000,
+                    model="model-id",
+                    object="chat.completion.chunk",
+                ),
+                ChatCompletionChunk(
+                    id="1",
+                    choices=[
+                        DeltaChoice(
+                            index=0,
+                            delta=ChoiceDelta(content="lo"),
+                            finish_reason=None,
+                        )
+                    ],
+                    created=100000,
+                    model="model-id",
+                    object="chat.completion.chunk",
+                ),
+            ],
+            include_event_type=False,
+        )
+    )
+
+    with mock.patch.object(
+        client.chat._client._client,
+        "send",
+        return_value=returned_stream,
+    ):
+        events = capture_events()
+        with start_transaction(name="openai tx"):
+            stream = client.chat.completions.create(
+                model="some-model",
+                messages=[{"role": "user", "content": "hello"}],
+                stream=True,
+            )
+            if consume == "break_then_close":
+                for _ in stream:
+                    break
+                stream.close()
+            else:
+                with stream:
+                    next(iter(stream))
+
+    transactions = [event for event in events if event.get("type") == "transaction"]
+    assert len(transactions) == 1
+    span_ops = [span["op"] for span in transactions[0]["spans"]]
+    assert "gen_ai.chat" in span_ops
+
+
 # noinspection PyTypeChecker
 @pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
