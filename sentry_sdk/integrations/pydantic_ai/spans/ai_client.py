@@ -1,6 +1,7 @@
 import json
 from typing import TYPE_CHECKING
 
+import sentry_sdk
 from sentry_sdk.ai.utils import (
     normalize_message_roles,
     set_data_normalized,
@@ -15,8 +16,6 @@ from ..utils import (
     _set_agent_data,
     _set_available_tools,
     _set_model_data,
-    _should_send_inputs,
-    _should_send_outputs,
 )
 from .utils import (
     _serialize_binary_content_item,
@@ -101,7 +100,7 @@ def _get_system_instructions(
 
 def _set_input_messages(span: "Span", messages: "list[ModelMessage]") -> None:
     """Set input messages data on a span."""
-    if not _should_send_inputs():
+    if not sentry_sdk.get_client().options["data_collection"]["gen_ai"]["inputs"]:
         return
 
     if not messages:
@@ -216,14 +215,12 @@ def _set_output_data(
     response: "Optional[ModelResponse]",
 ) -> None:
     """Set output data on a span."""
-    record_outputs = _should_send_outputs()
-
     if not response:
         return
 
     span.set_attribute(SPANDATA.GEN_AI_RESPONSE_MODEL, response.model_name)  # type: ignore[arg-type]
 
-    if not record_outputs:
+    if not sentry_sdk.get_client().options["data_collection"]["gen_ai"]["outputs"]:
         return
 
     try:
@@ -293,6 +290,17 @@ def ai_client_context(
     )
 
     _set_agent_data(context.span, agent)
+
+    # Extract model information
+    model_obj = model
+    if not model_obj and agent and hasattr(agent, "model"):
+        model_obj = agent.model
+
+    if model_obj:
+        # Set system from model
+        if hasattr(model_obj, "system"):
+            context.span.set_attribute(SPANDATA.GEN_AI_PROVIDER_NAME, model_obj.system)
+
     _set_model_data(context.span, agent, model, model_settings)
     _set_available_tools(context.span, agent)
 

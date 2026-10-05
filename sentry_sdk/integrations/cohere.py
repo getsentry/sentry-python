@@ -14,11 +14,9 @@ if TYPE_CHECKING:
 
 import sentry_sdk
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
-from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
-    has_data_collection_enabled,
     parse_version,
     reraise,
 )
@@ -88,14 +86,6 @@ class CohereIntegration(Integration):
         BaseCohere.chat = _wrap_chat(BaseCohere.chat, streaming=False)
         Client.embed = _wrap_embed(Client.embed)
         BaseCohere.chat_stream = _wrap_chat(BaseCohere.chat_stream, streaming=True)
-
-
-def _should_record(category: str) -> bool:
-    client = sentry_sdk.get_client()
-    if has_data_collection_enabled(client.options):
-        return bool(client.options["data_collection"]["gen_ai"][category])
-
-    return should_send_default_pii()
 
 
 def _capture_exception(exc: "Any") -> None:
@@ -177,7 +167,7 @@ def _wrap_chat(f: "Callable[..., Any]", streaming: bool) -> "Callable[..., Any]"
             reraise(*exc_info)
 
         with capture_internal_exceptions():
-            if _should_record("inputs"):
+            if sentry_sdk.get_client().options["data_collection"]["gen_ai"]["inputs"]:
                 set_data_normalized(
                     span,
                     SPANDATA.AI_INPUT_MESSAGES,
@@ -213,7 +203,9 @@ def _wrap_chat(f: "Callable[..., Any]", streaming: bool) -> "Callable[..., Any]"
                                 collect_chat_response_fields(
                                     span,
                                     x.response,
-                                    include_pii=_should_record("outputs"),
+                                    include_pii=sentry_sdk.get_client().options[
+                                        "data_collection"
+                                    ]["gen_ai"]["outputs"],
                                 )
                             yield x
                     span.end()
@@ -223,7 +215,9 @@ def _wrap_chat(f: "Callable[..., Any]", streaming: bool) -> "Callable[..., Any]"
                 collect_chat_response_fields(
                     span,
                     res,
-                    include_pii=_should_record("outputs"),
+                    include_pii=sentry_sdk.get_client().options["data_collection"][
+                        "gen_ai"
+                    ]["outputs"],
                 )
                 span.end()
             else:
@@ -248,7 +242,12 @@ def _wrap_embed(f: "Callable[..., Any]") -> "Callable[..., Any]":
                 "sentry.origin": CohereIntegration.origin,
             },
         ) as span:
-            if "texts" in kwargs and _should_record("inputs"):
+            if (
+                "texts" in kwargs
+                and sentry_sdk.get_client().options["data_collection"]["gen_ai"][
+                    "inputs"
+                ]
+            ):
                 if isinstance(kwargs["texts"], str):
                     set_data_normalized(span, SPANDATA.AI_TEXTS, [kwargs["texts"]])
                 elif (

@@ -291,7 +291,7 @@ class SamplePartialReceiveSendMiddleware:
 async def test_request_info_json_body(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
-        send_default_pii=True,
+        data_collection={},
         integrations=[StarletteIntegration()],
     )
 
@@ -332,7 +332,7 @@ async def test_request_info_json_body(sentry_init, capture_items):
 async def test_formdata_request_body(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
-        send_default_pii=True,
+        data_collection={},
         max_request_body_size="always",
         integrations=[StarletteIntegration()],
     )
@@ -353,7 +353,7 @@ async def test_formdata_request_body(sentry_init, capture_items):
     (event,) = (item.payload for item in items if item.type == "event")
     assert event["request"]["data"].keys() == PARSED_FORM.keys()
     assert event["request"]["data"]["username"] == PARSED_FORM["username"]
-    assert event["request"]["data"]["password"] == "[Filtered]"
+    assert event["request"]["data"]["password"] == PARSED_FORM["password"]
     assert event["request"]["data"]["photo"] == ""
 
     sentry_sdk.flush()
@@ -377,7 +377,7 @@ async def test_formdata_request_body(sentry_init, capture_items):
 async def test_request_body_too_big(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
-        send_default_pii=True,
+        data_collection={},
         integrations=[StarletteIntegration()],
     )
 
@@ -502,10 +502,10 @@ async def test_request_body_data_collection(
 
 
 @pytest.mark.asyncio
-async def test_request_info_no_pii(sentry_init, capture_items):
+async def test_request_info_cookies_off(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
-        send_default_pii=False,
+        data_collection={"cookies": {"mode": "off"}},
         integrations=[StarletteIntegration()],
     )
 
@@ -539,35 +539,35 @@ async def test_request_info_no_pii(sentry_init, capture_items):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "init_kwargs, expected_cookies",
+    "data_collection, expected_cookies",
     [
         pytest.param(
-            {"send_default_pii": True},
+            {},
             {
-                "jwt": "tokenval",
+                "jwt": SENSITIVE_DATA_SUBSTITUTE,
                 "theme": "dark",
                 "lang": "en",
-                "identity": "alice",
+                "identity": SENSITIVE_DATA_SUBSTITUTE,
             },
-            id="send_default_pii_true",
+            id="data_collection_default",
         ),
         pytest.param(
-            {"send_default_pii": False},
-            None,
-            id="send_default_pii_false",
+            {"cookies": {"mode": "denylist", "terms": []}},
+            {
+                "jwt": SENSITIVE_DATA_SUBSTITUTE,
+                "theme": "dark",
+                "lang": "en",
+                "identity": SENSITIVE_DATA_SUBSTITUTE,
+            },
+            id="data_collection_denylist_empty_terms",
         ),
         pytest.param(
-            {},
-            None,
-            id="defaults",
-        ),
-        pytest.param(
-            {"data_collection": {"cookies": {"mode": "off"}}},
+            {"cookies": {"mode": "off"}},
             None,
             id="data_collection_off",
         ),
         pytest.param(
-            {"data_collection": {"cookies": {"mode": "denylist"}}},
+            {"cookies": {"mode": "denylist"}},
             {
                 "jwt": SENSITIVE_DATA_SUBSTITUTE,
                 "theme": "dark",
@@ -577,7 +577,7 @@ async def test_request_info_no_pii(sentry_init, capture_items):
             id="data_collection_denylist_default",
         ),
         pytest.param(
-            {"data_collection": {"cookies": {"mode": "denylist", "terms": ["theme"]}}},
+            {"cookies": {"mode": "denylist", "terms": ["theme"]}},
             {
                 "jwt": SENSITIVE_DATA_SUBSTITUTE,
                 "theme": SENSITIVE_DATA_SUBSTITUTE,
@@ -587,7 +587,7 @@ async def test_request_info_no_pii(sentry_init, capture_items):
             id="data_collection_denylist_custom_terms",
         ),
         pytest.param(
-            {"data_collection": {"cookies": {"mode": "allowlist", "terms": ["theme"]}}},
+            {"cookies": {"mode": "allowlist", "terms": ["theme"]}},
             {
                 "jwt": SENSITIVE_DATA_SUBSTITUTE,
                 "theme": "dark",
@@ -597,11 +597,7 @@ async def test_request_info_no_pii(sentry_init, capture_items):
             id="data_collection_allowlist",
         ),
         pytest.param(
-            {
-                "data_collection": {
-                    "cookies": {"mode": "allowlist", "terms": ["identity"]}
-                }
-            },
+            {"cookies": {"mode": "allowlist", "terms": ["identity"]}},
             {
                 "jwt": SENSITIVE_DATA_SUBSTITUTE,
                 "theme": SENSITIVE_DATA_SUBSTITUTE,
@@ -610,28 +606,15 @@ async def test_request_info_no_pii(sentry_init, capture_items):
             },
             id="data_collection_allowlist_sensitive_term",
         ),
-        pytest.param(
-            {
-                "send_default_pii": False,
-                "data_collection": {"cookies": {"mode": "denylist"}},
-            },
-            {
-                "jwt": SENSITIVE_DATA_SUBSTITUTE,
-                "theme": "dark",
-                "lang": "en",
-                "identity": SENSITIVE_DATA_SUBSTITUTE,
-            },
-            id="data_collection_wins_over_send_default_pii",
-        ),
     ],
 )
 async def test_cookie_data_collection(
-    sentry_init, capture_events, init_kwargs, expected_cookies
+    sentry_init, capture_events, data_collection, expected_cookies
 ):
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[StarletteIntegration()],
-        **init_kwargs,
+        data_collection=data_collection,
     )
 
     starlette_app = starlette_app_factory()
@@ -649,41 +632,32 @@ async def test_cookie_data_collection(
 
 
 @pytest.mark.parametrize(
-    "init_kwargs, expected_query_string",
+    "data_collection, expected_query_string",
     [
         pytest.param(
-            {"send_default_pii": True},
-            QUERY_STRING,
-            id="legacy_send_default_pii_true",
-        ),
-        pytest.param(
-            {"data_collection": {}},
+            {},
             "toy=tennisball&color=red&auth=%5BFiltered%5D",
             id="data_collection_denylist_default",
         ),
         pytest.param(
-            {
-                "data_collection": {
-                    "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
-                }
-            },
+            {"url_query_params": {"mode": "allowlist", "terms": ["toy"]}},
             "toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D",
             id="data_collection_allowlist",
         ),
         pytest.param(
-            {"data_collection": {"url_query_params": {"mode": "off"}}},
+            {"url_query_params": {"mode": "off"}},
             None,
             id="data_collection_off",
         ),
     ],
 )
 def test_query_string_data_collection(
-    sentry_init, capture_items, init_kwargs, expected_query_string
+    sentry_init, capture_items, data_collection, expected_query_string
 ):
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[StarletteIntegration()],
-        **init_kwargs,
+        data_collection=data_collection,
     )
 
     starlette_app = starlette_app_factory()
@@ -713,22 +687,16 @@ def test_query_string_data_collection(
 
 
 @pytest.mark.parametrize(
-    "init_kwargs, expected_query, expected_url_full",
+    "data_collection, expected_query, expected_url_full",
     [
         pytest.param(
-            {"send_default_pii": True},
-            QUERY_STRING,
-            "http://testserver/message?" + QUERY_STRING,
-            id="legacy_send_default_pii_true",
-        ),
-        pytest.param(
-            {"data_collection": {}},
+            {},
             "toy=tennisball&color=red&auth=%5BFiltered%5D",
             "http://testserver/message?toy=tennisball&color=red&auth=%5BFiltered%5D",
             id="data_collection_denylist_default",
         ),
         pytest.param(
-            {"data_collection": {"url_query_params": {"mode": "off"}}},
+            {"url_query_params": {"mode": "off"}},
             None,
             "http://testserver/message",
             id="data_collection_off",
@@ -736,13 +704,13 @@ def test_query_string_data_collection(
     ],
 )
 def test_span_http_query_data_collection(
-    sentry_init, capture_items, init_kwargs, expected_query, expected_url_full
+    sentry_init, capture_items, data_collection, expected_query, expected_url_full
 ):
     sentry_init(
         auto_enabling_integrations=False,
         integrations=[StarletteIntegration()],
         traces_sample_rate=1.0,
-        **init_kwargs,
+        data_collection=data_collection,
     )
 
     starlette_app = starlette_app_factory()
@@ -777,51 +745,32 @@ NO_USER_INFO = object()
 
 USER_INFO_CASES = [
     pytest.param(
-        {"send_default_pii": True},
-        TESTCLIENT_IP,
-        id="legacy_send_default_pii_true",
-    ),
-    pytest.param(
-        {"send_default_pii": False},
-        NO_USER_INFO,
-        id="legacy_send_default_pii_false",
-    ),
-    pytest.param(
-        {"data_collection": {}},
+        {},
         TESTCLIENT_IP,
         id="data_collection_default_user_info_true",
     ),
     pytest.param(
-        {"data_collection": {"user_info": True}},
+        {"user_info": True},
         TESTCLIENT_IP,
         id="data_collection_user_info_true",
     ),
     pytest.param(
-        {"data_collection": {"user_info": False}},
+        {"user_info": False},
         NO_USER_INFO,
         id="data_collection_user_info_false",
-    ),
-    pytest.param(
-        {
-            "send_default_pii": True,
-            "data_collection": {"user_info": False},
-        },
-        NO_USER_INFO,
-        id="data_collection_wins_over_send_default_pii",
     ),
 ]
 
 
-@pytest.mark.parametrize("init_kwargs, expected_ip", USER_INFO_CASES)
+@pytest.mark.parametrize("data_collection, expected_ip", USER_INFO_CASES)
 def test_user_info_data_collection(
-    sentry_init, capture_items, init_kwargs, expected_ip
+    sentry_init, capture_items, data_collection, expected_ip
 ):
-    kwargs = dict(init_kwargs)
     sentry_init(
         auto_enabling_integrations=False,
         integrations=[StarletteIntegration()],
         traces_sample_rate=1.0,
-        **kwargs,
+        data_collection=data_collection,
     )
 
     starlette_app = starlette_app_factory()
@@ -842,44 +791,29 @@ def test_user_info_data_collection(
 
 
 @pytest.mark.parametrize(
-    "url,transaction_style,expected_transaction,expected_source",
+    "url,expected_transaction,expected_source",
     [
         (
             "/message",
-            "url",
             "/message",
             "route",
         ),
         (
-            "/message",
-            "endpoint",
-            "tests.integrations.starlette.test_starlette.starlette_app_factory.<locals>._message",
-            "component",
-        ),
-        (
             "/message/123456",
-            "url",
             "/message/{message_id}",
             "route",
         ),
-        (
-            "/message/123456",
-            "endpoint",
-            "tests.integrations.starlette.test_starlette.starlette_app_factory.<locals>._message_with_id",
-            "component",
-        ),
     ],
 )
-def test_transaction_style(
+def test_segment_name_and_source(
     sentry_init,
     capture_events,
     url,
-    transaction_style,
     expected_transaction,
     expected_source,
 ):
     sentry_init(
-        integrations=[StarletteIntegration(transaction_style=transaction_style)],
+        integrations=[StarletteIntegration()],
     )
     starlette_app = starlette_app_factory()
 
@@ -893,9 +827,9 @@ def test_transaction_style(
     assert event["transaction_info"] == {"source": expected_source}
 
 
-def test_host_route_path_has_url_source(sentry_init, capture_items):
+def test_hosted_route_transaction_info(sentry_init, capture_items):
     sentry_init(
-        integrations=[StarletteIntegration(transaction_style="url")],
+        integrations=[StarletteIntegration()],
         traces_sample_rate=1.0,
     )
 
@@ -916,18 +850,20 @@ def test_host_route_path_has_url_source(sentry_init, capture_items):
 
     sentry_sdk.flush()
 
-    events = [item.payload for item in items if item.type == "event"]
-    assert len(events) == 1
-    assert events[0]["transaction"].endswith("/users/123456")
-
     segments = [
         item.payload
         for item in items
         if item.type == "span" and item.payload.get("is_segment")
     ]
     assert len(segments) == 1
-    assert segments[0]["name"].endswith("/users/123456")
-    assert segments[0]["attributes"]["sentry.segment.name.source"] == "url"
+
+    # Starlette starting setting scope["route"] with https://github.com/Kludex/starlette/commit/9c594b56e8da9c3d8c35baa40f357e7bc94f6d02
+    if STARLETTE_VERSION >= (1, 7):
+        assert segments[0]["name"].endswith("/users/{user_id}")
+        assert segments[0]["attributes"]["sentry.segment.name.source"] == "route"
+    else:
+        assert segments[0]["name"].endswith("/users/123456")
+        assert segments[0]["attributes"]["sentry.segment.name.source"] == "url"
 
 
 @pytest.mark.parametrize(
@@ -965,39 +901,31 @@ def test_catch_exceptions(
 
 
 USER_AUTH_CASES = [
-    pytest.param({"send_default_pii": True}, True, id="legacy_pii_true"),
-    pytest.param({"send_default_pii": False}, False, id="legacy_pii_false"),
     pytest.param(
-        {"data_collection": {}},
+        {},
         True,
         id="dc_default_user_info",
     ),
     pytest.param(
-        {"data_collection": {"user_info": True}},
+        {"user_info": True},
         True,
         id="dc_user_info_true",
     ),
     pytest.param(
-        {"data_collection": {"user_info": False}},
+        {"user_info": False},
         False,
         id="dc_user_info_false",
-    ),
-    pytest.param(
-        {
-            "send_default_pii": True,
-            "data_collection": {"user_info": False},
-        },
-        False,
-        id="dc_wins_over_pii",
     ),
 ]
 
 
-@pytest.mark.parametrize("init_kwargs, expect_user", USER_AUTH_CASES)
-def test_user_information_error(sentry_init, capture_events, init_kwargs, expect_user):
+@pytest.mark.parametrize("data_collection, expect_user", USER_AUTH_CASES)
+def test_user_information_error(
+    sentry_init, capture_events, data_collection, expect_user
+):
     sentry_init(
         integrations=[StarletteIntegration()],
-        **init_kwargs,
+        data_collection=data_collection,
     )
     starlette_app = starlette_app_factory(
         middleware=[Middleware(AuthenticationMiddleware, backend=BasicAuthBackend())]
@@ -1020,12 +948,12 @@ def test_user_information_error(sentry_init, capture_events, init_kwargs, expect
         assert "user" not in event
 
 
-@pytest.mark.parametrize("init_kwargs, expect_user", USER_AUTH_CASES)
-def test_user_information(sentry_init, capture_events, init_kwargs, expect_user):
+@pytest.mark.parametrize("data_collection, expect_user", USER_AUTH_CASES)
+def test_user_information(sentry_init, capture_events, data_collection, expect_user):
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[StarletteIntegration()],
-        **init_kwargs,
+        data_collection=data_collection,
     )
     starlette_app = starlette_app_factory(
         middleware=[Middleware(AuthenticationMiddleware, backend=BasicAuthBackend())]
@@ -1055,7 +983,7 @@ def test_user_information_does_not_clobber_app_set_user(sentry_init, capture_eve
     """
     sentry_init(
         traces_sample_rate=1.0,
-        send_default_pii=True,
+        data_collection={},
         integrations=[StarletteIntegration()],
     )
 
@@ -1398,7 +1326,7 @@ def test_active_thread_id(sentry_init, capture_items, endpoint):
 def test_http_route(sentry_init, capture_items, endpoint):
     sentry_init(
         auto_enabling_integrations=False,
-        integrations=[StarletteIntegration(transaction_style="url")],
+        integrations=[StarletteIntegration()],
         traces_sample_rate=1.0,
     )
     app = starlette_app_factory()
@@ -1424,7 +1352,7 @@ def test_segment_name_is_route_resolved_name_static(
 ):
     sentry_init(
         auto_enabling_integrations=False,
-        integrations=[StarletteIntegration(transaction_style="url")],
+        integrations=[StarletteIntegration()],
         traces_sample_rate=1.0,
     )
     items = capture_items("span")
@@ -1476,7 +1404,8 @@ def test_original_request_not_scrubbed(sentry_init, capture_events):
     )
 
     event = events[0]
-    assert event["request"]["data"] == {"password": "[Filtered]"}
+    # Expectation in data collection is that the user scrubs this within `before_send`
+    assert event["request"]["data"] == {"password": "ohno"}
     assert event["request"]["headers"]["authorization"] == "[Filtered]"
     assert event["request"]["headers"]["proxy-authorization"] == "[Filtered]"
 
@@ -1511,29 +1440,8 @@ def test_template_tracing_meta(sentry_init, capture_events):
     assert rendered_baggage == baggage
 
 
-@pytest.mark.parametrize(
-    "request_url,transaction_style,expected_transaction_name,expected_transaction_source",
-    [
-        (
-            "/message/123456",
-            "endpoint",
-            "tests.integrations.starlette.test_starlette.starlette_app_factory.<locals>._message_with_id",
-            "component",
-        ),
-        (
-            "/message/123456",
-            "url",
-            "/message/{message_id}",
-            "route",
-        ),
-    ],
-)
 def test_transaction_name(
     sentry_init,
-    request_url,
-    transaction_style,
-    expected_transaction_name,
-    expected_transaction_source,
     capture_items,
 ):
     """
@@ -1541,7 +1449,7 @@ def test_transaction_name(
     """
     sentry_init(
         auto_enabling_integrations=False,  # Make sure that httpx integration is not added, because it adds tracing information to the starlette test clients request.
-        integrations=[StarletteIntegration(transaction_style=transaction_style)],
+        integrations=[StarletteIntegration()],
         traces_sample_rate=1.0,
     )
 
@@ -1549,42 +1457,18 @@ def test_transaction_name(
 
     app = starlette_app_factory()
     client = TestClient(app)
-    client.get(request_url)
+    client.get("/message/123456")
 
     sentry_sdk.flush()
 
     segments = [item.payload for item in items if item.payload.get("is_segment")]
     assert len(segments) == 1
-    assert segments[0]["name"] == expected_transaction_name
-    assert (
-        segments[0]["attributes"]["sentry.segment.name.source"]
-        == expected_transaction_source
-    )
+    assert segments[0]["name"] == "/message/{message_id}"
+    assert segments[0]["attributes"]["sentry.segment.name.source"] == "route"
 
 
-@pytest.mark.parametrize(
-    "request_url,transaction_style,expected_transaction_name,expected_transaction_source",
-    [
-        (
-            "/message/123456",
-            "endpoint",
-            "http://testserver/message/123456",
-            "url",
-        ),
-        (
-            "/message/123456",
-            "url",
-            "http://testserver/message/123456",
-            "url",
-        ),
-    ],
-)
 def test_transaction_name_in_traces_sampler(
     sentry_init,
-    request_url,
-    transaction_style,
-    expected_transaction_name,
-    expected_transaction_source,
 ):
     """
     Tests that a custom traces_sampler has a meaningful transaction name.
@@ -1593,50 +1477,27 @@ def test_transaction_name_in_traces_sampler(
 
     def dummy_traces_sampler(sampling_context):
         assert (
-            sampling_context["transaction_context"]["name"] == expected_transaction_name
+            sampling_context["transaction_context"]["name"]
+            == "http://testserver/message/123456"
         )
-        assert (
-            sampling_context["transaction_context"]["source"]
-            == expected_transaction_source
-        )
+        assert sampling_context["transaction_context"]["source"] == "url"
 
     sentry_init(
         auto_enabling_integrations=False,  # Make sure that httpx integration is not added, because it adds tracing information to the starlette test clients request.
-        integrations=[StarletteIntegration(transaction_style=transaction_style)],
+        integrations=[StarletteIntegration()],
         traces_sampler=dummy_traces_sampler,
         traces_sample_rate=1.0,
     )
 
     app = starlette_app_factory()
     client = TestClient(app)
-    client.get(request_url)
+    client.get("/message/123456")
 
 
 @pytest.mark.parametrize("middleware_spans", [False, True])
-@pytest.mark.parametrize(
-    "request_url,transaction_style,expected_transaction_name,expected_transaction_source",
-    [
-        (
-            "/message/123456",
-            "endpoint",
-            "starlette.middleware.trustedhost.TrustedHostMiddleware",
-            "component",
-        ),
-        (
-            "/message/123456",
-            "url",
-            "http://testserver/message/123456",
-            "url",
-        ),
-    ],
-)
 def test_transaction_name_in_middleware(
     sentry_init,
     middleware_spans,
-    request_url,
-    transaction_style,
-    expected_transaction_name,
-    expected_transaction_source,
     capture_items,
 ):
     """
@@ -1645,9 +1506,7 @@ def test_transaction_name_in_middleware(
     sentry_init(
         auto_enabling_integrations=False,  # Make sure that httpx integration is not added, because it adds tracing information to the starlette test clients request.
         integrations=[
-            StarletteIntegration(
-                transaction_style=transaction_style, middleware_spans=middleware_spans
-            ),
+            StarletteIntegration(middleware_spans=middleware_spans),
         ],
         traces_sample_rate=1.0,
     )
@@ -1663,17 +1522,14 @@ def test_transaction_name_in_middleware(
 
     app = starlette_app_factory(middleware=middleware)
     client = TestClient(app)
-    client.get(request_url)
+    client.get("/message/123456")
 
     sentry_sdk.flush()
 
     segments = [item.payload for item in items if item.payload.get("is_segment")]
     assert len(segments) == 1
-    assert segments[0]["name"] == expected_transaction_name
-    assert (
-        segments[0]["attributes"]["sentry.segment.name.source"]
-        == expected_transaction_source
-    )
+    assert segments[0]["name"] == "http://testserver/message/123456"
+    assert segments[0]["attributes"]["sentry.segment.name.source"] == "url"
 
 
 def test_span_origin(sentry_init, capture_items):
@@ -1735,7 +1591,7 @@ def test_segment_http_method_default(sentry_init, capture_items):
 def test_request_url(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
-        send_default_pii=True,
+        data_collection={},
         integrations=[
             StarletteIntegration(),
         ],
@@ -1834,7 +1690,7 @@ def test_configurable_status_codes(
 async def test_malformed_json_request_body(sentry_init, capture_events):
     sentry_init(
         traces_sample_rate=1.0,
-        send_default_pii=True,
+        data_collection={},
         integrations=[StarletteIntegration()],
     )
 

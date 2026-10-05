@@ -27,11 +27,9 @@ from sentry_sdk.ai.utils import (
     transform_google_content_part,
 )
 from sentry_sdk.consts import OP, SPANDATA
-from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
-    has_data_collection_enabled,
     safe_serialize,
 )
 
@@ -919,16 +917,7 @@ def set_span_data_for_request(
         if tools:
             formatted_tools = _format_tools_for_span(tools)
             if formatted_tools:
-                if has_data_collection_enabled(client.options):
-                    if client.options["data_collection"]["gen_ai"]["inputs"]:
-                        set_data_normalized(
-                            span,
-                            SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
-                            formatted_tools,
-                            unpack=False,
-                        )
-                else:
-                    # To remove once data collection has been fully rolled out
+                if client.options["data_collection"]["gen_ai"]["inputs"]:
                     set_data_normalized(
                         span,
                         SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
@@ -937,10 +926,7 @@ def set_span_data_for_request(
                     )
 
     record_inputs = False
-    if has_data_collection_enabled(client.options):
-        if client.options["data_collection"]["gen_ai"]["inputs"]:
-            record_inputs = True
-    elif should_send_default_pii():
+    if client.options["data_collection"]["gen_ai"]["inputs"]:
         record_inputs = True
 
     if record_inputs:
@@ -1043,29 +1029,14 @@ def set_span_data_for_response(
 
     tool_calls = extract_tool_calls(response)
     if tool_calls:
-        if has_data_collection_enabled(client.options):
-            if client.options["data_collection"]["gen_ai"]["outputs"]:
-                span.set_attribute(
-                    SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS, safe_serialize(tool_calls)
-                )
-        else:
-            # Before data collection was introduced, this was set unconditionally
+        if client.options["data_collection"]["gen_ai"]["outputs"]:
             span.set_attribute(
                 SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS, safe_serialize(tool_calls)
             )
 
-    if has_data_collection_enabled(client.options):
-        if client.options["data_collection"]["gen_ai"]["outputs"]:
-            response_texts = _extract_response_text(response)
-            if response_texts:
-                span.set_attribute(
-                    SPANDATA.GEN_AI_RESPONSE_TEXT, safe_serialize(response_texts)
-                )
-    elif should_send_default_pii():
-        # TODO: Delete this block once data collection has been completely rolled out
+    if client.options["data_collection"]["gen_ai"]["outputs"]:
         response_texts = _extract_response_text(response)
         if response_texts:
-            # Format as JSON string array as per documentation
             span.set_attribute(
                 SPANDATA.GEN_AI_RESPONSE_TEXT, safe_serialize(response_texts)
             )
@@ -1111,14 +1082,7 @@ def set_span_data_for_embed_request(
     """Set span data for embedding request."""
     client = sentry_sdk.get_client()
 
-    record_inputs = False
-    if has_data_collection_enabled(client.options):
-        if client.options["data_collection"]["gen_ai"]["inputs"]:
-            record_inputs = True
-    elif should_send_default_pii():
-        record_inputs = True
-
-    if record_inputs:
+    if client.options["data_collection"]["gen_ai"]["inputs"]:
         if contents:
             # For embeddings, contents is typically a list of strings/texts
             input_texts = []

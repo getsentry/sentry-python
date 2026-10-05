@@ -56,7 +56,7 @@ def test_view_exceptions(
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
-        send_default_pii=True,
+        data_collection={},
     )
     exceptions = capture_exceptions()
     items = capture_items("event")
@@ -85,7 +85,7 @@ def test_ensures_x_forwarded_header_is_honored_in_sdk_when_enabled_in_django(
 
     sentry_init(
         integrations=[DjangoIntegration()],
-        send_default_pii=True,
+        data_collection={},
     )
     exceptions = capture_exceptions()
     items = capture_items("event")
@@ -111,7 +111,7 @@ def test_ensures_x_forwarded_header_is_not_honored_when_unenabled_in_django(
     """
     sentry_init(
         integrations=[DjangoIntegration()],
-        send_default_pii=True,
+        data_collection={},
     )
     exceptions = capture_exceptions()
     items = capture_items("event")
@@ -125,7 +125,7 @@ def test_ensures_x_forwarded_header_is_not_honored_when_unenabled_in_django(
 
 
 def test_middleware_exceptions(sentry_init, client, capture_exceptions):
-    sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
+    sentry_init(integrations=[DjangoIntegration()], data_collection={})
     exceptions = capture_exceptions()
     client.get(reverse("middleware_exc"))
 
@@ -140,7 +140,7 @@ def test_request_captured(
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
-        send_default_pii=True,
+        data_collection={},
     )
     items = capture_items("event")
     content, status, headers = unpack_werkzeug_response(client.get(reverse("message")))
@@ -151,35 +151,11 @@ def test_request_captured(
 
     assert event["transaction"] == "/message"
     assert event["request"] == {
-        "cookies": {},
         "env": {"SERVER_NAME": "localhost", "SERVER_PORT": "80"},
         "headers": {"Host": "localhost"},
         "method": "GET",
-        "query_string": "",
         "url": "http://localhost/message",
     }
-
-
-def test_transaction_with_class_view(
-    sentry_init,
-    client,
-    capture_items,
-):
-    sentry_init(
-        integrations=[DjangoIntegration(transaction_style="function_name")],
-        send_default_pii=True,
-    )
-    items = capture_items("event")
-    content, status, headers = unpack_werkzeug_response(
-        client.head(reverse("classbased"))
-    )
-    assert status.lower() == "200 ok"
-
-    (event,) = (item.payload for item in items)
-    assert (
-        event["transaction"] == "tests.integrations.django.myapp.views.ClassBasedView"
-    )
-    assert event["message"] == "hi"
 
 
 def test_has_trace_if_performance_enabled(
@@ -337,7 +313,7 @@ def test_user_captured(
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
-        send_default_pii=True,
+        data_collection={},
     )
     items = capture_items("event")
     content, status, headers = unpack_werkzeug_response(client.get(reverse("mylogin")))
@@ -367,7 +343,7 @@ def test_materialized_user_captured(
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
-        send_default_pii=True,
+        data_collection={},
         traces_sample_rate=1.0,
     )
 
@@ -470,7 +446,7 @@ def test_custom_error_handler_request_context(
 
 
 def test_500(sentry_init, client):
-    sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
+    sentry_init(integrations=[DjangoIntegration()], data_collection={})
 
     content, status, headers = unpack_werkzeug_response(client.get("/view-exc"))
     assert status.lower() == "500 internal server error"
@@ -498,7 +474,7 @@ def test_sql_queries(
 ):
     sentry_init(
         integrations=[DjangoIntegration()] if with_integration else [],
-        send_default_pii=True,
+        data_collection={},
         _experiments={"record_sql_params": True},
     )
 
@@ -533,7 +509,7 @@ def test_sql_dict_query_params(
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
-        send_default_pii=True,
+        data_collection={},
         _experiments={"record_sql_params": True},
     )
 
@@ -610,7 +586,7 @@ def test_sql_psycopg2_string_composition(
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
-        send_default_pii=True,
+        data_collection={},
         _experiments={
             "record_sql_params": True,
         },
@@ -648,7 +624,7 @@ def test_sql_psycopg2_placeholders(
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
-        send_default_pii=True,
+        data_collection={},
         _experiments={
             "record_sql_params": True,
         },
@@ -719,7 +695,7 @@ def test_django_connect_trace(
     """
     sentry_init(
         integrations=[DjangoIntegration()],
-        send_default_pii=True,
+        data_collection={},
         traces_sample_rate=1.0,
     )
 
@@ -760,7 +736,7 @@ def test_django_connect_breadcrumbs(
     """
     sentry_init(
         integrations=[DjangoIntegration()],
-        send_default_pii=True,
+        data_collection={},
     )
 
     from django.db import connections
@@ -785,7 +761,12 @@ def test_django_connect_breadcrumbs(
 
     assert event["breadcrumbs"]["values"][-2:] == [
         {"message": "connect", "category": "query", "type": "default"},
-        {"message": "select 1", "category": "query", "data": {}, "type": "default"},
+        {
+            "message": "select 1",
+            "category": "query",
+            "data": {"db.paramstyle": "format"},
+            "type": "default",
+        },
     ]
 
 
@@ -798,7 +779,7 @@ def test_db_connection_span_data(
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
-        send_default_pii=True,
+        data_collection={},
         traces_sample_rate=1.0,
     )
 
@@ -857,33 +838,25 @@ def test_set_db_data_custom_backend():
 
 
 @pytest.mark.parametrize(
-    "transaction_style,client_url,expected_transaction,expected_source,expected_response",
+    "client_url,expected_transaction,expected_source,expected_response",
     [
-        (
-            "function_name",
-            "/message",
-            "tests.integrations.django.myapp.views.message",
-            "component",
-            b"ok",
-        ),
-        ("url", "/message", "/message", "route", b"ok"),
-        ("url", "/404", "/404", "url", b"404"),
+        ("/message", "/message", "route", b"ok"),
+        ("/404", "/404", "url", b"404"),
     ],
 )
-def test_transaction_style(
+def test_segment_name(
     sentry_init,
     client,
     capture_items,
-    transaction_style,
     client_url,
     expected_transaction,
     expected_source,
     expected_response,
 ):
     sentry_init(
-        integrations=[DjangoIntegration(transaction_style=transaction_style)],
+        integrations=[DjangoIntegration()],
         traces_sample_rate=1.0,
-        send_default_pii=True,
+        data_collection={},
     )
     items = capture_items("event", "span")
 
@@ -902,32 +875,24 @@ def test_transaction_style(
 
 
 @pytest.mark.parametrize(
-    "transaction_style,client_url,expected_transaction,expected_source,expected_response",
+    "client_url,expected_transaction,expected_source,expected_response",
     [
-        (
-            "function_name",
-            "/message",
-            "tests.integrations.django.myapp.views.message",
-            "component",
-            b"ok",
-        ),
-        ("url", "/message", "/message", "route", b"ok"),
-        ("url", "/404", "/404", "url", b"404"),
+        ("/message", "/message", "route", b"ok"),
+        ("/404", "/404", "url", b"404"),
     ],
 )
-def test_transaction_style_tracing_disabled(
+def test_segment_name_tracing_disabled(
     sentry_init,
     client,
     capture_items,
-    transaction_style,
     client_url,
     expected_transaction,
     expected_source,
     expected_response,
 ):
     sentry_init(
-        integrations=[DjangoIntegration(transaction_style=transaction_style)],
-        send_default_pii=True,
+        integrations=[DjangoIntegration()],
+        data_collection={},
     )
     items = capture_items("event")
 
@@ -1261,7 +1226,7 @@ def test_rest_framework_basic(
     pytest.importorskip("rest_framework")
     sentry_init(
         integrations=[DjangoIntegration()],
-        send_default_pii=True,
+        data_collection={},
     )
     exceptions = capture_exceptions()
     items = capture_items("event")

@@ -177,6 +177,7 @@ _MIN_VERSIONS = {
     "tornado": (6, 0),
     "trytond_wsgi": (5, 4),
     "typer": (0, 15),
+    "typesafe": (0, 7),
     "unleash": (6, 0, 1),
 }
 

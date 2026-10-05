@@ -31,6 +31,7 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 - The option `attach_stacktrace` is now `True` by default, meaning the SDK will attach stack traces to messages.
 - The Django integration now creates spans for cache operations by default. Pass `DjangoIntegration(cache_spans=False)` to `sentry_sdk.init()` to turn them off.
 - The Django integration no longer force-enables cache spans when Spotlight is active and `settings.DEBUG` is `True`. The `cache_spans` option is now always respected as given.
+- Exception groups in exception chains are now properly unfurled.
 
 ### Logging
 
@@ -121,6 +122,7 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 - Dropped support for Pydantic AI below 1.76.
 - Dropped support for OpenAI Agents below 0.10.3.
 - Dropped support for MCP below 2.0.
+- Removed the `transaction_style` option from server integrations (DjangoIntegration, StarletteIntegration, FastApiIntegration, AioHttpIntegration, FlaskIntegration, PyramidIntegration, QuartIntegration, BottleIntegration, FalconIntegration, StarliteIntegration and LitestarIntegration).
 - Removed the RedisIntegration `max_data_size` option.
 - Removed the possibility to supply a specific client to the LaunchDarklyIntegration.
 - The `enable_tracing` option was removed. Use `traces_sample_rate=1.0` instead.

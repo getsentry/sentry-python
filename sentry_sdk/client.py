@@ -27,7 +27,6 @@ from sentry_sdk.integrations import setup_integrations
 from sentry_sdk.integrations.dedupe import DedupeIntegration
 from sentry_sdk.monitor import Monitor
 from sentry_sdk.profiler.continuous_profiler import setup_continuous_profiler
-from sentry_sdk.scrubber import EventScrubber
 from sentry_sdk.serializer import serialize
 from sentry_sdk.sessions import SessionFlusher
 from sentry_sdk.traces import Span, trace
@@ -49,7 +48,6 @@ from sentry_sdk.utils import (
     get_sdk_name,
     get_type_name,
     handle_in_app,
-    has_data_collection_enabled,
     logger,
 )
 
@@ -131,20 +129,6 @@ def _get_options(*args: "Optional[str]", **kwargs: "Any") -> "Dict[str, Any]":
         rv["project_root"] = project_root
 
     rv["data_collection"] = _resolve_data_collection(rv)
-
-    # Do not add the event scrubber if data collection is enabled as it can remove data that's
-    # collected under data collection config
-    if not has_data_collection_enabled(rv) and rv["event_scrubber"] is None:
-        rv["event_scrubber"] = EventScrubber(
-            send_default_pii=False
-            if rv["send_default_pii"] is None
-            else rv["send_default_pii"]
-        )
-    elif has_data_collection_enabled(rv) and rv["event_scrubber"]:
-        logger.warning(
-            "Event scrubbers are not enabled when data collection configuration is provided. Ignoring event_scrubber...",
-        )
-        rv["event_scrubber"] = None
 
     if rv["socket_options"] and not isinstance(rv["socket_options"], list):
         logger.warning(
@@ -571,11 +555,6 @@ class _Client(BaseClient):
             self.options["project_root"],
         )
 
-        if event is not None:
-            event_scrubber = self.options["event_scrubber"]
-            if event_scrubber:
-                event_scrubber.scrub_event(event)
-
         if previous_total_breadcrumbs is not None:
             event["breadcrumbs"] = AnnotatedValue(
                 event.get("breadcrumbs", {"values": []}),
@@ -598,14 +577,22 @@ class _Client(BaseClient):
         before_send = self.options["before_send"]
         if before_send is not None and event is not None:
             new_event = None
+            exception_raised_in_before_send = False
             with capture_internal_exceptions():
-                new_event = before_send(event, hint or {})
+                try:
+                    new_event = before_send(event, hint or {})
+                except Exception:
+                    exception_raised_in_before_send = True
+                    raise
             if new_event is None:
                 logger.info("before send dropped event")
                 if self.transport:
-                    self.transport.record_lost_event(
-                        "before_send", data_category="error"
+                    reason = (
+                        "callback_error"
+                        if exception_raised_in_before_send
+                        else "before_send"
                     )
+                    self.transport.record_lost_event(reason, data_category="error")
 
                 # If this is an exception, reset the DedupeIntegration. It still
                 # remembers the dropped exception as the last exception, meaning
@@ -853,15 +840,32 @@ class _Client(BaseClient):
                     exception_raised_in_before_send_func = True
                     raise
 
-            if ty in ("log", "metric"):
-                # We are ok with dropping metrics and logs when an exception is raised
-                # because we allow users to drop them in their respect before_send_*
-                # functions.
+            if ty == "log":
                 if exception_raised_in_before_send_func:
+                    if self.transport:
+                        self.transport.record_lost_event(
+                            "callback_error", data_category="log_item"
+                        )
                     return
-                # Logs and metrics can be dropped in their respective
-                # before_send, so if we get None, don't queue them for sending.
                 if serialized is None:
+                    if self.transport:
+                        self.transport.record_lost_event(
+                            "before_send", data_category="log_item"
+                        )
+                    return
+
+            elif ty == "metric":
+                if exception_raised_in_before_send_func:
+                    if self.transport:
+                        self.transport.record_lost_event(
+                            "callback_error", data_category="trace_metric"
+                        )
+                    return
+                if serialized is None:
+                    if self.transport:
+                        self.transport.record_lost_event(
+                            "before_send", data_category="trace_metric"
+                        )
                     return
 
             elif ty == "span" and isinstance(telemetry, Span):

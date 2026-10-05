@@ -41,12 +41,10 @@ from sentry_sdk.ai.utils import (
 )
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
-from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import Span
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
-    has_data_collection_enabled,
     parse_version,
     reraise,
 )
@@ -369,32 +367,15 @@ def _set_responses_api_input_data(
             reasoning["effort"],
         )
 
-    client_options = sentry_sdk.get_client().options
-    if has_data_collection_enabled(client_options):
-        if client_options["data_collection"]["gen_ai"]["inputs"]:
-            tools = kwargs.get("tools")
-            if tools is not None and _is_given(tools):
-                span.set_attribute(
-                    SPANDATA.GEN_AI_TOOL_DEFINITIONS,
-                    json.dumps(_transform_tool_definitions_responses(tools)),
-                )
-    else:
-        # Pre-data collection this was always set, so this needs to be left here for now until
-        # we deprecate `send_default_pii`. Once we do, this 'else' branch should be removed,
-        # and the above branch placed below the "if not should_send_default_pii()"
-        # line below
-        tools = kwargs.get("tools")
-        if tools is not None and _is_given(tools):
-            span.set_attribute(
-                SPANDATA.GEN_AI_TOOL_DEFINITIONS,
-                json.dumps(_transform_tool_definitions_responses(tools)),
-            )
-
-    if has_data_collection_enabled(client_options):
-        if not client_options["data_collection"]["gen_ai"]["inputs"]:
-            return
-    elif not should_send_default_pii():
+    if not sentry_sdk.get_client().options["data_collection"]["gen_ai"]["inputs"]:
         return
+
+    tools = kwargs.get("tools")
+    if tools is not None and _is_given(tools):
+        span.set_attribute(
+            SPANDATA.GEN_AI_TOOL_DEFINITIONS,
+            json.dumps(_transform_tool_definitions_responses(tools)),
+        )
 
     explicit_instructions: "Union[Optional[str], Omit]" = kwargs.get("instructions")
     has_explicit_instructions = explicit_instructions is not None and _is_given(
@@ -497,36 +478,19 @@ def _set_completions_api_input_data(
     if reasoning_level is not None and _is_given(reasoning_level):
         span.set_attribute(SPANDATA.GEN_AI_REQUEST_REASONING_LEVEL, reasoning_level)
 
-    client = sentry_sdk.get_client()
-    if has_data_collection_enabled(client.options):
-        if client.options["data_collection"]["gen_ai"]["inputs"]:
-            tools = kwargs.get("tools")
-            if tools is not None and _is_given(tools):
-                span.set_attribute(
-                    SPANDATA.GEN_AI_TOOL_DEFINITIONS,
-                    json.dumps(_transform_tool_definitions_completions(tools)),
-                )
-    else:
-        # Pre-data collection this was always set, so this needs to be left here for now until
-        # we deprecate `send_default_pii`. Once we do, this 'else' branch should be removed,
-        # and the above branch placed below the "if not should_send_default_pii()"
-        # line below
-        tools = kwargs.get("tools")
-        if tools is not None and _is_given(tools):
-            span.set_attribute(
-                SPANDATA.GEN_AI_TOOL_DEFINITIONS,
-                json.dumps(_transform_tool_definitions_completions(tools)),
-            )
+    if not sentry_sdk.get_client().options["data_collection"]["gen_ai"]["inputs"]:
+        return
+
+    tools = kwargs.get("tools")
+    if tools is not None and _is_given(tools):
+        span.set_attribute(
+            SPANDATA.GEN_AI_TOOL_DEFINITIONS,
+            json.dumps(_transform_tool_definitions_completions(tools)),
+        )
 
     messages: "Optional[Union[str, Iterable[ChatCompletionMessageParam]]]" = kwargs.get(
         "messages"
     )
-
-    if has_data_collection_enabled(client.options):
-        if not client.options["data_collection"]["gen_ai"]["inputs"]:
-            return
-    elif not should_send_default_pii():
-        return
 
     if messages is None:
         return
@@ -562,7 +526,6 @@ def _set_completions_api_input_data(
     ]
     if len(non_system_messages) > 0:
         normalized_messages = normalize_message_roles(non_system_messages)  # type: ignore
-        client = sentry_sdk.get_client()
         set_data_normalized(
             span,
             SPANDATA.GEN_AI_REQUEST_MESSAGES,
@@ -583,16 +546,12 @@ def _set_embeddings_input_data(
     if model is not None:
         span.set_attribute(SPANDATA.GEN_AI_REQUEST_MODEL, model)
 
+    if not sentry_sdk.get_client().options["data_collection"]["gen_ai"]["inputs"]:
+        return
+
     messages: "Optional[Union[str, SequenceNotStr[str], Iterable[int], Iterable[Iterable[int]]]]" = kwargs.get(
         "input"
     )
-
-    client = sentry_sdk.get_client()
-    if has_data_collection_enabled(client.options):
-        if not client.options["data_collection"]["gen_ai"]["inputs"]:
-            return
-    elif not should_send_default_pii():
-        return
 
     if messages is None:
         return
@@ -640,18 +599,7 @@ def _set_common_output_data(
 
     # Chat Completions API
     if hasattr(response, "choices") and response.choices is not None:
-        if has_data_collection_enabled(client.options):
-            if client.options["data_collection"]["gen_ai"]["outputs"]:
-                response_text = [
-                    choice.message.model_dump()
-                    for choice in response.choices
-                    if choice.message is not None
-                ]
-                if len(response_text) > 0:
-                    set_data_normalized(
-                        span, SPANDATA.GEN_AI_RESPONSE_TEXT, response_text
-                    )
-        elif should_send_default_pii():
+        if client.options["data_collection"]["gen_ai"]["outputs"]:
             response_text = [
                 choice.message.model_dump()
                 for choice in response.choices
@@ -681,39 +629,7 @@ def _set_common_output_data(
             "tool": [],
         }
 
-        if has_data_collection_enabled(client.options) and isinstance(
-            response.output, list
-        ):
-            record_outputs = client.options["data_collection"]["gen_ai"]["outputs"]
-
-            if record_outputs:
-                for output in response.output:
-                    if output.type == "function_call":
-                        output_messages["tool"].append(output.dict())
-                    elif output.type == "message":
-                        for output_message in output.content:
-                            try:
-                                output_messages["response"].append(output_message.text)  # type: ignore[union-attr]
-                            except AttributeError:
-                                # Unknown output message type, just return the json
-                                output_messages["response"].append(
-                                    output_message.dict()
-                                )
-
-                if len(output_messages["tool"]) > 0:
-                    set_data_normalized(
-                        span,
-                        SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
-                        output_messages["tool"],
-                        unpack=False,
-                    )
-
-                if record_outputs and len(output_messages["response"]) > 0:
-                    set_data_normalized(
-                        span, SPANDATA.GEN_AI_RESPONSE_TEXT, output_messages["response"]
-                    )
-
-        elif should_send_default_pii() and isinstance(response.output, list):
+        if client.options["data_collection"]["gen_ai"]["outputs"]:
             for output in response.output:
                 if output.type == "function_call":
                     output_messages["tool"].append(output.dict())
@@ -983,12 +899,7 @@ def _wrap_synchronous_completions_chunk_iterator(
         all_responses = None
         if len(data_buf) > 0:
             all_responses = ["".join(chunk) for chunk in data_buf]
-            if has_data_collection_enabled(client.options):
-                if client.options["data_collection"]["gen_ai"]["outputs"]:
-                    set_data_normalized(
-                        span, SPANDATA.GEN_AI_RESPONSE_TEXT, all_responses
-                    )
-            elif should_send_default_pii():
+            if client.options["data_collection"]["gen_ai"]["outputs"]:
                 set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, all_responses)
 
         _calculate_completions_token_usage(
@@ -1051,12 +962,7 @@ async def _wrap_asynchronous_completions_chunk_iterator(
         all_responses = None
         if len(data_buf) > 0:
             all_responses = ["".join(chunk) for chunk in data_buf]
-            if has_data_collection_enabled(client.options):
-                if client.options["data_collection"]["gen_ai"]["outputs"]:
-                    set_data_normalized(
-                        span, SPANDATA.GEN_AI_RESPONSE_TEXT, all_responses
-                    )
-            elif should_send_default_pii():
+            if client.options["data_collection"]["gen_ai"]["outputs"]:
                 set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, all_responses)
 
         _calculate_completions_token_usage(
@@ -1121,12 +1027,7 @@ def _wrap_synchronous_responses_event_iterator(
             )
         if len(data_buf) > 0:
             all_responses = ["".join(chunk) for chunk in data_buf]
-            if has_data_collection_enabled(client.options):
-                if client.options["data_collection"]["gen_ai"]["outputs"]:
-                    set_data_normalized(
-                        span, SPANDATA.GEN_AI_RESPONSE_TEXT, all_responses
-                    )
-            elif should_send_default_pii():
+            if client.options["data_collection"]["gen_ai"]["outputs"]:
                 set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, all_responses)
 
             if count_tokens_manually:
@@ -1192,12 +1093,7 @@ async def _wrap_asynchronous_responses_event_iterator(
         if len(data_buf) > 0:
             all_responses = ["".join(chunk) for chunk in data_buf]
 
-            if has_data_collection_enabled(client.options):
-                if client.options["data_collection"]["gen_ai"]["outputs"]:
-                    set_data_normalized(
-                        span, SPANDATA.GEN_AI_RESPONSE_TEXT, all_responses
-                    )
-            elif should_send_default_pii():
+            if client.options["data_collection"]["gen_ai"]["outputs"]:
                 set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, all_responses)
 
             if count_tokens_manually:

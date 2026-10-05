@@ -38,8 +38,6 @@ from tests.integrations.utils import DATA_COLLECTION_USER_INFO_CASES
 # built-in sensitive term, so it is redacted by the default denylist.
 QUERY_STRING = "toy=tennisball&color=red&auth=secret"
 
-login_manager = LoginManager()
-
 
 @pytest.fixture
 def app():
@@ -47,7 +45,14 @@ def app():
     app.config["TESTING"] = True
     app.secret_key = "haha"
 
+    login_manager = LoginManager()
     login_manager.init_app(app)
+
+    # install `LoginManager` with user loader to avoid Flask-Login's
+    # "Missing user_loader or request_loader" error.
+    @login_manager.user_loader
+    def load_user(user_id):
+        return None
 
     @app.route("/message")
     def hi():
@@ -77,7 +82,10 @@ def integration_enabled_params(request):
 
 
 def test_has_context(sentry_init, app, capture_events):
-    sentry_init(integrations=[flask_sentry.FlaskIntegration()])
+    sentry_init(
+        data_collection={},
+        integrations=[flask_sentry.FlaskIntegration()],
+    )
     events = capture_events()
 
     client = app.test_client()
@@ -85,34 +93,30 @@ def test_has_context(sentry_init, app, capture_events):
     assert response.status_code == 200
 
     (event,) = events
-    assert event["transaction"] == "hi"
+    assert event["transaction"] == "/message"
     assert "data" not in event["request"]
     assert event["request"]["url"] == "http://localhost/message"
 
 
 @pytest.mark.parametrize(
-    "url,transaction_style,expected_transaction,expected_source",
+    "url,expected_transaction,expected_source",
     [
-        ("/message", "endpoint", "hi", "component"),
-        ("/message", "url", "/message", "route"),
-        ("/message/123456", "endpoint", "hi_with_id", "component"),
-        ("/message/123456", "url", "/message/<int:message_id>", "route"),
+        ("/message", "/message", "route"),
+        ("/message/123456", "/message/<int:message_id>", "route"),
     ],
 )
-def test_transaction_or_segment_style(
+def test_segment_name_and_source(
     sentry_init,
     app,
     capture_events,
     capture_items,
     url,
-    transaction_style,
     expected_transaction,
     expected_source,
 ):
     sentry_init(
-        integrations=[
-            flask_sentry.FlaskIntegration(transaction_style=transaction_style)
-        ],
+        data_collection={},
+        integrations=[flask_sentry.FlaskIntegration()],
         traces_sample_rate=1.0,
     )
 
@@ -137,6 +141,7 @@ def test_http_route(
     capture_items,
 ):
     sentry_init(
+        data_collection={},
         integrations=[flask_sentry.FlaskIntegration()],
         traces_sample_rate=1.0,
     )
@@ -162,7 +167,7 @@ def test_errors(
     testing,
     integration_enabled_params,
 ):
-    sentry_init(**integration_enabled_params)
+    sentry_init(data_collection={}, **integration_enabled_params)
 
     app.debug = debug
     app.testing = testing
@@ -190,7 +195,7 @@ def test_errors(
 def test_flask_login_not_installed(
     sentry_init, app, capture_events, monkeypatch, integration_enabled_params
 ):
-    sentry_init(**integration_enabled_params)
+    sentry_init(data_collection={}, **integration_enabled_params)
 
     monkeypatch.setattr(flask_sentry, "flask_login", None)
 
@@ -206,9 +211,12 @@ def test_flask_login_not_installed(
 def test_flask_login_not_configured(
     sentry_init, app, capture_events, monkeypatch, integration_enabled_params
 ):
-    sentry_init(**integration_enabled_params)
+    sentry_init(data_collection={"user_info": False}, **integration_enabled_params)
 
     assert flask_sentry.flask_login
+
+    login_manager = LoginManager()
+    login_manager.init_app(app)
 
     events = capture_events()
     client = app.test_client()
@@ -221,7 +229,7 @@ def test_flask_login_not_configured(
 def test_flask_login_partially_configured(
     sentry_init, app, capture_events, monkeypatch, integration_enabled_params
 ):
-    sentry_init(**integration_enabled_params)
+    sentry_init(data_collection={"user_info": False}, **integration_enabled_params)
 
     events = capture_events()
 
@@ -235,10 +243,17 @@ def test_flask_login_partially_configured(
     assert event.get("user", {}).get("id") is None
 
 
-@pytest.mark.parametrize("send_default_pii", [True, False])
+@pytest.mark.parametrize(
+    "data_collection, expect_user",
+    [
+        pytest.param({}, True, id="data_collection_default"),
+        pytest.param({"user_info": False}, False, id="data_collection_user_info_false"),
+    ],
+)
 @pytest.mark.parametrize("user_id", [None, "42", 3])
 def test_flask_login_configured(
-    send_default_pii,
+    data_collection,
+    expect_user,
     sentry_init,
     app,
     user_id,
@@ -249,7 +264,7 @@ def test_flask_login_configured(
 ):
     sentry_init(
         integrations=[flask_sentry.FlaskIntegration()],
-        send_default_pii=send_default_pii,
+        data_collection=data_collection,
         traces_sample_rate=1.0,
     )
 
@@ -262,7 +277,7 @@ def test_flask_login_configured(
         def get_id(self):
             return str(user_id)
 
-    @login_manager.user_loader
+    @app.login_manager.user_loader
     def load_user(user_id):
         if user_id is not None:
             return User()
@@ -282,9 +297,9 @@ def test_flask_login_configured(
     sentry_sdk.flush()
 
     spans = [i.payload for i in items if i.type == "span"]
-    segment = next(s for s in spans if s["name"] == "hi")
+    segment = next(s for s in spans if s["name"] == "/message")
 
-    if send_default_pii and user_id is not None:
+    if expect_user and user_id is not None:
         assert segment["attributes"]["user.id"] == str(user_id)
         assert segment["attributes"]["user.email"] == "user@example.com"
         assert segment["attributes"]["user.name"] == "testuser"
@@ -295,6 +310,7 @@ def test_flask_login_configured(
 @pytest.mark.parametrize("max_value_length", [1024, None])
 def test_flask_large_json_request(sentry_init, capture_events, app, max_value_length):
     sentry_init(
+        data_collection={},
         integrations=[flask_sentry.FlaskIntegration()],
         max_request_body_size="always",
         max_value_length=max_value_length,
@@ -331,6 +347,7 @@ def test_flask_large_json_request(sentry_init, capture_events, app, max_value_le
 
 def test_flask_session_tracking(sentry_init, capture_envelopes, app):
     sentry_init(
+        data_collection={},
         integrations=[
             flask_sentry.FlaskIntegration(),
             LoggingIntegration(level=None, event_level=logging.ERROR),
@@ -355,7 +372,7 @@ def test_flask_session_tracking(sentry_init, capture_envelopes, app):
         except ZeroDivisionError:
             pass
 
-    sentry_sdk.get_client().flush()
+    sentry_sdk.flush()
 
     (first_event, error_event, session) = envelopes
     first_event = first_event.get_event()
@@ -374,7 +391,7 @@ def test_flask_session_tracking(sentry_init, capture_envelopes, app):
 
 @pytest.mark.parametrize("data", [{}, []], ids=["empty-dict", "empty-list"])
 def test_flask_empty_json_request(sentry_init, capture_events, app, data):
-    sentry_init(integrations=[flask_sentry.FlaskIntegration()])
+    sentry_init(data_collection={}, integrations=[flask_sentry.FlaskIntegration()])
 
     @app.route("/", methods=["POST"])
     def index():
@@ -399,6 +416,7 @@ def test_flask_medium_formdata_request(
     sentry_init, capture_events, app, max_value_length
 ):
     sentry_init(
+        data_collection={},
         integrations=[flask_sentry.FlaskIntegration()],
         max_request_body_size="always",
         max_value_length=max_value_length,
@@ -440,7 +458,9 @@ def test_flask_medium_formdata_request(
 @pytest.mark.parametrize("input_char", ["a", b"a"])
 def test_flask_too_large_raw_request(sentry_init, input_char, capture_events, app):
     sentry_init(
-        integrations=[flask_sentry.FlaskIntegration()], max_request_body_size="small"
+        data_collection={},
+        integrations=[flask_sentry.FlaskIntegration()],
+        max_request_body_size="small",
     )
 
     data = input_char * 2000
@@ -474,6 +494,7 @@ def test_flask_too_large_raw_request(sentry_init, input_char, capture_events, ap
 @pytest.mark.parametrize("max_value_length", [1024, None])
 def test_flask_files_and_form(sentry_init, capture_events, app, max_value_length):
     sentry_init(
+        data_collection={},
         integrations=[flask_sentry.FlaskIntegration()],
         max_request_body_size="always",
         max_value_length=max_value_length,
@@ -522,7 +543,9 @@ def test_json_not_truncated_if_max_request_body_size_is_always(
     sentry_init, capture_events, app
 ):
     sentry_init(
-        integrations=[flask_sentry.FlaskIntegration()], max_request_body_size="always"
+        data_collection={},
+        integrations=[flask_sentry.FlaskIntegration()],
+        max_request_body_size="always",
     )
 
     data = {
@@ -554,7 +577,7 @@ def test_json_not_truncated_if_max_request_body_size_is_always(
     ],
 )
 def test_errors_not_reported_twice(sentry_init, integrations, capture_events, app):
-    sentry_init(integrations=integrations)
+    sentry_init(data_collection={}, integrations=integrations)
 
     @app.route("/")
     def index():
@@ -576,10 +599,11 @@ def test_errors_not_reported_twice(sentry_init, integrations, capture_events, ap
 def test_logging(sentry_init, capture_events, app):
     # ensure that Flask's logger magic doesn't break ours
     sentry_init(
+        data_collection={},
         integrations=[
             flask_sentry.FlaskIntegration(),
             LoggingIntegration(event_level="ERROR"),
-        ]
+        ],
     )
 
     @app.route("/")
@@ -597,7 +621,7 @@ def test_logging(sentry_init, capture_events, app):
 
 
 def test_no_errors_without_request(app, sentry_init):
-    sentry_init(integrations=[flask_sentry.FlaskIntegration()])
+    sentry_init(data_collection={}, integrations=[flask_sentry.FlaskIntegration()])
     with app.app_context():
         capture_exception(ValueError())
 
@@ -624,7 +648,7 @@ def test_cli_commands_raise(app):
 def test_wsgi_level_error_is_caught(
     app, capture_exceptions, capture_events, sentry_init
 ):
-    sentry_init(integrations=[flask_sentry.FlaskIntegration()])
+    sentry_init(data_collection={}, integrations=[flask_sentry.FlaskIntegration()])
 
     def wsgi_app(environ, start_response):
         1 / 0
@@ -648,7 +672,7 @@ def test_wsgi_level_error_is_caught(
 
 
 def test_500(sentry_init, app):
-    sentry_init(integrations=[flask_sentry.FlaskIntegration()])
+    sentry_init(data_collection={}, integrations=[flask_sentry.FlaskIntegration()])
 
     app.debug = False
     app.testing = False
@@ -668,7 +692,7 @@ def test_500(sentry_init, app):
 
 
 def test_error_in_errorhandler(sentry_init, capture_events, app):
-    sentry_init(integrations=[flask_sentry.FlaskIntegration()])
+    sentry_init(data_collection={}, integrations=[flask_sentry.FlaskIntegration()])
 
     app.debug = False
     app.testing = False
@@ -698,7 +722,7 @@ def test_error_in_errorhandler(sentry_init, capture_events, app):
 
 
 def test_bad_request_not_captured(sentry_init, capture_events, app):
-    sentry_init(integrations=[flask_sentry.FlaskIntegration()])
+    sentry_init(data_collection={}, integrations=[flask_sentry.FlaskIntegration()])
     events = capture_events()
 
     @app.route("/")
@@ -713,7 +737,7 @@ def test_bad_request_not_captured(sentry_init, capture_events, app):
 
 
 def test_does_not_leak_scope(sentry_init, capture_events, app):
-    sentry_init(integrations=[flask_sentry.FlaskIntegration()])
+    sentry_init(data_collection={}, integrations=[flask_sentry.FlaskIntegration()])
     events = capture_events()
 
     sentry_sdk.get_isolation_scope().set_tag("request_data", False)
@@ -739,7 +763,7 @@ def test_does_not_leak_scope(sentry_init, capture_events, app):
 
 
 def test_scoped_test_client(sentry_init, app):
-    sentry_init(integrations=[flask_sentry.FlaskIntegration()])
+    sentry_init(data_collection={}, integrations=[flask_sentry.FlaskIntegration()])
 
     @app.route("/")
     def index():
@@ -757,7 +781,7 @@ def test_errorhandler_for_exception_swallows_exception(
     # In contrast to error handlers for a status code, error
     # handlers for exceptions can swallow the exception (this is
     # just how the Flask signal works)
-    sentry_init(integrations=[flask_sentry.FlaskIntegration()])
+    sentry_init(data_collection={}, integrations=[flask_sentry.FlaskIntegration()])
     events = capture_events()
 
     @app.route("/")
@@ -782,6 +806,7 @@ def test_tracing_success(
     app,
 ):
     sentry_init(
+        data_collection={},
         traces_sample_rate=1.0,
         integrations=[flask_sentry.FlaskIntegration()],
     )
@@ -812,18 +837,19 @@ def test_tracing_success(
     (segment,) = spans
     (message_event,) = message_events
 
-    assert segment["name"] == "hi_tx"
+    assert segment["name"] == "/message_tx"
     assert segment["status"] == SpanStatus.OK
     assert segment["attributes"]["sentry.origin"] == "auto.http.flask"
 
     assert message_event["message"] == "hi"
-    assert message_event["transaction"] == "hi_tx"
+    assert message_event["transaction"] == "/message_tx"
     assert message_event["tags"]["view"] == "yes"
     assert message_event["tags"]["before_request"] == "yes"
 
 
 def test_tracing_error(sentry_init, capture_events, capture_items, app):
     sentry_init(
+        data_collection={},
         traces_sample_rate=1.0,
         integrations=[flask_sentry.FlaskIntegration()],
     )
@@ -850,16 +876,16 @@ def test_tracing_error(sentry_init, capture_events, capture_items, app):
     (segment,) = spans
     (error_event,) = error_events
 
-    assert segment["name"] == "error"
+    assert segment["name"] == "/error"
     assert segment["status"] == SpanStatus.ERROR
 
-    assert error_event["transaction"] == "error"
+    assert error_event["transaction"] == "/error"
     (exception,) = error_event["exception"]["values"]
     assert exception["type"] == "ZeroDivisionError"
 
 
 def test_error_has_trace_context_if_tracing_disabled(sentry_init, capture_events, app):
-    sentry_init(integrations=[flask_sentry.FlaskIntegration()])
+    sentry_init(data_collection={}, integrations=[flask_sentry.FlaskIntegration()])
 
     events = capture_events()
 
@@ -878,7 +904,7 @@ def test_error_has_trace_context_if_tracing_disabled(sentry_init, capture_events
 
 
 def test_class_based_views(sentry_init, app, capture_events):
-    sentry_init(integrations=[flask_sentry.FlaskIntegration()])
+    sentry_init(data_collection={}, integrations=[flask_sentry.FlaskIntegration()])
     events = capture_events()
 
     @app.route("/")
@@ -896,14 +922,14 @@ def test_class_based_views(sentry_init, app, capture_events):
     (event,) = events
 
     assert event["message"] == "hi"
-    assert event["transaction"] == "hello_class"
+    assert event["transaction"] == "/hello-class/"
 
 
 @pytest.mark.parametrize(
     "template_string", ["{{ sentry_trace }}", "{{ sentry_trace_meta }}"]
 )
 def test_template_tracing_meta(sentry_init, app, capture_events, template_string):
-    sentry_init(integrations=[flask_sentry.FlaskIntegration()])
+    sentry_init(data_collection={}, integrations=[flask_sentry.FlaskIntegration()])
     events = capture_events()
 
     @app.route("/")
@@ -932,7 +958,7 @@ def test_template_tracing_meta(sentry_init, app, capture_events, template_string
 
 
 def test_dont_override_sentry_trace_context(sentry_init, app):
-    sentry_init(integrations=[flask_sentry.FlaskIntegration()])
+    sentry_init(data_collection={}, integrations=[flask_sentry.FlaskIntegration()])
 
     @app.route("/")
     def index():
@@ -944,13 +970,17 @@ def test_dont_override_sentry_trace_context(sentry_init, app):
         assert response.data == b"hi"
 
 
-def test_request_not_modified_by_reference(sentry_init, capture_events, app):
+def test_request_not_modified_by_reference(
+    sentry_init, capture_events, app, monkeypatch
+):
     sentry_init(
         integrations=[
             flask_sentry.FlaskIntegration(),
             LoggingIntegration(event_level=logging.ERROR),
-        ]
+        ],
+        data_collection={},
     )
+    monkeypatch.setattr(flask_sentry, "flask_login", None)
 
     @app.route("/", methods=["POST"])
     def index():
@@ -974,13 +1004,16 @@ def test_request_not_modified_by_reference(sentry_init, capture_events, app):
 
     (event,) = events
 
-    assert event["request"]["data"]["password"] == "[Filtered]"
+    # In data collection, request bodies need to be handled in the before_send
+    # callback, so it's expected that the event will contain the raw value.
+    assert event["request"]["data"]["password"] == "ohno"
     assert event["request"]["headers"]["Authorization"] == "[Filtered]"
     assert event["request"]["headers"]["Proxy-Authorization"] == "[Filtered]"
 
 
 def test_span_origin(sentry_init, app, capture_events, capture_items):
     sentry_init(
+        data_collection={},
         integrations=[flask_sentry.FlaskIntegration()],
         traces_sample_rate=1.0,
     )
@@ -1008,6 +1041,7 @@ def test_segment_http_method_default(
     By default OPTIONS and HEAD requests do not create a transaction or segment.
     """
     sentry_init(
+        data_collection={},
         traces_sample_rate=1.0,
         integrations=[flask_sentry.FlaskIntegration()],
     )
@@ -1042,6 +1076,7 @@ def test_segment_http_method_custom(
     Configure FlaskIntegration to ONLY capture OPTIONS and HEAD requests.
     """
     sentry_init(
+        data_collection={},
         traces_sample_rate=1.0,
         integrations=[
             flask_sentry.FlaskIntegration(
@@ -1080,34 +1115,20 @@ def test_segment_http_method_custom(
 
 
 @pytest.mark.parametrize(
-    "init_kwargs, expected_query_string",
+    "data_collection, expected_query_string",
     [
         pytest.param(
-            {"send_default_pii": True},
-            "toy=tennisball&color=red&auth=secret",
-            id="legacy_send_default_pii_true",
-        ),
-        pytest.param(
-            {"send_default_pii": False},
-            "toy=tennisball&color=red&auth=secret",
-            id="legacy_send_default_pii_false",
-        ),
-        pytest.param(
-            {"data_collection": {}},
+            {},
             "toy=tennisball&color=red&auth=%5BFiltered%5D",
             id="data_collection_denylist_default",
         ),
         pytest.param(
-            {
-                "data_collection": {
-                    "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
-                }
-            },
+            {"url_query_params": {"mode": "allowlist", "terms": ["toy"]}},
             "toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D",
             id="data_collection_allowlist",
         ),
         pytest.param(
-            {"data_collection": {"url_query_params": {"mode": "off"}}},
+            {"url_query_params": {"mode": "off"}},
             None,
             id="data_collection_off",
         ),
@@ -1118,13 +1139,13 @@ def test_query_string_data_collection(
     app,
     capture_events,
     monkeypatch,
-    init_kwargs,
+    data_collection,
     expected_query_string,
 ):
-    sentry_init(integrations=[flask_sentry.FlaskIntegration()], **init_kwargs)
-    # This test is about query-string filtering, not user data. Disable
-    # flask_login so the module-level login manager (which has no user_loader)
-    # does not raise when send_default_pii is on.
+    sentry_init(
+        integrations=[flask_sentry.FlaskIntegration()], data_collection=data_collection
+    )
+    # Disable Flask-Login to isolate query-string filtering from user collection.
     monkeypatch.setattr(flask_sentry, "flask_login", None)
     events = capture_events()
 
@@ -1140,34 +1161,20 @@ def test_query_string_data_collection(
 
 
 @pytest.mark.parametrize(
-    "init_kwargs, expected_query",
+    "data_collection, expected_query",
     [
         pytest.param(
-            {"send_default_pii": True},
-            "toy=tennisball&color=red&auth=secret",
-            id="legacy_send_default_pii_true",
-        ),
-        pytest.param(
-            {"send_default_pii": False},
-            None,
-            id="legacy_send_default_pii_false",
-        ),
-        pytest.param(
-            {"data_collection": {}},
+            {},
             "toy=tennisball&color=red&auth=%5BFiltered%5D",
             id="data_collection_denylist_default",
         ),
         pytest.param(
-            {
-                "data_collection": {
-                    "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
-                }
-            },
+            {"url_query_params": {"mode": "allowlist", "terms": ["toy"]}},
             "toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D",
             id="data_collection_allowlist",
         ),
         pytest.param(
-            {"data_collection": {"url_query_params": {"mode": "off"}}},
+            {"url_query_params": {"mode": "off"}},
             None,
             id="data_collection_off",
         ),
@@ -1178,13 +1185,13 @@ def test_span_http_query_data_collection(
     app,
     capture_items,
     monkeypatch,
-    init_kwargs,
+    data_collection,
     expected_query,
 ):
     sentry_init(
         integrations=[flask_sentry.FlaskIntegration()],
         traces_sample_rate=1.0,
-        **init_kwargs,
+        data_collection=data_collection,
     )
     monkeypatch.setattr(flask_sentry, "flask_login", None)
 
@@ -1204,20 +1211,6 @@ def test_span_http_query_data_collection(
         assert segment["attributes"][SPANDATA.HTTP_QUERY] == expected_query
 
 
-def test_query_string_empty_legacy_emits_empty_string(
-    sentry_init, app, capture_events, monkeypatch
-):
-    sentry_init(integrations=[flask_sentry.FlaskIntegration()], send_default_pii=True)
-    monkeypatch.setattr(flask_sentry, "flask_login", None)
-    events = capture_events()
-
-    client = app.test_client()
-    client.get("/message")
-
-    (event,) = events
-    assert event["request"]["query_string"] == ""
-
-
 def test_empty_query_string_is_dropped_with_data_collection(
     sentry_init, app, capture_events
 ):
@@ -1234,14 +1227,14 @@ def test_empty_query_string_is_dropped_with_data_collection(
     assert "query_string" not in event["request"]
 
 
-@pytest.mark.parametrize("init_kwargs, expect_ip", DATA_COLLECTION_USER_INFO_CASES)
+@pytest.mark.parametrize("data_collection, expect_ip", DATA_COLLECTION_USER_INFO_CASES)
 def test_user_info_span_attributes_data_collection(
-    sentry_init, app, capture_items, monkeypatch, init_kwargs, expect_ip
+    sentry_init, app, capture_items, monkeypatch, data_collection, expect_ip
 ):
     sentry_init(
         integrations=[flask_sentry.FlaskIntegration()],
         traces_sample_rate=1.0,
-        **init_kwargs,
+        data_collection=data_collection,
     )
     # This test is about user IP collection, not flask_login. Disable
     # flask_login so the module-level login manager does not interfere.
@@ -1265,11 +1258,13 @@ def test_user_info_span_attributes_data_collection(
         assert "client.address" not in segment["attributes"]
 
 
-@pytest.mark.parametrize("init_kwargs, expect_ip", DATA_COLLECTION_USER_INFO_CASES)
+@pytest.mark.parametrize("data_collection, expect_ip", DATA_COLLECTION_USER_INFO_CASES)
 def test_user_info_error_event_data_collection(
-    sentry_init, app, capture_events, monkeypatch, init_kwargs, expect_ip
+    sentry_init, app, capture_events, monkeypatch, data_collection, expect_ip
 ):
-    sentry_init(integrations=[flask_sentry.FlaskIntegration()], **init_kwargs)
+    sentry_init(
+        integrations=[flask_sentry.FlaskIntegration()], data_collection=data_collection
+    )
     monkeypatch.setattr(flask_sentry, "flask_login", None)
 
     @app.route("/crash")
@@ -1316,11 +1311,15 @@ def test_error_event_no_user_ip_address_without_remote_addr(
     assert "ip_address" not in event.get("user", {})
 
 
-@pytest.mark.parametrize("init_kwargs, expect_user", DATA_COLLECTION_USER_INFO_CASES)
+@pytest.mark.parametrize(
+    "data_collection, expect_user", DATA_COLLECTION_USER_INFO_CASES
+)
 def test_flask_login_user_identity_error_event_data_collection(
-    sentry_init, app, capture_events, init_kwargs, expect_user
+    sentry_init, app, capture_events, data_collection, expect_user
 ):
-    sentry_init(integrations=[flask_sentry.FlaskIntegration()], **init_kwargs)
+    sentry_init(
+        integrations=[flask_sentry.FlaskIntegration()], data_collection=data_collection
+    )
 
     class User:
         is_authenticated = is_active = True
@@ -1331,7 +1330,7 @@ def test_flask_login_user_identity_error_event_data_collection(
         def get_id(self):
             return "42"
 
-    @login_manager.user_loader
+    @app.login_manager.user_loader
     def load_user(user_id):
         return User()
 
@@ -1364,14 +1363,16 @@ def test_flask_login_user_identity_error_event_data_collection(
         assert "username" not in user
 
 
-@pytest.mark.parametrize("init_kwargs, expect_user", DATA_COLLECTION_USER_INFO_CASES)
+@pytest.mark.parametrize(
+    "data_collection, expect_user", DATA_COLLECTION_USER_INFO_CASES
+)
 def test_flask_login_user_identity_span_attributes_data_collection(
-    sentry_init, app, capture_items, init_kwargs, expect_user
+    sentry_init, app, capture_items, data_collection, expect_user
 ):
     sentry_init(
         integrations=[flask_sentry.FlaskIntegration()],
         traces_sample_rate=1.0,
-        **init_kwargs,
+        data_collection=data_collection,
     )
 
     class User:
@@ -1383,7 +1384,7 @@ def test_flask_login_user_identity_span_attributes_data_collection(
         def get_id(self):
             return "42"
 
-    @login_manager.user_loader
+    @app.login_manager.user_loader
     def load_user(user_id):
         return User()
 
@@ -1401,7 +1402,7 @@ def test_flask_login_user_identity_span_attributes_data_collection(
     sentry_sdk.flush()
 
     spans = [item.payload for item in items]
-    segment = next(s for s in spans if s["name"] == "hi")
+    segment = next(s for s in spans if s["name"] == "/message")
 
     if expect_user:
         assert segment["attributes"]["user.id"] == "42"

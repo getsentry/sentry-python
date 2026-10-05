@@ -65,7 +65,7 @@ def get_client(pyramid_config):
 def test_view_exceptions(
     get_client, route, sentry_init, capture_events, capture_exceptions
 ):
-    sentry_init(integrations=[PyramidIntegration()])
+    sentry_init(integrations=[PyramidIntegration()], data_collection={})
     events = capture_events()
     exceptions = capture_exceptions()
 
@@ -93,7 +93,7 @@ def test_view_exceptions(
 
 
 def test_has_context(route, get_client, sentry_init, capture_events):
-    sentry_init(integrations=[PyramidIntegration()])
+    sentry_init(integrations=[PyramidIntegration()], data_collection={})
     events = capture_events()
 
     @route("/context_message/{msg}")
@@ -110,33 +110,30 @@ def test_has_context(route, get_client, sentry_init, capture_events):
         "env": {"SERVER_NAME": "localhost", "SERVER_PORT": "80"},
         "headers": {"Host": "localhost"},
         "method": "GET",
-        "query_string": "",
         "url": "http://localhost/context_message/yoo",
     }
-    assert event["transaction"] == "hi2"
+    assert event["transaction"] == "/context_message/{msg}"
 
 
 @pytest.mark.parametrize(
-    "url,transaction_style,expected_transaction,expected_source",
+    "url,expected_transaction,expected_source",
     [
-        ("/message", "route_name", "hi", "component"),
-        ("/message", "route_pattern", "/message", "route"),
-        ("/message/123456", "route_name", "hi_with_id", "component"),
-        ("/message/123456", "route_pattern", "/message/{message_id}", "route"),
+        ("/message", "/message", "route"),
+        ("/message/123456", "/message/{message_id}", "route"),
     ],
 )
-def test_transaction_style(
+def test_segment_name_and_source(
     sentry_init,
     get_client,
     capture_items,
     url,
-    transaction_style,
     expected_transaction,
     expected_source,
 ):
     sentry_init(
-        integrations=[PyramidIntegration(transaction_style=transaction_style)],
+        integrations=[PyramidIntegration()],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     items = capture_items("event", "span")
@@ -161,6 +158,7 @@ def test_http_route(
     sentry_init(
         integrations=[PyramidIntegration()],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     items = capture_items("span")
@@ -182,6 +180,7 @@ def test_large_json_request(
         integrations=[PyramidIntegration()],
         max_request_body_size="always",
         max_value_length=max_value_length,
+        data_collection={},
     )
 
     data = {"foo": {"bar": "a" * (1034)}}
@@ -215,7 +214,7 @@ def test_large_json_request(
 
 @pytest.mark.parametrize("data", [{}, []], ids=["empty-dict", "empty-list"])
 def test_flask_empty_json_request(sentry_init, capture_events, route, get_client, data):
-    sentry_init(integrations=[PyramidIntegration()])
+    sentry_init(integrations=[PyramidIntegration()], data_collection={})
 
     @route("/")
     def index(request):
@@ -238,7 +237,11 @@ def test_flask_empty_json_request(sentry_init, capture_events, route, get_client
 def test_json_not_truncated_if_max_request_body_size_is_always(
     sentry_init, capture_events, route, get_client
 ):
-    sentry_init(integrations=[PyramidIntegration()], max_request_body_size="always")
+    sentry_init(
+        integrations=[PyramidIntegration()],
+        max_request_body_size="always",
+        data_collection={},
+    )
 
     data = {
         "key{}".format(i): "value{}".format(i) for i in range(MAX_DATABAG_BREADTH + 10)
@@ -268,6 +271,7 @@ def test_files_and_form(
         integrations=[PyramidIntegration()],
         max_request_body_size="always",
         max_value_length=max_value_length,
+        data_collection={},
     )
 
     data = {
@@ -306,7 +310,7 @@ def test_bad_request_not_captured(
 ):
     import pyramid.httpexceptions as exc
 
-    sentry_init(integrations=[PyramidIntegration()])
+    sentry_init(integrations=[PyramidIntegration()], data_collection={})
     events = capture_events()
 
     @route("/")
@@ -327,7 +331,7 @@ def test_bad_request_not_captured(
 def test_errorhandler_ok(
     sentry_init, pyramid_config, capture_exceptions, route, get_client
 ):
-    sentry_init(integrations=[PyramidIntegration()])
+    sentry_init(integrations=[PyramidIntegration()], data_collection={})
     errors = capture_exceptions()
 
     @route("/")
@@ -348,7 +352,7 @@ def test_errorhandler_ok(
 def test_errorhandler_500(
     sentry_init, pyramid_config, capture_exceptions, route, get_client
 ):
-    sentry_init(integrations=[PyramidIntegration()])
+    sentry_init(integrations=[PyramidIntegration()], data_collection={})
     errors = capture_exceptions()
 
     @route("/")
@@ -373,7 +377,7 @@ def test_errorhandler_500(
 def test_error_in_errorhandler(
     sentry_init, pyramid_config, capture_events, route, get_client
 ):
-    sentry_init(integrations=[PyramidIntegration()])
+    sentry_init(integrations=[PyramidIntegration()], data_collection={})
 
     @route("/")
     def index(request):
@@ -403,11 +407,11 @@ def test_error_in_authenticated_userid(
     from sentry_sdk.integrations.logging import LoggingIntegration
 
     sentry_init(
-        send_default_pii=True,
         integrations=[
             PyramidIntegration(),
             LoggingIntegration(event_level=logging.ERROR),
         ],
+        data_collection={},
     )
     logger = logging.getLogger("test_pyramid")
 
@@ -450,7 +454,7 @@ def tween_factory(handler, registry):
 
 
 def test_tween_ok(sentry_init, pyramid_config, capture_exceptions, route, get_client):
-    sentry_init(integrations=[PyramidIntegration()])
+    sentry_init(integrations=[PyramidIntegration()], data_collection={})
     errors = capture_exceptions()
 
     @route("/")
@@ -477,6 +481,7 @@ def test_tracing_error(
     sentry_init(
         integrations=[PyramidIntegration()],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     items = capture_items("event", "span")
@@ -499,7 +504,7 @@ def test_tracing_error(
     (segment,) = spans
     (error_event,) = error_events
 
-    assert segment["name"] == "tracing_error"
+    assert segment["name"] == "/tracing-error"
     assert segment["status"] == SpanStatus.ERROR
     assert segment["attributes"]["sentry.origin"] == "auto.http.pyramid"
 
@@ -516,6 +521,7 @@ def test_span_origin(
     sentry_init(
         integrations=[PyramidIntegration()],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     items = capture_items("event", "span")
@@ -531,19 +537,21 @@ def test_span_origin(
     assert segment["attributes"]["sentry.origin"] == "auto.http.pyramid"
 
 
-@pytest.mark.parametrize("init_kwargs, expect_user", DATA_COLLECTION_USER_INFO_CASES)
+@pytest.mark.parametrize(
+    "data_collection, expect_user", DATA_COLLECTION_USER_INFO_CASES
+)
 def test_span_sets_user_id_on_segment(
     sentry_init,
     pyramid_config,
     capture_items,
     get_client,
-    init_kwargs,
+    data_collection,
     expect_user,
 ):
     sentry_init(
         integrations=[PyramidIntegration()],
         traces_sample_rate=1.0,
-        **init_kwargs,
+        data_collection=data_collection,
     )
 
     class AuthenticationPolicy:
@@ -570,17 +578,19 @@ def test_span_sets_user_id_on_segment(
         assert "user.id" not in segment["attributes"]
 
 
-@pytest.mark.parametrize("init_kwargs, expect_user", DATA_COLLECTION_USER_INFO_CASES)
+@pytest.mark.parametrize(
+    "data_collection, expect_user", DATA_COLLECTION_USER_INFO_CASES
+)
 def test_user_id_error_event_data_collection(
     sentry_init,
     pyramid_config,
     capture_events,
     route,
     get_client,
-    init_kwargs,
+    data_collection,
     expect_user,
 ):
-    sentry_init(integrations=[PyramidIntegration()], **init_kwargs)
+    sentry_init(integrations=[PyramidIntegration()], data_collection=data_collection)
     events = capture_events()
 
     class AuthenticationPolicy:

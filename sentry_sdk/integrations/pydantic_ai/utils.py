@@ -2,11 +2,9 @@ from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk.consts import SPANDATA
-from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import Span
 from sentry_sdk.utils import (
     event_from_exception,
-    has_data_collection_enabled,
     safe_serialize,
 )
 
@@ -17,22 +15,6 @@ if TYPE_CHECKING:
     from pydantic_ai.models import AbstractModel, Model
     from pydantic_ai.realtime.settings import RealtimeModelSettings
     from pydantic_ai.settings import ModelSettings
-
-
-def _should_send_inputs() -> bool:
-    client = sentry_sdk.get_client()
-    if has_data_collection_enabled(client.options):
-        return bool(client.options["data_collection"]["gen_ai"]["inputs"])
-
-    return should_send_default_pii()
-
-
-def _should_send_outputs() -> bool:
-    client = sentry_sdk.get_client()
-    if has_data_collection_enabled(client.options):
-        return bool(client.options["data_collection"]["gen_ai"]["outputs"])
-
-    return should_send_default_pii()
 
 
 def _set_agent_data(span: "Span", agent: "Optional[Agent]") -> None:
@@ -92,10 +74,6 @@ def _set_model_data(
         model_obj = agent.model
 
     if model_obj:
-        # Set system from model
-        if hasattr(model_obj, "system"):
-            span.set_attribute(SPANDATA.GEN_AI_PROVIDER_NAME, model_obj.system)
-
         # Set model name
         model_name = _get_model_name(model_obj)
         if model_name:
@@ -141,9 +119,8 @@ def _set_available_tools(span: "Span", agent: "Optional[Agent[Any, Any]]") -> No
         return
 
     client_options = sentry_sdk.get_client().options
-    if has_data_collection_enabled(client_options):
-        if not client_options["data_collection"]["gen_ai"]["inputs"]:
-            return
+    if not client_options["data_collection"]["gen_ai"]["inputs"]:
+        return
 
     try:
         tools = []

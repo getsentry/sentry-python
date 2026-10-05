@@ -10,10 +10,8 @@ from sentry_sdk.ai.utils import (
 )
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
-from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.utils import (
     event_from_exception,
-    has_data_collection_enabled,
     package_version,
 )
 
@@ -113,14 +111,7 @@ def _input_callback(kwargs: "Dict[str, Any]") -> None:
     set_data_normalized(span, SPANDATA.GEN_AI_PROVIDER_NAME, provider)
     set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, operation)
 
-    # Record input/messages if allowed
-    record_inputs = False
-    if has_data_collection_enabled(client.options):
-        record_inputs = client.options["data_collection"]["gen_ai"]["inputs"]
-    elif should_send_default_pii():
-        record_inputs = True
-
-    if record_inputs:
+    if client.options["data_collection"]["gen_ai"]["inputs"]:
         if operation == "embeddings":
             # For embeddings, look for the 'input' parameter
             embedding_input = kwargs.get("input")
@@ -194,14 +185,7 @@ def _success_callback(
                 span, SPANDATA.GEN_AI_RESPONSE_MODEL, completion_response.model
             )
 
-        # Record response content if allowed
-        record_outputs = False
-        if has_data_collection_enabled(client.options):
-            record_outputs = client.options["data_collection"]["gen_ai"]["outputs"]
-        elif should_send_default_pii():
-            record_outputs = True
-
-        if record_outputs:
+        if client.options["data_collection"]["gen_ai"]["outputs"]:
             if hasattr(completion_response, "choices"):
                 response_messages = []
                 for choice in completion_response.choices:
@@ -313,7 +297,6 @@ class LiteLLMIntegration(Integration):
     # Initialize Sentry with the LiteLLM integration
     sentry_sdk.init(
         dsn="your-dsn",
-        send_default_pii=True
         integrations=[
             sentry_sdk.integrations.LiteLLMIntegration(
                 include_prompts=True  # Set to False to exclude message content

@@ -18,7 +18,6 @@ except ImportError:
 from openai import AsyncOpenAI, AsyncStream, OpenAI, OpenAIError, Stream
 from openai.types import CompletionUsage, CreateEmbeddingResponse, Embedding
 from openai.types.chat import (
-    ChatCompletion,
     ChatCompletionChunk,
     ChatCompletionMessage,
 )
@@ -44,9 +43,7 @@ try:
         CustomToolParam,
         FunctionToolParam,
         Response,
-        ResponseFunctionToolCall,
         ResponseOutputMessage,
-        ResponseOutputRefusal,
         ResponseOutputText,
         ResponseUsage,
         WebSearchToolParam,
@@ -176,6 +173,11 @@ def test_chat_completion_tool_definitions(
         integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
+        data_collection={
+            "gen_ai": {
+                "inputs": True,
+            }
+        },
     )
 
     client = OpenAI(api_key="z")
@@ -263,7 +265,12 @@ def test_nonstreaming_chat_completion_no_sensitive_data(
         integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        send_default_pii=False,
+        data_collection={
+            "gen_ai": {
+                "inputs": False,
+                "outputs": False,
+            }
+        },
     )
 
     client = OpenAI(api_key="z")
@@ -411,7 +418,12 @@ def test_nonstreaming_chat_completion(
         integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        send_default_pii=True,
+        data_collection={
+            "gen_ai": {
+                "inputs": True,
+                "outputs": True,
+            }
+        },
     )
 
     client = OpenAI(api_key="z")
@@ -475,518 +487,6 @@ def test_nonstreaming_chat_completion(
     assert span["attributes"]["gen_ai.usage.total_tokens"] == 30
 
 
-@pytest.mark.skipif(
-    OPENAI_VERSION <= (1, 1, 0),
-    reason="OpenAI versions <=1.1.0 do not support the tools parameter.",
-)
-@pytest.mark.parametrize(
-    "data_collection,expected_present,expected_absent",
-    [
-        pytest.param(
-            {"gen_ai": {"inputs": True}},
-            {
-                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS: json.dumps(
-                    [{"type": "text", "content": "You are a helpful assistant."}]
-                ),
-                SPANDATA.GEN_AI_REQUEST_MESSAGES: safe_serialize(
-                    [{"role": "user", "content": "hello"}]
-                ),
-                SPANDATA.GEN_AI_TOOL_DEFINITIONS: safe_serialize(EXAMPLE_TOOLS),
-            },
-            [],
-            id="gen-ai-inputs-enabled",
-        ),
-        pytest.param(
-            {"gen_ai": {"inputs": False}},
-            {},
-            [
-                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
-                SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                SPANDATA.GEN_AI_TOOL_DEFINITIONS,
-            ],
-            id="gen-ai-inputs-disabled",
-        ),
-        pytest.param(
-            {},
-            {
-                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS: json.dumps(
-                    [{"type": "text", "content": "You are a helpful assistant."}]
-                ),
-                SPANDATA.GEN_AI_REQUEST_MESSAGES: safe_serialize(
-                    [{"role": "user", "content": "hello"}]
-                ),
-                SPANDATA.GEN_AI_TOOL_DEFINITIONS: safe_serialize(EXAMPLE_TOOLS),
-            },
-            [],
-            id="gen-ai-omitted-defaults-to-enabled",
-        ),
-    ],
-)
-def test_completions_api_data_collection(
-    sentry_init,
-    capture_items,
-    data_collection,
-    expected_present,
-    expected_absent,
-    nonstreaming_chat_completions_model_response,
-):
-    sentry_init(
-        integrations=[OpenAIIntegration()],
-        disabled_integrations=[StdlibIntegration],
-        traces_sample_rate=1.0,
-        data_collection=data_collection,
-    )
-
-    client = OpenAI(api_key="z")
-    client.chat.completions._post = mock.Mock(
-        return_value=nonstreaming_chat_completions_model_response(
-            response_id="chat-id",
-            response_model="gpt-3.5-turbo",
-            message_content="the model response",
-            created=10000000,
-            usage=CompletionUsage(
-                prompt_tokens=20,
-                completion_tokens=10,
-                total_tokens=30,
-            ),
-        )
-    )
-
-    create_kwargs = {
-        "model": "some-model",
-        "messages": [
-            {"role": "system", "content": "You are a helpful assistant."},
-            {"role": "user", "content": "hello"},
-        ],
-        "max_tokens": 100,
-        "presence_penalty": 0.1,
-        "frequency_penalty": 0.2,
-        "temperature": 0.7,
-        "top_p": 0.9,
-        "tools": EXAMPLE_COMPLETIONS_TOOLS,
-    }
-    items = capture_items("span")
-
-    client.chat.completions.create(**create_kwargs)
-
-    sentry_sdk.flush()
-    (span,) = (item.payload for item in items)
-    span_data = span["attributes"]
-
-    assert span_data[SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-    assert span_data[SPANDATA.GEN_AI_REQUEST_MODEL] == "some-model"
-    assert span_data[SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
-    assert span_data[SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.1
-    assert span_data[SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
-    assert span_data[SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
-    assert span_data[SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
-    assert span_data[SPANDATA.GEN_AI_PROVIDER_NAME] == "openai"
-
-    for key, value in expected_present.items():
-        assert span_data[key] == value
-
-    for key in expected_absent:
-        assert key not in span_data
-
-
-@pytest.mark.parametrize(
-    "data_collection,send_default_pii,expect_output",
-    [
-        pytest.param(
-            {"gen_ai": {"outputs": True}},
-            False,
-            True,
-            id="gen-ai-outputs-enabled-overrides-pii-disabled",
-        ),
-        pytest.param(
-            {"gen_ai": {"outputs": False}},
-            True,
-            False,
-            id="gen-ai-outputs-disabled-overrides-pii-enabled",
-        ),
-        pytest.param(
-            {},
-            False,
-            True,
-            id="gen-ai-omitted-defaults-to-enabled",
-        ),
-        pytest.param(
-            {"gen_ai": {"outputs": False}},
-            False,
-            False,
-            id="gen-ai-outputs-disabled-and-pii-disabled",
-        ),
-        pytest.param(
-            None,
-            False,
-            False,
-            id="no-gen-ai-data-collection-falls-back-to-send-default-pii",
-        ),
-        pytest.param(
-            None,
-            True,
-            True,
-            id="no-gen-ai-data-collection-pii-enabled-collects",
-        ),
-    ],
-)
-def test_completions_api_data_collection_outputs(
-    sentry_init,
-    capture_items,
-    data_collection,
-    send_default_pii,
-    expect_output,
-    nonstreaming_chat_completions_model_response,
-):
-    init_kwargs = {
-        "integrations": [OpenAIIntegration()],
-        "disabled_integrations": [StdlibIntegration],
-        "traces_sample_rate": 1.0,
-        "send_default_pii": send_default_pii,
-    }
-    if data_collection is not None:
-        init_kwargs["data_collection"] = data_collection
-
-    sentry_init(**init_kwargs)
-
-    client = OpenAI(api_key="z")
-    client.chat.completions._post = mock.Mock(
-        return_value=nonstreaming_chat_completions_model_response(
-            response_id="chat-id",
-            response_model="gpt-3.5-turbo",
-            message_content="the model response",
-            created=10000000,
-            usage=CompletionUsage(
-                prompt_tokens=20,
-                completion_tokens=10,
-                total_tokens=30,
-            ),
-        )
-    )
-    items = capture_items("span")
-
-    client.chat.completions.create(
-        model="some-model",
-        messages=[{"role": "user", "content": "hello"}],
-    )
-
-    sentry_sdk.flush()
-    (span,) = (item.payload for item in items)
-    span_data = span["attributes"]
-
-    assert span_data[SPANDATA.GEN_AI_RESPONSE_MODEL] == "gpt-3.5-turbo"
-
-    if expect_output:
-        assert "the model response" in span_data[SPANDATA.GEN_AI_RESPONSE_TEXT]
-    else:
-        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span_data
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "data_collection,send_default_pii,expect_output",
-    [
-        pytest.param(
-            {"gen_ai": {"outputs": True}},
-            False,
-            True,
-            id="gen-ai-outputs-enabled-overrides-pii-disabled",
-        ),
-        pytest.param(
-            {"gen_ai": {"outputs": False}},
-            True,
-            False,
-            id="gen-ai-outputs-disabled-overrides-pii-enabled",
-        ),
-        pytest.param(
-            {},
-            False,
-            True,
-            id="gen-ai-omitted-defaults-to-enabled",
-        ),
-        pytest.param(
-            {"gen_ai": {"outputs": False}},
-            False,
-            False,
-            id="gen-ai-outputs-disabled-and-pii-disabled",
-        ),
-        pytest.param(
-            None,
-            False,
-            False,
-            id="no-gen-ai-data-collection-falls-back-to-send-default-pii",
-        ),
-        pytest.param(
-            None,
-            True,
-            True,
-            id="no-gen-ai-data-collection-pii-enabled-collects",
-        ),
-    ],
-)
-async def test_completions_api_data_collection_outputs_async(
-    sentry_init,
-    capture_items,
-    data_collection,
-    send_default_pii,
-    expect_output,
-    nonstreaming_chat_completions_model_response,
-):
-    init_kwargs = {
-        "integrations": [OpenAIIntegration()],
-        "disabled_integrations": [StdlibIntegration],
-        "traces_sample_rate": 1.0,
-        "send_default_pii": send_default_pii,
-    }
-    if data_collection is not None:
-        init_kwargs["data_collection"] = data_collection
-
-    sentry_init(**init_kwargs)
-
-    client = AsyncOpenAI(api_key="z")
-    client.chat.completions._post = AsyncMock(
-        return_value=nonstreaming_chat_completions_model_response(
-            response_id="chat-id",
-            response_model="gpt-3.5-turbo",
-            message_content="the model response",
-            created=10000000,
-            usage=CompletionUsage(
-                prompt_tokens=20,
-                completion_tokens=10,
-                total_tokens=30,
-            ),
-        )
-    )
-    items = capture_items("span")
-
-    await client.chat.completions.create(
-        model="some-model",
-        messages=[{"role": "user", "content": "hello"}],
-    )
-
-    sentry_sdk.flush()
-    (span,) = (item.payload for item in items)
-    span_data = span["attributes"]
-
-    assert span_data[SPANDATA.GEN_AI_RESPONSE_MODEL] == "gpt-3.5-turbo"
-
-    if expect_output:
-        assert "the model response" in span_data[SPANDATA.GEN_AI_RESPONSE_TEXT]
-    else:
-        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span_data
-
-
-def test_completions_api_data_collection_outputs_empty_choices(
-    sentry_init,
-    capture_items,
-):
-    sentry_init(
-        integrations=[OpenAIIntegration()],
-        disabled_integrations=[StdlibIntegration],
-        traces_sample_rate=1.0,
-        data_collection={"gen_ai": {"outputs": True}},
-    )
-
-    client = OpenAI(api_key="z")
-    client.chat.completions._post = mock.Mock(
-        return_value=ChatCompletion(
-            id="chat-id",
-            choices=[],
-            created=10000000,
-            model="gpt-3.5-turbo",
-            object="chat.completion",
-            usage=CompletionUsage(
-                prompt_tokens=20,
-                completion_tokens=10,
-                total_tokens=30,
-            ),
-        )
-    )
-    items = capture_items("span")
-
-    client.chat.completions.create(
-        model="some-model",
-        messages=[{"role": "user", "content": "hello"}],
-    )
-
-    sentry_sdk.flush()
-    (span,) = (item.payload for item in items)
-    span_data = span["attributes"]
-
-    # No choices means no output data, even with outputs collection enabled
-    assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span_data
-
-
-@pytest.mark.parametrize(
-    "data_collection,expect_output",
-    [
-        pytest.param(
-            {"gen_ai": {"outputs": True}},
-            True,
-            id="gen-ai-outputs-enabled",
-        ),
-        pytest.param(
-            {"gen_ai": {"outputs": False}},
-            False,
-            id="gen-ai-outputs-disabled",
-        ),
-        pytest.param(
-            {},
-            True,
-            id="gen-ai-omitted-defaults-to-enabled",
-        ),
-    ],
-)
-def test_streaming_chat_completion_data_collection_outputs(
-    sentry_init,
-    capture_items,
-    data_collection,
-    expect_output,
-    get_model_response,
-    server_side_event_chunks,
-):
-    sentry_init(
-        integrations=[OpenAIIntegration()],
-        disabled_integrations=[StdlibIntegration],
-        traces_sample_rate=1.0,
-        send_default_pii=False,
-        data_collection=data_collection,
-    )
-
-    client = OpenAI(api_key="z")
-    returned_stream = get_model_response(
-        server_side_event_chunks(
-            [
-                ChatCompletionChunk(
-                    id="1",
-                    choices=[
-                        DeltaChoice(
-                            index=0,
-                            delta=ChoiceDelta(content="hello"),
-                            finish_reason="stop",
-                        )
-                    ],
-                    created=100000,
-                    model="model-id",
-                    object="chat.completion.chunk",
-                ),
-            ],
-            include_event_type=False,
-        )
-    )
-    items = capture_items("span")
-
-    with mock.patch.object(
-        client.chat._client._client, "send", return_value=returned_stream
-    ):
-        response_stream = client.chat.completions.create(
-            model="some-model",
-            messages=[{"role": "user", "content": "hello"}],
-            stream=True,
-        )
-        response_string = "".join(
-            map(lambda x: x.choices[0].delta.content, response_stream)
-        )
-
-    assert response_string == "hello"
-    sentry_sdk.flush()
-    (span,) = (item.payload for item in items)
-    span_data = span["attributes"]
-
-    if expect_output:
-        assert "hello" in span_data[SPANDATA.GEN_AI_RESPONSE_TEXT]
-    else:
-        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span_data
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "data_collection,expect_output",
-    [
-        pytest.param(
-            {"gen_ai": {"outputs": True}},
-            True,
-            id="gen-ai-outputs-enabled",
-        ),
-        pytest.param(
-            {"gen_ai": {"outputs": False}},
-            False,
-            id="gen-ai-outputs-disabled",
-        ),
-        pytest.param(
-            {},
-            True,
-            id="gen-ai-omitted-defaults-to-enabled",
-        ),
-    ],
-)
-async def test_streaming_chat_completion_data_collection_outputs_async(
-    sentry_init,
-    capture_items,
-    data_collection,
-    expect_output,
-    get_model_response,
-    async_iterator,
-    server_side_event_chunks,
-):
-    sentry_init(
-        integrations=[OpenAIIntegration()],
-        disabled_integrations=[StdlibIntegration],
-        traces_sample_rate=1.0,
-        send_default_pii=False,
-        data_collection=data_collection,
-    )
-
-    client = AsyncOpenAI(api_key="z")
-    returned_stream = get_model_response(
-        async_iterator(
-            server_side_event_chunks(
-                [
-                    ChatCompletionChunk(
-                        id="1",
-                        choices=[
-                            DeltaChoice(
-                                index=0,
-                                delta=ChoiceDelta(content="hello"),
-                                finish_reason="stop",
-                            )
-                        ],
-                        created=100000,
-                        model="model-id",
-                        object="chat.completion.chunk",
-                    ),
-                ],
-                include_event_type=False,
-            )
-        )
-    )
-    items = capture_items("span")
-
-    with mock.patch.object(
-        client.chat._client._client,
-        "send",
-        return_value=returned_stream,
-    ):
-        response_stream = await client.chat.completions.create(
-            model="some-model",
-            messages=[{"role": "user", "content": "hello"}],
-            stream=True,
-        )
-        response_string = ""
-        async for x in response_stream:
-            response_string += x.choices[0].delta.content
-
-    assert response_string == "hello"
-    sentry_sdk.flush()
-    (span,) = (item.payload for item in items)
-    span_data = span["attributes"]
-
-    if expect_output:
-        assert "hello" in span_data[SPANDATA.GEN_AI_RESPONSE_TEXT]
-    else:
-        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span_data
-
-
 @pytest.mark.asyncio
 async def test_nonstreaming_chat_completion_async_no_sensitive_data(
     sentry_init,
@@ -997,7 +497,12 @@ async def test_nonstreaming_chat_completion_async_no_sensitive_data(
         integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        send_default_pii=False,
+        data_collection={
+            "gen_ai": {
+                "inputs": False,
+                "outputs": False,
+            }
+        },
     )
 
     client = AsyncOpenAI(api_key="z")
@@ -1143,7 +648,12 @@ async def test_nonstreaming_chat_completion_async(
         integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        send_default_pii=True,
+        data_collection={
+            "gen_ai": {
+                "inputs": True,
+                "outputs": True,
+            }
+        },
     )
 
     client = AsyncOpenAI(api_key="z")
@@ -1228,7 +738,12 @@ def test_streaming_chat_completion_no_sensitive_data(
         ],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        send_default_pii=False,
+        data_collection={
+            "gen_ai": {
+                "inputs": False,
+                "outputs": False,
+            }
+        },
     )
 
     client = OpenAI(api_key="z")
@@ -1347,7 +862,12 @@ def test_streaming_chat_completion_with_usage_in_stream(
         integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        send_default_pii=False,
+        data_collection={
+            "gen_ai": {
+                "inputs": False,
+                "outputs": False,
+            }
+        },
     )
 
     client = OpenAI(api_key="z")
@@ -1428,7 +948,12 @@ def test_streaming_chat_completion_empty_content_preserves_token_usage(
         integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        send_default_pii=False,
+        data_collection={
+            "gen_ai": {
+                "inputs": False,
+                "outputs": False,
+            }
+        },
     )
 
     client = OpenAI(api_key="z")
@@ -1492,7 +1017,12 @@ async def test_streaming_chat_completion_empty_content_preserves_token_usage_asy
         integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        send_default_pii=False,
+        data_collection={
+            "gen_ai": {
+                "inputs": False,
+                "outputs": False,
+            }
+        },
     )
 
     client = AsyncOpenAI(api_key="z")
@@ -1558,7 +1088,12 @@ async def test_streaming_chat_completion_async_with_usage_in_stream(
         integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        send_default_pii=False,
+        data_collection={
+            "gen_ai": {
+                "inputs": False,
+                "outputs": False,
+            }
+        },
     )
 
     client = AsyncOpenAI(api_key="z")
@@ -1729,7 +1264,12 @@ def test_streaming_chat_completion(
         ],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        send_default_pii=True,
+        data_collection={
+            "gen_ai": {
+                "inputs": True,
+                "outputs": True,
+            }
+        },
     )
 
     client = OpenAI(api_key="z")
@@ -1860,7 +1400,12 @@ async def test_streaming_chat_completion_async_no_sensitive_data(
         ],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        send_default_pii=False,
+        data_collection={
+            "gen_ai": {
+                "inputs": False,
+                "outputs": False,
+            }
+        },
     )
 
     client = AsyncOpenAI(api_key="z")
@@ -2073,7 +1618,12 @@ async def test_streaming_chat_completion_async(
         ],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        send_default_pii=True,
+        data_collection={
+            "gen_ai": {
+                "inputs": True,
+                "outputs": True,
+            }
+        },
     )
 
     client = AsyncOpenAI(api_key="z")
@@ -2200,6 +1750,7 @@ def test_bad_chat_completion(
         integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
+        data_collection={},
     )
     items = capture_items("event", "span")
 
@@ -2228,6 +1779,7 @@ def test_span_status_error(
         integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
+        data_collection={},
     )
     items = capture_items("event", "span")
 
@@ -2258,6 +1810,7 @@ async def test_bad_chat_completion_async(
         integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     client = AsyncOpenAI(api_key="z")
@@ -2286,7 +1839,12 @@ def test_embeddings_create_no_sensitive_data(
         integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        send_default_pii=False,
+        data_collection={
+            "gen_ai": {
+                "inputs": False,
+                "outputs": False,
+            }
+        },
     )
 
     client = OpenAI(api_key="z")
@@ -2399,7 +1957,12 @@ def test_embeddings_create(
         integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        send_default_pii=True,
+        data_collection={
+            "gen_ai": {
+                "inputs": True,
+                "outputs": True,
+            }
+        },
     )
 
     client = OpenAI(api_key="z")
@@ -2438,156 +2001,6 @@ def test_embeddings_create(
     assert span["attributes"]["gen_ai.usage.total_tokens"] == 30
 
 
-def _collect_embeddings_span_data(capture_items, create):
-    items = capture_items("span")
-
-    response = create()
-
-    assert len(response.data[0].embedding) == 3
-
-    sentry_sdk.flush()
-    span = next(item.payload for item in items)
-    assert span["attributes"]["sentry.op"] == "gen_ai.embeddings"
-    return span["attributes"]
-
-
-@pytest.mark.parametrize(
-    "data_collection,send_default_pii,expect_input",
-    [
-        pytest.param(
-            {"gen_ai": {"inputs": True}},
-            False,
-            True,
-            id="gen-ai-inputs-enabled-overrides-pii-disabled",
-        ),
-        pytest.param(
-            {"gen_ai": {"inputs": False}},
-            True,
-            False,
-            id="gen-ai-inputs-disabled-overrides-pii-enabled",
-        ),
-        pytest.param(
-            {},
-            False,
-            True,
-            id="gen-ai-omitted-defaults-to-enabled",
-        ),
-        pytest.param(
-            {"gen_ai": {"inputs": False}},
-            False,
-            False,
-            id="gen-ai-inputs-disabled-and-pii-disabled",
-        ),
-        pytest.param(
-            None,
-            False,
-            False,
-            id="no-gen-ai-data-collection-falls-back-to-send-default-pii",
-        ),
-    ],
-)
-def test_embeddings_create_data_collection(
-    sentry_init,
-    capture_items,
-    data_collection,
-    send_default_pii,
-    expect_input,
-):
-    init_kwargs = {
-        "integrations": [OpenAIIntegration()],
-        "disabled_integrations": [StdlibIntegration],
-        "traces_sample_rate": 1.0,
-        "send_default_pii": send_default_pii,
-    }
-
-    sentry_init_kwargs = dict(init_kwargs)
-    if data_collection is not None:
-        sentry_init_kwargs["data_collection"] = data_collection
-
-    sentry_init(**sentry_init_kwargs)
-
-    client = OpenAI(api_key="z")
-
-    returned_embedding = CreateEmbeddingResponse(
-        data=[Embedding(object="embedding", index=0, embedding=[1.0, 2.0, 3.0])],
-        model="some-model",
-        object="list",
-        usage=EmbeddingTokenUsage(
-            prompt_tokens=20,
-            total_tokens=30,
-        ),
-    )
-
-    client.embeddings._post = mock.Mock(return_value=returned_embedding)
-
-    span_data = _collect_embeddings_span_data(
-        capture_items,
-        lambda: client.embeddings.create(input="hello", model="text-embedding-3-large"),
-    )
-
-    assert span_data[SPANDATA.GEN_AI_PROVIDER_NAME] == "openai"
-    assert span_data[SPANDATA.GEN_AI_OPERATION_NAME] == "embeddings"
-    assert span_data[SPANDATA.GEN_AI_REQUEST_MODEL] == "text-embedding-3-large"
-
-    if expect_input:
-        assert json.loads(span_data[SPANDATA.GEN_AI_EMBEDDINGS_INPUT]) == ["hello"]
-    else:
-        assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT not in span_data
-
-    assert span_data["gen_ai.usage.input_tokens"] == 20
-    assert span_data["gen_ai.usage.total_tokens"] == 30
-
-
-@pytest.mark.parametrize(
-    "get_input",
-    [
-        lambda: "hello",
-        lambda: ["First text", "Second text"],
-        lambda: iter(["First text", "Second text"]),
-        lambda: [5, 8, 13, 21, 34],
-        lambda: [[5, 8, 13], [8, 13, 21]],
-        lambda: {"text": "hello"},
-    ],
-)
-def test_embeddings_create_data_collection_inputs_disabled_input_shapes(
-    sentry_init,
-    capture_items,
-    get_input,
-):
-    sentry_init(
-        integrations=[OpenAIIntegration()],
-        disabled_integrations=[StdlibIntegration],
-        traces_sample_rate=1.0,
-        send_default_pii=True,
-        data_collection={"gen_ai": {"inputs": False}},
-    )
-
-    client = OpenAI(api_key="z")
-
-    returned_embedding = CreateEmbeddingResponse(
-        data=[Embedding(object="embedding", index=0, embedding=[1.0, 2.0, 3.0])],
-        model="some-model",
-        object="list",
-        usage=EmbeddingTokenUsage(
-            prompt_tokens=20,
-            total_tokens=30,
-        ),
-    )
-
-    client.embeddings._post = mock.Mock(return_value=returned_embedding)
-
-    span_data = _collect_embeddings_span_data(
-        capture_items,
-        lambda: client.embeddings.create(
-            input=get_input(), model="text-embedding-3-large"
-        ),
-    )
-
-    assert span_data[SPANDATA.GEN_AI_OPERATION_NAME] == "embeddings"
-    assert span_data[SPANDATA.GEN_AI_REQUEST_MODEL] == "text-embedding-3-large"
-    assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT not in span_data
-
-
 @pytest.mark.asyncio
 async def test_embeddings_create_async_no_sensitive_data(
     sentry_init,
@@ -2597,7 +2010,12 @@ async def test_embeddings_create_async_no_sensitive_data(
         integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        send_default_pii=False,
+        data_collection={
+            "gen_ai": {
+                "inputs": False,
+                "outputs": False,
+            }
+        },
     )
 
     client = AsyncOpenAI(api_key="z")
@@ -2713,7 +2131,12 @@ async def test_embeddings_create_async(
         integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        send_default_pii=True,
+        data_collection={
+            "gen_ai": {
+                "inputs": True,
+                "outputs": True,
+            }
+        },
     )
 
     client = AsyncOpenAI(api_key="z")
@@ -2752,109 +2175,15 @@ async def test_embeddings_create_async(
     assert span["attributes"]["gen_ai.usage.total_tokens"] == 30
 
 
-@pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "data_collection,send_default_pii,expect_input",
-    [
-        pytest.param(
-            {"gen_ai": {"inputs": True}},
-            False,
-            True,
-            id="gen-ai-inputs-enabled-overrides-pii-disabled",
-        ),
-        pytest.param(
-            {"gen_ai": {"inputs": False}},
-            True,
-            False,
-            id="gen-ai-inputs-disabled-overrides-pii-enabled",
-        ),
-        pytest.param(
-            {},
-            False,
-            True,
-            id="gen-ai-omitted-defaults-to-enabled",
-        ),
-        pytest.param(
-            None,
-            False,
-            False,
-            id="no-experiment-falls-back-to-pii",
-        ),
-    ],
-)
-async def test_embeddings_create_async_data_collection(
-    sentry_init,
-    capture_items,
-    data_collection,
-    send_default_pii,
-    expect_input,
-):
-    init_kwargs = {
-        "integrations": [OpenAIIntegration()],
-        "disabled_integrations": [StdlibIntegration],
-        "traces_sample_rate": 1.0,
-        "send_default_pii": send_default_pii,
-    }
-
-    sentry_init_kwargs = dict(init_kwargs)
-    if data_collection is not None:
-        sentry_init_kwargs["data_collection"] = data_collection
-
-    sentry_init(**sentry_init_kwargs)
-
-    client = AsyncOpenAI(api_key="z")
-
-    returned_embedding = CreateEmbeddingResponse(
-        data=[Embedding(object="embedding", index=0, embedding=[1.0, 2.0, 3.0])],
-        model="some-model",
-        object="list",
-        usage=EmbeddingTokenUsage(
-            prompt_tokens=20,
-            total_tokens=30,
-        ),
-    )
-
-    client.embeddings._post = AsyncMock(return_value=returned_embedding)
-    items = capture_items("span")
-
-    response = await client.embeddings.create(
-        input="hello", model="text-embedding-3-large"
-    )
-
-    assert len(response.data[0].embedding) == 3
-
-    sentry_sdk.flush()
-    span = next(item.payload for item in items)
-    assert span["attributes"]["sentry.op"] == "gen_ai.embeddings"
-    span_data = span["attributes"]
-
-    assert span_data[SPANDATA.GEN_AI_PROVIDER_NAME] == "openai"
-    assert span_data[SPANDATA.GEN_AI_OPERATION_NAME] == "embeddings"
-    assert span_data[SPANDATA.GEN_AI_REQUEST_MODEL] == "text-embedding-3-large"
-
-    if expect_input:
-        assert json.loads(span_data[SPANDATA.GEN_AI_EMBEDDINGS_INPUT]) == ["hello"]
-    else:
-        assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT not in span_data
-
-    assert span_data["gen_ai.usage.input_tokens"] == 20
-    assert span_data["gen_ai.usage.total_tokens"] == 30
-
-
-@pytest.mark.parametrize(
-    "send_default_pii",
-    [True, False],
-)
 def test_embeddings_create_raises_error(
     sentry_init,
     capture_items,
-    send_default_pii,
 ):
     sentry_init(
         integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        send_default_pii=send_default_pii,
+        data_collection={},
     )
 
     client = OpenAI(api_key="z")
@@ -2875,20 +2204,15 @@ def test_embeddings_create_raises_error(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "send_default_pii",
-    [True, False],
-)
 async def test_embeddings_create_raises_error_async(
     sentry_init,
     capture_items,
-    send_default_pii,
 ):
     sentry_init(
         integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        send_default_pii=send_default_pii,
+        data_collection={},
     )
 
     client = AsyncOpenAI(api_key="z")
@@ -2916,6 +2240,7 @@ def test_span_origin_nonstreaming_chat(
     sentry_init(
         integrations=[OpenAIIntegration()],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     client = OpenAI(api_key="z")
@@ -2953,6 +2278,7 @@ async def test_span_origin_nonstreaming_chat_async(
         integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     client = AsyncOpenAI(api_key="z")
@@ -2988,6 +2314,7 @@ def test_span_origin_streaming_chat(
         integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     client = OpenAI(api_key="z")
@@ -3051,6 +2378,7 @@ async def test_span_origin_streaming_chat_async(
         integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     client = AsyncOpenAI(api_key="z")
@@ -3119,6 +2447,7 @@ def test_span_origin_embeddings(
         integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     client = OpenAI(api_key="z")
@@ -3152,6 +2481,7 @@ async def test_span_origin_embeddings_async(
         integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     client = AsyncOpenAI(api_key="z")
@@ -3547,6 +2877,12 @@ def test_ai_client_span_responses_api_no_sensitive_data(
         integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
+        data_collection={
+            "gen_ai": {
+                "inputs": False,
+                "outputs": False,
+            }
+        },
     )
 
     client = OpenAI(api_key="z")
@@ -3603,6 +2939,11 @@ def test_ai_client_span_responses_tool_definitions(
         integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
+        data_collection={
+            "gen_ai": {
+                "inputs": True,
+            }
+        },
     )
 
     client = OpenAI(api_key="z")
@@ -3817,7 +3158,12 @@ def test_ai_client_span_responses_api(
         integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        send_default_pii=True,
+        data_collection={
+            "gen_ai": {
+                "inputs": True,
+                "outputs": True,
+            }
+        },
     )
 
     client = OpenAI(api_key="z")
@@ -3870,467 +3216,6 @@ def test_ai_client_span_responses_api(
 
 
 @pytest.mark.parametrize(
-    "data_collection,extra_kwargs,expected_present,expected_absent",
-    [
-        pytest.param(
-            {"gen_ai": {"inputs": True}},
-            {
-                "instructions": "You are a coding assistant that talks like a pirate.",
-                "input": "How do I check if a Python object is an instance of a class?",
-                "tools": EXAMPLE_TOOLS,
-            },
-            {
-                SPANDATA.GEN_AI_REQUEST_MESSAGES: safe_serialize(
-                    ["How do I check if a Python object is an instance of a class?"]
-                ),
-                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS: safe_serialize(
-                    [
-                        {
-                            "type": "text",
-                            "content": "You are a coding assistant that talks like a pirate.",
-                        }
-                    ]
-                ),
-                SPANDATA.GEN_AI_TOOL_DEFINITIONS: safe_serialize(EXAMPLE_TOOLS),
-            },
-            [],
-            id="gen-ai-inputs-enabled-string-input",
-        ),
-        pytest.param(
-            {"gen_ai": {"inputs": True}},
-            {
-                "instructions": "You are a coding assistant that talks like a pirate.",
-            },
-            {
-                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS: safe_serialize(
-                    [
-                        {
-                            "type": "text",
-                            "content": "You are a coding assistant that talks like a pirate.",
-                        }
-                    ]
-                ),
-            },
-            [
-                SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                SPANDATA.GEN_AI_TOOL_DEFINITIONS,
-            ],
-            id="gen-ai-inputs-enabled-instructions-only",
-        ),
-        pytest.param(
-            {"gen_ai": {"inputs": True}},
-            {
-                "instructions": "You are a coding assistant that talks like a pirate.",
-                "input": [
-                    {"role": "system", "content": "You are a helpful assistant."},
-                    {"role": "user", "content": "hello"},
-                ],
-            },
-            {
-                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS: safe_serialize(
-                    [
-                        {
-                            "type": "text",
-                            "content": "You are a coding assistant that talks like a pirate.",
-                        },
-                        {"type": "text", "content": "You are a helpful assistant."},
-                    ]
-                ),
-                SPANDATA.GEN_AI_REQUEST_MESSAGES: safe_serialize(
-                    [{"role": "user", "content": "hello"}]
-                ),
-            },
-            [SPANDATA.GEN_AI_TOOL_DEFINITIONS],
-            id="gen-ai-inputs-enabled-list-input-with-system-message",
-        ),
-        pytest.param(
-            {"gen_ai": {"inputs": False}},
-            {
-                "instructions": "You are a coding assistant that talks like a pirate.",
-                "input": "How do I check if a Python object is an instance of a class?",
-                "tools": EXAMPLE_TOOLS,
-            },
-            {},
-            [
-                SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
-                SPANDATA.GEN_AI_TOOL_DEFINITIONS,
-            ],
-            id="gen-ai-inputs-disabled",
-        ),
-        pytest.param(
-            {},
-            {
-                "input": "How do I check if a Python object is an instance of a class?",
-                "tools": EXAMPLE_TOOLS,
-            },
-            {
-                SPANDATA.GEN_AI_REQUEST_MESSAGES: safe_serialize(
-                    ["How do I check if a Python object is an instance of a class?"]
-                ),
-                SPANDATA.GEN_AI_TOOL_DEFINITIONS: safe_serialize(EXAMPLE_TOOLS),
-            },
-            [SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS],
-            id="gen-ai-omitted-defaults-to-enabled",
-        ),
-        pytest.param(
-            {"gen_ai": {"inputs": True}},
-            {},
-            {},
-            [
-                SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
-                SPANDATA.GEN_AI_TOOL_DEFINITIONS,
-            ],
-            id="gen-ai-inputs-enabled-no-input-provided",
-        ),
-    ],
-)
-@pytest.mark.skipif(SKIP_RESPONSES_TESTS, reason="Responses API not available")
-def test_responses_api_data_collection(
-    sentry_init,
-    capture_items,
-    data_collection,
-    extra_kwargs,
-    expected_present,
-    expected_absent,
-):
-    sentry_init(
-        integrations=[OpenAIIntegration()],
-        disabled_integrations=[StdlibIntegration],
-        traces_sample_rate=1.0,
-        data_collection=data_collection,
-    )
-
-    client = OpenAI(api_key="z")
-    client.responses._post = mock.Mock(return_value=EXAMPLE_RESPONSE)
-
-    create_kwargs = {
-        "model": "gpt-4o",
-        "max_output_tokens": 100,
-        "temperature": 0.7,
-        "top_p": 0.9,
-        "reasoning": {"effort": "high"},
-    }
-    create_kwargs.update(extra_kwargs)
-    items = capture_items("span")
-
-    client.responses.create(**create_kwargs)
-
-    sentry_sdk.flush()
-    spans = [item.payload for item in items]
-
-    assert len(spans) == 1
-    span_data = spans[0]["attributes"]
-
-    # Non-input data is always collected, regardless of data collection config
-    assert span_data["gen_ai.operation.name"] == "responses"
-    assert span_data["gen_ai.request.model"] == "gpt-4o"
-    assert span_data["gen_ai.request.max_tokens"] == 100
-    assert span_data["gen_ai.request.temperature"] == 0.7
-    assert span_data["gen_ai.request.top_p"] == 0.9
-    assert span_data["gen_ai.request.reasoning.level"] == "high"
-    assert span_data[SPANDATA.GEN_AI_PROVIDER_NAME] == "openai"
-
-    for key, value in expected_present.items():
-        assert span_data[key] == value
-
-    for key in expected_absent:
-        assert key not in span_data
-
-
-def _make_responses_api_output_message(content):
-    return ResponseOutputMessage(
-        id="message-id",
-        content=content,
-        role="assistant",
-        status="completed",
-        type="message",
-    )
-
-
-def _make_responses_api_function_call():
-    return ResponseFunctionToolCall(
-        id="fc-id",
-        call_id="call_123",
-        name="get_current_weather",
-        arguments='{"location": "San Francisco, CA"}',
-        type="function_call",
-    )
-
-
-def _make_responses_api_response(output):
-    return Response(
-        id="chat-id",
-        output=output,
-        parallel_tool_calls=False,
-        tool_choice="none",
-        tools=[],
-        created_at=10000000,
-        model="response-model-id",
-        object="response",
-        usage=ResponseUsage(
-            input_tokens=20,
-            input_tokens_details=InputTokensDetails(
-                cached_tokens=5,
-                cache_write_tokens=0,
-            ),
-            output_tokens=10,
-            output_tokens_details=OutputTokensDetails(
-                reasoning_tokens=8,
-            ),
-            total_tokens=30,
-        ),
-    )
-
-
-def _collect_responses_span_data(capture_items, create):
-    items = capture_items("span")
-
-    create()
-
-    sentry_sdk.flush()
-    (span,) = (item.payload for item in items)
-    return span["attributes"]
-
-
-@pytest.mark.parametrize(
-    "data_collection,send_default_pii,expect_output",
-    [
-        pytest.param(
-            {"gen_ai": {"outputs": True}},
-            False,
-            True,
-            id="gen-ai-outputs-enabled-overrides-pii-disabled",
-        ),
-        pytest.param(
-            {},
-            False,
-            True,
-            id="gen-ai-omitted-defaults-to-enabled",
-        ),
-        pytest.param(
-            {"gen_ai": {"inputs": False, "outputs": False}},
-            False,
-            False,
-            id="gen-ai-inputs-and-outputs-disabled-and-pii-disabled",
-        ),
-        pytest.param(
-            None,
-            False,
-            False,
-            id="no-gen-ai-data-collection-falls-back-to-send-default-pii",
-        ),
-        pytest.param(
-            None,
-            True,
-            True,
-            id="no-gen-ai-data-collection-pii-enabled-collects",
-        ),
-    ],
-)
-@pytest.mark.skipif(SKIP_RESPONSES_TESTS, reason="Responses API not available")
-def test_responses_api_data_collection_outputs(
-    sentry_init,
-    capture_items,
-    data_collection,
-    send_default_pii,
-    expect_output,
-):
-    init_kwargs = {
-        "integrations": [OpenAIIntegration()],
-        "disabled_integrations": [StdlibIntegration],
-        "traces_sample_rate": 1.0,
-        "send_default_pii": send_default_pii,
-    }
-    if data_collection is not None:
-        init_kwargs["data_collection"] = data_collection
-
-    sentry_init(**init_kwargs)
-
-    client = OpenAI(api_key="z")
-    client.responses._post = mock.Mock(
-        return_value=_make_responses_api_response(
-            output=[
-                _make_responses_api_output_message(
-                    content=[
-                        ResponseOutputText(
-                            annotations=[],
-                            text="the model response",
-                            type="output_text",
-                        ),
-                    ]
-                ),
-                _make_responses_api_function_call(),
-            ]
-        )
-    )
-
-    span_data = _collect_responses_span_data(
-        capture_items,
-        lambda: client.responses.create(model="gpt-4o", input="hello"),
-    )
-
-    assert span_data[SPANDATA.GEN_AI_RESPONSE_MODEL] == "response-model-id"
-
-    if expect_output:
-        assert "the model response" in span_data[SPANDATA.GEN_AI_RESPONSE_TEXT]
-        assert "get_current_weather" in span_data[SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS]
-    else:
-        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span_data
-        assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in span_data
-
-
-@pytest.mark.parametrize(
-    "get_output,expect_text,expect_tool_calls",
-    [
-        pytest.param(
-            lambda: [
-                _make_responses_api_output_message(
-                    content=[
-                        ResponseOutputText(
-                            annotations=[],
-                            text="the model response",
-                            type="output_text",
-                        ),
-                    ]
-                ),
-            ],
-            True,
-            False,
-            id="message-only",
-        ),
-        pytest.param(
-            lambda: [_make_responses_api_function_call()],
-            False,
-            True,
-            id="function-call-only",
-        ),
-        pytest.param(
-            lambda: [
-                _make_responses_api_output_message(
-                    content=[
-                        ResponseOutputRefusal(
-                            refusal="I cannot help with that.",
-                            type="refusal",
-                        ),
-                    ]
-                ),
-            ],
-            True,
-            False,
-            id="non-text-content-falls-back-to-dict",
-        ),
-    ],
-)
-@pytest.mark.skipif(SKIP_RESPONSES_TESTS, reason="Responses API not available")
-def test_responses_api_data_collection_outputs_shapes(
-    sentry_init,
-    capture_items,
-    get_output,
-    expect_text,
-    expect_tool_calls,
-):
-    sentry_init(
-        integrations=[OpenAIIntegration()],
-        disabled_integrations=[StdlibIntegration],
-        traces_sample_rate=1.0,
-        data_collection={"gen_ai": {"outputs": True}},
-    )
-
-    client = OpenAI(api_key="z")
-    client.responses._post = mock.Mock(
-        return_value=_make_responses_api_response(output=get_output())
-    )
-
-    span_data = _collect_responses_span_data(
-        capture_items,
-        lambda: client.responses.create(model="gpt-4o", input="hello"),
-    )
-
-    if expect_text:
-        assert SPANDATA.GEN_AI_RESPONSE_TEXT in span_data
-    else:
-        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span_data
-
-    if expect_tool_calls:
-        assert "get_current_weather" in span_data[SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS]
-    else:
-        assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in span_data
-
-
-@pytest.mark.parametrize(
-    "data_collection,expect_output",
-    [
-        pytest.param(
-            {"gen_ai": {"outputs": True}},
-            True,
-            id="gen-ai-outputs-enabled",
-        ),
-        pytest.param(
-            {"gen_ai": {"outputs": False}},
-            False,
-            id="gen-ai-outputs-disabled",
-        ),
-        pytest.param(
-            {},
-            True,
-            id="gen-ai-omitted-defaults-to-enabled",
-        ),
-    ],
-)
-@pytest.mark.skipif(SKIP_RESPONSES_TESTS, reason="Responses API not available")
-def test_streaming_responses_api_data_collection_outputs(
-    sentry_init,
-    capture_items,
-    data_collection,
-    expect_output,
-    get_model_response,
-    server_side_event_chunks,
-):
-    sentry_init(
-        integrations=[OpenAIIntegration()],
-        disabled_integrations=[StdlibIntegration],
-        traces_sample_rate=1.0,
-        send_default_pii=False,
-        data_collection=data_collection,
-    )
-
-    client = OpenAI(api_key="z")
-    returned_stream = get_model_response(
-        server_side_event_chunks(
-            EXAMPLE_RESPONSES_STREAM,
-        )
-    )
-    items = capture_items("span")
-
-    with mock.patch.object(
-        client.responses._client._client,
-        "send",
-        return_value=returned_stream,
-    ):
-        response_stream = client.responses.create(
-            model="some-model",
-            input="hello",
-            stream=True,
-        )
-        response_string = ""
-        for item in response_stream:
-            if hasattr(item, "delta"):
-                response_string += item.delta
-
-    assert response_string == "hello world"
-    sentry_sdk.flush()
-    (span,) = (item.payload for item in items)
-    span_data = span["attributes"]
-
-    if expect_output:
-        assert "hello world" in span_data[SPANDATA.GEN_AI_RESPONSE_TEXT]
-    else:
-        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span_data
-
-
-@pytest.mark.parametrize(
     "conversation, expected_id",
     [
         pytest.param(omit, None, id="omit"),
@@ -4350,6 +3235,7 @@ def test_responses_api_conversation_id(
         integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     client = OpenAI(api_key="z")
@@ -4391,6 +3277,7 @@ def test_responses_api_reasoning_level(
         integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     client = OpenAI(api_key="z")
@@ -4424,7 +3311,12 @@ def test_error_in_responses_api(
         integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        send_default_pii=True,
+        data_collection={
+            "gen_ai": {
+                "inputs": True,
+                "outputs": True,
+            }
+        },
     )
 
     client = OpenAI(api_key="z")
@@ -4610,7 +3502,12 @@ async def test_ai_client_span_responses_async_api(
         integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        send_default_pii=True,
+        data_collection={
+            "gen_ai": {
+                "inputs": True,
+                "outputs": True,
+            }
+        },
     )
 
     client = AsyncOpenAI(api_key="z")
@@ -4822,7 +3719,12 @@ async def test_ai_client_span_streaming_responses_async_api(
         integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        send_default_pii=True,
+        data_collection={
+            "gen_ai": {
+                "inputs": True,
+                "outputs": True,
+            }
+        },
     )
 
     client = AsyncOpenAI(api_key="z")
@@ -4901,7 +3803,12 @@ async def test_error_in_responses_async_api(
         integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        send_default_pii=True,
+        data_collection={
+            "gen_ai": {
+                "inputs": True,
+                "outputs": True,
+            }
+        },
     )
 
     client = AsyncOpenAI(api_key="z")
@@ -5004,15 +3911,10 @@ else:
     ]
 
 
-@pytest.mark.parametrize(
-    "send_default_pii",
-    [True, False],
-)
 @pytest.mark.skipif(SKIP_RESPONSES_TESTS, reason="Responses API not available")
 def test_streaming_responses_api(
     sentry_init,
     capture_items,
-    send_default_pii,
     get_model_response,
     server_side_event_chunks,
 ):
@@ -5020,7 +3922,12 @@ def test_streaming_responses_api(
         integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        send_default_pii=send_default_pii,
+        data_collection={
+            "gen_ai": {
+                "inputs": True,
+                "outputs": True,
+            }
+        },
     )
 
     client = OpenAI(api_key="z")
@@ -5064,12 +3971,76 @@ def test_streaming_responses_api(
 
     assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "response-model-id"
 
-    if send_default_pii:
-        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES] == '["hello"]'
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "hello world"
-    else:
-        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
-        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
+    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES] == '["hello"]'
+    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "hello world"
+
+    assert span["attributes"]["gen_ai.usage.input_tokens"] == 20
+    assert span["attributes"]["gen_ai.usage.output_tokens"] == 10
+    assert span["attributes"]["gen_ai.usage.total_tokens"] == 30
+
+
+@pytest.mark.skipif(SKIP_RESPONSES_TESTS, reason="Responses API not available")
+def test_streaming_responses_api_no_sensitive_data(
+    sentry_init,
+    capture_items,
+    get_model_response,
+    server_side_event_chunks,
+):
+    sentry_init(
+        integrations=[OpenAIIntegration()],
+        disabled_integrations=[StdlibIntegration],
+        traces_sample_rate=1.0,
+        data_collection={
+            "gen_ai": {
+                "inputs": False,
+                "outputs": False,
+            }
+        },
+    )
+
+    client = OpenAI(api_key="z")
+    returned_stream = get_model_response(
+        server_side_event_chunks(
+            EXAMPLE_RESPONSES_STREAM,
+        )
+    )
+    items = capture_items("span")
+
+    with mock.patch.object(
+        client.responses._client._client,
+        "send",
+        return_value=returned_stream,
+    ):
+        response_stream = client.responses.create(
+            model="some-model",
+            input="hello",
+            stream=True,
+            max_output_tokens=100,
+            temperature=0.7,
+            top_p=0.9,
+            reasoning={"effort": "high"},
+        )
+
+        response_string = ""
+        for item in response_stream:
+            if hasattr(item, "delta"):
+                response_string += item.delta
+
+    assert response_string == "hello world"
+
+    sentry_sdk.flush()
+    (span,) = (item.payload for item in items)
+    assert span["attributes"]["sentry.op"] == "gen_ai.responses"
+    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "openai"
+    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
+    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
+    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
+    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_REASONING_LEVEL] == "high"
+
+    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "response-model-id"
+
+    assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
+    assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
 
     assert span["attributes"]["gen_ai.usage.input_tokens"] == 20
     assert span["attributes"]["gen_ai.usage.output_tokens"] == 10
@@ -5077,15 +4048,10 @@ def test_streaming_responses_api(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "send_default_pii",
-    [True, False],
-)
 @pytest.mark.skipif(SKIP_RESPONSES_TESTS, reason="Responses API not available")
 async def test_streaming_responses_api_async(
     sentry_init,
     capture_items,
-    send_default_pii,
     get_model_response,
     async_iterator,
     server_side_event_chunks,
@@ -5094,7 +4060,12 @@ async def test_streaming_responses_api_async(
         integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        send_default_pii=send_default_pii,
+        data_collection={
+            "gen_ai": {
+                "inputs": True,
+                "outputs": True,
+            }
+        },
     )
 
     client = AsyncOpenAI(api_key="z")
@@ -5136,12 +4107,76 @@ async def test_streaming_responses_api_async(
 
     assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "response-model-id"
 
-    if send_default_pii:
-        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES] == '["hello"]'
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "hello world"
-    else:
-        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
-        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
+    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES] == '["hello"]'
+    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "hello world"
+
+    assert span["attributes"]["gen_ai.usage.input_tokens"] == 20
+    assert span["attributes"]["gen_ai.usage.output_tokens"] == 10
+    assert span["attributes"]["gen_ai.usage.total_tokens"] == 30
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif(SKIP_RESPONSES_TESTS, reason="Responses API not available")
+async def test_streaming_responses_api_async_no_sensitive_data(
+    sentry_init,
+    capture_items,
+    get_model_response,
+    async_iterator,
+    server_side_event_chunks,
+):
+    sentry_init(
+        integrations=[OpenAIIntegration()],
+        disabled_integrations=[StdlibIntegration],
+        traces_sample_rate=1.0,
+        data_collection={
+            "gen_ai": {
+                "inputs": False,
+                "outputs": False,
+            }
+        },
+    )
+
+    client = AsyncOpenAI(api_key="z")
+    returned_stream = get_model_response(
+        async_iterator(server_side_event_chunks(EXAMPLE_RESPONSES_STREAM))
+    )
+    items = capture_items("span")
+
+    with mock.patch.object(
+        client.responses._client._client,
+        "send",
+        return_value=returned_stream,
+    ):
+        response_stream = await client.responses.create(
+            model="some-model",
+            input="hello",
+            stream=True,
+            max_output_tokens=100,
+            temperature=0.7,
+            top_p=0.9,
+            reasoning={"effort": "high"},
+        )
+
+        response_string = ""
+        async for item in response_stream:
+            if hasattr(item, "delta"):
+                response_string += item.delta
+
+    assert response_string == "hello world"
+
+    sentry_sdk.flush()
+    (span,) = (item.payload for item in items)
+    assert span["attributes"]["sentry.op"] == "gen_ai.responses"
+    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "openai"
+    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
+    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
+    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
+    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_REASONING_LEVEL] == "high"
+
+    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "response-model-id"
+
+    assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
+    assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
 
     assert span["attributes"]["gen_ai.usage.input_tokens"] == 20
     assert span["attributes"]["gen_ai.usage.output_tokens"] == 10
@@ -5173,6 +4208,7 @@ def test_chat_completion_reasoning_level(
         integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     client = OpenAI(api_key="z")
@@ -5237,7 +4273,12 @@ def test_openai_message_role_mapping(
         integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        send_default_pii=True,
+        data_collection={
+            "gen_ai": {
+                "inputs": True,
+                "outputs": True,
+            }
+        },
     )
 
     client = OpenAI(api_key="z")
@@ -5286,6 +4327,7 @@ def test_streaming_chat_completion_ttft(
         integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     client = OpenAI(api_key="z")
@@ -5366,6 +4408,7 @@ async def test_streaming_chat_completion_ttft_async(
         integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     client = AsyncOpenAI(api_key="z")
@@ -5447,6 +4490,7 @@ def test_streaming_responses_api_ttft(
         integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     client = OpenAI(api_key="z")
@@ -5498,6 +4542,7 @@ async def test_streaming_responses_api_ttft_async(
         integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     client = AsyncOpenAI(api_key="z")

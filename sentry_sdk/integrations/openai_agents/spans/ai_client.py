@@ -5,7 +5,6 @@ import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.traces import Span, _AgentFrameworkChatGenerationContext
-from sentry_sdk.utils import has_data_collection_enabled
 
 try:
     from agents import (
@@ -221,15 +220,7 @@ def ai_client_context(
 
     _set_agent_data(context.span, agent)
 
-    if has_data_collection_enabled(client_options):
-        if client_options["data_collection"]["gen_ai"]["inputs"]:
-            context.span.set_attribute(
-                SPANDATA.GEN_AI_TOOL_DEFINITIONS,
-                json.dumps(_transform_tool_definitions(agent.tools)),
-            )
-    else:
-        # This is set unconditionally prior to data collection being introduced.
-        # Remove this block once data collection is fully rolled out
+    if client_options["data_collection"]["gen_ai"]["inputs"]:
         context.span.set_attribute(
             SPANDATA.GEN_AI_TOOL_DEFINITIONS,
             json.dumps(_transform_tool_definitions(agent.tools)),

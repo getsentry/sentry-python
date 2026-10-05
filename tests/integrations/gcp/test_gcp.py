@@ -625,8 +625,8 @@ def test_request_attributes(run_cloud_function):
 
     assert attrs["http.request.method"] == "POST"
     assert attrs["url.query"] == "foo=bar"
-    assert attrs["http.request.header.content-type"] == "application/json"
-    assert attrs["http.request.header.accept"] == "text/html"
+    assert attrs["http.request.header.content-type"] == ["application/json"]
+    assert attrs["http.request.header.accept"] == ["text/html"]
     assert attrs["faas.name"] == "Google Cloud function"
     assert attrs["gcp.project.id"] == "serverless_project"
     assert attrs["faas.identity"] == "func_ID"

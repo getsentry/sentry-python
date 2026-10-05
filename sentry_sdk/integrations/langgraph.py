@@ -11,9 +11,7 @@ from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_ve
 
 # This is fine because langgraph depends on langchain-base, and LangchainIntegration only imports from langchain-base.
 from sentry_sdk.integrations.langchain import LangchainIntegration
-from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.utils import (
-    has_data_collection_enabled,
     package_version,
     safe_serialize,
 )
@@ -49,24 +47,6 @@ class LanggraphIntegration(Integration):
             Pregel.invoke = _wrap_pregel_invoke(Pregel.invoke)
         if hasattr(Pregel, "ainvoke"):
             Pregel.ainvoke = _wrap_pregel_ainvoke(Pregel.ainvoke)
-
-
-def _should_record_inputs(integration: "LanggraphIntegration") -> bool:
-    client = sentry_sdk.get_client()
-    if has_data_collection_enabled(client.options):
-        return bool(client.options["data_collection"]["gen_ai"]["inputs"])
-
-    # To remove once data collection has been fully rolled out
-    return should_send_default_pii()
-
-
-def _should_record_outputs(integration: "LanggraphIntegration") -> bool:
-    client = sentry_sdk.get_client()
-    if has_data_collection_enabled(client.options):
-        return bool(client.options["data_collection"]["gen_ai"]["outputs"])
-
-    # To remove once data collection has been fully rolled out
-    return should_send_default_pii()
 
 
 def _get_graph_name(graph_obj: "Any") -> "Optional[str]":
@@ -156,7 +136,10 @@ def _wrap_pregel_invoke(f: "Callable[..., Any]") -> "Callable[..., Any]":
             input_messages = None
             if len(args) > 0:
                 input_messages = _parse_langgraph_messages(args[0])
-                if input_messages and _should_record_inputs(integration):
+                if (
+                    input_messages
+                    and client.options["data_collection"]["gen_ai"]["inputs"]
+                ):
                     normalized_input_messages = normalize_message_roles(input_messages)
                     set_data_normalized(
                         span,
@@ -199,7 +182,10 @@ def _wrap_pregel_ainvoke(f: "Callable[..., Any]") -> "Callable[..., Any]":
             input_messages = None
             if len(args) > 0:
                 input_messages = _parse_langgraph_messages(args[0])
-                if input_messages and _should_record_inputs(integration):
+                if (
+                    input_messages
+                    and client.options["data_collection"]["gen_ai"]["inputs"]
+                ):
                     normalized_input_messages = normalize_message_roles(input_messages)
                     set_data_normalized(
                         span,
@@ -277,20 +263,22 @@ def _set_response_attributes(
     if new_messages is None:
         return
 
-    if _should_record_outputs(integration):
-        llm_response_text = _extract_llm_response_text(new_messages)
-        if llm_response_text:
-            set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, llm_response_text)
-        elif new_messages:
-            set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, new_messages)
-        else:
-            set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, result)
+    if not sentry_sdk.get_client().options["data_collection"]["gen_ai"]["outputs"]:
+        return
 
-        tool_calls = _extract_tool_calls(new_messages)
-        if tool_calls:
-            set_data_normalized(
-                span,
-                SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
-                safe_serialize(tool_calls),
-                unpack=False,
-            )
+    llm_response_text = _extract_llm_response_text(new_messages)
+    if llm_response_text:
+        set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, llm_response_text)
+    elif new_messages:
+        set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, new_messages)
+    else:
+        set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, result)
+
+    tool_calls = _extract_tool_calls(new_messages)
+    if tool_calls:
+        set_data_normalized(
+            span,
+            SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
+            safe_serialize(tool_calls),
+            unpack=False,
+        )
