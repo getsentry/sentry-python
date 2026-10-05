@@ -730,16 +730,14 @@ def _set_common_output_data(
             if record_outputs:
                 for output in response.output:
                     if output.type == "function_call":
-                        output_messages["tool"].append(output.model_dump())
+                        output_messages["tool"].append(output.dict())
                     elif output.type == "message":
                         for output_message in output.content:
                             try:
                                 output_messages["response"].append(output_message.text)  # type: ignore[union-attr]
                             except AttributeError:
                                 # Unknown output message type, just return the json
-                                output_messages["response"].append(
-                                    output_message.model_dump()
-                                )
+                                output_messages["response"].append(output_message.dict())
 
                 if len(output_messages["tool"]) > 0:
                     set_data_normalized(
@@ -761,16 +759,14 @@ def _set_common_output_data(
         ):
             for output in response.output:
                 if output.type == "function_call":
-                    output_messages["tool"].append(output.model_dump())
+                    output_messages["tool"].append(output.dict())
                 elif output.type == "message":
                     for output_message in output.content:
                         try:
                             output_messages["response"].append(output_message.text)  # type: ignore[union-attr]
                         except AttributeError:
                             # Unknown output message type, just return the json
-                            output_messages["response"].append(
-                                output_message.model_dump()
-                            )
+                            output_messages["response"].append(output_message.dict())
 
             if len(output_messages["tool"]) > 0:
                 set_data_normalized(

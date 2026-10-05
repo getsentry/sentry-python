@@ -72,10 +72,7 @@ from sentry_sdk import start_span
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.logging import LoggingIntegration
 from sentry_sdk.integrations.openai_agents import OpenAIAgentsIntegration
-from sentry_sdk.integrations.openai_agents.utils import (
-    _set_input_data,
-    safe_serialize,
-)
+from sentry_sdk.integrations.openai_agents.utils import _set_input_data, safe_serialize
 from sentry_sdk.integrations.stdlib import StdlibIntegration
 from sentry_sdk.utils import package_version, parse_version
 
