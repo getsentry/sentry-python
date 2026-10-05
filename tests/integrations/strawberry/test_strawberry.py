@@ -172,7 +172,7 @@ def test_replace_existing_sentry_sync_extension(sentry_init):
 
 
 @parameterize_strawberry_test
-def test_do_not_capture_request_if_send_pii_is_off(
+def test_do_not_capture_request_if_data_collection_settings_are_off(
     request,
     sentry_init,
     capture_events,
@@ -475,10 +475,6 @@ def test_breadcrumb_no_operation_name(
 
 
 @parameterize_strawberry_test
-@pytest.mark.parametrize(
-    "send_default_pii",
-    [True, False],
-)
 def test_capture_segment_on_error(
     request,
     sentry_init,
@@ -487,10 +483,9 @@ def test_capture_segment_on_error(
     client_factory,
     async_execution,
     framework_integrations,
-    send_default_pii,
 ):
     sentry_init(
-        send_default_pii=send_default_pii,
+        data_collection={},
         integrations=[
             StrawberryIntegration(async_execution=async_execution),
         ]
@@ -526,10 +521,7 @@ def test_capture_segment_on_error(
     assert query_span["attributes"]["graphql.operation.type"] == "query"
     assert query_span["attributes"]["graphql.operation.name"] == "ErrorQuery"
 
-    if send_default_pii is True:
-        assert query_span["attributes"]["graphql.document"] == query
-    else:
-        assert "graphql.document" not in query_span["attributes"]
+    assert query_span["attributes"]["graphql.document"] == query
 
     assert parse_span["attributes"]["sentry.op"] == OP.GRAPHQL_PARSE
     assert parse_span["name"] == "parsing"
@@ -545,10 +537,6 @@ def test_capture_segment_on_error(
 
 
 @parameterize_strawberry_test
-@pytest.mark.parametrize(
-    "send_default_pii",
-    [True, False],
-)
 def test_capture_segment_on_success(
     request,
     sentry_init,
@@ -557,7 +545,6 @@ def test_capture_segment_on_success(
     client_factory,
     async_execution,
     framework_integrations,
-    send_default_pii,
 ):
     sentry_init(
         integrations=[
@@ -565,7 +552,7 @@ def test_capture_segment_on_success(
         ]
         + framework_integrations,
         traces_sample_rate=1,
-        send_default_pii=send_default_pii,
+        data_collection={},
     )
 
     items = capture_items("span")
@@ -593,10 +580,7 @@ def test_capture_segment_on_success(
     assert query_span["attributes"]["graphql.operation.type"] == "query"
     assert query_span["attributes"]["graphql.operation.name"] == "GreetingQuery"
 
-    if send_default_pii is True:
-        assert query_span["attributes"]["graphql.document"] == query
-    else:
-        assert "graphql.document" not in query_span["attributes"]
+    assert query_span["attributes"]["graphql.document"] == query
 
     assert parse_span["attributes"]["sentry.op"] == OP.GRAPHQL_PARSE
     assert parse_span["name"] == "parsing"
@@ -612,10 +596,6 @@ def test_capture_segment_on_success(
 
 
 @parameterize_strawberry_test
-@pytest.mark.parametrize(
-    "send_default_pii",
-    [True, False],
-)
 def test_segment_no_operation_name(
     request,
     sentry_init,
@@ -624,7 +604,6 @@ def test_segment_no_operation_name(
     client_factory,
     async_execution,
     framework_integrations,
-    send_default_pii,
 ):
     sentry_init(
         integrations=[
@@ -632,7 +611,7 @@ def test_segment_no_operation_name(
         ]
         + framework_integrations,
         traces_sample_rate=1,
-        send_default_pii=send_default_pii,
+        data_collection={},
     )
 
     items = capture_items("span")
@@ -659,10 +638,7 @@ def test_segment_no_operation_name(
     assert query_span["attributes"]["graphql.operation.type"] == "query"
     assert "graphql.operation.name" not in query_span["attributes"]
 
-    if send_default_pii is True:
-        assert query_span["attributes"]["graphql.document"] == query
-    else:
-        assert "graphql.document" not in query_span["attributes"]
+    assert query_span["attributes"]["graphql.document"] == query
 
     assert parse_span["attributes"]["sentry.op"] == OP.GRAPHQL_PARSE
     assert parse_span["name"] == "parsing"
@@ -678,10 +654,6 @@ def test_segment_no_operation_name(
 
 
 @parameterize_strawberry_test
-@pytest.mark.parametrize(
-    "send_default_pii",
-    [True, False],
-)
 def test_segment_mutation(
     request,
     sentry_init,
@@ -690,7 +662,6 @@ def test_segment_mutation(
     client_factory,
     async_execution,
     framework_integrations,
-    send_default_pii,
 ):
     sentry_init(
         integrations=[
@@ -698,7 +669,7 @@ def test_segment_mutation(
         ]
         + framework_integrations,
         traces_sample_rate=1,
-        send_default_pii=send_default_pii,
+        data_collection={},
     )
 
     items = capture_items("span")
@@ -726,10 +697,7 @@ def test_segment_mutation(
     assert mutation_span["attributes"]["graphql.operation.type"] == "mutation"
     assert "graphql.operation.name" not in mutation_span["attributes"]
 
-    if send_default_pii is True:
-        assert mutation_span["attributes"]["graphql.document"] == query
-    else:
-        assert "graphql.document" not in mutation_span["attributes"]
+    assert mutation_span["attributes"]["graphql.document"] == query
 
     assert parse_span["attributes"]["sentry.op"] == OP.GRAPHQL_PARSE
     assert parse_span["name"] == "parsing"
@@ -746,31 +714,17 @@ def test_segment_mutation(
 
 @parameterize_strawberry_test
 @pytest.mark.parametrize(
-    "data_collection,send_default_pii,expect_document",
+    "data_collection,expect_document",
     [
         pytest.param(
             {"graphql": {"document": True}},
-            None,
             True,
             id="document_on_sets_graphql_document",
         ),
         pytest.param(
             {"graphql": {"document": False}},
-            None,
             False,
             id="document_off_omits_graphql_document",
-        ),
-        pytest.param(
-            {"graphql": {"document": False}},
-            True,
-            False,
-            id="data_collection_takes_precedence_over_send_default_pii_on",
-        ),
-        pytest.param(
-            {"graphql": {"document": True}},
-            False,
-            True,
-            id="data_collection_takes_precedence_over_send_default_pii_off",
         ),
     ],
 )
@@ -783,7 +737,6 @@ def test_graphql_span_data_collection(
     async_execution,
     framework_integrations,
     data_collection,
-    send_default_pii,
     expect_document,
 ):
     init_kwargs = {
@@ -792,8 +745,6 @@ def test_graphql_span_data_collection(
         "traces_sample_rate": 1,
         "data_collection": data_collection,
     }
-    if send_default_pii is not None:
-        init_kwargs["send_default_pii"] = send_default_pii
 
     sentry_init(**init_kwargs)
 
