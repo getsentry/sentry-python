@@ -58,7 +58,6 @@ def _get_model_name(
 def _set_model_data(
     span: "Span",
     agent: "Optional[Agent]",
-    model: "Union[Model, AbstractModel]",
     model_settings: "Optional[Union[ModelSettings, RealtimeModelSettings]]",
 ) -> None:
     """Set model-related data on a span.
@@ -68,17 +67,6 @@ def _set_model_data(
         model: Model object (can be None, will try to get from agent if not provided)
         model_settings: Model settings (can be None, will try to get from agent if not provided)
     """
-    # Extract model information
-    model_obj = model
-    if not model_obj and agent and hasattr(agent, "model"):
-        model_obj = agent.model
-
-    if model_obj:
-        # Set model name
-        model_name = _get_model_name(model_obj)
-        if model_name:
-            span.set_attribute(SPANDATA.GEN_AI_REQUEST_MODEL, model_name)
-
     # Extract model settings
     settings = model_settings
     if not settings and agent and hasattr(agent, "model_settings"):
