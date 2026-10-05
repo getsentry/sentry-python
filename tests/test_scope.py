@@ -1110,3 +1110,45 @@ def test_conversation_id_clear():
 
     scope.clear()
     assert scope.get_conversation_id() is None
+
+
+def test_transaction_name_cleared_when_span_unset():
+    """Scope._transaction follows the span lifecycle (GH-7774).
+
+    Set by a Transaction, preserved while a child span is active, cleared
+    when the span is set back to None (top-level transaction exit).
+    """
+    from sentry_sdk.tracing import Transaction
+
+    scope = Scope()
+
+    transaction = Transaction(name="my-transaction")
+    scope.span = transaction
+    assert scope._transaction == "my-transaction"
+    assert scope._transaction_info.get("source")  # info follows the name
+
+    child = transaction.start_child(op="child")
+    scope.span = child
+    assert scope._transaction == "my-transaction"
+
+    scope.span = None
+    assert scope._transaction is None
+    assert scope._transaction_info == {}  # no stale source left behind
+
+
+def test_transaction_name_survives_nested_span_exit():
+    """Exiting a child span restores the transaction on the scope.
+
+    The transaction name must not be dropped when an inner span finishes
+    while the transaction is still live.
+    """
+    scope = Scope()
+
+    with sentry_sdk.start_transaction(name="my-transaction", scope=scope):
+        assert scope._transaction == "my-transaction"
+        with sentry_sdk.start_span(op="child", scope=scope):
+            assert scope._transaction == "my-transaction"
+        # span restored to the transaction, not None
+        assert scope._transaction == "my-transaction"
+
+    assert scope._transaction is None
