@@ -172,64 +172,6 @@ def test_replace_existing_sentry_sync_extension(sentry_init):
 
 
 @parameterize_strawberry_test
-def test_capture_request_if_available_and_send_pii_is_on(
-    request,
-    sentry_init,
-    capture_events,
-    client_factory,
-    async_execution,
-    framework_integrations,
-):
-    sentry_init(
-        send_default_pii=True,
-        integrations=[
-            StrawberryIntegration(async_execution=async_execution),
-        ]
-        + framework_integrations,
-    )
-    events = capture_events()
-
-    schema = strawberry.Schema(Query)
-
-    client_factory = request.getfixturevalue(client_factory)
-    client = client_factory(schema)
-
-    query = "query ErrorQuery { error }"
-    client.post("/graphql", json={"query": query, "operationName": "ErrorQuery"})
-
-    assert len(events) == 1
-
-    (error_event,) = events
-
-    assert len(error_event["exception"]["values"]) == 2
-    assert error_event["exception"]["values"][0]["mechanism"]["type"] == "chained"
-    assert error_event["exception"]["values"][-1]["mechanism"]["type"] == "strawberry"
-    assert error_event["request"]["api_target"] == "graphql"
-    assert error_event["request"]["data"] == {
-        "query": query,
-        "operationName": "ErrorQuery",
-    }
-    assert error_event["contexts"]["response"] == {
-        "data": {
-            "data": None,
-            "errors": [
-                {
-                    "message": "division by zero",
-                    "locations": [{"line": 1, "column": 20}],
-                    "path": ["error"],
-                }
-            ],
-        }
-    }
-    assert len(error_event["breadcrumbs"]["values"]) == 1
-    assert error_event["breadcrumbs"]["values"][0]["category"] == "graphql.operation"
-    assert error_event["breadcrumbs"]["values"][0]["data"] == {
-        "operation_name": "ErrorQuery",
-        "operation_type": "query",
-    }
-
-
-@parameterize_strawberry_test
 def test_do_not_capture_request_if_send_pii_is_off(
     request,
     sentry_init,
@@ -239,6 +181,10 @@ def test_do_not_capture_request_if_send_pii_is_off(
     framework_integrations,
 ):
     sentry_init(
+        data_collection={
+            "graphql": {"document": False, "variables": False},
+            "http_bodies": [],
+        },
         integrations=[
             StrawberryIntegration(async_execution=async_execution),
         ]
@@ -261,7 +207,8 @@ def test_do_not_capture_request_if_send_pii_is_off(
     assert len(error_event["exception"]["values"]) == 2
     assert error_event["exception"]["values"][0]["mechanism"]["type"] == "chained"
     assert error_event["exception"]["values"][-1]["mechanism"]["type"] == "strawberry"
-    assert "data" not in error_event["request"]
+    assert error_event["request"]["data"] == {"operationName": "ErrorQuery"}
+
     assert "response" not in error_event["contexts"]
 
     assert len(error_event["breadcrumbs"]["values"]) == 1
@@ -274,31 +221,17 @@ def test_do_not_capture_request_if_send_pii_is_off(
 
 @parameterize_strawberry_test
 @pytest.mark.parametrize(
-    "data_collection,send_default_pii,expect_api_target",
+    "data_collection,expect_api_target",
     [
         pytest.param(
             {"graphql": {"document": True}},
-            None,
             True,
             id="document_on_sets_api_target",
         ),
         pytest.param(
             {"graphql": {"document": False}},
-            None,
             False,
             id="document_off_omits_api_target",
-        ),
-        pytest.param(
-            {"graphql": {"document": False}},
-            True,
-            False,
-            id="data_collection_takes_precedence_over_send_default_pii_on",
-        ),
-        pytest.param(
-            {"graphql": {"document": True}},
-            False,
-            True,
-            id="data_collection_takes_precedence_over_send_default_pii_off",
         ),
     ],
 )
@@ -310,7 +243,6 @@ def test_event_processor_data_collection(
     async_execution,
     framework_integrations,
     data_collection,
-    send_default_pii,
     expect_api_target,
 ):
     init_kwargs = {
@@ -318,8 +250,6 @@ def test_event_processor_data_collection(
         + framework_integrations,
         "data_collection": data_collection,
     }
-    if send_default_pii is not None:
-        init_kwargs["send_default_pii"] = send_default_pii
     sentry_init(**init_kwargs)
     events = capture_events()
 
@@ -894,6 +824,16 @@ def test_graphql_span_data_collection(
 
 
 @parameterize_strawberry_test
+@pytest.mark.parametrize(
+    "data_collection",
+    [
+        pytest.param(None, id="data_collection_default"),
+        pytest.param(
+            {"graphql": {"document": True, "variables": True}},
+            id="data_collection_graphql_on",
+        ),
+    ],
+)
 def test_handle_none_query_gracefully(
     request,
     sentry_init,
@@ -901,13 +841,15 @@ def test_handle_none_query_gracefully(
     client_factory,
     async_execution,
     framework_integrations,
+    data_collection,
 ):
-    sentry_init(
-        integrations=[
-            StrawberryIntegration(async_execution=async_execution),
-        ]
+    init_kwargs = {
+        "integrations": [StrawberryIntegration(async_execution=async_execution)]
         + framework_integrations,
-    )
+    }
+    if data_collection is not None:
+        init_kwargs["data_collection"] = data_collection
+    sentry_init(**init_kwargs)
     events = capture_events()
 
     schema = strawberry.Schema(Query)
@@ -921,35 +863,7 @@ def test_handle_none_query_gracefully(
 
 
 @parameterize_strawberry_test
-def test_handle_none_query_gracefully_with_data_collection(
-    request,
-    sentry_init,
-    capture_events,
-    client_factory,
-    async_execution,
-    framework_integrations,
-):
-    sentry_init(
-        integrations=[
-            StrawberryIntegration(async_execution=async_execution),
-        ]
-        + framework_integrations,
-        data_collection={"graphql": {"document": True, "variables": True}},
-    )
-    events = capture_events()
-
-    schema = strawberry.Schema(Query)
-
-    client_factory = request.getfixturevalue(client_factory)
-    client = client_factory(schema)
-
-    client.post("/graphql", json={})
-
-    assert len(events) == 0, "expected no events to be sent to Sentry"
-
-
-@parameterize_strawberry_test
-def test_span_origin(
+def test_span_origin_for_gql_mutations_and_related_ops(
     request,
     sentry_init,
     capture_events,
@@ -998,7 +912,7 @@ def test_span_origin(
 
 
 @parameterize_strawberry_test
-def test_span_origin2(
+def test_span_origin_for_gql_query_ops(
     request,
     sentry_init,
     capture_events,
