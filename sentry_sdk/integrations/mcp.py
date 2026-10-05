@@ -261,7 +261,7 @@ async def _instrument_tool_call(
         _set_span_input_data(
             span,
             handler_name,
-            SPANDATA.MCP_TOOL_NAME,
+            SPANDATA.GEN_AI_TOOL_NAME,
             "tools/call",
             arguments,
             request_id,
