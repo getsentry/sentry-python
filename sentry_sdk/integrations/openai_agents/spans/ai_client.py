@@ -45,7 +45,6 @@ except ImportError:
 
 from ..consts import SPAN_ORIGIN
 from ..utils import (
-    _set_agent_data,
     _set_input_data,
     _set_output_data,
     _set_usage_data,
@@ -218,6 +217,7 @@ def ai_client_context(
     )
 
     context.span.set_attribute(SPANDATA.GEN_AI_PROVIDER_NAME, "openai")
+    context.span.set_attribute(SPANDATA.GEN_AI_AGENT_NAME, agent.name)
 
     request_model_name: "Optional[str]" = None
     if isinstance(agent.model, Model) and hasattr(agent.model, "model"):
@@ -230,7 +230,32 @@ def ai_client_context(
     if request_model_name:
         context.span.set_attribute(SPANDATA.GEN_AI_REQUEST_MODEL, request_model_name)
 
-    _set_agent_data(context.span, agent)
+    if agent.model_settings.max_tokens:
+        context.span.set_attribute(
+            SPANDATA.GEN_AI_REQUEST_MAX_TOKENS, agent.model_settings.max_tokens
+        )
+
+    if agent.model_settings.presence_penalty:
+        context.span.set_attribute(
+            SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY,
+            agent.model_settings.presence_penalty,
+        )
+
+    if agent.model_settings.temperature:
+        context.span.set_attribute(
+            SPANDATA.GEN_AI_REQUEST_TEMPERATURE, agent.model_settings.temperature
+        )
+
+    if agent.model_settings.top_p:
+        context.span.set_attribute(
+            SPANDATA.GEN_AI_REQUEST_TOP_P, agent.model_settings.top_p
+        )
+
+    if agent.model_settings.frequency_penalty:
+        context.span.set_attribute(
+            SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY,
+            agent.model_settings.frequency_penalty,
+        )
 
     if client_options["data_collection"]["gen_ai"]["inputs"]:
         context.span.set_attribute(
