@@ -211,6 +211,15 @@ def _parse_rate_limits(
             continue
 
 
+class TransportResponseError(Exception):
+    """Raised when the HTTP transport receives an unexpected response status.
+
+    A non-2xx status (other than 429 rate limiting) means the envelope was not
+    accepted. Raising lets custom/wrapper transports detect the failed
+    delivery and fail over to another route instead of assuming success.
+    """
+
+
 class HttpTransportCore(Transport):
     """Shared base class for sync and async transports."""
 
@@ -403,6 +412,13 @@ class HttpTransportCore(Transport):
             )
             self._handle_request_error(
                 envelope=envelope, loss_reason="status_{}".format(response.status)
+            )
+            # Surface the failed delivery so custom/wrapper transports can
+            # catch it and fail over (e.g. a 403/404 from a network middlebox).
+            # 429 is handled via rate limits above and 413 is a deliberate
+            # drop, so neither raises here.
+            raise TransportResponseError(
+                "Unexpected status code: {}".format(response.status)
             )
 
     def _update_headers(

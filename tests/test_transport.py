@@ -1110,3 +1110,40 @@ async def test_async_transport_rate_limiting_with_concurrency(
     # New request should be dropped due to rate limiting
     assert len(capturing_server.captured) == 0
     await client.close_async(timeout=2.0)
+
+
+from sentry_sdk.consts import EndpointType
+from sentry_sdk.transport import TransportResponseError
+
+
+@pytest.mark.parametrize("status_code", [403, 404, 500])
+def test_unexpected_status_code_raises(capturing_server, make_client, status_code):
+    # https://github.com/getsentry/sentry-python/issues/7844
+    # A non-2xx response (e.g. 403/404 from a network middlebox) is a failed
+    # delivery and must raise, so wrapper transports can catch it and fail
+    # over instead of assuming the event was sent.
+    client = make_client()
+    capturing_server.respond_with(code=status_code)
+
+    with pytest.raises(TransportResponseError, match="Unexpected status code"):
+        client.transport._send_request(
+            body=b"{}",
+            headers={},
+            endpoint_type=EndpointType.ENVELOPE,
+        )
+
+
+@pytest.mark.parametrize("status_code", [413, 429])
+def test_expected_error_status_codes_do_not_raise(
+    capturing_server, make_client, status_code
+):
+    # 413 (envelope too large) is a deliberate drop and 429 is handled via
+    # rate limits; neither should raise.
+    client = make_client()
+    capturing_server.respond_with(code=status_code)
+
+    client.transport._send_request(
+        body=b"{}",
+        headers={},
+        endpoint_type=EndpointType.ENVELOPE,
+    )
