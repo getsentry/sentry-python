@@ -440,7 +440,6 @@ def test_custom_error_handler_request_context(
         "env": {"SERVER_NAME": "localhost", "SERVER_PORT": "80"},
         "headers": {"Host": "localhost"},
         "method": "POST",
-        "query_string": "",
         "url": "http://localhost/404",
     }
 
