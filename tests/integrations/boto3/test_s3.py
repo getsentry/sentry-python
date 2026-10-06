@@ -10,6 +10,12 @@ from tests.integrations.boto3.helpers import (
     capture_spans_by_op,
     require_botocore_model_fields,
 )
+from tests.integrations.boto3.helpers import (
+    client_factory as client_factory,
+)
+from tests.integrations.boto3.helpers import (
+    s3_client as s3_client,
+)
 
 
 def _assert_s3_attributes(span, expected):

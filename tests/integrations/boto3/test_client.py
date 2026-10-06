@@ -33,6 +33,9 @@ from tests.integrations.boto3.helpers import (
 from tests.integrations.boto3.helpers import (
     capture_spans_by_op as _capture_boto3_spans_by_op,
 )
+from tests.integrations.boto3.helpers import (
+    client_factory as client_factory,
+)
 
 session = boto3.Session(  # type: ignore[attr-defined]
     aws_access_key_id="-",
