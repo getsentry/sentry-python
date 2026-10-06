@@ -13,11 +13,9 @@ if TYPE_CHECKING:
 
 import sentry_sdk
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
-from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
-    has_data_collection_enabled,
     parse_version,
     reraise,
 )
@@ -79,9 +77,6 @@ class CohereIntegration(Integration):
     identifier = "cohere"
     origin = f"auto.ai.{identifier}"
 
-    def __init__(self: "CohereIntegration", include_prompts: bool = True) -> None:
-        self.include_prompts = include_prompts
-
     @staticmethod
     def setup_once() -> None:
         version = parse_version(COHERE_VERSION)
@@ -92,18 +87,9 @@ class CohereIntegration(Integration):
         BaseCohere.chat_stream = _wrap_chat(BaseCohere.chat_stream, streaming=True)
 
 
-def _should_record(integration: "CohereIntegration", category: str) -> bool:
-    client = sentry_sdk.get_client()
-    if has_data_collection_enabled(client.options):
-        return bool(client.options["data_collection"]["gen_ai"][category])
-
-    return should_send_default_pii() and integration.include_prompts
-
-
 def _capture_exception(exc: "Any") -> None:
     event, hint = event_from_exception(
         exc,
-        client_options=sentry_sdk.get_client().options,
         mechanism={"type": "cohere", "handled": False},
     )
     sentry_sdk.capture_event(event, hint=hint)
@@ -190,7 +176,7 @@ def _wrap_chat(f: "Callable[..., Any]", streaming: bool) -> "Callable[..., Any]"
 
         message = kwargs.get("message")
 
-        span = sentry_sdk.traces.start_span(
+        span = sentry_sdk.start_span(
             name="cohere.client.Chat",
             attributes={
                 "sentry.op": consts.OP.COHERE_CHAT_COMPLETIONS_CREATE,
@@ -209,7 +195,7 @@ def _wrap_chat(f: "Callable[..., Any]", streaming: bool) -> "Callable[..., Any]"
             reraise(*exc_info)
 
         with capture_internal_exceptions():
-            if _should_record(integration, "inputs"):
+            if sentry_sdk.get_client().options["data_collection"]["gen_ai"]["inputs"]:
                 set_data_normalized(
                     span,
                     SPANDATA.AI_INPUT_MESSAGES,
@@ -245,7 +231,9 @@ def _wrap_chat(f: "Callable[..., Any]", streaming: bool) -> "Callable[..., Any]"
                                 collect_chat_response_fields(
                                     span,
                                     x.response,
-                                    include_pii=_should_record(integration, "outputs"),
+                                    include_pii=sentry_sdk.get_client().options[
+                                        "data_collection"
+                                    ]["gen_ai"]["outputs"],
                                 )
                             yield x
                     span.end()
@@ -255,7 +243,9 @@ def _wrap_chat(f: "Callable[..., Any]", streaming: bool) -> "Callable[..., Any]"
                 collect_chat_response_fields(
                     span,
                     res,
-                    include_pii=_should_record(integration, "outputs"),
+                    include_pii=sentry_sdk.get_client().options["data_collection"][
+                        "gen_ai"
+                    ]["outputs"],
                 )
                 span.end()
             else:
@@ -273,14 +263,19 @@ def _wrap_embed(f: "Callable[..., Any]") -> "Callable[..., Any]":
         if integration is None:
             return f(*args, **kwargs)
 
-        with sentry_sdk.traces.start_span(
+        with sentry_sdk.start_span(
             name="Cohere Embedding Creation",
             attributes={
                 "sentry.op": consts.OP.COHERE_EMBEDDINGS_CREATE,
                 "sentry.origin": CohereIntegration.origin,
             },
         ) as span:
-            if "texts" in kwargs and _should_record(integration, "inputs"):
+            if (
+                "texts" in kwargs
+                and sentry_sdk.get_client().options["data_collection"]["gen_ai"][
+                    "inputs"
+                ]
+            ):
                 if isinstance(kwargs["texts"], str):
                     set_data_normalized(span, SPANDATA.AI_TEXTS, [kwargs["texts"]])
                 elif (

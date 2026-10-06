@@ -58,9 +58,7 @@ def test_monitor_unhealthy(sentry_init):
         assert monitor.downsample_factor == (i + 1 if i < 10 else 10)
 
 
-def test_segment_uses_downsampled_rate(
-    sentry_init, capture_record_lost_event_calls, monkeypatch
-):
+def test_segment_uses_downsampled_rate(sentry_init, capture_record_lost_event_calls):
     sentry_init(
         traces_sample_rate=1.0,
         transport=UnhealthyTestTransport(),
@@ -78,7 +76,7 @@ def test_segment_uses_downsampled_rate(
 
     # make sure we don't sample the segment
     with mock.patch("sentry_sdk.tracing_utils.Random.randrange", return_value=750000):
-        with sentry_sdk.traces.start_span(name="foobar") as segment:
+        with sentry_sdk.start_span(name="foobar") as segment:
             assert segment.sampled is False
             assert segment._sample_rate == 0.5
 

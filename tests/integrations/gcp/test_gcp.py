@@ -613,7 +613,7 @@ def test_request_attributes(run_cloud_function):
         + FUNCTIONS_PRELUDE
         + dedent(
             """
-        init_sdk(traces_sample_rate=1.0, send_default_pii=True)
+        init_sdk(traces_sample_rate=1.0, data_collection={})
         gcp_functions.worker_v1.FunctionHandler.invoke_user_function(functionhandler, event)
         """
         )
@@ -625,139 +625,61 @@ def test_request_attributes(run_cloud_function):
 
     assert attrs["http.request.method"] == "POST"
     assert attrs["url.query"] == "foo=bar"
-    assert attrs["http.request.header.content-type"] == "application/json"
-    assert attrs["http.request.header.accept"] == "text/html"
+    assert attrs["http.request.header.content-type"] == ["application/json"]
+    assert attrs["http.request.header.accept"] == ["text/html"]
     assert attrs["faas.name"] == "Google Cloud function"
     assert attrs["gcp.project.id"] == "serverless_project"
     assert attrs["faas.identity"] == "func_ID"
     assert attrs["faas.entry_point"] == "cloud_function"
 
 
-def test_no_query_string_without_pii(run_cloud_function):
-    _, _, span_items = run_cloud_function(
-        dedent(
-            """
-        functionhandler = None
-
-        from collections import namedtuple
-        GCPEvent = namedtuple("GCPEvent", ["headers", "method", "query_string"])
-        event = GCPEvent(
-            headers={},
-            method="GET",
-            query_string=b"secret=hunter2",
-        )
-
-        def cloud_function(functionhandler, event):
-            return "ok"
-        """
-        )
-        + FUNCTIONS_PRELUDE
-        + dedent(
-            """
-        init_sdk(traces_sample_rate=1.0, send_default_pii=False)
-        gcp_functions.worker_v1.FunctionHandler.invoke_user_function(functionhandler, event)
-        """
-        )
-    )
-
-    assert len(span_items) == 1
-    segment_span = span_items[0]
-    attrs = segment_span["attributes"]
-
-    assert "url.query" not in attrs
-    assert attrs["http.request.method"] == "GET"
-    assert attrs["faas.name"] == "Google Cloud function"
-    assert attrs["gcp.project.id"] == "serverless_project"
-    assert attrs["faas.identity"] == "func_ID"
-    assert attrs["faas.entry_point"] == "cloud_function"
-
-
-# Each case is (send_default_pii, data_collection, expected_event, expected_span).
-# ``send_default_pii`` / ``data_collection`` of None means the option is omitted.
-# The two paths only diverge for the legacy (no ``data_collection``) rows: the
-# event processor always records the raw query string, while the span-streaming
-# path gates the ``url.query`` attribute on ``send_default_pii``.
+# Each case is (data_collection, expected_span). ``data_collection`` of None
+# means the option is omitted.
 _QUERY_STRING_DATA_COLLECTION_CASES = [
     pytest.param(
-        True,
-        None,
-        "toy=tennisball&color=red&auth=secret",
-        "toy=tennisball&color=red&auth=secret",
-        id="send_default_pii_true",
-    ),
-    pytest.param(
-        False,
-        None,
-        "toy=tennisball&color=red&auth=secret",
-        None,
-        id="send_default_pii_false",
-    ),
-    pytest.param(
-        None,
-        None,
-        "toy=tennisball&color=red&auth=secret",
-        None,
-        id="defaults",
-    ),
-    # data_collection configured: query string is routed through filtering.
-    # Spec defaults -> denylist: only the sensitive ``auth`` is redacted.
-    pytest.param(
-        None,
         {},
-        "toy=tennisball&color=red&auth=%5BFiltered%5D",
         "toy=tennisball&color=red&auth=%5BFiltered%5D",
         id="data_collection_denylist_default",
     ),
     pytest.param(
-        None,
         {"url_query_params": {"mode": "denylist", "terms": ["toy"]}},
-        "toy=%5BFiltered%5D&color=red&auth=%5BFiltered%5D",
         "toy=%5BFiltered%5D&color=red&auth=%5BFiltered%5D",
         id="data_collection_denylist_custom_terms",
     ),
     # allowlist with only ``toy`` allowed: ``color`` is redacted even though it
     # is not sensitive, proving the redaction comes from the allowlist.
     pytest.param(
-        None,
         {"url_query_params": {"mode": "allowlist", "terms": ["toy"]}},
-        "toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D",
         "toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D",
         id="data_collection_allowlist",
     ),
     pytest.param(
-        None,
         {"url_query_params": {"mode": "off"}},
-        None,
         None,
         id="data_collection_off",
     ),
 ]
 
 
-def _build_init_kwargs(send_default_pii, data_collection):
+def _build_init_kwargs(data_collection):
     """Render the keyword-argument string passed to ``init_sdk`` in the
     subprocess."""
-    kwargs = []
-    if send_default_pii is not None:
-        kwargs.append("send_default_pii=%r" % send_default_pii)
-    if data_collection is not None:
-        kwargs.append("_experiments=%r" % {"data_collection": data_collection})
+    if data_collection is None:
+        return ""
 
-    return ", ".join(kwargs)
+    return "data_collection=%r" % (data_collection,)
 
 
 @pytest.mark.parametrize(
-    "send_default_pii, data_collection, expected_event, expected_span",
+    "data_collection, expected_span",
     _QUERY_STRING_DATA_COLLECTION_CASES,
 )
 def test_query_string_data_collection(
     run_cloud_function,
-    send_default_pii,
     data_collection,
-    expected_event,
     expected_span,
 ):
-    init_kwargs = _build_init_kwargs(send_default_pii, data_collection)
+    init_kwargs = _build_init_kwargs(data_collection)
     _, _, span_items = run_cloud_function(
         dedent(
             """
@@ -793,71 +715,37 @@ def test_query_string_data_collection(
         assert attrs["url.query"] == expected_span
 
 
-# Each case is (send_default_pii, data_collection, expected_data, expected_meta).
-# ``send_default_pii`` / ``data_collection`` of None means the option is omitted;
-# ``expected_data`` of None means the body is not attached to the event at all.
+# Each case is (data_collection, expected_data, expected_meta).
 @pytest.mark.parametrize(
-    "send_default_pii, data_collection, expected_data, expected_meta",
+    "data_collection, expected_data, expected_meta",
     [
         pytest.param(
-            True,
-            None,
-            '{"toy": "tennisball"}',
-            None,
-            id="send_default_pii_true_attaches_body",
-        ),
-        pytest.param(
-            False,
-            None,
-            "",
-            {"": {"rem": [["!raw", "x"]]}},
-            id="send_default_pii_false_annotates_body_as_raw",
-        ),
-        pytest.param(
-            None,
             {},
             '{"toy": "tennisball"}',
             None,
             id="http_bodies_default_attaches_body",
         ),
         pytest.param(
-            None,
             {"http_bodies": ["incoming_request"]},
             '{"toy": "tennisball"}',
             None,
             id="http_bodies_incoming_request_attaches_body",
         ),
         pytest.param(
-            None,
             {"http_bodies": []},
-            None,
-            None,
-            id="http_bodies_empty_omits_body",
-        ),
-        pytest.param(
-            False,
-            {"http_bodies": ["incoming_request"]},
-            '{"toy": "tennisball"}',
-            None,
-            id="http_bodies_incoming_request_attaches_body_despite_send_default_pii_false",
-        ),
-        pytest.param(
-            True,
-            {"http_bodies": []},
-            None,
-            None,
-            id="http_bodies_empty_omits_body_despite_send_default_pii_true",
+            "",
+            {"": {"rem": [["!raw", "x"]]}},
+            id="http_bodies_empty_annotates_body_as_raw",
         ),
     ],
 )
 def test_request_body_data_collection_event_processor(
     run_cloud_function,
-    send_default_pii,
     data_collection,
     expected_data,
     expected_meta,
 ):
-    init_kwargs = _build_init_kwargs(send_default_pii, data_collection)
+    init_kwargs = _build_init_kwargs(data_collection)
     envelope_items, _, _ = run_cloud_function(
         dedent(
             """

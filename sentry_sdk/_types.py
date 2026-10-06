@@ -458,6 +458,14 @@ if TYPE_CHECKING:
         name: NotRequired[str]
         arguments: NotRequired[Any]
 
+    class InputMessage(TypedDict):
+        role: Literal["user", "assistant", "tool"]
+        parts: list[Union[TextPart, ReasoningPart, ToolCallPart]]
+
+    class OutputMessage(TypedDict):
+        role: Literal["assistant"]
+        parts: list[Union[TextPart, ReasoningPart]]
+
     class ToolDefinition(TypedDict):
         type: str
         name: NotRequired[str]

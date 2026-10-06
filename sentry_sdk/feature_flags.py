@@ -61,6 +61,6 @@ def add_feature_flag(flag: str, result: bool) -> None:
     flags = sentry_sdk.get_isolation_scope().flags
     flags.set(flag, result)
 
-    span = sentry_sdk.traces.get_current_span()
+    span = sentry_sdk.get_current_span()
     if span is not None:
         span.set_attribute(f"flag.evaluation.{flag}", result)

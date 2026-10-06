@@ -149,12 +149,7 @@ def _apply_key_value_collection_filtering(
     return result
 
 
-def _map_from_send_default_pii(
-    *,
-    send_default_pii: bool,
-    include_local_variables: bool,
-    include_source_context: bool,
-) -> "DataCollection":
+def _map_from_send_default_pii(*, send_default_pii: bool) -> "DataCollection":
     """
     Build a fully-resolved ``DataCollection`` dict that mirrors the data
     ``send_default_pii`` collects today. Used when ``data_collection`` is not
@@ -179,10 +174,8 @@ def _map_from_send_default_pii(
         "gen_ai": {"inputs": send_default_pii, "outputs": send_default_pii},
         "database_query_data": send_default_pii,
         "queues": send_default_pii,
-        "stack_frame_variables": include_local_variables,
-        "frame_context_lines": (
-            _DEFAULT_FRAME_CONTEXT_LINES if include_source_context else 0
-        ),
+        "stack_frame_variables": True,
+        "frame_context_lines": _DEFAULT_FRAME_CONTEXT_LINES,
     }
 
 
@@ -287,27 +280,22 @@ def _resolve_data_collection(options: "Dict[str, Any]") -> "DataCollection":
     """
     Resolve the effective ``DataCollection`` dict from client ``options``.
 
-    Reads ``data_collection``, ``send_default_pii``, ``include_local_variables``
-    and ``include_source_context`` and returns a fully-resolved dict with
-    concrete values for every field.
+    Reads ``data_collection``, ``send_default_pii`` and returns a fully-resolved
+    dict with concrete values for every field.
 
     ``data_collection`` must be a plain ``dict``.
+
+    Must be called exactly once per options dict, before ``client._get_options``
+    overwrites ``options["data_collection"]`` with the resolved result. Feeding an
+    already-resolved dict back in would flip ``provided_by_user`` to ``True``.
     """
     from sentry_sdk.utils import deprecation_warning
 
-    user_dc = options.get("_experiments", {}).get("data_collection")
-    send_default_pii = options.get("send_default_pii")
+    user_dc = options.get("data_collection")
+    if user_dc is None:
+        user_dc = options.get("_experiments", {}).get("data_collection")
 
-    include_local_variables = (
-        bool(options.get("include_local_variables"))
-        if options.get("include_local_variables") is not None
-        else True
-    )
-    include_source_context = (
-        bool(options.get("include_source_context"))
-        if options.get("include_source_context") is not None
-        else True
-    )
+    send_default_pii = options.get("send_default_pii")
 
     if user_dc is not None:
         if not isinstance(user_dc, dict):
@@ -325,8 +313,4 @@ def _resolve_data_collection(options: "Dict[str, Any]") -> "DataCollection":
             user_dc,
         )
 
-    return _map_from_send_default_pii(
-        send_default_pii=bool(send_default_pii),
-        include_local_variables=include_local_variables,
-        include_source_context=include_source_context,
-    )
+    return _map_from_send_default_pii(send_default_pii=bool(send_default_pii))

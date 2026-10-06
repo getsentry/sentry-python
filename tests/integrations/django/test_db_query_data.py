@@ -38,7 +38,7 @@ def test_query_source_disabled(
 ):
     sentry_options = {
         "integrations": [DjangoIntegration()],
-        "send_default_pii": True,
+        "data_collection": {},
         "traces_sample_rate": 1.0,
         "enable_db_query_source": False,
         "db_query_source_threshold_ms": 0,
@@ -86,7 +86,7 @@ def test_query_source_enabled(
 ):
     sentry_options = {
         "integrations": [DjangoIntegration()],
-        "send_default_pii": True,
+        "data_collection": {},
         "traces_sample_rate": 1.0,
         "db_query_source_threshold_ms": 0,
     }
@@ -134,7 +134,7 @@ def test_query_source(
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
-        send_default_pii=True,
+        data_collection={},
         traces_sample_rate=1.0,
         enable_db_query_source=True,
         db_query_source_threshold_ms=0,
@@ -199,7 +199,7 @@ def test_query_source_with_module_in_search_path(
 
     sentry_init(
         integrations=[DjangoIntegration()],
-        send_default_pii=True,
+        data_collection={},
         traces_sample_rate=1.0,
         enable_db_query_source=True,
         db_query_source_threshold_ms=0,
@@ -255,7 +255,7 @@ def test_query_source_with_in_app_exclude(
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
-        send_default_pii=True,
+        data_collection={},
         traces_sample_rate=1.0,
         enable_db_query_source=True,
         db_query_source_threshold_ms=0,
@@ -325,7 +325,7 @@ def test_query_source_with_in_app_include(
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
-        send_default_pii=True,
+        data_collection={},
         traces_sample_rate=1.0,
         enable_db_query_source=True,
         db_query_source_threshold_ms=0,
@@ -382,7 +382,7 @@ def test_no_query_source_if_duration_too_short(
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
-        send_default_pii=True,
+        data_collection={},
         traces_sample_rate=1.0,
         enable_db_query_source=True,
         db_query_source_threshold_ms=100,
@@ -451,7 +451,7 @@ def test_query_source_if_duration_over_threshold(
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
-        send_default_pii=True,
+        data_collection={},
         traces_sample_rate=1.0,
         enable_db_query_source=True,
         db_query_source_threshold_ms=100,
@@ -576,7 +576,7 @@ def test_db_span_origin_executemany(
         pytest.skip("postgres tests disabled")
 
     items = capture_items("span")
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         from django.db import connection, transaction
 
         cursor = connection.cursor()

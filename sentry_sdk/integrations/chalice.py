@@ -52,7 +52,6 @@ class EventSourceHandler(ChaliceEventSourceHandler):  # type: ignore
                 exc_info = sys.exc_info()
                 event, hint = event_from_exception(
                     exc_info,
-                    client_options=client.options,
                     mechanism={"type": "chalice", "handled": False},
                 )
                 sentry_sdk.capture_event(event, hint=hint)
@@ -82,7 +81,7 @@ def _get_view_function_response(
                 source=SegmentNameSource.COMPONENT,
             )
 
-            current_span = sentry_sdk.traces.get_current_span()
+            current_span = sentry_sdk.get_current_span()
             segment = None
             if type(current_span) is Span:
                 # A segment already exists (created by the AWS Lambda
@@ -94,10 +93,8 @@ def _get_view_function_response(
                 headers = request_dict.get("headers", {})
 
                 header_attrs: "Dict[str, Any]" = {}
-                for header, value in _filter_headers(
-                    headers, use_annotated_value=False
-                ).items():
-                    header_attrs[f"http.request.header.{header.lower()}"] = value
+                for header, value in _filter_headers(headers).items():
+                    header_attrs[f"http.request.header.{header.lower()}"] = [value]
 
                 additional_attrs: "Dict[str, Any]" = {}
                 if "method" in request_dict:
@@ -122,7 +119,6 @@ def _get_view_function_response(
                     segment.status = SpanStatus.ERROR.value
                 sentry_event, hint = event_from_exception(
                     exc_info,
-                    client_options=client.options,
                     mechanism={"type": "chalice", "handled": False},
                 )
                 sentry_sdk.capture_event(sentry_event, hint=hint)

@@ -110,7 +110,6 @@ def test_that_a_single_error_is_captured(broker, worker, capture_events, fail_fa
 def test_task_transaction(
     broker,
     worker,
-    capture_events,
     capture_items,
     expected_span_status,
     fail_fast,
@@ -168,7 +167,7 @@ def test_task_transaction(
 def test_dramatiq_propagate_trace(broker, worker, capture_items):
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="outer") as outer_span:
+    with sentry_sdk.start_span(name="outer") as outer_span:
 
         @dramatiq.actor(max_retries=0)
         def propagated_trace_task():
@@ -355,6 +354,7 @@ def test_that_multiple_errors_are_captured(broker, worker, capture_events, fail_
         True,
     ],
 )
+@pytest.mark.parametrize("broker", [{"data_collection": {}}], indirect=True)
 def test_that_message_data_is_added_as_request(
     broker, worker, capture_events, fail_fast
 ):
@@ -394,20 +394,21 @@ def test_that_message_data_is_added_as_request(
 @pytest.mark.parametrize(
     "broker,expect_message_data",
     [
-        pytest.param({}, True, id="data_collection_not_enabled"),
+        pytest.param({"data_collection": {}}, True, id="data_collection_default"),
         pytest.param(
-            {
-                "_experiments": {
-                    "data_collection": {"http_bodies": ["incoming_request"]}
-                }
-            },
+            {"data_collection": {"queues": True}},
             True,
-            id="data_collection_http_bodies_incoming_request",
+            id="data_collection_queues_on",
         ),
         pytest.param(
-            {"_experiments": {"data_collection": {"http_bodies": []}}},
+            {"data_collection": {"queues": False}},
             False,
-            id="data_collection_http_bodies_empty",
+            id="data_collection_queues_off",
+        ),
+        pytest.param(
+            {"data_collection": {"queues": True, "http_bodies": []}},
+            True,
+            id="data_collection_queues_independent_of_http_bodies",
         ),
     ],
     indirect=["broker"],
@@ -437,7 +438,7 @@ def test_that_message_data_is_gated_by_data_collection(
 
 @pytest.mark.parametrize(
     "broker",
-    [{"_experiments": {"data_collection": {"http_bodies": []}}}],
+    [{"data_collection": {"queues": False}}],
     indirect=True,
 )
 def test_that_dramatiq_context_type_is_set_regardless_of_data_collection(

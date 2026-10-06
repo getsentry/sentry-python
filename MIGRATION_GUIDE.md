@@ -31,6 +31,7 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 - The option `attach_stacktrace` is now `True` by default, meaning the SDK will attach stack traces to messages.
 - The Django integration now creates spans for cache operations by default. Pass `DjangoIntegration(cache_spans=False)` to `sentry_sdk.init()` to turn them off.
 - The Django integration no longer force-enables cache spans when Spotlight is active and `settings.DEBUG` is `True`. The `cache_spans` option is now always respected as given.
+- Exception groups in exception chains are now properly unfurled.
 
 ### Logging
 
@@ -121,6 +122,8 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 - Dropped support for Pydantic AI below 1.76.
 - Dropped support for OpenAI Agents below 0.10.3.
 - Dropped support for MCP below 2.0.
+- Dropped support for Hugging Face Hub below 2.0.
+- Removed the `transaction_style` option from server integrations (DjangoIntegration, StarletteIntegration, FastApiIntegration, AioHttpIntegration, FlaskIntegration, PyramidIntegration, QuartIntegration, BottleIntegration, FalconIntegration, StarliteIntegration and LitestarIntegration).
 - Removed the RedisIntegration `max_data_size` option.
 - Removed the possibility to supply a specific client to the LaunchDarklyIntegration.
 - The `enable_tracing` option was removed. Use `traces_sample_rate=1.0` instead.
@@ -161,7 +164,11 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 - The `trace_ignore_status_codes` option was removed.
 - `add_attachment` no longer accepts an `add_to_transactions` argument.
 - The `stream_gen_ai_spans` option was removed. All spans are streamed now.
-
+- The `data_collection` option is no longer accessible under `_experiments`. Use it as a top-level option instead.
+- The experimental `record_sql_params` option was removed. Use the `database_query_data` setting of `data_collection` instead.
+- The `record_params` option of `AsyncPGIntegration` and `AioMySQLIntegration` was removed. Use the `database_query_data` setting of `data_collection` instead.
+- The `include_local_variables` option was removed. Use `data_collection`'s `stack_frame_variables` as a drop-in replacement.
+- The `include_source_context` option was removed. Use `data_collection`'s `frame_context_lines` for more granular control over the source context reported by specifying the number of lines to include around the failing line, or set `frame_context_lines=0` to disable source context entirely.
 
 ## Deprecated
 

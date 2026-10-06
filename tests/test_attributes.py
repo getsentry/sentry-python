@@ -21,7 +21,7 @@ def test_top_level_api(sentry_init, capture_items):
     sentry_sdk.remove_attribute("nonexistent")
 
     sentry_sdk.metrics.count("test", 1)
-    sentry_sdk.get_client().flush()
+    sentry_sdk.flush()
 
     metrics = [item.payload for item in items]
     (metric,) = metrics
@@ -56,7 +56,7 @@ def test_scope_precedence(sentry_init, capture_items):
     current_scope.set_attribute("overwritten.attribute", "current")
 
     sentry_sdk.metrics.count("test", 1)
-    sentry_sdk.get_client().flush()
+    sentry_sdk.flush()
 
     metrics = [item.payload for item in items]
     (metric,) = metrics
@@ -99,7 +99,7 @@ def test_telemetry_precedence(sentry_init, capture_items):
         },
     )
 
-    sentry_sdk.get_client().flush()
+    sentry_sdk.flush()
 
     metrics = [item.payload for item in items]
     (metric,) = metrics
@@ -122,7 +122,7 @@ def test_attribute_out_of_scope(sentry_init, capture_items):
 
     sentry_sdk.metrics.count("test", 1)
 
-    sentry_sdk.get_client().flush()
+    sentry_sdk.flush()
 
     metrics = [item.payload for item in items]
     (metric,) = metrics
@@ -141,7 +141,7 @@ def test_remove_attribute(sentry_init, capture_items):
 
         sentry_sdk.metrics.count("test", 1)
 
-    sentry_sdk.get_client().flush()
+    sentry_sdk.flush()
 
     metrics = [item.payload for item in items]
     (metric,) = metrics
@@ -177,7 +177,7 @@ def test_scope_attributes_preserialized(sentry_init, capture_items):
 
         sentry_sdk.metrics.count("test", 1)
 
-    sentry_sdk.get_client().flush()
+    sentry_sdk.flush()
 
     metrics = [item.payload for item in items]
     (metric,) = metrics
@@ -190,7 +190,7 @@ def test_scope_attributes_preserialized(sentry_init, capture_items):
 def test_user_attributes(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
-        send_default_pii=True,
+        data_collection={"user_info": True},
     )
 
     items = capture_items("trace_metric", "span")
@@ -204,10 +204,10 @@ def test_user_attributes(sentry_init, capture_items):
         }
     )
 
-    with sentry_sdk.traces.start_span(name="login"):
+    with sentry_sdk.start_span(name="login"):
         sentry_sdk.metrics.count("test", 1)
 
-    sentry_sdk.get_client().flush()
+    sentry_sdk.flush()
 
     metric, span = [item.payload for item in items]
 

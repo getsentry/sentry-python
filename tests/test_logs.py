@@ -127,6 +127,43 @@ def test_logs_before_send_log_raises_does_not_crash_application(
     assert not logs
 
 
+@pytest.mark.tests_internal_exceptions
+def test_logs_before_send_log_raises_records_callback_error(
+    sentry_init, capture_items, capture_record_lost_event_calls
+):
+    def _before_log(record, hint):
+        raise ValueError("before_send_log error")
+
+    sentry_init(before_send_log=_before_log)
+    items = capture_items("log")
+    record_lost_event_calls = capture_record_lost_event_calls()
+
+    sentry_sdk.logger.error("This is an error log...")
+
+    get_client().flush()
+
+    assert not items
+    assert ("callback_error", "log_item", None, 1) in record_lost_event_calls
+
+
+def test_logs_before_send_log_returns_none_records_before_send(
+    sentry_init, capture_items, capture_record_lost_event_calls
+):
+    def _before_log(record, hint):
+        return None
+
+    sentry_init(before_send_log=_before_log)
+    items = capture_items("log")
+    record_lost_event_calls = capture_record_lost_event_calls()
+
+    sentry_sdk.logger.error("This is an error log...")
+
+    get_client().flush()
+
+    assert not items
+    assert ("before_send", "log_item", None, 1) in record_lost_event_calls
+
+
 def test_logs_attributes(sentry_init, capture_items):
     """
     Passing arbitrary attributes to log messages.
@@ -233,7 +270,7 @@ def test_logs_tied_to_segments(sentry_init, capture_items):
     sentry_init(traces_sample_rate=1.0)
     items = capture_items("log")
 
-    with sentry_sdk.traces.start_span(name="test-segment") as sgmt:
+    with sentry_sdk.start_span(name="test-segment") as sgmt:
         sentry_sdk.logger.warning("This is a log tied to a segment")
 
     sentry_sdk.flush()
@@ -267,8 +304,8 @@ def test_logs_tied_to_spans(sentry_init, capture_items):
     sentry_init(traces_sample_rate=1.0)
     items = capture_items("log")
 
-    with sentry_sdk.traces.start_span(name="test-segment"):
-        with sentry_sdk.traces.start_span(name="test-span") as span:
+    with sentry_sdk.start_span(name="test-segment"):
+        with sentry_sdk.start_span(name="test-span") as span:
             sentry_sdk.logger.warning("This is a log tied to a span")
 
     sentry_sdk.flush()
@@ -295,8 +332,8 @@ def test_auto_flush_logs_after_100(sentry_init, capture_envelopes):
 
 
 def test_log_user_attributes(sentry_init, capture_items):
-    """User attributes are sent if send_default_pii is True."""
-    sentry_init(send_default_pii=True)
+    """User attributes are sent if user_info is True."""
+    sentry_init(data_collection={"user_info": True})
 
     sentry_sdk.set_user({"id": "1", "email": "test@example.com", "username": "test"})
     items = capture_items("log")
@@ -318,7 +355,7 @@ def test_log_user_attributes(sentry_init, capture_items):
 
 def test_log_no_user_attributes_if_no_pii(sentry_init, capture_items):
     """User attributes are not if PII sending is off."""
-    sentry_init(send_default_pii=False)
+    sentry_init(data_collection={"user_info": False})
 
     sentry_sdk.set_user({"id": "1", "email": "test@example.com", "username": "test"})
     items = capture_items("log")
@@ -407,7 +444,7 @@ def test_transport_format(sentry_init, capture_envelopes):
 
     sentry_sdk.logger.warning("This is a log...")
 
-    sentry_sdk.get_client().flush()
+    sentry_sdk.flush()
 
     assert len(envelopes) == 1
     assert len(envelopes[0].items) == 1
@@ -699,7 +736,7 @@ def test_attributes_preserialized_in_before_send(sentry_init, capture_items):
     assert isinstance(log["attributes"]["inhomogeneous_tuple"], str)
 
 
-def test_array_attributes_deep_copied_in_before_send(sentry_init, capture_envelopes):
+def test_array_attributes_deep_copied_in_before_send(sentry_init):
     """We don't surface user-held references to objects in attributes."""
 
     strings = ["value1", "value2"]

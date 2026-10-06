@@ -15,11 +15,9 @@ from typing import TYPE_CHECKING
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
-from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
-    has_data_collection_enabled,
     package_version,
     safe_serialize,
 )
@@ -53,16 +51,6 @@ class MCPIntegration(Integration):
     identifier = "mcp"
     origin = "auto.ai.mcp"
 
-    def __init__(self, include_prompts: bool = True) -> None:
-        """
-        Initialize the MCP integration.
-
-        Args:
-            include_prompts: Whether to include prompts (tool results and prompt content)
-                             in span data. Requires send_default_pii=True. Default is True.
-        """
-        self.include_prompts = include_prompts
-
     @staticmethod
     def setup_once() -> None:
         """
@@ -77,7 +65,6 @@ class MCPIntegration(Integration):
 def _capture_exception(exc: "Any") -> None:
     event, hint = event_from_exception(
         exc,
-        client_options=sentry_sdk.get_client().options,
         mechanism={"type": "mcp", "handled": False},
     )
     sentry_sdk.capture_event(event, hint=hint)
@@ -255,20 +242,14 @@ async def _instrument_tool_call(
     client = sentry_sdk.get_client()
     handler_name = ctx.params["name"]
     arguments = ctx.params.get("arguments")
-    if arguments is None:
+    if arguments is None or not client.options["data_collection"]["gen_ai"]["inputs"]:
         arguments = {}
-
-    if has_data_collection_enabled(client.options):
-        if not client.options["data_collection"]["gen_ai"]["inputs"]:
-            # Arguments can contain sensitive data and shouldn't be added to the span
-            # if the user has opted out via this config.
-            arguments = {}
 
     # Get request ID, session ID, and transport from context
     request_id, session_id, mcp_transport = _get_request_context_data(ctx=ctx)
 
     # Start span and execute
-    with _active_http_scopes(ctx=ctx), sentry_sdk.traces.start_span(
+    with _active_http_scopes(ctx=ctx), sentry_sdk.start_span(
         name=f"tools/call {handler_name}",
         attributes={
             "sentry.op": OP.MCP_SERVER,
@@ -279,7 +260,7 @@ async def _instrument_tool_call(
         _set_span_input_data(
             span,
             handler_name,
-            SPANDATA.MCP_TOOL_NAME,
+            SPANDATA.GEN_AI_TOOL_NAME,
             "tools/call",
             arguments,
             request_id,
@@ -297,18 +278,9 @@ async def _instrument_tool_call(
         if not isinstance(result, dict):
             return result
 
-        # Get integration to check PII settings
         integration = client.get_integration(MCPIntegration)
         if integration is None:
             return result
-
-        # Check if we should include sensitive data
-        should_include_result_data = False
-        if has_data_collection_enabled(client.options):
-            if client.options["data_collection"]["gen_ai"]["outputs"]:
-                should_include_result_data = True
-        elif should_send_default_pii() and integration.include_prompts:
-            should_include_result_data = True
 
         result_content = result
         if "structuredContent" in result:
@@ -316,17 +288,22 @@ async def _instrument_tool_call(
         elif isinstance(result.get("content"), list):
             result_content = _extract_text_from_content_blocks(result["content"])
 
-        if result_content is not None and should_include_result_data:
+        if (
+            result_content is None
+            or not client.options["data_collection"]["gen_ai"]["outputs"]
+        ):
+            return result
+
+        span.set_attribute(
+            SPANDATA.GEN_AI_TOOL_CALL_RESULT,
+            safe_serialize(result_content),
+        )
+        # Set content count if result is a dict
+        if isinstance(result_content, dict):
             span.set_attribute(
-                SPANDATA.MCP_TOOL_RESULT_CONTENT,
-                safe_serialize(result_content),
+                SPANDATA.MCP_TOOL_RESULT_CONTENT_COUNT,
+                len(result_content),
             )
-            # Set content count if result is a dict
-            if isinstance(result_content, dict):
-                span.set_attribute(
-                    SPANDATA.MCP_TOOL_RESULT_CONTENT_COUNT,
-                    len(result_content),
-                )
 
     return result
 
@@ -347,20 +324,14 @@ async def _instrument_prompt_get(
 
     arguments = ctx.params.get("arguments")
 
-    if arguments is None:
+    if arguments is None or not client.options["data_collection"]["gen_ai"]["inputs"]:
         arguments = {}
-
-    if has_data_collection_enabled(client.options):
-        if not client.options["data_collection"]["gen_ai"]["inputs"]:
-            # Arguments can contain sensitive data and shouldn't be added to the span
-            # if the user has opted out via this config.
-            arguments = {}
 
     # Get request ID, session ID, and transport from context
     request_id, session_id, mcp_transport = _get_request_context_data(ctx=ctx)
 
     # Start span and execute
-    with _active_http_scopes(ctx=ctx), sentry_sdk.traces.start_span(
+    with _active_http_scopes(ctx=ctx), sentry_sdk.start_span(
         name=f"prompts/get {handler_name}",
         attributes={
             "sentry.op": OP.MCP_SERVER,
@@ -371,7 +342,7 @@ async def _instrument_prompt_get(
         _set_span_input_data(
             span,
             handler_name,
-            SPANDATA.MCP_PROMPT_NAME,
+            SPANDATA.GEN_AI_PROMPT_NAME,
             "prompts/get",
             arguments,
             request_id,
@@ -389,18 +360,9 @@ async def _instrument_prompt_get(
         if not isinstance(result, dict):
             return result
 
-        # Get integration to check PII settings
         integration = client.get_integration(MCPIntegration)
         if integration is None:
             return result
-
-        # Check if we should include sensitive data
-        should_include_result_data = False
-        if has_data_collection_enabled(client.options):
-            if client.options["data_collection"]["gen_ai"]["inputs"]:
-                should_include_result_data = True
-        elif should_send_default_pii() and integration.include_prompts:
-            should_include_result_data = True
 
         # For prompts, count messages and set role/content only for single-message prompts
         try:
@@ -417,28 +379,33 @@ async def _instrument_prompt_get(
                     SPANDATA.MCP_PROMPT_RESULT_MESSAGE_COUNT, message_count
                 )
 
-            # Only set role and content for single-message prompts if PII is allowed
-            if message_count == 1 and should_include_result_data and messages:
-                first_message = messages[0]
-                # Extract role
-                role = None
-                if "role" in first_message:
-                    role = first_message["role"]
+            if (
+                message_count != 1
+                or not client.options["data_collection"]["gen_ai"]["inputs"]
+                or not messages
+            ):
+                return result
 
-                if role:
-                    span.set_attribute(SPANDATA.MCP_PROMPT_RESULT_MESSAGE_ROLE, role)
+            first_message = messages[0]
+            # Extract role
+            role = None
+            if "role" in first_message:
+                role = first_message["role"]
 
-                content_text = None
-                if "content" in first_message:
-                    msg_content = first_message["content"]
-                    if "text" in msg_content:
-                        content_text = msg_content["text"]
+            if role:
+                span.set_attribute(SPANDATA.MCP_PROMPT_RESULT_MESSAGE_ROLE, role)
 
-                if content_text:
-                    span.set_attribute(
-                        SPANDATA.MCP_PROMPT_RESULT_MESSAGE_CONTENT,
-                        content_text,
-                    )
+            content_text = None
+            if "content" in first_message:
+                msg_content = first_message["content"]
+                if "text" in msg_content:
+                    content_text = msg_content["text"]
+
+            if content_text:
+                span.set_attribute(
+                    SPANDATA.MCP_PROMPT_RESULT_MESSAGE_CONTENT,
+                    content_text,
+                )
         except Exception:
             # Silently ignore if we can't extract message info
             pass
@@ -463,7 +430,7 @@ async def _instrument_resource_read(
     request_id, session_id, mcp_transport = _get_request_context_data(ctx=ctx)
 
     # Start span and execute
-    with _active_http_scopes(ctx=ctx), sentry_sdk.traces.start_span(
+    with _active_http_scopes(ctx=ctx), sentry_sdk.start_span(
         name=f"resources/read {handler_name}",
         attributes={
             "sentry.op": OP.MCP_SERVER,

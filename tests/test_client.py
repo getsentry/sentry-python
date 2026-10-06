@@ -411,8 +411,8 @@ def test_ignore_errors(sentry_init, capture_events):
     assert events[0]["exception"]["values"][0]["type"] == "ValueError"
 
 
-def test_include_local_variables_enabled(sentry_init, capture_events):
-    sentry_init(include_local_variables=True)
+def test_stack_frame_variables_enabled(sentry_init, capture_events):
+    sentry_init(data_collection={"stack_frame_variables": True})
     events = capture_events()
     try:
         1 / 0
@@ -427,8 +427,8 @@ def test_include_local_variables_enabled(sentry_init, capture_events):
     )
 
 
-def test_include_local_variables_disabled(sentry_init, capture_events):
-    sentry_init(include_local_variables=False)
+def test_stack_frame_variables_disabled(sentry_init, capture_events):
+    sentry_init(data_collection={"stack_frame_variables": False})
     events = capture_events()
     try:
         1 / 0
@@ -443,8 +443,8 @@ def test_include_local_variables_disabled(sentry_init, capture_events):
     )
 
 
-def test_include_source_context_enabled(sentry_init, capture_events):
-    sentry_init(include_source_context=True)
+def test_frame_source_context_enabled(sentry_init, capture_events):
+    sentry_init(data_collection={"frame_context_lines": 5})
     events = capture_events()
     try:
         1 / 0
@@ -459,8 +459,8 @@ def test_include_source_context_enabled(sentry_init, capture_events):
     assert "context_line" in frame
 
 
-def test_include_source_context_disabled(sentry_init, capture_events):
-    sentry_init(include_source_context=False)
+def test_frame_source_context_disabled(sentry_init, capture_events):
+    sentry_init(data_collection={"frame_context_lines": False})
     events = capture_events()
     try:
         1 / 0
@@ -542,8 +542,10 @@ def test_attach_stacktrace_enabled(sentry_init, capture_events):
     assert functions[-2:] == ["foo", "bar"]
 
 
-def test_attach_stacktrace_enabled_no_locals(sentry_init, capture_events):
-    sentry_init(attach_stacktrace=True, include_local_variables=False)
+def test_attach_stacktrace_enabled_no_stack_trace_vars(sentry_init, capture_events):
+    sentry_init(
+        attach_stacktrace=True, data_collection={"stack_frame_variables": False}
+    )
     events = capture_events()
 
     def foo():
@@ -593,7 +595,7 @@ def test_capture_event_works(sentry_init):
 @pytest.mark.parametrize(
     "http2", [True, False] if sys.version_info >= (3, 8) else [False]
 )
-def test_atexit(tmpdir, monkeypatch, num_messages, http2):
+def test_atexit(tmpdir, num_messages, http2):
     if http2:
         options = '_experiments={"transport_http2": True}'
         transport = "Http2Transport"
@@ -951,7 +953,7 @@ def test_dict_changed_during_iteration(sentry_init, capture_events):
 
     See https://github.com/getsentry/sentry-python/pull/298 for discussion
     """
-    sentry_init(send_default_pii=True)
+    sentry_init(data_collection={})
     events = capture_events()
 
     class TooSmartClass:

@@ -172,7 +172,6 @@ def _capture_exception() -> "ExcInfo":
     if client.get_integration(ThreadingIntegration) is not None:
         event, hint = event_from_exception(
             exc_info,
-            client_options=client.options,
             mechanism={"type": "threading", "handled": False},
         )
         sentry_sdk.capture_event(event, hint=hint)

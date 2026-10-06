@@ -27,11 +27,9 @@ from sentry_sdk.ai.utils import (
     transform_google_content_part,
 )
 from sentry_sdk.consts import OP, SPANDATA
-from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
-    has_data_collection_enabled,
     safe_serialize,
 )
 
@@ -155,7 +153,6 @@ def _capture_exception(exc: "Any") -> None:
     """Capture exception with Google GenAI mechanism."""
     event, hint = event_from_exception(
         exc,
-        client_options=sentry_sdk.get_client().options,
         mechanism={"type": "google_genai", "handled": False},
     )
     sentry_sdk.capture_event(event, hint=hint)
@@ -681,7 +678,7 @@ def _capture_tool_input(
 
 def _create_tool_span(tool_name: str, tool_doc: "Optional[str]") -> "Span":
     """Create a span for tool execution."""
-    span = sentry_sdk.traces.start_span(
+    span = sentry_sdk.start_span(
         name=f"execute_tool {tool_name}",
         attributes={
             "sentry.op": OP.GEN_AI_EXECUTE_TOOL,
@@ -712,7 +709,7 @@ def wrapped_tool(tool: "Tool | Callable[..., Any]") -> "Tool | Callable[..., Any
                 tool_input = _capture_tool_input(args, kwargs, tool)
                 with capture_internal_exceptions():
                     span.set_attribute(
-                        SPANDATA.GEN_AI_TOOL_INPUT, safe_serialize(tool_input)
+                        SPANDATA.GEN_AI_TOOL_CALL_ARGUMENTS, safe_serialize(tool_input)
                     )
 
                 try:
@@ -721,7 +718,7 @@ def wrapped_tool(tool: "Tool | Callable[..., Any]") -> "Tool | Callable[..., Any
                     # Capture tool output
                     with capture_internal_exceptions():
                         span.set_attribute(
-                            SPANDATA.GEN_AI_TOOL_OUTPUT, safe_serialize(result)
+                            SPANDATA.GEN_AI_TOOL_CALL_RESULT, safe_serialize(result)
                         )
 
                     return result
@@ -739,7 +736,7 @@ def wrapped_tool(tool: "Tool | Callable[..., Any]") -> "Tool | Callable[..., Any
                 tool_input = _capture_tool_input(args, kwargs, tool)
                 with capture_internal_exceptions():
                     span.set_attribute(
-                        SPANDATA.GEN_AI_TOOL_INPUT, safe_serialize(tool_input)
+                        SPANDATA.GEN_AI_TOOL_CALL_ARGUMENTS, safe_serialize(tool_input)
                     )
 
                 try:
@@ -748,7 +745,7 @@ def wrapped_tool(tool: "Tool | Callable[..., Any]") -> "Tool | Callable[..., Any
                     # Capture tool output
                     with capture_internal_exceptions():
                         span.set_attribute(
-                            SPANDATA.GEN_AI_TOOL_OUTPUT, safe_serialize(result)
+                            SPANDATA.GEN_AI_TOOL_CALL_RESULT, safe_serialize(result)
                         )
 
                     return result
@@ -919,16 +916,7 @@ def set_span_data_for_request(
         if tools:
             formatted_tools = _format_tools_for_span(tools)
             if formatted_tools:
-                if has_data_collection_enabled(client.options):
-                    if client.options["data_collection"]["gen_ai"]["inputs"]:
-                        set_data_normalized(
-                            span,
-                            SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
-                            formatted_tools,
-                            unpack=False,
-                        )
-                else:
-                    # To remove once data collection has been fully rolled out
+                if client.options["data_collection"]["gen_ai"]["inputs"]:
                     set_data_normalized(
                         span,
                         SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
@@ -937,10 +925,7 @@ def set_span_data_for_request(
                     )
 
     record_inputs = False
-    if has_data_collection_enabled(client.options):
-        if client.options["data_collection"]["gen_ai"]["inputs"]:
-            record_inputs = True
-    elif should_send_default_pii() and integration.include_prompts:
+    if client.options["data_collection"]["gen_ai"]["inputs"]:
         record_inputs = True
 
     if record_inputs:
@@ -1043,29 +1028,14 @@ def set_span_data_for_response(
 
     tool_calls = extract_tool_calls(response)
     if tool_calls:
-        if has_data_collection_enabled(client.options):
-            if client.options["data_collection"]["gen_ai"]["outputs"]:
-                span.set_attribute(
-                    SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS, safe_serialize(tool_calls)
-                )
-        else:
-            # Before data collection was introduced, this was set unconditionally
+        if client.options["data_collection"]["gen_ai"]["outputs"]:
             span.set_attribute(
                 SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS, safe_serialize(tool_calls)
             )
 
-    if has_data_collection_enabled(client.options):
-        if client.options["data_collection"]["gen_ai"]["outputs"]:
-            response_texts = _extract_response_text(response)
-            if response_texts:
-                span.set_attribute(
-                    SPANDATA.GEN_AI_RESPONSE_TEXT, safe_serialize(response_texts)
-                )
-    elif should_send_default_pii() and integration.include_prompts:
-        # TODO: Delete this block once data collection has been completely rolled out
+    if client.options["data_collection"]["gen_ai"]["outputs"]:
         response_texts = _extract_response_text(response)
         if response_texts:
-            # Format as JSON string array as per documentation
             span.set_attribute(
                 SPANDATA.GEN_AI_RESPONSE_TEXT, safe_serialize(response_texts)
             )
@@ -1111,14 +1081,7 @@ def set_span_data_for_embed_request(
     """Set span data for embedding request."""
     client = sentry_sdk.get_client()
 
-    record_inputs = False
-    if has_data_collection_enabled(client.options):
-        if client.options["data_collection"]["gen_ai"]["inputs"]:
-            record_inputs = True
-    elif should_send_default_pii() and integration.include_prompts:
-        record_inputs = True
-
-    if record_inputs:
+    if client.options["data_collection"]["gen_ai"]["inputs"]:
         if contents:
             # For embeddings, contents is typically a list of strings/texts
             input_texts = []

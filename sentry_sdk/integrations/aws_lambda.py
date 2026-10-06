@@ -17,7 +17,7 @@ from sentry_sdk.integrations.cloud_resource_context import (
     CLOUD_PLATFORM,
     CLOUD_PROVIDER,
 )
-from sentry_sdk.scope import Scope, should_send_default_pii
+from sentry_sdk.scope import Scope
 from sentry_sdk.traces import SegmentNameSource
 from sentry_sdk.utils import (
     AnnotatedValue,
@@ -25,7 +25,6 @@ from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
     event_from_exception,
-    has_data_collection_enabled,
     logger,
     reraise,
 )
@@ -66,8 +65,6 @@ def _get_user_from_event(aws_event: "dict[str, Any]") -> "dict[str, Any]":
 def _wrap_init_error(init_error: "F") -> "F":
     @ensure_integration_enabled(AwsLambdaIntegration, init_error)
     def sentry_init_error(*args: "Any", **kwargs: "Any") -> "Any":
-        client = sentry_sdk.get_client()
-
         with capture_internal_exceptions():
             sentry_sdk.get_isolation_scope().clear_breadcrumbs()
 
@@ -75,7 +72,6 @@ def _wrap_init_error(init_error: "F") -> "F":
             if exc_info and all(exc_info):
                 sentry_event, hint = event_from_exception(
                     exc_info,
-                    client_options=client.options,
                     mechanism={"type": "aws_lambda", "handled": False},
                 )
                 sentry_sdk.capture_event(sentry_event, hint=hint)
@@ -167,12 +163,10 @@ def _wrap_handler(handler: "F") -> "F":
                 headers = {}
 
             header_attributes: "dict[str, Any]" = {}
-            for header, header_value in _filter_headers(
-                headers, use_annotated_value=False
-            ).items():
-                header_attributes[f"http.request.header.{header.lower()}"] = (
+            for header, header_value in _filter_headers(headers).items():
+                header_attributes[f"http.request.header.{header.lower()}"] = [
                     header_value
-                )
+                ]
 
             additional_attributes: "dict[str, Any]" = {}
             if "httpMethod" in request_data:
@@ -180,31 +174,21 @@ def _wrap_handler(handler: "F") -> "F":
                     "httpMethod"
                 ]
 
+            data_collection = client.options["data_collection"]
             if "queryStringParameters" in request_data:
                 qs = request_data["queryStringParameters"]
                 if qs:
-                    if has_data_collection_enabled(client.options):
-                        filtered_qs = _apply_key_value_collection_filtering(
-                            items=qs,
-                            behaviour=client.options["data_collection"][
-                                "url_query_params"
-                            ],
-                        )
-                        if filtered_qs:
-                            additional_attributes["url.query"] = urlencode(filtered_qs)
-                    elif should_send_default_pii():
-                        additional_attributes["url.query"] = urlencode(qs)
+                    filtered_qs = _apply_key_value_collection_filtering(
+                        items=qs,
+                        behaviour=data_collection["url_query_params"],
+                    )
+                    if filtered_qs:
+                        additional_attributes["url.query"] = urlencode(filtered_qs)
 
-            if not scope._user:
-                if has_data_collection_enabled(client.options):
-                    if client.options["data_collection"]["user_info"]:
-                        user_info = _get_user_from_event(request_data)
-                        if user_info:
-                            scope.set_user(user_info)
-                elif should_send_default_pii():
-                    user_info = _get_user_from_event(request_data)
-                    if user_info:
-                        scope.set_user(user_info)
+            if not scope._user and data_collection["user_info"]:
+                user_info = _get_user_from_event(request_data)
+                if user_info:
+                    scope.set_user(user_info)
 
             sampling_context = {
                 "aws_event": aws_event,
@@ -213,10 +197,10 @@ def _wrap_handler(handler: "F") -> "F":
 
             function_name = aws_context.function_name
 
-            sentry_sdk.traces.continue_trace(headers)
+            sentry_sdk.continue_trace(headers)
             Scope.set_custom_sampling_context(sampling_context)
 
-            with sentry_sdk.traces.start_span(
+            with sentry_sdk.start_span(
                 name=function_name,
                 parent_span=None,
                 attributes={
@@ -244,7 +228,6 @@ def _wrap_handler(handler: "F") -> "F":
                     exc_info = sys.exc_info()
                     sentry_event, hint = event_from_exception(
                         exc_info,
-                        client_options=client.options,
                         mechanism={"type": "aws_lambda", "handled": False},
                     )
                     sentry_sdk.capture_event(sentry_event, hint=hint)
@@ -397,50 +380,36 @@ def _make_request_event_processor(
 
         request["url"] = _get_url(aws_event, aws_context)
 
+        client_options = sentry_sdk.get_client().options
+        data_collection = client_options["data_collection"]
+
         if "queryStringParameters" in aws_event:
             query_string = aws_event["queryStringParameters"]
-            client_options = sentry_sdk.get_client().options
-            if has_data_collection_enabled(client_options):
-                if query_string:
-                    filtered_qs = _apply_key_value_collection_filtering(
-                        items=query_string,
-                        behaviour=client_options["data_collection"]["url_query_params"],
-                    )
-                    if filtered_qs:
-                        request["query_string"] = filtered_qs
-            else:
-                request["query_string"] = query_string
+            if query_string:
+                filtered_qs = _apply_key_value_collection_filtering(
+                    items=query_string,
+                    behaviour=data_collection["url_query_params"],
+                )
+                if filtered_qs:
+                    request["query_string"] = filtered_qs
 
-        if "headers" in aws_event:
+        if "headers" in aws_event and isinstance(aws_event["headers"], dict):
             request["headers"] = _filter_headers(aws_event["headers"])
 
-        client_options = sentry_sdk.get_client().options
-        if has_data_collection_enabled(client_options):
-            if client_options["data_collection"]["user_info"]:
-                extracted_user = _get_user_from_event(aws_event)
-                if extracted_user:
-                    user_info = sentry_event.setdefault("user", {})
-                    for key, value in extracted_user.items():
-                        user_info.setdefault(key, value)
-
-            if "incoming_request" in client_options["data_collection"]["http_bodies"]:
-                if "body" in aws_event:
-                    request["data"] = aws_event.get("body", "")
-
-        elif should_send_default_pii():
+        if data_collection["user_info"]:
             extracted_user = _get_user_from_event(aws_event)
             if extracted_user:
                 user_info = sentry_event.setdefault("user", {})
                 for key, value in extracted_user.items():
                     user_info.setdefault(key, value)
 
+        if "incoming_request" in data_collection["http_bodies"]:
             if "body" in aws_event:
                 request["data"] = aws_event.get("body", "")
-        else:
-            if aws_event.get("body", None):
-                # Unfortunately couldn't find a way to get structured body from AWS
-                # event. Meaning every body is unstructured to us.
-                request["data"] = AnnotatedValue.removed_because_raw_data()
+        elif aws_event.get("body", None):
+            # Unfortunately couldn't find a way to get structured body from AWS
+            # event. Meaning every body is unstructured to us.
+            request["data"] = AnnotatedValue.removed_because_raw_data()
 
         sentry_event["request"] = deepcopy(request)
 
@@ -453,7 +422,7 @@ def _get_url(aws_event: "Any", aws_context: "Any") -> str:
     path = aws_event.get("path", None)
 
     headers = aws_event.get("headers")
-    if headers is None:
+    if not isinstance(headers, dict):
         headers = {}
 
     host = headers.get("Host", None)

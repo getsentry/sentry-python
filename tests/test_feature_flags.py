@@ -8,7 +8,7 @@ import sentry_sdk
 from sentry_sdk.feature_flags import FlagBuffer, add_feature_flag
 
 
-def test_featureflags_integration(sentry_init, capture_events, uninstall_integration):
+def test_featureflags_integration(sentry_init, capture_events):
     sentry_init()
 
     add_feature_flag("hello", False)
@@ -38,8 +38,8 @@ async def test_featureflags_integration_spans_async(sentry_init, capture_events)
     add_feature_flag("hello", False)
 
     try:
-        with sentry_sdk.traces.start_span(name="test-span"):
-            with sentry_sdk.traces.start_span(name="test-span-2"):
+        with sentry_sdk.start_span(name="test-span"):
+            with sentry_sdk.start_span(name="test-span-2"):
                 raise ValueError("something wrong!")
     except ValueError as e:
         sentry_sdk.capture_exception(e)
@@ -66,8 +66,8 @@ def test_featureflags_integration_spans_sync(sentry_init, capture_events):
     add_feature_flag("hello", False)
 
     try:
-        with sentry_sdk.traces.start_span(name="test-span"):
-            with sentry_sdk.traces.start_span(name="test-span-2"):
+        with sentry_sdk.start_span(name="test-span"):
+            with sentry_sdk.start_span(name="test-span-2"):
                 raise ValueError("something wrong!")
     except ValueError as e:
         sentry_sdk.capture_exception(e)
@@ -85,9 +85,7 @@ def test_featureflags_integration_spans_sync(sentry_init, capture_events):
     assert found, "No event with exception found"
 
 
-def test_featureflags_integration_threaded(
-    sentry_init, capture_events, uninstall_integration
-):
+def test_featureflags_integration_threaded(sentry_init, capture_events):
     sentry_init()
     events = capture_events()
 
@@ -133,9 +131,7 @@ def test_featureflags_integration_threaded(
     }
 
 
-def test_featureflags_integration_asyncio(
-    sentry_init, capture_events, uninstall_integration
-):
+def test_featureflags_integration_asyncio(sentry_init, capture_events):
     asyncio = pytest.importorskip("asyncio")
 
     sentry_init()

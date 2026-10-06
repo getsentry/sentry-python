@@ -232,7 +232,7 @@ def test_non_dict_event(
 
     if has_request_data:
         request_data = {
-            "headers": {"Host": "x1.io", "X-Forwarded-Proto": "https"},
+            "headers": {"Host": "x1.io", "X-Forwarded-Proto": "[Filtered]"},
             "method": "GET",
             "url": "https://x1.io/1",
             "query_string": {
@@ -250,7 +250,7 @@ def test_non_dict_event(
     assert segment_spans[0]["status"] == "error"
 
 
-def test_request_data_with_send_default_pii_false(lambda_client, test_environment):
+def test_request_data_with_default_data_collection(lambda_client, test_environment):
     payload = b"""
         {
           "resource": "/asd",
@@ -290,8 +290,7 @@ def test_request_data_with_send_default_pii_false(lambda_client, test_environmen
     attrs = segment_spans[0]["attributes"]
 
     assert _get_span_attr(attrs, "http.request.method") == "GET"
-    # With send_default_pii=False (default for layer), query string is not included.
-    assert "url.query" not in attrs
+    assert _get_span_attr(attrs, "url.query") == "bonkers=true"
 
 
 USER_INFO_PAYLOAD = b"""
@@ -377,17 +376,17 @@ def test_request_data_with_data_collection_allowlist(lambda_client, test_environ
 
     assert _get_span_attr(attrs, "http.request.method") == "GET"
     # Allowlisted, non-sensitive headers pass through.
-    assert _get_span_attr(attrs, "http.request.header.user-agent") == "custom"
-    assert _get_span_attr(attrs, "http.request.header.x-allow-me") == "yes"
+    assert _get_span_attr(attrs, "http.request.header.user-agent") == ["custom"]
+    assert _get_span_attr(attrs, "http.request.header.x-allow-me") == ["yes"]
     # Not allowlisted -> filtered.
-    assert _get_span_attr(attrs, "http.request.header.host") == "[Filtered]"
-    assert (
-        _get_span_attr(attrs, "http.request.header.x-forwarded-proto") == "[Filtered]"
-    )
+    assert _get_span_attr(attrs, "http.request.header.host") == ["[Filtered]"]
+    assert _get_span_attr(attrs, "http.request.header.x-forwarded-proto") == [
+        "[Filtered]"
+    ]
     # Allowlisted but sensitive -> still filtered.
-    assert _get_span_attr(attrs, "http.request.header.authorization") == "[Filtered]"
+    assert _get_span_attr(attrs, "http.request.header.authorization") == ["[Filtered]"]
     # Not allowlisted, and cookies are always filtered.
-    assert _get_span_attr(attrs, "http.request.header.cookie") == "[Filtered]"
+    assert _get_span_attr(attrs, "http.request.header.cookie") == ["[Filtered]"]
 
 
 def test_request_data_with_data_collection_denylist(lambda_client, test_environment):
@@ -432,20 +431,19 @@ def test_request_data_with_data_collection_denylist(lambda_client, test_environm
 
     assert _get_span_attr(attrs, "http.request.method") == "GET"
     # Not denied by any term -> pass through.
-    assert (
-        _get_span_attr(attrs, "http.request.header.host")
-        == "iwsz2c7uwi.execute-api.us-east-1.amazonaws.com"
-    )
-    assert _get_span_attr(attrs, "http.request.header.x-custom") == "keep-me"
+    assert _get_span_attr(attrs, "http.request.header.host") == [
+        "iwsz2c7uwi.execute-api.us-east-1.amazonaws.com"
+    ]
+    assert _get_span_attr(attrs, "http.request.header.x-custom") == ["keep-me"]
     # Denied by custom terms.
-    assert _get_span_attr(attrs, "http.request.header.user-agent") == "[Filtered]"
-    assert (
-        _get_span_attr(attrs, "http.request.header.x-forwarded-proto") == "[Filtered]"
-    )
+    assert _get_span_attr(attrs, "http.request.header.user-agent") == ["[Filtered]"]
+    assert _get_span_attr(attrs, "http.request.header.x-forwarded-proto") == [
+        "[Filtered]"
+    ]
     # Denied by the built-in sensitive denylist.
-    assert _get_span_attr(attrs, "http.request.header.authorization") == "[Filtered]"
+    assert _get_span_attr(attrs, "http.request.header.authorization") == ["[Filtered]"]
     # Cookies are always filtered.
-    assert _get_span_attr(attrs, "http.request.header.cookie") == "[Filtered]"
+    assert _get_span_attr(attrs, "http.request.header.cookie") == ["[Filtered]"]
 
 
 def test_request_data_with_data_collection_off(lambda_client, test_environment):
@@ -827,7 +825,7 @@ def test_request_attributes(lambda_client, test_environment):
     }
 
     lambda_client.invoke(
-        FunctionName="BasicOkSpanStreamingPii",
+        FunctionName="BasicOkSpanStreamingDataCollection",
         Payload=json.dumps(payload),
     )
     span_items = test_environment["server"].span_items
@@ -842,18 +840,18 @@ def test_request_attributes(lambda_client, test_environment):
         _get_span_attr(attrs, "url.query")
         == "foo=bar&a-complicated-value=a%3Db%26c%3Dd"
     )
-    assert (
-        _get_span_attr(attrs, "http.request.header.content-type") == "application/json"
-    )
-    assert _get_span_attr(attrs, "http.request.header.accept") == "text/html"
-    assert _get_span_attr(attrs, "faas.name") == "BasicOkSpanStreamingPii"
+    assert _get_span_attr(attrs, "http.request.header.content-type") == [
+        "application/json"
+    ]
+    assert _get_span_attr(attrs, "http.request.header.accept") == ["text/html"]
+    assert _get_span_attr(attrs, "faas.name") == "BasicOkSpanStreamingDataCollection"
     assert _get_span_attr(attrs, "cloud.provider") == "aws"
     assert _get_span_attr(attrs, "cloud.platform") == "aws_lambda"
     assert _get_span_attr(attrs, "cloud.region") == "us-east-1"
     assert _get_span_attr(attrs, "faas.version") == "$LATEST"
     assert "faas.invocation_id" in attrs
     assert _get_span_attr(attrs, "aws.log.group.names") == [
-        "aws/lambda/BasicOkSpanStreamingPii"
+        "aws/lambda/BasicOkSpanStreamingDataCollection"
     ]
     assert _get_span_attr(attrs, "aws.log.stream.names") == ["$LATEST"]
 
@@ -886,46 +884,6 @@ def test_url_query_params_with_data_collection(lambda_client, test_environment):
         _get_span_attr(attrs, "url.query")
         == "page=2&tracking=%5BFiltered%5D&token=%5BFiltered%5D"
     )
-
-
-def test_user_info_with_send_default_pii(lambda_client, test_environment):
-    payload = b"""
-        {
-          "resource": "/asd",
-          "path": "/asd",
-          "httpMethod": "GET",
-          "headers": {
-            "Host": "iwsz2c7uwi.execute-api.us-east-1.amazonaws.com",
-            "User-Agent": "custom",
-            "X-Forwarded-Proto": "https"
-          },
-          "queryStringParameters": {
-            "bonkers": "true"
-          },
-          "pathParameters": null,
-          "stageVariables": null,
-          "requestContext": {
-            "identity": {
-                "sourceIp": "213.47.147.207",
-                "userArn": "42"
-            }
-          },
-          "body": null,
-          "isBase64Encoded": false
-        }
-    """
-
-    lambda_client.invoke(
-        FunctionName="BasicOkSpanStreamingPii",
-        Payload=payload,
-    )
-    span_items = test_environment["server"].span_items
-
-    segment_spans = [s for s in span_items if s.get("is_segment")]
-    assert len(segment_spans) == 1
-    attrs = segment_spans[0]["attributes"]
-
-    assert _get_span_attr(attrs, "user.id") == "42"
 
 
 def test_user_info_with_data_collection_user_info_off(lambda_client, test_environment):

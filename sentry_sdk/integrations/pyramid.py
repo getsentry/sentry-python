@@ -8,13 +8,11 @@ from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.integrations._wsgi_common import RequestExtractor
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
-from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.traces import SOURCE_FOR_STYLE as SEGMENT_SOURCE_FOR_STYLE
+from sentry_sdk.traces import SegmentNameSource
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
     event_from_exception,
-    has_data_collection_enabled,
     package_version,
     reraise,
 )
@@ -39,22 +37,9 @@ if TYPE_CHECKING:
     from sentry_sdk.utils import ExcInfo
 
 
-TRANSACTION_STYLE_VALUES = ("route_name", "route_pattern")
-
-
 class PyramidIntegration(Integration):
     identifier = "pyramid"
     origin = f"auto.http.{identifier}"
-
-    transaction_style = ""
-
-    def __init__(self, transaction_style: str = "route_name") -> None:
-        if transaction_style not in TRANSACTION_STYLE_VALUES:
-            raise ValueError(
-                "Invalid value for transaction_style: %s (must be in %s)"
-                % (transaction_style, TRANSACTION_STYLE_VALUES)
-            )
-        self.transaction_style = transaction_style
 
     @staticmethod
     def setup_once() -> None:
@@ -86,18 +71,16 @@ class PyramidIntegration(Integration):
                     SPANDATA.HTTP_ROUTE, request.matched_route.pattern
                 )
 
-            _set_transaction_name_and_source(
-                sentry_sdk.get_current_scope(), integration.transaction_style, request
-            )
+            try:
+                sentry_sdk.get_current_scope().set_transaction_name(
+                    request.matched_route.pattern, source=SegmentNameSource.ROUTE
+                )
+            except Exception:
+                pass
 
             scope = sentry_sdk.get_isolation_scope()
 
-            if has_data_collection_enabled(client.options):
-                if client.options["data_collection"]["user_info"]:
-                    user_id = request.authenticated_userid
-                    if user_id:
-                        scope.set_user({"id": user_id})
-            elif should_send_default_pii():
+            if client.options["data_collection"]["user_info"]:
                 user_id = request.authenticated_userid
                 if user_id:
                     scope.set_user({"id": user_id})
@@ -163,27 +146,10 @@ def _capture_exception(exc_info: "ExcInfo") -> None:
 
     event, hint = event_from_exception(
         exc_info,
-        client_options=sentry_sdk.get_client().options,
         mechanism={"type": "pyramid", "handled": False},
     )
 
     sentry_sdk.capture_event(event, hint=hint)
-
-
-def _set_transaction_name_and_source(
-    scope: "sentry_sdk.Scope", transaction_style: str, request: "Request"
-) -> None:
-    try:
-        name_for_style = {
-            "route_name": request.matched_route.name,
-            "route_pattern": request.matched_route.pattern,
-        }
-        scope.set_transaction_name(
-            name_for_style[transaction_style],
-            source=SEGMENT_SOURCE_FOR_STYLE[transaction_style],
-        )
-    except Exception:
-        pass
 
 
 class PyramidRequestExtractor(RequestExtractor):
@@ -233,12 +199,8 @@ def _make_event_processor(
             PyramidRequestExtractor(request).extract_into_event(event)
 
         client_options = sentry_sdk.get_client().options
-        if has_data_collection_enabled(client_options):
-            if client_options["data_collection"]["user_info"]:
-                with capture_internal_exceptions():
-                    user_info = event.setdefault("user", {})
-                    user_info.setdefault("id", request.authenticated_userid)
-        elif should_send_default_pii():
+
+        if client_options["data_collection"]["user_info"]:
             with capture_internal_exceptions():
                 user_info = event.setdefault("user", {})
                 user_info.setdefault("id", request.authenticated_userid)

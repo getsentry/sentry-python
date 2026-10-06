@@ -47,7 +47,7 @@ def test_db_transaction_spans_disabled_no_autocommit(
     client.get(reverse("postgres_insert_orm_no_autocommit_rollback"))
     client.get(reverse("postgres_insert_orm_no_autocommit"))
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         from django.db import connection, transaction
 
         cursor = connection.cursor()
@@ -87,7 +87,7 @@ VALUES ('password', false, %s, %s, %s, %s, false, true, %s);"""
         transaction.rollback()
         transaction.set_autocommit(True)
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         from django.db import connection, transaction
 
         cursor = connection.cursor()
@@ -179,7 +179,7 @@ def test_db_transaction_spans_disabled_atomic(
     client.get(reverse("postgres_insert_orm_atomic_rollback"))
     client.get(reverse("postgres_insert_orm_atomic"))
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         from django.db import connection, transaction
 
         with transaction.atomic():
@@ -217,7 +217,7 @@ VALUES ('password', false, %s, %s, %s, %s, false, true, %s);"""
             cursor.executemany(query, query_list)
             transaction.set_rollback(True)
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         from django.db import connection, transaction
 
         with transaction.atomic():
@@ -350,7 +350,7 @@ def test_db_no_autocommit_executemany(
     )
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         from django.db import connection, transaction
 
         cursor = connection.cursor()
@@ -500,7 +500,7 @@ def test_db_no_autocommit_rollback_executemany(
     )
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         from django.db import connection, transaction
 
         cursor = connection.cursor()
@@ -645,12 +645,12 @@ def test_db_atomic_executemany(
 ):
     sentry_init(
         integrations=[DjangoIntegration(db_transaction_spans=True)],
-        send_default_pii=True,
+        data_collection={},
         traces_sample_rate=1.0,
     )
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         from django.db import connection, transaction
 
         with transaction.atomic():
@@ -729,7 +729,7 @@ def test_db_atomic_rollback_execute(
 ):
     sentry_init(
         integrations=[DjangoIntegration(db_transaction_spans=True)],
-        send_default_pii=True,
+        data_collection={},
         traces_sample_rate=1.0,
     )
 
@@ -793,12 +793,12 @@ def test_db_atomic_rollback_executemany(
 ):
     sentry_init(
         integrations=[DjangoIntegration(db_transaction_spans=True)],
-        send_default_pii=True,
+        data_collection={},
         traces_sample_rate=1.0,
     )
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         from django.db import connection, transaction
 
         with transaction.atomic():
@@ -879,7 +879,7 @@ def test_db_atomic_execute_exception(
 ):
     sentry_init(
         integrations=[DjangoIntegration(db_transaction_spans=True)],
-        send_default_pii=True,
+        data_collection={},
         traces_sample_rate=1.0,
     )
 
@@ -942,12 +942,12 @@ def test_db_atomic_executemany_exception(
 ):
     sentry_init(
         integrations=[DjangoIntegration(db_transaction_spans=True)],
-        send_default_pii=True,
+        data_collection={},
         traces_sample_rate=1.0,
     )
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         from django.db import connection, transaction
 
         try:

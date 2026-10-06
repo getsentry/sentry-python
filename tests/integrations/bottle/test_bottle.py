@@ -343,7 +343,7 @@ def test_errors_not_reported_twice(
     assert len(events) == 1
 
 
-def test_mount(app, capture_exceptions, capture_events, sentry_init, get_client):
+def test_mount(app, capture_exceptions, capture_events, sentry_init):
     sentry_init(integrations=[BottleIntegration()])
 
     app.catchall = False
@@ -437,7 +437,6 @@ def test_no_exception_on_redirect(sentry_init, capture_events, app, get_client):
 def test_span_origin(
     sentry_init,
     get_client,
-    capture_events,
     capture_items,
 ):
     sentry_init(
@@ -488,28 +487,25 @@ def test_basic(sentry_init, capture_items):
     assert segment["attributes"]["sentry.origin"] == "auto.http.bottle"
     assert segment["attributes"]["http.request.method"] == "GET"
     assert segment["attributes"]["http.response.status_code"] == 200
-    assert segment["name"].endswith("hi")
+    assert segment["name"] == "/message"
 
 
 @pytest.mark.parametrize(
-    "url,transaction_style,expected_name,expected_source",
+    "url,expected_name,expected_source",
     [
-        ("/message", "endpoint", "hi", "component"),
-        ("/message", "url", "/message", "route"),
-        ("/message/123456", "url", "/message/<message_id>", "route"),
-        ("/message-named-route", "endpoint", "hi", "component"),
+        ("/message", "/message", "route"),
+        ("/message/123456", "/message/<message_id>", "route"),
     ],
 )
-def test_transaction_style(
+def test_segment_name_and_source(
     sentry_init,
     capture_items,
     url,
-    transaction_style,
     expected_name,
     expected_source,
 ):
     sentry_init(
-        integrations=[BottleIntegration(transaction_style=transaction_style)],
+        integrations=[BottleIntegration()],
         traces_sample_rate=1.0,
     )
     items = capture_items("span")
@@ -767,7 +763,7 @@ def test_request_body_data_collection(
 ):
     sentry_init(
         integrations=[BottleIntegration()],
-        _experiments={"data_collection": data_collection},
+        data_collection=data_collection,
     )
 
     data = {"foo": "bar"}
@@ -796,7 +792,7 @@ def test_request_body_dropped_with_form_and_files_data_collection(
     sentry_init(
         integrations=[BottleIntegration()],
         max_request_body_size="always",
-        _experiments={"data_collection": {"http_bodies": []}},
+        data_collection={"http_bodies": []},
     )
 
     data = {
@@ -830,7 +826,7 @@ def test_error_event_has_transaction_name(sentry_init, capture_events):
     transaction name set by the event processor, even though the inline
     set_transaction_name call happens after the handler returns.
     """
-    sentry_init(integrations=[BottleIntegration(transaction_style="url")])
+    sentry_init(integrations=[BottleIntegration()])
     events = capture_events()
 
     app = Bottle()
@@ -862,7 +858,7 @@ def test_oversized_request_body_not_annotated_data_collection(
     sentry_init(
         integrations=[BottleIntegration()],
         max_request_body_size="small",
-        _experiments={"data_collection": {"http_bodies": []}},
+        data_collection={"http_bodies": []},
     )
 
     data = "a" * 2000

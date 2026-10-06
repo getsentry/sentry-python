@@ -1,9 +1,11 @@
 import datetime
+import gc
 import importlib
 import logging
 import os
 import sys
 import time
+import weakref
 from collections import Counter
 
 import pytest
@@ -27,6 +29,7 @@ from sentry_sdk.integrations import (
     Integration,
     setup_integrations,
 )
+from sentry_sdk.integrations.dedupe import DedupeIntegration
 from sentry_sdk.integrations.logging import LoggingIntegration
 from sentry_sdk.integrations.stdlib import StdlibIntegration
 from sentry_sdk.scope import add_global_event_processor
@@ -214,7 +217,7 @@ def test_option_before_breadcrumb(sentry_init, capture_events, monkeypatch):
 
 @pytest.mark.tests_internal_exceptions
 def test_option_before_breadcrumb_exception(sentry_init, capture_events):
-    """Exceptions in before_breadcrumb are contained."""
+    """Breadcrumb is dropped if before_breadcrumb raises an exception."""
 
     def before_breadcrumb(crumb, hint):
         1 / 0
@@ -234,13 +237,10 @@ def test_option_before_breadcrumb_exception(sentry_init, capture_events):
     (event,) = events
 
     assert event["exception"]["values"][0]["type"] == "ValueError"
-    (crumb,) = event["breadcrumbs"]["values"]
-    assert "timestamp" in crumb
-    assert crumb["message"] == "Hello"
-    assert crumb["type"] == "default"
+    assert event["breadcrumbs"]["values"] == []
 
 
-def test_breadcrumb_arguments(sentry_init, capture_events):
+def test_breadcrumb_arguments(sentry_init):
     assert_hint = {"bar": 42}
 
     def before_breadcrumb(crumb, hint):
@@ -614,17 +614,73 @@ def test_dedupe_doesnt_take_into_account_dropped_exception(sentry_init, capture_
     sentry_init(before_send=before_send)
     events = capture_events()
 
-    exc = ValueError("aha!")
     for _ in range(2):
         # The first ValueError will be dropped by before_send. The second
         # ValueError will be accepted by before_send, and should be sent to
         # Sentry.
         try:
-            raise exc
+            raise ValueError("aha!")
         except Exception:
             capture_exception()
 
     assert len(events) == 1
+
+
+def test_dedupe_drops_exception_when_seen_a_second_time(sentry_init, capture_events):
+    """
+    This test is intended to emulate behavior seen in frameworks like Django,
+    where an exception is raised in a view and then is re-raised in middleware.
+
+    In cases like that we don't want to send a second event for that exception.
+    """
+    sentry_init()
+    events = capture_events()
+
+    test = None
+    for _ in range(2):
+        try:
+            if test is None:
+                test = ValueError("foo")
+            raise test
+        except Exception:
+            capture_exception()
+
+    assert len(events) == 1
+
+
+def test_dedupe_does_not_retain_builtin_exceptions(sentry_init):
+    """
+    There was a different approach that used to be used by DedupeIntegration
+    that used a weakref to hold a reference to a seen exception, and then do a comparison
+    on an incoming exception with that weakref to determine if it was a duplicate.
+
+    Built in exceptions such as ValueError couldn't be used with weakref, so we would instead
+    hold a strong reference to that exception. However, this led to memory leaks as described in
+    https://github.com/getsentry/sentry-python/issues/6094
+    """
+    sentry_init(default_integrations=False, integrations=[DedupeIntegration()])
+
+    class Payload:
+        pass
+
+    payload_ref = None
+
+    def fail():
+        nonlocal payload_ref
+        payload = Payload()
+        payload_ref = weakref.ref(payload)
+        raise ValueError("boom")
+
+    def capture():
+        try:
+            fail()
+        except ValueError as e:
+            sentry_sdk.capture_exception(e)
+
+    capture()
+
+    gc.collect()
+    assert payload_ref() is None
 
 
 def test_event_processor_drop_records_client_report(
@@ -659,6 +715,82 @@ def test_event_processor_drop_records_client_report(
 
     finally:
         sentry_sdk.scope.global_event_processors = old_processors
+
+
+@pytest.mark.tests_internal_exceptions
+def test_event_processor_exception_drops_event_and_records_client_report(
+    sentry_init, capture_events, capture_record_lost_event_calls
+):
+    sentry_init(default_integrations=False)
+    events = capture_events()
+    record_lost_event_calls = capture_record_lost_event_calls()
+
+    scope = sentry_sdk.get_isolation_scope()
+
+    @scope.add_event_processor
+    def bad_processor(event, hint):
+        raise ValueError("processor error")
+
+    capture_message("should be dropped")
+
+    assert len(events) == 0
+    assert ("event_processor", "error", None, 1) in record_lost_event_calls
+
+
+@pytest.mark.tests_internal_exceptions
+def test_error_processor_exception_drops_event(
+    sentry_init, capture_events, capture_record_lost_event_calls
+):
+    sentry_init(default_integrations=False)
+    events = capture_events()
+    record_lost_event_calls = capture_record_lost_event_calls()
+
+    scope = sentry_sdk.get_isolation_scope()
+
+    @scope.add_error_processor
+    def bad_error_processor(event, exc_info):
+        raise ValueError("error processor error")
+
+    try:
+        raise ValueError("original error")
+    except Exception:
+        capture_exception()
+
+    assert len(events) == 0
+    assert ("event_processor", "error", None, 1) in record_lost_event_calls
+
+
+@pytest.mark.tests_internal_exceptions
+def test_before_send_exception_records_callback_error(
+    sentry_init, capture_events, capture_record_lost_event_calls
+):
+    def bad_before_send(event, hint):
+        raise ValueError("before_send error")
+
+    sentry_init(before_send=bad_before_send, default_integrations=False)
+    events = capture_events()
+    record_lost_event_calls = capture_record_lost_event_calls()
+
+    capture_message("should be dropped")
+
+    assert len(events) == 0
+    assert ("callback_error", "error", None, 1) in record_lost_event_calls
+
+
+def test_before_send_returning_none_records_before_send(
+    sentry_init, capture_events, capture_record_lost_event_calls
+):
+    def dropping_before_send(event, hint):
+        return None
+
+    sentry_init(before_send=dropping_before_send)
+    events = capture_events()
+    record_lost_event_calls = capture_record_lost_event_calls()
+
+    capture_message("should be dropped")
+
+    assert len(events) == 0
+    assert ("before_send", "error", None, 1) in record_lost_event_calls
 
 
 @pytest.mark.parametrize(
@@ -754,7 +886,7 @@ def test_functions_to_trace(sentry_init, capture_items):
 
         items = capture_items("span")
 
-        with sentry_sdk.traces.start_span(name="something"):
+        with sentry_sdk.start_span(name="something"):
             time.sleep(0)
 
             for word in ["World", "You"]:
@@ -797,7 +929,7 @@ def test_functions_to_trace_with_class(sentry_init, capture_items):
 
         items = capture_items("span")
 
-        with sentry_sdk.traces.start_span(name="something"):
+        with sentry_sdk.start_span(name="something"):
             wg = WorldGreeter("World")
             wg.greet()
             wg.greet("You")
@@ -845,7 +977,7 @@ def test_staticmethod_class_tracing(sentry_init, capture_items):
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="test"):
+    with sentry_sdk.start_span(name="test"):
         assert TracingTestClass.static(1) == 1
 
     sentry_sdk.flush()
@@ -870,7 +1002,7 @@ def test_staticmethod_instance_tracing(sentry_init, capture_items):
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="test"):
+    with sentry_sdk.start_span(name="test"):
         assert TracingTestClass().static(1) == 1
 
     sentry_sdk.flush()
@@ -894,7 +1026,7 @@ def test_classmethod_class_tracing(sentry_init, capture_items):
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="test"):
+    with sentry_sdk.start_span(name="test"):
         assert TracingTestClass.class_(1) == (TracingTestClass, 1)
 
     sentry_sdk.flush()
@@ -918,7 +1050,7 @@ def test_classmethod_instance_tracing(sentry_init, capture_items):
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="test"):
+    with sentry_sdk.start_span(name="test"):
         assert TracingTestClass().class_(1) == (TracingTestClass, 1)
 
     sentry_sdk.flush()

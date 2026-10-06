@@ -63,10 +63,10 @@ def patch_signals() -> None:
             def wrapper(*args: "Any", **kwargs: "Any") -> "Any":
                 signal_name = _get_receiver_name(receiver)
 
-                if sentry_sdk.traces.get_current_span() is None:
+                if sentry_sdk.get_current_span() is None:
                     return receiver(*args, **kwargs)
 
-                with sentry_sdk.traces.start_span(
+                with sentry_sdk.start_span(
                     name=signal_name,
                     attributes={
                         "sentry.op": OP.EVENT_DJANGO,

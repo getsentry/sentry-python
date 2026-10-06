@@ -587,7 +587,7 @@ def test_cache_spans_get_custom_default(
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         cache.set(f"S{id}", "Sensitive1")
         cache.set(f"S{id + 1}", "")
 
@@ -653,7 +653,7 @@ def test_cache_spans_get_many(
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         cache.get_many([f"S{id}", f"S{id + 1}"])
         cache.set(f"S{id}", "Sensitive1")
         cache.get_many([f"S{id}", f"S{id + 1}"])
@@ -714,7 +714,7 @@ def test_cache_spans_set_many(
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         cache.set_many({f"S{id}": "Sensitive1", f"S{id + 1}": "Sensitive2"})
         cache.get(f"S{id}")
 

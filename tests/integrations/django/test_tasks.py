@@ -66,7 +66,7 @@ def test_task_span_is_created(
     )
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         simple_task.enqueue()
 
     sentry_sdk.flush()
@@ -118,7 +118,7 @@ def test_task_enqueue_with_kwargs(
     )
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         result = greet.enqueue(name="World", greeting="Hi")
 
     assert result.return_value == "Hi, World!"
@@ -154,7 +154,7 @@ def test_task_error_reporting(
     )
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         result = failing_task.enqueue()
 
     with pytest.raises(ValueError, match="Task failed"):
@@ -192,7 +192,7 @@ def test_multiple_task_enqueues_create_multiple_spans(
     )
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         task_one.enqueue()
         task_two.enqueue()
         task_one.enqueue()

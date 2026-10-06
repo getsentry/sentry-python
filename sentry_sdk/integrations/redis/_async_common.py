@@ -52,10 +52,10 @@ def patch_redis_async_pipeline(
             },
         )
 
-        if sentry_sdk.traces.get_current_span() is None:
+        if sentry_sdk.get_current_span() is None:
             return await old_execute(self, *args, **kwargs)
 
-        span = sentry_sdk.traces.start_span(
+        span = sentry_sdk.start_span(
             name="redis.pipeline.execute",
             attributes={
                 "sentry.origin": SPAN_ORIGIN,
@@ -107,7 +107,7 @@ def patch_redis_async_client(
             data=breadcrumb_data,
         )
 
-        if sentry_sdk.traces.get_current_span() is None:
+        if sentry_sdk.get_current_span() is None:
             return await old_execute_command(self, name, *args, **kwargs)
 
         cache_properties = _compile_cache_span_properties(
@@ -125,7 +125,7 @@ def patch_redis_async_client(
 
         cache_span: "Optional[Span]" = None
         if cache_properties["is_cache_key"] and cache_properties["op"] is not None:
-            cache_span = sentry_sdk.traces.start_span(
+            cache_span = sentry_sdk.start_span(
                 name=cache_properties["description"],
                 attributes={
                     "sentry.op": cache_properties["op"],
@@ -140,7 +140,7 @@ def patch_redis_async_client(
                 name, args
             )
 
-        db_span = sentry_sdk.traces.start_span(
+        db_span = sentry_sdk.start_span(
             name=db_properties["description"],
             attributes={
                 "sentry.op": db_properties["op"],

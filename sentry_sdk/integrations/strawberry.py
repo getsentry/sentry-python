@@ -5,13 +5,11 @@ import sentry_sdk
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.integrations.logging import ignore_logger_for_events
-from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import SegmentNameSource
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
     event_from_exception,
-    has_data_collection_enabled,
     logger,
     package_version,
 )
@@ -163,22 +161,19 @@ class SentryAsyncExtension(SchemaExtension):
 
         client = sentry_sdk.get_client()
 
-        if sentry_sdk.traces.get_current_span() is None:
+        if sentry_sdk.get_current_span() is None:
             yield
             return
 
         additional_attributes: "dict[str, Any]" = {}
-        if has_data_collection_enabled(client.options):
-            if client.options["data_collection"]["graphql"]["document"]:
-                additional_attributes["graphql.document"] = self.execution_context.query
 
-        elif should_send_default_pii():
+        if client.options["data_collection"]["graphql"]["document"]:
             additional_attributes["graphql.document"] = self.execution_context.query
 
         if operation_name:
             additional_attributes["graphql.operation.name"] = operation_name
 
-        graphql_span = sentry_sdk.traces.start_span(
+        graphql_span = sentry_sdk.start_span(
             name=description,
             attributes={
                 "sentry.origin": StrawberryIntegration.origin,
@@ -201,11 +196,11 @@ class SentryAsyncExtension(SchemaExtension):
         graphql_span.end()
 
     def on_validate(self) -> "Generator[None, None, None]":
-        if sentry_sdk.traces.get_current_span() is None:
+        if sentry_sdk.get_current_span() is None:
             yield
             return
 
-        validation_span = sentry_sdk.traces.start_span(
+        validation_span = sentry_sdk.start_span(
             name="validation",
             attributes={
                 "sentry.op": OP.GRAPHQL_VALIDATE,
@@ -220,11 +215,11 @@ class SentryAsyncExtension(SchemaExtension):
             validation_span.end()
 
     def on_parse(self) -> "Generator[None, None, None]":
-        if sentry_sdk.traces.get_current_span() is None:
+        if sentry_sdk.get_current_span() is None:
             yield
             return
 
-        parsing_span = sentry_sdk.traces.start_span(
+        parsing_span = sentry_sdk.start_span(
             name="parsing",
             attributes={
                 "sentry.op": OP.GRAPHQL_PARSE,
@@ -273,10 +268,10 @@ class SentryAsyncExtension(SchemaExtension):
 
         field_path = "{}.{}".format(info.parent_type, info.field_name)
 
-        if sentry_sdk.traces.get_current_span() is None:
+        if sentry_sdk.get_current_span() is None:
             return await self._resolve(_next, root, info, *args, **kwargs)
 
-        with sentry_sdk.traces.start_span(
+        with sentry_sdk.start_span(
             name=f"resolving {field_path}",
             attributes={
                 "sentry.origin": StrawberryIntegration.origin,
@@ -300,10 +295,10 @@ class SentrySyncExtension(SentryAsyncExtension):
 
         field_path = "{}.{}".format(info.parent_type, info.field_name)
 
-        if sentry_sdk.traces.get_current_span() is None:
+        if sentry_sdk.get_current_span() is None:
             return _next(root, info, *args, **kwargs)
 
-        with sentry_sdk.traces.start_span(
+        with sentry_sdk.start_span(
             name=f"resolving {field_path}",
             attributes={
                 "sentry.origin": StrawberryIntegration.origin,
@@ -344,7 +339,6 @@ def _patch_views() -> None:
             for error in errors:
                 event, hint = event_from_exception(
                     error,
-                    client_options=sentry_sdk.get_client().options,
                     mechanism={
                         "type": StrawberryIntegration.identifier,
                         "handled": False,
@@ -366,50 +360,29 @@ def _make_request_event_processor(
     def inner(event: "Event", hint: "dict[str, Any]") -> "Event":
         client_options = sentry_sdk.get_client().options
         with capture_internal_exceptions():
-            if has_data_collection_enabled(client_options):
-                request_data = event.setdefault("request", {})
-                if client_options["data_collection"]["graphql"]["document"]:
-                    request_data["api_target"] = "graphql"
-
-                if not request_data.get("data"):
-                    execution_context_data: "dict[str, Any]" = (
-                        {"query": execution_context.query}
-                        if client_options["data_collection"]["graphql"]["document"]
-                        else {}
-                    )
-
-                    if (
-                        client_options["data_collection"]["graphql"]["variables"]
-                        and execution_context.variables
-                    ):
-                        execution_context_data["variables"] = (
-                            execution_context.variables
-                        )
-
-                    if execution_context.operation_name:
-                        execution_context_data["operationName"] = (
-                            execution_context.operation_name
-                        )
-
-                    request_data["data"] = execution_context_data
-            elif should_send_default_pii():
-                request_data = event.setdefault("request", {})
+            request_data = event.setdefault("request", {})
+            if client_options["data_collection"]["graphql"]["document"]:
                 request_data["api_target"] = "graphql"
 
-                if not request_data.get("data"):
-                    data: "dict[str, Any]" = {"query": execution_context.query}
-                    if execution_context.variables:
-                        data["variables"] = execution_context.variables
-                    if execution_context.operation_name:
-                        data["operationName"] = execution_context.operation_name
+            if not request_data.get("data"):
+                execution_context_data: "dict[str, Any]" = (
+                    {"query": execution_context.query}
+                    if client_options["data_collection"]["graphql"]["document"]
+                    else {}
+                )
 
-                    request_data["data"] = data
+                if (
+                    client_options["data_collection"]["graphql"]["variables"]
+                    and execution_context.variables
+                ):
+                    execution_context_data["variables"] = execution_context.variables
 
-            else:
-                try:
-                    del event["request"]["data"]
-                except (KeyError, TypeError):
-                    pass
+                if execution_context.operation_name:
+                    execution_context_data["operationName"] = (
+                        execution_context.operation_name
+                    )
+
+                request_data["data"] = execution_context_data
 
         return event
 
@@ -422,15 +395,7 @@ def _make_response_event_processor(
     def inner(event: "Event", hint: "dict[str, Any]") -> "Event":
         client_options = sentry_sdk.get_client().options
         with capture_internal_exceptions():
-            if has_data_collection_enabled(client_options):
-                collect_response = (
-                    "outgoing_response"
-                    in client_options["data_collection"]["http_bodies"]
-                )
-            else:
-                collect_response = should_send_default_pii()
-
-            if collect_response:
+            if "outgoing_response" in client_options["data_collection"]["http_bodies"]:
                 contexts = event.setdefault("contexts", {})
                 contexts["response"] = {"data": response_data}
 

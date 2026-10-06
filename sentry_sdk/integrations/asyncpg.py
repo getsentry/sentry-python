@@ -32,10 +32,6 @@ except ImportError:
 class AsyncPGIntegration(Integration):
     identifier = "asyncpg"
     origin = f"auto.db.{identifier}"
-    _record_params = False
-
-    def __init__(self, *, record_params: bool = False):
-        AsyncPGIntegration._record_params = record_params
 
     @staticmethod
     def setup_once() -> None:
@@ -114,7 +110,10 @@ def _record(
 ) -> "Iterator[Span]":
     client = sentry_sdk.get_client()
     integration = client.get_integration(AsyncPGIntegration)
-    if integration is not None and not integration._record_params:
+    if (
+        integration is not None
+        and not client.options["data_collection"]["database_query_data"]
+    ):
         params_list = None
 
     param_style = "pyformat" if params_list else None
@@ -222,10 +221,10 @@ def _wrap_connect_addr(
                 message="connect", category="query", data=span_attributes
             )
 
-        if sentry_sdk.traces.get_current_span() is None:
+        if sentry_sdk.get_current_span() is None:
             return await f(*args, **kwargs)
 
-        with sentry_sdk.traces.start_span(name="connect", attributes=span_attributes):
+        with sentry_sdk.start_span(name="connect", attributes=span_attributes):
             return await f(*args, **kwargs)
 
     return _inner

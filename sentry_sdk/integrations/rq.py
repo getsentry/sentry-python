@@ -5,14 +5,12 @@ import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.integrations.logging import ignore_logger_for_events
-from sentry_sdk.scope import Scope, should_send_default_pii
+from sentry_sdk.scope import Scope
 from sentry_sdk.traces import SegmentNameSource
 from sentry_sdk.utils import (
-    SENSITIVE_DATA_SUBSTITUTE,
     capture_internal_exceptions,
     event_from_exception,
     format_timestamp,
-    has_data_collection_enabled,
     parse_version,
 )
 
@@ -73,9 +71,7 @@ class RqIntegration(Integration):
                 scope.clear_breadcrumbs()
                 scope.add_event_processor(_make_event_processor(weakref.ref(job)))
 
-                sentry_sdk.traces.continue_trace(
-                    job.meta.get("_sentry_trace_headers") or {}
-                )
+                sentry_sdk.continue_trace(job.meta.get("_sentry_trace_headers") or {})
 
                 Scope.set_custom_sampling_context({"rq_job": job})
 
@@ -83,7 +79,7 @@ class RqIntegration(Integration):
                 with capture_internal_exceptions():
                     func_name = job.func_name
 
-                with sentry_sdk.traces.start_span(
+                with sentry_sdk.start_span(
                     name="unknown RQ task" if func_name is None else func_name,
                     attributes={
                         "sentry.op": OP.QUEUE_TASK_RQ,
@@ -163,16 +159,9 @@ def _make_event_processor(weak_job: "Callable[[], Job]") -> "EventProcessor":
                 }
 
                 client_options = sentry_sdk.get_client().options
-                if has_data_collection_enabled(client_options):
-                    if client_options["data_collection"]["queues"]:
-                        rq_job["args"] = job.args
-                        rq_job["kwargs"] = job.kwargs
-                elif should_send_default_pii():
+                if client_options["data_collection"]["queues"]:
                     rq_job["args"] = job.args
                     rq_job["kwargs"] = job.kwargs
-                else:
-                    rq_job["args"] = SENSITIVE_DATA_SUBSTITUTE
-                    rq_job["kwargs"] = SENSITIVE_DATA_SUBSTITUTE
 
                 if job.enqueued_at:
                     rq_job["enqueued_at"] = format_timestamp(job.enqueued_at)
@@ -192,11 +181,8 @@ def _make_event_processor(weak_job: "Callable[[], Job]") -> "EventProcessor":
 
 
 def _capture_exception(exc_info: "ExcInfo", **kwargs: "Any") -> None:
-    client = sentry_sdk.get_client()
-
     event, hint = event_from_exception(
         exc_info,
-        client_options=client.options,
         mechanism={"type": "rq", "handled": False},
     )
 

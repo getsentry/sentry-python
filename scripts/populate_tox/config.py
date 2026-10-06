@@ -234,7 +234,7 @@ TEST_SUITE_CONFIG = {
     "huggingface_hub": {
         "package": "huggingface_hub",
         "deps": {
-            "*": ["responses", "pytest-httpx"],
+            "*": ["httpx2-pytest"],
         },
     },
     "langchain-base": {
@@ -299,6 +299,12 @@ TEST_SUITE_CONFIG = {
     },
     "mcp": {
         "package": "mcp",
+        "deps": {
+            "*": ["pytest-asyncio", "httpx"],
+        },
+    },
+    "mistral": {
+        "package": "mistralai",
         "deps": {
             "*": ["pytest-asyncio", "httpx"],
         },
@@ -466,12 +472,13 @@ TEST_SUITE_CONFIG = {
                 "pytest-asyncio",
                 "python-multipart",
                 "requests",
-                "anyio<4.0.0",
                 "jinja2",
                 "httpx",
             ],
             # See the comment on FastAPI's httpx bound for more info
             "<0.37.2": ["httpx<0.28.0"],
+            # Starlette <0.21 uses anyio.start_blocking_portal which was removed in anyio 4.
+            "<0.21": ["anyio<4"],
         },
     },
     "starlite": {
@@ -526,6 +533,13 @@ TEST_SUITE_CONFIG = {
     "typer": {
         "package": "typer",
         "num_versions": 2,
+    },
+    "typesafe": {
+        "package": "typesafe-sdk",
+        "integration_name": "typesafe",
+        "deps": {
+            "*": ["pytest-asyncio"],
+        },
     },
     "unleash": {
         "package": "UnleashClient",

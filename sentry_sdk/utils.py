@@ -65,6 +65,7 @@ if TYPE_CHECKING:
 
     from sentry_sdk._types import (
         AttributeValue,
+        DataCollection,
         Event,
         ExcInfo,
         Hint,
@@ -99,6 +100,9 @@ the stacktrace to avoid getting stuck in a long-lasting loop. This value
 exceeds the default sys.getrecursionlimit() of 1000, so users will only
 be affected by this limit if they have a custom recursion limit.
 """
+
+_LOCAL_IPS = frozenset({"127.0.0.1", "::1"})
+_LOCAL_DOMAINS = _LOCAL_IPS.union({"localhost"})
 
 
 def env_to_bool(value: "Any", *, strict: "Optional[bool]" = False) -> "bool | None":
@@ -585,8 +589,6 @@ def filename_for_module(
 def serialize_frame(
     frame: "FrameType",
     tb_lineno: "Optional[int]" = None,
-    include_local_variables: bool = True,
-    include_source_context: bool = True,
     max_value_length: "Optional[int]" = None,
     custom_repr: "Optional[Callable[..., Optional[str]]]" = None,
 ) -> "Dict[str, Any]":
@@ -620,53 +622,38 @@ def serialize_frame(
         "lineno": tb_lineno,
     }
 
-    client_options = sentry_sdk.get_client().options
-    if has_data_collection_enabled(client_options):
-        include_source_context = bool(
-            client_options["data_collection"]["frame_context_lines"]
-        )
+    data_collection = sentry_sdk.get_client().options["data_collection"]
 
+    include_source_context = bool(data_collection["frame_context_lines"])
     if include_source_context:
         rv["pre_context"], rv["context_line"], rv["post_context"] = get_source_context(
             frame, tb_lineno, max_value_length
         )
 
-    if has_data_collection_enabled(client_options):
-        dc_stack_frame_vars_config = client_options["data_collection"][
-            "stack_frame_variables"
-        ]
+    dc_stack_frame_vars_config = data_collection["stack_frame_variables"]
 
-        if isinstance(dc_stack_frame_vars_config, bool):
-            if dc_stack_frame_vars_config:
-                rv["vars"] = serialize(
-                    dict(frame.f_locals), is_vars=True, custom_repr=custom_repr
-                )
-        else:
-            local_variables_to_send = _apply_key_value_collection_filtering(
-                items=dict(frame.f_locals),
-                behaviour=dc_stack_frame_vars_config,
+    if isinstance(dc_stack_frame_vars_config, bool):
+        if dc_stack_frame_vars_config:
+            rv["vars"] = serialize(
+                dict(frame.f_locals), is_vars=True, custom_repr=custom_repr
+            )
+    else:
+        local_variables_to_send = _apply_key_value_collection_filtering(
+            items=dict(frame.f_locals),
+            behaviour=dc_stack_frame_vars_config,
+        )
+
+        if local_variables_to_send:
+            serialized_variables = serialize(
+                local_variables_to_send, is_vars=True, custom_repr=custom_repr
             )
 
-            if local_variables_to_send:
-                serialized_variables = serialize(
-                    local_variables_to_send, is_vars=True, custom_repr=custom_repr
-                )
-
-                rv["vars"] = serialized_variables
-
-    elif include_local_variables:
-        rv["vars"] = serialize(
-            dict(frame.f_locals), is_vars=True, custom_repr=custom_repr
-        )
+            rv["vars"] = serialized_variables
 
     return rv
 
 
-def current_stacktrace(
-    include_local_variables: bool = True,
-    include_source_context: bool = True,
-    max_value_length: "Optional[int]" = None,
-) -> "Dict[str, Any]":
+def current_stacktrace(max_value_length: "Optional[int]" = None) -> "Dict[str, Any]":
     __tracebackhide__ = True
     frames = []
 
@@ -676,8 +663,6 @@ def current_stacktrace(
             frames.append(
                 serialize_frame(
                     f,
-                    include_local_variables=include_local_variables,
-                    include_source_context=include_source_context,
                     max_value_length=max_value_length,
                 )
             )
@@ -766,13 +751,9 @@ def single_exception_from_error_tuple(
     exception_value["value"] = get_error_message(exc_value)
 
     if client_options is None:
-        include_local_variables = True
-        include_source_context = True
         max_value_length = None  # fallback
         custom_repr = None
     else:
-        include_local_variables = client_options["include_local_variables"]
-        include_source_context = client_options["include_source_context"]
         max_value_length = client_options["max_value_length"]
         custom_repr = client_options.get("custom_repr")
 
@@ -780,8 +761,6 @@ def single_exception_from_error_tuple(
         serialize_frame(
             tb.tb_frame,
             tb_lineno=tb.tb_lineno,
-            include_local_variables=include_local_variables,
-            include_source_context=include_source_context,
             max_value_length=max_value_length,
             custom_repr=custom_repr,
         )
@@ -865,27 +844,16 @@ def exceptions_from_error(
     seen_exception_ids: "Optional[Set[int]]" = None,
 ) -> "Tuple[int, List[Dict[str, Any]]]":
     """
-    Creates the list of exceptions.
-    This can include chained exceptions and exceptions from an ExceptionGroup.
+    Convert the given exception information into the Sentry "exception" format.
 
-    See the Exception Interface documentation for more details:
-    https://develop.sentry.dev/sdk/event-payloads/exception/
+    This will return a list of exceptions (a flattened tree of exceptions) in the
+    format of the Exception Interface documentation:
+    https://develop.sentry.dev/sdk/telemetry/errors/#exception-interface
 
-    Args:
-        exception_id (int):
-
-            Sequential counter for assigning ``mechanism.exception_id``
-            to each processed exception. Is NOT the result of calling `id()` on the exception itself.
-
-        parent_id (int):
-
-            The ``mechanism.exception_id`` of the parent exception.
-
-            Written into ``mechanism.parent_id`` in the event payload so Sentry can
-            reconstruct the exception tree.
-
-            Not to be confused with ``seen_exception_ids``, which tracks Python ``id()``
-            values for cycle detection.
+    This function can handle:
+    - simple exceptions
+    - chained exceptions (raise .. from ..)
+    - exception groups
     """
 
     if seen_exception_ids is None:
@@ -901,7 +869,7 @@ def exceptions_from_error(
         seen_exceptions.append(exc_value)
         seen_exception_ids.add(id(exc_value))
 
-    parent = single_exception_from_error_tuple(
+    base_exception = single_exception_from_error_tuple(
         exc_type=exc_type,
         exc_value=exc_value,
         tb=tb,
@@ -912,70 +880,60 @@ def exceptions_from_error(
         source=source,
         full_stack=full_stack,
     )
-    exceptions = [parent]
+    exceptions = [base_exception]
 
     parent_id = exception_id
     exception_id += 1
 
-    should_supress_context = (
+    causing_exception = None
+    exception_source = None
+
+    should_suppress_context = (
         hasattr(exc_value, "__suppress_context__") and exc_value.__suppress_context__  # type: ignore
     )
-    if should_supress_context:
-        # Add direct cause.
-        # The field `__cause__` is set when raised with the exception (using the `from` keyword).
-        exception_has_cause = (
+    if should_suppress_context:
+        has_explicit_causing_exception = (
             exc_value
             and hasattr(exc_value, "__cause__")
             and exc_value.__cause__ is not None
         )
-        if exception_has_cause:
-            cause = exc_value.__cause__  # type: ignore
-            (exception_id, child_exceptions) = exceptions_from_error(
-                exc_type=type(cause),
-                exc_value=cause,
-                tb=getattr(cause, "__traceback__", None),
-                client_options=client_options,
-                mechanism=mechanism,
-                exception_id=exception_id,
-                source="__cause__",
-                full_stack=full_stack,
-                seen_exceptions=seen_exceptions,
-                seen_exception_ids=seen_exception_ids,
-            )
-            exceptions.extend(child_exceptions)
-
+        if has_explicit_causing_exception:
+            exception_source = "__cause__"
+            causing_exception = exc_value.__cause__  # type: ignore
     else:
-        # Add indirect cause.
-        # The field `__context__` is assigned if another exception occurs while handling the exception.
-        exception_has_content = (
+        has_implicit_causing_exception = (
             exc_value
             and hasattr(exc_value, "__context__")
             and exc_value.__context__ is not None
         )
-        if exception_has_content:
-            context = exc_value.__context__  # type: ignore
-            (exception_id, child_exceptions) = exceptions_from_error(
-                exc_type=type(context),
-                exc_value=context,
-                tb=getattr(context, "__traceback__", None),
-                client_options=client_options,
-                mechanism=mechanism,
-                exception_id=exception_id,
-                source="__context__",
-                full_stack=full_stack,
-                seen_exceptions=seen_exceptions,
-                seen_exception_ids=seen_exception_ids,
-            )
-            exceptions.extend(child_exceptions)
+        if has_implicit_causing_exception:
+            exception_source = "__context__"
+            causing_exception = exc_value.__context__  # type: ignore
 
-    # Add exceptions from an ExceptionGroup.
+    if causing_exception:
+        (exception_id, child_exceptions) = exceptions_from_error(
+            exc_type=type(causing_exception),
+            exc_value=causing_exception,
+            tb=getattr(causing_exception, "__traceback__", None),
+            client_options=client_options,
+            mechanism=mechanism,
+            exception_id=exception_id,
+            parent_id=parent_id,
+            source=exception_source,
+            full_stack=full_stack,
+            seen_exceptions=seen_exceptions,
+            seen_exception_ids=seen_exception_ids,
+        )
+        exceptions.extend(child_exceptions)
+
+    # Add child exceptions from an ExceptionGroup.
     is_exception_group = exc_value and hasattr(exc_value, "exceptions")
     if is_exception_group:
-        for idx, e in enumerate(exc_value.exceptions):  # type: ignore
+        for idx, causing_exception in enumerate(exc_value.exceptions):  # type: ignore
             (exception_id, child_exceptions) = exceptions_from_error(
-                exc_type=type(e),
-                exc_value=e,
-                tb=getattr(e, "__traceback__", None),
+                exc_type=type(causing_exception),
+                exc_value=causing_exception,
+                tb=getattr(causing_exception, "__traceback__", None),
                 client_options=client_options,
                 mechanism=mechanism,
                 exception_id=exception_id,
@@ -996,37 +954,24 @@ def exceptions_from_error_tuple(
     mechanism: "Optional[Dict[str, Any]]" = None,
     full_stack: "Optional[list[dict[str, Any]]]" = None,
 ) -> "List[Dict[str, Any]]":
+    """
+    Convert an exception into Sentry's structured "exception" format.
+
+    See https://develop.sentry.dev/sdk/telemetry/errors/#exception-interface
+    This is the entry point for exception handling.
+    """
     exc_type, exc_value, tb = exc_info
 
-    is_exception_group = BaseExceptionGroup is not None and isinstance(
-        exc_value, BaseExceptionGroup
+    _, exceptions = exceptions_from_error(
+        exc_type=exc_type,
+        exc_value=exc_value,
+        tb=tb,
+        client_options=client_options,
+        mechanism=mechanism,
+        exception_id=0,
+        parent_id=0,
+        full_stack=full_stack,
     )
-
-    if is_exception_group:
-        (_, exceptions) = exceptions_from_error(
-            exc_type=exc_type,
-            exc_value=exc_value,
-            tb=tb,
-            client_options=client_options,
-            mechanism=mechanism,
-            exception_id=0,
-            parent_id=0,
-            full_stack=full_stack,
-        )
-
-    else:
-        exceptions = []
-        for exc_type, exc_value, tb in walk_exception_chain(exc_info):
-            exceptions.append(
-                single_exception_from_error_tuple(
-                    exc_type=exc_type,
-                    exc_value=exc_value,
-                    tb=tb,
-                    client_options=client_options,
-                    mechanism=mechanism,
-                    full_stack=full_stack,
-                )
-            )
 
     exceptions.reverse()
 
@@ -1198,15 +1143,14 @@ def merge_stack_frames(
 
 def event_from_exception(
     exc_info: "Union[BaseException, ExcInfo]",
-    client_options: "Optional[Dict[str, Any]]" = None,
     mechanism: "Optional[Dict[str, Any]]" = None,
 ) -> "Tuple[Event, Dict[str, Any]]":
     exc_info = exc_info_from_error(exc_info)
     hint = event_hint_with_exc_info(exc_info)
+    client_options = sentry_sdk.get_client().options
 
-    if client_options and client_options.get("add_full_stack", DEFAULT_ADD_FULL_STACK):
+    if client_options.get("add_full_stack", DEFAULT_ADD_FULL_STACK):
         full_stack = current_stacktrace(
-            include_local_variables=client_options["include_local_variables"],
             max_value_length=client_options["max_value_length"],
         )["frames"]
     else:
@@ -1450,10 +1394,8 @@ class TimeoutThread(threading.Thread):
     def _capture_exception(self) -> "ExcInfo":
         exc_info = sys.exc_info()
 
-        client = sentry_sdk.get_client()
         event, hint = event_from_exception(
             exc_info,
-            client_options=client.options,
             mechanism={"type": "threading", "handled": False},
         )
         sentry_sdk.capture_event(event, hint=hint)
@@ -1767,7 +1709,7 @@ def ensure_integration_enabled(
     ```python
     @ensure_integration_enabled(MyIntegration, my_function)
     def patch_my_function():
-        with sentry_sdk.traces.start_span(...):
+        with sentry_sdk.start_span(...):
             return my_function()
     ```
     """
@@ -1972,7 +1914,13 @@ def has_data_collection_enabled(options: "Optional[dict[str, Any]]") -> bool:
     if options is None:
         return False
 
-    return "data_collection" in options.get("_experiments", {})
+    data_collection: "Optional[DataCollection]" = options.get("data_collection")
+    # Client options are resolved as part of client initialization, so `data_collection`
+    # being None could be that the user just didn't provide it.
+    # `provided_by_user` is what actually records whether the user actually configured it.
+    return data_collection is not None and data_collection.get(
+        "provided_by_user", False
+    )
 
 
 def get_before_send_log(
@@ -2062,3 +2010,44 @@ def deprecation_warning(msg: str) -> None:
     For other types of warnings, use logger.warning().
     """
     warnings.warn(msg, stacklevel=3, category=DeprecationWarning)
+
+
+def _host_matches_local_domain(host: str) -> bool:
+    """Check if host matches a local domain, including subdomains like foo.localhost."""
+    if host in _LOCAL_DOMAINS:
+        return True
+    for domain in _LOCAL_DOMAINS:
+        if host.endswith("." + domain):
+            return True
+    return False
+
+
+def _is_localhost(
+    client_ip: "Optional[str]" = None,
+    url_host: "Optional[str]" = None,
+    host_header: "Optional[str]" = None,
+    forwarded_host_header: "Optional[str]" = None,
+) -> bool:
+    """
+    Determine if a request originates from localhost.
+
+    Based on the logic in relay's localhost filter.
+    """
+    if client_ip is not None and client_ip.strip("[]") in _LOCAL_IPS:
+        return True
+
+    # URL host uses subdomain-aware matching
+    if url_host is not None and _host_matches_local_domain(url_host):
+        return True
+
+    for header in (host_header, forwarded_host_header):
+        if header is not None:
+            if header.startswith("["):
+                # Bracketed IPv6, e.g. [::1]:8080 or [::1]
+                domain = header.split("]")[0].strip("[]")
+            else:
+                domain = header.split(":")[0]
+            if _host_matches_local_domain(domain):
+                return True
+
+    return False

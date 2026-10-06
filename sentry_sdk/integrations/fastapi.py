@@ -7,7 +7,6 @@ import sentry_sdk
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable, _check_minimum_version
 from sentry_sdk.traces import (
-    SOURCE_FOR_STYLE,
     SegmentNameSource,
     Span,
     get_current_span,
@@ -15,11 +14,10 @@ from sentry_sdk.traces import (
 from sentry_sdk.utils import (
     has_data_collection_enabled,
     parse_version,
-    transaction_from_function,
 )
 
 if TYPE_CHECKING:
-    from typing import Any, Awaitable, Callable, Dict, Optional
+    from typing import Any, Awaitable, Callable, Dict
 
     from sentry_sdk._types import Event
 
@@ -58,29 +56,6 @@ class FastApiIntegration(StarletteIntegration):
         _check_minimum_version(FastApiIntegration, version)
 
         patch_get_request_handler()
-
-
-def _set_transaction_name_and_source(
-    scope: "sentry_sdk.Scope",
-    transaction_style: str,
-    endpoint: "Optional[Callable[..., Any]]",
-    route_path: "Optional[str]",
-) -> None:
-    name = ""
-
-    if transaction_style == "endpoint" and endpoint:
-        name = transaction_from_function(endpoint) or ""
-
-    elif transaction_style == "url" and route_path is not None:
-        name = route_path
-
-    if not name:
-        name = _DEFAULT_TRANSACTION_NAME
-        source = SegmentNameSource.ROUTE
-    else:
-        source = SOURCE_FOR_STYLE[transaction_style]
-
-    scope.set_transaction_name(name, source=source)
 
 
 async def _wrap_async_handler(
@@ -122,11 +97,9 @@ async def _wrap_async_handler(
     if server_span is not None and route_path is not None:
         server_span.set_attribute(SPANDATA.HTTP_ROUTE, route_path)
 
-    _set_transaction_name_and_source(
-        sentry_sdk.get_current_scope(),
-        integration.transaction_style,
-        endpoint=request.scope.get("endpoint"),
-        route_path=route_path,
+    sentry_sdk.get_current_scope().set_transaction_name(
+        route_path if route_path is not None else _DEFAULT_TRANSACTION_NAME,
+        source=SegmentNameSource.ROUTE,
     )
     sentry_scope = sentry_sdk.get_isolation_scope()
     extractor = StarletteRequestExtractor(request)
@@ -207,7 +180,7 @@ def patch_get_request_handler() -> None:
 
             @wraps(old_call)
             def _sentry_call(*args: "Any", **kwargs: "Any") -> "Any":
-                current_span = sentry_sdk.traces.get_current_span()
+                current_span = sentry_sdk.get_current_span()
 
                 if type(current_span) is Span:
                     segment = current_span._segment

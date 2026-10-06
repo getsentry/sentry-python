@@ -134,29 +134,23 @@ class MockCompletionResponse:
         self.created = 1234567890
 
 
-@pytest.mark.parametrize(
-    "send_default_pii, include_prompts",
-    [
-        (True, True),
-        (True, False),
-        (False, True),
-        (False, False),
-    ],
-)
 def test_nonstreaming_chat_completion(
     reset_litellm_executor,
     sentry_init,
     capture_items,
-    send_default_pii,
-    include_prompts,
     get_model_response,
     nonstreaming_chat_completions_model_response,
 ):
     sentry_init(
-        integrations=[LiteLLMIntegration(include_prompts=include_prompts)],
+        integrations=[LiteLLMIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        send_default_pii=send_default_pii,
+        data_collection={
+            "gen_ai": {
+                "inputs": True,
+                "outputs": True,
+            }
+        },
     )
 
     messages = [
@@ -214,18 +208,96 @@ def test_nonstreaming_chat_completion(
     assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "openai"
     assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
 
-    if send_default_pii and include_prompts:
-        assert json.loads(span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]) == [
-            {
-                "role": "user",
-                "content": "Message demonstrating the absence of truncation.",
-            },
-            {"role": "user", "content": "Hello!"},
-        ]
-        assert SPANDATA.GEN_AI_RESPONSE_TEXT in span["attributes"]
-    else:
-        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
-        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
+    assert json.loads(span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]) == [
+        {
+            "role": "user",
+            "content": "Message demonstrating the absence of truncation.",
+        },
+        {"role": "user", "content": "Hello!"},
+    ]
+    assert SPANDATA.GEN_AI_RESPONSE_TEXT in span["attributes"]
+
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
+
+
+def test_nonstreaming_chat_completion_no_sensitive_data(
+    reset_litellm_executor,
+    sentry_init,
+    capture_items,
+    get_model_response,
+    nonstreaming_chat_completions_model_response,
+):
+    sentry_init(
+        integrations=[LiteLLMIntegration()],
+        disabled_integrations=[StdlibIntegration],
+        traces_sample_rate=1.0,
+        data_collection={
+            "gen_ai": {
+                "inputs": False,
+                "outputs": False,
+            }
+        },
+    )
+
+    messages = [
+        {"role": "user", "content": "Message demonstrating the absence of truncation."},
+        {"role": "user", "content": "Hello!"},
+    ]
+
+    client = OpenAI(api_key="test-key")
+
+    model_response = get_model_response(
+        nonstreaming_chat_completions_model_response(
+            response_id="chatcmpl-test",
+            response_model="gpt-3.5-turbo",
+            message_content="Test response",
+            created=1234567890,
+            usage=CompletionUsage(
+                prompt_tokens=10,
+                completion_tokens=20,
+                total_tokens=30,
+            ),
+        ),
+        serialize_pydantic=True,
+        request_headers={"X-Stainless-Raw-Response": "true"},
+    )
+    items = capture_items("span")
+
+    with mock.patch.object(
+        client.completions._client._client,
+        "send",
+        return_value=model_response,
+    ):
+        litellm.completion(
+            model="gpt-3.5-turbo",
+            messages=messages,
+            client=client,
+        )
+
+        litellm_utils.executor.shutdown(wait=True)
+
+    sentry_sdk.flush()
+    spans = [item.payload for item in items]
+    chat_spans = list(
+        x
+        for x in spans
+        if x["attributes"].get("sentry.op") == OP.GEN_AI_CHAT
+        and x["attributes"].get("sentry.origin") == "auto.ai.litellm"
+    )
+    assert len(chat_spans) == 1
+    span = chat_spans[0]
+
+    assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    assert span["name"] == "chat gpt-3.5-turbo"
+    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "gpt-3.5-turbo"
+    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "gpt-3.5-turbo"
+    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "openai"
+    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+
+    assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
+    assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
 
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
@@ -233,28 +305,22 @@ def test_nonstreaming_chat_completion(
 
 
 @pytest.mark.asyncio(loop_scope="session")
-@pytest.mark.parametrize(
-    "send_default_pii, include_prompts",
-    [
-        (True, True),
-        (True, False),
-        (False, True),
-        (False, False),
-    ],
-)
 async def test_async_nonstreaming_chat_completion(
     sentry_init,
     capture_items,
-    send_default_pii,
-    include_prompts,
     get_model_response,
     nonstreaming_chat_completions_model_response,
 ):
     sentry_init(
-        integrations=[LiteLLMIntegration(include_prompts=include_prompts)],
+        integrations=[LiteLLMIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        send_default_pii=send_default_pii,
+        data_collection={
+            "gen_ai": {
+                "inputs": True,
+                "outputs": True,
+            }
+        },
     )
 
     messages = [
@@ -313,48 +379,116 @@ async def test_async_nonstreaming_chat_completion(
     assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "openai"
     assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
 
-    if send_default_pii and include_prompts:
-        assert json.loads(span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]) == [
-            {
-                "role": "user",
-                "content": "Message demonstrating the absence of truncation.",
-            },
-            {"role": "user", "content": "Hello!"},
-        ]
-        assert SPANDATA.GEN_AI_RESPONSE_TEXT in span["attributes"]
-    else:
-        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
-        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
+    assert json.loads(span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]) == [
+        {
+            "role": "user",
+            "content": "Message demonstrating the absence of truncation.",
+        },
+        {"role": "user", "content": "Hello!"},
+    ]
+    assert SPANDATA.GEN_AI_RESPONSE_TEXT in span["attributes"]
 
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
 
 
-@pytest.mark.parametrize(
-    "send_default_pii, include_prompts",
-    [
-        (True, True),
-        (True, False),
-        (False, True),
-        (False, False),
-    ],
-)
+@pytest.mark.asyncio(loop_scope="session")
+async def test_async_nonstreaming_chat_completion_no_sensitive_data(
+    sentry_init,
+    capture_items,
+    get_model_response,
+    nonstreaming_chat_completions_model_response,
+):
+    sentry_init(
+        integrations=[LiteLLMIntegration()],
+        disabled_integrations=[StdlibIntegration],
+        traces_sample_rate=1.0,
+        data_collection={
+            "gen_ai": {
+                "inputs": False,
+                "outputs": False,
+            }
+        },
+    )
+
+    messages = [
+        {"role": "user", "content": "Message demonstrating the absence of truncation."},
+        {"role": "user", "content": "Hello!"},
+    ]
+
+    client = AsyncOpenAI(api_key="test-key")
+
+    model_response = get_model_response(
+        nonstreaming_chat_completions_model_response(
+            response_id="chatcmpl-test",
+            response_model="gpt-3.5-turbo",
+            message_content="Test response",
+            created=1234567890,
+            usage=CompletionUsage(
+                prompt_tokens=10,
+                completion_tokens=20,
+                total_tokens=30,
+            ),
+        ),
+        serialize_pydantic=True,
+        request_headers={"X-Stainless-Raw-Response": "true"},
+    )
+    items = capture_items("span")
+
+    with mock.patch.object(
+        client.completions._client._client,
+        "send",
+        return_value=model_response,
+    ):
+        await litellm.acompletion(
+            model="gpt-3.5-turbo",
+            messages=messages,
+            client=client,
+        )
+
+        await GLOBAL_LOGGING_WORKER.flush()
+        await asyncio.sleep(0.5)
+
+    sentry_sdk.flush()
+    spans = [item.payload for item in items]
+    chat_spans = list(
+        x
+        for x in spans
+        if x["attributes"].get("sentry.op") == OP.GEN_AI_CHAT
+        and x["attributes"].get("sentry.origin") == "auto.ai.litellm"
+    )
+    assert len(chat_spans) == 1
+    span = chat_spans[0]
+
+    assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    assert span["name"] == "chat gpt-3.5-turbo"
+    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "gpt-3.5-turbo"
+    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "gpt-3.5-turbo"
+    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "openai"
+    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+
+    assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
+    assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
+
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
+
+
 def test_streaming_chat_completion(
     reset_litellm_executor,
     sentry_init,
     capture_items,
-    send_default_pii,
-    include_prompts,
     get_model_response,
     server_side_event_chunks,
     streaming_chat_completions_model_response,
 ):
     sentry_init(
-        integrations=[LiteLLMIntegration(include_prompts=include_prompts)],
+        integrations=[LiteLLMIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        send_default_pii=send_default_pii,
+        data_collection={},
     )
 
     messages = [
@@ -366,7 +500,14 @@ def test_streaming_chat_completion(
 
     model_response = get_model_response(
         server_side_event_chunks(
-            streaming_chat_completions_model_response,
+            streaming_chat_completions_model_response(
+                usage=CompletionUsage(
+                    prompt_tokens=10,
+                    completion_tokens=20,
+                    total_tokens=30,
+                ),
+                message_contents=("Tes", "t r", "esp", "ons", "e"),
+            ),
             include_event_type=False,
         ),
         request_headers={"X-Stainless-Raw-Response": "true"},
@@ -405,30 +546,19 @@ def test_streaming_chat_completion(
 
 
 @pytest.mark.asyncio(loop_scope="session")
-@pytest.mark.parametrize(
-    "send_default_pii, include_prompts",
-    [
-        (True, True),
-        (True, False),
-        (False, True),
-        (False, False),
-    ],
-)
 async def test_async_streaming_chat_completion(
     sentry_init,
     capture_items,
-    send_default_pii,
-    include_prompts,
     get_model_response,
     async_iterator,
     server_side_event_chunks,
     streaming_chat_completions_model_response,
 ):
     sentry_init(
-        integrations=[LiteLLMIntegration(include_prompts=include_prompts)],
+        integrations=[LiteLLMIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        send_default_pii=send_default_pii,
+        data_collection={},
     )
 
     messages = [
@@ -441,7 +571,14 @@ async def test_async_streaming_chat_completion(
     model_response = get_model_response(
         async_iterator(
             server_side_event_chunks(
-                streaming_chat_completions_model_response,
+                streaming_chat_completions_model_response(
+                    usage=CompletionUsage(
+                        prompt_tokens=10,
+                        completion_tokens=20,
+                        total_tokens=30,
+                    ),
+                    message_contents=("Tes", "t r", "esp", "ons", "e"),
+                ),
                 include_event_type=False,
             ),
         ),
@@ -495,10 +632,15 @@ def test_embeddings_create(
     to ensure proper integration testing.
     """
     sentry_init(
-        integrations=[LiteLLMIntegration(include_prompts=True)],
+        integrations=[LiteLLMIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        send_default_pii=True,
+        data_collection={
+            "gen_ai": {
+                "inputs": True,
+                "outputs": True,
+            }
+        },
     )
 
     client = OpenAI(api_key="test-key")
@@ -565,10 +707,15 @@ async def test_async_embeddings_create(
     to ensure proper integration testing.
     """
     sentry_init(
-        integrations=[LiteLLMIntegration(include_prompts=True)],
+        integrations=[LiteLLMIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        send_default_pii=True,
+        data_collection={
+            "gen_ai": {
+                "inputs": True,
+                "outputs": True,
+            }
+        },
     )
 
     client = AsyncOpenAI(api_key="test-key")
@@ -630,10 +777,15 @@ def test_embeddings_create_with_list_input(
 ):
     """Test embedding with list input."""
     sentry_init(
-        integrations=[LiteLLMIntegration(include_prompts=True)],
+        integrations=[LiteLLMIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        send_default_pii=True,
+        data_collection={
+            "gen_ai": {
+                "inputs": True,
+                "outputs": True,
+            }
+        },
     )
 
     client = OpenAI(api_key="test-key")
@@ -694,10 +846,15 @@ async def test_async_embeddings_create_with_list_input(
 ):
     """Test embedding with list input."""
     sentry_init(
-        integrations=[LiteLLMIntegration(include_prompts=True)],
+        integrations=[LiteLLMIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        send_default_pii=True,
+        data_collection={
+            "gen_ai": {
+                "inputs": True,
+                "outputs": True,
+            }
+        },
     )
 
     client = AsyncOpenAI(api_key="test-key")
@@ -748,19 +905,23 @@ async def test_async_embeddings_create_with_list_input(
         ]
 
 
-def test_embeddings_no_pii(
+def test_embeddings_no_sensitive_data(
     sentry_init,
     capture_items,
     get_model_response,
     openai_embedding_model_response,
     clear_litellm_cache,
 ):
-    """Test that PII is not captured when disabled."""
     sentry_init(
-        integrations=[LiteLLMIntegration(include_prompts=True)],
+        integrations=[LiteLLMIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        send_default_pii=False,  # PII disabled
+        data_collection={
+            "gen_ai": {
+                "inputs": False,
+                "outputs": False,
+            }
+        },
     )
 
     client = OpenAI(api_key="test-key")
@@ -799,24 +960,27 @@ def test_embeddings_no_pii(
         span = spans[0]
 
         assert span["attributes"]["sentry.op"] == OP.GEN_AI_EMBEDDINGS
-        # Check that embeddings input is NOT captured when PII is disabled
         assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT not in span["attributes"]
 
 
 @pytest.mark.asyncio(loop_scope="session")
-async def test_async_embeddings_no_pii(
+async def test_async_embeddings_no_sensitive_data(
     sentry_init,
     capture_items,
     get_model_response,
     openai_embedding_model_response,
     clear_litellm_cache,
 ):
-    """Test that PII is not captured when disabled."""
     sentry_init(
-        integrations=[LiteLLMIntegration(include_prompts=True)],
+        integrations=[LiteLLMIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        send_default_pii=False,  # PII disabled
+        data_collection={
+            "gen_ai": {
+                "inputs": False,
+                "outputs": False,
+            }
+        },
     )
 
     client = AsyncOpenAI(api_key="test-key")
@@ -856,7 +1020,6 @@ async def test_async_embeddings_no_pii(
         span = spans[0]
 
         assert span["attributes"]["sentry.op"] == OP.GEN_AI_EMBEDDINGS
-        # Check that embeddings input is NOT captured when PII is disabled
         assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT not in span["attributes"]
 
 
@@ -870,6 +1033,7 @@ def test_exception_handling(
         integrations=[LiteLLMIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     messages = [{"role": "user", "content": "Hello!"}]
@@ -905,6 +1069,7 @@ async def test_async_exception_handling(
         integrations=[LiteLLMIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     messages = [{"role": "user", "content": "Hello!"}]
@@ -941,6 +1106,7 @@ def test_span_origin(
         integrations=[LiteLLMIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     messages = [{"role": "user", "content": "Hello!"}]
@@ -996,6 +1162,7 @@ def test_multiple_providers(
         integrations=[LiteLLMIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     messages = [{"role": "user", "content": "Hello!"}]
@@ -1097,6 +1264,7 @@ async def test_async_multiple_providers(
         integrations=[LiteLLMIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     messages = [{"role": "user", "content": "Hello!"}]
@@ -1199,6 +1367,7 @@ def test_additional_parameters(
         integrations=[LiteLLMIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     messages = [{"role": "user", "content": "Hello!"}]
@@ -1269,6 +1438,7 @@ async def test_async_additional_parameters(
         integrations=[LiteLLMIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     messages = [{"role": "user", "content": "Hello!"}]
@@ -1339,6 +1509,7 @@ def test_no_integration(
     sentry_init(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     messages = [{"role": "user", "content": "Hello!"}]
@@ -1396,6 +1567,7 @@ async def test_async_no_integration(
     sentry_init(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     messages = [{"role": "user", "content": "Hello!"}]
@@ -1452,6 +1624,7 @@ def test_response_without_usage(
         integrations=[LiteLLMIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     messages = [{"role": "user", "content": "Hello!"}]
@@ -1494,6 +1667,7 @@ def test_integration_setup(sentry_init):
         integrations=[LiteLLMIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     # Check that callbacks are registered
@@ -1515,10 +1689,15 @@ def test_binary_content_encoding_image_url(
     nonstreaming_chat_completions_model_response,
 ):
     sentry_init(
-        integrations=[LiteLLMIntegration(include_prompts=True)],
+        integrations=[LiteLLMIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        send_default_pii=True,
+        data_collection={
+            "gen_ai": {
+                "inputs": True,
+                "outputs": True,
+            }
+        },
     )
 
     messages = [
@@ -1605,10 +1784,15 @@ async def test_async_binary_content_encoding_image_url(
     nonstreaming_chat_completions_model_response,
 ):
     sentry_init(
-        integrations=[LiteLLMIntegration(include_prompts=True)],
+        integrations=[LiteLLMIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        send_default_pii=True,
+        data_collection={
+            "gen_ai": {
+                "inputs": True,
+                "outputs": True,
+            }
+        },
     )
 
     messages = [
@@ -1696,10 +1880,15 @@ def test_binary_content_encoding_mixed_content(
     nonstreaming_chat_completions_model_response,
 ):
     sentry_init(
-        integrations=[LiteLLMIntegration(include_prompts=True)],
+        integrations=[LiteLLMIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        send_default_pii=True,
+        data_collection={
+            "gen_ai": {
+                "inputs": True,
+                "outputs": True,
+            }
+        },
     )
 
     messages = [
@@ -1775,10 +1964,15 @@ async def test_async_binary_content_encoding_mixed_content(
     nonstreaming_chat_completions_model_response,
 ):
     sentry_init(
-        integrations=[LiteLLMIntegration(include_prompts=True)],
+        integrations=[LiteLLMIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        send_default_pii=True,
+        data_collection={
+            "gen_ai": {
+                "inputs": True,
+                "outputs": True,
+            }
+        },
     )
 
     messages = [
@@ -1855,10 +2049,15 @@ def test_binary_content_encoding_uri_type(
     nonstreaming_chat_completions_model_response,
 ):
     sentry_init(
-        integrations=[LiteLLMIntegration(include_prompts=True)],
+        integrations=[LiteLLMIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        send_default_pii=True,
+        data_collection={
+            "gen_ai": {
+                "inputs": True,
+                "outputs": True,
+            }
+        },
     )
 
     messages = [
@@ -1938,10 +2137,15 @@ async def test_async_binary_content_encoding_uri_type(
     nonstreaming_chat_completions_model_response,
 ):
     sentry_init(
-        integrations=[LiteLLMIntegration(include_prompts=True)],
+        integrations=[LiteLLMIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        send_default_pii=True,
+        data_collection={
+            "gen_ai": {
+                "inputs": True,
+                "outputs": True,
+            }
+        },
     )
 
     messages = [
@@ -2116,63 +2320,19 @@ def test_convert_message_parts_image_url_missing_url():
 
 
 @pytest.mark.parametrize(
-    "data_collection, send_default_pii, include_prompts, expected_present, expected_absent",
+    "data_collection, expected_present, expected_absent",
     [
         pytest.param(
-            {"gen_ai": {"inputs": True, "outputs": True}},
-            False,
-            False,
-            [SPANDATA.GEN_AI_REQUEST_MESSAGES, SPANDATA.GEN_AI_RESPONSE_TEXT],
-            [],
-            id="gen-ai-inputs-and-outputs-enabled-override-legacy-off",
-        ),
-        pytest.param(
-            {"gen_ai": {"inputs": False, "outputs": False}},
-            True,
-            True,
-            [],
-            [SPANDATA.GEN_AI_REQUEST_MESSAGES, SPANDATA.GEN_AI_RESPONSE_TEXT],
-            id="gen-ai-inputs-and-outputs-disabled-override-legacy-on",
-        ),
-        pytest.param(
             {"gen_ai": {"inputs": True, "outputs": False}},
-            False,
-            False,
             [SPANDATA.GEN_AI_REQUEST_MESSAGES],
             [SPANDATA.GEN_AI_RESPONSE_TEXT],
             id="gen-ai-inputs-enabled-outputs-disabled",
         ),
         pytest.param(
             {"gen_ai": {"inputs": False, "outputs": True}},
-            False,
-            False,
             [SPANDATA.GEN_AI_RESPONSE_TEXT],
             [SPANDATA.GEN_AI_REQUEST_MESSAGES],
             id="gen-ai-outputs-enabled-inputs-disabled",
-        ),
-        pytest.param(
-            {"gen_ai": {}},
-            False,
-            False,
-            [SPANDATA.GEN_AI_REQUEST_MESSAGES, SPANDATA.GEN_AI_RESPONSE_TEXT],
-            [],
-            id="gen-ai-inputs-and-outputs-omitted-default-to-enabled",
-        ),
-        pytest.param(
-            None,
-            True,
-            True,
-            [SPANDATA.GEN_AI_REQUEST_MESSAGES, SPANDATA.GEN_AI_RESPONSE_TEXT],
-            [],
-            id="no-gen-ai-config-legacy-pii-and-include-prompts-enabled",
-        ),
-        pytest.param(
-            None,
-            False,
-            True,
-            [],
-            [SPANDATA.GEN_AI_REQUEST_MESSAGES, SPANDATA.GEN_AI_RESPONSE_TEXT],
-            id="no-gen-ai-config-legacy-pii-disabled",
         ),
     ],
 )
@@ -2183,19 +2343,16 @@ def test_chat_completion_data_collection(
     get_model_response,
     nonstreaming_chat_completions_model_response,
     data_collection,
-    send_default_pii,
-    include_prompts,
     expected_present,
     expected_absent,
 ):
     sentry_init_kwargs = dict(
-        integrations=[LiteLLMIntegration(include_prompts=include_prompts)],
+        integrations=[LiteLLMIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        send_default_pii=send_default_pii,
     )
     if data_collection is not None:
-        sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
+        sentry_init_kwargs["data_collection"] = data_collection
 
     sentry_init(**sentry_init_kwargs)
 
@@ -2258,114 +2415,7 @@ def test_chat_completion_data_collection(
     for key in expected_absent:
         assert key not in span_data, f"{key} should not have been collected"
 
-    # Data collection never gates non-PII attributes
     assert span_data[SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
     assert span_data[SPANDATA.GEN_AI_REQUEST_MODEL] == "gpt-3.5-turbo"
     assert span_data[SPANDATA.GEN_AI_RESPONSE_MODEL] == "gpt-3.5-turbo"
     assert span_data[SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
-
-
-@pytest.mark.parametrize(
-    "data_collection, send_default_pii, include_prompts, should_collect_input",
-    [
-        pytest.param(
-            {"gen_ai": {"inputs": True}},
-            False,
-            False,
-            True,
-            id="gen-ai-inputs-enabled-override-legacy-off",
-        ),
-        pytest.param(
-            {"gen_ai": {"inputs": False}},
-            True,
-            True,
-            False,
-            id="gen-ai-inputs-disabled-override-legacy-on",
-        ),
-        pytest.param(
-            {"gen_ai": {}},
-            False,
-            False,
-            True,
-            id="gen-ai-inputs-omitted-default-to-enabled",
-        ),
-        pytest.param(
-            None,
-            True,
-            True,
-            True,
-            id="no-gen-ai-config-legacy-pii-and-include-prompts-enabled",
-        ),
-        pytest.param(
-            None,
-            False,
-            True,
-            False,
-            id="no-gen-ai-config-legacy-pii-disabled",
-        ),
-    ],
-)
-def test_embeddings_data_collection(
-    sentry_init,
-    capture_items,
-    get_model_response,
-    openai_embedding_model_response,
-    data_collection,
-    send_default_pii,
-    include_prompts,
-    should_collect_input,
-):
-    sentry_init_kwargs = dict(
-        integrations=[LiteLLMIntegration(include_prompts=include_prompts)],
-        disabled_integrations=[StdlibIntegration],
-        traces_sample_rate=1.0,
-        send_default_pii=send_default_pii,
-    )
-    if data_collection is not None:
-        sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
-
-    sentry_init(**sentry_init_kwargs)
-
-    client = OpenAI(api_key="test-key")
-
-    model_response = get_model_response(
-        openai_embedding_model_response,
-        serialize_pydantic=True,
-        request_headers={"X-Stainless-Raw-Response": "true"},
-    )
-
-    items = capture_items("span")
-
-    with mock.patch.object(
-        client.embeddings._client._client,
-        "send",
-        return_value=model_response,
-    ):
-        litellm.embedding(
-            model="text-embedding-ada-002",
-            input="Hello, world!",
-            client=client,
-        )
-        # Allow time for callbacks to complete (they may run in separate threads)
-        time.sleep(0.1)
-
-    spans = [item.payload for item in items]
-    (span,) = [
-        x
-        for x in spans
-        if x["attributes"].get("sentry.op") == OP.GEN_AI_EMBEDDINGS
-        and x["attributes"].get("sentry.origin") == "auto.ai.litellm"
-    ]
-    span_data = span["attributes"]
-
-    if should_collect_input:
-        assert json.loads(span_data[SPANDATA.GEN_AI_EMBEDDINGS_INPUT]) == [
-            "Hello, world!"
-        ]
-    else:
-        assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT not in span_data
-
-    # Data collection never gates non-PII attributes
-    assert span_data[SPANDATA.GEN_AI_OPERATION_NAME] == "embeddings"
-    assert span_data[SPANDATA.GEN_AI_REQUEST_MODEL] == "text-embedding-ada-002"
-    assert span_data[SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 5

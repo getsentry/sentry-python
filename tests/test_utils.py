@@ -13,6 +13,7 @@ from sentry_sdk.utils import (
     Components,
     Dsn,
     _get_installed_modules,
+    _is_localhost,
     datetime_from_isoformat,
     ensure_integration_enabled,
     env_to_bool,
@@ -477,44 +478,6 @@ def test_warns_on_invalid_sample_rate(rate, StringContaining):  # noqa: N803
         assert result is False
 
 
-@pytest.mark.parametrize(
-    "options,include_source_context,expected_source_context",
-    [
-        pytest.param({}, True, True, id="no_data_collection-include_true"),
-        pytest.param({}, False, False, id="no_data_collection-include_false"),
-        pytest.param(
-            {"_experiments": {"data_collection": {}}},
-            False,
-            True,
-            id="data_collection-spec_default_overrides_include_false",
-        ),
-        pytest.param(
-            {"_experiments": {"data_collection": {"frame_context_lines": 3}}},
-            True,
-            True,
-            id="data_collection-frame_context_lines_3",
-        ),
-        pytest.param(
-            {"_experiments": {"data_collection": {"frame_context_lines": 0}}},
-            True,
-            False,
-            id="data_collection-frame_context_lines_0_overrides_include_true",
-        ),
-    ],
-)
-def test_include_source_context_when_serializing_frame(
-    sentry_init, options, include_source_context, expected_source_context
-):
-    sentry_init(**options)
-
-    frame = sys._getframe()
-    result = serialize_frame(frame, include_source_context=include_source_context)
-
-    assert ("pre_context" in result) is expected_source_context
-    assert ("context_line" in result) is expected_source_context
-    assert ("post_context" in result) is expected_source_context
-
-
 def _frame_with_locals():
     safe_value = "not sensitive"  # noqa: F841
     password = "ada123"  # noqa: F841
@@ -524,42 +487,37 @@ def _frame_with_locals():
 
 
 @pytest.mark.parametrize(
-    "data_collection,include_local_variables,expected_vars",
+    "data_collection,expected_vars",
     [
         pytest.param(
             {"stack_frame_variables": True},
-            False,
             True,
-            id="data_collection_stack_frame_variables_true_overrides_include_false",
+            id="data_collection_stack_frame_variables_true",
         ),
         pytest.param(
             {"stack_frame_variables": False},
-            True,
             False,
-            id="data_collection_stack_frame_variables_false_overrides_include_true",
+            id="data_collection_stack_frame_variables_false",
         ),
         pytest.param(
             {},
-            False,
             True,
             id="data_collection_stack_frame_variables_spec_default_is_true",
         ),
     ],
 )
 def test_stack_frame_variables_bool_when_serializing_frame(
-    sentry_init, data_collection, include_local_variables, expected_vars
+    sentry_init, data_collection, expected_vars
 ):
-    sentry_init(_experiments={"data_collection": data_collection})
+    sentry_init(data_collection=data_collection)
 
-    result = serialize_frame(
-        _frame_with_locals(), include_local_variables=include_local_variables
-    )
+    result = serialize_frame(_frame_with_locals())
 
     assert ("vars" in result) is expected_vars
 
 
 def test_stack_frame_variables_true_does_not_filter_sensitive_locals(sentry_init):
-    sentry_init(_experiments={"data_collection": {"stack_frame_variables": True}})
+    sentry_init(data_collection={"stack_frame_variables": True})
 
     result = serialize_frame(_frame_with_locals())
 
@@ -615,7 +573,7 @@ def test_stack_frame_variables_true_does_not_filter_sensitive_locals(sentry_init
 def test_stack_frame_variables_filtering_when_serializing_frame(
     sentry_init, behaviour, expected_vars
 ):
-    sentry_init(_experiments={"data_collection": {"stack_frame_variables": behaviour}})
+    sentry_init(data_collection={"stack_frame_variables": behaviour})
 
     result = serialize_frame(_frame_with_locals())
 
@@ -623,9 +581,7 @@ def test_stack_frame_variables_filtering_when_serializing_frame(
 
 
 def test_stack_frame_variables_off_omits_vars(sentry_init):
-    sentry_init(
-        _experiments={"data_collection": {"stack_frame_variables": {"mode": "off"}}}
-    )
+    sentry_init(data_collection={"stack_frame_variables": {"mode": "off"}})
 
     result = serialize_frame(_frame_with_locals())
 
@@ -636,11 +592,7 @@ def test_stack_frame_variables_omits_vars_when_frame_has_no_locals(sentry_init):
     def _frame_without_locals():
         return sys._getframe()
 
-    sentry_init(
-        _experiments={
-            "data_collection": {"stack_frame_variables": {"mode": "denylist"}}
-        }
-    )
+    sentry_init(data_collection={"stack_frame_variables": {"mode": "denylist"}})
 
     result = serialize_frame(_frame_without_locals())
 
@@ -648,11 +600,7 @@ def test_stack_frame_variables_omits_vars_when_frame_has_no_locals(sentry_init):
 
 
 def test_stack_frame_variables_filtering_uses_custom_repr(sentry_init):
-    sentry_init(
-        _experiments={
-            "data_collection": {"stack_frame_variables": {"mode": "denylist"}}
-        }
-    )
+    sentry_init(data_collection={"stack_frame_variables": {"mode": "denylist"}})
 
     def custom_repr(value):
         return "CUSTOM" if value == "not sensitive" else None
@@ -663,66 +611,12 @@ def test_stack_frame_variables_filtering_uses_custom_repr(sentry_init):
     assert result["vars"]["password"] == "'[Filtered]'"
 
 
-@pytest.mark.parametrize(
-    "options,include_local_variables,expected_vars",
-    [
-        pytest.param(
-            {},
-            True,
-            True,
-            id="no_data_collection-include_local_variables_true",
-        ),
-        pytest.param(
-            {},
-            False,
-            False,
-            id="no_data_collection-include_local_variables_false",
-        ),
-    ],
-)
-def test_include_local_variables_when_data_collection_is_unset(
-    sentry_init, options, include_local_variables, expected_vars
-):
-    sentry_init(**options)
-
-    result = serialize_frame(
-        _frame_with_locals(), include_local_variables=include_local_variables
-    )
-
-    assert ("vars" in result) is expected_vars
-
-
-def test_data_collection_stack_frame_variables_overrides_include_local_variables_option(
-    sentry_init, capture_events
-):
-    sentry_init(
-        include_local_variables=False,
-        _experiments={"data_collection": {"stack_frame_variables": True}},
-    )
-    events = capture_events()
-
-    def raise_with_locals():
-        safe_value = "not sensitive"  # noqa: F841
-        raise ValueError("boom")
-
-    try:
-        raise_with_locals()
-    except ValueError:
-        sentry_sdk.capture_exception()
-
-    (event,) = events
-    frame = event["exception"]["values"][0]["stacktrace"]["frames"][-1]
-    assert frame["vars"]["safe_value"] == "'not sensitive'"
-
-
 def test_data_collection_stack_frame_variables_filtering_applies_to_captured_exception(
     sentry_init, capture_events
 ):
     sentry_init(
-        _experiments={
-            "data_collection": {
-                "stack_frame_variables": {"mode": "denylist", "terms": ["nickname"]}
-            }
+        data_collection={
+            "stack_frame_variables": {"mode": "denylist", "terms": ["nickname"]}
         }
     )
     events = capture_events()
@@ -748,10 +642,8 @@ def test_data_collection_stack_frame_variables_filtering_applies_to_captured_exc
 
 def test_serialize_frame_variables_serializer_failure(sentry_init):
     sentry_init(
-        _experiments={
-            "data_collection": {
-                "stack_frame_variables": {"mode": "denylist", "terms": ["password"]}
-            }
+        data_collection={
+            "stack_frame_variables": {"mode": "denylist", "terms": ["password"]}
         }
     )
 
@@ -1334,27 +1226,19 @@ def test_get_lines_from_file_handle_linecache_errors():
     [
         pytest.param({}, 5, id="no_data_collection-defaults_to_5"),
         pytest.param(
-            {"_experiments": {"data_collection": {}}},
+            {"data_collection": {}},
             5,
             id="data_collection-spec_default_5",
         ),
         pytest.param(
-            {"_experiments": {"data_collection": {"frame_context_lines": 3}}},
+            {"data_collection": {"frame_context_lines": 3}},
             3,
             id="data_collection-frame_context_lines_3",
         ),
         pytest.param(
-            {"_experiments": {"data_collection": {"frame_context_lines": 0}}},
+            {"data_collection": {"frame_context_lines": 0}},
             0,
             id="data_collection-frame_context_lines_0",
-        ),
-        pytest.param(
-            {
-                "_experiments": {"data_collection": {}},
-                "include_source_context": False,
-            },
-            5,
-            id="data_collection-spec_default_overrides_include_source_context_false",
         ),
     ],
 )
@@ -1409,3 +1293,60 @@ def test_safe_serialize_object():
 
 def test_package_version_is_none():
     assert package_version("non_existent_package") is None
+
+
+@pytest.mark.parametrize(
+    "kwargs, expected",
+    [
+        # Client IP matches
+        ({"client_ip": "127.0.0.1"}, True),
+        ({"client_ip": "::1"}, True),
+        ({"client_ip": "192.168.1.1"}, False),
+        ({"client_ip": "10.0.0.1"}, False),
+        ({"client_ip": "8.8.8.8"}, False),
+        ({"client_ip": "::2"}, False),
+        # Bracketed IPv6 (e.g. from Sanic's Forwarded header parsing)
+        ({"client_ip": "[::1]"}, True),
+        ({"client_ip": "[::2]"}, False),
+        # URL host (subdomain-aware matching)
+        ({"url_host": "localhost"}, True),
+        ({"url_host": "127.0.0.1"}, True),
+        ({"url_host": "::1"}, True),
+        ({"url_host": "foo.localhost"}, True),
+        ({"url_host": "bar.foo.localhost"}, True),
+        ({"url_host": "foolocalhost"}, False),
+        ({"url_host": "notlocalhost"}, False),
+        ({"url_host": "example.com"}, False),
+        # Host header (subdomain-aware matching after port strip)
+        ({"host_header": "localhost"}, True),
+        ({"host_header": "localhost:3000"}, True),
+        ({"host_header": "127.0.0.1:8080"}, True),
+        ({"host_header": "[::1]"}, True),
+        ({"host_header": "[::1]:8080"}, True),
+        ({"host_header": "foo.localhost"}, True),
+        ({"host_header": "foo.localhost:8080"}, True),
+        ({"host_header": "example.com"}, False),
+        ({"host_header": "localhost.example.com"}, False),
+        # X-Forwarded-Host header
+        ({"forwarded_host_header": "localhost"}, True),
+        ({"forwarded_host_header": "localhost:3000"}, True),
+        ({"forwarded_host_header": "127.0.0.1:8080"}, True),
+        ({"forwarded_host_header": "[::1]:8080"}, True),
+        ({"forwarded_host_header": "foo.localhost"}, True),
+        ({"forwarded_host_header": "example.com"}, False),
+        # No args
+        ({}, False),
+        # All non-local
+        (
+            {
+                "client_ip": "8.8.8.8",
+                "url_host": "example.com",
+                "host_header": "example.com",
+                "forwarded_host_header": "example.com",
+            },
+            False,
+        ),
+    ],
+)
+def test_is_localhost(kwargs, expected):
+    assert _is_localhost(**kwargs) is expected

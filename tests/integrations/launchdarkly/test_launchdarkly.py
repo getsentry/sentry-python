@@ -188,7 +188,6 @@ def test_launchdarkly_integration_did_not_enable(uninstall_integration):
 
 def test_launchdarkly_span_integration(
     sentry_init,
-    capture_events,
     capture_items,
     uninstall_integration,
 ):
@@ -208,7 +207,7 @@ def test_launchdarkly_span_integration(
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="bar"):
+    with sentry_sdk.start_span(name="bar"):
         client.variation("hello", Context.create("my-org", "organization"), False)
         client.variation("other", Context.create("my-org", "organization"), False)
 

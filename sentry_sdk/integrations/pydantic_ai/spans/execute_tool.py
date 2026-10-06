@@ -6,7 +6,7 @@ from sentry_sdk.traces import Span
 from sentry_sdk.utils import safe_serialize
 
 from ..consts import SPAN_ORIGIN
-from ..utils import _set_agent_data, _should_send_inputs, _should_send_outputs
+from ..utils import _set_agent_data
 
 if TYPE_CHECKING:
     from typing import Any, Optional
@@ -29,7 +29,7 @@ def execute_tool_span(
         agent: The agent executing the tool
         tool_definition: The definition of the tool, if available
     """
-    span = sentry_sdk.traces.start_span(
+    span = sentry_sdk.start_span(
         name=f"execute_tool {tool_name}",
         attributes={
             "sentry.op": OP.GEN_AI_EXECUTE_TOOL,
@@ -47,8 +47,13 @@ def execute_tool_span(
 
     _set_agent_data(span, agent)
 
-    if _should_send_inputs() and tool_args is not None:
-        span.set_attribute(SPANDATA.GEN_AI_TOOL_INPUT, safe_serialize(tool_args))
+    if (
+        not sentry_sdk.get_client().options["data_collection"]["gen_ai"]["inputs"]
+        or tool_args is None
+    ):
+        return span
+
+    span.set_attribute(SPANDATA.GEN_AI_TOOL_CALL_ARGUMENTS, safe_serialize(tool_args))
 
     return span
 
@@ -58,7 +63,10 @@ def update_execute_tool_span(span: "Span", result: "Any") -> None:
     if not span:
         return
 
-    if not _should_send_outputs() or result is None:
+    if (
+        not sentry_sdk.get_client().options["data_collection"]["gen_ai"]["outputs"]
+        or result is None
+    ):
         return
 
-    span.set_attribute(SPANDATA.GEN_AI_TOOL_OUTPUT, safe_serialize(result))
+    span.set_attribute(SPANDATA.GEN_AI_TOOL_CALL_RESULT, safe_serialize(result))

@@ -2,11 +2,9 @@ from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk.consts import SPANDATA
-from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import Span
 from sentry_sdk.utils import (
     event_from_exception,
-    has_data_collection_enabled,
     safe_serialize,
 )
 
@@ -15,45 +13,6 @@ if TYPE_CHECKING:
 
     from pydantic_ai import Agent
     from pydantic_ai.models import AbstractModel, Model
-    from pydantic_ai.realtime.settings import RealtimeModelSettings
-    from pydantic_ai.settings import ModelSettings
-
-
-def _should_send_prompts_legacy() -> bool:
-    """
-    Check if prompts should be sent to Sentry based on the deprecated
-    ``send_default_pii`` option and the ``include_prompts`` integration setting.
-
-    TODO: Remove this once `send_default_pii` is deprecated.
-    """
-    if not should_send_default_pii():
-        return False
-
-    from . import PydanticAIIntegration
-
-    # Get the integration instance from the client
-    integration = sentry_sdk.get_client().get_integration(PydanticAIIntegration)
-
-    if integration is None:
-        return False
-
-    return getattr(integration, "include_prompts", False)
-
-
-def _should_send_inputs() -> bool:
-    client = sentry_sdk.get_client()
-    if has_data_collection_enabled(client.options):
-        return bool(client.options["data_collection"]["gen_ai"]["inputs"])
-
-    return _should_send_prompts_legacy()
-
-
-def _should_send_outputs() -> bool:
-    client = sentry_sdk.get_client()
-    if has_data_collection_enabled(client.options):
-        return bool(client.options["data_collection"]["gen_ai"]["outputs"])
-
-    return _should_send_prompts_legacy()
 
 
 def _set_agent_data(span: "Span", agent: "Optional[Agent]") -> None:
@@ -94,63 +53,6 @@ def _get_model_name(
         return str(model_obj)
 
 
-def _set_model_data(
-    span: "Span",
-    agent: "Optional[Agent]",
-    model: "Union[Model, AbstractModel]",
-    model_settings: "Optional[Union[ModelSettings, RealtimeModelSettings]]",
-) -> None:
-    """Set model-related data on a span.
-
-    Args:
-        span: The span to set data on
-        model: Model object (can be None, will try to get from agent if not provided)
-        model_settings: Model settings (can be None, will try to get from agent if not provided)
-    """
-    # Extract model information
-    model_obj = model
-    if not model_obj and agent and hasattr(agent, "model"):
-        model_obj = agent.model
-
-    if model_obj:
-        # Set system from model
-        if hasattr(model_obj, "system"):
-            span.set_attribute(SPANDATA.GEN_AI_PROVIDER_NAME, model_obj.system)
-
-        # Set model name
-        model_name = _get_model_name(model_obj)
-        if model_name:
-            span.set_attribute(SPANDATA.GEN_AI_REQUEST_MODEL, model_name)
-
-    # Extract model settings
-    settings = model_settings
-    if not settings and agent and hasattr(agent, "model_settings"):
-        settings = agent.model_settings
-
-    if settings:
-        settings_map = {
-            "max_tokens": SPANDATA.GEN_AI_REQUEST_MAX_TOKENS,
-            "temperature": SPANDATA.GEN_AI_REQUEST_TEMPERATURE,
-            "top_p": SPANDATA.GEN_AI_REQUEST_TOP_P,
-            "frequency_penalty": SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY,
-            "presence_penalty": SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY,
-        }
-
-        # ModelSettings is a TypedDict (dict at runtime), so use dict access
-        if isinstance(settings, dict):
-            for setting_name, spandata_key in settings_map.items():
-                value = settings.get(setting_name)
-                if value is not None:
-                    span.set_attribute(spandata_key, value)  # type: ignore[arg-type]
-        else:
-            # Fallback for object-style settings
-            for setting_name, spandata_key in settings_map.items():
-                if hasattr(settings, setting_name):
-                    value = getattr(settings, setting_name)
-                    if value is not None:
-                        span.set_attribute(spandata_key, value)
-
-
 def _set_available_tools(span: "Span", agent: "Optional[Agent[Any, Any]]") -> None:
     """Set available tools data on a span from an agent's function toolset.
 
@@ -162,9 +64,8 @@ def _set_available_tools(span: "Span", agent: "Optional[Agent[Any, Any]]") -> No
         return
 
     client_options = sentry_sdk.get_client().options
-    if has_data_collection_enabled(client_options):
-        if not client_options["data_collection"]["gen_ai"]["inputs"]:
-            return
+    if not client_options["data_collection"]["gen_ai"]["inputs"]:
+        return
 
     try:
         tools = []
@@ -198,7 +99,6 @@ def _set_available_tools(span: "Span", agent: "Optional[Agent[Any, Any]]") -> No
 def _capture_exception(exc: "Any", handled: bool = False) -> None:
     event, hint = event_from_exception(
         exc,
-        client_options=sentry_sdk.get_client().options,
         mechanism={"type": "pydantic_ai", "handled": handled},
     )
     sentry_sdk.capture_event(event, hint=hint)

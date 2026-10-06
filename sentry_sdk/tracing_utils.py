@@ -124,27 +124,15 @@ def record_sql_queries(
 ) -> "Generator[sentry_sdk.traces.Span, None, None]":
     # TODO: Bring back capturing of params by default
     client = sentry_sdk.get_client()
-    if has_data_collection_enabled(client.options):
-        if client.options["data_collection"]["database_query_data"]:
-            if not params_list or params_list == [None]:
-                params_list = None
-
-            if paramstyle == "pyformat":
-                paramstyle = "format"
-        else:
+    if client.options["data_collection"]["database_query_data"]:
+        if not params_list or params_list == [None]:
             params_list = None
-            paramstyle = None
+
+        if paramstyle == "pyformat":
+            paramstyle = "format"
     else:
-        # TODO: remove this else block once data collection is released
-        if client.options["_experiments"].get("record_sql_params", False):
-            if not params_list or params_list == [None]:
-                params_list = None
-
-            if paramstyle == "pyformat":
-                paramstyle = "format"
-        else:
-            params_list = None
-            paramstyle = None
+        params_list = None
+        paramstyle = None
 
     query = _format_sql(cursor, query)
 
@@ -191,8 +179,9 @@ def add_http_breadcrumb(status_code: "Optional[int]", data: "dict[str, Any]") ->
     sentry_sdk.add_breadcrumb(**kwargs)
 
 
-def get_url_attributes(
-    client: "sentry_sdk.client.BaseClient", parsed_url: "Optional[ParsedUrl]"
+def get_url_attributes_legacy(
+    client: "sentry_sdk.client.BaseClient",
+    parsed_url: "Optional[ParsedUrl]",
 ) -> "Attributes":
     """Build the `url.*` span attributes for an outgoing HTTP request.
 
@@ -216,6 +205,40 @@ def get_url_attributes(
         query = parsed_url.query
     else:
         return attributes
+
+    url_full = parsed_url.url
+    if query:
+        attributes[SPANDATA.URL_QUERY] = query
+        url_full += "?" + query
+
+    if parsed_url.fragment:
+        attributes[SPANDATA.URL_FRAGMENT] = parsed_url.fragment
+        url_full += "#" + parsed_url.fragment
+
+    attributes[SPANDATA.URL_FULL] = url_full
+
+    return attributes
+
+
+def get_url_attributes(
+    client: "sentry_sdk.client.BaseClient",
+    parsed_url: "Optional[ParsedUrl]",
+) -> "Attributes":
+    """Build the `url.*` span attributes for an outgoing HTTP request.
+
+    The query string is filtered through the resolved `data_collection`
+    settings.
+    """
+    attributes: "Attributes" = {}
+    if parsed_url is None:
+        return attributes
+
+    query: "Optional[str]" = None
+    if parsed_url.query:
+        query = _apply_data_collection_filtering_to_query_string(
+            query_string=parsed_url.query,
+            behaviour=client.options["data_collection"]["url_query_params"],
+        )
 
     url_full = parsed_url.url
     if query:
@@ -1182,13 +1205,10 @@ def _make_sampling_decision(
             sample_rate = client.options["traces_sampler"](sampling_context)
         except Exception:
             logger.warning(
-                "[Tracing] traces_sampler raised; falling back to parent sample rate or traces_sample_rate",
+                "[Tracing] traces_sampler raised; unsampling trace",
                 exc_info=True,
             )
-            if propagation_context.parent_sampled is not None:
-                sample_rate = propagation_context.parent_sampled
-            else:
-                sample_rate = client.options["traces_sample_rate"]
+            return False, None, None, "callback_error"
     else:
         if propagation_context.parent_sampled is not None:
             sample_rate = propagation_context.parent_sampled

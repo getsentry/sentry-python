@@ -919,6 +919,7 @@ class Scope:
 
         new_crumb = crumb
         if before_breadcrumb is not None:
+            new_crumb = None
             with capture_internal_exceptions():
                 new_crumb = before_breadcrumb(crumb, hint)
 
@@ -938,6 +939,58 @@ class Scope:
         parent_span: "Optional[Span]",
         active: bool,
     ) -> "Span":
+        """
+        Start a span.
+
+        The span's parent, unless provided explicitly via the `parent_span` argument,
+        will be the current active span, if any. If there is none, this span will
+        become the root of a new span tree. If you explicitly want this span to be
+        top-level without a parent, set `parent_span=None`.
+
+        ``start_span()`` can either be used as context manager or you can use the span
+        object it returns and explicitly end it via ``span.end()``. The following is
+        equivalent::
+
+            import sentry_sdk
+
+            with sentry_sdk.start_span(name="My Span"):
+                # do something
+
+            # The span automatically finishes once the ``with`` block is exited
+
+        ::
+
+            import sentry_sdk
+
+            span = sentry_sdk.start_span(name="My Span")
+            # do something
+            span.end()
+
+        To continue a trace from another service, call
+        `sentry_sdk.continue_trace()` prior to creating a top-level span.
+
+        :param name: The name to identify this span by.
+        :type name: str
+
+        :param attributes: Key-value attributes to set on the span from the start.
+            These will also be accessible in the traces sampler.
+        :type attributes: "Optional[Attributes]"
+
+        :param parent_span: A span instance that the new span should consider its
+            parent. If not provided, the parent will be set to the currently active
+            span, if any. If set to `None`, this span will become a new root-level
+            span.
+        :type parent_span: "Optional[Span]"
+
+        :param active: Controls whether spans started while this span is running
+            will automatically become its children. That's the default behavior. If
+            you want to create a span that shouldn't have any children (unless
+            provided explicitly via the `parent_span` argument), set this to `False`.
+        :type active: bool
+
+        :return: The span that has been started.
+        :rtype: Span
+        """
         if isinstance(parent_span, NoOpSpan):
             # parent_span is only set if the user explicitly set it
             logger.debug(
@@ -1190,9 +1243,7 @@ class Scope:
         else:
             exc_info = sys.exc_info()
 
-        event, hint = event_from_exception(
-            exc_info, client_options=self.get_client().options
-        )
+        event, hint = event_from_exception(exc_info)
 
         try:
             return self.capture_event(event, hint=hint, scope=scope, **scope_kwargs)
@@ -1428,7 +1479,9 @@ class Scope:
             )
 
             for error_processor in error_processors:
-                new_event = error_processor(event, exc_info)
+                new_event = None
+                with capture_internal_exceptions():
+                    new_event = error_processor(event, exc_info)
                 if new_event is None:
                     return self._drop(error_processor, "error processor")
 
@@ -1456,7 +1509,7 @@ class Scope:
             )
 
             for event_processor in event_processors:
-                new_event = event
+                new_event = None
                 with capture_internal_exceptions():
                     new_event = event_processor(event, hint)
                 if new_event is None:

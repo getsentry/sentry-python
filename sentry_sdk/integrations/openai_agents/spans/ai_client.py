@@ -5,7 +5,6 @@ import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.traces import Span, _AgentFrameworkChatGenerationContext
-from sentry_sdk.utils import has_data_collection_enabled
 
 try:
     from agents import (
@@ -16,6 +15,7 @@ try:
         HostedMCPTool,
         ImageGenerationTool,
         LocalShellTool,
+        Model,
         WebSearchTool,
     )
 except ImportError:
@@ -45,7 +45,6 @@ except ImportError:
 
 from ..consts import SPAN_ORIGIN
 from ..utils import (
-    _set_agent_data,
     _set_input_data,
     _set_output_data,
     _set_usage_data,
@@ -217,17 +216,48 @@ def ai_client_context(
         },
     )
 
-    _set_agent_data(context.span, agent)
+    context.span.set_attribute(SPANDATA.GEN_AI_PROVIDER_NAME, "openai")
+    context.span.set_attribute(SPANDATA.GEN_AI_AGENT_NAME, agent.name)
 
-    if has_data_collection_enabled(client_options):
-        if client_options["data_collection"]["gen_ai"]["inputs"]:
-            context.span.set_attribute(
-                SPANDATA.GEN_AI_TOOL_DEFINITIONS,
-                json.dumps(_transform_tool_definitions(agent.tools)),
-            )
-    else:
-        # This is set unconditionally prior to data collection being introduced.
-        # Remove this block once data collection is fully rolled out
+    request_model_name: "Optional[str]" = None
+    if isinstance(agent.model, Model) and hasattr(agent.model, "model"):
+        request_model_name = agent.model.model
+    elif isinstance(agent.model, str):
+        request_model_name = agent.model
+    elif hasattr(agent, "_sentry_request_model"):
+        request_model_name = agent._sentry_request_model
+
+    if request_model_name:
+        context.span.set_attribute(SPANDATA.GEN_AI_REQUEST_MODEL, request_model_name)
+
+    if agent.model_settings.max_tokens:
+        context.span.set_attribute(
+            SPANDATA.GEN_AI_REQUEST_MAX_TOKENS, agent.model_settings.max_tokens
+        )
+
+    if agent.model_settings.presence_penalty:
+        context.span.set_attribute(
+            SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY,
+            agent.model_settings.presence_penalty,
+        )
+
+    if agent.model_settings.temperature:
+        context.span.set_attribute(
+            SPANDATA.GEN_AI_REQUEST_TEMPERATURE, agent.model_settings.temperature
+        )
+
+    if agent.model_settings.top_p:
+        context.span.set_attribute(
+            SPANDATA.GEN_AI_REQUEST_TOP_P, agent.model_settings.top_p
+        )
+
+    if agent.model_settings.frequency_penalty:
+        context.span.set_attribute(
+            SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY,
+            agent.model_settings.frequency_penalty,
+        )
+
+    if client_options["data_collection"]["gen_ai"]["inputs"]:
         context.span.set_attribute(
             SPANDATA.GEN_AI_TOOL_DEFINITIONS,
             json.dumps(_transform_tool_definitions(agent.tools)),

@@ -2,12 +2,9 @@ from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
-from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import Span, SpanStatus
-from sentry_sdk.utils import has_data_collection_enabled
 
 from ..consts import SPAN_ORIGIN
-from ..utils import _set_agent_data
 
 if TYPE_CHECKING:
     from typing import Any
@@ -18,7 +15,7 @@ if TYPE_CHECKING:
 def execute_tool_span(
     tool: "agents.FunctionTool", *args: "Any", **kwargs: "Any"
 ) -> "Span":
-    return sentry_sdk.traces.start_span(
+    return sentry_sdk.start_span(
         name=f"execute_tool {tool.name}",
         attributes={
             "sentry.op": OP.GEN_AI_EXECUTE_TOOL,
@@ -38,18 +35,15 @@ def update_execute_tool_span(
 ) -> None:
     client = sentry_sdk.get_client()
 
-    _set_agent_data(span, agent)
+    span.set_attribute(SPANDATA.GEN_AI_AGENT_NAME, agent.name)
 
     if isinstance(result, str) and result.startswith(
         "An error occurred while running the tool"
     ):
         span.status = SpanStatus.ERROR
 
-    if has_data_collection_enabled(client.options):
-        if client.options["data_collection"]["gen_ai"]["outputs"]:
-            span.set_attribute(SPANDATA.GEN_AI_TOOL_OUTPUT, result)
-    elif should_send_default_pii():
-        span.set_attribute(SPANDATA.GEN_AI_TOOL_OUTPUT, result)
+    if client.options["data_collection"]["gen_ai"]["outputs"]:
+        span.set_attribute(SPANDATA.GEN_AI_TOOL_CALL_RESULT, result)
 
     # Add conversation ID from agent
     conv_id = getattr(agent, "_sentry_conversation_id", None)

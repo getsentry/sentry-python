@@ -63,7 +63,7 @@ def init_arq(sentry_init):
         sentry_init_kwargs = {
             "integrations": [ArqIntegration()],
             "traces_sample_rate": 1.0,
-            "send_default_pii": True,
+            "data_collection": {},
         }
         sentry_init_kwargs.update(init_kwargs or {})
         sentry_init(**sentry_init_kwargs)
@@ -111,7 +111,7 @@ def init_arq_with_dict_settings(sentry_init):
         sentry_init_kwargs = {
             "integrations": [ArqIntegration()],
             "traces_sample_rate": 1.0,
-            "send_default_pii": True,
+            "data_collection": {},
         }
         sentry_init_kwargs.update(init_kwargs or {})
         sentry_init(**sentry_init_kwargs)
@@ -162,7 +162,7 @@ def init_arq_with_kwarg_settings(sentry_init):
         sentry_init_kwargs = {
             "integrations": [ArqIntegration()],
             "traces_sample_rate": 1.0,
-            "send_default_pii": True,
+            "data_collection": {},
         }
         sentry_init_kwargs.update(init_kwargs or {})
         sentry_init(**sentry_init_kwargs)
@@ -346,14 +346,14 @@ async def test_worker_jobs(
 
 
 @pytest.mark.parametrize(
-    "init_kwargs,expected_args,expected_kwargs",
+    "data_collection,expected_args,expected_kwargs",
     DATA_COLLECTION_QUEUES_CASES,
 )
 @pytest.mark.asyncio
 async def test_job_args_kwargs_data_collection(
     capture_items,
     init_arq,
-    init_kwargs,
+    data_collection,
     expected_args,
     expected_kwargs,
 ):
@@ -364,7 +364,7 @@ async def test_job_args_kwargs_data_collection(
 
     pool, worker = init_arq(
         cls_functions=[division],
-        init_kwargs=init_kwargs,
+        init_kwargs={"data_collection": data_collection},
     )
 
     job = await pool.enqueue_job("division", 1, b=0)
@@ -406,7 +406,7 @@ async def test_enqueue_job(
     pool, _ = init_fixture_method(**{source: [dummy_job]})
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent") as span:
+    with sentry_sdk.start_span(name="custom parent") as span:
         await pool.enqueue_job("dummy_job")
 
     sentry_sdk.flush()
@@ -465,7 +465,7 @@ async def test_span_origin_producer(
     pool, _ = init_fixture_method(**{source: [dummy_job]})
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
+    with sentry_sdk.start_span(name="custom parent"):
         await pool.enqueue_job("dummy_job")
 
     sentry_sdk.flush()

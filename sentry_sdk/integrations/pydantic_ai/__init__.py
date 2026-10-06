@@ -127,7 +127,6 @@ def register_hooks(hooks: "Hooks") -> None:
         with sentry_sdk.isolation_scope(), invoke_agent_span(
             user_prompt=ctx.prompt,
             agent=ctx.agent,
-            model=ctx.model,
             model_settings=ctx.model_settings,
         ) as span:
             try:
@@ -172,19 +171,14 @@ class PydanticAIIntegration(Integration):
     identifier = "pydantic_ai"
     origin = f"auto.ai.{identifier}"
 
-    def __init__(
-        self, include_prompts: bool = True, handled_tool_call_exceptions: bool = True
-    ) -> None:
+    def __init__(self, handled_tool_call_exceptions: bool = True) -> None:
         """
         Initialize the Pydantic AI integration.
 
         Args:
-            include_prompts: Whether to include prompts and messages in span data.
-                Requires send_default_pii=True. Defaults to True.
             handled_tool_exceptions: Capture tool call exceptions that Pydantic AI
                 internally prevents from bubbling up.
         """
-        self.include_prompts = include_prompts
         self.handled_tool_call_exceptions = handled_tool_call_exceptions
 
     @staticmethod

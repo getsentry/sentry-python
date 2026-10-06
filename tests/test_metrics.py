@@ -64,7 +64,7 @@ def test_metrics_with_attributes(sentry_init, capture_items):
 
 
 def test_metrics_with_user(sentry_init, capture_items):
-    sentry_init(send_default_pii=True)
+    sentry_init(data_collection={"user_info": True})
     items = capture_items("trace_metric")
 
     sentry_sdk.set_user(
@@ -83,7 +83,7 @@ def test_metrics_with_user(sentry_init, capture_items):
 
 
 def test_metrics_no_user_if_pii_off(sentry_init, capture_items):
-    sentry_init(send_default_pii=False)
+    sentry_init(data_collection={"user_info": False})
     items = capture_items("trace_metric")
 
     sentry_sdk.set_user(
@@ -105,7 +105,7 @@ def test_metrics_with_span(sentry_init, capture_items):
     sentry_init(traces_sample_rate=1.0)
     items = capture_items("trace_metric")
 
-    with sentry_sdk.traces.start_span(name="test-span") as segment:
+    with sentry_sdk.start_span(name="test-span") as segment:
         sentry_sdk.metrics.count("test.span.counter", 1)
 
     sentry_sdk.flush()
@@ -200,6 +200,43 @@ def test_metrics_before_send_raises_does_not_crash_application(
     assert not metrics
 
 
+@pytest.mark.tests_internal_exceptions
+def test_metrics_before_send_raises_records_callback_error(
+    sentry_init, capture_items, capture_record_lost_event_calls
+):
+    def _before_metric(record, hint):
+        raise ValueError("before_send_metric error")
+
+    sentry_init(before_send_metric=_before_metric)
+    items = capture_items("trace_metric")
+    record_lost_event_calls = capture_record_lost_event_calls()
+
+    sentry_sdk.metrics.count("test.keep", 1)
+
+    get_client().flush()
+
+    assert not items
+    assert ("callback_error", "trace_metric", None, 1) in record_lost_event_calls
+
+
+def test_metrics_before_send_returns_none_records_before_send(
+    sentry_init, capture_items, capture_record_lost_event_calls
+):
+    def _before_metric(record, hint):
+        return None
+
+    sentry_init(before_send_metric=_before_metric)
+    items = capture_items("trace_metric")
+    record_lost_event_calls = capture_record_lost_event_calls()
+
+    sentry_sdk.metrics.count("test.drop", 1)
+
+    get_client().flush()
+
+    assert not items
+    assert ("before_send", "trace_metric", None, 1) in record_lost_event_calls
+
+
 def test_transport_format(sentry_init, capture_envelopes):
     sentry_init(server_name="test-server", release="1.0.0")
 
@@ -207,7 +244,7 @@ def test_transport_format(sentry_init, capture_envelopes):
 
     sentry_sdk.metrics.count("test.counter", 1)
 
-    sentry_sdk.get_client().flush()
+    sentry_sdk.flush()
 
     assert len(envelopes) == 1
     assert len(envelopes[0].items) == 1
@@ -429,7 +466,7 @@ def test_attributes_preserialized_in_before_send(sentry_init, capture_items):
     assert isinstance(metric["attributes"]["dictionary"], str)
 
 
-def test_array_attributes_deep_copied_in_before_send(sentry_init, capture_envelopes):
+def test_array_attributes_deep_copied_in_before_send(sentry_init):
     """We don't surface user-held references to objects in attributes."""
 
     strings = ["value1", "value2"]

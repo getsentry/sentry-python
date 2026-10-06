@@ -12,12 +12,10 @@ from sentry_sdk.integrations import (
 )
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 from sentry_sdk.integrations.logging import ignore_logger_for_events
-from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.traces import SOURCE_FOR_STYLE, SegmentNameSource
+from sentry_sdk.traces import SegmentNameSource
 from sentry_sdk.utils import (
     ensure_integration_enabled,
     event_from_exception,
-    has_data_collection_enabled,
     package_version,
     transaction_from_function,
 )
@@ -93,7 +91,6 @@ class SentryLitestarASGIMiddleware(SentryAsgiMiddleware):
     ) -> None:
         super().__init__(
             app=app,
-            transaction_style="endpoint",
             mechanism_type="asgi",
             span_origin=span_origin,
             asgi_version=3,
@@ -168,9 +165,9 @@ def enable_span_for_middleware(middleware: "Middleware") -> "Middleware":
             return await old_call(self, scope, receive, send)
 
         middleware_name = self.__class__.__name__
-        if sentry_sdk.traces.get_current_span() is None:
+        if sentry_sdk.get_current_span() is None:
             return await old_call(self, scope, receive, send)
-        with sentry_sdk.traces.start_span(
+        with sentry_sdk.start_span(
             name=middleware_name,
             attributes={
                 "sentry.op": OP.MIDDLEWARE_LITESTAR,
@@ -185,9 +182,9 @@ def enable_span_for_middleware(middleware: "Middleware") -> "Middleware":
             ) -> "Union[HTTPReceiveMessage, WebSocketReceiveMessage]":
                 if client.get_integration(LitestarIntegration) is None:
                     return await receive(*args, **kwargs)
-                if sentry_sdk.traces.get_current_span() is None:
+                if sentry_sdk.get_current_span() is None:
                     return await receive(*args, **kwargs)
-                with sentry_sdk.traces.start_span(
+                with sentry_sdk.start_span(
                     name=getattr(receive, "__qualname__", str(receive)),
                     attributes={
                         "sentry.op": OP.MIDDLEWARE_LITESTAR_RECEIVE,
@@ -205,9 +202,9 @@ def enable_span_for_middleware(middleware: "Middleware") -> "Middleware":
             async def _sentry_send(message: "Message") -> None:
                 if client.get_integration(LitestarIntegration) is None:
                     return await send(message)
-                if sentry_sdk.traces.get_current_span() is None:
+                if sentry_sdk.get_current_span() is None:
                     return await send(message)
-                with sentry_sdk.traces.start_span(
+                with sentry_sdk.start_span(
                     name=getattr(send, "__qualname__", str(send)),
                     attributes={
                         "sentry.op": OP.MIDDLEWARE_LITESTAR_SEND,
@@ -268,7 +265,7 @@ def patch_http_route_handle() -> None:
         if func is not None:
             name = transaction_from_function(func)
 
-        source = SOURCE_FOR_STYLE["endpoint"]
+        source = SegmentNameSource.COMPONENT
 
         if not name:
             name = _DEFAULT_TRANSACTION_NAME
@@ -282,21 +279,16 @@ def patch_http_route_handle() -> None:
             request_info["content_length"] = len(scope.get("_body", b""))
             should_attach_request_body = True
 
-            if has_data_collection_enabled(client.options):
-                cookies = _apply_key_value_collection_filtering(
-                    items=extracted_request_data["cookies"],
-                    behaviour=client.options["data_collection"]["cookies"],
-                )
-                if cookies:
-                    request_info["cookies"] = cookies
+            cookies = _apply_key_value_collection_filtering(
+                items=extracted_request_data["cookies"],
+                behaviour=client.options["data_collection"]["cookies"],
+            )
+            if cookies:
+                request_info["cookies"] = cookies
 
-                should_attach_request_body = (
-                    "incoming_request"
-                    in client.options["data_collection"]["http_bodies"]
-                )
-            elif should_send_default_pii():
-                request_info["cookies"] = extracted_request_data["cookies"]
-
+            should_attach_request_body = (
+                "incoming_request" in client.options["data_collection"]["http_bodies"]
+            )
             if request_data is not None and should_attach_request_body:
                 request_info["data"] = request_data
 
@@ -326,10 +318,7 @@ def exception_handler(exc: Exception, scope: "LitestarScope") -> None:
     user_info: "Optional[dict[str, Any]]" = None
     client_options = sentry_sdk.get_client().options
 
-    if has_data_collection_enabled(client_options):
-        if client_options["data_collection"]["user_info"]:
-            user_info = retrieve_user_from_scope(scope)
-    elif should_send_default_pii():
+    if client_options["data_collection"]["user_info"]:
         user_info = retrieve_user_from_scope(scope)
 
     if user_info and isinstance(user_info, dict):
@@ -346,7 +335,6 @@ def exception_handler(exc: Exception, scope: "LitestarScope") -> None:
 
     event, hint = event_from_exception(
         exc,
-        client_options=sentry_sdk.get_client().options,
         mechanism={"type": LitestarIntegration.identifier, "handled": False},
     )
 

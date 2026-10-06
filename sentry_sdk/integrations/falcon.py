@@ -5,6 +5,7 @@ from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.integrations._wsgi_common import RequestExtractor
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
+from sentry_sdk.traces import SegmentNameSource
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
@@ -100,31 +101,12 @@ class SentryFalconMiddleware:
         if server_span is not None:
             server_span.set_attribute(SPANDATA.HTTP_ROUTE, req.uri_template)
 
-        name_for_style = {
-            "uri_template": req.uri_template,
-            "path": req.path,
-        }
-        name = name_for_style[integration.transaction_style]
-        source = sentry_sdk.traces.SOURCE_FOR_STYLE[integration.transaction_style]
-        sentry_sdk.set_transaction_name(name, source)
-
-
-TRANSACTION_STYLE_VALUES = ("uri_template", "path")
+        sentry_sdk.set_transaction_name(req.uri_template, SegmentNameSource.ROUTE)
 
 
 class FalconIntegration(Integration):
     identifier = "falcon"
     origin = f"auto.http.{identifier}"
-
-    transaction_style = ""
-
-    def __init__(self, transaction_style: str = "uri_template") -> None:
-        if transaction_style not in TRANSACTION_STYLE_VALUES:
-            raise ValueError(
-                f"Invalid value for transaction_style: {transaction_style} "
-                f"(must be in {TRANSACTION_STYLE_VALUES})"
-            )
-        self.transaction_style = transaction_style
 
     @staticmethod
     def setup_once() -> None:
@@ -181,7 +163,6 @@ def _patch_handle_exception() -> None:
         if _exception_leads_to_http_5xx(ex, response):
             event, hint = event_from_exception(
                 ex,
-                client_options=sentry_sdk.get_client().options,
                 mechanism={"type": "falcon", "handled": False},
             )
             sentry_sdk.capture_event(event, hint=hint)

@@ -14,80 +14,26 @@ from sentry_sdk.ai.utils import (
     set_data_normalized,
 )
 from sentry_sdk.consts import SPANDATA
-from sentry_sdk.integrations import DidNotEnable
-from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import Span
 from sentry_sdk.utils import (
     event_from_exception,
-    has_data_collection_enabled,
     safe_serialize,
 )
 
 if TYPE_CHECKING:
-    from typing import Any, Optional
+    from typing import Any
 
     from agents import TResponseInputItem, Usage
 
     from sentry_sdk._types import TextPart
 
-try:
-    import agents
-    from agents import Model
-except ImportError:
-    raise DidNotEnable("OpenAI Agents not installed")
-
 
 def _capture_exception(exc: "Any") -> None:
     event, hint = event_from_exception(
         exc,
-        client_options=sentry_sdk.get_client().options,
         mechanism={"type": "openai_agents", "handled": False},
     )
     sentry_sdk.capture_event(event, hint=hint)
-
-
-def _set_agent_data(span: "Span", agent: "agents.Agent") -> None:
-    span.set_attribute(
-        SPANDATA.GEN_AI_PROVIDER_NAME, "openai"
-    )  # See footnote for  https://opentelemetry.io/docs/specs/semconv/registry/attributes/gen-ai/#gen-ai-system for explanation why.
-
-    span.set_attribute(SPANDATA.GEN_AI_AGENT_NAME, agent.name)
-
-    if agent.model_settings.max_tokens:
-        span.set_attribute(
-            SPANDATA.GEN_AI_REQUEST_MAX_TOKENS, agent.model_settings.max_tokens
-        )
-
-    model_name: "Optional[str]" = None
-    if isinstance(agent.model, Model) and hasattr(agent.model, "model"):
-        model_name = agent.model.model
-    elif isinstance(agent.model, str):
-        model_name = agent.model
-    elif hasattr(agent, "_sentry_request_model"):
-        model_name = agent._sentry_request_model
-
-    if model_name:
-        span.set_attribute(SPANDATA.GEN_AI_REQUEST_MODEL, model_name)
-
-    if agent.model_settings.presence_penalty:
-        span.set_attribute(
-            SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY,
-            agent.model_settings.presence_penalty,
-        )
-
-    if agent.model_settings.temperature:
-        span.set_attribute(
-            SPANDATA.GEN_AI_REQUEST_TEMPERATURE, agent.model_settings.temperature
-        )
-
-    if agent.model_settings.top_p:
-        span.set_attribute(SPANDATA.GEN_AI_REQUEST_TOP_P, agent.model_settings.top_p)
-
-    if agent.model_settings.frequency_penalty:
-        span.set_attribute(
-            SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY,
-            agent.model_settings.frequency_penalty,
-        )
 
 
 def _set_usage_data(span: "Span", usage: "Usage") -> None:
@@ -109,11 +55,9 @@ def _set_input_data(
     get_response_kwargs: "dict[str, Any]",
 ) -> None:
     client = sentry_sdk.get_client()
-    if has_data_collection_enabled(client.options):
-        if not client.options["data_collection"]["gen_ai"]["inputs"]:
-            return
-    elif not should_send_default_pii():
+    if not client.options["data_collection"]["gen_ai"]["inputs"]:
         return
+
     request_messages = []
 
     messages: "str | list[TResponseInputItem]" = get_response_kwargs.get("input", [])
@@ -184,13 +128,8 @@ def _set_input_data(
 
 def _set_output_data(span: "Span", result: "Any") -> None:
     client = sentry_sdk.get_client()
-    record_outputs = False
-    if has_data_collection_enabled(client.options):
-        record_outputs = client.options["data_collection"]["gen_ai"]["outputs"]
-    elif should_send_default_pii():
-        record_outputs = True
 
-    if not record_outputs:
+    if not client.options["data_collection"]["gen_ai"]["outputs"]:
         return
 
     output_messages: "dict[str, list[Any]]" = {
@@ -200,22 +139,22 @@ def _set_output_data(span: "Span", result: "Any") -> None:
 
     for output in result.output:
         if output.type == "function_call":
-            output_messages["tool"].append(output.dict())
+            output_messages["tool"].append(output.model_dump())
         elif output.type == "message":
             for output_message in output.content:
                 try:
                     output_messages["response"].append(output_message.text)
                 except AttributeError:
                     # Unknown output message type, just return the json
-                    output_messages["response"].append(output_message.dict())
+                    output_messages["response"].append(output_message.model_dump())
 
-    if record_outputs and len(output_messages["tool"]) > 0:
+    if len(output_messages["tool"]) > 0:
         span.set_attribute(
             SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
             safe_serialize(output_messages["tool"]),
         )
 
-    if record_outputs and len(output_messages["response"]) > 0:
+    if len(output_messages["response"]) > 0:
         set_data_normalized(
             span, SPANDATA.GEN_AI_RESPONSE_TEXT, output_messages["response"]
         )

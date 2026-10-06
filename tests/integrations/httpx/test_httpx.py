@@ -19,10 +19,7 @@ def _get_http_client_span(items):
     )
 
 
-@pytest.mark.parametrize("send_default_pii", [True, False])
-def test_crumb_capture_and_hint_sync(
-    sentry_init, capture_events, httpx_mock, send_default_pii
-):
+def test_crumb_capture_and_hint_sync(sentry_init, capture_events, httpx_mock):
     httpx_mock.add_response()
 
     def before_breadcrumb(crumb, hint):
@@ -32,12 +29,12 @@ def test_crumb_capture_and_hint_sync(
     sentry_init(
         integrations=[HttpxIntegration()],
         before_breadcrumb=before_breadcrumb,
-        send_default_pii=send_default_pii,
+        data_collection={},
     )
 
     url = "http://example.com/"
 
-    with sentry_sdk.traces.start_span(name="segment"):
+    with sentry_sdk.start_span(name="segment"):
         events = capture_events()
 
         response = httpx.Client().get(url)
@@ -50,35 +47,21 @@ def test_crumb_capture_and_hint_sync(
         crumb = event["breadcrumbs"]["values"][0]
         assert crumb["type"] == "http"
         assert crumb["category"] == "httplib"
-
-        if send_default_pii:
-            assert crumb["data"] == ApproxDict(
-                {
-                    "url": url,
-                    SPANDATA.HTTP_METHOD: "GET",
-                    SPANDATA.HTTP_FRAGMENT: "",
-                    SPANDATA.HTTP_QUERY: "",
-                    SPANDATA.HTTP_STATUS_CODE: 200,
-                    "reason": "OK",
-                    "extra": "foo",
-                }
-            )
-        else:
-            assert crumb["data"] == ApproxDict(
-                {
-                    SPANDATA.HTTP_METHOD: "GET",
-                    SPANDATA.HTTP_STATUS_CODE: 200,
-                    "reason": "OK",
-                    "extra": "foo",
-                }
-            )
+        assert crumb["data"] == ApproxDict(
+            {
+                "url": url,
+                SPANDATA.HTTP_METHOD: "GET",
+                SPANDATA.HTTP_FRAGMENT: "",
+                SPANDATA.HTTP_QUERY: "",
+                SPANDATA.HTTP_STATUS_CODE: 200,
+                "reason": "OK",
+                "extra": "foo",
+            }
+        )
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("send_default_pii", [True, False])
-async def test_crumb_capture_and_hint_async(
-    sentry_init, capture_events, httpx_mock, send_default_pii
-):
+async def test_crumb_capture_and_hint_async(sentry_init, capture_events, httpx_mock):
     httpx_mock.add_response()
 
     def before_breadcrumb(crumb, hint):
@@ -88,12 +71,12 @@ async def test_crumb_capture_and_hint_async(
     sentry_init(
         integrations=[HttpxIntegration()],
         before_breadcrumb=before_breadcrumb,
-        send_default_pii=send_default_pii,
+        data_collection={},
     )
 
     url = "http://example.com/"
 
-    with sentry_sdk.traces.start_span(name="segment"):
+    with sentry_sdk.start_span(name="segment"):
         events = capture_events()
 
         response = await httpx.AsyncClient().get(url)
@@ -106,27 +89,17 @@ async def test_crumb_capture_and_hint_async(
         crumb = event["breadcrumbs"]["values"][0]
         assert crumb["type"] == "http"
         assert crumb["category"] == "httplib"
-        if send_default_pii:
-            assert crumb["data"] == ApproxDict(
-                {
-                    "url": url,
-                    SPANDATA.HTTP_METHOD: "GET",
-                    SPANDATA.HTTP_FRAGMENT: "",
-                    SPANDATA.HTTP_QUERY: "",
-                    SPANDATA.HTTP_STATUS_CODE: 200,
-                    "reason": "OK",
-                    "extra": "foo",
-                }
-            )
-        else:
-            assert crumb["data"] == ApproxDict(
-                {
-                    SPANDATA.HTTP_METHOD: "GET",
-                    SPANDATA.HTTP_STATUS_CODE: 200,
-                    "reason": "OK",
-                    "extra": "foo",
-                }
-            )
+        assert crumb["data"] == ApproxDict(
+            {
+                "url": url,
+                SPANDATA.HTTP_METHOD: "GET",
+                SPANDATA.HTTP_FRAGMENT: "",
+                SPANDATA.HTTP_QUERY: "",
+                SPANDATA.HTTP_STATUS_CODE: 200,
+                "reason": "OK",
+                "extra": "foo",
+            }
+        )
 
 
 def test_crumb_capture_without_span_sync(sentry_init, capture_events, httpx_mock):
@@ -134,6 +107,7 @@ def test_crumb_capture_without_span_sync(sentry_init, capture_events, httpx_mock
 
     sentry_init(
         integrations=[HttpxIntegration()],
+        data_collection={},
     )
 
     url = "http://example.com/"
@@ -169,6 +143,7 @@ async def test_crumb_capture_without_span_async(
 
     sentry_init(
         integrations=[HttpxIntegration()],
+        data_collection={},
     )
 
     url = "http://example.com/"
@@ -206,20 +181,19 @@ async def test_crumb_capture_without_span_async(
         (500, "error"),
     ],
 )
-@pytest.mark.parametrize("send_default_pii", [True, False])
 def test_crumb_capture_client_error_sync(
-    sentry_init, capture_events, httpx_mock, status_code, level, send_default_pii
+    sentry_init, capture_events, httpx_mock, status_code, level
 ):
     httpx_mock.add_response(status_code=status_code)
 
     sentry_init(
         integrations=[HttpxIntegration()],
-        send_default_pii=send_default_pii,
+        data_collection={},
     )
 
     url = "http://example.com/"
 
-    with sentry_sdk.traces.start_span(name="segment"):
+    with sentry_sdk.start_span(name="segment"):
         events = capture_events()
 
         response = httpx.Client().get(url)
@@ -238,23 +212,15 @@ def test_crumb_capture_client_error_sync(
         else:
             assert crumb["level"] == level
 
-        if send_default_pii:
-            assert crumb["data"] == ApproxDict(
-                {
-                    "url": url,
-                    SPANDATA.HTTP_METHOD: "GET",
-                    SPANDATA.HTTP_FRAGMENT: "",
-                    SPANDATA.HTTP_QUERY: "",
-                    SPANDATA.HTTP_STATUS_CODE: status_code,
-                }
-            )
-        else:
-            assert crumb["data"] == ApproxDict(
-                {
-                    SPANDATA.HTTP_METHOD: "GET",
-                    SPANDATA.HTTP_STATUS_CODE: status_code,
-                }
-            )
+        assert crumb["data"] == ApproxDict(
+            {
+                "url": url,
+                SPANDATA.HTTP_METHOD: "GET",
+                SPANDATA.HTTP_FRAGMENT: "",
+                SPANDATA.HTTP_QUERY: "",
+                SPANDATA.HTTP_STATUS_CODE: status_code,
+            }
+        )
 
 
 @pytest.mark.asyncio
@@ -268,20 +234,19 @@ def test_crumb_capture_client_error_sync(
         (500, "error"),
     ],
 )
-@pytest.mark.parametrize("send_default_pii", [True, False])
 async def test_crumb_capture_client_error_async(
-    sentry_init, capture_events, httpx_mock, status_code, level, send_default_pii
+    sentry_init, capture_events, httpx_mock, status_code, level
 ):
     httpx_mock.add_response(status_code=status_code)
 
     sentry_init(
         integrations=[HttpxIntegration()],
-        send_default_pii=send_default_pii,
+        data_collection={},
     )
 
     url = "http://example.com/"
 
-    with sentry_sdk.traces.start_span(name="segment"):
+    with sentry_sdk.start_span(name="segment"):
         events = capture_events()
 
         response = await httpx.AsyncClient().get(url)
@@ -300,23 +265,15 @@ async def test_crumb_capture_client_error_async(
         else:
             assert crumb["level"] == level
 
-        if send_default_pii:
-            assert crumb["data"] == ApproxDict(
-                {
-                    "url": url,
-                    SPANDATA.HTTP_METHOD: "GET",
-                    SPANDATA.HTTP_FRAGMENT: "",
-                    SPANDATA.HTTP_QUERY: "",
-                    SPANDATA.HTTP_STATUS_CODE: status_code,
-                }
-            )
-        else:
-            assert crumb["data"] == ApproxDict(
-                {
-                    SPANDATA.HTTP_METHOD: "GET",
-                    SPANDATA.HTTP_STATUS_CODE: status_code,
-                }
-            )
+        assert crumb["data"] == ApproxDict(
+            {
+                "url": url,
+                SPANDATA.HTTP_METHOD: "GET",
+                SPANDATA.HTTP_FRAGMENT: "",
+                SPANDATA.HTTP_QUERY: "",
+                SPANDATA.HTTP_STATUS_CODE: status_code,
+            }
+        )
 
 
 @pytest.mark.parametrize(
@@ -383,6 +340,7 @@ def test_option_trace_propagation_targets_sync(
         trace_propagation_targets=trace_propagation_targets,
         traces_sample_rate=1.0,
         integrations=[HttpxIntegration()],
+        data_collection={},
     )
 
     httpx.Client().get(url)
@@ -460,6 +418,7 @@ async def test_option_trace_propagation_targets_async(
         trace_propagation_targets=trace_propagation_targets,
         traces_sample_rate=1.0,
         integrations=[HttpxIntegration()],
+        data_collection={},
     )
 
     await httpx.AsyncClient().get(url)
@@ -478,13 +437,14 @@ def test_outgoing_trace_headers_sync(sentry_init, capture_items, httpx_mock):
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[HttpxIntegration()],
+        data_collection={},
     )
 
     url = "http://example.com/"
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="test"):
+    with sentry_sdk.start_span(name="test"):
         response = httpx.Client().get(url)
 
     sentry_sdk.flush()
@@ -507,13 +467,14 @@ async def test_outgoing_trace_headers_async(sentry_init, capture_items, httpx_mo
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[HttpxIntegration()],
+        data_collection={},
     )
 
     url = "http://example.com/"
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="test"):
+    with sentry_sdk.start_span(name="test"):
         response = await httpx.AsyncClient().get(url)
 
     sentry_sdk.flush()
@@ -530,9 +491,7 @@ async def test_outgoing_trace_headers_async(sentry_init, capture_items, httpx_mo
 
 
 def test_outgoing_trace_headers_append_to_baggage_sync(
-    sentry_init,
-    capture_items,
-    httpx_mock,
+    sentry_init, capture_items, httpx_mock
 ):
     httpx_mock.add_response()
 
@@ -540,6 +499,7 @@ def test_outgoing_trace_headers_append_to_baggage_sync(
         traces_sample_rate=1.0,
         integrations=[HttpxIntegration()],
         release="d08ebdb9309e1b004c6f52202de58a09c2268e42",
+        data_collection={},
     )
 
     url = "http://example.com/"
@@ -547,7 +507,7 @@ def test_outgoing_trace_headers_append_to_baggage_sync(
     items = capture_items("span")
 
     with mock.patch("sentry_sdk.tracing_utils.Random.randrange", return_value=500000):
-        with sentry_sdk.traces.start_span(name="test"):
+        with sentry_sdk.start_span(name="test"):
             response = httpx.Client().get(url, headers={"baGGage": "custom=data"})
 
     sentry_sdk.flush()
@@ -563,9 +523,7 @@ def test_outgoing_trace_headers_append_to_baggage_sync(
 
 @pytest.mark.asyncio
 async def test_outgoing_trace_headers_append_to_baggage_async(
-    sentry_init,
-    capture_items,
-    httpx_mock,
+    sentry_init, capture_items, httpx_mock
 ):
     httpx_mock.add_response()
 
@@ -573,6 +531,7 @@ async def test_outgoing_trace_headers_append_to_baggage_async(
         traces_sample_rate=1.0,
         integrations=[HttpxIntegration()],
         release="d08ebdb9309e1b004c6f52202de58a09c2268e42",
+        data_collection={},
     )
 
     url = "http://example.com/"
@@ -580,7 +539,7 @@ async def test_outgoing_trace_headers_append_to_baggage_async(
     items = capture_items("span")
 
     with mock.patch("sentry_sdk.tracing_utils.Random.randrange", return_value=500000):
-        with sentry_sdk.traces.start_span(name="test"):
+        with sentry_sdk.start_span(name="test"):
             response = await httpx.AsyncClient().get(
                 url, headers={"baGGage": "custom=data"}
             )
@@ -613,13 +572,14 @@ def test_outgoing_trace_headers_no_current_span(sentry_init, httpx_mock):
         traces_sample_rate=1.0,
         trace_propagation_targets=[MATCH_ALL],
         integrations=[HttpxIntegration()],
+        data_collection={},
     )
 
     url = "http://example.com/"
 
     httpx_client = httpx.Client()
 
-    assert sentry_sdk.traces.get_current_span() is None
+    assert sentry_sdk.get_current_span() is None
 
     response = httpx_client.get(url)
 
@@ -649,13 +609,14 @@ async def test_outgoing_trace_headers_no_current_span_async(sentry_init, httpx_m
         traces_sample_rate=1.0,
         trace_propagation_targets=[MATCH_ALL],
         integrations=[HttpxIntegration()],
+        data_collection={},
     )
 
     url = "http://example.com/"
 
     httpx_client = httpx.AsyncClient()
 
-    assert sentry_sdk.traces.get_current_span() is None
+    assert sentry_sdk.get_current_span() is None
 
     response = await httpx_client.get(url)
 
@@ -680,13 +641,14 @@ def test_request_source_disabled_sync(sentry_init, capture_items, httpx_mock):
         traces_sample_rate=1.0,
         enable_http_request_source=False,
         http_request_source_threshold_ms=0,
+        data_collection={},
     )
 
     items = capture_items("span")
 
     url = "http://example.com/"
 
-    with sentry_sdk.traces.start_span(name="test"):
+    with sentry_sdk.start_span(name="test"):
         httpx.Client().get(url)
 
     sentry_sdk.flush()
@@ -708,13 +670,14 @@ async def test_request_source_disabled_async(sentry_init, capture_items, httpx_m
         traces_sample_rate=1.0,
         enable_http_request_source=False,
         http_request_source_threshold_ms=0,
+        data_collection={},
     )
 
     items = capture_items("span")
 
     url = "http://example.com/"
 
-    with sentry_sdk.traces.start_span(name="test"):
+    with sentry_sdk.start_span(name="test"):
         await httpx.AsyncClient().get(url)
 
     sentry_sdk.flush()
@@ -736,21 +699,23 @@ def test_request_source_enabled_sync(
 ):
     httpx_mock.add_response()
 
-    sentry_options = {
-        "integrations": [HttpxIntegration()],
-        "traces_sample_rate": 1.0,
-        "http_request_source_threshold_ms": 0,
-    }
+    kwargs = {}
     if enable_http_request_source is not None:
-        sentry_options["enable_http_request_source"] = enable_http_request_source
+        kwargs["enable_http_request_source"] = enable_http_request_source
 
-    sentry_init(**sentry_options)
+    sentry_init(
+        integrations=[HttpxIntegration()],
+        traces_sample_rate=1.0,
+        http_request_source_threshold_ms=0,
+        data_collection={},
+        **kwargs,
+    )
 
     items = capture_items("span")
 
     url = "http://example.com/"
 
-    with sentry_sdk.traces.start_span(name="test"):
+    with sentry_sdk.start_span(name="test"):
         httpx.Client().get(url)
 
     sentry_sdk.flush()
@@ -766,28 +731,27 @@ def test_request_source_enabled_sync(
 @pytest.mark.asyncio
 @pytest.mark.parametrize("enable_http_request_source", [None, True])
 async def test_request_source_enabled_async(
-    sentry_init,
-    capture_items,
-    enable_http_request_source,
-    httpx_mock,
+    sentry_init, capture_items, enable_http_request_source, httpx_mock
 ):
     httpx_mock.add_response()
 
-    sentry_options = {
-        "integrations": [HttpxIntegration()],
-        "traces_sample_rate": 1.0,
-        "http_request_source_threshold_ms": 0,
-    }
+    kwargs = {}
     if enable_http_request_source is not None:
-        sentry_options["enable_http_request_source"] = enable_http_request_source
+        kwargs["enable_http_request_source"] = enable_http_request_source
 
-    sentry_init(**sentry_options)
+    sentry_init(
+        integrations=[HttpxIntegration()],
+        traces_sample_rate=1.0,
+        http_request_source_threshold_ms=0,
+        data_collection={},
+        **kwargs,
+    )
 
     items = capture_items("span")
 
     url = "http://example.com/"
 
-    with sentry_sdk.traces.start_span(name="test"):
+    with sentry_sdk.start_span(name="test"):
         await httpx.AsyncClient().get(url)
 
     sentry_sdk.flush()
@@ -808,13 +772,14 @@ def test_request_source_sync(sentry_init, capture_items, httpx_mock):
         traces_sample_rate=1.0,
         enable_http_request_source=True,
         http_request_source_threshold_ms=0,
+        data_collection={},
     )
 
     items = capture_items("span")
 
     url = "http://example.com/"
 
-    with sentry_sdk.traces.start_span(name="test"):
+    with sentry_sdk.start_span(name="test"):
         httpx.Client().get(url)
 
     sentry_sdk.flush()
@@ -851,13 +816,14 @@ async def test_request_source_async(sentry_init, capture_items, httpx_mock):
         traces_sample_rate=1.0,
         enable_http_request_source=True,
         http_request_source_threshold_ms=0,
+        data_collection={},
     )
 
     items = capture_items("span")
 
     url = "http://example.com/"
 
-    with sentry_sdk.traces.start_span(name="test"):
+    with sentry_sdk.start_span(name="test"):
         await httpx.AsyncClient().get(url)
 
     sentry_sdk.flush()
@@ -900,13 +866,14 @@ def test_request_source_with_module_in_search_path_sync(
         traces_sample_rate=1.0,
         enable_http_request_source=True,
         http_request_source_threshold_ms=0,
+        data_collection={},
     )
 
     items = capture_items("span")
 
     url = "http://example.com/"
 
-    with sentry_sdk.traces.start_span(name="test"):
+    with sentry_sdk.start_span(name="test"):
         from httpx_helpers.helpers import get_request_with_client
 
         get_request_with_client(httpx.Client(), url)
@@ -945,13 +912,14 @@ async def test_request_source_with_module_in_search_path_async(
         traces_sample_rate=1.0,
         enable_http_request_source=True,
         http_request_source_threshold_ms=0,
+        data_collection={},
     )
 
     items = capture_items("span")
 
     url = "http://example.com/"
 
-    with sentry_sdk.traces.start_span(name="test"):
+    with sentry_sdk.start_span(name="test"):
         from httpx_helpers.helpers import async_get_request_with_client
 
         await async_get_request_with_client(httpx.AsyncClient(), url)
@@ -990,13 +958,14 @@ def test_no_request_source_if_duration_too_short_sync(
         enable_http_request_source=True,
         # Threshold so high no real request will ever exceed it
         http_request_source_threshold_ms=9999999,
+        data_collection={},
     )
 
     items = capture_items("span")
 
     url = "http://example.com/"
 
-    with sentry_sdk.traces.start_span(name="test"):
+    with sentry_sdk.start_span(name="test"):
         httpx.Client().get(url)
 
     sentry_sdk.flush()
@@ -1021,13 +990,14 @@ async def test_no_request_source_if_duration_too_short_async(
         enable_http_request_source=True,
         # Threshold so high no real request will ever exceed it
         http_request_source_threshold_ms=9999999,
+        data_collection={},
     )
 
     items = capture_items("span")
 
     url = "http://example.com/"
 
-    with sentry_sdk.traces.start_span(name="test"):
+    with sentry_sdk.start_span(name="test"):
         await httpx.AsyncClient().get(url)
 
     sentry_sdk.flush()
@@ -1051,13 +1021,14 @@ def test_request_source_if_duration_over_threshold_sync(
         enable_http_request_source=True,
         # Threshold of 0 means any non-zero duration qualifies
         http_request_source_threshold_ms=0,
+        data_collection={},
     )
 
     items = capture_items("span")
 
     url = "http://example.com/"
 
-    with sentry_sdk.traces.start_span(name="test"):
+    with sentry_sdk.start_span(name="test"):
         httpx.Client().get(url)
 
     sentry_sdk.flush()
@@ -1100,13 +1071,14 @@ async def test_request_source_if_duration_over_threshold_async(
         enable_http_request_source=True,
         # Threshold of 0 means any non-zero duration qualifies
         http_request_source_threshold_ms=0,
+        data_collection={},
     )
 
     items = capture_items("span")
 
     url = "http://example.com/"
 
-    with sentry_sdk.traces.start_span(name="test"):
+    with sentry_sdk.start_span(name="test"):
         await httpx.AsyncClient().get(url)
 
     sentry_sdk.flush()
@@ -1143,13 +1115,14 @@ def test_span_origin_sync(sentry_init, capture_items, httpx_mock):
     sentry_init(
         integrations=[HttpxIntegration()],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     items = capture_items("span")
 
     url = "http://example.com/"
 
-    with sentry_sdk.traces.start_span(name="test"):
+    with sentry_sdk.start_span(name="test"):
         httpx.Client().get(url)
 
     sentry_sdk.flush()
@@ -1166,13 +1139,14 @@ async def test_span_origin_async(sentry_init, capture_items, httpx_mock):
     sentry_init(
         integrations=[HttpxIntegration()],
         traces_sample_rate=1.0,
+        data_collection={},
     )
 
     items = capture_items("span")
 
     url = "http://example.com/"
 
-    with sentry_sdk.traces.start_span(name="test"):
+    with sentry_sdk.start_span(name="test"):
         await httpx.AsyncClient().get(url)
 
     sentry_sdk.flush()
@@ -1182,23 +1156,44 @@ async def test_span_origin_async(sentry_init, capture_items, httpx_mock):
     assert http_span["attributes"]["sentry.origin"] == "auto.http.httpx"
 
 
-@pytest.mark.parametrize("send_default_pii", [True, False])
+@pytest.mark.parametrize(
+    "data_collection,expected_url_full,expected_query",
+    [
+        pytest.param(
+            {},
+            "http://example.com/?foo=bar#frag",
+            "foo=bar",
+            id="data_collection_defaults",
+        ),
+        pytest.param(
+            {"url_query_params": {"mode": "off"}},
+            "http://example.com/#frag",
+            None,
+            id="data_collection_query_off",
+        ),
+    ],
+)
 def test_http_url_attributes_sync(
-    sentry_init, capture_items, httpx_mock, send_default_pii
+    sentry_init,
+    capture_items,
+    httpx_mock,
+    data_collection,
+    expected_url_full,
+    expected_query,
 ):
     httpx_mock.add_response()
 
     sentry_init(
         integrations=[HttpxIntegration()],
         traces_sample_rate=1.0,
-        send_default_pii=send_default_pii,
+        data_collection=data_collection,
     )
 
     items = capture_items("span")
 
     url = "http://example.com/?foo=bar#frag"
 
-    with sentry_sdk.traces.start_span(name="test"):
+    with sentry_sdk.start_span(name="test"):
         httpx.Client().get(url)
 
     sentry_sdk.flush()
@@ -1207,35 +1202,54 @@ def test_http_url_attributes_sync(
 
     assert http_span["attributes"]["http.request.method"] == "GET"
     assert http_span["attributes"]["http.response.status_code"] == 200
+    assert http_span["attributes"]["url.full"] == expected_url_full
+    assert http_span["attributes"]["url.fragment"] == "frag"
 
-    if send_default_pii:
-        assert http_span["attributes"]["url.full"] == "http://example.com/?foo=bar#frag"
-        assert http_span["attributes"]["url.query"] == "foo=bar"
-        assert http_span["attributes"]["url.fragment"] == "frag"
+    if expected_query is not None:
+        assert http_span["attributes"]["url.query"] == expected_query
     else:
-        assert "url.full" not in http_span["attributes"]
         assert "url.query" not in http_span["attributes"]
-        assert "url.fragment" not in http_span["attributes"]
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("send_default_pii", [True, False])
+@pytest.mark.parametrize(
+    "data_collection,expected_url_full,expected_query",
+    [
+        pytest.param(
+            {},
+            "http://example.com/?foo=bar#frag",
+            "foo=bar",
+            id="data_collection_defaults",
+        ),
+        pytest.param(
+            {"url_query_params": {"mode": "off"}},
+            "http://example.com/#frag",
+            None,
+            id="data_collection_query_off",
+        ),
+    ],
+)
 async def test_http_url_attributes_async(
-    sentry_init, capture_items, httpx_mock, send_default_pii
+    sentry_init,
+    capture_items,
+    httpx_mock,
+    data_collection,
+    expected_url_full,
+    expected_query,
 ):
     httpx_mock.add_response()
 
     sentry_init(
         integrations=[HttpxIntegration()],
         traces_sample_rate=1.0,
-        send_default_pii=send_default_pii,
+        data_collection=data_collection,
     )
 
     items = capture_items("span")
 
     url = "http://example.com/?foo=bar#frag"
 
-    with sentry_sdk.traces.start_span(name="test"):
+    with sentry_sdk.start_span(name="test"):
         await httpx.AsyncClient().get(url)
 
     sentry_sdk.flush()
@@ -1244,34 +1258,31 @@ async def test_http_url_attributes_async(
 
     assert http_span["attributes"]["http.request.method"] == "GET"
     assert http_span["attributes"]["http.response.status_code"] == 200
+    assert http_span["attributes"]["url.full"] == expected_url_full
+    assert http_span["attributes"]["url.fragment"] == "frag"
 
-    if send_default_pii:
-        assert http_span["attributes"]["url.full"] == "http://example.com/?foo=bar#frag"
-        assert http_span["attributes"]["url.query"] == "foo=bar"
-        assert http_span["attributes"]["url.fragment"] == "frag"
+    if expected_query is not None:
+        assert http_span["attributes"]["url.query"] == expected_query
     else:
-        assert "url.full" not in http_span["attributes"]
         assert "url.query" not in http_span["attributes"]
-        assert "url.fragment" not in http_span["attributes"]
 
 
-@pytest.mark.parametrize("send_default_pii", [True, False])
 def test_http_url_attributes_no_query_or_fragment_sync(
-    sentry_init, capture_items, httpx_mock, send_default_pii
+    sentry_init, capture_items, httpx_mock
 ):
     httpx_mock.add_response()
 
     sentry_init(
         integrations=[HttpxIntegration()],
         traces_sample_rate=1.0,
-        send_default_pii=send_default_pii,
+        data_collection={},
     )
 
     items = capture_items("span")
 
     url = "http://example.com/"
 
-    with sentry_sdk.traces.start_span(name="test"):
+    with sentry_sdk.start_span(name="test"):
         httpx.Client().get(url)
 
     sentry_sdk.flush()
@@ -1280,33 +1291,28 @@ def test_http_url_attributes_no_query_or_fragment_sync(
 
     assert http_span["attributes"]["http.request.method"] == "GET"
     assert http_span["attributes"]["http.response.status_code"] == 200
+    assert http_span["attributes"]["url.full"] == "http://example.com/"
     assert "url.query" not in http_span["attributes"]
     assert "url.fragment" not in http_span["attributes"]
 
-    if send_default_pii:
-        assert http_span["attributes"]["url.full"] == "http://example.com/"
-    else:
-        assert "url.full" not in http_span["attributes"]
-
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("send_default_pii", [True, False])
 async def test_http_url_attributes_no_query_or_fragment_async(
-    sentry_init, capture_items, httpx_mock, send_default_pii
+    sentry_init, capture_items, httpx_mock
 ):
     httpx_mock.add_response()
 
     sentry_init(
         integrations=[HttpxIntegration()],
         traces_sample_rate=1.0,
-        send_default_pii=send_default_pii,
+        data_collection={},
     )
 
     items = capture_items("span")
 
     url = "http://example.com/"
 
-    with sentry_sdk.traces.start_span(name="test"):
+    with sentry_sdk.start_span(name="test"):
         await httpx.AsyncClient().get(url)
 
     sentry_sdk.flush()
@@ -1315,113 +1321,74 @@ async def test_http_url_attributes_no_query_or_fragment_async(
 
     assert http_span["attributes"]["http.request.method"] == "GET"
     assert http_span["attributes"]["http.response.status_code"] == 200
+    assert http_span["attributes"]["url.full"] == "http://example.com/"
     assert "url.query" not in http_span["attributes"]
     assert "url.fragment" not in http_span["attributes"]
-
-    if send_default_pii:
-        assert http_span["attributes"]["url.full"] == "http://example.com/"
-    else:
-        assert "url.full" not in http_span["attributes"]
 
 
 @pytest.mark.parametrize(
-    "init_kwargs, expected_query",
+    "data_collection, expected_query, expected_url_full",
     [
         pytest.param(
-            {"send_default_pii": True},
-            "toy=tennisball&color=red&auth=secret",
-            id="send_default_pii_true",
-        ),
-        pytest.param(
-            {"send_default_pii": False},
-            None,
-            id="send_default_pii_false",
-        ),
-        pytest.param(
             {},
-            None,
-            id="defaults",
-        ),
-        pytest.param(
-            {"_experiments": {"data_collection": {}}},
             "toy=tennisball&color=red&auth=%5BFiltered%5D",
-            id="data_collection_denylist_default",
+            "http://example.com/?toy=tennisball&color=red&auth=%5BFiltered%5D#frag",
+            id="denylist_default",
         ),
         pytest.param(
-            {
-                "_experiments": {
-                    "data_collection": {
-                        "url_query_params": {"mode": "denylist", "terms": ["toy"]}
-                    }
-                }
-            },
+            {"url_query_params": {"mode": "denylist", "terms": ["toy"]}},
             "toy=%5BFiltered%5D&color=red&auth=%5BFiltered%5D",
-            id="data_collection_denylist_custom_terms",
+            "http://example.com/?toy=%5BFiltered%5D&color=red&auth=%5BFiltered%5D#frag",
+            id="denylist_custom_terms",
         ),
         pytest.param(
-            {
-                "_experiments": {
-                    "data_collection": {
-                        "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
-                    }
-                }
-            },
+            {"url_query_params": {"mode": "allowlist", "terms": ["toy"]}},
             "toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D",
-            id="data_collection_allowlist",
+            "http://example.com/?toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D#frag",
+            id="allowlist",
         ),
         pytest.param(
-            {
-                "_experiments": {
-                    "data_collection": {
-                        "url_query_params": {"mode": "allowlist", "terms": ["auth"]}
-                    }
-                }
-            },
+            {"url_query_params": {"mode": "allowlist", "terms": ["auth"]}},
             "toy=%5BFiltered%5D&color=%5BFiltered%5D&auth=%5BFiltered%5D",
-            id="data_collection_allowlist_sensitive_term",
+            "http://example.com/?toy=%5BFiltered%5D&color=%5BFiltered%5D&auth=%5BFiltered%5D#frag",
+            id="allowlist_sensitive_term",
         ),
         pytest.param(
-            {
-                "_experiments": {
-                    "data_collection": {"url_query_params": {"mode": "off"}}
-                }
-            },
+            {"url_query_params": {"mode": "off"}},
             None,
-            id="data_collection_off",
-        ),
-        pytest.param(
-            {
-                "send_default_pii": True,
-                "_experiments": {
-                    "data_collection": {"url_query_params": {"mode": "off"}}
-                },
-            },
-            None,
-            id="data_collection_wins_over_send_default_pii",
+            "http://example.com/#frag",
+            id="off",
         ),
     ],
 )
 def test_url_query_data_collection_sync(
-    sentry_init, capture_items, httpx_mock, init_kwargs, expected_query
+    sentry_init,
+    capture_items,
+    httpx_mock,
+    data_collection,
+    expected_query,
+    expected_url_full,
 ):
     httpx_mock.add_response()
 
     sentry_init(
         integrations=[HttpxIntegration()],
         traces_sample_rate=1.0,
-        **init_kwargs,
+        data_collection=data_collection,
     )
 
     items = capture_items("span")
 
     url = "http://example.com/?toy=tennisball&color=red&auth=secret#frag"
 
-    with sentry_sdk.traces.start_span(name="test"):
+    with sentry_sdk.start_span(name="test"):
         httpx.Client().get(url)
 
     sentry_sdk.flush()
 
     http_span = _get_http_client_span(items)
+
+    assert http_span["attributes"]["url.full"] == expected_url_full
 
     if expected_query is None:
         assert "url.query" not in http_span["attributes"]
@@ -1431,103 +1398,68 @@ def test_url_query_data_collection_sync(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "init_kwargs, expected_query",
+    "data_collection, expected_query, expected_url_full",
     [
         pytest.param(
-            {"send_default_pii": True},
-            "toy=tennisball&color=red&auth=secret",
-            id="send_default_pii_true",
-        ),
-        pytest.param(
-            {"send_default_pii": False},
-            None,
-            id="send_default_pii_false",
-        ),
-        pytest.param(
             {},
-            None,
-            id="defaults",
-        ),
-        pytest.param(
-            {"_experiments": {"data_collection": {}}},
             "toy=tennisball&color=red&auth=%5BFiltered%5D",
-            id="data_collection_denylist_default",
+            "http://example.com/?toy=tennisball&color=red&auth=%5BFiltered%5D#frag",
+            id="denylist_default",
         ),
         pytest.param(
-            {
-                "_experiments": {
-                    "data_collection": {
-                        "url_query_params": {"mode": "denylist", "terms": ["toy"]}
-                    }
-                }
-            },
+            {"url_query_params": {"mode": "denylist", "terms": ["toy"]}},
             "toy=%5BFiltered%5D&color=red&auth=%5BFiltered%5D",
-            id="data_collection_denylist_custom_terms",
+            "http://example.com/?toy=%5BFiltered%5D&color=red&auth=%5BFiltered%5D#frag",
+            id="denylist_custom_terms",
         ),
         pytest.param(
-            {
-                "_experiments": {
-                    "data_collection": {
-                        "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
-                    }
-                }
-            },
+            {"url_query_params": {"mode": "allowlist", "terms": ["toy"]}},
             "toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D",
-            id="data_collection_allowlist",
+            "http://example.com/?toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D#frag",
+            id="allowlist",
         ),
         pytest.param(
-            {
-                "_experiments": {
-                    "data_collection": {
-                        "url_query_params": {"mode": "allowlist", "terms": ["auth"]}
-                    }
-                }
-            },
+            {"url_query_params": {"mode": "allowlist", "terms": ["auth"]}},
             "toy=%5BFiltered%5D&color=%5BFiltered%5D&auth=%5BFiltered%5D",
-            id="data_collection_allowlist_sensitive_term",
+            "http://example.com/?toy=%5BFiltered%5D&color=%5BFiltered%5D&auth=%5BFiltered%5D#frag",
+            id="allowlist_sensitive_term",
         ),
         pytest.param(
-            {
-                "_experiments": {
-                    "data_collection": {"url_query_params": {"mode": "off"}}
-                }
-            },
+            {"url_query_params": {"mode": "off"}},
             None,
-            id="data_collection_off",
-        ),
-        pytest.param(
-            {
-                "send_default_pii": True,
-                "_experiments": {
-                    "data_collection": {"url_query_params": {"mode": "off"}}
-                },
-            },
-            None,
-            id="data_collection_wins_over_send_default_pii",
+            "http://example.com/#frag",
+            id="off",
         ),
     ],
 )
 async def test_url_query_data_collection_async(
-    sentry_init, capture_items, httpx_mock, init_kwargs, expected_query
+    sentry_init,
+    capture_items,
+    httpx_mock,
+    data_collection,
+    expected_query,
+    expected_url_full,
 ):
     httpx_mock.add_response()
 
     sentry_init(
         integrations=[HttpxIntegration()],
         traces_sample_rate=1.0,
-        **init_kwargs,
+        data_collection=data_collection,
     )
 
     items = capture_items("span")
 
     url = "http://example.com/?toy=tennisball&color=red&auth=secret#frag"
 
-    with sentry_sdk.traces.start_span(name="test"):
+    with sentry_sdk.start_span(name="test"):
         await httpx.AsyncClient().get(url)
 
     sentry_sdk.flush()
 
     http_span = _get_http_client_span(items)
+
+    assert http_span["attributes"]["url.full"] == expected_url_full
 
     if expected_query is None:
         assert "url.query" not in http_span["attributes"]
@@ -1536,261 +1468,28 @@ async def test_url_query_data_collection_async(
 
 
 @pytest.mark.parametrize(
-    "init_kwargs, expected_url_full",
+    "data_collection, expected_url, expected_query, expected_fragment",
     [
         pytest.param(
-            {"_experiments": {"data_collection": {}}},
-            "http://example.com/?toy=tennisball&color=red&auth=%5BFiltered%5D#frag",
-            id="data_collection_denylist_default",
-        ),
-        pytest.param(
-            {
-                "_experiments": {
-                    "data_collection": {
-                        "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
-                    }
-                }
-            },
-            "http://example.com/?toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D#frag",
-            id="data_collection_allowlist",
-        ),
-    ],
-)
-def test_url_full_reassembly_sync(
-    sentry_init, capture_items, httpx_mock, init_kwargs, expected_url_full
-):
-    httpx_mock.add_response()
-
-    sentry_init(
-        integrations=[HttpxIntegration()],
-        traces_sample_rate=1.0,
-        **init_kwargs,
-    )
-
-    items = capture_items("span")
-
-    url = "http://example.com/?toy=tennisball&color=red&auth=secret#frag"
-
-    with sentry_sdk.traces.start_span(name="test"):
-        httpx.Client().get(url)
-
-    sentry_sdk.flush()
-
-    http_span = _get_http_client_span(items)
-
-    assert http_span["attributes"]["url.full"] == expected_url_full
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "init_kwargs, expected_url_full",
-    [
-        pytest.param(
-            {"_experiments": {"data_collection": {}}},
-            "http://example.com/?toy=tennisball&color=red&auth=%5BFiltered%5D#frag",
-            id="data_collection_denylist_default",
-        ),
-        pytest.param(
-            {
-                "_experiments": {
-                    "data_collection": {
-                        "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
-                    }
-                }
-            },
-            "http://example.com/?toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D#frag",
-            id="data_collection_allowlist",
-        ),
-    ],
-)
-async def test_url_full_reassembly_async(
-    sentry_init, capture_items, httpx_mock, init_kwargs, expected_url_full
-):
-    httpx_mock.add_response()
-
-    sentry_init(
-        integrations=[HttpxIntegration()],
-        traces_sample_rate=1.0,
-        **init_kwargs,
-    )
-
-    items = capture_items("span")
-
-    url = "http://example.com/?toy=tennisball&color=red&auth=secret#frag"
-
-    with sentry_sdk.traces.start_span(name="test"):
-        await httpx.AsyncClient().get(url)
-
-    sentry_sdk.flush()
-
-    http_span = _get_http_client_span(items)
-
-    assert http_span["attributes"]["url.full"] == expected_url_full
-
-
-@pytest.mark.parametrize(
-    "init_kwargs, expected_url_full",
-    [
-        pytest.param(
-            {
-                "_experiments": {
-                    "data_collection": {"url_query_params": {"mode": "off"}}
-                }
-            },
-            "http://example.com/#frag",
-            id="data_collection_off",
-        ),
-        pytest.param(
-            {
-                "send_default_pii": True,
-                "_experiments": {
-                    "data_collection": {"url_query_params": {"mode": "off"}}
-                },
-            },
-            "http://example.com/#frag",
-            id="data_collection_wins_over_send_default_pii",
-        ),
-        pytest.param(
-            {"send_default_pii": False},
-            None,
-            id="send_default_pii_false",
-        ),
-    ],
-)
-def test_url_query_params_off_keeps_bare_url_sync(
-    sentry_init, capture_items, httpx_mock, init_kwargs, expected_url_full
-):
-    httpx_mock.add_response()
-
-    sentry_init(
-        integrations=[HttpxIntegration()],
-        traces_sample_rate=1.0,
-        **init_kwargs,
-    )
-
-    items = capture_items("span")
-
-    url = "http://example.com/?toy=tennisball&color=red&auth=secret#frag"
-
-    with sentry_sdk.traces.start_span(name="test"):
-        httpx.Client().get(url)
-
-    sentry_sdk.flush()
-
-    http_span = _get_http_client_span(items)
-
-    assert "url.query" not in http_span["attributes"]
-
-    if expected_url_full is None:
-        assert "url.full" not in http_span["attributes"]
-        assert "url.fragment" not in http_span["attributes"]
-    else:
-        assert http_span["attributes"]["url.full"] == expected_url_full
-        assert http_span["attributes"]["url.fragment"] == "frag"
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "init_kwargs, expected_url_full",
-    [
-        pytest.param(
-            {
-                "_experiments": {
-                    "data_collection": {"url_query_params": {"mode": "off"}}
-                }
-            },
-            "http://example.com/#frag",
-            id="data_collection_off",
-        ),
-        pytest.param(
-            {
-                "send_default_pii": True,
-                "_experiments": {
-                    "data_collection": {"url_query_params": {"mode": "off"}}
-                },
-            },
-            "http://example.com/#frag",
-            id="data_collection_wins_over_send_default_pii",
-        ),
-        pytest.param(
-            {"send_default_pii": False},
-            None,
-            id="send_default_pii_false",
-        ),
-    ],
-)
-async def test_url_query_params_off_keeps_bare_url_async(
-    sentry_init, capture_items, httpx_mock, init_kwargs, expected_url_full
-):
-    httpx_mock.add_response()
-
-    sentry_init(
-        integrations=[HttpxIntegration()],
-        traces_sample_rate=1.0,
-        **init_kwargs,
-    )
-
-    items = capture_items("span")
-
-    url = "http://example.com/?toy=tennisball&color=red&auth=secret#frag"
-
-    with sentry_sdk.traces.start_span(name="test"):
-        await httpx.AsyncClient().get(url)
-
-    sentry_sdk.flush()
-
-    http_span = _get_http_client_span(items)
-
-    assert "url.query" not in http_span["attributes"]
-
-    if expected_url_full is None:
-        assert "url.full" not in http_span["attributes"]
-        assert "url.fragment" not in http_span["attributes"]
-    else:
-        assert http_span["attributes"]["url.full"] == expected_url_full
-        assert http_span["attributes"]["url.fragment"] == "frag"
-
-
-@pytest.mark.parametrize(
-    "init_kwargs, expected_url, expected_query, expected_fragment",
-    [
-        pytest.param(
-            {"_experiments": {"data_collection": {}}},
+            {},
             "http://example.com/?toy=tennisball&color=red&auth=%5BFiltered%5D#frag",
             "toy=tennisball&color=red&auth=%5BFiltered%5D",
             "frag",
-            id="data_collection_denylist_default",
+            id="denylist_default",
         ),
         pytest.param(
-            {
-                "_experiments": {
-                    "data_collection": {
-                        "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
-                    }
-                }
-            },
+            {"url_query_params": {"mode": "allowlist", "terms": ["toy"]}},
             "http://example.com/?toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D#frag",
             "toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D",
             "frag",
-            id="data_collection_allowlist",
+            id="allowlist",
         ),
         pytest.param(
-            {
-                "_experiments": {
-                    "data_collection": {"url_query_params": {"mode": "off"}}
-                }
-            },
+            {"url_query_params": {"mode": "off"}},
             "http://example.com/#frag",
             "",
             "frag",
-            id="data_collection_off",
-        ),
-        pytest.param(
-            {"send_default_pii": False},
-            None,
-            None,
-            None,
-            id="send_default_pii_false",
+            id="off",
         ),
     ],
 )
@@ -1798,7 +1497,7 @@ def test_crumb_url_query_data_collection_sync(
     sentry_init,
     capture_events,
     httpx_mock,
-    init_kwargs,
+    data_collection,
     expected_url,
     expected_query,
     expected_fragment,
@@ -1807,12 +1506,12 @@ def test_crumb_url_query_data_collection_sync(
 
     sentry_init(
         integrations=[HttpxIntegration()],
-        **init_kwargs,
+        data_collection=data_collection,
     )
 
     url = "http://example.com/?toy=tennisball&color=red&auth=secret#frag"
 
-    with sentry_sdk.traces.start_span(name="segment"):
+    with sentry_sdk.start_span(name="segment"):
         events = capture_events()
 
         httpx.Client().get(url)
@@ -1822,57 +1521,35 @@ def test_crumb_url_query_data_collection_sync(
 
     crumb = event["breadcrumbs"]["values"][0]
 
-    if expected_url is None:
-        assert "url" not in crumb["data"]
-        assert SPANDATA.HTTP_QUERY not in crumb["data"]
-        assert SPANDATA.HTTP_FRAGMENT not in crumb["data"]
-    else:
-        assert crumb["data"]["url"] == expected_url
-        assert crumb["data"][SPANDATA.HTTP_QUERY] == expected_query
-        assert crumb["data"][SPANDATA.HTTP_FRAGMENT] == expected_fragment
+    assert crumb["data"]["url"] == expected_url
+    assert crumb["data"][SPANDATA.HTTP_QUERY] == expected_query
+    assert crumb["data"][SPANDATA.HTTP_FRAGMENT] == expected_fragment
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "init_kwargs, expected_url, expected_query, expected_fragment",
+    "data_collection, expected_url, expected_query, expected_fragment",
     [
         pytest.param(
-            {"_experiments": {"data_collection": {}}},
+            {},
             "http://example.com/?toy=tennisball&color=red&auth=%5BFiltered%5D#frag",
             "toy=tennisball&color=red&auth=%5BFiltered%5D",
             "frag",
-            id="data_collection_denylist_default",
+            id="denylist_default",
         ),
         pytest.param(
-            {
-                "_experiments": {
-                    "data_collection": {
-                        "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
-                    }
-                }
-            },
+            {"url_query_params": {"mode": "allowlist", "terms": ["toy"]}},
             "http://example.com/?toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D#frag",
             "toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D",
             "frag",
-            id="data_collection_allowlist",
+            id="allowlist",
         ),
         pytest.param(
-            {
-                "_experiments": {
-                    "data_collection": {"url_query_params": {"mode": "off"}}
-                }
-            },
+            {"url_query_params": {"mode": "off"}},
             "http://example.com/#frag",
             "",
             "frag",
-            id="data_collection_off",
-        ),
-        pytest.param(
-            {"send_default_pii": False},
-            None,
-            None,
-            None,
-            id="send_default_pii_false",
+            id="off",
         ),
     ],
 )
@@ -1880,7 +1557,7 @@ async def test_crumb_url_query_data_collection_async(
     sentry_init,
     capture_events,
     httpx_mock,
-    init_kwargs,
+    data_collection,
     expected_url,
     expected_query,
     expected_fragment,
@@ -1889,12 +1566,12 @@ async def test_crumb_url_query_data_collection_async(
 
     sentry_init(
         integrations=[HttpxIntegration()],
-        **init_kwargs,
+        data_collection=data_collection,
     )
 
     url = "http://example.com/?toy=tennisball&color=red&auth=secret#frag"
 
-    with sentry_sdk.traces.start_span(name="segment"):
+    with sentry_sdk.start_span(name="segment"):
         events = capture_events()
 
         await httpx.AsyncClient().get(url)
@@ -1904,14 +1581,9 @@ async def test_crumb_url_query_data_collection_async(
 
     crumb = event["breadcrumbs"]["values"][0]
 
-    if expected_url is None:
-        assert "url" not in crumb["data"]
-        assert SPANDATA.HTTP_QUERY not in crumb["data"]
-        assert SPANDATA.HTTP_FRAGMENT not in crumb["data"]
-    else:
-        assert crumb["data"]["url"] == expected_url
-        assert crumb["data"][SPANDATA.HTTP_QUERY] == expected_query
-        assert crumb["data"][SPANDATA.HTTP_FRAGMENT] == expected_fragment
+    assert crumb["data"]["url"] == expected_url
+    assert crumb["data"][SPANDATA.HTTP_QUERY] == expected_query
+    assert crumb["data"][SPANDATA.HTTP_FRAGMENT] == expected_fragment
 
 
 @pytest.mark.tests_internal_exceptions
@@ -1923,14 +1595,14 @@ def test_omit_url_data_if_parsing_fails(
     sentry_init(
         integrations=[HttpxIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"data_collection": {}},
+        data_collection={},
     )
 
     items = capture_items("span")
 
     url = "http://example.com/?toy=tennisball&color=red&auth=secret#frag"
 
-    with sentry_sdk.traces.start_span(name="segment"):
+    with sentry_sdk.start_span(name="segment"):
         events = capture_events()
 
         with mock.patch(

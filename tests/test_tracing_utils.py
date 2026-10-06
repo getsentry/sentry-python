@@ -321,54 +321,24 @@ def _get_query_breadcrumb_data(
     "sentry_options, expected_data",
     (
         pytest.param(
-            {"_experiments": {"data_collection": {"database_query_data": True}}},
+            {"data_collection": {"database_query_data": True}},
             {"db.params": [1, 2], "db.paramstyle": "format"},
             id="data_collection_on_records_params",
         ),
         pytest.param(
-            {"_experiments": {"data_collection": {"database_query_data": False}}},
+            {"data_collection": {"database_query_data": False}},
             {},
             id="data_collection_off_strips_params",
         ),
         pytest.param(
-            {"_experiments": {"data_collection": {}}},
+            {"data_collection": {}},
             {"db.params": [1, 2], "db.paramstyle": "format"},
             id="data_collection_default_records_params",
-        ),
-        pytest.param(
-            {"_experiments": {"record_sql_params": True}},
-            {"db.params": [1, 2], "db.paramstyle": "format"},
-            id="legacy_record_sql_params_on_records_params",
-        ),
-        pytest.param(
-            {"_experiments": {"record_sql_params": False}},
-            {},
-            id="legacy_record_sql_params_off_strips_params",
         ),
         pytest.param(
             {},
             {},
             id="no_options_strips_params",
-        ),
-        pytest.param(
-            {
-                "_experiments": {
-                    "record_sql_params": True,
-                    "data_collection": {"database_query_data": False},
-                }
-            },
-            {},
-            id="data_collection_off_takes_precedence_over_legacy_on",
-        ),
-        pytest.param(
-            {
-                "_experiments": {
-                    "record_sql_params": False,
-                    "data_collection": {"database_query_data": True},
-                }
-            },
-            {"db.params": [1, 2], "db.paramstyle": "format"},
-            id="data_collection_on_takes_precedence_over_legacy_off",
         ),
     ),
 )
@@ -388,7 +358,7 @@ def test_record_sql_queries_empty_params_not_recorded(
     data = _get_query_breadcrumb_data(
         sentry_init,
         capture_events,
-        {"_experiments": {"data_collection": {"database_query_data": True}}},
+        {"data_collection": {"database_query_data": True}},
         params_list=params_list,
     )
     assert "db.params" not in data
@@ -398,7 +368,7 @@ def test_record_sql_queries_paramstyle_passthrough(sentry_init, capture_events):
     data = _get_query_breadcrumb_data(
         sentry_init,
         capture_events,
-        {"_experiments": {"data_collection": {"database_query_data": True}}},
+        {"data_collection": {"database_query_data": True}},
         paramstyle="qmark",
     )
     assert data["db.paramstyle"] == "qmark"
@@ -410,7 +380,7 @@ def test_record_sql_queries_paramstyle_dropped_when_collection_off(
     data = _get_query_breadcrumb_data(
         sentry_init,
         capture_events,
-        {"_experiments": {"data_collection": {"database_query_data": False}}},
+        {"data_collection": {"database_query_data": False}},
         paramstyle="qmark",
     )
     assert "db.paramstyle" not in data

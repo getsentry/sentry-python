@@ -6,12 +6,10 @@ from sentry_sdk.ai.utils import (
     set_data_normalized,
 )
 from sentry_sdk.consts import OP, SPANDATA
-from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import Span
-from sentry_sdk.utils import has_data_collection_enabled, safe_serialize
+from sentry_sdk.utils import safe_serialize
 
 from ..consts import SPAN_ORIGIN
-from ..utils import _set_agent_data
 
 if TYPE_CHECKING:
     from typing import Any, Optional
@@ -24,7 +22,7 @@ def invoke_agent_span(
 ) -> "Span":
     client_options = sentry_sdk.get_client().options
 
-    span = sentry_sdk.traces.start_span(
+    span = sentry_sdk.start_span(
         name=f"invoke_agent {agent.name}",
         attributes={
             "sentry.op": OP.GEN_AI_INVOKE_AGENT,
@@ -33,14 +31,7 @@ def invoke_agent_span(
         },
     )
 
-    record_inputs = False
-    if has_data_collection_enabled(client_options):
-        if client_options["data_collection"]["gen_ai"]["inputs"]:
-            record_inputs = True
-    elif should_send_default_pii():
-        record_inputs = True
-
-    if record_inputs:
+    if client_options["data_collection"]["gen_ai"]["inputs"]:
         messages = []
         if agent.instructions:
             message = (
@@ -78,7 +69,7 @@ def invoke_agent_span(
                 unpack=False,
             )
 
-    _set_agent_data(span, agent)
+    span.set_attribute(SPANDATA.GEN_AI_AGENT_NAME, agent.name)
 
     return span
 
@@ -89,12 +80,7 @@ def update_invoke_agent_span(
     output: "Any" = None,
 ) -> None:
     client = sentry_sdk.get_client()
-    if has_data_collection_enabled(client.options):
-        if client.options["data_collection"]["gen_ai"]["outputs"]:
-            set_data_normalized(
-                span, SPANDATA.GEN_AI_RESPONSE_TEXT, output, unpack=False
-            )
-    elif should_send_default_pii():
+    if client.options["data_collection"]["gen_ai"]["outputs"]:
         set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, output, unpack=False)
 
     # Add conversation ID from agent

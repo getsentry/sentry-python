@@ -16,12 +16,10 @@ from django.core.handlers.wsgi import WSGIRequest
 import sentry_sdk
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
-from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import Span
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
-    has_data_collection_enabled,
 )
 
 if TYPE_CHECKING:
@@ -71,11 +69,7 @@ def _make_asgi_request_event_processor(request: "ASGIRequest") -> "EventProcesso
             DjangoRequestExtractor(request).extract_into_event(event)
 
         client_options = sentry_sdk.get_client().options
-        if has_data_collection_enabled(client_options):
-            if client_options["data_collection"]["user_info"]:
-                with capture_internal_exceptions():
-                    _set_user_info(request, event)
-        elif should_send_default_pii():
+        if client_options["data_collection"]["user_info"]:
             with capture_internal_exceptions():
                 _set_user_info(request, event)
 
@@ -174,7 +168,7 @@ def wrap_async_view(callback: "Any") -> "Any":
         request: "Any", *args: "Any", **kwargs: "Any"
     ) -> "Any":
         client = sentry_sdk.get_client()
-        current_span = sentry_sdk.traces.get_current_span()
+        current_span = sentry_sdk.get_current_span()
         if type(current_span) is Span:
             segment = current_span._segment
             segment._update_active_thread()
@@ -186,7 +180,7 @@ def wrap_async_view(callback: "Any") -> "Any":
         if current_span is None:
             return await callback(request, *args, **kwargs)
 
-        with sentry_sdk.traces.start_span(
+        with sentry_sdk.start_span(
             name=request.resolver_match.view_name,
             attributes={
                 "sentry.op": OP.VIEW_RENDER,

@@ -146,7 +146,7 @@ _MIN_VERSIONS = {
     "httpx": (0, 16, 0),
     "httpx2": (2, 0, 0),
     "huey": (2, 0),
-    "huggingface_hub": (0, 24, 7),
+    "huggingface_hub": (2, 0, 0),
     "langchain": (0, 1, 0),
     "langgraph": (0, 6, 6),
     "launchdarkly": (9, 8, 0),
@@ -154,6 +154,7 @@ _MIN_VERSIONS = {
     "litellm": (1, 77, 5),
     "loguru": (0, 7, 0),
     "mcp": (2, 0),
+    "mistral": (2, 0, 5),
     "openai": (1, 0, 0),
     "openai_agents": (0, 10, 3),
     "openfeature": (0, 7, 1),
@@ -176,6 +177,7 @@ _MIN_VERSIONS = {
     "tornado": (6, 0),
     "trytond_wsgi": (5, 4),
     "typer": (0, 15),
+    "typesafe": (0, 7),
     "unleash": (6, 0, 1),
 }
 

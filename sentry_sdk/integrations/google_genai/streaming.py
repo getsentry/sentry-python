@@ -3,10 +3,8 @@ from typing import TYPE_CHECKING, Any, List, Optional, TypedDict
 import sentry_sdk
 from sentry_sdk.ai.utils import set_data_normalized
 from sentry_sdk.consts import SPANDATA
-from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import Span
 from sentry_sdk.utils import (
-    has_data_collection_enabled,
     safe_serialize,
 )
 
@@ -154,28 +152,14 @@ def set_span_data_for_streaming_response(
         )
 
     if accumulated_response.get("tool_calls"):
-        if has_data_collection_enabled(client.options):
-            if client.options["data_collection"]["gen_ai"]["outputs"]:
-                span.set_attribute(
-                    SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
-                    safe_serialize(accumulated_response["tool_calls"]),
-                )
-        else:
-            # Before data collection was introduced this was unconditionally set
+        if client.options["data_collection"]["gen_ai"]["outputs"]:
             span.set_attribute(
                 SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
                 safe_serialize(accumulated_response["tool_calls"]),
             )
 
     if accumulated_response.get("text"):
-        if has_data_collection_enabled(client.options):
-            if client.options["data_collection"]["gen_ai"]["outputs"]:
-                span.set_attribute(
-                    SPANDATA.GEN_AI_RESPONSE_TEXT,
-                    safe_serialize([accumulated_response["text"]]),
-                )
-
-        elif should_send_default_pii() and integration.include_prompts:
+        if client.options["data_collection"]["gen_ai"]["outputs"]:
             span.set_attribute(
                 SPANDATA.GEN_AI_RESPONSE_TEXT,
                 safe_serialize([accumulated_response["text"]]),

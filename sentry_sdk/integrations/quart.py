@@ -10,14 +10,11 @@ from sentry_sdk.data_collection import _apply_data_collection_filtering_to_query
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations._wsgi_common import _filter_headers
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
-from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.traces import SOURCE_FOR_STYLE as SEGMENT_SOURCE_FOR_STYLE
-from sentry_sdk.traces import Span, get_current_span
+from sentry_sdk.traces import SegmentNameSource, Span, get_current_span
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
     event_from_exception,
-    has_data_collection_enabled,
     parse_url,
 )
 
@@ -51,22 +48,10 @@ try:
 except ImportError:
     raise DidNotEnable("Quart is not installed or incompatible")
 
-TRANSACTION_STYLE_VALUES = ("endpoint", "url")
-
 
 class QuartIntegration(Integration):
     identifier = "quart"
     origin = f"auto.http.{identifier}"
-
-    transaction_style = ""
-
-    def __init__(self, transaction_style: str = "endpoint") -> None:
-        if transaction_style not in TRANSACTION_STYLE_VALUES:
-            raise ValueError(
-                "Invalid value for transaction_style: %s (must be in %s)"
-                % (transaction_style, TRANSACTION_STYLE_VALUES)
-            )
-        self.transaction_style = transaction_style
 
     @staticmethod
     def setup_once() -> None:
@@ -133,25 +118,6 @@ def patch_scaffold_route() -> None:
     Scaffold.route = _sentry_route
 
 
-def _set_transaction_name_and_source(
-    scope: "sentry_sdk.Scope", transaction_style: str, request: "Request"
-) -> None:
-    try:
-        name_for_style = {
-            "url": request.url_rule.rule,
-            "endpoint": request.url_rule.endpoint,
-        }
-
-        source = SEGMENT_SOURCE_FOR_STYLE[transaction_style]
-
-        scope.set_transaction_name(
-            name=name_for_style[transaction_style],
-            source=source,
-        )
-    except Exception:
-        pass
-
-
 async def _request_websocket_started(app: "Quart", **kwargs: "Any") -> None:
     integration = sentry_sdk.get_client().get_integration(QuartIntegration)
     if integration is None:
@@ -174,9 +140,13 @@ async def _request_websocket_started(app: "Quart", **kwargs: "Any") -> None:
 
     # Set the transaction name here, but rely on ASGI middleware
     # to actually start the transaction
-    _set_transaction_name_and_source(
-        sentry_sdk.get_current_scope(), integration.transaction_style, request_websocket
-    )
+    try:
+        sentry_sdk.get_current_scope().set_transaction_name(
+            name=request_websocket.url_rule.rule,
+            source=SegmentNameSource.ROUTE,
+        )
+    except Exception:
+        pass
 
     scope = sentry_sdk.get_isolation_scope()
 
@@ -188,64 +158,35 @@ async def _request_websocket_started(app: "Quart", **kwargs: "Any") -> None:
         header_attributes: "dict[str, Any]" = {}
 
         for header, header_value in _filter_headers(
-            dict(request_websocket.headers), use_annotated_value=False
+            dict(request_websocket.headers)
         ).items():
-            header_attributes[f"http.request.header.{header.lower()}"] = header_value
+            header_attributes[f"http.request.header.{header.lower()}"] = [header_value]
 
         segment.set_attributes(header_attributes)
 
         client_options = sentry_sdk.get_client().options
         filtered_query_string = None
-        if has_data_collection_enabled(client_options):
-            query_string = request_websocket.query_string.decode(
-                "utf-8", errors="replace"
+
+        query_string = request_websocket.query_string.decode("utf-8", errors="replace")
+        if query_string:
+            filtered_query_string = _apply_data_collection_filtering_to_query_string(
+                query_string=query_string,
+                behaviour=client_options["data_collection"]["url_query_params"],
             )
-            if query_string:
-                filtered_query_string = (
-                    _apply_data_collection_filtering_to_query_string(
-                        query_string=query_string,
-                        behaviour=client_options["data_collection"]["url_query_params"],
-                    )
-                )
-                if filtered_query_string:
-                    segment.set_attribute(
-                        "url.query",
-                        filtered_query_string,
-                    )
+            if filtered_query_string:
+                segment.set_attribute("url.query", filtered_query_string)
 
-            parsed_url = parse_url(request_websocket.url)
-            segment.set_attribute(
-                "url.full",
-                f"{parsed_url.url}?{filtered_query_string}"
-                if filtered_query_string
-                else parsed_url.url,
-            )
+        parsed_url = parse_url(request_websocket.url)
+        segment.set_attribute(
+            "url.full",
+            f"{parsed_url.url}?{filtered_query_string}"
+            if filtered_query_string
+            else parsed_url.url,
+        )
 
-            if client_options["data_collection"]["user_info"]:
-                user_properties = {}
-
-                if len(request_websocket.access_route) >= 1:
-                    segment.set_attribute(
-                        "client.address", request_websocket.access_route[0]
-                    )
-                    user_properties["ip_address"] = request_websocket.access_route[0]
-
-                current_user_id = _get_current_user_id_from_quart()
-                if current_user_id:
-                    user_properties["id"] = current_user_id
-
-                if user_properties:
-                    existing_user_properties = scope._user or {}
-                    scope.set_user({**existing_user_properties, **user_properties})
-
-        elif should_send_default_pii():
-            segment.set_attribute("url.full", request_websocket.url)
-            segment.set_attribute(
-                "url.query",
-                request_websocket.query_string.decode("utf-8", errors="replace"),
-            )
-
+        if client_options["data_collection"]["user_info"]:
             user_properties = {}
+
             if len(request_websocket.access_route) >= 1:
                 segment.set_attribute(
                     "client.address", request_websocket.access_route[0]
@@ -285,17 +226,7 @@ def _make_request_event_processor(
             request_info["headers"] = _filter_headers(dict(request.headers))
 
             client_options = sentry_sdk.get_client().options
-            if has_data_collection_enabled(client_options):
-                if client_options["data_collection"]["user_info"]:
-                    if len(request.access_route) >= 1:
-                        request_info["env"] = {"REMOTE_ADDR": request.access_route[0]}
-
-                    current_user_id = _get_current_user_id_from_quart()
-                    if current_user_id:
-                        user_info = event.setdefault("user", {})
-                        user_info["id"] = current_user_id
-
-            elif should_send_default_pii():
+            if client_options["data_collection"]["user_info"]:
                 if len(request.access_route) >= 1:
                     request_info["env"] = {"REMOTE_ADDR": request.access_route[0]}
 
@@ -318,7 +249,6 @@ async def _capture_exception(
 
     event, hint = event_from_exception(
         exception,
-        client_options=sentry_sdk.get_client().options,
         mechanism={"type": "quart", "handled": False},
     )
 
