@@ -309,7 +309,6 @@ def exception_handler(exc: Exception, scope: "StarliteScope", _: "State") -> Non
 
     event, hint = event_from_exception(
         exc,
-        client_options=sentry_sdk.get_client().options,
         mechanism={"type": StarliteIntegration.identifier, "handled": False},
     )
 

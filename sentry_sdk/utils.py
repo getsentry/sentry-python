@@ -1143,13 +1143,13 @@ def merge_stack_frames(
 
 def event_from_exception(
     exc_info: "Union[BaseException, ExcInfo]",
-    client_options: "Optional[Dict[str, Any]]" = None,
     mechanism: "Optional[Dict[str, Any]]" = None,
 ) -> "Tuple[Event, Dict[str, Any]]":
     exc_info = exc_info_from_error(exc_info)
     hint = event_hint_with_exc_info(exc_info)
+    client_options = sentry_sdk.get_client().options
 
-    if client_options and client_options.get("add_full_stack", DEFAULT_ADD_FULL_STACK):
+    if client_options.get("add_full_stack", DEFAULT_ADD_FULL_STACK):
         full_stack = current_stacktrace(
             max_value_length=client_options["max_value_length"],
         )["frames"]
@@ -1394,10 +1394,8 @@ class TimeoutThread(threading.Thread):
     def _capture_exception(self) -> "ExcInfo":
         exc_info = sys.exc_info()
 
-        client = sentry_sdk.get_client()
         event, hint = event_from_exception(
             exc_info,
-            client_options=client.options,
             mechanism={"type": "threading", "handled": False},
         )
         sentry_sdk.capture_event(event, hint=hint)

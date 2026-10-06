@@ -31,7 +31,6 @@ if TYPE_CHECKING:
 def _capture_exception(exc: "Any") -> None:
     event, hint = event_from_exception(
         exc,
-        client_options=sentry_sdk.get_client().options,
         mechanism={"type": "openai_agents", "handled": False},
     )
     sentry_sdk.capture_event(event, hint=hint)

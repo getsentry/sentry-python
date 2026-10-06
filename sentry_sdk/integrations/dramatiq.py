@@ -183,7 +183,6 @@ class SentryMiddleware(Middleware):  # type: ignore[misc]
 
         event, hint = event_from_exception(
             exception,  # type: ignore[arg-type]
-            client_options=sentry_sdk.get_client().options,
             mechanism={
                 "type": DramatiqIntegration.identifier,
                 "handled": False,

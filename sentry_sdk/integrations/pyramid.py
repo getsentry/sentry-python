@@ -146,7 +146,6 @@ def _capture_exception(exc_info: "ExcInfo") -> None:
 
     event, hint = event_from_exception(
         exc_info,
-        client_options=sentry_sdk.get_client().options,
         mechanism={"type": "pyramid", "handled": False},
     )
 

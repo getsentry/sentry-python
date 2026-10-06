@@ -39,10 +39,8 @@ class TrytondWSGIIntegration(Integration):
             if isinstance(e, TrytonException):
                 return
             else:
-                client = sentry_sdk.get_client()
                 event, hint = event_from_exception(
                     e,
-                    client_options=client.options,
                     mechanism={"type": "trytond", "handled": False},
                 )
                 sentry_sdk.capture_event(event, hint=hint)

@@ -122,7 +122,6 @@ def _patch_execute() -> None:
         except TransportQueryError as e:
             event, hint = event_from_exception(
                 e,
-                client_options=sentry_sdk.get_client().options,
                 mechanism={"type": "gql", "handled": False},
             )
 

@@ -177,11 +177,8 @@ def _patch_ray_remote() -> None:
 
 
 def _capture_exception(exc_info: "ExcInfo", **kwargs: "Any") -> None:
-    client = sentry_sdk.get_client()
-
     event, hint = event_from_exception(
         exc_info,
-        client_options=client.options,
         mechanism={
             "handled": False,
             "type": RayIntegration.identifier,

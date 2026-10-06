@@ -226,7 +226,6 @@ def _capture_exception(ty: type, value: BaseException, tb: "Any") -> None:
 
     event, hint = event_from_exception(
         (ty, value, tb),
-        client_options=sentry_sdk.get_client().options,
         mechanism={"type": "tornado", "handled": False},
     )
 

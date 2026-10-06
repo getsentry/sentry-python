@@ -1243,9 +1243,7 @@ class Scope:
         else:
             exc_info = sys.exc_info()
 
-        event, hint = event_from_exception(
-            exc_info, client_options=self.get_client().options
-        )
+        event, hint = event_from_exception(exc_info)
 
         try:
             return self.capture_event(event, hint=hint, scope=scope, **scope_kwargs)

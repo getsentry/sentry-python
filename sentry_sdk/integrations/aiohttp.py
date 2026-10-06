@@ -503,7 +503,6 @@ def _capture_exception() -> "ExcInfo":
     exc_info = sys.exc_info()
     event, hint = event_from_exception(
         exc_info,
-        client_options=sentry_sdk.get_client().options,
         mechanism={"type": "aiohttp", "handled": False},
     )
     sentry_sdk.capture_event(event, hint=hint)

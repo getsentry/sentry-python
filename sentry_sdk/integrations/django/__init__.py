@@ -593,7 +593,6 @@ def _capture_exception(
 
     event, hint = event_from_exception(
         exc_info,
-        client_options=sentry_sdk.get_client().options,
         mechanism={"type": "django", "handled": handled},
     )
     sentry_sdk.capture_event(event, hint=hint)
