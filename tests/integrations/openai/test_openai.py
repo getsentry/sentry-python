@@ -4860,7 +4860,7 @@ def test_completions_token_usage_manual_input_counting(
     OPENAI_VERSION is None or OPENAI_VERSION < (1, 26, 0),
     reason="Previous versions do not report token usage when streaming. See https://github.com/openai/openai-python/commit/6cc515874f5f4b26b35f408d6afc3c14b4dfe3b0.",
 )
-def test_completions_token_usage_from_streaming_response(
+def test_completions_token_usage_manual_output_counting_streaming(
     sentry_init,
     capture_events,
     capture_items,
@@ -4870,9 +4870,11 @@ def test_completions_token_usage_from_streaming_response(
     span_streaming,
     stream_gen_ai_spans,
 ):
-    """Token counts are extracted from the final chunk's usage when streaming."""
+    """When completion_tokens is missing, output tokens are counted from streamed content."""
     sentry_init(
-        integrations=[OpenAIIntegration()],
+        integrations=[
+            OpenAIIntegration(tiktoken_encoding_name=tiktoken_encoding_if_installed())
+        ],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
@@ -4882,7 +4884,13 @@ def test_completions_token_usage_from_streaming_response(
     client = OpenAI(api_key="z")
     returned_stream = get_model_response(
         server_side_event_chunks(
-            streaming_chat_completions_model_response,
+            streaming_chat_completions_model_response(
+                usage=CompletionUsage(
+                    prompt_tokens=20,
+                    completion_tokens=0,
+                    total_tokens=20,
+                )
+            ),
             include_event_type=False,
         )
     )
@@ -4906,9 +4914,10 @@ def test_completions_token_usage_from_streaming_response(
         sentry_sdk.flush()
         (span,) = (item.payload for item in items)
 
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
+        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 20
+        assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 20
+        if tiktoken_encoding_if_installed():
+            assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 2
 
     else:
         events = capture_events()
@@ -4929,9 +4938,10 @@ def test_completions_token_usage_from_streaming_response(
         (event,) = events
         (span,) = event["spans"]
 
-        assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-        assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
-        assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
+        assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 20
+        assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 20
+        if tiktoken_encoding_if_installed():
+            assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 2
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])

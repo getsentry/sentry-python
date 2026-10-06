@@ -596,7 +596,13 @@ def test_streaming_chat_completion(
 
     model_response = get_model_response(
         server_side_event_chunks(
-            streaming_chat_completions_model_response,
+            streaming_chat_completions_model_response(
+                usage=CompletionUsage(
+                    prompt_tokens=10,
+                    completion_tokens=20,
+                    total_tokens=30,
+                ),
+            ),
             include_event_type=False,
         ),
         request_headers={"X-Stainless-Raw-Response": "true"},
@@ -713,7 +719,13 @@ async def test_async_streaming_chat_completion(
     model_response = get_model_response(
         async_iterator(
             server_side_event_chunks(
-                streaming_chat_completions_model_response,
+                streaming_chat_completions_model_response(
+                    usage=CompletionUsage(
+                        prompt_tokens=10,
+                        completion_tokens=20,
+                        total_tokens=30,
+                    ),
+                ),
                 include_event_type=False,
             ),
         ),
