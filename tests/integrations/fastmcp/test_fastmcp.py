@@ -276,7 +276,7 @@ async def test_fastmcp_tool_sync(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
         data_collection={
-            "gen_ai": {
+            "mcp": {
                 "inputs": True,
                 "outputs": True,
             }
@@ -333,7 +333,7 @@ async def test_fastmcp_tool_sync_no_sensitive_data(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
         data_collection={
-            "gen_ai": {
+            "mcp": {
                 "inputs": False,
                 "outputs": False,
             }
@@ -385,7 +385,7 @@ async def test_fastmcp_tool_async(sentry_init, capture_items, FastMCP, json_rpc)
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
         data_collection={
-            "gen_ai": {
+            "mcp": {
                 "inputs": True,
                 "outputs": True,
             }
@@ -460,7 +460,7 @@ async def test_fastmcp_tool_async_no_sensitive_data(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
         data_collection={
-            "gen_ai": {
+            "mcp": {
                 "inputs": False,
                 "outputs": False,
             }
@@ -589,7 +589,7 @@ async def test_fastmcp_tool_with_complex_return(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
         data_collection={
-            "gen_ai": {
+            "mcp": {
                 "inputs": True,
                 "outputs": True,
             }
@@ -647,7 +647,7 @@ async def test_fastmcp_prompt_sync(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
         data_collection={
-            "gen_ai": {
+            "mcp": {
                 "inputs": True,
                 "outputs": True,
             }
@@ -714,7 +714,7 @@ async def test_fastmcp_prompt_sync_no_sensitive_data(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
         data_collection={
-            "gen_ai": {
+            "mcp": {
                 "inputs": False,
                 "outputs": False,
             }

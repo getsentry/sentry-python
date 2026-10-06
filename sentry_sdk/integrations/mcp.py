@@ -242,7 +242,7 @@ async def _instrument_tool_call(
     client = sentry_sdk.get_client()
     handler_name = ctx.params["name"]
     arguments = ctx.params.get("arguments")
-    if arguments is None or not client.options["data_collection"]["gen_ai"]["inputs"]:
+    if arguments is None or not client.options["data_collection"]["mcp"]["inputs"]:
         arguments = {}
 
     # Get request ID, session ID, and transport from context
@@ -290,7 +290,7 @@ async def _instrument_tool_call(
 
         if (
             result_content is None
-            or not client.options["data_collection"]["gen_ai"]["outputs"]
+            or not client.options["data_collection"]["mcp"]["outputs"]
         ):
             return result
 
@@ -324,7 +324,7 @@ async def _instrument_prompt_get(
 
     arguments = ctx.params.get("arguments")
 
-    if arguments is None or not client.options["data_collection"]["gen_ai"]["inputs"]:
+    if arguments is None or not client.options["data_collection"]["mcp"]["inputs"]:
         arguments = {}
 
     # Get request ID, session ID, and transport from context
@@ -381,7 +381,7 @@ async def _instrument_prompt_get(
 
             if (
                 message_count != 1
-                or not client.options["data_collection"]["gen_ai"]["inputs"]
+                or not client.options["data_collection"]["mcp"]["outputs"]
                 or not messages
             ):
                 return result
