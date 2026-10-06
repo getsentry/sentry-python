@@ -5,21 +5,10 @@ Implements the ``data_collection`` client option described in the Sentry SDK
 "Data Collection" spec
 (https://develop.sentry.dev/sdk/foundations/client/data-collection/).
 
-``data_collection`` supersedes the single ``send_default_pii`` boolean with a
-structured configuration that lets users enable or restrict automatically
+``data_collection`` lets users enable or restrict automatically
 collected data by category (user identity, cookies, HTTP headers, URL query params,
 HTTP bodies, generative AI inputs/outputs, stack frame variables, source
 context).
-
-Resolution precedence (see :func:`_resolve_data_collection`):
-
-* ``data_collection`` set, ``send_default_pii`` unset -> honour ``data_collection``
-  using the spec defaults for any omitted field.
-* ``send_default_pii`` set, ``data_collection`` unset -> derive a
-  resolved ``DataCollection`` that mirrors what ``send_default_pii`` collects today.
-* neither set -> treated as ``send_default_pii=False``.
-* both set -> ``data_collection`` wins (it is the single source of truth); a
-  ``DeprecationWarning`` is emitted for ``send_default_pii``.
 """
 
 from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional, Union, cast
