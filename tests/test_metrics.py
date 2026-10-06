@@ -64,7 +64,7 @@ def test_metrics_with_attributes(sentry_init, capture_items):
 
 
 def test_metrics_with_user(sentry_init, capture_items):
-    sentry_init(send_default_pii=True)
+    sentry_init(data_collection={"user_info": True})
     items = capture_items("trace_metric")
 
     sentry_sdk.set_user(
@@ -83,7 +83,7 @@ def test_metrics_with_user(sentry_init, capture_items):
 
 
 def test_metrics_no_user_if_pii_off(sentry_init, capture_items):
-    sentry_init(send_default_pii=False)
+    sentry_init(data_collection={"user_info": False})
     items = capture_items("trace_metric")
 
     sentry_sdk.set_user(

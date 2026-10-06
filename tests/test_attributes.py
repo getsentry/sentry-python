@@ -190,7 +190,7 @@ def test_scope_attributes_preserialized(sentry_init, capture_items):
 def test_user_attributes(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
-        send_default_pii=True,
+        data_collection={"user_info": True},
     )
 
     items = capture_items("trace_metric", "span")
