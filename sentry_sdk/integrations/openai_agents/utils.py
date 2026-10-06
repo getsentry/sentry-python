@@ -139,14 +139,14 @@ def _set_output_data(span: "Span", result: "Any") -> None:
 
     for output in result.output:
         if output.type == "function_call":
-            output_messages["tool"].append(output.dict())
+            output_messages["tool"].append(output.model_dump())
         elif output.type == "message":
             for output_message in output.content:
                 try:
                     output_messages["response"].append(output_message.text)
                 except AttributeError:
                     # Unknown output message type, just return the json
-                    output_messages["response"].append(output_message.dict())
+                    output_messages["response"].append(output_message.model_dump())
 
     if len(output_messages["tool"]) > 0:
         span.set_attribute(
