@@ -160,7 +160,7 @@ def test_streaming_span_order_and_scope(
         assert span["end_timestamp"] is not None
 
 
-def test_non_body_stream_does_not_delay_client_span(sentry_init, capture_items):
+def test_non_body_stream_delays_client_span(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[Boto3Integration()],
@@ -184,6 +184,7 @@ def test_non_body_stream_does_not_delay_client_span(sentry_init, capture_items):
         assert isinstance(response["Payload"], StreamingBody)
         assert sentry_sdk.get_current_span() is parent  # type: ignore[attr-defined]
 
+    response["Payload"].close()
     sentry_sdk.flush()
 
     spans = [item.payload for item in items]
@@ -192,9 +193,18 @@ def test_non_body_stream_does_not_delay_client_span(sentry_init, capture_items):
         for span in spans
         if span["attributes"].get(SPANDATA.SENTRY_ORIGIN) == ORIGIN
     ]
-    assert len(boto_spans) == 1
-    assert boto_spans[0]["attributes"].get(SPANDATA.SENTRY_OP) == OP.HTTP_CLIENT
-    response["Payload"].close()
+    assert len(boto_spans) == 2
+    client_span = next(
+        span
+        for span in boto_spans
+        if span["attributes"].get(SPANDATA.SENTRY_OP) == OP.HTTP_CLIENT
+    )
+    stream_span = next(
+        span
+        for span in boto_spans
+        if span["attributes"].get(SPANDATA.SENTRY_OP) == OP.HTTP_CLIENT_STREAM
+    )
+    assert stream_span["parent_span_id"] == client_span["span_id"]
 
 
 @pytest.fixture

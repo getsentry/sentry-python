@@ -207,7 +207,13 @@ def _instrument_streaming_body(span: "Span", parsed: "Dict[str, Any]") -> bool:
     if isinstance(span, NoOpSpan):
         return False
 
-    body = parsed.get("Body")
+    # botocore uses service-specific response key for streaming payload; e.g. `Payload`
+    # for Lambda Invoke, `Body` for S3 GetObject. Find it by type so every streaming
+    # response is handled.
+    body = next(
+        (value for value in parsed.values() if isinstance(value, StreamingBody)),
+        None,
+    )
     if not isinstance(body, StreamingBody):
         return False
 
