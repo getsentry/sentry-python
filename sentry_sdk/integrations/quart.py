@@ -249,7 +249,6 @@ async def _capture_exception(
 
     event, hint = event_from_exception(
         exception,
-        client_options=sentry_sdk.get_client().options,
         mechanism={"type": "quart", "handled": False},
     )
 

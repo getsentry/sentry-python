@@ -292,7 +292,6 @@ class EventHandler(_BaseHandler):
         if record.exc_info and record.exc_info[0] is not None:
             event, hint = event_from_exception(
                 record.exc_info,
-                client_options=client_options,
                 mechanism={"type": "logging", "handled": True},
             )
         elif (record.exc_info and record.exc_info[0] is None) or record.stack_info:

@@ -120,7 +120,6 @@ def setup_capture_exceptions() -> None:
             with capture_internal_exceptions():
                 event, hint = event_from_exception(
                     exception,
-                    client_options=get_client().options,
                     mechanism={"type": OTLPIntegration.identifier, "handled": False},
                 )
                 capture_event(event, hint=hint)

@@ -153,7 +153,6 @@ def _capture_exception(exc: "Any") -> None:
     """Capture exception with Google GenAI mechanism."""
     event, hint = event_from_exception(
         exc,
-        client_options=sentry_sdk.get_client().options,
         mechanism={"type": "google_genai", "handled": False},
     )
     sentry_sdk.capture_event(event, hint=hint)

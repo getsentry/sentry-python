@@ -136,11 +136,8 @@ def _capture_exception(exc_info: "ExcInfo") -> None:
     """
     Send Beam exception to Sentry.
     """
-    client = sentry_sdk.get_client()
-
     event, hint = event_from_exception(
         exc_info,
-        client_options=client.options,
         mechanism={"type": "beam", "handled": False},
     )
     sentry_sdk.capture_event(event, hint=hint)

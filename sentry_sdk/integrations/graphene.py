@@ -58,11 +58,9 @@ def _patch_graphql() -> None:
             result = old_graphql_sync(schema, source, *args, **kwargs)
 
         with capture_internal_exceptions():
-            client = sentry_sdk.get_client()
             for error in result.errors or []:
                 event, hint = event_from_exception(
                     error,
-                    client_options=client.options,
                     mechanism={
                         "type": GrapheneIntegration.identifier,
                         "handled": False,
@@ -89,11 +87,9 @@ def _patch_graphql() -> None:
             result = await old_graphql_async(schema, source, *args, **kwargs)
 
         with capture_internal_exceptions():
-            client = sentry_sdk.get_client()
             for error in result.errors or []:
                 event, hint = event_from_exception(
                     error,
-                    client_options=client.options,
                     mechanism={
                         "type": GrapheneIntegration.identifier,
                         "handled": False,

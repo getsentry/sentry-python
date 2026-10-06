@@ -263,7 +263,6 @@ def _failure_callback(
         # Capture the exception
         event, hint = event_from_exception(
             exception,
-            client_options=sentry_sdk.get_client().options,
             mechanism={"type": "litellm", "handled": False},
         )
         sentry_sdk.capture_event(event, hint=hint)

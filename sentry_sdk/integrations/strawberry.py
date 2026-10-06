@@ -344,7 +344,6 @@ def _patch_views() -> None:
             for error in errors:
                 event, hint = event_from_exception(
                     error,
-                    client_options=sentry_sdk.get_client().options,
                     mechanism={
                         "type": StrawberryIntegration.identifier,
                         "handled": False,

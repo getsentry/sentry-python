@@ -280,7 +280,6 @@ def _capture_exception() -> "ExcInfo":
     if not should_skip_capture:
         event, hint = event_from_exception(
             exc_info,
-            client_options=sentry_sdk.get_client().options,
             mechanism={"type": "wsgi", "handled": False},
         )
         sentry_sdk.capture_event(event, hint=hint)

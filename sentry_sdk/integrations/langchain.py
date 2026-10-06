@@ -180,7 +180,6 @@ class LangchainIntegration(Integration):
 def _capture_exception(exc: "Any", scope: "Optional[Any]" = None) -> None:
     event, hint = event_from_exception(
         exc,
-        client_options=sentry_sdk.get_client().options,
         mechanism={"type": "langchain", "handled": False},
     )
     sentry_sdk.capture_event(event, hint=hint, scope=scope)

@@ -115,7 +115,6 @@ def _capture_exception(task: "Any", exc_info: "ExcInfo") -> None:
 
     event, hint = event_from_exception(
         exc_info,
-        client_options=client.options,
         mechanism={"type": "celery", "handled": False},
     )
 
