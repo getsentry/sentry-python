@@ -4816,8 +4816,9 @@ def test_completions_token_usage_manual_input_counting(
             client.chat.completions.create(
                 model="some-model",
                 messages=[
-                    {"role": "system", "content": "You are a helpful assistant."},
-                    {"role": "user", "content": "hello"},
+                    {"content": "one"},
+                    {"content": "two"},
+                    {"content": "three"},
                 ],
             )
 
@@ -4827,7 +4828,7 @@ def test_completions_token_usage_manual_input_counting(
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 10
         if tiktoken_encoding_if_installed():
-            assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 7
+            assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 3
 
     else:
         events = capture_events()
@@ -4840,8 +4841,9 @@ def test_completions_token_usage_manual_input_counting(
             client.chat.completions.create(
                 model="some-model",
                 messages=[
-                    {"role": "system", "content": "You are a helpful assistant."},
-                    {"role": "user", "content": "hello"},
+                    {"content": "one"},
+                    {"content": "two"},
+                    {"content": "three"},
                 ],
             )
 
@@ -4851,7 +4853,7 @@ def test_completions_token_usage_manual_input_counting(
         assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
         assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 10
         if tiktoken_encoding_if_installed():
-            assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 7
+            assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 3
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
