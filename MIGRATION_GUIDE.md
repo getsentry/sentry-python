@@ -170,6 +170,41 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 - The `include_local_variables` option was removed. Use `data_collection`'s `stack_frame_variables` as a drop-in replacement.
 - The `include_source_context` option was removed. Use `data_collection`'s `frame_context_lines` for more granular control over the source context reported by specifying the number of lines to include around the failing line, or set `frame_context_lines=0` to disable source context entirely.
 
+### Migrating from `send_default_pii` to `data_collection`
+
+The new `data_collection` defaults collect more data than `send_default_pii` did. User identity, generative AI content, HTTP request/response bodies, and file paths are now on by default, and more HTTP headers and cookies are collected.
+
+If you wish to restrict data collection to roughly match the previous behaviour of `send_default_pii=False`, you can use the following configuration:
+
+```python
+init({
+  "dsn": "...",
+  "data_collection": {
+    "user_info": false,
+    "http_bodies": [],
+    "graphql": {
+      "document": false,
+      "variables": false,
+    },
+    "gen_ai": {
+      "inputs": false,
+      "outputs": false,
+    },
+    "mcp": {
+      "inputs": false,
+      "outputs": false,
+    },
+    "database_query_data": false,
+    "queues": false,
+    "http_headers": { "mode": "denylist", "terms": ["forwarded", "-ip", "remote-", "via", "-user"] },
+    "cookies": { "mode": "denylist", "terms": ["forwarded", "-ip", "remote-", "via", "-user"] },
+    "url_query_params": {
+      "mode": "denylist", "terms": ["forwarded", "-ip", "remote-", "via", "-user"],
+    },
+  },
+});
+```
+
 ## Deprecated
 
 
