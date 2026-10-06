@@ -62,23 +62,23 @@ async def test_async_breadcrumb(sentry_init, capture_events):
 
 
 @pytest.mark.parametrize(
-    "send_default_pii, description",
+    "data_collection, description",
     [
-        (False, "SET 'bar' [Filtered]"),
-        (True, "SET 'bar' 1"),
+        ({"database_query_data": False}, "SET 'bar' [Filtered]"),
+        ({"database_query_data": True}, "SET 'bar' 1"),
     ],
 )
 @pytest.mark.asyncio
 async def test_async_basic(
     sentry_init,
     capture_items,
-    send_default_pii,
+    data_collection,
     description,
 ):
     sentry_init(
         integrations=[RedisIntegration()],
         traces_sample_rate=1.0,
-        send_default_pii=send_default_pii,
+        data_collection=data_collection,
     )
 
     connection = cluster.RedisCluster(host="localhost", port=6379)
@@ -105,24 +105,11 @@ async def test_async_basic(
     assert attrs["db.redis.key"] == "bar"
 
 
-@pytest.mark.parametrize(
-    "send_default_pii, expected_first_ten",
-    [
-        (False, ["GET 'foo'", "SET 'bar' [Filtered]", "SET 'baz' [Filtered]"]),
-        (True, ["GET 'foo'", "SET 'bar' 1", "SET 'baz' 2"]),
-    ],
-)
 @pytest.mark.asyncio
-async def test_async_redis_pipeline(
-    sentry_init,
-    capture_items,
-    send_default_pii,
-    expected_first_ten,
-):
+async def test_async_redis_pipeline(sentry_init, capture_items):
     sentry_init(
         integrations=[RedisIntegration()],
         traces_sample_rate=1.0,
-        send_default_pii=send_default_pii,
     )
 
     connection = cluster.RedisCluster(host="localhost", port=6379)

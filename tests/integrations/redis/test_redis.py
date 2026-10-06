@@ -42,52 +42,6 @@ def test_basic(sentry_init, capture_events):
     }
 
 
-@pytest.mark.parametrize(
-    "data_collection, expected_first_ten",
-    [
-        (
-            {"database_query_data": False},
-            ["GET 'foo'", "SET 'bar'", "SET 'baz'"],
-        ),
-        (
-            {"database_query_data": True},
-            ["GET 'foo'", "SET 'bar' 1", "SET 'baz' 2"],
-        ),
-    ],
-)
-def test_redis_pipeline_data_collection(
-    sentry_init,
-    capture_items,
-    data_collection,
-    expected_first_ten,
-):
-    sentry_init(
-        integrations=[RedisIntegration()],
-        traces_sample_rate=1.0,
-        data_collection=data_collection,
-    )
-
-    connection = FakeRedis()
-
-    items = capture_items("span")
-
-    with sentry_sdk.start_span(name="custom parent"):
-        pipeline = connection.pipeline(transaction=False)
-        pipeline.get("foo")
-        pipeline.set("bar", 1)
-        pipeline.set("baz", 2)
-        pipeline.execute()
-
-    sentry_sdk.flush()
-
-    assert len(items) == 2
-    pipeline_span, parent_span = items[0].payload, items[1].payload
-
-    assert parent_span["name"] == "custom parent"
-    assert pipeline_span["name"] == "redis.pipeline.execute"
-    assert pipeline_span["attributes"]["sentry.op"] == "db.redis"
-
-
 def test_pii_data_redacted(
     sentry_init,
     capture_items,

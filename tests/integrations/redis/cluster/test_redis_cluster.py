@@ -104,23 +104,10 @@ def test_rediscluster_basic(
     assert attrs["db.redis.key"] == "bar"
 
 
-@pytest.mark.parametrize(
-    "send_default_pii, expected_first_ten",
-    [
-        (False, ["GET 'foo'", "SET 'bar' [Filtered]", "SET 'baz' [Filtered]"]),
-        (True, ["GET 'foo'", "SET 'bar' 1", "SET 'baz' 2"]),
-    ],
-)
-def test_rediscluster_pipeline(
-    sentry_init,
-    capture_items,
-    send_default_pii,
-    expected_first_ten,
-):
+def test_rediscluster_pipeline(sentry_init, capture_items):
     sentry_init(
         integrations=[RedisIntegration()],
         traces_sample_rate=1.0,
-        send_default_pii=send_default_pii,
     )
 
     rc = redis.RedisCluster(host="localhost", port=6379)

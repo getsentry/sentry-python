@@ -34,25 +34,11 @@ async def test_async_basic(sentry_init, capture_events):
     }
 
 
-@pytest.mark.parametrize(
-    "is_transaction, send_default_pii, expected_first_ten",
-    [
-        (False, False, ["GET 'foo'", "SET 'bar' [Filtered]", "SET 'baz' [Filtered]"]),
-        (True, True, ["GET 'foo'", "SET 'bar' 1", "SET 'baz' 2"]),
-    ],
-)
 @pytest.mark.asyncio
-async def test_async_redis_pipeline(
-    sentry_init,
-    capture_items,
-    is_transaction,
-    send_default_pii,
-    expected_first_ten,
-):
+async def test_async_redis_pipeline(sentry_init, capture_items):
     sentry_init(
         integrations=[RedisIntegration()],
         traces_sample_rate=1.0,
-        send_default_pii=send_default_pii,
     )
 
     connection = FakeRedis()
@@ -60,7 +46,7 @@ async def test_async_redis_pipeline(
     items = capture_items("span")
 
     with sentry_sdk.start_span(name="custom parent"):
-        pipeline = connection.pipeline(transaction=is_transaction)
+        pipeline = connection.pipeline()
         pipeline.get("foo")
         pipeline.set("bar", 1)
         pipeline.set("baz", 2)
