@@ -344,7 +344,6 @@ def _patch_views() -> None:
             for error in errors:
                 event, hint = event_from_exception(
                     error,
-                    client_options=sentry_sdk.get_client().options,
                     mechanism={
                         "type": StrawberryIntegration.identifier,
                         "handled": False,
@@ -366,50 +365,29 @@ def _make_request_event_processor(
     def inner(event: "Event", hint: "dict[str, Any]") -> "Event":
         client_options = sentry_sdk.get_client().options
         with capture_internal_exceptions():
-            if has_data_collection_enabled(client_options):
-                request_data = event.setdefault("request", {})
-                if client_options["data_collection"]["graphql"]["document"]:
-                    request_data["api_target"] = "graphql"
-
-                if not request_data.get("data"):
-                    execution_context_data: "dict[str, Any]" = (
-                        {"query": execution_context.query}
-                        if client_options["data_collection"]["graphql"]["document"]
-                        else {}
-                    )
-
-                    if (
-                        client_options["data_collection"]["graphql"]["variables"]
-                        and execution_context.variables
-                    ):
-                        execution_context_data["variables"] = (
-                            execution_context.variables
-                        )
-
-                    if execution_context.operation_name:
-                        execution_context_data["operationName"] = (
-                            execution_context.operation_name
-                        )
-
-                    request_data["data"] = execution_context_data
-            elif should_send_default_pii():
-                request_data = event.setdefault("request", {})
+            request_data = event.setdefault("request", {})
+            if client_options["data_collection"]["graphql"]["document"]:
                 request_data["api_target"] = "graphql"
 
-                if not request_data.get("data"):
-                    data: "dict[str, Any]" = {"query": execution_context.query}
-                    if execution_context.variables:
-                        data["variables"] = execution_context.variables
-                    if execution_context.operation_name:
-                        data["operationName"] = execution_context.operation_name
+            if not request_data.get("data"):
+                execution_context_data: "dict[str, Any]" = (
+                    {"query": execution_context.query}
+                    if client_options["data_collection"]["graphql"]["document"]
+                    else {}
+                )
 
-                    request_data["data"] = data
+                if (
+                    client_options["data_collection"]["graphql"]["variables"]
+                    and execution_context.variables
+                ):
+                    execution_context_data["variables"] = execution_context.variables
 
-            else:
-                try:
-                    del event["request"]["data"]
-                except (KeyError, TypeError):
-                    pass
+                if execution_context.operation_name:
+                    execution_context_data["operationName"] = (
+                        execution_context.operation_name
+                    )
+
+                request_data["data"] = execution_context_data
 
         return event
 

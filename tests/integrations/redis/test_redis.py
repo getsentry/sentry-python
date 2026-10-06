@@ -44,7 +44,6 @@ def test_basic(sentry_init, capture_events):
 
 def test_pii_data_redacted(
     sentry_init,
-    capture_events,
     capture_items,
 ):
     sentry_init(
@@ -92,7 +91,6 @@ def test_pii_data_redacted(
 )
 def test_data_collection_database_query_data(
     sentry_init,
-    capture_events,
     capture_items,
     data_collection,
     expected_description,

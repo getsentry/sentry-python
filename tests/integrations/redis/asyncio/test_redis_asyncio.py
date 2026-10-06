@@ -71,7 +71,7 @@ async def test_async_redis_pipeline(sentry_init, capture_items):
 
 
 @pytest.mark.asyncio
-async def test_async_span_origin(sentry_init, capture_events, capture_items):
+async def test_async_span_origin(sentry_init, capture_items):
     sentry_init(
         integrations=[RedisIntegration()],
         traces_sample_rate=1.0,

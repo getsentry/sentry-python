@@ -241,7 +241,6 @@ def _capture_exception(exception: "Union[ExcInfo, BaseException]") -> None:
     with capture_internal_exceptions():
         event, hint = event_from_exception(
             exception,
-            client_options=sentry_sdk.get_client().options,
             mechanism={"type": "sanic", "handled": False},
         )
 

@@ -212,7 +212,6 @@ def _capture_exception(
 ) -> None:
     event, hint = event_from_exception(
         exception,
-        client_options=sentry_sdk.get_client().options,
         mechanism={"type": "flask", "handled": False},
     )
 

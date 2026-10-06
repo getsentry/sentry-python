@@ -80,7 +80,6 @@ def _patch_graphql() -> None:
                 for error in errors:
                     event, hint = event_from_exception(
                         error,
-                        client_options=client.options,
                         mechanism={
                             "type": AriadneIntegration.identifier,
                             "handled": False,
@@ -105,7 +104,6 @@ def _patch_graphql() -> None:
                 for error in result.errors or []:
                     event, hint = event_from_exception(
                         error,
-                        client_options=client.options,
                         mechanism={
                             "type": AriadneIntegration.identifier,
                             "handled": False,

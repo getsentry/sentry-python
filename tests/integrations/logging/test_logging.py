@@ -299,7 +299,7 @@ def test_event_logging_captured_warnings(sentry_init, capture_events, recwarn):
     assert len(third_warnings) == 1
 
 
-def test_sentry_logs_collection_off_by_default(sentry_init, capture_items, request):
+def test_sentry_logs_collection_off_by_default(sentry_init, capture_items):
     """Automatic logs capture by Sentry logs needs explicit opt-in to the integration."""
     sentry_init()
     items = capture_items("log")
@@ -312,7 +312,7 @@ def test_sentry_logs_collection_off_by_default(sentry_init, capture_items, reque
     assert not items
 
 
-def test_sentry_logs_collection_opt_in(sentry_init, capture_items, request):
+def test_sentry_logs_collection_opt_in(sentry_init, capture_items):
     """Automatic logs capture by Sentry logs needs explicit opt-in to the integration."""
     sentry_init(integrations=[LoggingIntegration()])
     items = capture_items("log")

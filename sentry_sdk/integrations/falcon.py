@@ -163,7 +163,6 @@ def _patch_handle_exception() -> None:
         if _exception_leads_to_http_5xx(ex, response):
             event, hint = event_from_exception(
                 ex,
-                client_options=sentry_sdk.get_client().options,
                 mechanism={"type": "falcon", "handled": False},
             )
             sentry_sdk.capture_event(event, hint=hint)

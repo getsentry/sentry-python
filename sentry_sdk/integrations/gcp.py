@@ -150,7 +150,6 @@ def _wrap_func(func: "F") -> "F":
                     exc_info = sys.exc_info()
                     sentry_event, hint = event_from_exception(
                         exc_info,
-                        client_options=client.options,
                         mechanism={"type": "gcp", "handled": False},
                     )
                     sentry_sdk.capture_event(sentry_event, hint=hint)

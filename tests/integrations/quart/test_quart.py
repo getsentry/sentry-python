@@ -228,7 +228,6 @@ async def test_quart_auth_configured(
     sentry_init,
     user_id,
     capture_events,
-    monkeypatch,
     integration_enabled_params,
 ):
     from quart_auth import AuthUser, login_user

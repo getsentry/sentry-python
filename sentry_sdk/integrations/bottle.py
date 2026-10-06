@@ -208,7 +208,6 @@ def _make_request_event_processor(
 def _capture_exception(exception: BaseException, handled: bool) -> None:
     event, hint = event_from_exception(
         exception,
-        client_options=sentry_sdk.get_client().options,
         mechanism={"type": "bottle", "handled": handled},
     )
     sentry_sdk.capture_event(event, hint=hint)

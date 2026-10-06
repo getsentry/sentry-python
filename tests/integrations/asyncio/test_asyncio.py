@@ -511,7 +511,7 @@ async def test_delayed_enable_integration(
 
 @minimum_python_38
 @pytest.mark.asyncio
-async def test_delayed_enable_integration_with_options(sentry_init, capture_events):
+async def test_delayed_enable_integration_with_options(sentry_init):
     sentry_init(
         traces_sample_rate=1.0,
         data_collection={},

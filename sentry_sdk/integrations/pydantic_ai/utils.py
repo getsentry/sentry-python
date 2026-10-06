@@ -99,7 +99,6 @@ def _set_available_tools(span: "Span", agent: "Optional[Agent[Any, Any]]") -> No
 def _capture_exception(exc: "Any", handled: bool = False) -> None:
     event, hint = event_from_exception(
         exc,
-        client_options=sentry_sdk.get_client().options,
         mechanism={"type": "pydantic_ai", "handled": handled},
     )
     sentry_sdk.capture_event(event, hint=hint)

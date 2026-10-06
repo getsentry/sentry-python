@@ -226,7 +226,6 @@ def _serialize_request_body_data(data: "Any") -> str:
 def _capture_exception(exception: BaseException, handled: "Any" = False) -> None:
     event, hint = event_from_exception(
         exception,
-        client_options=sentry_sdk.get_client().options,
         mechanism={"type": StarletteIntegration.identifier, "handled": handled},
     )
 

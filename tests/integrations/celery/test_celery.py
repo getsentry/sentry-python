@@ -16,15 +16,6 @@ from sentry_sdk.integrations.celery.beat import _get_headers
 
 
 @pytest.fixture
-def connect_signal(request):
-    def inner(signal, f):
-        signal.connect(f)
-        request.addfinalizer(lambda: signal.disconnect(f))
-
-    return inner
-
-
-@pytest.fixture
 def init_celery(sentry_init, request):
     def inner(
         propagate_traces=True,
@@ -53,7 +44,6 @@ def init_celery(sentry_init, request):
             if VERSION < (4,):
                 pytest.skip("Redis backend broken for some reason")
 
-            # this backend requires capture_events_forksafe
             celery.conf.worker_max_tasks_per_child = 1
             celery.conf.worker_concurrency = 1
             redis_url = f"redis://{os.environ.get('SENTRY_PYTHON_TEST_REDIS_HOST', '127.0.0.1')}:6379"

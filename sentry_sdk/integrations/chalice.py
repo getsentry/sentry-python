@@ -52,7 +52,6 @@ class EventSourceHandler(ChaliceEventSourceHandler):  # type: ignore
                 exc_info = sys.exc_info()
                 event, hint = event_from_exception(
                     exc_info,
-                    client_options=client.options,
                     mechanism={"type": "chalice", "handled": False},
                 )
                 sentry_sdk.capture_event(event, hint=hint)
@@ -120,7 +119,6 @@ def _get_view_function_response(
                     segment.status = SpanStatus.ERROR.value
                 sentry_event, hint = event_from_exception(
                     exc_info,
-                    client_options=client.options,
                     mechanism={"type": "chalice", "handled": False},
                 )
                 sentry_sdk.capture_event(sentry_event, hint=hint)

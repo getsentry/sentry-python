@@ -335,7 +335,6 @@ def exception_handler(exc: Exception, scope: "LitestarScope") -> None:
 
     event, hint = event_from_exception(
         exc,
-        client_options=sentry_sdk.get_client().options,
         mechanism={"type": LitestarIntegration.identifier, "handled": False},
     )
 
