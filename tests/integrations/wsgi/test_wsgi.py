@@ -83,9 +83,8 @@ def test_script_name_is_respected(
     assert event["request"]["url"] == "https://dogs.are.great/woof/woof/bark/"
 
 
-@pytest.fixture(params=[0, None])
-def test_systemexit_zero_is_ignored(sentry_init, capture_events, request):
-    zero_code = request.param
+@pytest.mark.parametrize("zero_code", [0, None])
+def test_systemexit_zero_is_ignored(sentry_init, capture_events, zero_code):
     sentry_init(data_collection={})
     iterable = ExitingIterable(lambda: SystemExit(zero_code))
     app = SentryWsgiMiddleware(IterableApp(iterable))
@@ -98,9 +97,8 @@ def test_systemexit_zero_is_ignored(sentry_init, capture_events, request):
     assert len(events) == 0
 
 
-@pytest.fixture(params=["", "foo", 1, 2])
-def test_systemexit_nonzero_is_captured(sentry_init, capture_events, request):
-    nonzero_code = request.param
+@pytest.mark.parametrize("nonzero_code", ["", "foo", 1, 2])
+def test_systemexit_nonzero_is_captured(sentry_init, capture_events, nonzero_code):
     sentry_init(data_collection={})
     iterable = ExitingIterable(lambda: SystemExit(nonzero_code))
     app = SentryWsgiMiddleware(IterableApp(iterable))
@@ -115,7 +113,7 @@ def test_systemexit_nonzero_is_captured(sentry_init, capture_events, request):
     assert "exception" in event
     exc = event["exception"]["values"][-1]
     assert exc["type"] == "SystemExit"
-    assert exc["value"] == nonzero_code
+    assert exc["value"] == str(nonzero_code)
     assert event["level"] == "error"
 
 
@@ -140,10 +138,7 @@ def test_keyboard_interrupt_is_captured(sentry_init, capture_events):
 
 def test_transaction_with_error(
     sentry_init,
-    crashing_app,
-    capture_events,
     capture_items,
-    DictionaryContaining,  # noqa:N803
 ):
     def dogpark(environ, start_response):
         raise ValueError("Fetch aborted. The ball was not returned.")
@@ -196,9 +191,7 @@ def test_transaction_with_error(
 )
 def test_transaction_no_error(
     sentry_init,
-    capture_events,
     capture_items,
-    DictionaryContaining,  # noqa:N803
     data_collection,
     expect_query,
 ):
@@ -244,7 +237,6 @@ def test_transaction_no_error(
 
 def test_has_trace_if_performance_enabled(
     sentry_init,
-    capture_events,
     capture_items,
 ):
     def dogpark(environ, start_response):
@@ -315,7 +307,6 @@ def test_has_trace_if_performance_disabled(
 
 def test_trace_from_headers_if_performance_enabled(
     sentry_init,
-    capture_events,
     capture_items,
 ):
     def dogpark(environ, start_response):
@@ -513,7 +504,7 @@ def test_auto_session_tracking_with_aggregates(
     assert sum(agg.get("crashed", 0) for agg in session_aggregates) == 1
 
 
-def test_span_origin_manual(sentry_init, capture_events, capture_items):
+def test_span_origin_manual(sentry_init, capture_items):
     def dogpark(environ, start_response):
         start_response("200 OK", [])
         return ["Go get the ball! Good dog!"]
@@ -535,7 +526,7 @@ def test_span_origin_manual(sentry_init, capture_events, capture_items):
     assert items[0].payload["attributes"]["sentry.origin"] == "manual"
 
 
-def test_span_origin_custom(sentry_init, capture_events, capture_items):
+def test_span_origin_custom(sentry_init, capture_items):
     def dogpark(environ, start_response):
         start_response("200 OK", [])
         return ["Go get the ball! Good dog!"]

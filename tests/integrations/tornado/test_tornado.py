@@ -427,7 +427,6 @@ def test_request_body_data_collection_event_processor(
 def test_transactions(
     tornado_testcase,
     sentry_init,
-    capture_events,
     capture_items,
     handler,
     code,
@@ -779,7 +778,6 @@ def test_error_has_existing_trace_context_performance_disabled(
 def test_span_origin(
     tornado_testcase,
     sentry_init,
-    capture_events,
     capture_items,
 ):
     sentry_init(

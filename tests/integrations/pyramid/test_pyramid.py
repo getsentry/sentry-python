@@ -402,7 +402,7 @@ def test_error_in_errorhandler(
 
 
 def test_error_in_authenticated_userid(
-    sentry_init, pyramid_config, capture_events, route, get_client
+    sentry_init, pyramid_config, capture_events, get_client
 ):
     from sentry_sdk.integrations.logging import LoggingIntegration
 

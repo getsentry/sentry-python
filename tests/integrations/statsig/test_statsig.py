@@ -183,7 +183,6 @@ def test_wrapper_attributes(sentry_init, uninstall_integration):
 
 def test_statsig_span_integration(
     sentry_init,
-    capture_events,
     capture_items,
     uninstall_integration,
 ):

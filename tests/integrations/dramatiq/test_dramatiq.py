@@ -110,7 +110,6 @@ def test_that_a_single_error_is_captured(broker, worker, capture_events, fail_fa
 def test_task_transaction(
     broker,
     worker,
-    capture_events,
     capture_items,
     expected_span_status,
     fail_fast,

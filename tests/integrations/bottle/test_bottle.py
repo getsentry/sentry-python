@@ -343,7 +343,7 @@ def test_errors_not_reported_twice(
     assert len(events) == 1
 
 
-def test_mount(app, capture_exceptions, capture_events, sentry_init, get_client):
+def test_mount(app, capture_exceptions, capture_events, sentry_init):
     sentry_init(integrations=[BottleIntegration()])
 
     app.catchall = False
@@ -437,7 +437,6 @@ def test_no_exception_on_redirect(sentry_init, capture_events, app, get_client):
 def test_span_origin(
     sentry_init,
     get_client,
-    capture_events,
     capture_items,
 ):
     sentry_init(

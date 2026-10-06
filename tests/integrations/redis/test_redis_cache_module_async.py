@@ -23,7 +23,7 @@ FAKEREDIS_VERSION = parse_version(fakeredis.__version__)
 
 
 @pytest.mark.asyncio
-async def test_no_cache_basic(sentry_init, capture_events, capture_items):
+async def test_no_cache_basic(sentry_init, capture_items):
     sentry_init(
         integrations=[
             RedisIntegration(),
@@ -45,7 +45,7 @@ async def test_no_cache_basic(sentry_init, capture_events, capture_items):
 
 
 @pytest.mark.asyncio
-async def test_cache_basic(sentry_init, capture_events, capture_items):
+async def test_cache_basic(sentry_init, capture_items):
     sentry_init(
         integrations=[
             RedisIntegration(
@@ -71,7 +71,7 @@ async def test_cache_basic(sentry_init, capture_events, capture_items):
 
 
 @pytest.mark.asyncio
-async def test_cache_keys(sentry_init, capture_events, capture_items):
+async def test_cache_keys(sentry_init, capture_items):
     sentry_init(
         integrations=[
             RedisIntegration(
@@ -120,7 +120,7 @@ async def test_cache_keys(sentry_init, capture_events, capture_items):
 
 
 @pytest.mark.asyncio
-async def test_cache_data(sentry_init, capture_events, capture_items):
+async def test_cache_data(sentry_init, capture_items):
     sentry_init(
         integrations=[
             RedisIntegration(

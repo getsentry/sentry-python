@@ -2998,7 +2998,6 @@ class TestTransformLangchainMessageContent:
 )
 def test_langchain_chat_data_collection(
     sentry_init,
-    capture_events,
     capture_items,
     get_model_response,
     nonstreaming_chat_completions_model_response,
@@ -3106,7 +3105,6 @@ def test_langchain_chat_data_collection(
 )
 def test_langchain_text_completion_data_collection(
     sentry_init,
-    capture_events,
     capture_items,
     get_model_response,
     data_collection,
@@ -3210,7 +3208,6 @@ def test_langchain_text_completion_data_collection(
 )
 def test_langchain_data_collection_tools(
     sentry_init,
-    capture_events,
     capture_items,
     get_model_response,
     server_side_event_chunks,
@@ -3310,7 +3307,6 @@ def test_langchain_data_collection_tools(
 )
 def test_langchain_data_collection_request_tool_call_params(
     sentry_init,
-    capture_events,
     capture_items,
     data_collection,
     tool_calls_collected,
@@ -3378,7 +3374,6 @@ def test_langchain_data_collection_request_tool_call_params(
 )
 def test_langchain_tool_execution_data_collection(
     sentry_init,
-    capture_events,
     capture_items,
     get_model_response,
     server_side_event_chunks,
@@ -3476,7 +3471,6 @@ def test_langchain_tool_execution_data_collection(
 )
 def test_langchain_agent_executor_data_collection(
     sentry_init,
-    capture_events,
     capture_items,
     get_model_response,
     server_side_event_chunks,

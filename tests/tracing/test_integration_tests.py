@@ -188,7 +188,7 @@ def test_continue_trace(sentry_init, capture_items, parent_sampled, sample_rate)
 
 @pytest.mark.parametrize("sample_rate", [0.5, 1.0])
 def test_dynamic_sampling_head_sdk_creates_dsc(
-    sentry_init, capture_envelopes, sample_rate, monkeypatch
+    sentry_init, capture_envelopes, sample_rate
 ):
     sentry_init(
         traces_sample_rate=sample_rate,
@@ -252,7 +252,7 @@ def test_dynamic_sampling_head_sdk_creates_dsc(
     "args",
     [{"traces_sample_rate": 1.0}, {"traces_sample_rate": 0.0}],
 )
-def test_memory_usage(sentry_init, capture_events, args):
+def test_memory_usage(sentry_init, args):
     sentry_init(**args)
 
     references = weakref.WeakSet()
