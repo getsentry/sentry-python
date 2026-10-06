@@ -5041,6 +5041,7 @@ def test_responses_token_usage_manual_output_counting_response_output(
     capture_events,
     capture_items,
     get_model_response,
+    nonstreaming_responses_model_response,
     span_streaming,
     stream_gen_ai_spans,
 ):
@@ -5057,30 +5058,8 @@ def test_responses_token_usage_manual_output_counting_response_output(
 
     client = OpenAI(api_key="z")
     returned_stream = get_model_response(
-        Response(
-            id="chat-id",
-            output=[
-                ResponseOutputMessage(
-                    id="message-id",
-                    content=[
-                        ResponseOutputText(
-                            annotations=[],
-                            text=content,
-                            type="output_text",
-                        )
-                    ],
-                    role="assistant",
-                    status="completed",
-                    type="message",
-                )
-                for content in ("one", "two", "three")
-            ],
-            parallel_tool_calls=False,
-            tool_choice="none",
-            tools=[],
-            created_at=10000000,
-            model="response-model-id",
-            object="response",
+        nonstreaming_responses_model_response(
+            message_contents=("one", "two", "three"),
             usage=ResponseUsage(
                 input_tokens=20,
                 input_tokens_details=InputTokensDetails(

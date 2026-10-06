@@ -1479,42 +1479,38 @@ def openai_embedding_model_response():
 
 @pytest.fixture
 def nonstreaming_responses_model_response():
-    return openai.types.responses.Response(
-        id="resp_123",
-        output=[
-            openai.types.responses.ResponseOutputMessage(
-                id="msg_123",
-                type="message",
-                status="completed",
-                content=[
-                    openai.types.responses.ResponseOutputText(
-                        text="Hello, how can I help you?",
-                        type="output_text",
-                        annotations=[],
-                    )
-                ],
-                role="assistant",
-            )
-        ],
-        parallel_tool_calls=False,
-        tool_choice="none",
-        tools=[],
-        created_at=10000000,
-        model="gpt-4",
-        object="response",
-        usage=openai.types.responses.ResponseUsage(
-            input_tokens=10,
-            input_tokens_details=openai.types.responses.response_usage.InputTokensDetails(
-                cached_tokens=4,
-                cache_write_tokens=6,
-            ),
-            output_tokens=20,
-            output_tokens_details=openai.types.responses.response_usage.OutputTokensDetails(
-                reasoning_tokens=5,
-            ),
-            total_tokens=30,
-        ),
-    )
+    def inner(
+        message_contents,
+        usage,
+    ):
+        return openai.types.responses.Response(
+            id="resp_123",
+            output=[
+                openai.types.responses.ResponseOutputMessage(
+                    id="msg_123",
+                    type="message",
+                    status="completed",
+                    content=[
+                        openai.types.responses.ResponseOutputText(
+                            text=message_content,
+                            type="output_text",
+                            annotations=[],
+                        )
+                    ],
+                    role="assistant",
+                )
+                for message_content in message_contents
+            ],
+            parallel_tool_calls=False,
+            tool_choice="none",
+            tools=[],
+            created_at=10000000,
+            model="gpt-4",
+            object="response",
+            usage=usage,
+        )
+
+    return inner
 
 
 @pytest.fixture
