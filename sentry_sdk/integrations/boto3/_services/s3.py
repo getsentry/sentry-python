@@ -16,7 +16,7 @@ if TYPE_CHECKING:
         _AttributeSpec,
     )
 
-# maps s3 operations to the response field that contains the complete object size.
+# maps s3 operations to the response field that contains the complete file size.
 _RESPONSE_FILE_SIZE_FIELDS = {
     "GetObjectAttributes": "ObjectSize",
     "PutObject": "Size",
@@ -81,10 +81,10 @@ class _S3Extension(_ServiceExtension):
             # `ContentLength` is the size of the HTTP body returned, which may be a range.
             attributes[SPANDATA.HTTP_BODY_SIZE] = response["ContentLength"]
 
-        # report the complete object size, not just the HTTP body size.
-        object_size_field = _RESPONSE_FILE_SIZE_FIELDS.get(ctx.operation_name)
-        if object_size_field is not None and object_size_field in response:
-            attributes[SPANDATA.FILE_SIZE] = response[object_size_field]
+        # report the complete file size, not just the HTTP body size.
+        file_size_field = _RESPONSE_FILE_SIZE_FIELDS.get(ctx.operation_name)
+        if file_size_field is not None and file_size_field in response:
+            attributes[SPANDATA.FILE_SIZE] = response[file_size_field]
 
         if (
             ctx.operation_name == "HeadObject"
@@ -92,7 +92,7 @@ class _S3Extension(_ServiceExtension):
             and "PartNumber" not in ctx.params
             and "ContentLength" in response
         ):
-            # an un-ranged `HEAD` has no body, so `ContentLength` is the object size.
+            # an un-ranged `HEAD` has no body, so `ContentLength` is the file size.
             attributes[SPANDATA.FILE_SIZE] = response["ContentLength"]
 
         return attributes
