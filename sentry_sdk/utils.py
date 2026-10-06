@@ -630,25 +630,25 @@ def serialize_frame(
             frame, tb_lineno, max_value_length
         )
 
-        dc_stack_frame_vars_config = data_collection["stack_frame_variables"]
+    dc_stack_frame_vars_config = data_collection["stack_frame_variables"]
 
-        if isinstance(dc_stack_frame_vars_config, bool):
-            if dc_stack_frame_vars_config:
-                rv["vars"] = serialize(
-                    dict(frame.f_locals), is_vars=True, custom_repr=custom_repr
-                )
-        else:
-            local_variables_to_send = _apply_key_value_collection_filtering(
-                items=dict(frame.f_locals),
-                behaviour=dc_stack_frame_vars_config,
+    if isinstance(dc_stack_frame_vars_config, bool):
+        if dc_stack_frame_vars_config:
+            rv["vars"] = serialize(
+                dict(frame.f_locals), is_vars=True, custom_repr=custom_repr
+            )
+    else:
+        local_variables_to_send = _apply_key_value_collection_filtering(
+            items=dict(frame.f_locals),
+            behaviour=dc_stack_frame_vars_config,
+        )
+
+        if local_variables_to_send:
+            serialized_variables = serialize(
+                local_variables_to_send, is_vars=True, custom_repr=custom_repr
             )
 
-            if local_variables_to_send:
-                serialized_variables = serialize(
-                    local_variables_to_send, is_vars=True, custom_repr=custom_repr
-                )
-
-                rv["vars"] = serialized_variables
+            rv["vars"] = serialized_variables
 
     return rv
 
