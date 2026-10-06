@@ -246,7 +246,6 @@ def test_url_query_data_collection_no_query_string(
     sentry_init(
         integrations=[TornadoIntegration()],
         traces_sample_rate=1.0,
-        data_collection={},
     )
 
     items = capture_items("span")
@@ -270,7 +269,6 @@ def test_url_query_data_collection_repeated_and_blank_params(
     sentry_init(
         integrations=[TornadoIntegration()],
         traces_sample_rate=1.0,
-        data_collection={},
     )
 
     items = capture_items("span")
@@ -584,7 +582,7 @@ def test_user_auth_data_collection(
 
 
 def test_formdata(tornado_testcase, sentry_init, capture_events):
-    sentry_init(integrations=[TornadoIntegration()], data_collection={})
+    sentry_init(integrations=[TornadoIntegration()])
     events = capture_events()
 
     class FormdataHandler(RequestHandler):
@@ -609,7 +607,7 @@ def test_formdata(tornado_testcase, sentry_init, capture_events):
 
 
 def test_json(tornado_testcase, sentry_init, capture_events):
-    sentry_init(integrations=[TornadoIntegration()], data_collection={})
+    sentry_init(integrations=[TornadoIntegration()])
     events = capture_events()
 
     class FormdataHandler(RequestHandler):

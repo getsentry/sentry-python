@@ -362,47 +362,6 @@ async def test_execute_record_params(sentry_init, capture_events) -> None:
 
 
 @pytest.mark.asyncio
-async def test_execute_record_params_with_data_collection_default(
-    sentry_init, capture_events
-) -> None:
-    sentry_init(
-        integrations=[AioMySQLIntegration()],
-        data_collection={},
-    )
-    events = capture_events()
-
-    conn = await aiomysql.connect(**_connect_args())
-
-    async with conn.cursor() as cur:
-        await cur.execute(
-            "INSERT INTO users(name, password, dob) VALUES (%s, %s, %s)",
-            ("Bob", "secret_pw", datetime.date(1984, 3, 1)),
-        )
-
-    conn.close()
-
-    capture_message("hi")
-
-    (event,) = events
-
-    for crumb in event["breadcrumbs"]["values"]:
-        del crumb["timestamp"]
-
-    assert event["breadcrumbs"]["values"] == [
-        CRUMBS_CONNECT,
-        {
-            "category": "query",
-            "data": {
-                "db.params": ["Bob", "secret_pw", "datetime.date(1984, 3, 1)"],
-                "db.paramstyle": "format",
-            },
-            "message": "INSERT INTO users(name, password, dob) VALUES (%s, %s, %s)",
-            "type": "default",
-        },
-    ]
-
-
-@pytest.mark.asyncio
 async def test_cursor_context_manager(sentry_init, capture_events) -> None:
     sentry_init(
         integrations=[AioMySQLIntegration()],
