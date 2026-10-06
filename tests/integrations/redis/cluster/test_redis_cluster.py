@@ -57,22 +57,22 @@ def test_rediscluster_breadcrumb(sentry_init, capture_events):
 
 
 @pytest.mark.parametrize(
-    "send_default_pii, description",
+    "data_collection, description",
     [
-        (False, "SET 'bar' [Filtered]"),
-        (True, "SET 'bar' 1"),
+        ({"database_query_data": False}, "SET 'bar' [Filtered]"),
+        ({"database_query_data": True}, "SET 'bar' 1"),
     ],
 )
 def test_rediscluster_basic(
     sentry_init,
     capture_items,
-    send_default_pii,
+    data_collection,
     description,
 ):
     sentry_init(
         integrations=[RedisIntegration()],
         traces_sample_rate=1.0,
-        send_default_pii=send_default_pii,
+        data_collection=data_collection,
     )
 
     items = capture_items("span")
