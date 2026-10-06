@@ -1480,8 +1480,8 @@ def openai_embedding_model_response():
 @pytest.fixture
 def nonstreaming_responses_model_response():
     def inner(
-        message_contents,
-        usage,
+        message_contents: "Iterator[str]",
+        usage: "Iterator[openai.types.responses.ResponseUsage]",
     ):
         return openai.types.responses.Response(
             id="resp_123",
