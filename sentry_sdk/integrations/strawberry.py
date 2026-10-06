@@ -5,13 +5,11 @@ import sentry_sdk
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.integrations.logging import ignore_logger_for_events
-from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import SegmentNameSource
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
     event_from_exception,
-    has_data_collection_enabled,
     logger,
     package_version,
 )
@@ -168,11 +166,8 @@ class SentryAsyncExtension(SchemaExtension):
             return
 
         additional_attributes: "dict[str, Any]" = {}
-        if has_data_collection_enabled(client.options):
-            if client.options["data_collection"]["graphql"]["document"]:
-                additional_attributes["graphql.document"] = self.execution_context.query
 
-        elif should_send_default_pii():
+        if client.options["data_collection"]["graphql"]["document"]:
             additional_attributes["graphql.document"] = self.execution_context.query
 
         if operation_name:
@@ -400,13 +395,9 @@ def _make_response_event_processor(
     def inner(event: "Event", hint: "dict[str, Any]") -> "Event":
         client_options = sentry_sdk.get_client().options
         with capture_internal_exceptions():
-            if has_data_collection_enabled(client_options):
-                collect_response = (
-                    "outgoing_response"
-                    in client_options["data_collection"]["http_bodies"]
-                )
-            else:
-                collect_response = should_send_default_pii()
+            collect_response = (
+                "outgoing_response" in client_options["data_collection"]["http_bodies"]
+            )
 
             if collect_response:
                 contexts = event.setdefault("contexts", {})
