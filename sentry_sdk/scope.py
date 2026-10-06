@@ -43,7 +43,6 @@ from sentry_sdk.utils import (
     event_from_exception,
     exc_info_from_error,
     format_attribute,
-    has_data_collection_enabled,
     logger,
 )
 
@@ -1443,10 +1442,7 @@ class Scope:
             attributes = telemetry._attributes
 
         client_options = sentry_sdk.get_client().options
-        if has_data_collection_enabled(client_options):
-            if not client_options["data_collection"]["user_info"] or self._user is None:
-                return
-        elif not should_send_default_pii() or self._user is None:
+        if not client_options["data_collection"]["user_info"] or self._user is None:
             return
 
         for attribute_name, user_attribute in (
@@ -1872,11 +1868,6 @@ def use_isolation_scope(isolation_scope: "Scope") -> "Generator[Scope, None, Non
             _isolation_scope.reset(isolation_token)
         except (LookupError, ValueError):
             capture_internal_exception(sys.exc_info())
-
-
-def should_send_default_pii() -> bool:
-    """Shortcut for `Scope.get_client().should_send_default_pii()`."""
-    return Scope.get_client().should_send_default_pii()
 
 
 # Circular imports

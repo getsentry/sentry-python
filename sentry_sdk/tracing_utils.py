@@ -23,7 +23,6 @@ from sentry_sdk.utils import (
     _module_in_list,
     capture_internal_exceptions,
     filename_for_module,
-    has_data_collection_enabled,
     is_sentry_url,
     is_valid_sample_rate,
     logger,
@@ -185,26 +184,18 @@ def get_url_attributes_legacy(
 ) -> "Attributes":
     """Build the `url.*` span attributes for an outgoing HTTP request.
 
-    The query string is only included when the user has opted into collecting
-    it, either through `data_collection` (in which case the configured
-    filtering is applied) or through the legacy `send_default_pii`.
+    The query string is filtered according to `data_collection`.
     """
     attributes: "Attributes" = {}
     if parsed_url is None:
         return attributes
 
-    query: "Optional[str]"
-    if has_data_collection_enabled(client.options):
-        query = None
-        if parsed_url.query:
-            query = _apply_data_collection_filtering_to_query_string(
-                query_string=parsed_url.query,
-                behaviour=client.options["data_collection"]["url_query_params"],
-            )
-    elif client.should_send_default_pii():
-        query = parsed_url.query
-    else:
-        return attributes
+    query: "Optional[str]" = None
+    if parsed_url.query:
+        query = _apply_data_collection_filtering_to_query_string(
+            query_string=parsed_url.query,
+            behaviour=client.options["data_collection"]["url_query_params"],
+        )
 
     url_full = parsed_url.url
     if query:

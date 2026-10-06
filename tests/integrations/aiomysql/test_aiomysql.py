@@ -210,47 +210,6 @@ async def test_execute_many(sentry_init, capture_events) -> None:
         CRUMBS_CONNECT,
         {
             "category": "query",
-            "data": {"db.executemany": True},
-            "message": "INSERT INTO users(name, password, dob) VALUES (%s, %s, %s)",
-            "type": "default",
-        },
-    ]
-
-
-@pytest.mark.asyncio
-async def test_execute_many_record_params_with_data_collection_enabled(
-    sentry_init, capture_events
-) -> None:
-    sentry_init(
-        integrations=[AioMySQLIntegration()],
-        data_collection={"database_query_data": True},
-    )
-    events = capture_events()
-
-    conn = await aiomysql.connect(**_connect_args())
-
-    async with conn.cursor() as cur:
-        await cur.executemany(
-            "INSERT INTO users(name, password, dob) VALUES (%s, %s, %s)",
-            [
-                ("Bob", "secret_pw", datetime.date(1984, 3, 1)),
-                ("Alice", "pw", datetime.date(1990, 12, 25)),
-            ],
-        )
-
-    conn.close()
-
-    capture_message("hi")
-
-    (event,) = events
-
-    for crumb in event["breadcrumbs"]["values"]:
-        del crumb["timestamp"]
-
-    assert event["breadcrumbs"]["values"] == [
-        CRUMBS_CONNECT,
-        {
-            "category": "query",
             "data": {
                 "db.params": [
                     ["Bob", "secret_pw", "datetime.date(1984, 3, 1)"],
@@ -266,12 +225,12 @@ async def test_execute_many_record_params_with_data_collection_enabled(
 
 
 @pytest.mark.asyncio
-async def test_execute_many_record_params_with_data_collection_default(
+async def test_execute_many_record_params_with_data_collection_enabled(
     sentry_init, capture_events
 ) -> None:
     sentry_init(
         integrations=[AioMySQLIntegration()],
-        data_collection={},
+        data_collection={"database_query_data": True},
     )
     events = capture_events()
 
