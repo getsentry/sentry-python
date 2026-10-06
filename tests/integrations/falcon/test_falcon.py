@@ -68,7 +68,6 @@ def test_has_context(
 ):
     sentry_init(
         integrations=[FalconIntegration()],
-        data_collection={},
     )
 
     client = make_client()
@@ -278,7 +277,6 @@ def test_falcon_large_json_request(
         integrations=[FalconIntegration()],
         max_request_body_size="always",
         max_value_length=max_value_length,
-        data_collection={},
     )
 
     data = {"foo": {"bar": "a" * (1034)}}
@@ -361,7 +359,6 @@ def test_falcon_raw_data_request(
 ):
     sentry_init(
         integrations=[FalconIntegration()],
-        data_collection={},
     )
 
     class Resource:
@@ -626,7 +623,6 @@ def test_falcon_request_media(sentry_init):
 
     sentry_init(
         integrations=[FalconIntegration()],
-        data_collection={},
     )
 
     try:

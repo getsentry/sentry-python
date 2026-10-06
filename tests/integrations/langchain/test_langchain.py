@@ -2088,7 +2088,7 @@ def test_span_status_error(
         integrations=[LangchainIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        data_collection={},
+
     )
     items = capture_items("event", "span")
 
@@ -2143,7 +2143,7 @@ def test_langchain_tool_error(
         integrations=[LangchainIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        data_collection={},
+
     )
 
     responses = nonstreaming_responses_tool_call_model_responses(
@@ -2246,7 +2246,7 @@ def test_manual_callback_no_duplication(sentry_init):
     sentry_init(
         integrations=[LangchainIntegration()],
         disabled_integrations=[StdlibIntegration],
-        data_collection={},
+
     )
 
     # Create a manual SentryLangchainCallback
@@ -2287,7 +2287,7 @@ def test_langchain_callback_manager(sentry_init):
         integrations=[LangchainIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        data_collection={},
+
     )
     local_manager = BaseCallbackManager(handlers=[])
 
@@ -2321,7 +2321,7 @@ def test_langchain_callback_manager_with_sentry_callback(sentry_init):
         integrations=[LangchainIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        data_collection={},
+
     )
     sentry_callback = SentryLangchainCallback()
     local_manager = BaseCallbackManager(handlers=[sentry_callback])
@@ -2355,7 +2355,7 @@ def test_langchain_callback_list(sentry_init):
         integrations=[LangchainIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        data_collection={},
+
     )
     local_callbacks = []
 
@@ -2389,7 +2389,7 @@ def test_langchain_callback_list_existing_callback(sentry_init):
         integrations=[LangchainIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        data_collection={},
+
     )
     sentry_callback = SentryLangchainCallback()
     local_callbacks = [sentry_callback]
@@ -2843,7 +2843,7 @@ def test_langchain_ai_system_detection(
         integrations=[LangchainIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        data_collection={},
+
     )
 
     callback = SentryLangchainCallback()
