@@ -7,7 +7,7 @@ from sentry_sdk.integrations.pure_eval import PureEvalIntegration
 
 
 @pytest.mark.parametrize("integrations", [[], [PureEvalIntegration()]])
-def test_include_local_variables_enabled(sentry_init, capture_events, integrations):
+def test_stack_frame_variables_enabled(sentry_init, capture_events, integrations):
     sentry_init(
         data_collection={"stack_frame_variables": True}, integrations=integrations
     )

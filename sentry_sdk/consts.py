@@ -1378,8 +1378,6 @@ class ClientConstructor:
         _experiments: "Experiments" = {},  # noqa: B006
         proxy_headers: "Optional[Dict[str, str]]" = None,
         project_root: "Optional[str]" = None,
-        include_local_variables: "Optional[bool]" = True,
-        include_source_context: "Optional[bool]" = True,
         trace_propagation_targets: "Optional[Sequence[str]]" = [  # noqa: B006
             MATCH_ALL
         ],
@@ -1515,14 +1513,6 @@ class ClientConstructor:
                 )
 
             See https://docs.sentry.io/platforms/python/configuration/options/#data_collection for more details.
-
-        :param include_source_context: When enabled, source context will be included in events sent to Sentry.
-
-            This source context includes the five lines of code above and below the line of code where an error
-            happened.
-
-        :param include_local_variables: When enabled, the SDK will capture a snapshot of local variables to send with
-            the event to help with debugging.
 
         :param add_full_stack: When capturing errors, Sentry stack traces typically only include frames that start the
             moment an error occurs.

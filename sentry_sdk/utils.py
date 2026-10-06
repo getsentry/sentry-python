@@ -589,8 +589,6 @@ def filename_for_module(
 def serialize_frame(
     frame: "FrameType",
     tb_lineno: "Optional[int]" = None,
-    include_local_variables: bool = True,
-    include_source_context: bool = True,
     max_value_length: "Optional[int]" = None,
     custom_repr: "Optional[Callable[..., Optional[str]]]" = None,
 ) -> "Dict[str, Any]":
@@ -624,53 +622,38 @@ def serialize_frame(
         "lineno": tb_lineno,
     }
 
-    client_options = sentry_sdk.get_client().options
-    if has_data_collection_enabled(client_options):
-        include_source_context = bool(
-            client_options["data_collection"]["frame_context_lines"]
-        )
+    data_collection = sentry_sdk.get_client().options["data_collection"]
 
+    include_source_context = bool(data_collection["frame_context_lines"])
     if include_source_context:
         rv["pre_context"], rv["context_line"], rv["post_context"] = get_source_context(
             frame, tb_lineno, max_value_length
         )
 
-    if has_data_collection_enabled(client_options):
-        dc_stack_frame_vars_config = client_options["data_collection"][
-            "stack_frame_variables"
-        ]
+    dc_stack_frame_vars_config = data_collection["stack_frame_variables"]
 
-        if isinstance(dc_stack_frame_vars_config, bool):
-            if dc_stack_frame_vars_config:
-                rv["vars"] = serialize(
-                    dict(frame.f_locals), is_vars=True, custom_repr=custom_repr
-                )
-        else:
-            local_variables_to_send = _apply_key_value_collection_filtering(
-                items=dict(frame.f_locals),
-                behaviour=dc_stack_frame_vars_config,
+    if isinstance(dc_stack_frame_vars_config, bool):
+        if dc_stack_frame_vars_config:
+            rv["vars"] = serialize(
+                dict(frame.f_locals), is_vars=True, custom_repr=custom_repr
+            )
+    else:
+        local_variables_to_send = _apply_key_value_collection_filtering(
+            items=dict(frame.f_locals),
+            behaviour=dc_stack_frame_vars_config,
+        )
+
+        if local_variables_to_send:
+            serialized_variables = serialize(
+                local_variables_to_send, is_vars=True, custom_repr=custom_repr
             )
 
-            if local_variables_to_send:
-                serialized_variables = serialize(
-                    local_variables_to_send, is_vars=True, custom_repr=custom_repr
-                )
-
-                rv["vars"] = serialized_variables
-
-    elif include_local_variables:
-        rv["vars"] = serialize(
-            dict(frame.f_locals), is_vars=True, custom_repr=custom_repr
-        )
+            rv["vars"] = serialized_variables
 
     return rv
 
 
-def current_stacktrace(
-    include_local_variables: bool = True,
-    include_source_context: bool = True,
-    max_value_length: "Optional[int]" = None,
-) -> "Dict[str, Any]":
+def current_stacktrace(max_value_length: "Optional[int]" = None) -> "Dict[str, Any]":
     __tracebackhide__ = True
     frames = []
 
@@ -680,8 +663,6 @@ def current_stacktrace(
             frames.append(
                 serialize_frame(
                     f,
-                    include_local_variables=include_local_variables,
-                    include_source_context=include_source_context,
                     max_value_length=max_value_length,
                 )
             )
@@ -770,13 +751,9 @@ def single_exception_from_error_tuple(
     exception_value["value"] = get_error_message(exc_value)
 
     if client_options is None:
-        include_local_variables = True
-        include_source_context = True
         max_value_length = None  # fallback
         custom_repr = None
     else:
-        include_local_variables = client_options["include_local_variables"]
-        include_source_context = client_options["include_source_context"]
         max_value_length = client_options["max_value_length"]
         custom_repr = client_options.get("custom_repr")
 
@@ -784,8 +761,6 @@ def single_exception_from_error_tuple(
         serialize_frame(
             tb.tb_frame,
             tb_lineno=tb.tb_lineno,
-            include_local_variables=include_local_variables,
-            include_source_context=include_source_context,
             max_value_length=max_value_length,
             custom_repr=custom_repr,
         )
@@ -1176,7 +1151,6 @@ def event_from_exception(
 
     if client_options and client_options.get("add_full_stack", DEFAULT_ADD_FULL_STACK):
         full_stack = current_stacktrace(
-            include_local_variables=client_options["include_local_variables"],
             max_value_length=client_options["max_value_length"],
         )["frames"]
     else:

@@ -18,7 +18,8 @@ minimum_python_311 = pytest.mark.skipif(
 
 
 @minimum_python_311
-def test_exceptiongroup():
+def test_exceptiongroup(sentry_init):
+    sentry_init()
     exception_group = None
 
     try:
@@ -45,8 +46,6 @@ def test_exceptiongroup():
     (event, _) = event_from_exception(
         exception_group,
         client_options={
-            "include_local_variables": True,
-            "include_source_context": True,
             "max_value_length": 1024,
         },
         mechanism={"type": "test_suite", "handled": False},
@@ -145,7 +144,8 @@ def test_exceptiongroup():
 
 
 @minimum_python_311
-def test_exceptiongroup_simple():
+def test_exceptiongroup_simple(sentry_init):
+    sentry_init()
     exception_group = None
 
     try:
@@ -161,8 +161,6 @@ def test_exceptiongroup_simple():
     (event, _) = event_from_exception(
         exception_group,
         client_options={
-            "include_local_variables": True,
-            "include_source_context": True,
             "max_value_length": 1024,
         },
         mechanism={"type": "test_suite", "handled": False},
@@ -206,8 +204,6 @@ def test_exception_chain_cause():
     (event, _) = event_from_exception(
         exception_chain_cause,
         client_options={
-            "include_local_variables": True,
-            "include_source_context": True,
             "max_value_length": 1024,
         },
         mechanism={"type": "test_suite", "handled": False},
@@ -250,8 +246,6 @@ def test_exception_chain_context():
     (event, _) = event_from_exception(
         exception_chain_context,
         client_options={
-            "include_local_variables": True,
-            "include_source_context": True,
             "max_value_length": 1024,
         },
         mechanism={"type": "test_suite", "handled": False},
@@ -293,8 +287,6 @@ def test_simple_exception():
     (event, _) = event_from_exception(
         simple_excpetion,
         client_options={
-            "include_local_variables": True,
-            "include_source_context": True,
             "max_value_length": 1024,
         },
         mechanism={"type": "test_suite", "handled": False},
@@ -318,7 +310,8 @@ def test_simple_exception():
 
 
 @minimum_python_311
-def test_exception_group_chained_with_context():
+def test_exception_group_chained_with_context(sentry_init):
+    sentry_init()
     try:
         try:
             raise ExceptionGroup(
@@ -342,8 +335,6 @@ def test_exception_group_chained_with_context():
     (event, _) = event_from_exception(
         exc,
         client_options={
-            "include_local_variables": True,
-            "include_source_context": True,
             "max_value_length": 1024,
         },
         mechanism={"type": "test_suite", "handled": False},
@@ -402,7 +393,7 @@ def test_exception_group_chained_with_context():
 
 
 @minimum_python_311
-def test_exceptiongroup_starlette_collapse():
+def test_exceptiongroup_starlette_collapse(sentry_init):
     """
     Simulates the Starlette collapse_excgroups() pattern where a single-exception
     ExceptionGroup is caught and the inner exception is unwrapped and re-raised.
@@ -422,6 +413,7 @@ def test_exceptiongroup_starlette_collapse():
     Without cycle detection in exceptions_from_error(), this causes infinite
     recursion and a silent RecursionError that drops the event.
     """
+    sentry_init()
     exception_group = None
 
     try:
@@ -445,8 +437,6 @@ def test_exceptiongroup_starlette_collapse():
     (event, _) = event_from_exception(
         exception_group,
         client_options={
-            "include_local_variables": True,
-            "include_source_context": True,
             "max_value_length": 1024,
         },
         mechanism={"type": "test_suite", "handled": False},
@@ -516,8 +506,6 @@ def test_cyclic_exception_group_cause():
     (event, _) = event_from_exception(
         group,
         client_options={
-            "include_local_variables": True,
-            "include_source_context": True,
             "max_value_length": 1024,
         },
         mechanism={"type": "test_suite", "handled": False},
@@ -554,8 +542,6 @@ def test_deeply_nested_cyclic_exception_group():
     (event, _) = event_from_exception(
         outer_group,
         client_options={
-            "include_local_variables": True,
-            "include_source_context": True,
             "max_value_length": 1024,
         },
         mechanism={"type": "test_suite", "handled": False},

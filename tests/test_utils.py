@@ -478,44 +478,6 @@ def test_warns_on_invalid_sample_rate(rate, StringContaining):  # noqa: N803
         assert result is False
 
 
-@pytest.mark.parametrize(
-    "options,include_source_context,expected_source_context",
-    [
-        pytest.param({}, True, True, id="no_data_collection-include_true"),
-        pytest.param({}, False, False, id="no_data_collection-include_false"),
-        pytest.param(
-            {"data_collection": {}},
-            False,
-            True,
-            id="data_collection-spec_default_overrides_include_false",
-        ),
-        pytest.param(
-            {"data_collection": {"frame_context_lines": 3}},
-            True,
-            True,
-            id="data_collection-frame_context_lines_3",
-        ),
-        pytest.param(
-            {"data_collection": {"frame_context_lines": 0}},
-            True,
-            False,
-            id="data_collection-frame_context_lines_0_overrides_include_true",
-        ),
-    ],
-)
-def test_include_source_context_when_serializing_frame(
-    sentry_init, options, include_source_context, expected_source_context
-):
-    sentry_init(**options)
-
-    frame = sys._getframe()
-    result = serialize_frame(frame, include_source_context=include_source_context)
-
-    assert ("pre_context" in result) is expected_source_context
-    assert ("context_line" in result) is expected_source_context
-    assert ("post_context" in result) is expected_source_context
-
-
 def _frame_with_locals():
     safe_value = "not sensitive"  # noqa: F841
     password = "ada123"  # noqa: F841
@@ -525,36 +487,31 @@ def _frame_with_locals():
 
 
 @pytest.mark.parametrize(
-    "data_collection,include_local_variables,expected_vars",
+    "data_collection,expected_vars",
     [
         pytest.param(
             {"stack_frame_variables": True},
-            False,
             True,
-            id="data_collection_stack_frame_variables_true_overrides_include_false",
+            id="data_collection_stack_frame_variables_true",
         ),
         pytest.param(
             {"stack_frame_variables": False},
-            True,
             False,
-            id="data_collection_stack_frame_variables_false_overrides_include_true",
+            id="data_collection_stack_frame_variables_false",
         ),
         pytest.param(
             {},
-            False,
             True,
             id="data_collection_stack_frame_variables_spec_default_is_true",
         ),
     ],
 )
 def test_stack_frame_variables_bool_when_serializing_frame(
-    sentry_init, data_collection, include_local_variables, expected_vars
+    sentry_init, data_collection, expected_vars
 ):
     sentry_init(data_collection=data_collection)
 
-    result = serialize_frame(
-        _frame_with_locals(), include_local_variables=include_local_variables
-    )
+    result = serialize_frame(_frame_with_locals())
 
     assert ("vars" in result) is expected_vars
 
@@ -652,58 +609,6 @@ def test_stack_frame_variables_filtering_uses_custom_repr(sentry_init):
 
     assert result["vars"]["safe_value"] == "CUSTOM"
     assert result["vars"]["password"] == "'[Filtered]'"
-
-
-@pytest.mark.parametrize(
-    "options,include_local_variables,expected_vars",
-    [
-        pytest.param(
-            {},
-            True,
-            True,
-            id="no_data_collection-include_local_variables_true",
-        ),
-        pytest.param(
-            {},
-            False,
-            False,
-            id="no_data_collection-include_local_variables_false",
-        ),
-    ],
-)
-def test_include_local_variables_when_data_collection_is_unset(
-    sentry_init, options, include_local_variables, expected_vars
-):
-    sentry_init(**options)
-
-    result = serialize_frame(
-        _frame_with_locals(), include_local_variables=include_local_variables
-    )
-
-    assert ("vars" in result) is expected_vars
-
-
-def test_data_collection_stack_frame_variables_overrides_include_local_variables_option(
-    sentry_init, capture_events
-):
-    sentry_init(
-        include_local_variables=False,
-        data_collection={"stack_frame_variables": True},
-    )
-    events = capture_events()
-
-    def raise_with_locals():
-        safe_value = "not sensitive"  # noqa: F841
-        raise ValueError("boom")
-
-    try:
-        raise_with_locals()
-    except ValueError:
-        sentry_sdk.capture_exception()
-
-    (event,) = events
-    frame = event["exception"]["values"][0]["stacktrace"]["frames"][-1]
-    assert frame["vars"]["safe_value"] == "'not sensitive'"
 
 
 def test_data_collection_stack_frame_variables_filtering_applies_to_captured_exception(
@@ -1334,14 +1239,6 @@ def test_get_lines_from_file_handle_linecache_errors():
             {"data_collection": {"frame_context_lines": 0}},
             0,
             id="data_collection-frame_context_lines_0",
-        ),
-        pytest.param(
-            {
-                "data_collection": {},
-                "include_source_context": False,
-            },
-            5,
-            id="data_collection-spec_default_overrides_include_source_context_false",
         ),
     ],
 )

@@ -166,7 +166,8 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 - The `data_collection` option is no longer accessible under `_experiments`. Use it as a top-level option instead.
 - The experimental `record_sql_params` option was removed. Use the `database_query_data` setting of `data_collection` instead.
 - The `record_params` option of `AsyncPGIntegration` and `AioMySQLIntegration` was removed. Use the `database_query_data` setting of `data_collection` instead.
-
+- The `include_local_variables` option was removed. Use `data_collection`'s `stack_frame_variables` as a drop-in replacement.
+- The `include_source_context` option was removed. Use `data_collection`'s `frame_context_lines` for more granular control over the source context reported by specifying the number of lines to include around the failing line, or set `frame_context_lines=0` to disable source context entirely.
 
 ## Deprecated
 
