@@ -43,7 +43,6 @@ from sentry_sdk.utils import (
     event_from_exception,
     exc_info_from_error,
     format_attribute,
-    has_data_collection_enabled,
     logger,
 )
 
@@ -1443,10 +1442,7 @@ class Scope:
             attributes = telemetry._attributes
 
         client_options = sentry_sdk.get_client().options
-        if has_data_collection_enabled(client_options):
-            if not client_options["data_collection"]["user_info"] or self._user is None:
-                return
-        elif not should_send_default_pii() or self._user is None:
+        if not client_options["data_collection"]["user_info"] or self._user is None:
             return
 
         for attribute_name, user_attribute in (

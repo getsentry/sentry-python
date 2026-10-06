@@ -149,36 +149,6 @@ def _apply_key_value_collection_filtering(
     return result
 
 
-def _map_from_send_default_pii(*, send_default_pii: bool) -> "DataCollection":
-    """
-    Build a fully-resolved ``DataCollection`` dict that mirrors the data
-    ``send_default_pii`` collects today. Used when ``data_collection`` is not
-    provided explicitly.
-    """
-    terms = [] if send_default_pii else ["forwarded", "-ip", "remote-", "via", "-user"]
-
-    return {
-        "provided_by_user": False,
-        "user_info": send_default_pii,
-        "cookies": {"mode": "denylist", "terms": terms},
-        # Headers are collected in both PII modes today (sensitive ones filtered
-        # when PII is off), so this never maps to "off".
-        "http_headers": {
-            "request": {"mode": "denylist", "terms": terms},
-        },
-        # Bodies are collected regardless of PII today, bounded by
-        # ``max_request_body_size``.
-        "http_bodies": list(_ALL_HTTP_BODY_TYPES),
-        "url_query_params": {"mode": "denylist", "terms": terms},
-        "graphql": {"document": send_default_pii, "variables": send_default_pii},
-        "gen_ai": {"inputs": send_default_pii, "outputs": send_default_pii},
-        "database_query_data": send_default_pii,
-        "queues": send_default_pii,
-        "stack_frame_variables": True,
-        "frame_context_lines": _DEFAULT_FRAME_CONTEXT_LINES,
-    }
-
-
 def _resolve_explicit(
     d: "dict[str, Any]",
 ) -> "DataCollection":
@@ -214,7 +184,6 @@ def _resolve_explicit(
     )
 
     return {
-        "provided_by_user": True,
         "user_info": d.get("user_info", True),
         "cookies": _kvcb_from_value(d.get("cookies") or {}),
         "http_headers": _http_headers_from_value(d.get("http_headers") or {}),
@@ -280,37 +249,20 @@ def _resolve_data_collection(options: "Dict[str, Any]") -> "DataCollection":
     """
     Resolve the effective ``DataCollection`` dict from client ``options``.
 
-    Reads ``data_collection``, ``send_default_pii`` and returns a fully-resolved
-    dict with concrete values for every field.
+    Reads ``data_collection`` and returns a fully-resolved dict with concrete values for every field.
 
     ``data_collection`` must be a plain ``dict``.
 
     Must be called exactly once per options dict, before ``client._get_options``
-    overwrites ``options["data_collection"]`` with the resolved result. Feeding an
-    already-resolved dict back in would flip ``provided_by_user`` to ``True``.
+    overwrites ``options["data_collection"]`` with the resolved result.
     """
-    from sentry_sdk.utils import deprecation_warning
+    user_dc = options.get("data_collection", {})
 
-    user_dc = options.get("data_collection")
-    if user_dc is None:
-        user_dc = options.get("_experiments", {}).get("data_collection")
-
-    send_default_pii = options.get("send_default_pii")
-
-    if user_dc is not None:
-        if not isinstance(user_dc, dict):
-            raise TypeError(
-                "`data_collection` must be a dict, got {!r}.".format(
-                    type(user_dc).__name__
-                )
-            )
-        if send_default_pii is not None:
-            deprecation_warning(
-                "`send_default_pii` is deprecated and ignored when "
-                "`data_collection` is set.",
-            )
-        return _resolve_explicit(
-            user_dc,
+    if not isinstance(user_dc, dict):
+        raise TypeError(
+            "`data_collection` must be a dict, got {!r}.".format(type(user_dc).__name__)
         )
 
-    return _map_from_send_default_pii(send_default_pii=bool(send_default_pii))
+    return _resolve_explicit(
+        user_dc,
+    )

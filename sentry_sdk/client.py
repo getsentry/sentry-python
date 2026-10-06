@@ -19,7 +19,6 @@ from sentry_sdk.consts import (
     ClientConstructor,
 )
 from sentry_sdk.data_collection import (
-    _map_from_send_default_pii,
     _resolve_data_collection,
 )
 from sentry_sdk.envelope import Envelope, Item
@@ -366,18 +365,8 @@ class _Client(BaseClient):
             self.spotlight = setup_spotlight(self.options)
             if self.spotlight is not None and not self.options["dsn"]:
                 sample_all = lambda *_args, **_kwargs: 1.0
-                self.options["send_default_pii"] = True
                 self.options["error_sampler"] = sample_all
                 self.options["traces_sampler"] = sample_all
-                # data_collection was resolved in _get_options() before this
-                # spotlight override flipped send_default_pii on. Re-derive it so
-                # data_collection agrees with should_send_default_pii() in
-                # DSN-less spotlight mode (only when the user did not set
-                # data_collection explicitly).
-                if not self.options["data_collection"]["provided_by_user"]:
-                    self.options["data_collection"] = _map_from_send_default_pii(
-                        send_default_pii=True
-                    )
 
             self.session_flusher = SessionFlusher(capture_func=_capture_envelope)
 
