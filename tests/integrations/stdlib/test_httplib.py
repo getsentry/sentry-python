@@ -79,7 +79,7 @@ CHUNKED_PORT = create_chunked_server()
 def test_crumb_capture(sentry_init, capture_events):
     sentry_init(
         integrations=[StdlibIntegration()],
-        data_collection={},
+
     )
     events = capture_events()
 
@@ -115,7 +115,7 @@ def test_crumb_capture(sentry_init, capture_events):
 def test_crumb_capture_client_error(sentry_init, capture_events, status_code, level):
     sentry_init(
         integrations=[StdlibIntegration()],
-        data_collection={},
+
     )
     events = capture_events()
 
@@ -239,7 +239,7 @@ def test_httplib_misuse(sentry_init, capture_events, request):
 def test_outgoing_trace_headers(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
-        data_collection={},
+
     )
 
     already_patched_getresponse = HTTPSConnection.getresponse
@@ -312,7 +312,7 @@ def test_outgoing_trace_headers_head_sdk(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=0.5,
         release="foo",
-        data_collection={},
+
     )
 
     already_patched_getresponse = HTTPSConnection.getresponse
@@ -374,7 +374,7 @@ def test_outgoing_trace_headers_no_current_span(sentry_init):
     """
     sentry_init(
         traces_sample_rate=1.0,
-        data_collection={},
+
     )
 
     already_patched_getresponse = HTTPSConnection.getresponse
@@ -503,7 +503,7 @@ def test_option_trace_propagation_targets(
     sentry_init(
         trace_propagation_targets=trace_propagation_targets,
         traces_sample_rate=1.0,
-        data_collection={},
+
     )
 
     already_patched_getresponse = HTTPSConnection.getresponse
@@ -557,7 +557,7 @@ def test_request_source_disabled(sentry_init, capture_items):
         traces_sample_rate=1.0,
         enable_http_request_source=False,
         http_request_source_threshold_ms=0,
-        data_collection={},
+
     )
 
     items = capture_items("span")
@@ -590,7 +590,7 @@ def test_request_source_enabled(sentry_init, capture_items, enable_http_request_
     sentry_init(
         traces_sample_rate=1.0,
         http_request_source_threshold_ms=0,
-        data_collection={},
+
         **kwargs,
     )
 
@@ -618,7 +618,7 @@ def test_request_source(sentry_init, capture_items):
         traces_sample_rate=1.0,
         enable_http_request_source=True,
         http_request_source_threshold_ms=0,
-        data_collection={},
+
     )
 
     items = capture_items("span")
@@ -664,7 +664,7 @@ def test_request_source_with_module_in_search_path(sentry_init, capture_items):
         traces_sample_rate=1.0,
         enable_http_request_source=True,
         http_request_source_threshold_ms=0,
-        data_collection={},
+
     )
 
     items = capture_items("span")
@@ -703,7 +703,7 @@ def test_no_request_source_if_duration_too_short(sentry_init, capture_items):
         traces_sample_rate=1.0,
         enable_http_request_source=True,
         http_request_source_threshold_ms=100,
-        data_collection={},
+
     )
 
     add_http_request_source = sentry_sdk.tracing_utils.add_http_request_source
@@ -742,7 +742,7 @@ def test_request_source_if_duration_over_threshold(sentry_init, capture_items):
         traces_sample_rate=1.0,
         enable_http_request_source=True,
         http_request_source_threshold_ms=100,
-        data_collection={},
+
     )
 
     add_http_request_source = sentry_sdk.tracing_utils.add_http_request_source
@@ -799,7 +799,7 @@ def test_request_source_if_duration_over_threshold(sentry_init, capture_items):
 def test_span_origin(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
-        data_collection={},
+
         debug=True,
     )
     items = capture_items("span")
@@ -823,7 +823,7 @@ def test_http_timeout(monkeypatch, sentry_init, capture_items):
 
     sentry_init(
         traces_sample_rate=1.0,
-        data_collection={},
+
     )
     items = capture_items("span")
 
@@ -850,7 +850,7 @@ def test_http_timeout(monkeypatch, sentry_init, capture_items):
 def test_proxy_http_tunnel(sentry_init, capture_items, tunnel_port):
     sentry_init(
         traces_sample_rate=1.0,
-        data_collection={},
+
     )
     items = capture_items("span")
 
@@ -884,7 +884,7 @@ def test_proxy_http_tunnel(sentry_init, capture_items, tunnel_port):
 def test_chunked_response_span_covers_body_read(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
-        data_collection={},
+
     )
 
     min_expected_duration = CHUNK_DELAY * NUM_CHUNKS
