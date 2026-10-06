@@ -29,7 +29,6 @@ def test_crumb_capture_and_hint_sync(sentry_init, capture_events, httpx2_mock):
     sentry_init(
         integrations=[Httpx2Integration()],
         before_breadcrumb=before_breadcrumb,
-
     )
 
     url = "http://example.com/"
@@ -72,7 +71,6 @@ async def test_crumb_capture_and_hint_async(sentry_init, capture_events, httpx2_
     sentry_init(
         integrations=[Httpx2Integration()],
         before_breadcrumb=before_breadcrumb,
-
     )
 
     url = "http://example.com/"
@@ -187,7 +185,6 @@ def test_crumb_capture_client_error_sync(
 
     sentry_init(
         integrations=[Httpx2Integration()],
-
     )
 
     url = "http://example.com/"
@@ -240,7 +237,6 @@ async def test_crumb_capture_client_error_async(
 
     sentry_init(
         integrations=[Httpx2Integration()],
-
     )
 
     url = "http://example.com/"
@@ -1255,7 +1251,6 @@ def test_http_url_attributes_no_query_or_fragment_sync(
     sentry_init(
         integrations=[Httpx2Integration()],
         traces_sample_rate=1.0,
-
     )
 
     items = capture_items("span")
@@ -1285,7 +1280,6 @@ async def test_http_url_attributes_no_query_or_fragment_async(
     sentry_init(
         integrations=[Httpx2Integration()],
         traces_sample_rate=1.0,
-
     )
 
     items = capture_items("span")
@@ -1575,7 +1569,6 @@ def test_omit_url_data_if_parsing_fails(
     sentry_init(
         integrations=[Httpx2Integration()],
         traces_sample_rate=1.0,
-
     )
 
     items = capture_items("span")

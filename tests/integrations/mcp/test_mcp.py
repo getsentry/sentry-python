@@ -142,7 +142,6 @@ async def test_tool_handler_constructor_registration(sentry_init, capture_items,
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
-
     )
 
     async def test_tool(ctx, params):
@@ -185,7 +184,6 @@ async def test_mcpserver_high_level_tool_instrumented(
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
-
     )
 
     mcp_server = MCPServer("test-server")
@@ -217,7 +215,6 @@ async def test_wrapping_handler_is_idempotent(sentry_init, capture_items, stdio)
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
-
     )
 
     async def test_tool(ctx, params):
@@ -556,7 +553,6 @@ async def test_tool_handler_stateless_streamable_http(
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
-
     )
 
     server = Server("test-server")
@@ -604,7 +600,6 @@ async def test_tool_handler_with_error(sentry_init, capture_items, stdio):
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
-
     )
 
     server = Server("test-server")
@@ -938,7 +933,6 @@ async def test_prompt_handler_with_error(sentry_init, capture_items, stdio):
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
-
     )
 
     server = Server("test-server")
@@ -979,7 +973,6 @@ async def test_resource_handler_stdio(sentry_init, capture_items, stdio):
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
-
     )
 
     server = Server("test-server")
@@ -1036,7 +1029,6 @@ async def test_resource_handler_streamable_http(sentry_init, capture_items, json
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
-
     )
 
     server = Server("test-server")
@@ -1099,7 +1091,6 @@ async def test_resource_handler_with_error(sentry_init, capture_items, stdio):
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
-
     )
 
     server = Server("test-server")
@@ -1342,7 +1333,6 @@ async def test_multiple_handlers(sentry_init, capture_items, stdio):
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
-
     )
 
     server = Server("test-server")
@@ -1594,7 +1584,6 @@ async def test_sse_transport_detection_v2(sentry_init, capture_items, json_rpc_s
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
-
     )
 
     server = Server("test-server")
@@ -1672,7 +1661,6 @@ async def test_streamable_http_scope_propagation(sentry_init, capture_items, jso
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
-
     )
 
     server = Server("test-server")

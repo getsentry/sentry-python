@@ -905,7 +905,6 @@ async def test_fastmcp_span_origin(
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
-
     )
 
     mcp = FastMCP("Test Server")
@@ -947,7 +946,6 @@ def test_fastmcp_http_transport(sentry_init, capture_items, FastMCP, json_rpc):
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
-
     )
 
     mcp = FastMCP("Test Server")
@@ -1011,7 +1009,6 @@ async def test_fastmcp_stdio_transport(
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
-
     )
 
     mcp = FastMCP("Test Server")

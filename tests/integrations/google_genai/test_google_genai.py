@@ -478,7 +478,6 @@ def test_error_handling(
     sentry_init(
         integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
-
     )
     items = capture_items("event")
 
@@ -658,7 +657,6 @@ def test_span_origin(
     sentry_init(
         integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
-
     )
 
     mock_http_response = create_mock_http_response(EXAMPLE_API_RESPONSE_JSON)
@@ -687,7 +685,6 @@ def test_response_without_usage_metadata(
     sentry_init(
         integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
-
     )
 
     # Response without usage metadata
@@ -807,7 +804,6 @@ def test_all_configuration_parameters(
     sentry_init(
         integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
-
     )
 
     mock_http_response = create_mock_http_response(EXAMPLE_API_RESPONSE_JSON)
@@ -851,7 +847,6 @@ def test_empty_response(
     sentry_init(
         integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
-
     )
 
     # Minimal response with empty candidates array
@@ -885,7 +880,6 @@ def test_response_with_different_id_fields(
     sentry_init(
         integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
-
     )
 
     # Response with response_id and model_version
@@ -928,7 +922,6 @@ def test_tool_with_async_function(sentry_init):
     sentry_init(
         integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
-
     )
 
     # Create an async tool function
@@ -1280,7 +1273,6 @@ def test_embed_content_error_handling(
     sentry_init(
         integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
-
     )
     items = capture_items("event")
 
@@ -1312,7 +1304,6 @@ def test_embed_content_without_statistics(
     sentry_init(
         integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
-
     )
 
     # Response without statistics (typical for older google-genai versions)
@@ -1356,7 +1347,6 @@ def test_embed_content_span_origin(
     sentry_init(
         integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
-
     )
 
     mock_http_response = create_mock_http_response(EXAMPLE_EMBED_RESPONSE_JSON)
@@ -1564,7 +1554,6 @@ async def test_async_embed_content_error_handling(
     sentry_init(
         integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
-
     )
     items = capture_items("event")
 
@@ -1597,7 +1586,6 @@ async def test_async_embed_content_without_statistics(
     sentry_init(
         integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
-
     )
 
     # Response without statistics (typical for older google-genai versions)
@@ -1644,7 +1632,6 @@ async def test_async_embed_content_span_origin(
     sentry_init(
         integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
-
     )
 
     mock_http_response = create_mock_http_response(EXAMPLE_EMBED_RESPONSE_JSON)

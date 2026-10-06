@@ -133,7 +133,6 @@ def test_segment_name_and_source(
     sentry_init(
         integrations=[PyramidIntegration()],
         traces_sample_rate=1.0,
-
     )
 
     items = capture_items("event", "span")
@@ -158,7 +157,6 @@ def test_http_route(
     sentry_init(
         integrations=[PyramidIntegration()],
         traces_sample_rate=1.0,
-
     )
 
     items = capture_items("span")
@@ -180,7 +178,6 @@ def test_large_json_request(
         integrations=[PyramidIntegration()],
         max_request_body_size="always",
         max_value_length=max_value_length,
-
     )
 
     data = {"foo": {"bar": "a" * (1034)}}
@@ -240,7 +237,6 @@ def test_json_not_truncated_if_max_request_body_size_is_always(
     sentry_init(
         integrations=[PyramidIntegration()],
         max_request_body_size="always",
-
     )
 
     data = {
@@ -271,7 +267,6 @@ def test_files_and_form(
         integrations=[PyramidIntegration()],
         max_request_body_size="always",
         max_value_length=max_value_length,
-
     )
 
     data = {
@@ -411,7 +406,6 @@ def test_error_in_authenticated_userid(
             PyramidIntegration(),
             LoggingIntegration(event_level=logging.ERROR),
         ],
-
     )
     logger = logging.getLogger("test_pyramid")
 
@@ -481,7 +475,6 @@ def test_tracing_error(
     sentry_init(
         integrations=[PyramidIntegration()],
         traces_sample_rate=1.0,
-
     )
 
     items = capture_items("event", "span")
@@ -521,7 +514,6 @@ def test_span_origin(
     sentry_init(
         integrations=[PyramidIntegration()],
         traces_sample_rate=1.0,
-
     )
 
     items = capture_items("event", "span")
