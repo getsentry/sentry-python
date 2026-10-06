@@ -178,9 +178,6 @@ class BaseClient:
     def parsed_dsn(self) -> "Optional[Dsn]":
         return None
 
-    def should_send_default_pii(self) -> bool:
-        return False
-
     def is_active(self) -> bool:
         """
         .. versionadded:: 2.0.0
@@ -440,14 +437,6 @@ class _Client(BaseClient):
         Returns whether the client is active (able to send data to Sentry)
         """
         return True
-
-    def should_send_default_pii(self) -> bool:
-        """
-        .. versionadded:: 2.0.0
-
-        Returns whether the client should send default PII (Personally Identifiable Information) data to Sentry.
-        """
-        return self.options.get("send_default_pii") or False
 
     @property
     def dsn(self) -> "Optional[str]":

@@ -1870,11 +1870,6 @@ def use_isolation_scope(isolation_scope: "Scope") -> "Generator[Scope, None, Non
             capture_internal_exception(sys.exc_info())
 
 
-def should_send_default_pii() -> bool:
-    """Shortcut for `Scope.get_client().should_send_default_pii()`."""
-    return Scope.get_client().should_send_default_pii()
-
-
 # Circular imports
 from sentry_sdk.client import NonRecordingClient
 
