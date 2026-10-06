@@ -240,7 +240,7 @@ def test_option_before_breadcrumb_exception(sentry_init, capture_events):
     assert event["breadcrumbs"]["values"] == []
 
 
-def test_breadcrumb_arguments(sentry_init, capture_events):
+def test_breadcrumb_arguments(sentry_init):
     assert_hint = {"bar": 42}
 
     def before_breadcrumb(crumb, hint):

@@ -1176,7 +1176,7 @@ def test_middleware_callback_spans(sentry_init, capture_items):
         assert span["attributes"]["middleware.name"] == exp["middleware_name"]
 
 
-def test_middleware_receive_send(sentry_init, capture_events):
+def test_middleware_receive_send(sentry_init):
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[StarletteIntegration()],

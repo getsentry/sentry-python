@@ -71,7 +71,6 @@ async def test_async_breadcrumb(sentry_init, capture_events):
 @pytest.mark.asyncio
 async def test_async_basic(
     sentry_init,
-    capture_events,
     capture_items,
     send_default_pii,
     description,

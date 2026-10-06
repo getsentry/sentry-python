@@ -127,9 +127,7 @@ def test_scope_data_not_leaked_in_threads(sentry_init, propagate_scope):
     (True, False),
     ids=["propagate_scope=True", "propagate_scope=False"],
 )
-def test_spans_from_multiple_threads(
-    sentry_init, capture_items, render_span_tree, propagate_scope
-):
+def test_spans_from_multiple_threads(sentry_init, capture_items, propagate_scope):
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[ThreadingIntegration(propagate_scope=propagate_scope)],
@@ -190,9 +188,7 @@ def test_spans_from_multiple_threads(
     (True, False),
     ids=["propagate_scope=True", "propagate_scope=False"],
 )
-def test_spans_from_threadpool(
-    sentry_init, capture_items, render_span_tree, propagate_scope
-):
+def test_spans_from_threadpool(sentry_init, capture_items, propagate_scope):
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[ThreadingIntegration(propagate_scope=propagate_scope)],

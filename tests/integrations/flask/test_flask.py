@@ -108,7 +108,6 @@ def test_has_context(sentry_init, app, capture_events):
 def test_segment_name_and_source(
     sentry_init,
     app,
-    capture_events,
     capture_items,
     url,
     expected_transaction,
@@ -209,7 +208,7 @@ def test_flask_login_not_installed(
 
 
 def test_flask_login_not_configured(
-    sentry_init, app, capture_events, monkeypatch, integration_enabled_params
+    sentry_init, app, capture_events, integration_enabled_params
 ):
     sentry_init(data_collection={"user_info": False}, **integration_enabled_params)
 
@@ -227,7 +226,7 @@ def test_flask_login_not_configured(
 
 
 def test_flask_login_partially_configured(
-    sentry_init, app, capture_events, monkeypatch, integration_enabled_params
+    sentry_init, app, capture_events, integration_enabled_params
 ):
     sentry_init(data_collection={"user_info": False}, **integration_enabled_params)
 
@@ -257,9 +256,7 @@ def test_flask_login_configured(
     sentry_init,
     app,
     user_id,
-    capture_events,
     capture_items,
-    monkeypatch,
     integration_enabled_params,
 ):
     sentry_init(
@@ -801,7 +798,6 @@ def test_errorhandler_for_exception_swallows_exception(
 
 def test_tracing_success(
     sentry_init,
-    capture_events,
     capture_items,
     app,
 ):
@@ -847,7 +843,7 @@ def test_tracing_success(
     assert message_event["tags"]["before_request"] == "yes"
 
 
-def test_tracing_error(sentry_init, capture_events, capture_items, app):
+def test_tracing_error(sentry_init, capture_items, app):
     sentry_init(
         data_collection={},
         traces_sample_rate=1.0,
@@ -1011,7 +1007,7 @@ def test_request_not_modified_by_reference(
     assert event["request"]["headers"]["Proxy-Authorization"] == "[Filtered]"
 
 
-def test_span_origin(sentry_init, app, capture_events, capture_items):
+def test_span_origin(sentry_init, app, capture_items):
     sentry_init(
         data_collection={},
         integrations=[flask_sentry.FlaskIntegration()],
@@ -1034,7 +1030,6 @@ def test_span_origin(sentry_init, app, capture_events, capture_items):
 def test_segment_http_method_default(
     sentry_init,
     app,
-    capture_events,
     capture_items,
 ):
     """
@@ -1069,7 +1064,6 @@ def test_segment_http_method_default(
 def test_segment_http_method_custom(
     sentry_init,
     app,
-    capture_events,
     capture_items,
 ):
     """

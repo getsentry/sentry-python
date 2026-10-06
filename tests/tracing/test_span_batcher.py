@@ -9,7 +9,7 @@ import sentry_sdk
 from sentry_sdk._span_batcher import SpanBatcher
 
 
-def test_envelope_by_trace_id(sentry_init, capture_envelopes, monkeypatch):
+def test_envelope_by_trace_id(sentry_init, capture_envelopes):
     """Envelopes only contain spans of one trace ID."""
     sentry_init(
         traces_sample_rate=1.0,

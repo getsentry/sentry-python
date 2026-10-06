@@ -817,7 +817,7 @@ def test_span_origin(sentry_init, capture_items):
     assert spans[0]["attributes"]["sentry.origin"] == "auto.http.stdlib.httplib"
 
 
-def test_http_timeout(monkeypatch, sentry_init, capture_envelopes, capture_items):
+def test_http_timeout(monkeypatch, sentry_init, capture_items):
     mock_readinto = mock.Mock(side_effect=TimeoutError)
     monkeypatch.setattr(SocketIO, "readinto", mock_readinto)
 

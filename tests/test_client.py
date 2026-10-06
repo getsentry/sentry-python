@@ -595,7 +595,7 @@ def test_capture_event_works(sentry_init):
 @pytest.mark.parametrize(
     "http2", [True, False] if sys.version_info >= (3, 8) else [False]
 )
-def test_atexit(tmpdir, monkeypatch, num_messages, http2):
+def test_atexit(tmpdir, num_messages, http2):
     if http2:
         options = '_experiments={"transport_http2": True}'
         transport = "Http2Transport"

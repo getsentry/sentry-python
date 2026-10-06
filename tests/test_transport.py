@@ -383,7 +383,7 @@ def test_socket_options_override_defaults(make_client):
     assert options["socket_options"] == []
 
 
-def test_transport_infinite_loop(capturing_server, request, make_client):
+def test_transport_infinite_loop(capturing_server, make_client):
     client = make_client(
         debug=True,
         # Make sure we cannot create events from our own logging

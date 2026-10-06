@@ -188,7 +188,6 @@ def test_launchdarkly_integration_did_not_enable(uninstall_integration):
 
 def test_launchdarkly_span_integration(
     sentry_init,
-    capture_events,
     capture_items,
     uninstall_integration,
 ):

@@ -466,7 +466,7 @@ def test_attributes_preserialized_in_before_send(sentry_init, capture_items):
     assert isinstance(metric["attributes"]["dictionary"], str)
 
 
-def test_array_attributes_deep_copied_in_before_send(sentry_init, capture_envelopes):
+def test_array_attributes_deep_copied_in_before_send(sentry_init):
     """We don't surface user-held references to objects in attributes."""
 
     strings = ["value1", "value2"]
