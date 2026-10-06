@@ -175,7 +175,7 @@ def _map_from_send_default_pii(*, send_default_pii: bool) -> "DataCollection":
         "database_query_data": send_default_pii,
         "queues": send_default_pii,
         "stack_frame_variables": True,
-        "frame_context_lines": (_DEFAULT_FRAME_CONTEXT_LINES),
+        "frame_context_lines": _DEFAULT_FRAME_CONTEXT_LINES,
     }
 
 
