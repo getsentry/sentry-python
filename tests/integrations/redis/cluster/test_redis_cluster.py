@@ -57,23 +57,23 @@ def test_rediscluster_breadcrumb(sentry_init, capture_events):
 
 
 @pytest.mark.parametrize(
-    "send_default_pii, description",
+    "data_collection, description",
     [
-        (False, "SET 'bar' [Filtered]"),
-        (True, "SET 'bar' 1"),
+        ({"database_query_data": False}, "SET 'bar' [Filtered]"),
+        ({"database_query_data": True}, "SET 'bar' 1"),
     ],
 )
 def test_rediscluster_basic(
     sentry_init,
     capture_events,
     capture_items,
-    send_default_pii,
+    data_collection,
     description,
 ):
     sentry_init(
         integrations=[RedisIntegration()],
         traces_sample_rate=1.0,
-        send_default_pii=send_default_pii,
+        data_collection=data_collection,
     )
 
     items = capture_items("span")
@@ -106,23 +106,26 @@ def test_rediscluster_basic(
 
 
 @pytest.mark.parametrize(
-    "send_default_pii, expected_first_ten",
+    "data_collection, expected_first_ten",
     [
-        (False, ["GET 'foo'", "SET 'bar' [Filtered]", "SET 'baz' [Filtered]"]),
-        (True, ["GET 'foo'", "SET 'bar' 1", "SET 'baz' 2"]),
+        (
+            {"database_query_data": False},
+            ["GET 'foo'", "SET 'bar' [Filtered]", "SET 'baz' [Filtered]"],
+        ),
+        ({"database_query_data": True}, ["GET 'foo'", "SET 'bar' 1", "SET 'baz' 2"]),
     ],
 )
 def test_rediscluster_pipeline(
     sentry_init,
     capture_events,
     capture_items,
-    send_default_pii,
+    data_collection,
     expected_first_ten,
 ):
     sentry_init(
         integrations=[RedisIntegration()],
         traces_sample_rate=1.0,
-        send_default_pii=send_default_pii,
+        data_collection=data_collection,
     )
 
     rc = redis.RedisCluster(host="localhost", port=6379)

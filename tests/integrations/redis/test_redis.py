@@ -97,6 +97,7 @@ def test_pii_data_redacted(
     sentry_init(
         integrations=[RedisIntegration()],
         traces_sample_rate=1.0,
+        data_collection={"database_query_data": False},
     )
 
     connection = FakeRedis()
@@ -336,5 +337,5 @@ def test_span_origin(sentry_init, capture_items):
     assert parent_span["name"] == "custom parent"
     assert parent_span["attributes"]["sentry.origin"] == "manual"
     assert set_span["attributes"]["sentry.origin"] == "auto.db.redis"
-    assert set_span["attributes"][SPANDATA.DB_QUERY_TEXT] == "SET 'somekey' [Filtered]"
+    assert set_span["attributes"][SPANDATA.DB_QUERY_TEXT] == "SET 'somekey' 'somevalue'"
     assert pipeline_span["attributes"]["sentry.origin"] == "auto.db.redis"

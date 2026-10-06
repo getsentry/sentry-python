@@ -335,11 +335,6 @@ def _get_query_breadcrumb_data(
             {"db.params": [1, 2], "db.paramstyle": "format"},
             id="data_collection_default_records_params",
         ),
-        pytest.param(
-            {},
-            {},
-            id="no_options_strips_params",
-        ),
     ),
 )
 def test_record_sql_queries_data_collection(

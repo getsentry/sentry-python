@@ -152,9 +152,10 @@ class BaseClient:
     spotlight: "Optional[SpotlightClient]" = None
 
     def __init__(self, options: "Optional[Dict[str, Any]]" = None) -> None:
-        self.options: "Dict[str, Any]" = (
-            options if options is not None else DEFAULT_OPTIONS
-        )
+        if options is None:
+            options = dict(DEFAULT_OPTIONS)
+            options["data_collection"] = _resolve_data_collection(options)
+        self.options: "Dict[str, Any]" = options
 
         self.transport: "Optional[Transport]" = None
         self.monitor: "Optional[Monitor]" = None

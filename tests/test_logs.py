@@ -354,8 +354,8 @@ def test_log_user_attributes(sentry_init, capture_items):
 
 
 def test_log_no_user_attributes_if_no_pii(sentry_init, capture_items):
-    """User attributes are not if PII sending is off."""
-    sentry_init(send_default_pii=False)
+    """User attributes are not sent if `user_info` is off."""
+    sentry_init(data_collection={"user_info": False})
 
     sentry_sdk.set_user({"id": "1", "email": "test@example.com", "username": "test"})
     items = capture_items("log")

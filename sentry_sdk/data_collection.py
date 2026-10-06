@@ -256,7 +256,7 @@ def _resolve_data_collection(options: "Dict[str, Any]") -> "DataCollection":
     Must be called exactly once per options dict, before ``client._get_options``
     overwrites ``options["data_collection"]`` with the resolved result.
     """
-    user_dc = options.get("data_collection") or {}
+    user_dc = options.get("data_collection")
 
     if not isinstance(user_dc, dict):
         raise TypeError(
