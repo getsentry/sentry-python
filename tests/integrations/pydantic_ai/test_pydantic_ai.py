@@ -419,8 +419,8 @@ async def test_agent_with_tools(
     assert "execute_tool" in tool_span["name"]
     assert tool_span["attributes"]["gen_ai.operation.name"] == "execute_tool"
     assert tool_span["attributes"]["gen_ai.tool.name"] == "add_numbers"
-    assert "gen_ai.tool.input" in tool_span["attributes"]
-    assert "gen_ai.tool.output" in tool_span["attributes"]
+    assert SPANDATA.GEN_AI_TOOL_CALL_ARGUMENTS in tool_span["attributes"]
+    assert SPANDATA.GEN_AI_TOOL_CALL_RESULT in tool_span["attributes"]
 
     # Check chat spans have available_tools
     for chat_span in chat_spans:
@@ -505,14 +505,14 @@ async def test_agent_with_tool_model_retry(
         model_retry_tool_span["attributes"]["gen_ai.operation.name"] == "execute_tool"
     )
     assert model_retry_tool_span["attributes"]["gen_ai.tool.name"] == "add_numbers"
-    assert "gen_ai.tool.input" in model_retry_tool_span["attributes"]
+    assert SPANDATA.GEN_AI_TOOL_CALL_ARGUMENTS in model_retry_tool_span["attributes"]
 
     tool_span = tool_spans[1]
     assert "execute_tool" in tool_span["name"]
     assert tool_span["attributes"]["gen_ai.operation.name"] == "execute_tool"
     assert tool_span["attributes"]["gen_ai.tool.name"] == "add_numbers"
-    assert "gen_ai.tool.input" in tool_span["attributes"]
-    assert "gen_ai.tool.output" in tool_span["attributes"]
+    assert SPANDATA.GEN_AI_TOOL_CALL_ARGUMENTS in tool_span["attributes"]
+    assert SPANDATA.GEN_AI_TOOL_CALL_RESULT in tool_span["attributes"]
 
     # Check chat spans have available_tools
     for chat_span in chat_spans:
@@ -636,8 +636,8 @@ async def test_agent_with_tools_streaming(
     # Check tool span
     tool_span = tool_spans[0]
     assert tool_span["attributes"]["gen_ai.tool.name"] == "multiply"
-    assert "gen_ai.tool.input" in tool_span["attributes"]
-    assert "gen_ai.tool.output" in tool_span["attributes"]
+    assert SPANDATA.GEN_AI_TOOL_CALL_ARGUMENTS in tool_span["attributes"]
+    assert SPANDATA.GEN_AI_TOOL_CALL_RESULT in tool_span["attributes"]
 
 
 @pytest.mark.asyncio
@@ -873,8 +873,8 @@ async def test_tools_no_sensitive_data(
 
     # If tool was executed, verify input/output are not captured
     for tool_span in tool_spans:
-        assert "gen_ai.tool.input" not in tool_span["attributes"]
-        assert "gen_ai.tool.output" not in tool_span["attributes"]
+        assert SPANDATA.GEN_AI_TOOL_CALL_ARGUMENTS not in tool_span["attributes"]
+        assert SPANDATA.GEN_AI_TOOL_CALL_RESULT not in tool_span["attributes"]
 
 
 @pytest.mark.asyncio
@@ -3079,8 +3079,8 @@ async def test_data_collection_gen_ai_request_messages_keep_tool_returns_when_ou
     # Derive the expected return value from the arguments the model actually
     # sent, so the assertion does not depend on the test model's defaults.
     tool_span = tool_spans[0]
-    assert SPANDATA.GEN_AI_TOOL_OUTPUT not in tool_span
-    tool_input = json.loads(tool_span[SPANDATA.GEN_AI_TOOL_INPUT])
+    assert SPANDATA.GEN_AI_TOOL_CALL_RESULT not in tool_span
+    tool_input = json.loads(tool_span[SPANDATA.GEN_AI_TOOL_CALL_ARGUMENTS])
     expected_tool_return = str(tool_input["a"] + tool_input["b"])
 
     tool_messages = [

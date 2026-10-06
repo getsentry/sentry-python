@@ -1344,9 +1344,15 @@ async def test_tool_execution_span(
     assert tool_span["attributes"]["gen_ai.operation.name"] == "execute_tool"
 
     assert tool_span["attributes"]["gen_ai.tool.description"] == "A simple tool"
-    assert tool_span["attributes"]["gen_ai.tool.input"] == '{"message": "hello"}'
+    assert (
+        tool_span["attributes"][SPANDATA.GEN_AI_TOOL_CALL_ARGUMENTS]
+        == '{"message": "hello"}'
+    )
     assert tool_span["attributes"]["gen_ai.tool.name"] == "simple_test_tool"
-    assert tool_span["attributes"]["gen_ai.tool.output"] == "Tool executed with: hello"
+    assert (
+        tool_span["attributes"][SPANDATA.GEN_AI_TOOL_CALL_RESULT]
+        == "Tool executed with: hello"
+    )
     assert ai_client_span2["name"] == "chat gpt-4"
     assert ai_client_span2["attributes"]["gen_ai.agent.name"] == "test_agent"
     assert ai_client_span2["attributes"]["gen_ai.operation.name"] == "chat"
@@ -1536,9 +1542,15 @@ async def test_run_streamed_tool_execution_span(
     assert tool_span["attributes"]["gen_ai.operation.name"] == "execute_tool"
 
     assert tool_span["attributes"]["gen_ai.tool.description"] == "A simple tool"
-    assert tool_span["attributes"]["gen_ai.tool.input"] == '{"message": "hello"}'
+    assert (
+        tool_span["attributes"][SPANDATA.GEN_AI_TOOL_CALL_ARGUMENTS]
+        == '{"message": "hello"}'
+    )
     assert tool_span["attributes"]["gen_ai.tool.name"] == "simple_test_tool"
-    assert tool_span["attributes"]["gen_ai.tool.output"] == "Tool executed with: hello"
+    assert (
+        tool_span["attributes"][SPANDATA.GEN_AI_TOOL_CALL_RESULT]
+        == "Tool executed with: hello"
+    )
 
 
 @pytest.fixture
@@ -1683,16 +1695,20 @@ async def test_tool_execution_span_data_collection(
     )
 
     if expect_input:
-        assert tool_span_data[SPANDATA.GEN_AI_TOOL_INPUT] == '{"message": "hello"}'
+        assert (
+            tool_span_data[SPANDATA.GEN_AI_TOOL_CALL_ARGUMENTS]
+            == '{"message": "hello"}'
+        )
     else:
-        assert SPANDATA.GEN_AI_TOOL_INPUT not in tool_span_data
+        assert SPANDATA.GEN_AI_TOOL_CALL_ARGUMENTS not in tool_span_data
 
     if expect_output:
         assert (
-            tool_span_data[SPANDATA.GEN_AI_TOOL_OUTPUT] == "Tool executed with: hello"
+            tool_span_data[SPANDATA.GEN_AI_TOOL_CALL_RESULT]
+            == "Tool executed with: hello"
         )
     else:
-        assert SPANDATA.GEN_AI_TOOL_OUTPUT not in tool_span_data
+        assert SPANDATA.GEN_AI_TOOL_CALL_RESULT not in tool_span_data
 
 
 @pytest.mark.asyncio

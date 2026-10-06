@@ -735,7 +735,7 @@ class SentryLangchainCallback(BaseCallbackHandler):
 
             set_data_normalized(
                 span,
-                SPANDATA.GEN_AI_TOOL_INPUT,
+                SPANDATA.GEN_AI_TOOL_CALL_ARGUMENTS,
                 kwargs.get("inputs", [input_str]),
             )
 
@@ -755,7 +755,7 @@ class SentryLangchainCallback(BaseCallbackHandler):
             )
 
             if sentry_sdk.get_client().options["data_collection"]["gen_ai"]["outputs"]:
-                set_data_normalized(span, SPANDATA.GEN_AI_TOOL_OUTPUT, output)
+                set_data_normalized(span, SPANDATA.GEN_AI_TOOL_CALL_RESULT, output)
 
             self._exit_span(span, run_id)
 

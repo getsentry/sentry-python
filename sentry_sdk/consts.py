@@ -65,7 +65,6 @@ if TYPE_CHECKING:
         "Experiments",
         {
             "max_flags": Optional[int],
-            "record_sql_params": Optional[bool],
             "continuous_profiling_auto_start": Optional[bool],
             "transport_zlib_compression_level": Optional[int],
             "transport_compression_level": Optional[int],
@@ -573,6 +572,12 @@ class SPANDATA:
     """
     Name of the AI pipeline or chain being executed.
     Example: "qa-pipeline"
+    """
+
+    GEN_AI_PROMPT_NAME = "gen_ai.prompt.name"
+    """
+    The name of the prompt that uniquely identifies it.
+    Example: "summarize_text"
     """
 
     GEN_AI_RESPONSE_FINISH_REASONS = "gen_ai.response.finish_reasons"
@@ -1086,12 +1091,18 @@ class SPANDATA:
 
     MCP_TOOL_NAME = "mcp.tool.name"
     """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_TOOL_NAME instead.
+
     The name of the MCP tool being called.
     Example: "get_weather"
     """
 
     MCP_PROMPT_NAME = "mcp.prompt.name"
     """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_PROMPT_NAME instead.
+
     The name of the MCP prompt being retrieved.
     Example: "code_review"
     """
@@ -1116,6 +1127,9 @@ class SPANDATA:
 
     MCP_TOOL_RESULT_CONTENT = "mcp.tool.result.content"
     """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_TOOL_CALL_RESULT instead.
+
     The result/output content from an MCP tool execution.
     Example: "The weather is sunny"
     """

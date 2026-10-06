@@ -261,7 +261,7 @@ async def _instrument_tool_call(
         _set_span_input_data(
             span,
             handler_name,
-            SPANDATA.MCP_TOOL_NAME,
+            SPANDATA.GEN_AI_TOOL_NAME,
             "tools/call",
             arguments,
             request_id,
@@ -296,7 +296,7 @@ async def _instrument_tool_call(
             return result
 
         span.set_attribute(
-            SPANDATA.MCP_TOOL_RESULT_CONTENT,
+            SPANDATA.GEN_AI_TOOL_CALL_RESULT,
             safe_serialize(result_content),
         )
         # Set content count if result is a dict
@@ -343,7 +343,7 @@ async def _instrument_prompt_get(
         _set_span_input_data(
             span,
             handler_name,
-            SPANDATA.MCP_PROMPT_NAME,
+            SPANDATA.GEN_AI_PROMPT_NAME,
             "prompts/get",
             arguments,
             request_id,
