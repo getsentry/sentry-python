@@ -6,6 +6,7 @@ from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.integrations.boto3.consts import (
     AWS_RPC_SYSTEM_NAME,
+    CLOUD_PROVIDER,
     DEFAULT_PORTS,
     IDENTIFIER,
     ORIGIN,
@@ -156,6 +157,7 @@ def _start_client_span(
     service_name = ctx.service_id or "unknown"
     span_name = f"{service_name}.{ctx.operation_name}"
     attributes: "Attributes" = {
+        SPANDATA.CLOUD_PROVIDER: CLOUD_PROVIDER,
         SPANDATA.RPC_METHOD: ctx.operation_name,
         SPANDATA.RPC_SYSTEM_NAME: AWS_RPC_SYSTEM_NAME,
         # all client call spans are by default "client" spans.
