@@ -5,6 +5,7 @@ if TYPE_CHECKING:
 
     from sentry_sdk._types import Attributes
 
+    # tuple of (request param name, span attribute name).
     _AttributeSpec = Tuple[str, str]
 
 
