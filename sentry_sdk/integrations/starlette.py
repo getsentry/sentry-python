@@ -649,7 +649,7 @@ def _update_active_thread() -> None:
 
 
 def _wrap_sync_handler(handler: "Callable[..., Any]") -> "Callable[..., Any]":
-    if getattr(handler, "_sentry_active_thread_is_patched", False):
+    if getattr(handler, "_sentry_patched", False):
         return handler
 
     @functools.wraps(handler)
@@ -657,7 +657,7 @@ def _wrap_sync_handler(handler: "Callable[..., Any]") -> "Callable[..., Any]":
         _update_active_thread()
         return handler(*args, **kwargs)
 
-    _sentry_sync_handler._sentry_active_thread_is_patched = True  # type: ignore[attr-defined]
+    _sentry_sync_handler._sentry_patched = True  # type: ignore[attr-defined]
     return _sentry_sync_handler
 
 
