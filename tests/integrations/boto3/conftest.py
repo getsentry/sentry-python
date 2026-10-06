@@ -22,7 +22,7 @@ def client_factory(sentry_init, monkeypatch):
     )
     clients = []
 
-    def make_client(service_name: str, attempt_count: int = 1, **client_kwargs):
+    def make_client(service_name: str = "s3", attempt_count: int = 1, **client_kwargs):
         client = session.client(
             service_name,
             config=Config(
