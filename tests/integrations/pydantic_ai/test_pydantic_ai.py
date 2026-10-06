@@ -152,7 +152,6 @@ async def test_agent_run_async_model_error(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
-        data_collection={},
     )
 
     def failing_model(messages, info):
@@ -227,7 +226,6 @@ def test_agent_run_sync_model_error(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
-        data_collection={},
     )
 
     def failing_model(messages, info):
@@ -652,7 +650,6 @@ async def test_model_settings(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
-        data_collection={},
     )
 
     test_agent_with_settings = get_test_agent_with_settings()
@@ -784,7 +781,6 @@ async def test_error_handling(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
-        data_collection={},
     )
     items = capture_items("span")
 
@@ -889,7 +885,6 @@ async def test_multiple_agents_concurrent(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
-        data_collection={},
     )
 
     test_agent = get_test_agent()
@@ -981,7 +976,6 @@ async def test_gen_ai_system(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
-        data_collection={},
     )
 
     test_agent = get_test_agent()
@@ -1014,7 +1008,6 @@ async def test_context_cleanup_after_run(sentry_init, get_test_agent):
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
-        data_collection={},
     )
 
     # Verify context is not set before run
@@ -1038,7 +1031,6 @@ def test_context_cleanup_after_run_sync(sentry_init, get_test_agent, sync_event_
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
-        data_collection={},
     )
 
     # Verify context is not set before run
@@ -1063,7 +1055,6 @@ async def test_context_cleanup_after_streaming(sentry_init, get_test_agent):
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
-        data_collection={},
     )
 
     # Verify context is not set before run
@@ -1090,7 +1081,6 @@ async def test_context_cleanup_on_error(sentry_init, get_test_agent):
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
-        data_collection={},
     )
 
     test_agent = get_test_agent()
@@ -1125,7 +1115,6 @@ async def test_context_isolation_concurrent_agents(sentry_init, get_test_agent):
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
-        data_collection={},
     )
 
     # Create a second agent
@@ -1318,7 +1307,6 @@ async def test_model_name_extraction_with_callable(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
-        data_collection={},
     )
 
     # Test the utility function directly
@@ -1348,7 +1336,6 @@ async def test_model_name_extraction_fallback_to_str(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
-        data_collection={},
     )
 
     # Test the utility function directly
@@ -1381,7 +1368,6 @@ async def test_usage_data_partial(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
-        data_collection={},
     )
     items = capture_items("span")
 
@@ -1419,7 +1405,6 @@ async def test_agent_data_from_scope(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
-        data_collection={},
     )
     items = capture_items("span")
 
@@ -1444,7 +1429,6 @@ async def test_available_tools_without_description(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
-        data_collection={},
     )
 
     test_agent = get_test_agent()
@@ -1621,7 +1605,6 @@ async def test_update_ai_client_span_with_none_response(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
-        data_collection={},
     )
 
     span = sentry_sdk.start_span(name="test_span")
@@ -1646,7 +1629,6 @@ async def test_agent_without_name(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
-        data_collection={},
     )
     items = capture_items("span")
 
@@ -1704,7 +1686,6 @@ async def test_available_tools_error_handling(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
-        data_collection={},
     )
 
     span = sentry_sdk.start_span(name="test_span")
@@ -1732,7 +1713,6 @@ async def test_set_usage_data_with_none_usage(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
-        data_collection={},
     )
 
     span = sentry_sdk.start_span(name="test_span")
@@ -1758,7 +1738,6 @@ async def test_set_usage_data_with_partial_fields(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
-        data_collection={},
     )
 
     span = sentry_sdk.start_span(name="test_span")
@@ -2100,7 +2079,6 @@ async def test_get_model_name_with_exception_in_callable(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
-        data_collection={},
     )
 
     # Create model with callable name that raises exception
@@ -2126,7 +2104,6 @@ async def test_get_model_name_with_string_model(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
-        data_collection={},
     )
 
     # Pass a string as model
@@ -2148,7 +2125,6 @@ async def test_get_model_name_with_none(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
-        data_collection={},
     )
 
     # Pass None
@@ -2173,7 +2149,6 @@ async def test_set_available_tools_without_toolset(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
-        data_collection={},
     )
 
     span = sentry_sdk.start_span(name="test_span")
@@ -2203,7 +2178,6 @@ async def test_set_available_tools_with_schema(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
-        data_collection={},
     )
 
     span = sentry_sdk.start_span(name="test_span")
@@ -2349,7 +2323,6 @@ async def test_update_execute_tool_span_with_none_span(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
-        data_collection={},
     )
 
     # Update with None span - should not raise
@@ -2401,7 +2374,6 @@ async def test_tool_execution_without_span_context(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
-        data_collection={},
     )
 
     # Create a simple agent with no tools (won't have function_toolset)
@@ -2502,7 +2474,6 @@ async def test_ai_client_span_with_streaming_flag(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
-        data_collection={},
     )
 
     # Set streaming flag in scope
@@ -2529,7 +2500,6 @@ async def test_ai_client_span_gets_agent_from_scope(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
-        data_collection={},
     )
 
     # Set agent in scope
@@ -2705,7 +2675,6 @@ async def test_set_usage_data_with_cache_tokens(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
-        data_collection={},
     )
     items = capture_items("span")
 
