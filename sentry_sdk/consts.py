@@ -400,7 +400,6 @@ class SPANDATA:
     Example: "aws"
     """
 
-
     CLOUD_REGION = "cloud.region"
     """
     The geographical region the resource is running.
