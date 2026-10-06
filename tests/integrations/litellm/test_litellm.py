@@ -3944,3 +3944,185 @@ def test_cache_write_token_usage_from_anthropic_shaped_usage(
     assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 2600
     assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 2048
     assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 512
+
+
+def test_streaming_cached_and_reasoning_token_usage(
+    reset_litellm_executor,
+    sentry_init,
+    capture_events,
+    get_model_response,
+    server_side_event_chunks,
+    streaming_chat_completions_model_response,
+):
+    sentry_init(
+        integrations=[LiteLLMIntegration()],
+        disabled_integrations=[StdlibIntegration],
+        traces_sample_rate=1.0,
+        stream_gen_ai_spans=False,
+    )
+    events = capture_events()
+
+    # With stream_options={"include_usage": True}, OpenAI sends usage in a final
+    # chunk that has no choices.
+    usage_chunk = streaming_chat_completions_model_response[-1].model_copy(
+        update={
+            "choices": [],
+            "usage": CompletionUsage(
+                prompt_tokens=1200,
+                completion_tokens=300,
+                total_tokens=1500,
+                prompt_tokens_details=PromptTokensDetails(
+                    cached_tokens=1024, cache_write_tokens=128
+                ),
+                completion_tokens_details=CompletionTokensDetails(reasoning_tokens=256),
+            ),
+        }
+    )
+
+    client = OpenAI(api_key="test-key")
+    model_response = get_model_response(
+        server_side_event_chunks(
+            [*streaming_chat_completions_model_response, usage_chunk],
+            include_event_type=False,
+        ),
+        request_headers={"X-Stainless-Raw-Response": "true"},
+    )
+
+    with mock.patch.object(
+        client.completions._client._client,
+        "send",
+        return_value=model_response,
+    ), start_transaction(name="litellm test"):
+        response = litellm.completion(
+            model="gpt-3.5-turbo",
+            messages=[{"role": "user", "content": "Hello!"}],
+            client=client,
+            stream=True,
+            stream_options={"include_usage": True},
+        )
+        for _ in response:
+            pass
+
+        streaming_handler.executor.shutdown(wait=True)
+
+    (event,) = events
+    (span,) = (
+        x
+        for x in event["spans"]
+        if x["op"] == OP.GEN_AI_CHAT and x["origin"] == "auto.ai.litellm"
+    )
+
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 1200
+    assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 1024
+    assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 128
+    assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 300
+    assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS_REASONING] == 256
+    assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 1500
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_async_cached_and_reasoning_token_usage(
+    sentry_init,
+    capture_events,
+    get_model_response,
+    nonstreaming_chat_completions_model_response,
+):
+    sentry_init(
+        integrations=[LiteLLMIntegration()],
+        disabled_integrations=[StdlibIntegration],
+        traces_sample_rate=1.0,
+        stream_gen_ai_spans=False,
+    )
+    events = capture_events()
+
+    client = AsyncOpenAI(api_key="test-key")
+    model_response = get_model_response(
+        nonstreaming_chat_completions_model_response(
+            response_id="chatcmpl-test",
+            response_model="gpt-3.5-turbo",
+            message_content="Test response",
+            created=1234567890,
+            usage=CompletionUsage(
+                prompt_tokens=1200,
+                completion_tokens=300,
+                total_tokens=1500,
+                prompt_tokens_details=PromptTokensDetails(cached_tokens=1024),
+                completion_tokens_details=CompletionTokensDetails(reasoning_tokens=256),
+            ),
+        ),
+        serialize_pydantic=True,
+        request_headers={"X-Stainless-Raw-Response": "true"},
+    )
+
+    with mock.patch.object(
+        client.completions._client._client,
+        "send",
+        return_value=model_response,
+    ), start_transaction(name="litellm test"):
+        await litellm.acompletion(
+            model="gpt-3.5-turbo",
+            messages=[{"role": "user", "content": "Hello!"}],
+            client=client,
+        )
+
+        await GLOBAL_LOGGING_WORKER.flush()
+        await asyncio.sleep(0.5)
+
+    (event,) = events
+    (span,) = (
+        x
+        for x in event["spans"]
+        if x["op"] == OP.GEN_AI_CHAT and x["origin"] == "auto.ai.litellm"
+    )
+
+    assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 1200
+    assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 1024
+    assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 300
+    assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS_REASONING] == 256
+    assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 1500
+
+
+@pytest.mark.parametrize(
+    "usage",
+    [
+        MockUsage(prompt_tokens=10, completion_tokens=20, total_tokens=30),
+        CompletionUsage(
+            prompt_tokens=10,
+            completion_tokens=20,
+            total_tokens=30,
+            prompt_tokens_details=None,
+            completion_tokens_details=None,
+        ),
+        CompletionUsage(
+            prompt_tokens=10,
+            completion_tokens=20,
+            total_tokens=30,
+            prompt_tokens_details=PromptTokensDetails(cached_tokens=None),
+            completion_tokens_details=CompletionTokensDetails(reasoning_tokens=None),
+        ),
+    ],
+)
+def test_token_usage_without_details(sentry_init, capture_events, usage):
+    sentry_init(
+        integrations=[LiteLLMIntegration()],
+        traces_sample_rate=1.0,
+        stream_gen_ai_spans=False,
+    )
+    events = capture_events()
+
+    response = MockCompletionResponse(usage=usage)
+    kwargs = {"model": "gpt-3.5-turbo", "messages": [], "litellm_params": {}}
+
+    with start_transaction(name="litellm test"):
+        _input_callback(kwargs)
+        _success_callback(kwargs, response, datetime.now(), datetime.now())
+
+    (event,) = events
+    (span,) = event["spans"]
+    assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
+    assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
+    assert SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED not in span["data"]
+    assert SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE not in span["data"]
+    assert SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS_REASONING not in span["data"]
