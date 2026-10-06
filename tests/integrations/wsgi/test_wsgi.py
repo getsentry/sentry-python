@@ -144,7 +144,7 @@ def test_transaction_with_error(
         raise ValueError("Fetch aborted. The ball was not returned.")
 
     sentry_init(
-        data_collection={},
+
         traces_sample_rate=1.0,
     )
     app = SentryWsgiMiddleware(dogpark)
@@ -244,7 +244,7 @@ def test_has_trace_if_performance_enabled(
         raise ValueError("Fetch aborted. The ball was not returned.")
 
     sentry_init(
-        data_collection={},
+
         traces_sample_rate=1.0,
     )
     app = SentryWsgiMiddleware(dogpark)
@@ -314,7 +314,7 @@ def test_trace_from_headers_if_performance_enabled(
         raise ValueError("Fetch aborted. The ball was not returned.")
 
     sentry_init(
-        data_collection={},
+
         traces_sample_rate=1.0,
     )
     app = SentryWsgiMiddleware(dogpark)
@@ -383,7 +383,7 @@ def test_traces_sampler_gets_correct_values_in_sampling_context(
 
     traces_sampler = mock.Mock(return_value=True)
     sentry_init(
-        data_collection={},
+
         traces_sampler=traces_sampler,
     )
     app = SentryWsgiMiddleware(app)
@@ -426,7 +426,7 @@ def test_session_mode_defaults_to_request_mode_in_wsgi_handler(
 
     traces_sampler = mock.Mock(return_value=True)
     sentry_init(
-        data_collection={},
+
         traces_sampler=traces_sampler,
     )
     app = SentryWsgiMiddleware(app)
@@ -468,7 +468,7 @@ def test_auto_session_tracking_with_aggregates(
 
     traces_sampler = mock.Mock(return_value=True)
     sentry_init(
-        data_collection={},
+
         traces_sampler=traces_sampler,
     )
     app = SentryWsgiMiddleware(sample_app)
@@ -510,7 +510,7 @@ def test_span_origin_manual(sentry_init, capture_items):
         return ["Go get the ball! Good dog!"]
 
     sentry_init(
-        data_collection={},
+
         traces_sample_rate=1.0,
     )
     app = SentryWsgiMiddleware(dogpark)
@@ -532,7 +532,7 @@ def test_span_origin_custom(sentry_init, capture_items):
         return ["Go get the ball! Good dog!"]
 
     sentry_init(
-        data_collection={},
+
         traces_sample_rate=1.0,
     )
     app = SentryWsgiMiddleware(
@@ -1032,7 +1032,7 @@ def test_is_localhost_attribute(
         start_response("200 OK", [])
         return ["woof"]
 
-    sentry_init(data_collection={}, traces_sample_rate=1.0)
+    sentry_init( traces_sample_rate=1.0)
 
     app = SentryWsgiMiddleware(dogpark)
     client = Client(app)
@@ -1057,7 +1057,7 @@ def test_user_agent_attribute(sentry_init, capture_items):
         return ["woof"]
 
     sentry_init(
-        data_collection={},
+
         traces_sample_rate=1.0,
     )
 

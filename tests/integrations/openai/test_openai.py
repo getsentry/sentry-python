@@ -1756,7 +1756,7 @@ def test_bad_chat_completion(
         integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        data_collection={},
+
     )
     items = capture_items("event", "span")
 
@@ -1785,7 +1785,7 @@ def test_span_status_error(
         integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        data_collection={},
+
     )
     items = capture_items("event", "span")
 
@@ -1816,7 +1816,7 @@ async def test_bad_chat_completion_async(
         integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        data_collection={},
+
     )
 
     client = AsyncOpenAI(api_key="z")
@@ -2189,7 +2189,7 @@ def test_embeddings_create_raises_error(
         integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        data_collection={},
+
     )
 
     client = OpenAI(api_key="z")
@@ -2218,7 +2218,7 @@ async def test_embeddings_create_raises_error_async(
         integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        data_collection={},
+
     )
 
     client = AsyncOpenAI(api_key="z")
@@ -2246,7 +2246,7 @@ def test_span_origin_nonstreaming_chat(
     sentry_init(
         integrations=[OpenAIIntegration()],
         traces_sample_rate=1.0,
-        data_collection={},
+
     )
 
     client = OpenAI(api_key="z")
@@ -2284,7 +2284,7 @@ async def test_span_origin_nonstreaming_chat_async(
         integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        data_collection={},
+
     )
 
     client = AsyncOpenAI(api_key="z")
@@ -2320,7 +2320,7 @@ def test_span_origin_streaming_chat(
         integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        data_collection={},
+
     )
 
     client = OpenAI(api_key="z")
@@ -2384,7 +2384,7 @@ async def test_span_origin_streaming_chat_async(
         integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        data_collection={},
+
     )
 
     client = AsyncOpenAI(api_key="z")
@@ -2453,7 +2453,7 @@ def test_span_origin_embeddings(
         integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        data_collection={},
+
     )
 
     client = OpenAI(api_key="z")
@@ -2487,7 +2487,7 @@ async def test_span_origin_embeddings_async(
         integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        data_collection={},
+
     )
 
     client = AsyncOpenAI(api_key="z")
@@ -3178,7 +3178,7 @@ def test_responses_api_conversation_id(
         integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        data_collection={},
+
     )
 
     client = OpenAI(api_key="z")
@@ -3220,7 +3220,7 @@ def test_responses_api_reasoning_level(
         integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        data_collection={},
+
     )
 
     client = OpenAI(api_key="z")
@@ -4151,7 +4151,7 @@ def test_chat_completion_reasoning_level(
         integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        data_collection={},
+
     )
 
     client = OpenAI(api_key="z")
@@ -4270,7 +4270,7 @@ def test_streaming_chat_completion_ttft(
         integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        data_collection={},
+
     )
 
     client = OpenAI(api_key="z")
@@ -4351,7 +4351,7 @@ async def test_streaming_chat_completion_ttft_async(
         integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        data_collection={},
+
     )
 
     client = AsyncOpenAI(api_key="z")
@@ -4433,7 +4433,7 @@ def test_streaming_responses_api_ttft(
         integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        data_collection={},
+
     )
 
     client = OpenAI(api_key="z")
@@ -4485,7 +4485,7 @@ async def test_streaming_responses_api_ttft_async(
         integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        data_collection={},
+
     )
 
     client = AsyncOpenAI(api_key="z")

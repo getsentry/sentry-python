@@ -146,7 +146,7 @@ def test_transaction_name_and_source(
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[StarliteIntegration()],
-        data_collection={},
+
     )
     starlite_app = starlite_app_factory()
     client = TestClient(starlite_app)
@@ -169,7 +169,7 @@ def test_middleware_spans(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[StarliteIntegration()],
-        data_collection={},
+
     )
 
     logging_config = LoggingMiddlewareConfig()
@@ -224,7 +224,7 @@ def test_middleware_callback_spans(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[StarliteIntegration()],
-        data_collection={},
+
     )
     starlite_app = starlite_app_factory(middleware=[SampleMiddleware])
 
@@ -286,7 +286,7 @@ def test_middleware_receive_send(sentry_init):
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[StarliteIntegration()],
-        data_collection={},
+
     )
     starlite_app = starlite_app_factory(middleware=[SampleReceiveSendMiddleware])
 
@@ -319,7 +319,7 @@ def test_middleware_partial_receive_send(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[StarliteIntegration()],
-        data_collection={},
+
     )
     starlite_app = starlite_app_factory(middleware=[SamplePartialReceiveSendMiddleware])
 
@@ -370,7 +370,7 @@ def test_span_origin(sentry_init, capture_items):
     sentry_init(
         integrations=[StarliteIntegration()],
         traces_sample_rate=1.0,
-        data_collection={},
+
     )
 
     logging_config = LoggingMiddlewareConfig()

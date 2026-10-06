@@ -14,7 +14,7 @@ PORT = create_mock_http_server()
 def test_crumb_capture(sentry_init, capture_events):
     sentry_init(
         integrations=[StdlibIntegration()],
-        data_collection={},
+
     )
     events = capture_events()
 
@@ -49,7 +49,7 @@ def test_crumb_capture(sentry_init, capture_events):
 def test_crumb_capture_client_error(sentry_init, capture_events, status_code, level):
     sentry_init(
         integrations=[StdlibIntegration()],
-        data_collection={},
+
     )
 
     events = capture_events()
@@ -84,7 +84,7 @@ def test_crumb_capture_client_error(sentry_init, capture_events, status_code, le
 def test_omit_url_data_if_parsing_fails(sentry_init, capture_events):
     sentry_init(
         integrations=[StdlibIntegration()],
-        data_collection={},
+
     )
 
     events = capture_events()
