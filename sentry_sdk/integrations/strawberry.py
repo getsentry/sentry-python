@@ -395,11 +395,7 @@ def _make_response_event_processor(
     def inner(event: "Event", hint: "dict[str, Any]") -> "Event":
         client_options = sentry_sdk.get_client().options
         with capture_internal_exceptions():
-            collect_response = (
-                "outgoing_response" in client_options["data_collection"]["http_bodies"]
-            )
-
-            if collect_response:
+if "outgoing_response" in client_options["data_collection"]["http_bodies"]:
                 contexts = event.setdefault("contexts", {})
                 contexts["response"] = {"data": response_data}
 
