@@ -1,9 +1,12 @@
 from typing import TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Mapping, Optional
 
+import boto3
 import pytest
+from botocore.config import Config
 
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.integrations.boto3 import Boto3Integration
 from sentry_sdk.integrations.boto3.consts import AWS_RPC_SYSTEM_NAME, ORIGIN
 
 if TYPE_CHECKING:
@@ -12,13 +15,55 @@ if TYPE_CHECKING:
     from sentry_sdk._types import SpanJSON
 
 
+@pytest.fixture
+def client_factory(sentry_init, monkeypatch):
+    sentry_init(
+        traces_sample_rate=1.0,
+        integrations=[Boto3Integration()],
+        default_integrations=False,
+        server_name="",
+    )
+    # Remove request retry delays without replacing botocore's retry handling.
+    monkeypatch.setattr("botocore.endpoint.time.sleep", lambda delay: None)
+    session = boto3.Session(
+        aws_access_key_id="-",
+        aws_secret_access_key="-",
+        region_name="eu-north-1",
+    )
+    clients = []
+
+    def make_client(service_name: str = "s3", attempt_count: int = 1, **client_kwargs):
+        client = session.client(
+            service_name,
+            config=Config(
+                retries={"total_max_attempts": attempt_count, "mode": "standard"}
+            ),
+            **client_kwargs,
+        )  # type: ignore
+        clients.append(client)
+        return client
+
+    yield make_client
+
+    for client in clients:
+        # Older supported botocore versions do not expose `BaseClient.close()`.
+        close = getattr(client, "close", None)
+        if close is not None:
+            close()
+
+
+@pytest.fixture
+def s3_client(client_factory):
+    return client_factory("s3")
+
+
 def require_botocore_model_fields(
     client: "BaseClient",
     method: str,
     input_fields: Iterable[str] = (),
     output_fields: Iterable[str] = (),
 ) -> None:
-    # Operations and members can differ across the supported botocore models.
+    """Botocore models differ across versions. Skip tests if model is missing required fields."""
     operation_name = client.meta.method_to_api_mapping.get(method)
     if operation_name is None:
         pytest.skip("%s is absent from this botocore model" % method)
