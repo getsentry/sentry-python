@@ -18,7 +18,8 @@ minimum_python_311 = pytest.mark.skipif(
 
 
 @minimum_python_311
-def test_exceptiongroup():
+def test_exceptiongroup(sentry_init):
+    sentry_init()
     exception_group = None
 
     try:
@@ -143,7 +144,8 @@ def test_exceptiongroup():
 
 
 @minimum_python_311
-def test_exceptiongroup_simple():
+def test_exceptiongroup_simple(sentry_init):
+    sentry_init()
     exception_group = None
 
     try:
@@ -308,7 +310,8 @@ def test_simple_exception():
 
 
 @minimum_python_311
-def test_exception_group_chained_with_context():
+def test_exception_group_chained_with_context(sentry_init):
+    sentry_init()
     try:
         try:
             raise ExceptionGroup(
@@ -390,7 +393,7 @@ def test_exception_group_chained_with_context():
 
 
 @minimum_python_311
-def test_exceptiongroup_starlette_collapse():
+def test_exceptiongroup_starlette_collapse(sentry_init):
     """
     Simulates the Starlette collapse_excgroups() pattern where a single-exception
     ExceptionGroup is caught and the inner exception is unwrapped and re-raised.
@@ -410,6 +413,7 @@ def test_exceptiongroup_starlette_collapse():
     Without cycle detection in exceptions_from_error(), this causes infinite
     recursion and a silent RecursionError that drops the event.
     """
+    sentry_init()
     exception_group = None
 
     try:

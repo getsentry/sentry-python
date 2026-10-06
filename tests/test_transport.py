@@ -456,7 +456,8 @@ def test_parse_rate_limits(input, expected):
     assert dict(_parse_rate_limits(input, now=NOW)) == expected
 
 
-def test_envelope_too_large_response(capturing_server, make_client):
+def test_envelope_too_large_response(sentry_init, capturing_server, make_client):
+    sentry_init()
     client = make_client()
 
     capturing_server.respond_with(code=413)
@@ -476,7 +477,8 @@ def test_envelope_too_large_response(capturing_server, make_client):
     capturing_server.clear_captured()
 
 
-def test_simple_rate_limits(capturing_server, make_client):
+def test_simple_rate_limits(sentry_init, capturing_server, make_client):
+    sentry_init()
     client = make_client()
     capturing_server.respond_with(code=429, headers={"Retry-After": "4"})
 
@@ -498,8 +500,9 @@ def test_simple_rate_limits(capturing_server, make_client):
 
 @pytest.mark.parametrize("response_code", [200, 429])
 def test_data_category_limits(
-    capturing_server, response_code, make_client, monkeypatch
+    sentry_init, capturing_server, response_code, make_client, monkeypatch
 ):
+    sentry_init()
     client = make_client(send_client_reports=False)
 
     captured_outcomes = []
@@ -557,8 +560,9 @@ def test_data_category_limits(
 
 @pytest.mark.parametrize("response_code", [200, 429])
 def test_data_category_limits_reporting(
-    capturing_server, response_code, make_client, monkeypatch
+    sentry_init, capturing_server, response_code, make_client, monkeypatch
 ):
+    sentry_init()
     client = make_client(send_client_reports=True)
 
     capturing_server.respond_with(
@@ -671,8 +675,9 @@ def test_data_category_limits_reporting(
 
 @pytest.mark.parametrize("response_code", [200, 429])
 def test_complex_limits_without_data_category(
-    capturing_server, response_code, make_client
+    sentry_init, capturing_server, response_code, make_client
 ):
+    sentry_init()
     client = make_client()
     capturing_server.respond_with(
         code=response_code,
