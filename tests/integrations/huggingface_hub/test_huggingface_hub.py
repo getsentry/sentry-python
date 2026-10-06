@@ -2,7 +2,6 @@ import re
 from typing import TYPE_CHECKING
 
 import pytest
-import responses
 from huggingface_hub import InferenceClient
 
 import sentry_sdk
@@ -23,518 +22,396 @@ if TYPE_CHECKING:
 
 HF_VERSION = package_version("huggingface-hub")
 
-if HF_VERSION and HF_VERSION < (0, 30, 0):
-    MODEL_ENDPOINT = "https://api-inference.huggingface.co/models/{model_name}"
-    INFERENCE_ENDPOINT = "https://api-inference.huggingface.co/models/{model_name}"
-else:
-    MODEL_ENDPOINT = "https://huggingface.co/api/models/{model_name}"
-    INFERENCE_ENDPOINT = (
-        "https://router.huggingface.co/hf-inference/models/{model_name}"
-    )
 
-
-def get_hf_provider_inference_client():
-    # The provider parameter was added in version 0.28.0 of huggingface_hub
-    return (
-        InferenceClient(model="test-model", provider="hf-inference")
-        if HF_VERSION >= (0, 28, 0)
-        else InferenceClient(model="test-model")
-    )
-
-
-def _add_mock_response(
-    httpx_mock,
-    httpx2_mock,
-    rsps,
-    method,
-    url,
-    json=None,
-    status=200,
-    body=None,
-    headers=None,
-):
-    # HF v1+ uses httpx for making requests to their API, while <1 uses requests.
-    # Since we have to test both, we need mocks for both httpx and requests.
-    if HF_VERSION >= (2, 0, 0):
-        httpx2_mock.add_response(
-            method=method,
-            url=url,
-            json=json,
-            content=body,
-            status_code=status,
-            headers=headers,
-            is_optional=True,
-            is_reusable=True,
-        )
-    elif HF_VERSION >= (1, 0, 0):
-        httpx_mock.add_response(
-            method=method,
-            url=url,
-            json=json,
-            content=body,
-            status_code=status,
-            headers=headers,
-            is_optional=True,
-            is_reusable=True,
-        )
-    else:
-        rsps.add(
-            method=method,
-            url=url,
-            json=json,
-            body=body,
-            status=status,
-            headers=headers,
-        )
+MODEL_ENDPOINT = "https://huggingface.co/api/models/{model_name}"
+INFERENCE_ENDPOINT = "https://router.huggingface.co/hf-inference/models/{model_name}"
 
 
 @pytest.fixture
-def mock_hf_text_generation_api(httpx_mock, request):
+def mock_hf_text_generation_api(httpx2_mock):
     # type: () -> Any
     """Mock HuggingFace text generation API"""
 
-    with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
-        model_name = "test-model"
+    model_name = "test-model"
 
-        httpx2_mock = (
-            request.getfixturevalue("httpx2_mock") if HF_VERSION >= (2, 0, 0) else None
-        )
-        _add_mock_response(
-            httpx_mock,
-            httpx2_mock,
-            rsps,
-            "GET",
-            re.compile(
-                MODEL_ENDPOINT.format(model_name=model_name)
-                + r"(\?expand=inferenceProviderMapping)?"
-            ),
-            json={
-                "id": model_name,
-                "pipeline_tag": "text-generation",
-                "inferenceProviderMapping": {
-                    "hf-inference": {
-                        "status": "live",
-                        "providerId": model_name,
-                        "task": "text-generation",
-                    }
-                },
+    httpx2_mock.add_response(
+        method="GET",
+        url=re.compile(
+            MODEL_ENDPOINT.format(model_name=model_name)
+            + r"(\?expand=inferenceProviderMapping)?"
+        ),
+        json={
+            "id": model_name,
+            "pipeline_tag": "text-generation",
+            "inferenceProviderMapping": {
+                "hf-inference": {
+                    "status": "live",
+                    "providerId": model_name,
+                    "task": "text-generation",
+                }
             },
-            status=200,
-        )
+        },
+        content=None,
+        status_code=200,
+        headers=None,
+        is_optional=True,
+        is_reusable=True,
+    )
 
-        _add_mock_response(
-            httpx_mock,
-            httpx2_mock,
-            rsps,
-            "POST",
-            INFERENCE_ENDPOINT.format(model_name=model_name),
-            json={
-                "generated_text": "[mocked] Hello! How can i help you?",
-                "details": {
-                    "finish_reason": "length",
-                    "generated_tokens": 10,
-                    "prefill": [],
-                    "tokens": [],
-                },
+    httpx2_mock.add_response(
+        method="POST",
+        url=INFERENCE_ENDPOINT.format(model_name=model_name),
+        json={
+            "generated_text": "[mocked] Hello! How can i help you?",
+            "details": {
+                "finish_reason": "length",
+                "generated_tokens": 10,
+                "prefill": [],
+                "tokens": [],
             },
-            status=200,
-        )
+        },
+        content=None,
+        status_code=200,
+        headers=None,
+        is_optional=True,
+        is_reusable=True,
+    )
 
-        if HF_VERSION >= (2, 0, 0):
-            yield httpx2_mock
-        elif HF_VERSION >= (1, 0, 0):
-            yield httpx_mock
-        else:
-            yield rsps
+    yield httpx2_mock
 
 
 @pytest.fixture
-def mock_hf_api_with_errors(httpx_mock, request):
+def mock_hf_api_with_errors(httpx2_mock):
     # type: () -> Any
     """Mock HuggingFace API that always raises errors for any request"""
 
-    with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
-        model_name = "test-model"
+    model_name = "test-model"
 
-        # Mock model info endpoint with error
-        httpx2_mock = (
-            request.getfixturevalue("httpx2_mock") if HF_VERSION >= (2, 0, 0) else None
-        )
-        _add_mock_response(
-            httpx_mock,
-            httpx2_mock,
-            rsps,
-            "GET",
-            MODEL_ENDPOINT.format(model_name=model_name),
-            json={"error": "Model not found"},
-            status=404,
-        )
+    httpx2_mock.add_response(
+        method="GET",
+        url=MODEL_ENDPOINT.format(model_name=model_name),
+        json={"error": "Model not found"},
+        content=None,
+        status_code=404,
+        headers=None,
+        is_optional=True,
+        is_reusable=True,
+    )
 
-        # Mock text generation endpoint with error
-        _add_mock_response(
-            httpx_mock,
-            httpx2_mock,
-            rsps,
-            "POST",
-            INFERENCE_ENDPOINT.format(model_name=model_name),
-            json={"error": "Internal server error", "message": "Something went wrong"},
-            status=500,
-        )
+    httpx2_mock.add_response(
+        method="POST",
+        url=INFERENCE_ENDPOINT.format(model_name=model_name),
+        json={"error": "Internal server error", "message": "Something went wrong"},
+        content=None,
+        status_code=500,
+        headers=None,
+        is_optional=True,
+        is_reusable=True,
+    )
 
-        # Mock chat completion endpoint with error
-        _add_mock_response(
-            httpx_mock,
-            httpx2_mock,
-            rsps,
-            "POST",
-            INFERENCE_ENDPOINT.format(model_name=model_name) + "/v1/chat/completions",
-            json={"error": "Internal server error", "message": "Something went wrong"},
-            status=500,
-        )
+    httpx2_mock.add_response(
+        method="POST",
+        url=INFERENCE_ENDPOINT.format(model_name=model_name) + "/v1/chat/completions",
+        json={"error": "Internal server error", "message": "Something went wrong"},
+        content=None,
+        status_code=500,
+        headers=None,
+        is_optional=True,
+        is_reusable=True,
+    )
 
-        # Catch-all pattern for any other model requests
-        _add_mock_response(
-            httpx_mock,
-            httpx2_mock,
-            rsps,
-            "GET",
-            "https://huggingface.co/api/models/test-model-error",
-            json={"error": "Generic model error"},
-            status=500,
-        )
+    httpx2_mock.add_response(
+        method="POST",
+        url="https://huggingface.co/api/models/test-model-error",
+        json={"error": "Generic model error"},
+        content=None,
+        status_code=500,
+        headers=None,
+        is_optional=True,
+        is_reusable=True,
+    )
 
-        if HF_VERSION >= (2, 0, 0):
-            yield httpx2_mock
-        elif HF_VERSION >= (1, 0, 0):
-            yield httpx_mock
-        else:
-            yield rsps
+    yield httpx2_mock
 
 
 @pytest.fixture
-def mock_hf_text_generation_api_streaming(httpx_mock, request):
+def mock_hf_text_generation_api_streaming(httpx2_mock):
     # type: () -> Any
     """Mock streaming HuggingFace text generation API"""
-    with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
-        model_name = "test-model"
+    model_name = "test-model"
 
-        # Mock model info endpoint
-        httpx2_mock = (
-            request.getfixturevalue("httpx2_mock") if HF_VERSION >= (2, 0, 0) else None
-        )
-        _add_mock_response(
-            httpx_mock,
-            httpx2_mock,
-            rsps,
-            "GET",
-            MODEL_ENDPOINT.format(model_name=model_name),
-            json={
-                "id": model_name,
-                "pipeline_tag": "text-generation",
-                "inferenceProviderMapping": {
-                    "hf-inference": {
-                        "status": "live",
-                        "providerId": model_name,
-                        "task": "text-generation",
-                    }
-                },
+    httpx2_mock.add_response(
+        method="GET",
+        url=MODEL_ENDPOINT.format(model_name=model_name),
+        json={
+            "id": model_name,
+            "pipeline_tag": "text-generation",
+            "inferenceProviderMapping": {
+                "hf-inference": {
+                    "status": "live",
+                    "providerId": model_name,
+                    "task": "text-generation",
+                }
             },
-            status=200,
-        )
+        },
+        content=None,
+        status_code=200,
+        headers=None,
+        is_optional=True,
+        is_reusable=True,
+    )
 
-        # Mock text generation endpoint for streaming
-        streaming_response = b'data:{"token":{"id":1, "special": false, "text": "the mocked "}}\n\ndata:{"token":{"id":2, "special": false, "text": "model response"}, "details":{"finish_reason": "length", "generated_tokens": 10, "seed": 0}}\n\n'
+    # Mock text generation endpoint for streaming
+    streaming_response = b'data:{"token":{"id":1, "special": false, "text": "the mocked "}}\n\ndata:{"token":{"id":2, "special": false, "text": "model response"}, "details":{"finish_reason": "length", "generated_tokens": 10, "seed": 0}}\n\n'
 
-        _add_mock_response(
-            httpx_mock,
-            httpx2_mock,
-            rsps,
-            "POST",
-            INFERENCE_ENDPOINT.format(model_name=model_name),
-            body=streaming_response,
-            status=200,
-            headers={
-                "Content-Type": "text/event-stream",
-                "Cache-Control": "no-cache",
-                "Connection": "keep-alive",
-            },
-        )
+    httpx2_mock.add_response(
+        method="POST",
+        url=INFERENCE_ENDPOINT.format(model_name=model_name),
+        json=None,
+        content=streaming_response,
+        status_code=200,
+        headers={
+            "Content-Type": "text/event-stream",
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+        },
+        is_optional=True,
+        is_reusable=True,
+    )
 
-        if HF_VERSION >= (2, 0, 0):
-            yield httpx2_mock
-        elif HF_VERSION >= (1, 0, 0):
-            yield httpx_mock
-        else:
-            yield rsps
+    yield httpx2_mock
 
 
 @pytest.fixture
-def mock_hf_chat_completion_api(httpx_mock, request):
+def mock_hf_chat_completion_api(httpx2_mock):
     # type: () -> Any
     """Mock HuggingFace chat completion API"""
-    with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
-        model_name = "test-model"
+    model_name = "test-model"
 
-        # Mock model info endpoint
-        httpx2_mock = (
-            request.getfixturevalue("httpx2_mock") if HF_VERSION >= (2, 0, 0) else None
-        )
-        _add_mock_response(
-            httpx_mock,
-            httpx2_mock,
-            rsps,
-            "GET",
-            MODEL_ENDPOINT.format(model_name=model_name),
-            json={
-                "id": model_name,
-                "pipeline_tag": "conversational",
-                "inferenceProviderMapping": {
-                    "hf-inference": {
-                        "status": "live",
-                        "providerId": model_name,
-                        "task": "conversational",
-                    }
-                },
+    httpx2_mock.add_response(
+        method="GET",
+        url=MODEL_ENDPOINT.format(model_name=model_name),
+        json={
+            "id": model_name,
+            "pipeline_tag": "conversational",
+            "inferenceProviderMapping": {
+                "hf-inference": {
+                    "status": "live",
+                    "providerId": model_name,
+                    "task": "conversational",
+                }
             },
-            status=200,
-        )
+        },
+        content=None,
+        status_code=200,
+        headers=None,
+        is_optional=True,
+        is_reusable=True,
+    )
 
-        # Mock chat completion endpoint
-        _add_mock_response(
-            httpx_mock,
-            httpx2_mock,
-            rsps,
-            "POST",
-            INFERENCE_ENDPOINT.format(model_name=model_name) + "/v1/chat/completions",
-            json={
-                "id": "xyz-123",
-                "created": 1234567890,
-                "model": f"{model_name}-123",
-                "system_fingerprint": "fp_123",
-                "choices": [
-                    {
-                        "index": 0,
-                        "finish_reason": "stop",
-                        "message": {
-                            "role": "assistant",
-                            "content": "[mocked] Hello! How can I help you today?",
-                        },
-                    }
-                ],
-                "usage": {
-                    "completion_tokens": 8,
-                    "prompt_tokens": 10,
-                    "total_tokens": 18,
-                },
+    httpx2_mock.add_response(
+        method="POST",
+        url=INFERENCE_ENDPOINT.format(model_name=model_name) + "/v1/chat/completions",
+        json={
+            "id": "xyz-123",
+            "created": 1234567890,
+            "model": f"{model_name}-123",
+            "system_fingerprint": "fp_123",
+            "choices": [
+                {
+                    "index": 0,
+                    "finish_reason": "stop",
+                    "message": {
+                        "role": "assistant",
+                        "content": "[mocked] Hello! How can I help you today?",
+                    },
+                }
+            ],
+            "usage": {
+                "completion_tokens": 8,
+                "prompt_tokens": 10,
+                "total_tokens": 18,
             },
-            status=200,
-        )
+        },
+        content=None,
+        status_code=200,
+        headers=None,
+        is_optional=True,
+        is_reusable=True,
+    )
 
-        if HF_VERSION >= (2, 0, 0):
-            yield httpx2_mock
-        elif HF_VERSION >= (1, 0, 0):
-            yield httpx_mock
-        else:
-            yield rsps
+    yield httpx2_mock
 
 
 @pytest.fixture
-def mock_hf_chat_completion_api_tools(httpx_mock, request):
+def mock_hf_chat_completion_api_tools(httpx2_mock):
     # type: () -> Any
     """Mock HuggingFace chat completion API with tool calls."""
-    with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
-        model_name = "test-model"
+    model_name = "test-model"
 
-        # Mock model info endpoint
-        httpx2_mock = (
-            request.getfixturevalue("httpx2_mock") if HF_VERSION >= (2, 0, 0) else None
-        )
-        _add_mock_response(
-            httpx_mock,
-            httpx2_mock,
-            rsps,
-            "GET",
-            MODEL_ENDPOINT.format(model_name=model_name),
-            json={
-                "id": model_name,
-                "pipeline_tag": "conversational",
-                "inferenceProviderMapping": {
-                    "hf-inference": {
-                        "status": "live",
-                        "providerId": model_name,
-                        "task": "conversational",
-                    }
-                },
+    httpx2_mock.add_response(
+        method="GET",
+        url=MODEL_ENDPOINT.format(model_name=model_name),
+        json={
+            "id": model_name,
+            "pipeline_tag": "conversational",
+            "inferenceProviderMapping": {
+                "hf-inference": {
+                    "status": "live",
+                    "providerId": model_name,
+                    "task": "conversational",
+                }
             },
-            status=200,
-        )
+        },
+        content=None,
+        status_code=200,
+        headers=None,
+        is_optional=True,
+        is_reusable=True,
+    )
 
-        # Mock chat completion endpoint
-        _add_mock_response(
-            httpx_mock,
-            httpx2_mock,
-            rsps,
-            "POST",
-            INFERENCE_ENDPOINT.format(model_name=model_name) + "/v1/chat/completions",
-            json={
-                "id": "xyz-123",
-                "created": 1234567890,
-                "model": f"{model_name}-123",
-                "system_fingerprint": "fp_123",
-                "choices": [
-                    {
-                        "index": 0,
-                        "finish_reason": "tool_calls",
-                        "message": {
-                            "role": "assistant",
-                            "tool_calls": [
-                                {
-                                    "id": "call_123",
-                                    "type": "function",
-                                    "function": {
-                                        "name": "get_weather",
-                                        "arguments": {"location": "Paris"},
-                                    },
-                                }
-                            ],
-                        },
-                    }
-                ],
-                "usage": {
-                    "completion_tokens": 8,
-                    "prompt_tokens": 10,
-                    "total_tokens": 18,
-                },
+    httpx2_mock.add_response(
+        method="POST",
+        url=INFERENCE_ENDPOINT.format(model_name=model_name) + "/v1/chat/completions",
+        json={
+            "id": "xyz-123",
+            "created": 1234567890,
+            "model": f"{model_name}-123",
+            "system_fingerprint": "fp_123",
+            "choices": [
+                {
+                    "index": 0,
+                    "finish_reason": "tool_calls",
+                    "message": {
+                        "role": "assistant",
+                        "tool_calls": [
+                            {
+                                "id": "call_123",
+                                "type": "function",
+                                "function": {
+                                    "name": "get_weather",
+                                    "arguments": {"location": "Paris"},
+                                },
+                            }
+                        ],
+                    },
+                }
+            ],
+            "usage": {
+                "completion_tokens": 8,
+                "prompt_tokens": 10,
+                "total_tokens": 18,
             },
-            status=200,
-        )
+        },
+        content=None,
+        status_code=200,
+        headers=None,
+        is_optional=True,
+        is_reusable=True,
+    )
 
-        if HF_VERSION >= (2, 0, 0):
-            yield httpx2_mock
-        elif HF_VERSION >= (1, 0, 0):
-            yield httpx_mock
-        else:
-            yield rsps
+    yield httpx2_mock
 
 
 @pytest.fixture
-def mock_hf_chat_completion_api_streaming(httpx_mock, request):
+def mock_hf_chat_completion_api_streaming(httpx2_mock):
     # type: () -> Any
     """Mock streaming HuggingFace chat completion API"""
-    with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
-        model_name = "test-model"
+    model_name = "test-model"
 
-        # Mock model info endpoint
-        httpx2_mock = (
-            request.getfixturevalue("httpx2_mock") if HF_VERSION >= (2, 0, 0) else None
-        )
-        _add_mock_response(
-            httpx_mock,
-            httpx2_mock,
-            rsps,
-            "GET",
-            MODEL_ENDPOINT.format(model_name=model_name),
-            json={
-                "id": model_name,
-                "pipeline_tag": "conversational",
-                "inferenceProviderMapping": {
-                    "hf-inference": {
-                        "status": "live",
-                        "providerId": model_name,
-                        "task": "conversational",
-                    }
-                },
+    httpx2_mock.add_response(
+        method="POST",
+        url=MODEL_ENDPOINT.format(model_name=model_name),
+        json={
+            "id": model_name,
+            "pipeline_tag": "conversational",
+            "inferenceProviderMapping": {
+                "hf-inference": {
+                    "status": "live",
+                    "providerId": model_name,
+                    "task": "conversational",
+                }
             },
-            status=200,
-        )
+        },
+        content=None,
+        status_code=200,
+        headers=None,
+        is_optional=True,
+        is_reusable=True,
+    )
 
-        # Mock chat completion streaming endpoint
-        streaming_chat_response = (
-            b'data:{"id":"xyz-123","created":1234567890,"model":"test-model-123","system_fingerprint":"fp_123","choices":[{"delta":{"role":"assistant","content":"the mocked "},"index":0,"finish_reason":null}],"usage":null}\n\n'
-            b'data:{"id":"xyz-124","created":1234567890,"model":"test-model-123","system_fingerprint":"fp_123","choices":[{"delta":{"role":"assistant","content":"model response"},"index":0,"finish_reason":"stop"}],"usage":{"prompt_tokens":183,"completion_tokens":14,"total_tokens":197}}\n\n'
-        )
+    streaming_chat_response = (
+        b'data:{"id":"xyz-123","created":1234567890,"model":"test-model-123","system_fingerprint":"fp_123","choices":[{"delta":{"role":"assistant","content":"the mocked "},"index":0,"finish_reason":null}],"usage":null}\n\n'
+        b'data:{"id":"xyz-124","created":1234567890,"model":"test-model-123","system_fingerprint":"fp_123","choices":[{"delta":{"role":"assistant","content":"model response"},"index":0,"finish_reason":"stop"}],"usage":{"prompt_tokens":183,"completion_tokens":14,"total_tokens":197}}\n\n'
+    )
 
-        _add_mock_response(
-            httpx_mock,
-            httpx2_mock,
-            rsps,
-            "POST",
-            INFERENCE_ENDPOINT.format(model_name=model_name) + "/v1/chat/completions",
-            body=streaming_chat_response,
-            status=200,
-            headers={
-                "Content-Type": "text/event-stream",
-                "Cache-Control": "no-cache",
-                "Connection": "keep-alive",
-            },
-        )
+    httpx2_mock.add_response(
+        method="POST",
+        url=INFERENCE_ENDPOINT.format(model_name=model_name) + "/v1/chat/completions",
+        json=None,
+        content=streaming_chat_response,
+        status_code=200,
+        headers={
+            "Content-Type": "text/event-stream",
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+        },
+        is_optional=True,
+        is_reusable=True,
+    )
 
-        if HF_VERSION >= (2, 0, 0):
-            yield httpx2_mock
-        elif HF_VERSION >= (1, 0, 0):
-            yield httpx_mock
-        else:
-            yield rsps
+    yield httpx2_mock
 
 
 @pytest.fixture
-def mock_hf_chat_completion_api_streaming_tools(httpx_mock, request):
+def mock_hf_chat_completion_api_streaming_tools(httpx2_mock):
     # type: () -> Any
     """Mock streaming HuggingFace chat completion API with tool calls."""
-    with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
-        model_name = "test-model"
+    model_name = "test-model"
 
-        # Mock model info endpoint
-        httpx2_mock = (
-            request.getfixturevalue("httpx2_mock") if HF_VERSION >= (2, 0, 0) else None
-        )
-        _add_mock_response(
-            httpx_mock,
-            httpx2_mock,
-            rsps,
-            "GET",
-            MODEL_ENDPOINT.format(model_name=model_name),
-            json={
-                "id": model_name,
-                "pipeline_tag": "conversational",
-                "inferenceProviderMapping": {
-                    "hf-inference": {
-                        "status": "live",
-                        "providerId": model_name,
-                        "task": "conversational",
-                    }
-                },
+    httpx2_mock.add_response(
+        method="GET",
+        url=MODEL_ENDPOINT.format(model_name=model_name),
+        json={
+            "id": model_name,
+            "pipeline_tag": "conversational",
+            "inferenceProviderMapping": {
+                "hf-inference": {
+                    "status": "live",
+                    "providerId": model_name,
+                    "task": "conversational",
+                }
             },
-            status=200,
-        )
+        },
+        content=None,
+        status_code=200,
+        headers=None,
+        is_optional=True,
+        is_reusable=True,
+    )
 
-        # Mock chat completion streaming endpoint
-        streaming_chat_response = (
-            b'data:{"id":"xyz-123","created":1234567890,"model":"test-model-123","system_fingerprint":"fp_123","choices":[{"delta":{"role":"assistant","content":"response with tool calls follows"},"index":0,"finish_reason":null}],"usage":null}\n\n'
-            b'data:{"id":"xyz-124","created":1234567890,"model":"test-model-123","system_fingerprint":"fp_123","choices":[{"delta":{"role":"assistant","tool_calls": [{"id": "call_123","type": "function","function": {"name": "get_weather", "arguments": {"location": "Paris"}}}]},"index":0,"finish_reason":"tool_calls"}],"usage":{"prompt_tokens":183,"completion_tokens":14,"total_tokens":197}}\n\n'
-        )
+    # Mock chat completion streaming endpoint
+    streaming_chat_response = (
+        b'data:{"id":"xyz-123","created":1234567890,"model":"test-model-123","system_fingerprint":"fp_123","choices":[{"delta":{"role":"assistant","content":"response with tool calls follows"},"index":0,"finish_reason":null}],"usage":null}\n\n'
+        b'data:{"id":"xyz-124","created":1234567890,"model":"test-model-123","system_fingerprint":"fp_123","choices":[{"delta":{"role":"assistant","tool_calls": [{"id": "call_123","type": "function","function": {"name": "get_weather", "arguments": {"location": "Paris"}}}]},"index":0,"finish_reason":"tool_calls"}],"usage":{"prompt_tokens":183,"completion_tokens":14,"total_tokens":197}}\n\n'
+    )
 
-        _add_mock_response(
-            httpx_mock,
-            httpx2_mock,
-            rsps,
-            "POST",
-            INFERENCE_ENDPOINT.format(model_name=model_name) + "/v1/chat/completions",
-            body=streaming_chat_response,
-            status=200,
-            headers={
-                "Content-Type": "text/event-stream",
-                "Cache-Control": "no-cache",
-                "Connection": "keep-alive",
-            },
-        )
+    httpx2_mock.add_response(
+        method="POST",
+        url=INFERENCE_ENDPOINT.format(model_name=model_name) + "/v1/chat/completions",
+        json={"error": "Model not found"},
+        content=streaming_chat_response,
+        status_code=200,
+        headers={
+            "Content-Type": "text/event-stream",
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+        },
+        is_optional=True,
+        is_reusable=True,
+    )
 
-        if HF_VERSION >= (2, 0, 0):
-            yield httpx2_mock
-        elif HF_VERSION >= (1, 0, 0):
-            yield httpx_mock
-        else:
-            yield rsps
+    yield httpx2_mock
 
 
 @pytest.mark.httpx_mock(assert_all_requests_were_expected=False)
@@ -821,7 +698,7 @@ def test_chat_completion(
         integrations=[HuggingfaceHubIntegration()],
     )
 
-    client = get_hf_provider_inference_client()
+    client = InferenceClient(model="test-model", provider="hf-inference")
     items = capture_items("span")
 
     client.chat_completion(
@@ -900,7 +777,7 @@ def test_chat_completion_no_sensitive_data(
         integrations=[HuggingfaceHubIntegration()],
     )
 
-    client = get_hf_provider_inference_client()
+    client = InferenceClient(model="test-model", provider="hf-inference")
     items = capture_items("span")
 
     client.chat_completion(
@@ -972,7 +849,7 @@ def test_chat_completion_streaming(
         integrations=[HuggingfaceHubIntegration()],
     )
 
-    client = get_hf_provider_inference_client()
+    client = InferenceClient(model="test-model", provider="hf-inference")
     items = capture_items("span")
 
     _ = list(
@@ -1055,7 +932,7 @@ def test_chat_completion_streaming_no_sensitive_data(
         integrations=[HuggingfaceHubIntegration()],
     )
 
-    client = get_hf_provider_inference_client()
+    client = InferenceClient(model="test-model", provider="hf-inference")
     items = capture_items("span")
 
     _ = list(
@@ -1125,7 +1002,7 @@ def test_chat_completion_api_error(
         data_collection={},
     )
 
-    client = get_hf_provider_inference_client()
+    client = InferenceClient(model="test-model", provider="hf-inference")
     items = capture_items("event", "span")
 
     with pytest.raises(HfHubHTTPError):
@@ -1179,7 +1056,7 @@ def test_span_status_error(
     capture_items: "Any",
     mock_hf_api_with_errors: "Any",
 ) -> None:
-    client = get_hf_provider_inference_client()
+    client = InferenceClient(model="test-model", provider="hf-inference")
 
     sentry_init(
         traces_sample_rate=1.0,
@@ -1231,7 +1108,7 @@ def test_chat_completion_with_tools(
         integrations=[HuggingfaceHubIntegration()],
     )
 
-    client = get_hf_provider_inference_client()
+    client = InferenceClient(model="test-model", provider="hf-inference")
 
     tools = [
         {
@@ -1316,7 +1193,7 @@ def test_chat_completion_with_tools_no_sensitive_data(
         integrations=[HuggingfaceHubIntegration()],
     )
 
-    client = get_hf_provider_inference_client()
+    client = InferenceClient(model="test-model", provider="hf-inference")
 
     tools = [
         {
@@ -1399,7 +1276,7 @@ def test_chat_completion_streaming_with_tools(
         integrations=[HuggingfaceHubIntegration()],
     )
 
-    client = get_hf_provider_inference_client()
+    client = InferenceClient(model="test-model", provider="hf-inference")
 
     tools = [
         {
@@ -1491,7 +1368,7 @@ def test_chat_completion_streaming_with_tools_no_sensitive_data(
         integrations=[HuggingfaceHubIntegration()],
     )
 
-    client = get_hf_provider_inference_client()
+    client = InferenceClient(model="test-model", provider="hf-inference")
 
     tools = [
         {
@@ -1770,7 +1647,7 @@ def test_chat_completion_data_collection_tools(
 
     sentry_init(**sentry_init_kwargs)
 
-    client = get_hf_provider_inference_client()
+    client = InferenceClient(model="test-model", provider="hf-inference")
 
     captured = capture_items("span")
 
@@ -1857,7 +1734,7 @@ def test_chat_completion_streaming_data_collection_tools(
 
     sentry_init(**sentry_init_kwargs)
 
-    client = get_hf_provider_inference_client()
+    client = InferenceClient(model="test-model", provider="hf-inference")
 
     captured = capture_items("span")
 
