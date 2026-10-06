@@ -154,7 +154,6 @@ def test_openfeature_integration_asyncio(
 
 def test_openfeature_span_integration(
     sentry_init,
-    capture_events,
     capture_items,
     uninstall_integration,
 ):

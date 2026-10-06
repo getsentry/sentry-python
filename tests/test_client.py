@@ -595,7 +595,7 @@ def test_capture_event_works(sentry_init):
 @pytest.mark.parametrize(
     "http2", [True, False] if sys.version_info >= (3, 8) else [False]
 )
-def test_atexit(tmpdir, monkeypatch, num_messages, http2):
+def test_atexit(tmpdir, num_messages, http2):
     if http2:
         options = '_experiments={"transport_http2": True}'
         transport = "Http2Transport"
@@ -953,7 +953,7 @@ def test_dict_changed_during_iteration(sentry_init, capture_events):
 
     See https://github.com/getsentry/sentry-python/pull/298 for discussion
     """
-    sentry_init(send_default_pii=True)
+    sentry_init(data_collection={})
     events = capture_events()
 
     class TooSmartClass:

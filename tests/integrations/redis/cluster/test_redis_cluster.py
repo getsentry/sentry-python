@@ -65,7 +65,6 @@ def test_rediscluster_breadcrumb(sentry_init, capture_events):
 )
 def test_rediscluster_basic(
     sentry_init,
-    capture_events,
     capture_items,
     data_collection,
     description,
@@ -160,7 +159,6 @@ def test_rediscluster_pipeline(
 
 def test_rediscluster_span_origin(
     sentry_init,
-    capture_events,
     capture_items,
 ):
     sentry_init(

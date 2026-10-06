@@ -135,7 +135,7 @@ def test_levels(
         assert log.payload["attributes"]["sentry.origin"] == "auto.log.loguru"
 
 
-def test_breadcrumb_format(sentry_init, capture_events, uninstall_integration, request):
+def test_breadcrumb_format(sentry_init, uninstall_integration, request):
     uninstall_integration("loguru")
     request.addfinalizer(logger.remove)
 

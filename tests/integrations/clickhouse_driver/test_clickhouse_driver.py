@@ -750,7 +750,6 @@ def test_clickhouse_dbapi_breadcrumbs(sentry_init, capture_events) -> None:
 def test_clickhouse_dbapi_spans(
     sentry_init,
     capture_items,
-    capture_envelopes,
 ):
     sentry_init(
         integrations=[ClickhouseDriverIntegration()],
@@ -878,7 +877,7 @@ def test_clickhouse_dbapi_spans(
     assert spans == expected_spans
 
 
-def test_span_origin(sentry_init, capture_items, capture_envelopes):
+def test_span_origin(sentry_init, capture_items):
     sentry_init(
         integrations=[ClickhouseDriverIntegration()],
         traces_sample_rate=1.0,

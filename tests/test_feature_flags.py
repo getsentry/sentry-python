@@ -8,7 +8,7 @@ import sentry_sdk
 from sentry_sdk.feature_flags import FlagBuffer, add_feature_flag
 
 
-def test_featureflags_integration(sentry_init, capture_events, uninstall_integration):
+def test_featureflags_integration(sentry_init, capture_events):
     sentry_init()
 
     add_feature_flag("hello", False)
@@ -85,9 +85,7 @@ def test_featureflags_integration_spans_sync(sentry_init, capture_events):
     assert found, "No event with exception found"
 
 
-def test_featureflags_integration_threaded(
-    sentry_init, capture_events, uninstall_integration
-):
+def test_featureflags_integration_threaded(sentry_init, capture_events):
     sentry_init()
     events = capture_events()
 
@@ -133,9 +131,7 @@ def test_featureflags_integration_threaded(
     }
 
 
-def test_featureflags_integration_asyncio(
-    sentry_init, capture_events, uninstall_integration
-):
+def test_featureflags_integration_asyncio(sentry_init, capture_events):
     asyncio = pytest.importorskip("asyncio")
 
     sentry_init()

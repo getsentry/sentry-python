@@ -13,7 +13,7 @@ from sentry_sdk.utils import parse_version
 FAKEREDIS_VERSION = parse_version(fakeredis.__version__)
 
 
-def test_no_cache_basic(sentry_init, capture_events, capture_items):
+def test_no_cache_basic(sentry_init, capture_items):
     sentry_init(
         integrations=[
             RedisIntegration(),
@@ -36,7 +36,7 @@ def test_no_cache_basic(sentry_init, capture_events, capture_items):
     assert db_span["attributes"]["sentry.op"] == "db.redis"
 
 
-def test_cache_basic(sentry_init, capture_events, capture_items):
+def test_cache_basic(sentry_init, capture_items):
     sentry_init(
         integrations=[
             RedisIntegration(
@@ -103,7 +103,7 @@ def test_cache_basic(sentry_init, capture_events, capture_items):
     assert payloads[9]["name"] == "custom parent"
 
 
-def test_cache_keys(sentry_init, capture_events, capture_items):
+def test_cache_keys(sentry_init, capture_items):
     sentry_init(
         integrations=[
             RedisIntegration(
@@ -153,7 +153,7 @@ def test_cache_keys(sentry_init, capture_events, capture_items):
     assert payloads[6]["name"] == "custom parent"
 
 
-def test_cache_data(sentry_init, capture_events, capture_items):
+def test_cache_data(sentry_init, capture_items):
     sentry_init(
         integrations=[
             RedisIntegration(
@@ -234,7 +234,7 @@ def test_cache_data(sentry_init, capture_events, capture_items):
     assert payloads[6]["name"] == "custom parent"
 
 
-def test_cache_prefixes(sentry_init, capture_events, capture_items):
+def test_cache_prefixes(sentry_init, capture_items):
     sentry_init(
         integrations=[
             RedisIntegration(

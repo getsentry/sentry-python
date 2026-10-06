@@ -64,7 +64,7 @@ def test_metrics_with_attributes(sentry_init, capture_items):
 
 
 def test_metrics_with_user(sentry_init, capture_items):
-    sentry_init(send_default_pii=True)
+    sentry_init(data_collection={"user_info": True})
     items = capture_items("trace_metric")
 
     sentry_sdk.set_user(
@@ -466,7 +466,7 @@ def test_attributes_preserialized_in_before_send(sentry_init, capture_items):
     assert isinstance(metric["attributes"]["dictionary"], str)
 
 
-def test_array_attributes_deep_copied_in_before_send(sentry_init, capture_envelopes):
+def test_array_attributes_deep_copied_in_before_send(sentry_init):
     """We don't surface user-held references to objects in attributes."""
 
     strings = ["value1", "value2"]

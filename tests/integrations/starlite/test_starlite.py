@@ -271,7 +271,7 @@ def test_middleware_callback_spans(sentry_init, capture_items):
         )
 
 
-def test_middleware_receive_send(sentry_init, capture_events):
+def test_middleware_receive_send(sentry_init):
     class SampleReceiveSendMiddleware(AbstractMiddleware):
         async def __call__(self, scope, receive, send):
             message = await receive()

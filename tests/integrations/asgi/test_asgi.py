@@ -401,7 +401,6 @@ async def test_websocket(
     sentry_init,
     asgi3_ws_app,
     capture_items,
-    request,
 ):
     sentry_init(
         data_collection={},

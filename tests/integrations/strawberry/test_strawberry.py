@@ -478,7 +478,6 @@ def test_breadcrumb_no_operation_name(
 def test_capture_segment_on_error(
     request,
     sentry_init,
-    capture_events,
     capture_items,
     client_factory,
     async_execution,
@@ -540,7 +539,6 @@ def test_capture_segment_on_error(
 def test_capture_segment_on_success(
     request,
     sentry_init,
-    capture_events,
     capture_items,
     client_factory,
     async_execution,
@@ -599,7 +597,6 @@ def test_capture_segment_on_success(
 def test_segment_no_operation_name(
     request,
     sentry_init,
-    capture_events,
     capture_items,
     client_factory,
     async_execution,
@@ -657,7 +654,6 @@ def test_segment_no_operation_name(
 def test_segment_mutation(
     request,
     sentry_init,
-    capture_events,
     capture_items,
     client_factory,
     async_execution,
@@ -731,7 +727,6 @@ def test_segment_mutation(
 def test_graphql_span_data_collection(
     request,
     sentry_init,
-    capture_events,
     capture_items,
     client_factory,
     async_execution,
@@ -817,7 +812,6 @@ def test_handle_none_query_gracefully(
 def test_span_origin_for_gql_mutations_and_related_ops(
     request,
     sentry_init,
-    capture_events,
     capture_items,
     client_factory,
     async_execution,
@@ -866,7 +860,6 @@ def test_span_origin_for_gql_mutations_and_related_ops(
 def test_span_origin_for_gql_query_ops(
     request,
     sentry_init,
-    capture_events,
     capture_items,
     client_factory,
     async_execution,
@@ -915,7 +908,6 @@ def test_span_origin_for_gql_query_ops(
 def test_span_origin3(
     request,
     sentry_init,
-    capture_events,
     capture_items,
     client_factory,
     async_execution,

@@ -5,7 +5,6 @@ import json
 import os
 import socket
 import threading
-import warnings
 from collections import namedtuple
 from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -41,11 +40,6 @@ try:
     # RuntimeError: The starlette.testclient module requires the httpx package to be installed.
 except (ImportError, RuntimeError):
     TestClient = None
-
-try:
-    import gevent
-except ImportError:
-    gevent = None
 
 import sentry_sdk
 import sentry_sdk.utils
@@ -490,37 +484,6 @@ def capture_record_lost_event_calls(monkeypatch):
 
 
 @pytest.fixture
-def capture_events_forksafe(monkeypatch, capture_events, request):
-    def inner():
-        capture_events()
-
-        events_r, events_w = os.pipe()
-        events_r = os.fdopen(events_r, "rb", 0)
-        events_w = os.fdopen(events_w, "wb", 0)
-
-        test_client = sentry_sdk.get_client()
-
-        old_capture_envelope = test_client.transport.capture_envelope
-
-        def append(envelope):
-            event = envelope.get_event()
-            if event is not None:
-                events_w.write(json.dumps(event).encode("utf-8"))
-                events_w.write(b"\n")
-            return old_capture_envelope(envelope)
-
-        def flush(timeout=None, callback=None):
-            events_w.write(b"flush\n")
-
-        monkeypatch.setattr(test_client.transport, "capture_envelope", append)
-        monkeypatch.setattr(test_client, "flush", flush)
-
-        return EventStreamReader(events_r, events_w)
-
-    return inner
-
-
-@pytest.fixture
 def capture_items_forksafe(monkeypatch, capture_items, request):
     def inner(*types):
         capture_items(*types)
@@ -576,29 +539,6 @@ class EventStreamReader:
 
     def read_flush(self):
         assert self.read_file.readline() == b"flush\n"
-
-
-# scope=session ensures that fixture is run earlier
-@pytest.fixture(
-    scope="session",
-    params=[None, "gevent"],
-    ids=("threads", "greenlet"),
-)
-def maybe_monkeypatched_threading(request):
-    if request.param == "gevent":
-        if gevent is None:
-            pytest.skip("no gevent installed")
-        try:
-            gevent.monkey.patch_all()
-        except Exception as e:
-            if "_RLock__owner" in str(e):
-                pytest.skip("https://github.com/gevent/gevent/issues/1380")
-            else:
-                raise
-    else:
-        assert request.param is None
-
-    return request.param
 
 
 @pytest.fixture
@@ -813,17 +753,6 @@ def teardown_profiling():
 
     # Make sure to shut down the profiler after the test
     teardown_continuous_profiler()
-
-
-@pytest.fixture()
-def suppress_deprecation_warnings():
-    """
-    Use this fixture to suppress deprecation warnings in a test.
-    Useful for testing deprecated SDK features.
-    """
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore", DeprecationWarning)
-        yield
 
 
 def _make_session_message(jsonrpc_msg):

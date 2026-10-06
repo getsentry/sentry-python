@@ -9,7 +9,7 @@ from sentry_sdk import capture_exception
 from sentry_sdk.utils import logger
 
 
-def test_sampling_decided_only_for_segments(sentry_init, capture_events):
+def test_sampling_decided_only_for_segments(sentry_init):
     sentry_init(
         traces_sample_rate=0.5,
     )

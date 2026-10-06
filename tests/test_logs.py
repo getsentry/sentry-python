@@ -332,8 +332,8 @@ def test_auto_flush_logs_after_100(sentry_init, capture_envelopes):
 
 
 def test_log_user_attributes(sentry_init, capture_items):
-    """User attributes are sent if send_default_pii is True."""
-    sentry_init(send_default_pii=True)
+    """User attributes are sent if user_info is True."""
+    sentry_init(data_collection={"user_info": True})
 
     sentry_sdk.set_user({"id": "1", "email": "test@example.com", "username": "test"})
     items = capture_items("log")
@@ -736,7 +736,7 @@ def test_attributes_preserialized_in_before_send(sentry_init, capture_items):
     assert isinstance(log["attributes"]["inhomogeneous_tuple"], str)
 
 
-def test_array_attributes_deep_copied_in_before_send(sentry_init, capture_envelopes):
+def test_array_attributes_deep_copied_in_before_send(sentry_init):
     """We don't surface user-held references to objects in attributes."""
 
     strings = ["value1", "value2"]
