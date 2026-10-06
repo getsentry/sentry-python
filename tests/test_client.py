@@ -953,7 +953,7 @@ def test_dict_changed_during_iteration(sentry_init, capture_events):
 
     See https://github.com/getsentry/sentry-python/pull/298 for discussion
     """
-    sentry_init(send_default_pii=True)
+    sentry_init(data_collection={})
     events = capture_events()
 
     class TooSmartClass:

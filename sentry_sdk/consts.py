@@ -393,6 +393,13 @@ class SPANDATA:
     Example: "10.1.2.80"
     """
 
+    CLOUD_PROVIDER = "cloud.provider"
+    """
+    Name of the cloud provider.
+
+    Example: "aws"
+    """
+
     CLOUD_REGION = "cloud.region"
     """
     The geographical region the resource is running.

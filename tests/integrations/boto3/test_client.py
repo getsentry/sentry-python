@@ -14,7 +14,11 @@ from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.boto3 import Boto3Integration
 from sentry_sdk.integrations.boto3._services.base import _ServiceExtension
 from sentry_sdk.integrations.boto3._services.registry import _SERVICE_EXTENSIONS
-from sentry_sdk.integrations.boto3.consts import AWS_RPC_SYSTEM_NAME, ORIGIN
+from sentry_sdk.integrations.boto3.consts import (
+    AWS_RPC_SYSTEM_NAME,
+    CLOUD_PROVIDER,
+    ORIGIN,
+)
 from sentry_sdk.integrations.stdlib import StdlibIntegration
 from sentry_sdk.traces import Span
 from tests.integrations.boto3.aws_mock import Body, MockResponse
@@ -432,6 +436,7 @@ def test_client_call_has_common_attributes(
     assert attributes[SPANDATA.RPC_SYSTEM_NAME] == AWS_RPC_SYSTEM_NAME
     assert attributes[SPANDATA.SENTRY_KIND] == "client"
     assert attributes[SPANDATA.CLOUD_REGION] == "eu-north-1"
+    assert attributes[SPANDATA.CLOUD_PROVIDER] == CLOUD_PROVIDER
     assert attributes[SPANDATA.SERVER_ADDRESS] == server_address
     assert attributes[SPANDATA.SERVER_PORT] == server_port
     assert attributes[SPANDATA.HTTP_STATUS_CODE] == 200
@@ -452,6 +457,7 @@ def test_client_call_attributes_are_available_at_span_creation(
         ignore_spans=[
             {
                 "attributes": {
+                    SPANDATA.CLOUD_PROVIDER: CLOUD_PROVIDER,
                     SPANDATA.RPC_METHOD: "HeadObject",
                     SPANDATA.RPC_SERVICE: "S3",
                     SPANDATA.RPC_SYSTEM_NAME: AWS_RPC_SYSTEM_NAME,
