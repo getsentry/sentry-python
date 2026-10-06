@@ -149,7 +149,7 @@ def _apply_key_value_collection_filtering(
     return result
 
 
-def _resolve_explicit(
+def _resolve(
     d: "dict[str, Any]",
 ) -> "DataCollection":
     """
@@ -256,13 +256,13 @@ def _resolve_data_collection(options: "Dict[str, Any]") -> "DataCollection":
     Must be called exactly once per options dict, before ``client._get_options``
     overwrites ``options["data_collection"]`` with the resolved result.
     """
-    user_dc = options.get("data_collection", {})
+    user_dc = options.get("data_collection") or {}
 
     if not isinstance(user_dc, dict):
         raise TypeError(
             "`data_collection` must be a dict, got {!r}.".format(type(user_dc).__name__)
         )
 
-    return _resolve_explicit(
+    return _resolve(
         user_dc,
     )
