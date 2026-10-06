@@ -4891,7 +4891,8 @@ def test_completions_token_usage_manual_output_counting_streaming(
                     prompt_tokens=20,
                     completion_tokens=0,
                     total_tokens=20,
-                )
+                ),
+                message_contents=("one", " two", " three"),
             ),
             include_event_type=False,
         )
@@ -4919,7 +4920,7 @@ def test_completions_token_usage_manual_output_counting_streaming(
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 20
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 20
         if tiktoken_encoding_if_installed():
-            assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 2
+            assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 3
 
     else:
         events = capture_events()
@@ -4943,7 +4944,7 @@ def test_completions_token_usage_manual_output_counting_streaming(
         assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 20
         assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 20
         if tiktoken_encoding_if_installed():
-            assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 2
+            assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 3
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])

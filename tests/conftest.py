@@ -1319,6 +1319,7 @@ def get_rate_limit_model_response():
 def streaming_chat_completions_model_response():
     def inner(
         usage: "openai.types.CompletionUsage",
+        message_contents: "Iterator[str]",
     ):
         return [
             openai.types.chat.ChatCompletionChunk(
@@ -1336,81 +1337,24 @@ def streaming_chat_completions_model_response():
                     ),
                 ],
             ),
-            openai.types.chat.ChatCompletionChunk(
-                id="chatcmpl-test",
-                object="chat.completion.chunk",
-                created=10000000,
-                model="gpt-3.5-turbo",
-                choices=[
-                    openai.types.chat.chat_completion_chunk.Choice(
-                        index=0,
-                        delta=openai.types.chat.chat_completion_chunk.ChoiceDelta(
-                            content="Tes"
+            *[
+                openai.types.chat.ChatCompletionChunk(
+                    id="chatcmpl-test",
+                    object="chat.completion.chunk",
+                    created=10000000,
+                    model="gpt-3.5-turbo",
+                    choices=[
+                        openai.types.chat.chat_completion_chunk.Choice(
+                            index=0,
+                            delta=openai.types.chat.chat_completion_chunk.ChoiceDelta(
+                                content=message_content
+                            ),
+                            finish_reason=None,
                         ),
-                        finish_reason=None,
-                    ),
-                ],
-            ),
-            openai.types.chat.ChatCompletionChunk(
-                id="chatcmpl-test",
-                object="chat.completion.chunk",
-                created=10000000,
-                model="gpt-3.5-turbo",
-                choices=[
-                    openai.types.chat.chat_completion_chunk.Choice(
-                        index=0,
-                        delta=openai.types.chat.chat_completion_chunk.ChoiceDelta(
-                            content="t r"
-                        ),
-                        finish_reason=None,
-                    ),
-                ],
-            ),
-            openai.types.chat.ChatCompletionChunk(
-                id="chatcmpl-test",
-                object="chat.completion.chunk",
-                created=10000000,
-                model="gpt-3.5-turbo",
-                choices=[
-                    openai.types.chat.chat_completion_chunk.Choice(
-                        index=0,
-                        delta=openai.types.chat.chat_completion_chunk.ChoiceDelta(
-                            content="esp"
-                        ),
-                        finish_reason=None,
-                    ),
-                ],
-            ),
-            openai.types.chat.ChatCompletionChunk(
-                id="chatcmpl-test",
-                object="chat.completion.chunk",
-                created=10000000,
-                model="gpt-3.5-turbo",
-                choices=[
-                    openai.types.chat.chat_completion_chunk.Choice(
-                        index=0,
-                        delta=openai.types.chat.chat_completion_chunk.ChoiceDelta(
-                            content="ons"
-                        ),
-                        finish_reason=None,
-                    ),
-                ],
-            ),
-            openai.types.chat.ChatCompletionChunk(
-                id="chatcmpl-test",
-                object="chat.completion.chunk",
-                created=10000000,
-                model="gpt-3.5-turbo",
-                choices=[
-                    openai.types.chat.chat_completion_chunk.Choice(
-                        index=0,
-                        delta=openai.types.chat.chat_completion_chunk.ChoiceDelta(
-                            content="e"
-                        ),
-                        finish_reason=None,
-                    ),
-                ],
-            ),
+                    ],
+                )
+                for message_content in message_contents
+            ],
             openai.types.chat.ChatCompletionChunk(
                 id="chatcmpl-test",
                 object="chat.completion.chunk",
