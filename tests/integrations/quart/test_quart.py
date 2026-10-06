@@ -113,7 +113,6 @@ async def test_quart_flask_patch(sentry_init, capture_events, reset_integrations
     app = quart_app_factory()
     sentry_init(
         integrations=[quart_sentry.QuartIntegration()],
-        data_collection={},
     )
 
     @app.route("/")
@@ -134,7 +133,7 @@ async def test_quart_flask_patch(sentry_init, capture_events, reset_integrations
 
 @pytest.mark.asyncio
 async def test_has_context(sentry_init, capture_events):
-    sentry_init(integrations=[quart_sentry.QuartIntegration()], data_collection={})
+    sentry_init(integrations=[quart_sentry.QuartIntegration()])
     app = quart_app_factory()
     events = capture_events()
 
@@ -156,7 +155,6 @@ async def test_http_route(
     sentry_init(
         integrations=[quart_sentry.QuartIntegration()],
         traces_sample_rate=1.0,
-        data_collection={},
     )
 
     app = quart_app_factory()
@@ -178,7 +176,7 @@ async def test_errors(
     capture_events,
     integration_enabled_params,
 ):
-    sentry_init(data_collection={}, **integration_enabled_params)
+    sentry_init(**integration_enabled_params)
     app = quart_app_factory()
 
     @app.route("/")
@@ -205,7 +203,7 @@ async def test_errors(
 async def test_quart_auth_not_installed(
     sentry_init, capture_events, monkeypatch, integration_enabled_params
 ):
-    sentry_init(data_collection={}, **integration_enabled_params)
+    sentry_init(**integration_enabled_params)
     app = quart_app_factory()
 
     monkeypatch.setattr(quart_sentry, "quart_auth", None)
@@ -270,7 +268,7 @@ async def test_quart_auth_configured(
     ],
 )
 async def test_errors_not_reported_twice(sentry_init, integrations, capture_events):
-    sentry_init(integrations=integrations, data_collection={})
+    sentry_init(integrations=integrations)
     app = quart_app_factory()
 
     @app.route("/")
@@ -298,7 +296,6 @@ async def test_logging(sentry_init, capture_events):
             quart_sentry.QuartIntegration(),
             LoggingIntegration(event_level="ERROR"),
         ],
-        data_collection={},
     )
     app = quart_app_factory()
 
@@ -318,7 +315,7 @@ async def test_logging(sentry_init, capture_events):
 
 @pytest.mark.asyncio
 async def test_no_errors_without_request(sentry_init):
-    sentry_init(integrations=[quart_sentry.QuartIntegration()], data_collection={})
+    sentry_init(integrations=[quart_sentry.QuartIntegration()])
     app = quart_app_factory()
 
     async with app.app_context():
@@ -345,7 +342,7 @@ def test_cli_commands_raise():
 
 @pytest.mark.asyncio
 async def test_500(sentry_init):
-    sentry_init(integrations=[quart_sentry.QuartIntegration()], data_collection={})
+    sentry_init(integrations=[quart_sentry.QuartIntegration()])
     app = quart_app_factory()
 
     @app.route("/")
@@ -364,7 +361,7 @@ async def test_500(sentry_init):
 
 @pytest.mark.asyncio
 async def test_error_in_errorhandler(sentry_init, capture_events):
-    sentry_init(integrations=[quart_sentry.QuartIntegration()], data_collection={})
+    sentry_init(integrations=[quart_sentry.QuartIntegration()])
     app = quart_app_factory()
 
     @app.route("/")
@@ -428,7 +425,7 @@ async def test_error_in_errorhandler(sentry_init, capture_events):
 async def test_bad_request_not_captured(sentry_init, capture_events):
     from quart import abort
 
-    sentry_init(integrations=[quart_sentry.QuartIntegration()], data_collection={})
+    sentry_init(integrations=[quart_sentry.QuartIntegration()])
     app = quart_app_factory()
     events = capture_events()
 
@@ -447,7 +444,7 @@ async def test_bad_request_not_captured(sentry_init, capture_events):
 async def test_does_not_leak_scope(sentry_init, capture_events):
     from quart import Response, stream_with_context
 
-    sentry_init(integrations=[quart_sentry.QuartIntegration()], data_collection={})
+    sentry_init(integrations=[quart_sentry.QuartIntegration()])
     app = quart_app_factory()
     events = capture_events()
 
@@ -476,7 +473,7 @@ async def test_does_not_leak_scope(sentry_init, capture_events):
 
 @pytest.mark.asyncio
 async def test_scoped_test_client(sentry_init):
-    sentry_init(integrations=[quart_sentry.QuartIntegration()], data_collection={})
+    sentry_init(integrations=[quart_sentry.QuartIntegration()])
     app = quart_app_factory()
 
     @app.route("/")
@@ -496,7 +493,7 @@ async def test_errorhandler_for_exception_swallows_exception(
     # In contrast to error handlers for a status code, error
     # handlers for exceptions can swallow the exception (this is
     # just how the Quart signal works)
-    sentry_init(integrations=[quart_sentry.QuartIntegration()], data_collection={})
+    sentry_init(integrations=[quart_sentry.QuartIntegration()])
     app = quart_app_factory()
     events = capture_events()
 
@@ -520,7 +517,6 @@ async def test_tracing_success(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[quart_sentry.QuartIntegration()],
-        data_collection={},
     )
     app = quart_app_factory()
 
@@ -557,7 +553,6 @@ async def test_tracing_error(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[quart_sentry.QuartIntegration()],
-        data_collection={},
     )
     app = quart_app_factory()
 
@@ -586,7 +581,7 @@ async def test_tracing_error(sentry_init, capture_items):
 async def test_class_based_views(sentry_init, capture_events):
     from quart.views import View
 
-    sentry_init(integrations=[quart_sentry.QuartIntegration()], data_collection={})
+    sentry_init(integrations=[quart_sentry.QuartIntegration()])
     app = quart_app_factory()
     events = capture_events()
 
@@ -615,7 +610,6 @@ async def test_span_origin(sentry_init, capture_items):
     sentry_init(
         integrations=[quart_sentry.QuartIntegration()],
         traces_sample_rate=1.0,
-        data_collection={},
     )
     app = quart_app_factory()
     items = capture_items("span")
@@ -635,7 +629,6 @@ async def test_basic(sentry_init, capture_items):
     sentry_init(
         integrations=[quart_sentry.QuartIntegration()],
         traces_sample_rate=1.0,
-        data_collection={},
     )
     items = capture_items("span")
 
@@ -677,7 +670,6 @@ async def test_segment_name_and_source(
     sentry_init(
         integrations=[quart_sentry.QuartIntegration()],
         traces_sample_rate=1.0,
-        data_collection={},
     )
     items = capture_items("span")
 
@@ -702,7 +694,6 @@ async def test_with_error(sentry_init, capture_items):
     sentry_init(
         integrations=[quart_sentry.QuartIntegration()],
         traces_sample_rate=1.0,
-        data_collection={},
     )
     items = capture_items("event", "span")
 
@@ -1005,7 +996,6 @@ async def test_url_query_multi_and_blank_values(sentry_init, capture_items):
     sentry_init(
         integrations=[quart_sentry.QuartIntegration()],
         traces_sample_rate=1.0,
-        data_collection={},
     )
     items = capture_items("span")
 
