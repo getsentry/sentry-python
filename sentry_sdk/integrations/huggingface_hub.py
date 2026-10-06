@@ -223,8 +223,20 @@ def _wrap_huggingface_task(f: "Callable[..., Any]", op: str) -> "Callable[..., A
                     SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, usage.total_tokens
                 )
 
-            elif tokens_used > 0 and tokens_used is not None:
-                span.set_attribute(SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, tokens_used)
+            elif (
+                usage is not None
+                and usage.prompt_tokens is not None
+                and usage.completion_tokens is not None
+            ):
+                span.set_attribute(
+                    SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS,
+                    usage.prompt_tokens + usage.completion_tokens,
+                )
+            elif tokens_used > 0:
+                span.set_attribute(
+                    SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS,
+                    tokens_used,
+                )
 
             # If the response is not a generator (meaning a streaming response)
             # we are done and can return the response
@@ -371,20 +383,32 @@ def _wrap_huggingface_task(f: "Callable[..., Any]", op: str) -> "Callable[..., A
                                     text_response,
                                 )
 
-                        if usage is not None and usage.prompt_tokens is not None:
+                        if usage is None:
+                            span.__exit__(None, None, None)
+                            return
+
+                        if usage.prompt_tokens is not None:
                             span.set_attribute(
                                 SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, usage.prompt_tokens
                             )
 
-                        if usage is not None and usage.completion_tokens is not None:
+                        if usage.completion_tokens is not None:
                             span.set_attribute(
                                 SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS,
                                 usage.completion_tokens,
                             )
 
-                        if usage is not None and usage.total_tokens is not None:
+                        if usage.total_tokens is not None:
                             span.set_attribute(
                                 SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, usage.total_tokens
+                            )
+                        elif (
+                            usage.prompt_tokens is not None
+                            and usage.completion_tokens is not None
+                        ):
+                            span.set_attribute(
+                                SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS,
+                                usage.prompt_tokens + usage.completion_tokens,
                             )
 
                         span.__exit__(None, None, None)
