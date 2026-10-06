@@ -291,7 +291,6 @@ class SamplePartialReceiveSendMiddleware:
 async def test_request_info_json_body(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
-
         integrations=[StarletteIntegration()],
     )
 
@@ -332,7 +331,6 @@ async def test_request_info_json_body(sentry_init, capture_items):
 async def test_formdata_request_body(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
-
         max_request_body_size="always",
         integrations=[StarletteIntegration()],
     )
@@ -377,7 +375,6 @@ async def test_formdata_request_body(sentry_init, capture_items):
 async def test_request_body_too_big(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
-
         integrations=[StarletteIntegration()],
     )
 
@@ -982,7 +979,6 @@ def test_user_information_does_not_clobber_app_set_user(sentry_init, capture_eve
     """
     sentry_init(
         traces_sample_rate=1.0,
-
         integrations=[StarletteIntegration()],
     )
 
@@ -1590,7 +1586,6 @@ def test_segment_http_method_default(sentry_init, capture_items):
 def test_request_url(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
-
         integrations=[
             StarletteIntegration(),
         ],
@@ -1689,7 +1684,6 @@ def test_configurable_status_codes(
 async def test_malformed_json_request_body(sentry_init, capture_events):
     sentry_init(
         traces_sample_rate=1.0,
-
         integrations=[StarletteIntegration()],
     )
 

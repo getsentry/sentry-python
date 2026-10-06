@@ -484,7 +484,6 @@ def test_capture_segment_on_error(
     framework_integrations,
 ):
     sentry_init(
-
         integrations=[
             StrawberryIntegration(async_execution=async_execution),
         ]
@@ -550,7 +549,6 @@ def test_capture_segment_on_success(
         ]
         + framework_integrations,
         traces_sample_rate=1,
-
     )
 
     items = capture_items("span")
@@ -608,7 +606,6 @@ def test_segment_no_operation_name(
         ]
         + framework_integrations,
         traces_sample_rate=1,
-
     )
 
     items = capture_items("span")
@@ -665,7 +662,6 @@ def test_segment_mutation(
         ]
         + framework_integrations,
         traces_sample_rate=1,
-
     )
 
     items = capture_items("span")
