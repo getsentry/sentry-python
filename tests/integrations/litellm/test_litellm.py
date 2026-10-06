@@ -602,6 +602,7 @@ def test_streaming_chat_completion(
                     completion_tokens=20,
                     total_tokens=30,
                 ),
+                message_contents=("Tes", "t r", "esp", "ons", "e"),
             ),
             include_event_type=False,
         ),
