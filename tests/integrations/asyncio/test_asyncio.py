@@ -69,7 +69,6 @@ async def test_create_task(
 ):
     sentry_init(
         traces_sample_rate=1.0,
-        data_collection={},
         integrations=[AsyncioIntegration()],
     )
 
@@ -118,7 +117,6 @@ async def test_gather(
 ):
     sentry_init(
         traces_sample_rate=1.0,
-        data_collection={},
         integrations=[AsyncioIntegration()],
     )
 
@@ -156,7 +154,6 @@ async def test_exception(
 ):
     sentry_init(
         traces_sample_rate=1.0,
-        data_collection={},
         integrations=[AsyncioIntegration()],
     )
 
@@ -184,7 +181,6 @@ async def test_exception(
 async def test_task_result(sentry_init):
     sentry_init(
         integrations=[AsyncioIntegration()],
-        data_collection={},
     )
 
     async def add(a, b):
@@ -202,7 +198,6 @@ async def test_task_with_context(sentry_init):
     """
     sentry_init(
         integrations=[AsyncioIntegration()],
-        data_collection={},
     )
 
     var = ContextVar("var")
@@ -374,7 +369,6 @@ async def test_span_origin(
     sentry_init(
         integrations=[AsyncioIntegration()],
         traces_sample_rate=1.0,
-        data_collection={},
     )
 
     items = capture_items("span")
@@ -408,7 +402,6 @@ async def test_task_spans_false(
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[AsyncioIntegration(task_spans=False)],
-        data_collection={},
     )
 
     items = capture_items("span")
@@ -441,7 +434,6 @@ async def test_enable_asyncio_integration_with_task_spans_false(
 
     sentry_init(
         traces_sample_rate=1.0,
-        data_collection={},
     )
 
     assert "asyncio" not in sentry_sdk.get_client().integrations
@@ -473,7 +465,6 @@ async def test_delayed_enable_integration(
 ):
     sentry_init(
         traces_sample_rate=1.0,
-        data_collection={},
     )
 
     assert "asyncio" not in sentry_sdk.get_client().integrations
@@ -514,7 +505,6 @@ async def test_delayed_enable_integration(
 async def test_delayed_enable_integration_with_options(sentry_init):
     sentry_init(
         traces_sample_rate=1.0,
-        data_collection={},
     )
 
     assert "asyncio" not in sentry_sdk.get_client().integrations
@@ -545,7 +535,6 @@ async def test_delayed_enable_enabled_integration(sentry_init, uninstall_integra
     sentry_init(
         integrations=[integration],
         traces_sample_rate=1.0,
-        data_collection={},
     )
 
     assert "asyncio" in sentry_sdk.get_client().integrations
@@ -573,7 +562,6 @@ async def test_delayed_enable_integration_after_disabling(
     sentry_init(
         disabled_integrations=[AsyncioIntegration()],
         traces_sample_rate=1.0,
-        data_collection={},
     )
 
     assert "asyncio" not in sentry_sdk.get_client().integrations
@@ -620,7 +608,6 @@ async def test_internal_tasks_not_wrapped(
     sentry_init(
         integrations=[AsyncioIntegration()],
         traces_sample_rate=1.0,
-        data_collection={},
     )
 
     async def user_task():
@@ -662,7 +649,6 @@ async def test_internal_tasks_not_wrapped(
 def test_loop_close_patching(sentry_init):
     sentry_init(
         integrations=[AsyncioIntegration()],
-        data_collection={},
     )
 
     loop = asyncio.new_event_loop()
@@ -689,7 +675,6 @@ def test_loop_close_flushes_async_transport(sentry_init):
 
     sentry_init(
         integrations=[AsyncioIntegration()],
-        data_collection={},
     )
 
     # Save the current event loop to restore it later
