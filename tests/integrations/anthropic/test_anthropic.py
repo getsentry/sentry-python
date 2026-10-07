@@ -3324,7 +3324,6 @@ def test_exception_message_create(
         integrations=[AnthropicIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        data_collection={},
     )
 
     client = Anthropic(api_key="z")
@@ -3352,7 +3351,6 @@ def test_span_status_error(
         integrations=[AnthropicIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        data_collection={},
     )
     items = capture_items("event", "span")
 
@@ -3386,7 +3384,6 @@ async def test_span_status_error_async(
         integrations=[AnthropicIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        data_collection={},
     )
     items = capture_items("event", "span")
 
@@ -3420,7 +3417,6 @@ async def test_exception_message_create_async(
         integrations=[AnthropicIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        data_collection={},
     )
 
     client = AsyncAnthropic(api_key="z")
@@ -3448,7 +3444,6 @@ def test_span_origin(
         integrations=[AnthropicIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        data_collection={},
     )
 
     client = Anthropic(api_key="z")
@@ -3480,7 +3475,6 @@ async def test_span_origin_async(
         integrations=[AnthropicIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        data_collection={},
     )
 
     client = AsyncAnthropic(api_key="z")
@@ -5309,7 +5303,6 @@ def test_cache_tokens_nonstreaming(
         integrations=[AnthropicIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        data_collection={},
     )
 
     client = Anthropic(api_key="z")
@@ -5366,7 +5359,6 @@ def test_input_tokens_include_cache_write_nonstreaming(
         integrations=[AnthropicIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        data_collection={},
     )
 
     client = Anthropic(api_key="z")
@@ -5423,7 +5415,6 @@ def test_input_tokens_include_cache_read_nonstreaming(
         integrations=[AnthropicIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        data_collection={},
     )
 
     client = Anthropic(api_key="z")
@@ -5506,7 +5497,6 @@ def test_input_tokens_include_cache_read_streaming(
         integrations=[AnthropicIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        data_collection={},
     )
     items = capture_items("span")
 
@@ -5577,7 +5567,6 @@ def test_stream_messages_input_tokens_include_cache_read_streaming(
         integrations=[AnthropicIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        data_collection={},
     )
     items = capture_items("span")
 
@@ -5617,7 +5606,6 @@ def test_input_tokens_unchanged_without_caching(
         integrations=[AnthropicIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        data_collection={},
     )
 
     client = Anthropic(api_key="z")
@@ -5691,7 +5679,6 @@ def test_cache_tokens_streaming(
         integrations=[AnthropicIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        data_collection={},
     )
     items = capture_items("span")
 
@@ -5759,7 +5746,6 @@ def test_stream_messages_cache_tokens(
         integrations=[AnthropicIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        data_collection={},
     )
     items = capture_items("span")
 
