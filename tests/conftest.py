@@ -264,6 +264,7 @@ def reset_integrations():
     _processed_integrations.clear()
     _installed_integrations.clear()
 
+
 @pytest.fixture
 def uninstall_integration():
     """Use to force the next call to sentry_init to re-install/setup an integration."""
