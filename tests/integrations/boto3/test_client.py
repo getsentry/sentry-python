@@ -27,14 +27,13 @@ from tests.conftest import ApproxDict
 from tests.integrations.boto3 import read_fixture
 from tests.integrations.boto3.aws_mock import Body, MockResponse
 from tests.integrations.boto3.helpers import (
-    assert_client_span,
-    require_botocore_model_fields,
-)
-from tests.integrations.boto3.helpers import (
     capture_spans_by_op as _capture_boto3_spans_by_op,
 )
 from tests.integrations.boto3.helpers import (
     client_factory as client_factory,
+)
+from tests.integrations.boto3.helpers import (
+    require_botocore_model_fields,
 )
 
 session = boto3.Session(  # type: ignore[attr-defined]
@@ -482,21 +481,24 @@ def test_service_extension_customizes_client_span(
 
     spans = spans_by_op.get("aws.test", [])
     assert len(spans) == 1
-    assert_client_span(
-        spans[0],
-        "S3",
-        "HeadObject",
-        server_address="s3.eu-north-1.amazonaws.com",
-        attributes={
-            SPANDATA.SENTRY_OP: "aws.test",
-            SPANDATA.SENTRY_ORIGIN: "auto.aws.test",
-            SPANDATA.SENTRY_KIND: "producer",
-            "aws.test.request": "foo",
-            "aws.test.response": "request-id",
-            SPANDATA.HTTP_STATUS_CODE: 200,
-            SPANDATA.AWS_EXTENDED_REQUEST_ID: "extended-request-id",
-        },
-    )
+    span = spans[0]
+    attributes = span["attributes"]
+    assert span["name"] == "S3.HeadObject"
+    assert span["end_timestamp"] is not None
+    assert attributes[SPANDATA.SENTRY_OP] == "aws.test"
+    assert attributes[SPANDATA.SENTRY_ORIGIN] == "auto.aws.test"
+    assert attributes[SPANDATA.SENTRY_KIND] == "producer"
+    assert attributes[SPANDATA.CLOUD_PROVIDER] == CLOUD_PROVIDER
+    assert attributes[SPANDATA.RPC_SYSTEM_NAME] == AWS_RPC_SYSTEM_NAME
+    assert attributes[SPANDATA.RPC_SERVICE] == "S3"
+    assert attributes[SPANDATA.RPC_METHOD] == "HeadObject"
+    assert attributes[SPANDATA.CLOUD_REGION] == "eu-north-1"
+    assert attributes[SPANDATA.SERVER_ADDRESS] == "s3.eu-north-1.amazonaws.com"
+    assert attributes[SPANDATA.SERVER_PORT] == 443
+    assert attributes["aws.test.request"] == "foo"
+    assert attributes["aws.test.response"] == "request-id"
+    assert attributes[SPANDATA.HTTP_STATUS_CODE] == 200
+    assert attributes[SPANDATA.AWS_EXTENDED_REQUEST_ID] == "extended-request-id"
 
 
 @pytest.mark.parametrize(
@@ -576,18 +578,20 @@ def test_client_call_has_common_attributes(
     )
     attributes = span["attributes"]
 
-    assert_client_span(
-        span,
-        rpc_service,
-        rpc_method,
-        name=span_name,
-        server_address=server_address,
-        server_port=server_port,
-        attributes={
-            SPANDATA.HTTP_STATUS_CODE: 200,
-            SPANDATA.AWS_REQUEST_ID: "request-id",
-        },
-    )
+    assert span["name"] == span_name
+    assert span["end_timestamp"] is not None
+    assert attributes[SPANDATA.SENTRY_OP] == OP.HTTP_CLIENT
+    assert attributes[SPANDATA.SENTRY_ORIGIN] == ORIGIN
+    assert attributes[SPANDATA.SENTRY_KIND] == "client"
+    assert attributes[SPANDATA.CLOUD_PROVIDER] == CLOUD_PROVIDER
+    assert attributes[SPANDATA.RPC_SYSTEM_NAME] == AWS_RPC_SYSTEM_NAME
+    assert attributes[SPANDATA.RPC_SERVICE] == rpc_service
+    assert attributes[SPANDATA.RPC_METHOD] == rpc_method
+    assert attributes[SPANDATA.CLOUD_REGION] == "eu-north-1"
+    assert attributes[SPANDATA.SERVER_ADDRESS] == server_address
+    assert attributes[SPANDATA.SERVER_PORT] == server_port
+    assert attributes[SPANDATA.HTTP_STATUS_CODE] == 200
+    assert attributes[SPANDATA.AWS_REQUEST_ID] == "request-id"
     assert SPANDATA.HTTP_REQUEST_RESEND_COUNT not in attributes
     assert SPANDATA.ERROR_TYPE not in attributes
 
@@ -745,18 +749,23 @@ def test_client_error_has_response_attributes_and_is_unchanged(
     _assert_one_failed_span(client_spans)
     attributes = client_spans[0]["attributes"]
 
-    assert_client_span(
-        client_spans[0],
-        "S3",
-        "HeadObject",
-        server_address="s3.eu-north-1.amazonaws.com",
-        attributes={
-            SPANDATA.AWS_REQUEST_ID: "request-id",
-            SPANDATA.HTTP_STATUS_CODE: 403,
-            SPANDATA.HTTP_REQUEST_RESEND_COUNT: 1,
-            SPANDATA.ERROR_TYPE: "AccessDeniedException",
-        },
-    )
+    span = client_spans[0]
+    assert span["name"] == "S3.HeadObject"
+    assert span["end_timestamp"] is not None
+    assert attributes[SPANDATA.SENTRY_OP] == OP.HTTP_CLIENT
+    assert attributes[SPANDATA.SENTRY_ORIGIN] == ORIGIN
+    assert attributes[SPANDATA.SENTRY_KIND] == "client"
+    assert attributes[SPANDATA.CLOUD_PROVIDER] == CLOUD_PROVIDER
+    assert attributes[SPANDATA.RPC_SYSTEM_NAME] == AWS_RPC_SYSTEM_NAME
+    assert attributes[SPANDATA.RPC_SERVICE] == "S3"
+    assert attributes[SPANDATA.RPC_METHOD] == "HeadObject"
+    assert attributes[SPANDATA.CLOUD_REGION] == "eu-north-1"
+    assert attributes[SPANDATA.SERVER_ADDRESS] == "s3.eu-north-1.amazonaws.com"
+    assert attributes[SPANDATA.SERVER_PORT] == 443
+    assert attributes[SPANDATA.AWS_REQUEST_ID] == "request-id"
+    assert attributes[SPANDATA.HTTP_STATUS_CODE] == 403
+    assert attributes[SPANDATA.HTTP_REQUEST_RESEND_COUNT] == 1
+    assert attributes[SPANDATA.ERROR_TYPE] == "AccessDeniedException"
     if with_service_extension:
         assert attributes["aws.test.error"] == "AccessDeniedException"
     assert "Error.Message" not in attributes

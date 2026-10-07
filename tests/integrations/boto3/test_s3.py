@@ -5,8 +5,8 @@ import pytest
 from botocore.stub import Stubber
 
 from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.integrations.boto3.consts import AWS_RPC_SYSTEM_NAME, ORIGIN
 from tests.integrations.boto3.helpers import (
-    assert_client_span,
     capture_spans_by_op,
     require_botocore_model_fields,
 )
@@ -38,12 +38,19 @@ def _stubbed_span(client, capture_items, method, params, response):
         )
         stubber.assert_no_pending_responses()
     (span,) = spans[OP.HTTP_CLIENT]
-    assert_client_span(
-        span,
-        "S3",
-        client.meta.method_to_api_mapping[method],
-        server_address="s3.eu-north-1.amazonaws.com",
-    )
+    operation = client.meta.method_to_api_mapping[method]
+    assert span["name"] == "S3.%s" % operation
+    assert span["end_timestamp"] is not None
+    assert span["attributes"][SPANDATA.SENTRY_OP] == OP.HTTP_CLIENT
+    assert span["attributes"][SPANDATA.SENTRY_ORIGIN] == ORIGIN
+    assert span["attributes"][SPANDATA.SENTRY_KIND] == "client"
+    assert span["attributes"][SPANDATA.CLOUD_PROVIDER] == "aws"
+    assert span["attributes"][SPANDATA.RPC_SYSTEM_NAME] == AWS_RPC_SYSTEM_NAME
+    assert span["attributes"][SPANDATA.RPC_SERVICE] == "S3"
+    assert span["attributes"][SPANDATA.RPC_METHOD] == operation
+    assert span["attributes"][SPANDATA.CLOUD_REGION] == "eu-north-1"
+    assert span["attributes"][SPANDATA.SERVER_ADDRESS] == "s3.eu-north-1.amazonaws.com"
+    assert span["attributes"][SPANDATA.SERVER_PORT] == 443
     return span
 
 
