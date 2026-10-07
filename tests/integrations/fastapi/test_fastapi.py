@@ -128,7 +128,6 @@ def fastapi_app_factory():
 async def test_request_info_json_body(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
-        data_collection={},
         integrations=[StarletteIntegration()],
     )
 
@@ -169,7 +168,6 @@ async def test_request_info_json_body(sentry_init, capture_items):
 async def test_formdata_request_body(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
-        data_collection={},
         max_request_body_size="always",
         integrations=[StarletteIntegration()],
     )
@@ -215,7 +213,6 @@ async def test_formdata_request_body(sentry_init, capture_items):
 async def test_request_body_too_big(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
-        data_collection={},
         integrations=[StarletteIntegration()],
     )
 
@@ -343,7 +340,6 @@ async def test_response(sentry_init, capture_events):
     sentry_init(
         integrations=[StarletteIntegration(), FastApiIntegration()],
         traces_sample_rate=1.0,
-        data_collection={},
     )
 
     app = fastapi_app_factory()
@@ -729,7 +725,6 @@ def test_transaction_http_method_custom(sentry_init, capture_items):
 def test_request_url(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
-        data_collection={},
         integrations=[
             StarletteIntegration(),
         ],

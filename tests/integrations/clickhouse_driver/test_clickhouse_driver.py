@@ -21,7 +21,6 @@ if clickhouse_driver.VERSION < (0, 2, 6):
 def test_clickhouse_client_breadcrumbs(sentry_init, capture_events) -> None:
     sentry_init(
         integrations=[ClickhouseDriverIntegration()],
-        data_collection={},
     )
     events = capture_events()
 
@@ -418,7 +417,6 @@ def test_clickhouse_client_spans(
     sentry_init(
         integrations=[ClickhouseDriverIntegration()],
         traces_sample_rate=1.0,
-        data_collection={},
     )
     items = capture_items("span")
 
@@ -547,7 +545,6 @@ def test_clickhouse_client_spans(
 def test_clickhouse_dbapi_breadcrumbs(sentry_init, capture_events) -> None:
     sentry_init(
         integrations=[ClickhouseDriverIntegration()],
-        data_collection={},
     )
     events = capture_events()
 
@@ -650,7 +647,6 @@ def test_clickhouse_dbapi_spans(
     sentry_init(
         integrations=[ClickhouseDriverIntegration()],
         traces_sample_rate=1.0,
-        data_collection={},
     )
     items = capture_items("span")
 
@@ -777,7 +773,6 @@ def test_span_origin(sentry_init, capture_items):
     sentry_init(
         integrations=[ClickhouseDriverIntegration()],
         traces_sample_rate=1.0,
-        data_collection={},
     )
     items = capture_items("span")
 

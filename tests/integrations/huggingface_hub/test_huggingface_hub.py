@@ -999,7 +999,6 @@ def test_chat_completion_api_error(
 ) -> None:
     sentry_init(
         traces_sample_rate=1.0,
-        data_collection={},
     )
 
     client = InferenceClient(model="test-model", provider="hf-inference")
@@ -1060,7 +1059,6 @@ def test_span_status_error(
 
     sentry_init(
         traces_sample_rate=1.0,
-        data_collection={},
     )
     items = capture_items("event", "span")
 
