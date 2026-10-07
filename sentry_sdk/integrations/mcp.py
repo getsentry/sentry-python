@@ -31,6 +31,7 @@ from sentry_sdk.utils import (
 
 try:
     from mcp.server.lowlevel import Server
+    from mcp.server.sse import SseServerTransport
     from mcp.server.streamable_http import (
         StreamableHTTPServerTransport,
     )
@@ -97,6 +98,7 @@ class MCPIntegration(Integration):
         """
         _patch_lowlevel_server()
         _patch_handle_request()
+        _patch_sse_handle_post_message()
 
         if FastMCP is not None:
             _patch_fastmcp()
@@ -148,37 +150,37 @@ def _active_http_scopes(
 
 def _get_request_context_data(
     ctx: "Any",
-) -> "tuple[Optional[str], Optional[str], str]":
-    """
-    Extract request ID, session ID, and MCP transport type from the request context.
-
-    Returns:
-        Tuple of (request_id, session_id, mcp_transport).
-        - request_id: May be None if not available
-        - session_id: May be None if not available
-        - mcp_transport: "http", "sse", "stdio"
-    """
+) -> "tuple[Optional[str], Optional[str], dict[str, str]]":
+    """Extract request ID, session ID, and known transport attributes."""
     request_id: "Optional[str]" = None
     session_id: "Optional[str]" = None
-    mcp_transport: str = "stdio"
+    transport_data: "dict[str, str]" = {}
 
     if ctx is not None:
         request_id = ctx.request_id
-        if hasattr(ctx, "request") and ctx.request is not None:
-            request = ctx.request
-            # Detect transport type by checking request characteristics
+        request = getattr(ctx, "request", None)
+        if request is not None:
             if hasattr(request, "query_params") and request.query_params.get(
                 "session_id"
             ):
-                # SSE transport uses query parameter
-                mcp_transport = "sse"
                 session_id = request.query_params.get("session_id")
             elif hasattr(request, "headers"):
-                # StreamableHTTP transport uses header
-                mcp_transport = "http"
                 session_id = request.headers.get("mcp-session-id")
 
-    return request_id, session_id, mcp_transport
+            scope = getattr(request, "scope", {})
+            if scope.get("type") == "http":
+                transport_data[SPANDATA.NETWORK_PROTOCOL_NAME] = "http"
+                http_version = scope.get("http_version")
+                if isinstance(http_version, str) and http_version:
+                    transport_data[SPANDATA.NETWORK_PROTOCOL_VERSION] = http_version
+                if http_version == "3":
+                    transport_data[SPANDATA.NETWORK_TRANSPORT] = "quic"
+
+                transport_name = scope.get("state", {}).get("sentry_sdk.mcp.transport")
+                if isinstance(transport_name, str):
+                    transport_data[SPANDATA.MCP_TRANSPORT] = transport_name
+
+    return request_id, session_id, transport_data
 
 
 def _set_span_input_data(
@@ -189,7 +191,7 @@ def _set_span_input_data(
     arguments: "dict[str, Any]",
     request_id: "Optional[str]",
     session_id: "Optional[str]",
-    mcp_transport: str,
+    transport_data: "dict[str, str]",
 ) -> None:
     """Set input span data for MCP handlers."""
 
@@ -197,13 +199,8 @@ def _set_span_input_data(
     _set_span_data_attribute(span, span_data_key, handler_name)
     _set_span_data_attribute(span, SPANDATA.MCP_METHOD_NAME, mcp_method_name)
 
-    # Set transport/MCP transport type
-    _set_span_data_attribute(
-        span,
-        SPANDATA.NETWORK_TRANSPORT,
-        "pipe" if mcp_transport == "stdio" else "tcp",
-    )
-    _set_span_data_attribute(span, SPANDATA.MCP_TRANSPORT, mcp_transport)
+    for key, value in transport_data.items():
+        _set_span_data_attribute(span, key, value)
 
     # Set request_id if provided
     if request_id:
@@ -315,7 +312,7 @@ async def _tool_handler_wrapper(
         pass
 
     # Get request ID, session ID, and transport from context
-    request_id, session_id, mcp_transport = _get_request_context_data(ctx=ctx)
+    request_id, session_id, transport_data = _get_request_context_data(ctx=ctx)
 
     span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
 
@@ -347,7 +344,7 @@ async def _tool_handler_wrapper(
                 arguments,
                 request_id,
                 session_id,
-                mcp_transport,
+                transport_data,
             )
 
             try:
@@ -418,7 +415,7 @@ async def _instrument_v2_tool_call(
             arguments = {}
 
     # Get request ID, session ID, and transport from context
-    request_id, session_id, mcp_transport = _get_request_context_data(ctx=ctx)
+    request_id, session_id, transport_data = _get_request_context_data(ctx=ctx)
 
     span_streaming = has_span_streaming_enabled(client.options)
 
@@ -450,7 +447,7 @@ async def _instrument_v2_tool_call(
                 arguments,
                 request_id,
                 session_id,
-                mcp_transport,
+                transport_data,
             )
 
             try:
@@ -545,7 +542,7 @@ async def _prompt_handler_wrapper(
         pass
 
     # Get request ID, session ID, and transport from context
-    request_id, session_id, mcp_transport = _get_request_context_data(ctx=ctx)
+    request_id, session_id, transport_data = _get_request_context_data(ctx=ctx)
 
     span_streaming = has_span_streaming_enabled(client.options)
 
@@ -577,7 +574,7 @@ async def _prompt_handler_wrapper(
                 arguments,
                 request_id,
                 session_id,
-                mcp_transport,
+                transport_data,
             )
 
             try:
@@ -702,7 +699,7 @@ async def _instrument_v2_prompt_get(
             arguments = {}
 
     # Get request ID, session ID, and transport from context
-    request_id, session_id, mcp_transport = _get_request_context_data(ctx=ctx)
+    request_id, session_id, transport_data = _get_request_context_data(ctx=ctx)
 
     span_streaming = has_span_streaming_enabled(client.options)
 
@@ -734,7 +731,7 @@ async def _instrument_v2_prompt_get(
                 arguments,
                 request_id,
                 session_id,
-                mcp_transport,
+                transport_data,
             )
 
             try:
@@ -841,7 +838,7 @@ async def _resource_handler_wrapper(
         pass
 
     # Get request ID, session ID, and transport from context
-    request_id, session_id, mcp_transport = _get_request_context_data(ctx=ctx)
+    request_id, session_id, transport_data = _get_request_context_data(ctx=ctx)
 
     span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
 
@@ -873,7 +870,7 @@ async def _resource_handler_wrapper(
                 arguments,
                 request_id,
                 session_id,
-                mcp_transport,
+                transport_data,
             )
 
             if original_args:
@@ -920,7 +917,7 @@ async def _instrument_v2_resource_read(
     handler_name = ctx.params["uri"]
 
     # Get request ID, session ID, and transport from context
-    request_id, session_id, mcp_transport = _get_request_context_data(ctx=ctx)
+    request_id, session_id, transport_data = _get_request_context_data(ctx=ctx)
 
     span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
 
@@ -952,7 +949,7 @@ async def _instrument_v2_resource_read(
                 {},
                 request_id,
                 session_id,
-                mcp_transport,
+                transport_data,
             )
 
             protocol = None
@@ -1092,9 +1089,27 @@ def _patch_handle_request() -> None:
             sentry_sdk.get_isolation_scope()
         )
         scope["state"]["sentry_sdk.current_scope"] = sentry_sdk.get_current_scope()
+        scope["state"]["sentry_sdk.mcp.transport"] = type(self).__name__
         await original_handle_request(self, scope, receive, send)
 
     StreamableHTTPServerTransport.handle_request = patched_handle_request  # type: ignore[method-assign]
+
+
+def _patch_sse_handle_post_message() -> None:
+    """Keep the SSE implementation name with each message's request context."""
+    original_handle_post_message = SseServerTransport.handle_post_message
+
+    @wraps(original_handle_post_message)
+    async def patched_handle_post_message(
+        self: "SseServerTransport",
+        scope: "Scope",
+        receive: "Receive",
+        send: "Send",
+    ) -> None:
+        scope.setdefault("state", {})["sentry_sdk.mcp.transport"] = type(self).__name__
+        await original_handle_post_message(self, scope, receive, send)
+
+    SseServerTransport.handle_post_message = patched_handle_post_message  # type: ignore[method-assign]
 
 
 def _patch_fastmcp() -> None:
