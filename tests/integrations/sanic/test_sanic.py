@@ -104,7 +104,7 @@ def get_client(app):
 
 
 def test_request_data(sentry_init, app, capture_events):
-    sentry_init(integrations=[SanicIntegration()], data_collection={})
+    sentry_init(integrations=[SanicIntegration()])
     events = capture_events()
 
     c = get_client(app)
