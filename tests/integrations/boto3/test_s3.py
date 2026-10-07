@@ -28,17 +28,18 @@ def _stubbed_span(client, capture_items, method, params, response):
     (span,) = spans[OP.HTTP_CLIENT]
     operation = client.meta.method_to_api_mapping[method]
     assert span["name"] == "S3.%s" % operation
-    assert span["end_timestamp"] is not None
-    assert span["attributes"][SPANDATA.SENTRY_OP] == OP.HTTP_CLIENT
-    assert span["attributes"][SPANDATA.SENTRY_ORIGIN] == ORIGIN
-    assert span["attributes"][SPANDATA.SENTRY_KIND] == "client"
-    assert span["attributes"][SPANDATA.CLOUD_PROVIDER] == "aws"
-    assert span["attributes"][SPANDATA.RPC_SYSTEM_NAME] == AWS_RPC_SYSTEM_NAME
-    assert span["attributes"][SPANDATA.RPC_SERVICE] == "S3"
-    assert span["attributes"][SPANDATA.RPC_METHOD] == operation
-    assert span["attributes"][SPANDATA.CLOUD_REGION] == "eu-north-1"
-    assert span["attributes"][SPANDATA.SERVER_ADDRESS] == "s3.eu-north-1.amazonaws.com"
-    assert span["attributes"][SPANDATA.SERVER_PORT] == 443
+    assert span.get("end_timestamp") is not None
+    attributes = span.get("attributes", {})
+    assert attributes[SPANDATA.SENTRY_OP] == OP.HTTP_CLIENT
+    assert attributes[SPANDATA.SENTRY_ORIGIN] == ORIGIN
+    assert attributes[SPANDATA.SENTRY_KIND] == "client"
+    assert attributes[SPANDATA.CLOUD_PROVIDER] == "aws"
+    assert attributes[SPANDATA.RPC_SYSTEM_NAME] == AWS_RPC_SYSTEM_NAME
+    assert attributes[SPANDATA.RPC_SERVICE] == "S3"
+    assert attributes[SPANDATA.RPC_METHOD] == operation
+    assert attributes[SPANDATA.CLOUD_REGION] == "eu-north-1"
+    assert attributes[SPANDATA.SERVER_ADDRESS] == "s3.eu-north-1.amazonaws.com"
+    assert attributes[SPANDATA.SERVER_PORT] == 443
     return span
 
 
@@ -54,7 +55,7 @@ def test_request_attributes(s3_client, capture_items):
 
     span = _stubbed_span(s3_client, capture_items, "upload_part", params, {})
 
-    attributes = span["attributes"]
+    attributes = span.get("attributes", {})
     assert attributes[SPANDATA.AWS_S3_BUCKET] == "bucket"
     assert attributes[SPANDATA.AWS_S3_KEY] == "file.txt"
     assert attributes[SPANDATA.AWS_S3_UPLOAD_ID] == "upload-id"
@@ -106,7 +107,7 @@ def test_copy_source(s3_client, capture_items, method, copy_source, expected):
 
     span = _stubbed_span(s3_client, capture_items, method, params, {})
 
-    attributes = span["attributes"]
+    attributes = span.get("attributes", {})
     for key, value in expected_attributes.items():
         assert attributes[key] == value
     for key in (
@@ -131,7 +132,7 @@ def test_delete_serialization(s3_client, capture_items):
 
     span = _stubbed_span(s3_client, capture_items, "delete_objects", params, {})
 
-    attributes = span["attributes"]
+    attributes = span.get("attributes", {})
     assert attributes[SPANDATA.AWS_S3_BUCKET] == "bucket"
     assert attributes[SPANDATA.AWS_S3_DELETE] == (
         '{"Objects":[{"Key":"file.txt","VersionId":"version-1"}],"Quiet":true}'
@@ -222,7 +223,7 @@ def test_size_attributes(
 
     span = _stubbed_span(s3_client, capture_items, method, params, response)
 
-    attributes = span["attributes"]
+    attributes = span.get("attributes", {})
     expected_attributes = {
         SPANDATA.AWS_S3_BUCKET: "bucket",
         SPANDATA.AWS_S3_KEY: "file.txt",
