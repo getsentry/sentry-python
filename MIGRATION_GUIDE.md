@@ -193,6 +193,47 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 - `Scope.iter_headers` was removed.
 - The SDK won't set any tags on its own anymore.
 
+## Migration
+
+### Migrating from `send_default_pii` to `data_collection`
+
+The new `data_collection` defaults collect more data than `send_default_pii` did. User identity, generative AI content, HTTP request/response bodies, and file paths are now on by default, and more HTTP headers and cookies are collected.
+
+If you wish to restrict data collection to roughly match the previous behaviour of `send_default_pii=False`, you can use the following configuration:
+
+```python
+sentry_sdk.init(
+    data_collection={
+        "user_info": False,
+        "http_bodies": [],
+        "graphql": {
+            "document": False,
+            "variables": False,
+        },
+        "gen_ai": {
+            "inputs": False,
+            "outputs": False,
+        },
+        "mcp": {
+            "inputs": False,
+            "outputs": False,
+        },
+        "database_query_data": False,
+        "queues": False,
+        "http_headers": { 
+            "request": {
+                "mode": "denylist", 
+                "terms": ["forwarded", "-ip", "remote-", "via", "-user"]
+            }, 
+        },
+        "cookies": { "mode": "denylist", "terms": ["forwarded", "-ip", "remote-", "via", "-user"] },
+        "url_query_params": {
+            "mode": "denylist", "terms": ["forwarded", "-ip", "remote-", "via", "-user"],
+        },
+    },
+)
+```
+
 ---------------------------------------------------------------------------------
 
 # Sentry SDK 2.0 Migration Guide
