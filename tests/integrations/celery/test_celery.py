@@ -6,6 +6,7 @@ import kombu
 import pytest
 from celery import VERSION, Celery
 from celery.bin import worker
+from celery.exceptions import Ignore, Reject, Retry
 
 import sentry_sdk
 from sentry_sdk.integrations.celery import (
@@ -407,6 +408,39 @@ def test_retry(celery, capture_events):
 
     for e in exceptions:
         assert e["type"] == "ZeroDivisionError"
+
+
+@pytest.mark.parametrize(
+    "exception",
+    [Retry, Ignore, Reject],
+    ids=["retry", "ignore", "reject"],
+)
+def test_control_flow_exceptions_not_errors(init_celery, capture_items, exception):
+    celery = init_celery(traces_sample_rate=1.0)
+    should_raise = [False]
+
+    @celery.task(name="dummy_task")
+    def dummy_task():
+        if should_raise[0]:
+            raise exception()
+
+    # XXX: For some reason the first call does not get instrumented properly.
+    dummy_task.delay()
+    sentry_sdk.flush()
+
+    items = capture_items("event", "span")
+    should_raise[0] = True
+
+    dummy_task.delay()
+    sentry_sdk.flush()
+
+    assert not [item for item in items if item.type == "event"]
+
+    process_span, execution_span = [item.payload for item in items]
+    assert process_span["attributes"]["sentry.op"] == "queue.process"
+    assert process_span["status"] == "ok"
+    assert execution_span["is_segment"] is True
+    assert execution_span["status"] == "ok"
 
 
 @pytest.mark.forked
