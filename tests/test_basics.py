@@ -493,6 +493,7 @@ default_integrations = [
 ]
 
 
+@pytest.mark.forked
 @pytest.mark.parametrize(
     "provided_integrations,default_integrations,disabled_integrations,expected_integrations",
     [
@@ -515,7 +516,6 @@ def test_integrations(
     disabled_integrations,
     expected_integrations,
     reset_integrations,
-    restore_global_event_processors,
 ):
     sentry_init(
         integrations=provided_integrations,
