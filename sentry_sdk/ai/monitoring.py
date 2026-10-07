@@ -194,7 +194,7 @@ def record_token_usage(
 ) -> None:
     warnings.warn(
         "record_token_usage() is deprecated and will be removed in version 3.0 of sentry-sdk. "
-        "Use the manual span API instead, e.g. Span.set_data().",
+        "Use the manual span API instead, e.g. span.set_attribute() (in streaming mode) or span.set_data().",
         DeprecationWarning,
         stacklevel=2,
     )
