@@ -55,7 +55,6 @@ def test_streaming(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[Boto3Integration()],
-        data_collection={},
     )
 
     s3 = session.resource("s3")
@@ -155,7 +154,6 @@ def test_omit_url_data_if_parsing_fails(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[Boto3Integration()],
-        data_collection={},
     )
 
     s3 = session.resource("s3")
@@ -229,7 +227,6 @@ def test_breadcrumb(sentry_init, capture_events):
     sentry_init(
         integrations=[Boto3Integration()],
         default_integrations=False,
-        data_collection={},
     )
 
     s3 = session.resource("s3")
@@ -269,11 +266,6 @@ URL_QUERY_PARAMS = [
         {},
         "list-type=2&prefix=foo&continuation-token=%5BFiltered%5D&encoding-type=url",
         id="defaults",
-    ),
-    pytest.param(
-        {"data_collection": {}},
-        "list-type=2&prefix=foo&continuation-token=%5BFiltered%5D&encoding-type=url",
-        id="data_collection_denylist_default",
     ),
     pytest.param(
         {
