@@ -92,14 +92,6 @@ class CeleryIntegration(Integration):
         ignore_logger_for_events("celery.redirected")
 
 
-def _set_status(status: str) -> None:
-    with capture_internal_exceptions():
-        span = sentry_sdk.get_current_span()
-
-        if span is not None:
-            span.status = "ok" if status == "ok" else "error"
-
-
 def _capture_exception(task: "Any", exc_info: "ExcInfo") -> None:
     client = sentry_sdk.get_client()
     if client.get_integration(CeleryIntegration) is None:
@@ -107,10 +99,11 @@ def _capture_exception(task: "Any", exc_info: "ExcInfo") -> None:
 
     if isinstance(exc_info[1], CELERY_CONTROL_FLOW_EXCEPTIONS):
         # Expected control flow exits, not errors
-        _set_status("ok")
         return
 
-    _set_status("internal_error")
+    span = sentry_sdk.get_current_span()
+    if span is not None:
+        span.status = "error"
 
     if hasattr(task, "throws") and isinstance(exc_info[1], task.throws):
         return
