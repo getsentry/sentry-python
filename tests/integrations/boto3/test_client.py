@@ -33,6 +33,9 @@ from tests.integrations.boto3.helpers import (
     client_factory as client_factory,
 )
 from tests.integrations.boto3.helpers import (
+    no_botocore_retry_delay as no_botocore_retry_delay,
+)
+from tests.integrations.boto3.helpers import (
     require_botocore_model_fields,
 )
 
@@ -662,7 +665,9 @@ def test_client_call_has_response_header_attributes(
     assert SPANDATA.HTTP_REQUEST_RESEND_COUNT not in attributes
 
 
-def test_retry_attempts_share_one_client_span(capture_items, client_factory):
+def test_retry_attempts_share_one_client_span(
+    capture_items, client_factory, no_botocore_retry_delay
+):
     attempt_count = 3
     client = client_factory(attempt_count=attempt_count)
     request_span_ids = _mock_responses(client, [500] * (attempt_count - 1) + [200])
@@ -680,7 +685,9 @@ def test_retry_attempts_share_one_client_span(capture_items, client_factory):
     assert attributes[SPANDATA.HTTP_REQUEST_RESEND_COUNT] == attempt_count - 1
 
 
-def test_retries_exhausted_has_one_failed_client_span(capture_items, client_factory):
+def test_retries_exhausted_has_one_failed_client_span(
+    capture_items, client_factory, no_botocore_retry_delay
+):
     client = client_factory(attempt_count=2)
     request_span_ids = _mock_responses(client, [500])
 

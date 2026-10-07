@@ -1,3 +1,4 @@
+from types import SimpleNamespace
 from typing import TYPE_CHECKING, Dict, List, Optional
 
 import boto3
@@ -19,8 +20,6 @@ def client_factory(sentry_init, monkeypatch):
         traces_sample_rate=1.0,
         integrations=[Boto3Integration()],
     )
-    # remove request retry delays without replacing botocore's retry handling.
-    monkeypatch.setattr("botocore.endpoint.time.sleep", lambda delay: None)
     session = boto3.Session(  # type: ignore
         aws_access_key_id="-",
         aws_secret_access_key="-",
@@ -46,6 +45,15 @@ def client_factory(sentry_init, monkeypatch):
         close = getattr(client, "close", None)
         if close is not None:
             close()
+
+
+@pytest.fixture
+def no_botocore_retry_delay(monkeypatch):
+    # remove request retry delays without replacing botocore's retry handling.
+    monkeypatch.setattr(
+        "botocore.endpoint.time",
+        SimpleNamespace(sleep=lambda delay: None),
+    )
 
 
 @pytest.fixture
