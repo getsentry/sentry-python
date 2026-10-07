@@ -265,6 +265,23 @@ def reset_integrations():
 
 
 @pytest.fixture
+def restore_global_event_processors():
+    """
+    Use with caution.
+
+    In tests where integrations are being reset, there may be "setup_once"
+    calls that add global event processors (such as DedupeIntegration).
+
+    To prevent the registration of duplicate processors that lead to test
+    leakage, use this to restore global event processors to their original
+    state.
+    """
+    original = list(scope.global_event_processors)
+    yield
+    scope.global_event_processors[:] = original
+
+
+@pytest.fixture
 def uninstall_integration():
     """Use to force the next call to sentry_init to re-install/setup an integration."""
 
