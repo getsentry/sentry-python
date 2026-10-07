@@ -177,32 +177,36 @@ The new `data_collection` defaults collect more data than `send_default_pii` did
 If you wish to restrict data collection to roughly match the previous behaviour of `send_default_pii=False`, you can use the following configuration:
 
 ```python
-init({
-  "dsn": "...",
-  "data_collection": {
-    "user_info": false,
-    "http_bodies": [],
-    "graphql": {
-      "document": false,
-      "variables": false,
+sentry_sdk.init(
+    data_collection={
+        "user_info": False,
+        "http_bodies": [],
+        "graphql": {
+            "document": False,
+            "variables": False,
+        },
+        "gen_ai": {
+            "inputs": False,
+            "outputs": False,
+        },
+        "mcp": {
+            "inputs": False,
+            "outputs": False,
+        },
+        "database_query_data": False,
+        "queues": False,
+        "http_headers": { 
+            "request": {
+                "mode": "denylist", 
+                "terms": ["forwarded", "-ip", "remote-", "via", "-user"]
+            }, 
+        },
+        "cookies": { "mode": "denylist", "terms": ["forwarded", "-ip", "remote-", "via", "-user"] },
+        "url_query_params": {
+            "mode": "denylist", "terms": ["forwarded", "-ip", "remote-", "via", "-user"],
+        },
     },
-    "gen_ai": {
-      "inputs": false,
-      "outputs": false,
-    },
-    "mcp": {
-      "inputs": false,
-      "outputs": false,
-    },
-    "database_query_data": false,
-    "queues": false,
-    "http_headers": { "mode": "denylist", "terms": ["forwarded", "-ip", "remote-", "via", "-user"] },
-    "cookies": { "mode": "denylist", "terms": ["forwarded", "-ip", "remote-", "via", "-user"] },
-    "url_query_params": {
-      "mode": "denylist", "terms": ["forwarded", "-ip", "remote-", "via", "-user"],
-    },
-  },
-});
+)
 ```
 
 ## Deprecated
