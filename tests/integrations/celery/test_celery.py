@@ -115,7 +115,6 @@ def test_simple_with_performance(
 ):
     celery = init_celery(
         traces_sample_rate=1.0,
-        data_collection={},
     )
 
     @celery.task(name="dummy_task")
@@ -151,7 +150,6 @@ def test_simple_with_performance(
 def test_simple_without_performance(capture_events, init_celery, celery_invocation):
     celery = init_celery(
         traces_sample_rate=None,
-        data_collection={},
     )
     events = capture_events()
 
@@ -262,7 +260,6 @@ def test_transaction_events(
 ):
     celery = init_celery(
         traces_sample_rate=1.0,
-        data_collection={},
     )
 
     @celery.task(name="dummy_task")
@@ -344,7 +341,7 @@ def test_no_double_patching(celery):
 
 
 def test_simple_no_propagation(capture_events, init_celery):
-    celery = init_celery(propagate_traces=False, data_collection={})
+    celery = init_celery(propagate_traces=False)
     events = capture_events()
 
     @celery.task(name="dummy_task")
@@ -489,7 +486,7 @@ def test_traces_sampler_gets_task_info_in_sampling_context(
     DictionaryContaining,  # noqa:N803
 ):
     traces_sampler = mock.Mock(return_value=1.0)
-    celery = init_celery(traces_sampler=traces_sampler, data_collection={})
+    celery = init_celery(traces_sampler=traces_sampler)
 
     @celery.task(name="dog_walk")
     def walk_dogs(x, y):
@@ -561,7 +558,7 @@ def test_task_headers(celery):
 
 
 def test_baggage_propagation(init_celery):
-    celery = init_celery(traces_sample_rate=1.0, release="abcdef", data_collection={})
+    celery = init_celery(traces_sample_rate=1.0, release="abcdef")
 
     @celery.task(name="dummy_task", bind=True)
     def dummy_task(self, x, y):
@@ -598,7 +595,6 @@ def test_sentry_propagate_traces_override(init_celery):
         propagate_traces=True,
         traces_sample_rate=1.0,
         release="abcdef",
-        data_collection={},
     )
 
     @celery.task(name="dummy_task", bind=True)
@@ -626,7 +622,6 @@ def test_sentry_propagate_traces_override(init_celery):
 def test_apply_async_manually_span(sentry_init):
     sentry_init(
         integrations=[CeleryIntegration()],
-        data_collection={},
     )
 
     def dummy_function(*args, **kwargs):
@@ -639,7 +634,7 @@ def test_apply_async_manually_span(sentry_init):
 
 
 def test_apply_async_no_args(init_celery):
-    celery = init_celery(data_collection={})
+    celery = init_celery()
 
     @celery.task
     def example_task():
@@ -663,7 +658,6 @@ def test_messaging_destination_name_default_exchange(
 ):
     celery_app = init_celery(
         traces_sample_rate=1.0,
-        data_collection={},
     )
     mock_request.delivery_info = {"routing_key": routing_key, "exchange": ""}
 
@@ -693,7 +687,6 @@ def test_messaging_destination_name_nondefault_exchange(
     """
     celery_app = init_celery(
         traces_sample_rate=1.0,
-        data_collection={},
     )
     mock_request.delivery_info = {"routing_key": "celery", "exchange": "custom"}
 
@@ -713,7 +706,6 @@ def test_messaging_destination_name_nondefault_exchange(
 def test_messaging_id(init_celery, capture_items):
     celery = init_celery(
         traces_sample_rate=1.0,
-        data_collection={},
     )
 
     @celery.task
@@ -732,7 +724,6 @@ def test_messaging_id(init_celery, capture_items):
 def test_retry_count_zero(init_celery, capture_items):
     celery = init_celery(
         traces_sample_rate=1.0,
-        data_collection={},
     )
 
     @celery.task()
@@ -754,7 +745,6 @@ def test_retry_count_nonzero(mock_request, init_celery, capture_items):
 
     celery = init_celery(
         traces_sample_rate=1.0,
-        data_collection={},
     )
 
     @celery.task()
@@ -774,7 +764,6 @@ def test_retry_count_nonzero(mock_request, init_celery, capture_items):
 def test_messaging_system(system, init_celery, capture_items):
     celery = init_celery(
         traces_sample_rate=1.0,
-        data_collection={},
     )
 
     # Does not need to be a real URL, since we use always eager
@@ -805,7 +794,6 @@ def test_producer_span_data(system, monkeypatch, sentry_init, capture_items):
     sentry_init(
         integrations=[CeleryIntegration()],
         traces_sample_rate=1.0,
-        data_collection={},
     )
     celery = Celery(__name__, broker=f"{system}://example.com")  # noqa: E231
 
@@ -835,7 +823,6 @@ def test_producer_span_data(system, monkeypatch, sentry_init, capture_items):
 def test_receive_latency(init_celery, capture_items):
     celery = init_celery(
         traces_sample_rate=1.0,
-        data_collection={},
     )
 
     @celery.task()
@@ -855,7 +842,6 @@ def test_receive_latency(init_celery, capture_items):
 def tests_span_origin_consumer(init_celery, capture_items):
     celery = init_celery(
         traces_sample_rate=1.0,
-        data_collection={},
     )
     celery.conf.broker_url = "redis://example.com"  # noqa: E231
 
@@ -884,7 +870,6 @@ def tests_span_origin_producer(monkeypatch, sentry_init, capture_items):
     sentry_init(
         integrations=[CeleryIntegration()],
         traces_sample_rate=1.0,
-        data_collection={},
     )
     celery = Celery(__name__, broker="redis://example.com")  # noqa: E231
 
@@ -919,7 +904,6 @@ def test_send_task_wrapped(
     sentry_init(
         integrations=[CeleryIntegration()],
         traces_sample_rate=1.0,
-        data_collection={},
     )
     celery = Celery(__name__, broker="redis://example.com")  # noqa: E231
 
@@ -971,7 +955,6 @@ def test_user_custom_headers_accessible_in_task(init_celery):
     """
     celery = init_celery(
         traces_sample_rate=1.0,
-        data_collection={},
     )
 
     @celery.task(name="custom_headers_task", bind=True)
