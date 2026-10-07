@@ -23,6 +23,7 @@ if TYPE_CHECKING:
         GraphQLCollectionBehaviour,
         HttpHeadersCollectionBehaviour,
         KeyValueCollectionBehaviour,
+        MCPCollectionBehaviour,
     )
 
 # ``http_bodies`` defaults to this (collect everything the
@@ -180,6 +181,7 @@ def _resolve(
         "url_query_params": _kvcb_from_value(d.get("url_query_params") or {}),
         "graphql": _graphql_from_value(d.get("graphql") or {}),
         "gen_ai": _gen_ai_from_value(d.get("gen_ai") or {}),
+        "mcp": _mcp_from_value(d.get("mcp") or {}),
         "database_query_data": d.get("database_query_data", True),
         "queues": d.get("queues", True),
         "stack_frame_variables": stack_frame_variables,
@@ -219,6 +221,13 @@ def _http_headers_from_value(
 
 
 def _gen_ai_from_value(val: "dict[str, Any]") -> "GenAICollectionBehaviour":
+    return {
+        "inputs": val.get("inputs", True),
+        "outputs": val.get("outputs", True),
+    }
+
+
+def _mcp_from_value(val: "dict[str, Any]") -> "MCPCollectionBehaviour":
     return {
         "inputs": val.get("inputs", True),
         "outputs": val.get("outputs", True),
