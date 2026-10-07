@@ -262,6 +262,7 @@ def test_sentry_task_factory_no_factory(MockTask, mock_get_running_loop):  # noq
 
     coro_param, *_ = task_args
     assert inspect.iscoroutine(coro_param)
+    coro_param.close()
 
     assert "loop" in task_kwargs
     assert task_kwargs["loop"] == mock_loop
@@ -292,6 +293,7 @@ def test_sentry_task_factory_with_factory(mock_get_running_loop):
     loop_arg, coro_arg = task_factory_args
     assert loop_arg == mock_loop
     assert inspect.iscoroutine(coro_arg)
+    coro_arg.close()
 
 
 @minimum_python_311
@@ -322,6 +324,7 @@ def test_sentry_task_factory_context_no_factory(
 
     coro_param, *_ = task_args
     assert inspect.iscoroutine(coro_param)
+    coro_param.close()
 
     assert "loop" in task_kwargs
     assert task_kwargs["loop"] == mock_loop
@@ -355,6 +358,7 @@ def test_sentry_task_factory_context_with_factory(mock_get_running_loop):
     loop_arg, coro_arg = task_factory_args
     assert loop_arg == mock_loop
     assert inspect.iscoroutine(coro_arg)
+    coro_arg.close()
 
     assert "context" in task_factory_kwargs
     assert task_factory_kwargs["context"] == mock_context
