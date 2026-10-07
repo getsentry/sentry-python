@@ -192,6 +192,13 @@ def record_token_usage(
     output_tokens_reasoning: "Optional[int]" = None,
     total_tokens: "Optional[int]" = None,
 ) -> None:
+    warnings.warn(
+        "record_token_usage() is deprecated and will be removed in version 3.0 of sentry-sdk. "
+        "Use the manual span API instead, e.g. Span.set_data().",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+
     # TODO: move pipeline name elsewhere
     ai_pipeline_name = get_ai_pipeline_name()
     if ai_pipeline_name:
