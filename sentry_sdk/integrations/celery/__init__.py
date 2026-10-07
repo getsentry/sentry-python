@@ -19,6 +19,7 @@ from sentry_sdk.scope import Scope
 from sentry_sdk.traces import BAGGAGE_HEADER_NAME, SegmentNameSource, Span
 from sentry_sdk.tracing_utils import Baggage
 from sentry_sdk.utils import (
+    _register_control_flow_exception,
     capture_internal_exceptions,
     event_from_exception,
     parse_version,
@@ -78,6 +79,7 @@ class CeleryIntegration(Integration):
         _patch_celery_send_task()
         _patch_worker_exit()
         _patch_producer_publish()
+        _register_control_flow_exception(list(CELERY_CONTROL_FLOW_EXCEPTIONS))
 
         # This logger logs every status of every task that ran on the worker.
         # Meaning that every task's breadcrumbs are full of stuff like "Task
@@ -104,8 +106,8 @@ def _capture_exception(task: "Any", exc_info: "ExcInfo") -> None:
         return
 
     if isinstance(exc_info[1], CELERY_CONTROL_FLOW_EXCEPTIONS):
-        # ??? Doesn't map to anything
-        _set_status("aborted")
+        # Expected control flow exits, not errors
+        _set_status("ok")
         return
 
     _set_status("internal_error")
