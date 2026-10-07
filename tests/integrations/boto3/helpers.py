@@ -21,7 +21,7 @@ def client_factory(sentry_init, monkeypatch):
     )
     # remove request retry delays without replacing botocore's retry handling.
     monkeypatch.setattr("botocore.endpoint.time.sleep", lambda delay: None)
-    session = boto3.Session(
+    session = boto3.Session(  # type: ignore
         aws_access_key_id="-",
         aws_secret_access_key="-",
         region_name="eu-north-1",
