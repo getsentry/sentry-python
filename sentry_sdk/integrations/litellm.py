@@ -22,7 +22,7 @@ from sentry_sdk.utils import event_from_exception, has_data_collection_enabled
 
 if TYPE_CHECKING:
     from datetime import datetime
-    from typing import Any, Dict, List
+    from typing import Any, Dict, List, Optional
 
 try:
     import litellm  # type: ignore[import-not-found]
@@ -34,6 +34,35 @@ except ImportError:
 # Stash the span on a top-level key of the per-request kwargs dict litellm passes
 # to every callback, so it lives and dies with the request.
 _SPAN_KEY = "_sentry_span"
+
+
+def _int_or_none(value: "Any") -> "Optional[int]":
+    return value if isinstance(value, int) and not isinstance(value, bool) else None
+
+
+def _get_cached_tokens(usage: "Any") -> "Optional[int]":
+    # LiteLLM normalizes every provider to the OpenAI shape, so cache reads land in
+    # prompt_tokens_details.cached_tokens (Anthropic's cache_read_input_tokens included).
+    # prompt_tokens already includes them, matching gen_ai.usage.input_tokens.
+    details = getattr(usage, "prompt_tokens_details", None)
+    cached = _int_or_none(getattr(details, "cached_tokens", None))
+    if cached is None:
+        cached = _int_or_none(getattr(usage, "_cache_read_input_tokens", None))
+    return cached
+
+
+def _get_cache_write_tokens(usage: "Any") -> "Optional[int]":
+    details = getattr(usage, "prompt_tokens_details", None)
+    for attr in ("cache_write_tokens", "cache_creation_tokens"):
+        written = _int_or_none(getattr(details, attr, None))
+        if written is not None:
+            return written
+    return _int_or_none(getattr(usage, "_cache_creation_input_tokens", None))
+
+
+def _get_reasoning_tokens(usage: "Any") -> "Optional[int]":
+    details = getattr(usage, "completion_tokens_details", None)
+    return _int_or_none(getattr(details, "reasoning_tokens", None))
 
 
 def _store_span(kwargs: "Dict[str, Any]", span: "Any") -> None:
@@ -260,7 +289,10 @@ def _success_callback(
             record_token_usage(
                 span,
                 input_tokens=getattr(usage, "prompt_tokens", None),
+                input_tokens_cached=_get_cached_tokens(usage),
+                input_tokens_cache_write=_get_cache_write_tokens(usage),
                 output_tokens=getattr(usage, "completion_tokens", None),
+                output_tokens_reasoning=_get_reasoning_tokens(usage),
                 total_tokens=getattr(usage, "total_tokens", None),
             )
 
