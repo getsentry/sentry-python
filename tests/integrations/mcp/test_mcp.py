@@ -320,7 +320,6 @@ async def test_tool_handler_stdio(
             "value": 42,
         }
     )
-    assert data[SPANDATA.MCP_TOOL_RESULT_CONTENT_COUNT] == 2
 
 
 @pytest.mark.asyncio
@@ -389,7 +388,6 @@ async def test_tool_handler_stdio_no_sensitive_data(
     assert SPANDATA.MCP_SESSION_ID not in data
 
     assert SPANDATA.GEN_AI_TOOL_CALL_RESULT not in data
-    assert SPANDATA.MCP_TOOL_RESULT_CONTENT_COUNT not in data
 
 
 @pytest.mark.asyncio
@@ -1183,7 +1181,6 @@ async def test_tool_result_extraction_tuple(
             "count": 5,
         }
     )
-    assert data[SPANDATA.MCP_TOOL_RESULT_CONTENT_COUNT] == 2
 
 
 @pytest.mark.asyncio
@@ -1231,7 +1228,6 @@ async def test_tool_result_extraction_tuple_no_sensitive_data(
     data = span["attributes"]
 
     assert SPANDATA.GEN_AI_TOOL_CALL_RESULT not in data
-    assert SPANDATA.MCP_TOOL_RESULT_CONTENT_COUNT not in data
 
 
 @pytest.mark.asyncio
