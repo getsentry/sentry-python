@@ -322,109 +322,7 @@ def test_clickhouse_client_breadcrumbs_with_data_collection_disabled(
     assert event["breadcrumbs"]["values"] == expected_breadcrumbs
 
 
-def test_clickhouse_client_breadcrumbs_with_data_collection_default(
-    sentry_init, capture_events
-) -> None:
-    sentry_init(
-        integrations=[ClickhouseDriverIntegration()],
-        data_collection={},
-    )
-    events = capture_events()
-
-    client = Client("localhost")
-    client.execute("DROP TABLE IF EXISTS test")
-    client.execute("CREATE TABLE test (x Int32) ENGINE = Memory")
-    client.execute("INSERT INTO test (x) VALUES", [{"x": 100}])
-    client.execute("INSERT INTO test (x) VALUES", [[170], [200]])
-
-    res = client.execute("SELECT sum(x) FROM test WHERE x > %(minv)i", {"minv": 150})
-    assert res[0][0] == 370
-
-    capture_message("hi")
-
-    (event,) = events
-
-    expected_breadcrumbs = [
-        {
-            "category": "query",
-            "data": {
-                "db.system": "clickhouse",
-                "db.driver.name": "clickhouse-driver",
-                "db.name": "",
-                "db.user": "default",
-                "server.address": "localhost",
-                "server.port": 9000,
-                "db.result": [],
-            },
-            "message": "DROP TABLE IF EXISTS test",
-            "type": "default",
-        },
-        {
-            "category": "query",
-            "data": {
-                "db.system": "clickhouse",
-                "db.driver.name": "clickhouse-driver",
-                "db.name": "",
-                "db.user": "default",
-                "server.address": "localhost",
-                "server.port": 9000,
-                "db.result": [],
-            },
-            "message": "CREATE TABLE test (x Int32) ENGINE = Memory",
-            "type": "default",
-        },
-        {
-            "category": "query",
-            "data": {
-                "db.system": "clickhouse",
-                "db.driver.name": "clickhouse-driver",
-                "db.name": "",
-                "db.user": "default",
-                "server.address": "localhost",
-                "server.port": 9000,
-            },
-            "message": "INSERT INTO test (x) VALUES",
-            "type": "default",
-        },
-        {
-            "category": "query",
-            "data": {
-                "db.system": "clickhouse",
-                "db.driver.name": "clickhouse-driver",
-                "db.name": "",
-                "db.user": "default",
-                "server.address": "localhost",
-                "server.port": 9000,
-            },
-            "message": "INSERT INTO test (x) VALUES",
-            "type": "default",
-        },
-        {
-            "category": "query",
-            "data": {
-                "db.system": "clickhouse",
-                "db.driver.name": "clickhouse-driver",
-                "db.name": "",
-                "db.user": "default",
-                "server.address": "localhost",
-                "server.port": 9000,
-                "db.result": [[370]],
-            },
-            "message": "SELECT sum(x) FROM test WHERE x > 150",
-            "type": "default",
-        },
-    ]
-
-    for crumb in expected_breadcrumbs:
-        crumb["data"] = ApproxDict(crumb["data"])
-
-    for crumb in event["breadcrumbs"]["values"]:
-        crumb.pop("timestamp", None)
-
-    assert event["breadcrumbs"]["values"] == expected_breadcrumbs
-
-
-def test_clickhouse_client_with_data_collection(sentry_init, capture_items) -> None:
+def test_clickhouse_client(sentry_init, capture_items) -> None:
     sentry_init(
         integrations=[ClickhouseDriverIntegration()],
         traces_sample_rate=1.0,
@@ -455,9 +353,7 @@ def test_clickhouse_client_with_data_collection(sentry_init, capture_items) -> N
         assert "db.result" not in attribute_keys
 
 
-def test_clickhouse_client_send_data_generator_with_data_collection(
-    sentry_init, capture_events
-) -> None:
+def test_clickhouse_client_send_data_generator(sentry_init, capture_events) -> None:
     sentry_init(
         integrations=[ClickhouseDriverIntegration()],
         data_collection={"database_query_data": True},
