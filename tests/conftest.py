@@ -4,7 +4,6 @@ import io
 import json
 import os
 import socket
-import sys
 import threading
 from collections import namedtuple
 from dataclasses import dataclass
