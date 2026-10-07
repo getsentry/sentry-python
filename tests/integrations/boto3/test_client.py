@@ -142,22 +142,23 @@ def test_streaming_span_order_and_scope(
         for span in spans
         if span["name"] == "S3.GetObject"
         and (
-            span["attributes"].get(SPANDATA.SENTRY_ORIGIN) == ORIGIN
-            and span["attributes"].get(SPANDATA.SENTRY_OP) == OP.HTTP_CLIENT
+            span.get("attributes", {}).get(SPANDATA.SENTRY_ORIGIN) == ORIGIN
+            and span.get("attributes", {}).get(SPANDATA.SENTRY_OP) == OP.HTTP_CLIENT
         )
     ]
     http_spans = [
         span
         for span in spans
-        if (
-            span["attributes"].get(SPANDATA.SENTRY_ORIGIN) == "auto.http.stdlib.httplib"
-        )
+        if span.get("attributes", {}).get(SPANDATA.SENTRY_ORIGIN)
+        == "auto.http.stdlib.httplib"
     ]
     stream_spans = [
         span
         for span in spans
         if span["name"] == "S3.GetObject"
-        and (span["attributes"].get(SPANDATA.SENTRY_OP) == OP.HTTP_CLIENT_STREAM)
+        and (
+            span.get("attributes", {}).get(SPANDATA.SENTRY_OP) == OP.HTTP_CLIENT_STREAM
+        )
     ]
     assert len(client_spans) == 1
     assert len(http_spans) == 1
@@ -166,11 +167,11 @@ def test_streaming_span_order_and_scope(
     http_span = http_spans[0]
     stream_span = stream_spans[0]
 
-    assert http_span["parent_span_id"] == client_span["span_id"]
-    assert stream_span["parent_span_id"] == client_span["span_id"]
+    assert http_span.get("parent_span_id") == client_span["span_id"]
+    assert stream_span.get("parent_span_id") == client_span["span_id"]
     assert client_span["span_id"] == request_client_span.span_id
     for span in (client_span, http_span, stream_span):
-        assert span["end_timestamp"] is not None
+        assert span.get("end_timestamp") is not None
 
 
 @pytest.mark.parametrize(
@@ -229,7 +230,7 @@ def test_non_body_stream_delays_client_span(
     spans_by_op = _capture_boto3_spans_by_op(invoke, capture_items)
     (client_span,) = spans_by_op[OP.HTTP_CLIENT]
     (stream_span,) = spans_by_op[OP.HTTP_CLIENT_STREAM]
-    assert stream_span["parent_span_id"] == client_span["span_id"]  # type: ignore
+    assert stream_span.get("parent_span_id") == client_span["span_id"]
 
 
 @pytest.mark.tests_internal_exceptions
@@ -248,9 +249,10 @@ def test_omit_url_data_if_parsing_fails(capture_items, client_factory):
 
     parse_url.assert_called()
     (span,) = spans_by_op[OP.HTTP_CLIENT]
-    assert SPANDATA.URL_FULL not in span["attributes"]  # type: ignore
-    assert SPANDATA.URL_FRAGMENT not in span["attributes"]  # type: ignore
-    assert SPANDATA.URL_QUERY not in span["attributes"]  # type: ignore
+    attributes = span.get("attributes", {})
+    assert SPANDATA.URL_FULL not in attributes
+    assert SPANDATA.URL_FRAGMENT not in attributes
+    assert SPANDATA.URL_QUERY not in attributes
 
 
 BUCKET_URL = "https://bucket.s3.eu-north-1.amazonaws.com/"
@@ -326,17 +328,16 @@ def test_url_query_data_collection(
     (span,) = [
         item.payload
         for item in items
-        if item.payload["attributes"].get(SPANDATA.SENTRY_OP) == OP.HTTP_CLIENT
+        if item.payload.get("attributes", {}).get(SPANDATA.SENTRY_OP) == OP.HTTP_CLIENT
     ]
+    attributes = span.get("attributes", {})
 
     if expected_query == "":
-        assert SPANDATA.URL_QUERY not in span["attributes"]
-        assert span["attributes"][SPANDATA.URL_FULL] == BUCKET_URL
+        assert SPANDATA.URL_QUERY not in attributes
+        assert attributes[SPANDATA.URL_FULL] == BUCKET_URL
     else:
-        assert span["attributes"][SPANDATA.URL_QUERY] == expected_query
-        assert (
-            span["attributes"][SPANDATA.URL_FULL] == BUCKET_URL + "?" + expected_query
-        )
+        assert attributes[SPANDATA.URL_QUERY] == expected_query
+        assert attributes[SPANDATA.URL_FULL] == BUCKET_URL + "?" + expected_query
 
 
 @pytest.mark.parametrize(
@@ -407,8 +408,9 @@ def _mock_responses(client, status_codes):
 def _assert_one_failed_span(spans):
     assert len(spans) == 1
     assert spans[0]["status"] == "error"
-    assert spans[0]["attributes"][SPANDATA.ERROR_TYPE]
-    assert spans[0]["end_timestamp"] is not None
+    attributes = spans[0].get("attributes", {})
+    assert attributes[SPANDATA.ERROR_TYPE]
+    assert spans[0].get("end_timestamp") is not None
 
 
 def _capture_stubbed_client_span(
@@ -482,9 +484,9 @@ def test_service_extension_customizes_client_span(
     spans = spans_by_op.get("aws.test", [])
     assert len(spans) == 1
     span = spans[0]
-    attributes = span["attributes"]  # type: ignore
+    attributes = span.get("attributes", {})
     assert span["name"] == "S3.HeadObject"
-    assert span["end_timestamp"] is not None  # type: ignore
+    assert span.get("end_timestamp") is not None
     assert attributes[SPANDATA.SENTRY_OP] == "aws.test"
     assert attributes[SPANDATA.SENTRY_ORIGIN] == "auto.aws.test"
     assert attributes[SPANDATA.SENTRY_KIND] == "producer"
@@ -576,10 +578,10 @@ def test_client_call_has_common_attributes(
             }
         },
     )
-    attributes = span["attributes"]  # type: ignore
+    attributes = span.get("attributes", {})
 
     assert span["name"] == span_name
-    assert span["end_timestamp"] is not None  # type: ignore
+    assert span.get("end_timestamp") is not None
     assert attributes[SPANDATA.SENTRY_OP] == OP.HTTP_CLIENT
     assert attributes[SPANDATA.SENTRY_ORIGIN] == ORIGIN
     assert attributes[SPANDATA.SENTRY_KIND] == "client"
@@ -632,7 +634,7 @@ def test_client_call_attributes_are_available_at_span_creation(
     client_spans = [
         item.payload
         for item in items
-        if item.payload["attributes"].get(SPANDATA.SENTRY_ORIGIN) == ORIGIN
+        if item.payload.get("attributes", {}).get(SPANDATA.SENTRY_ORIGIN) == ORIGIN
     ]
     assert client_spans == []
 
@@ -653,7 +655,7 @@ def test_client_call_has_response_header_attributes(
 
     spans = spans_by_op[OP.HTTP_CLIENT]
     assert len(spans) == 1
-    attributes = spans[0]["attributes"]  # type: ignore
+    attributes = spans[0].get("attributes", {})
     assert attributes[SPANDATA.HTTP_STATUS_CODE] == 200
     assert attributes[SPANDATA.AWS_REQUEST_ID] == "request-id"
     assert attributes[SPANDATA.AWS_EXTENDED_REQUEST_ID] == "extended-request-id"
@@ -674,7 +676,7 @@ def test_retry_attempts_share_one_client_span(capture_items, client_factory):
     # all `AWSRequest` instances created during retries reference the same client span.
     assert len(set(request_span_ids)) == 1
     assert len(client_spans) == 1
-    attributes = client_spans[0]["attributes"]  # type: ignore
+    attributes = client_spans[0].get("attributes", {})
     assert attributes[SPANDATA.HTTP_REQUEST_RESEND_COUNT] == attempt_count - 1
 
 
@@ -694,7 +696,7 @@ def test_retries_exhausted_has_one_failed_client_span(capture_items, client_fact
     assert len(request_span_ids) == 2
     assert len(set(request_span_ids)) == 1
     _assert_one_failed_span(client_spans)
-    attributes = client_spans[0]["attributes"]  # type: ignore
+    attributes = client_spans[0].get("attributes", {})
     assert attributes[SPANDATA.HTTP_STATUS_CODE] == 500
     assert attributes[SPANDATA.HTTP_REQUEST_RESEND_COUNT] == 1
 
@@ -747,11 +749,11 @@ def test_client_error_has_response_attributes_and_is_unchanged(
     )
     client_spans = spans_by_op.get(OP.HTTP_CLIENT, [])
     _assert_one_failed_span(client_spans)
-    attributes = client_spans[0]["attributes"]  # type: ignore
+    attributes = client_spans[0].get("attributes", {})
 
     span = client_spans[0]
     assert span["name"] == "S3.HeadObject"
-    assert span["end_timestamp"] is not None  # type: ignore
+    assert span.get("end_timestamp") is not None
     assert attributes[SPANDATA.SENTRY_OP] == OP.HTTP_CLIENT
     assert attributes[SPANDATA.SENTRY_ORIGIN] == ORIGIN
     assert attributes[SPANDATA.SENTRY_KIND] == "client"
@@ -814,7 +816,8 @@ def test_client_call_exception_is_unchanged_and_finishes_span(
         if event_name == "before-send"
         else "ValueError"
     )
-    assert client_spans[0]["attributes"][SPANDATA.ERROR_TYPE] == expected_error_type  # type: ignore
+    attributes = client_spans[0].get("attributes", {})
+    assert attributes[SPANDATA.ERROR_TYPE] == expected_error_type
 
 
 @pytest.mark.tests_internal_exceptions
@@ -856,7 +859,7 @@ def test_instrumentation_failure_does_not_change_response(
     assert returned_responses[0] is original_response
     if failing_instrumentation == "_get_response_attributes":
         assert len(client_spans) == 1
-        assert client_spans[0]["end_timestamp"] is not None  # type: ignore
+        assert client_spans[0].get("end_timestamp") is not None
     else:
         assert client_spans == []
 
@@ -892,7 +895,7 @@ def test_error_attribute_extraction_failure_does_not_replace_original_exception(
 
     assert len(client_spans) == 1
     assert client_spans[0]["status"] == "error"
-    assert client_spans[0]["end_timestamp"] is not None  # type: ignore
+    assert client_spans[0].get("end_timestamp") is not None
 
 
 def test_streaming_response_attributes_belong_to_client_span(
@@ -926,8 +929,8 @@ def test_streaming_response_attributes_belong_to_client_span(
 
     assert len(client_spans) == 1
     assert len(stream_spans) == 1
-    client_attributes = client_spans[0]["attributes"]  # type: ignore
-    stream_attributes = stream_spans[0]["attributes"]  # type: ignore
+    client_attributes = client_spans[0].get("attributes", {})
+    stream_attributes = stream_spans[0].get("attributes", {})
     assert client_attributes[SPANDATA.AWS_REQUEST_ID] == "request-id"
     assert client_attributes[SPANDATA.HTTP_STATUS_CODE] == 200
     assert SPANDATA.HTTP_REQUEST_RESEND_COUNT not in client_attributes
@@ -976,4 +979,5 @@ def test_streaming_body_read_failure_finishes_stream_span(
     assert len(client_spans) == 1
     _assert_one_failed_span(client_spans)
     _assert_one_failed_span(stream_spans)
-    assert stream_spans[0]["attributes"][SPANDATA.ERROR_TYPE] == "OSError"  # type: ignore
+    attributes = stream_spans[0].get("attributes", {})
+    assert attributes[SPANDATA.ERROR_TYPE] == "OSError"
