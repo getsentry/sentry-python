@@ -100,11 +100,9 @@ def _patch_botocore_client() -> None:
             return orig_make_api_call(self, operation_name, api_params)
 
         # activate without finishing; a streaming response may outlive the call.
-        span_ctx = _activate_client_span(span)
-
         attributes: "Attributes" = {}
         try:
-            with span_ctx:
+            with _activate_client_span(span):
                 try:
                     parsed = orig_make_api_call(self, operation_name, api_params)
                 except BaseException as error:
