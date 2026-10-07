@@ -10,6 +10,7 @@ import subprocess
 import sys
 import threading
 import time
+import warnings
 from collections import namedtuple
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -2253,3 +2254,12 @@ def _is_localhost(
 @contextmanager
 def nullcontext() -> "Iterator[None]":
     yield
+
+
+def deprecation_warning(msg: str) -> None:
+    """
+    Emit a warnings.warn about a deprecation.
+
+    For other types of warnings, use logger.warning().
+    """
+    warnings.warn(msg, stacklevel=3, category=DeprecationWarning)
