@@ -258,7 +258,7 @@ async def test_tool_handler_stdio(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
         data_collection={
-            "gen_ai": {
+            "mcp": {
                 "inputs": True,
                 "outputs": True,
             }
@@ -320,7 +320,6 @@ async def test_tool_handler_stdio(
             "value": 42,
         }
     )
-    assert data[SPANDATA.MCP_TOOL_RESULT_CONTENT_COUNT] == 2
 
 
 @pytest.mark.asyncio
@@ -334,7 +333,7 @@ async def test_tool_handler_stdio_no_sensitive_data(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
         data_collection={
-            "gen_ai": {
+            "mcp": {
                 "inputs": False,
                 "outputs": False,
             }
@@ -389,7 +388,6 @@ async def test_tool_handler_stdio_no_sensitive_data(
     assert SPANDATA.MCP_SESSION_ID not in data
 
     assert SPANDATA.GEN_AI_TOOL_CALL_RESULT not in data
-    assert SPANDATA.MCP_TOOL_RESULT_CONTENT_COUNT not in data
 
 
 @pytest.mark.asyncio
@@ -399,7 +397,7 @@ async def test_tool_handler_streamable_http(sentry_init, capture_items, json_rpc
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
         data_collection={
-            "gen_ai": {
+            "mcp": {
                 "inputs": True,
                 "outputs": True,
             }
@@ -476,7 +474,7 @@ async def test_tool_handler_streamable_http_no_sensitive_data(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
         data_collection={
-            "gen_ai": {
+            "mcp": {
                 "inputs": False,
                 "outputs": False,
             }
@@ -654,7 +652,7 @@ async def test_prompt_handler_stdio(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
         data_collection={
-            "gen_ai": {
+            "mcp": {
                 "inputs": True,
                 "outputs": True,
             }
@@ -727,7 +725,7 @@ async def test_prompt_handler_stdio_no_sensitive_data(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
         data_collection={
-            "gen_ai": {
+            "mcp": {
                 "inputs": False,
                 "outputs": False,
             }
@@ -795,7 +793,7 @@ async def test_prompt_handler_streamable_http(sentry_init, capture_items, json_r
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
         data_collection={
-            "gen_ai": {
+            "mcp": {
                 "inputs": True,
                 "outputs": True,
             }
@@ -868,7 +866,7 @@ async def test_prompt_handler_streamable_http_no_sensitive_data(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
         data_collection={
-            "gen_ai": {
+            "mcp": {
                 "inputs": False,
                 "outputs": False,
             }
@@ -1144,7 +1142,7 @@ async def test_tool_result_extraction_tuple(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
         data_collection={
-            "gen_ai": {
+            "mcp": {
                 "inputs": True,
                 "outputs": True,
             }
@@ -1183,7 +1181,6 @@ async def test_tool_result_extraction_tuple(
             "count": 5,
         }
     )
-    assert data[SPANDATA.MCP_TOOL_RESULT_CONTENT_COUNT] == 2
 
 
 @pytest.mark.asyncio
@@ -1197,7 +1194,7 @@ async def test_tool_result_extraction_tuple_no_sensitive_data(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
         data_collection={
-            "gen_ai": {
+            "mcp": {
                 "inputs": False,
                 "outputs": False,
             }
@@ -1231,7 +1228,6 @@ async def test_tool_result_extraction_tuple_no_sensitive_data(
     data = span["attributes"]
 
     assert SPANDATA.GEN_AI_TOOL_CALL_RESULT not in data
-    assert SPANDATA.MCP_TOOL_RESULT_CONTENT_COUNT not in data
 
 
 @pytest.mark.asyncio
@@ -1245,7 +1241,7 @@ async def test_tool_result_extraction_unstructured(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
         data_collection={
-            "gen_ai": {
+            "mcp": {
                 "inputs": True,
                 "outputs": True,
             }
@@ -1296,7 +1292,7 @@ async def test_tool_result_extraction_unstructured_no_sensitive_data(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
         data_collection={
-            "gen_ai": {
+            "mcp": {
                 "inputs": False,
                 "outputs": False,
             }
@@ -1430,7 +1426,7 @@ async def test_prompt_with_dict_result(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
         data_collection={
-            "gen_ai": {
+            "mcp": {
                 "inputs": True,
                 "outputs": True,
             }
@@ -1485,7 +1481,7 @@ async def test_prompt_with_dict_result_no_sensitive_data(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
         data_collection={
-            "gen_ai": {
+            "mcp": {
                 "inputs": False,
                 "outputs": False,
             }
@@ -1536,7 +1532,7 @@ async def test_tool_with_complex_arguments(sentry_init, capture_items, stdio):
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
         data_collection={
-            "gen_ai": {
+            "mcp": {
                 "inputs": True,
                 "outputs": True,
             },

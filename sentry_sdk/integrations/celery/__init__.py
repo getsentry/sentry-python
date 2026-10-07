@@ -19,6 +19,7 @@ from sentry_sdk.scope import Scope
 from sentry_sdk.traces import BAGGAGE_HEADER_NAME, SegmentNameSource, Span
 from sentry_sdk.tracing_utils import Baggage
 from sentry_sdk.utils import (
+    _register_control_flow_exception,
     capture_internal_exceptions,
     event_from_exception,
     parse_version,
@@ -78,6 +79,7 @@ class CeleryIntegration(Integration):
         _patch_celery_send_task()
         _patch_worker_exit()
         _patch_producer_publish()
+        _register_control_flow_exception(list(CELERY_CONTROL_FLOW_EXCEPTIONS))
 
         # This logger logs every status of every task that ran on the worker.
         # Meaning that every task's breadcrumbs are full of stuff like "Task
@@ -90,25 +92,18 @@ class CeleryIntegration(Integration):
         ignore_logger_for_events("celery.redirected")
 
 
-def _set_status(status: str) -> None:
-    with capture_internal_exceptions():
-        span = sentry_sdk.get_current_span()
-
-        if span is not None:
-            span.status = "ok" if status == "ok" else "error"
-
-
 def _capture_exception(task: "Any", exc_info: "ExcInfo") -> None:
     client = sentry_sdk.get_client()
     if client.get_integration(CeleryIntegration) is None:
         return
 
     if isinstance(exc_info[1], CELERY_CONTROL_FLOW_EXCEPTIONS):
-        # ??? Doesn't map to anything
-        _set_status("aborted")
+        # Expected control flow exits, not errors
         return
 
-    _set_status("internal_error")
+    span = sentry_sdk.get_current_span()
+    if span is not None:
+        span.status = "error"
 
     if hasattr(task, "throws") and isinstance(exc_info[1], task.throws):
         return

@@ -1360,7 +1360,6 @@ class ClientConstructor:
         transport: "Optional[Union[sentry_sdk.transport.Transport, Type[sentry_sdk.transport.Transport], None]]" = None,
         transport_queue_size: int = DEFAULT_QUEUE_SIZE,
         sample_rate: float = 1.0,
-        send_default_pii: "Optional[bool]" = None,
         data_collection: "Optional[DataCollectionUserOptions]" = {},
         http_proxy: "Optional[str]" = None,
         https_proxy: "Optional[str]" = None,
@@ -1497,12 +1496,6 @@ class ClientConstructor:
 
             Grouping in Sentry is different for events with stack traces and without. As a result, you will get new
             groups as you enable or disable this flag for certain events.
-
-        :param send_default_pii: If this flag is enabled, `certain personally identifiable information (PII)
-            <https://docs.sentry.io/platforms/python/data-management/data-collected/>`_ is added by active integrations.
-
-            If you enable this option, be sure to manually remove what you don't want to send using our features for
-            managing `Sensitive Data <https://docs.sentry.io/data-management/sensitive-data/>`_.
 
         :param data_collection: Structured configuration controlling what data integrations collect
             automatically. Omitted fields use their defaults (most categories are collected, with the sensitive denylist

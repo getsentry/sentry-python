@@ -159,6 +159,14 @@ if TYPE_CHECKING:
         inputs: bool
         outputs: bool
 
+    class MCPCollectionUserOptions(TypedDict, total=False):
+        inputs: bool
+        outputs: bool
+
+    class MCPCollectionBehaviour(TypedDict):
+        inputs: bool
+        outputs: bool
+
     class GraphQLCollectionUserOptions(TypedDict, total=False):
         document: bool
         variables: bool
@@ -181,6 +189,7 @@ if TYPE_CHECKING:
         url_query_params: "KeyValueCollectionBehaviour"
         graphql: "GraphQLCollectionUserOptions"
         gen_ai: "GenAICollectionUserOptions"
+        mcp: "MCPCollectionUserOptions"
         database_query_data: bool
         queues: bool
         stack_frame_variables: "Union[bool, KeyValueCollectionBehaviour]"
@@ -194,6 +203,7 @@ if TYPE_CHECKING:
         url_query_params: "KeyValueCollectionBehaviour"
         graphql: "GraphQLCollectionBehaviour"
         gen_ai: "GenAICollectionBehaviour"
+        mcp: "MCPCollectionBehaviour"
         database_query_data: bool
         queues: bool
         stack_frame_variables: "Union[bool, KeyValueCollectionBehaviour]"

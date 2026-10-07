@@ -545,6 +545,25 @@ async def _wrap_async_handler(
                     )
 
 
+def _update_active_thread() -> None:
+    span = sentry_sdk.get_current_span()
+    if type(span) is Span:
+        span._segment._update_active_thread()
+
+
+def _wrap_sync_handler(handler: "Callable[..., Any]") -> "Callable[..., Any]":
+    if getattr(handler, "_sentry_patched", False):
+        return handler
+
+    @functools.wraps(handler)
+    def _sentry_sync_handler(*args: "Any", **kwargs: "Any") -> "Any":
+        _update_active_thread()
+        return handler(*args, **kwargs)
+
+    _sentry_sync_handler._sentry_patched = True  # type: ignore[attr-defined]
+    return _sentry_sync_handler
+
+
 def patch_request_response() -> None:
     old_request_response = starlette.routing.request_response
 
@@ -569,10 +588,7 @@ def patch_request_response() -> None:
                 if integration is None:
                     return old_func(*args, **kwargs)
 
-                current_span = sentry_sdk.get_current_span()
-
-                if type(current_span) is Span:
-                    current_span._segment._update_active_thread()
+                _update_active_thread()
 
                 sentry_scope = sentry_sdk.get_isolation_scope()
 
