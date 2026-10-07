@@ -570,7 +570,21 @@ def test_langchain_create_agent(
     )
 
     model_response = get_model_response(
-        nonstreaming_responses_model_response,
+        nonstreaming_responses_model_response(
+            message_contents=("Hello, how can I help you?",),
+            usage=ResponseUsage(
+                input_tokens=10,
+                input_tokens_details=InputTokensDetails(
+                    cached_tokens=4,
+                    cache_write_tokens=6,
+                ),
+                output_tokens=20,
+                output_tokens_details=OutputTokensDetails(
+                    reasoning_tokens=5,
+                ),
+                total_tokens=30,
+            ),
+        ),
         serialize_pydantic=True,
         request_headers={
             "X-Stainless-Raw-Response": "True",
@@ -683,7 +697,21 @@ def test_langchain_create_agent_no_sensitive_data(
     )
 
     model_response = get_model_response(
-        nonstreaming_responses_model_response,
+        nonstreaming_responses_model_response(
+            message_contents=("Hello, how can I help you?",),
+            usage=ResponseUsage(
+                input_tokens=10,
+                input_tokens_details=InputTokensDetails(
+                    cached_tokens=4,
+                    cache_write_tokens=6,
+                ),
+                output_tokens=20,
+                output_tokens_details=OutputTokensDetails(
+                    reasoning_tokens=5,
+                ),
+                total_tokens=30,
+            ),
+        ),
         serialize_pydantic=True,
         request_headers={
             "X-Stainless-Raw-Response": "True",

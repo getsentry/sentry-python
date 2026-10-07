@@ -1361,7 +1361,7 @@ class ClientConstructor:
         transport_queue_size: int = DEFAULT_QUEUE_SIZE,
         sample_rate: float = 1.0,
         send_default_pii: "Optional[bool]" = None,
-        data_collection: "Optional[DataCollectionUserOptions]" = None,
+        data_collection: "Optional[DataCollectionUserOptions]" = {},
         http_proxy: "Optional[str]" = None,
         https_proxy: "Optional[str]" = None,
         ignore_errors: "Sequence[Union[type, str]]" = [],  # noqa: B006
@@ -1505,12 +1505,10 @@ class ClientConstructor:
             managing `Sensitive Data <https://docs.sentry.io/data-management/sensitive-data/>`_.
 
         :param data_collection: Structured configuration controlling what data integrations collect
-            automatically, superseding `send_default_pii`. Passing a dict opts into the feature; omitted
-            fields use their defaults (most categories are collected, with the sensitive denylist
-            scrubbing values). When it is not set, the SDK derives behaviour from `send_default_pii` so
-            that upgrading changes nothing. Restrict collection per category (user identity, cookies,
+            automatically. Omitted fields use their defaults (most categories are collected, with the sensitive denylist
+            scrubbing values). Restrict collection per category (user identity, cookies,
             HTTP headers/bodies, query params, generative AI inputs/outputs, stack frame variables,
-            source context). If `send_default_pii` is also set, `data_collection` takes precedence.
+            source context).
 
             Example::
 

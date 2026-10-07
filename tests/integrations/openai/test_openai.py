@@ -18,6 +18,7 @@ except ImportError:
 from openai import AsyncOpenAI, AsyncStream, OpenAI, OpenAIError, Stream
 from openai.types import CompletionUsage, CreateEmbeddingResponse, Embedding
 from openai.types.chat import (
+    ChatCompletion,
     ChatCompletionChunk,
     ChatCompletionMessage,
 )
@@ -25,6 +26,15 @@ from openai.types.chat.chat_completion import Choice
 from openai.types.chat.chat_completion_chunk import Choice as DeltaChoice
 from openai.types.chat.chat_completion_chunk import ChoiceDelta
 from openai.types.create_embedding_response import Usage as EmbeddingTokenUsage
+
+try:
+    from openai.types.completion_usage import (
+        CompletionTokensDetails,
+        PromptTokensDetails,
+    )
+except ImportError:
+    CompletionTokensDetails = None
+    PromptTokensDetails = None
 
 try:
     from openai.types.chat import (
@@ -61,11 +71,7 @@ except ImportError:
 from unittest import mock  # python 3.3 and above
 
 from sentry_sdk.consts import OP, SPANDATA
-from sentry_sdk.integrations.openai import (
-    OpenAIIntegration,
-    _calculate_completions_token_usage,
-    _calculate_responses_token_usage,
-)
+from sentry_sdk.integrations.openai import OpenAIIntegration
 from sentry_sdk.integrations.stdlib import StdlibIntegration
 from sentry_sdk.utils import safe_serialize
 
@@ -2506,366 +2512,303 @@ async def test_span_origin_embeddings_async(
     assert spans[0]["attributes"]["sentry.origin"] == "auto.ai.openai"
 
 
-def test_completions_token_usage_from_response():
-    """Token counts are extracted from response.usage using Completions API field names."""
-    span = mock.MagicMock()
-
-    def count_tokens(msg):
-        return len(str(msg))
-
-    response = mock.MagicMock()
-    response.usage = mock.MagicMock()
-    response.usage.completion_tokens = 10
-    response.usage.prompt_tokens = 20
-    response.usage.total_tokens = 30
-    messages = []
-    streaming_message_responses = []
-
-    with mock.patch(
-        "sentry_sdk.integrations.openai.record_token_usage"
-    ) as mock_record_token_usage:
-        _calculate_completions_token_usage(
-            messages=messages,
-            response=response,
-            span=span,
-            streaming_message_responses=streaming_message_responses,
-            streaming_message_total_token_usage=None,
-            count_tokens=count_tokens,
-        )
-        mock_record_token_usage.assert_called_once_with(
-            span,
-            input_tokens=20,
-            input_tokens_cached=None,
-            output_tokens=10,
-            output_tokens_reasoning=None,
-            total_tokens=30,
-        )
-
-
-def test_completions_token_usage_with_detailed_fields():
+@pytest.mark.skipif(
+    OPENAI_VERSION is None or OPENAI_VERSION < (1, 51, 0),
+    reason="Previous versions do not expose cached input tokens. See https://github.com/openai/openai-python/commit/7c8c11158c4e0b63fef495c32447d6e31870073f.",
+)
+def test_completions_token_usage_with_detailed_fields(
+    sentry_init,
+    capture_events,
+    capture_items,
+    nonstreaming_chat_completions_model_response,
+    get_model_response,
+):
     """Cached and reasoning token counts are extracted from prompt_tokens_details and completion_tokens_details."""
-    span = mock.MagicMock()
+    sentry_init(
+        integrations=[OpenAIIntegration()],
+        disabled_integrations=[StdlibIntegration],
+        traces_sample_rate=1.0,
+    )
 
-    def count_tokens(msg):
-        return len(str(msg))
+    client = OpenAI(api_key="z")
+    returned_stream = get_model_response(
+        nonstreaming_chat_completions_model_response(
+            response_id="chat-id",
+            response_model="gpt-3.5-turbo",
+            message_content="the model response",
+            created=10000000,
+            usage=CompletionUsage(
+                prompt_tokens=20,
+                prompt_tokens_details=PromptTokensDetails(cached_tokens=5),
+                completion_tokens=10,
+                completion_tokens_details=CompletionTokensDetails(reasoning_tokens=8),
+                total_tokens=30,
+            ),
+        ),
+        serialize_pydantic=True,
+    )
 
-    response = mock.MagicMock()
-    response.usage = mock.MagicMock()
-    response.usage.prompt_tokens = 20
-    response.usage.prompt_tokens_details = mock.MagicMock()
-    response.usage.prompt_tokens_details.cached_tokens = 5
-    response.usage.completion_tokens = 10
-    response.usage.completion_tokens_details = mock.MagicMock()
-    response.usage.completion_tokens_details.reasoning_tokens = 8
-    response.usage.total_tokens = 30
+    items = capture_items("span")
 
-    with mock.patch(
-        "sentry_sdk.integrations.openai.record_token_usage"
-    ) as mock_record_token_usage:
-        _calculate_completions_token_usage(
-            messages=[],
-            response=response,
-            span=span,
-            streaming_message_responses=[],
-            streaming_message_total_token_usage=None,
-            count_tokens=count_tokens,
+    with mock.patch.object(
+        client.chat._client._client,
+        "send",
+        return_value=returned_stream,
+    ):
+        client.chat.completions.create(
+            model="some-model",
+            messages=[{"role": "user", "content": "hello"}],
         )
-        mock_record_token_usage.assert_called_once_with(
-            span,
-            input_tokens=20,
-            input_tokens_cached=5,
-            output_tokens=10,
-            output_tokens_reasoning=8,
-            total_tokens=30,
-        )
+
+    sentry_sdk.flush()
+    (span,) = (item.payload for item in items)
+
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 20
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS] == 5
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_REASONING_OUTPUT_TOKENS] == 8
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
 
 
-def test_completions_token_usage_manual_input_counting():
+def test_completions_token_usage_manual_input_counting(
+    sentry_init,
+    capture_events,
+    capture_items,
+    nonstreaming_chat_completions_model_response,
+    get_model_response,
+):
     """When prompt_tokens is missing, input tokens are counted manually from messages."""
-    span = mock.MagicMock()
+    sentry_init(
+        integrations=[
+            OpenAIIntegration(tiktoken_encoding_name=tiktoken_encoding_if_installed())
+        ],
+        disabled_integrations=[StdlibIntegration],
+        traces_sample_rate=1.0,
+    )
 
-    def count_tokens(msg):
-        return len(str(msg))
+    client = OpenAI(api_key="z")
+    returned_stream = get_model_response(
+        nonstreaming_chat_completions_model_response(
+            response_id="chat-id",
+            response_model="gpt-3.5-turbo",
+            message_content="the model response",
+            created=10000000,
+            usage=CompletionUsage(
+                prompt_tokens=0,
+                completion_tokens=10,
+                total_tokens=10,
+            ),
+        ),
+        serialize_pydantic=True,
+    )
 
-    response = mock.MagicMock()
-    response.usage = mock.MagicMock()
-    response.usage.completion_tokens = 10
-    response.usage.total_tokens = 10
-    messages = [
-        {"content": "one"},
-        {"content": "two"},
-        {"content": "three"},
-    ]
-    streaming_message_responses = []
+    items = capture_items("span")
 
-    with mock.patch(
-        "sentry_sdk.integrations.openai.record_token_usage"
-    ) as mock_record_token_usage:
-        _calculate_completions_token_usage(
-            messages=messages,
-            response=response,
-            span=span,
-            streaming_message_responses=streaming_message_responses,
-            streaming_message_total_token_usage=None,
-            count_tokens=count_tokens,
-        )
-        mock_record_token_usage.assert_called_once_with(
-            span,
-            input_tokens=11,
-            input_tokens_cached=None,
-            output_tokens=10,
-            output_tokens_reasoning=None,
-            total_tokens=10,
-        )
-
-
-def test_completions_token_usage_manual_output_counting_streaming():
-    """When completion_tokens is missing, output tokens are counted from streaming responses."""
-    span = mock.MagicMock()
-
-    def count_tokens(msg):
-        return len(str(msg))
-
-    response = mock.MagicMock()
-    response.usage = mock.MagicMock()
-    response.usage.prompt_tokens = 20
-    response.usage.total_tokens = 20
-    messages = []
-    streaming_message_responses = [
-        "one",
-        "two",
-        "three",
-    ]
-
-    with mock.patch(
-        "sentry_sdk.integrations.openai.record_token_usage"
-    ) as mock_record_token_usage:
-        _calculate_completions_token_usage(
-            messages=messages,
-            response=response,
-            span=span,
-            streaming_message_responses=streaming_message_responses,
-            streaming_message_total_token_usage=None,
-            count_tokens=count_tokens,
-        )
-        mock_record_token_usage.assert_called_once_with(
-            span,
-            input_tokens=20,
-            input_tokens_cached=None,
-            output_tokens=11,
-            output_tokens_reasoning=None,
-            total_tokens=20,
+    with mock.patch.object(
+        client.chat._client._client,
+        "send",
+        return_value=returned_stream,
+    ):
+        client.chat.completions.create(
+            model="some-model",
+            messages=[
+                {"content": "one"},
+                {"content": "two"},
+                {"content": "three"},
+            ],
         )
 
+    sentry_sdk.flush()
+    (span,) = (item.payload for item in items)
 
-def test_completions_token_usage_manual_output_counting_choices():
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 10
+    if tiktoken_encoding_if_installed():
+        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 3
+
+
+@pytest.mark.skipif(
+    OPENAI_VERSION is None or OPENAI_VERSION < (1, 26, 0),
+    reason="Previous versions do not report token usage when streaming. See https://github.com/openai/openai-python/commit/6cc515874f5f4b26b35f408d6afc3c14b4dfe3b0.",
+)
+def test_completions_token_usage_manual_output_counting_streaming(
+    sentry_init,
+    capture_events,
+    capture_items,
+    get_model_response,
+    server_side_event_chunks,
+    streaming_chat_completions_model_response,
+):
+    """When completion_tokens is missing, output tokens are counted from streamed content."""
+    sentry_init(
+        integrations=[
+            OpenAIIntegration(tiktoken_encoding_name=tiktoken_encoding_if_installed())
+        ],
+        disabled_integrations=[StdlibIntegration],
+        traces_sample_rate=1.0,
+    )
+
+    client = OpenAI(api_key="z")
+    returned_stream = get_model_response(
+        server_side_event_chunks(
+            streaming_chat_completions_model_response(
+                usage=CompletionUsage(
+                    prompt_tokens=20,
+                    completion_tokens=0,
+                    total_tokens=20,
+                ),
+                message_contents=("one", " two", " three"),
+            ),
+            include_event_type=False,
+        )
+    )
+
+    items = capture_items("span")
+
+    with mock.patch.object(
+        client.chat._client._client,
+        "send",
+        return_value=returned_stream,
+    ):
+        response_stream = client.chat.completions.create(
+            model="some-model",
+            messages=[{"role": "user", "content": "hello"}],
+            stream=True,
+        )
+        for _ in response_stream:
+            pass
+
+    sentry_sdk.flush()
+    (span,) = (item.payload for item in items)
+
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 20
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 20
+    if tiktoken_encoding_if_installed():
+        assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 3
+
+
+def test_completions_token_usage_manual_output_counting_choices(
+    sentry_init,
+    capture_events,
+    capture_items,
+    get_model_response,
+):
     """When completion_tokens is missing, output tokens are counted from response.choices."""
-    span = mock.MagicMock()
+    sentry_init(
+        integrations=[
+            OpenAIIntegration(tiktoken_encoding_name=tiktoken_encoding_if_installed())
+        ],
+        disabled_integrations=[StdlibIntegration],
+        traces_sample_rate=1.0,
+    )
 
-    def count_tokens(msg):
-        return len(str(msg))
-
-    response = mock.MagicMock()
-    response.usage = mock.MagicMock()
-    response.usage.prompt_tokens = 20
-    response.usage.total_tokens = 20
-    response.choices = [
-        Choice(
-            index=0,
-            finish_reason="stop",
-            message=ChatCompletionMessage(role="assistant", content="one"),
+    client = OpenAI(api_key="z")
+    returned_stream = get_model_response(
+        ChatCompletion(
+            id="chat-id",
+            choices=[
+                Choice(
+                    index=0,
+                    finish_reason="stop",
+                    message=ChatCompletionMessage(role="assistant", content="one"),
+                ),
+                Choice(
+                    index=1,
+                    finish_reason="stop",
+                    message=ChatCompletionMessage(role="assistant", content="two"),
+                ),
+                Choice(
+                    index=2,
+                    finish_reason="stop",
+                    message=ChatCompletionMessage(role="assistant", content="three"),
+                ),
+            ],
+            created=10000000,
+            model="gpt-3.5-turbo",
+            object="chat.completion",
+            usage=CompletionUsage(
+                prompt_tokens=20,
+                completion_tokens=0,
+                total_tokens=20,
+            ),
         ),
-        Choice(
-            index=1,
-            finish_reason="stop",
-            message=ChatCompletionMessage(role="assistant", content="two"),
-        ),
-        Choice(
-            index=2,
-            finish_reason="stop",
-            message=ChatCompletionMessage(role="assistant", content="three"),
-        ),
-    ]
-    messages = []
-    streaming_message_responses = None
+        serialize_pydantic=True,
+    )
 
-    with mock.patch(
-        "sentry_sdk.integrations.openai.record_token_usage"
-    ) as mock_record_token_usage:
-        _calculate_completions_token_usage(
-            messages=messages,
-            response=response,
-            span=span,
-            streaming_message_responses=streaming_message_responses,
-            streaming_message_total_token_usage=None,
-            count_tokens=count_tokens,
-        )
-        mock_record_token_usage.assert_called_once_with(
-            span,
-            input_tokens=20,
-            input_tokens_cached=None,
-            output_tokens=11,
-            output_tokens_reasoning=None,
-            total_tokens=20,
+    items = capture_items("span")
+
+    with mock.patch.object(
+        client.chat._client._client,
+        "send",
+        return_value=returned_stream,
+    ):
+        client.chat.completions.create(
+            model="some-model",
+            messages=[{"role": "user", "content": "hello"}],
         )
 
+    sentry_sdk.flush()
+    (span,) = (item.payload for item in items)
 
-def test_completions_token_usage_no_usage_data():
-    """When response has no usage data and no streaming responses, all tokens are None."""
-    span = mock.MagicMock()
-
-    def count_tokens(msg):
-        return len(str(msg))
-
-    response = mock.MagicMock()
-    messages = []
-    streaming_message_responses = None
-
-    with mock.patch(
-        "sentry_sdk.integrations.openai.record_token_usage"
-    ) as mock_record_token_usage:
-        _calculate_completions_token_usage(
-            messages=messages,
-            response=response,
-            span=span,
-            streaming_message_responses=streaming_message_responses,
-            streaming_message_total_token_usage=None,
-            count_tokens=count_tokens,
-        )
-        mock_record_token_usage.assert_called_once_with(
-            span,
-            input_tokens=None,
-            input_tokens_cached=None,
-            output_tokens=None,
-            output_tokens_reasoning=None,
-            total_tokens=None,
-        )
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 20
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 20
+    if tiktoken_encoding_if_installed():
+        assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 3
 
 
 @pytest.mark.skipif(SKIP_RESPONSES_TESTS, reason="Responses API not available")
-def test_responses_token_usage_from_response():
-    """Token counts including cached and reasoning tokens are extracted from Responses API."""
-    span = mock.MagicMock()
-
-    def count_tokens(msg):
-        return len(str(msg))
-
-    response = mock.MagicMock()
-    response.usage = mock.MagicMock()
-    response.usage.input_tokens = 20
-    response.usage.input_tokens_details = mock.MagicMock()
-    response.usage.input_tokens_details.cached_tokens = 5
-    response.usage.output_tokens = 10
-    response.usage.output_tokens_details = mock.MagicMock()
-    response.usage.output_tokens_details.reasoning_tokens = 8
-    response.usage.total_tokens = 30
-    input = []
-
-    with mock.patch(
-        "sentry_sdk.integrations.openai.record_token_usage"
-    ) as mock_record_token_usage:
-        _calculate_responses_token_usage(input, response, span, None, count_tokens)
-        mock_record_token_usage.assert_called_once_with(
-            span,
-            input_tokens=20,
-            input_tokens_cached=5,
-            output_tokens=10,
-            output_tokens_reasoning=8,
-            total_tokens=30,
-        )
-
-
-@pytest.mark.skipif(SKIP_RESPONSES_TESTS, reason="Responses API not available")
-def test_responses_token_usage_no_usage_data():
-    """When Responses API response has no usage data, all tokens are None."""
-    span = mock.MagicMock()
-
-    def count_tokens(msg):
-        return len(str(msg))
-
-    response = mock.MagicMock()
-    response.usage = None
-    input = []
-    streaming_message_responses = None
-
-    with mock.patch(
-        "sentry_sdk.integrations.openai.record_token_usage"
-    ) as mock_record_token_usage:
-        _calculate_responses_token_usage(
-            input, response, span, streaming_message_responses, count_tokens
-        )
-        mock_record_token_usage.assert_called_once_with(
-            span,
-            input_tokens=None,
-            input_tokens_cached=None,
-            output_tokens=None,
-            output_tokens_reasoning=None,
-            total_tokens=None,
-        )
-
-
-@pytest.mark.skipif(SKIP_RESPONSES_TESTS, reason="Responses API not available")
-def test_responses_token_usage_manual_output_counting_response_output():
+def test_responses_token_usage_manual_output_counting_response_output(
+    sentry_init,
+    capture_events,
+    capture_items,
+    get_model_response,
+    nonstreaming_responses_model_response,
+):
     """When output_tokens is missing, output tokens are counted from response.output."""
-    span = mock.MagicMock()
+    sentry_init(
+        integrations=[
+            OpenAIIntegration(tiktoken_encoding_name=tiktoken_encoding_if_installed())
+        ],
+        disabled_integrations=[StdlibIntegration],
+        traces_sample_rate=1.0,
+    )
 
-    def count_tokens(msg):
-        return len(str(msg))
-
-    response = mock.MagicMock()
-    response.usage = mock.MagicMock()
-    response.usage.input_tokens = 20
-    response.usage.total_tokens = 20
-    response.output = [
-        ResponseOutputMessage(
-            id="msg-1",
-            content=[
-                ResponseOutputText(
-                    annotations=[],
-                    text="one",
-                    type="output_text",
+    client = OpenAI(api_key="z")
+    returned_stream = get_model_response(
+        nonstreaming_responses_model_response(
+            message_contents=("one", "two", "three"),
+            usage=ResponseUsage(
+                input_tokens=20,
+                input_tokens_details=InputTokensDetails(
+                    cached_tokens=0,
+                    cache_write_tokens=0,
                 ),
-            ],
-            role="assistant",
-            status="completed",
-            type="message",
+                output_tokens=0,
+                output_tokens_details=OutputTokensDetails(
+                    reasoning_tokens=0,
+                ),
+                total_tokens=20,
+            ),
         ),
-        ResponseOutputMessage(
-            id="msg-2",
-            content=[
-                ResponseOutputText(
-                    annotations=[],
-                    text="two",
-                    type="output_text",
-                ),
-                ResponseOutputText(
-                    annotations=[],
-                    text="three",
-                    type="output_text",
-                ),
-            ],
-            role="assistant",
-            status="completed",
-            type="message",
-        ),
-    ]
-    input = []
-    streaming_message_responses = None
+        serialize_pydantic=True,
+    )
 
-    with mock.patch(
-        "sentry_sdk.integrations.openai.record_token_usage"
-    ) as mock_record_token_usage:
-        _calculate_responses_token_usage(
-            input, response, span, streaming_message_responses, count_tokens
-        )
-        mock_record_token_usage.assert_called_once_with(
-            span,
-            input_tokens=20,
-            input_tokens_cached=None,
-            output_tokens=11,
-            output_tokens_reasoning=None,
-            total_tokens=20,
-        )
+    items = capture_items("span")
+
+    with mock.patch.object(
+        client.responses._client._client,
+        "send",
+        return_value=returned_stream,
+    ):
+        client.responses.create(model="gpt-4o", input="hello")
+
+    sentry_sdk.flush()
+    (span,) = (item.payload for item in items)
+
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 20
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 20
+    if tiktoken_encoding_if_installed():
+        assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 3
 
 
 @pytest.mark.skipif(SKIP_RESPONSES_TESTS, reason="Responses API not available")

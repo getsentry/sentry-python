@@ -82,7 +82,7 @@ def test_metrics_with_user(sentry_init, capture_items):
     assert metrics[0]["attributes"]["user.name"] == "testuser"
 
 
-def test_metrics_no_user_if_pii_off(sentry_init, capture_items):
+def test_metrics_no_user_if_user_info_off(sentry_init, capture_items):
     sentry_init(data_collection={"user_info": False})
     items = capture_items("trace_metric")
 

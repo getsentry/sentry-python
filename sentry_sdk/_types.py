@@ -196,7 +196,6 @@ if TYPE_CHECKING:
         frame_context_lines: int
 
     class DataCollection(TypedDict):
-        provided_by_user: bool
         user_info: bool
         cookies: "KeyValueCollectionBehaviour"
         http_headers: "HttpHeadersCollectionBehaviour"
