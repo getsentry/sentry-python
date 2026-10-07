@@ -298,12 +298,6 @@ async def _instrument_tool_call(
             SPANDATA.GEN_AI_TOOL_CALL_RESULT,
             safe_serialize(result_content),
         )
-        # Set content count if result is a dict
-        if isinstance(result_content, dict):
-            span.set_attribute(
-                SPANDATA.MCP_TOOL_RESULT_CONTENT_COUNT,
-                len(result_content),
-            )
 
     return result
 
