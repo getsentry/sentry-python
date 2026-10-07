@@ -19,7 +19,7 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 
 ### Integrations
 
-- The Strawberry integration won't auto-enable anymore if we detect `strawberry-graphql` is installed. Set it up manually, setting the `async_execution` integration option to either `True` or `False` depending on if your app is async or sync.
+- **The Strawberry integration won't auto-enable anymore** if we detect `strawberry-graphql` is installed. Set it up manually, setting the `async_execution` integration option to either `True` or `False` depending on if your app is async or sync.
 
   ```python
   from sentry_sdk.integrations.strawberry import StrawberryIntegration
@@ -33,7 +33,7 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
   ```
 
 - The FastAPI and Starlette integrations no longer eagerly consume the request body. As a result, the body is only reported in events if your handler parsed it with `Request.json()` or `Request.form()` before the event is captured.
-- The UnraisableHookIntegration is now enabled by default.
+- The `UnraisableHookIntegration` is now enabled by default.
 - We now don't suppress chained exceptions in the ASGI and asyncio integrations by default. The related `suppress_asgi_chained_exceptions` experimental option was removed.
 - In the AWS Lambda and GCP integrations, the text of the message of the warning the SDK optionally emits if a function is about to time out has changed.
 
@@ -44,7 +44,7 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 
 #### Logging
 
-- The standard library logging integration is not auto-enabled by default anymore. To continue using it, add it to the `integrations` list in your `sentry_sdk.init()`:
+- **The standard library logging integration is not auto-enabled by default anymore.** To continue using it, add it to the `integrations` list in your `sentry_sdk.init()`:
 
   ```python
   import sentry_sdk
@@ -79,7 +79,7 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 
 #### Loguru
 
-- The Loguru logging integration is not auto-enabled by default anymore if you have Loguru installed. To continue using it, add it to the `integrations` list in your `sentry_sdk.init()`:
+- **The Loguru logging integration is not auto-enabled by default anymore** if you have Loguru installed. To continue using it, add it to the `integrations` list in your `sentry_sdk.init()`:
 
   ```python
   import sentry_sdk
