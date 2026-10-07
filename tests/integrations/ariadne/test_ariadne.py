@@ -47,7 +47,6 @@ def schema_factory():
 
 def test_capture_validation_error(sentry_init, capture_events):
     sentry_init(
-        data_collection={},
         integrations=[
             AriadneIntegration(),
             FastApiIntegration(),
@@ -90,7 +89,6 @@ def test_no_event_if_no_errors_async(sentry_init, capture_events):
             FastApiIntegration(),
             StarletteIntegration(),
         ],
-        data_collection={},
     )
     events = capture_events()
 
@@ -112,7 +110,6 @@ def test_no_event_if_no_errors_async(sentry_init, capture_events):
 def test_no_event_if_no_errors_sync(sentry_init, capture_events):
     sentry_init(
         integrations=[AriadneIntegration(), FlaskIntegration()],
-        data_collection={},
     )
     events = capture_events()
 
@@ -254,7 +251,6 @@ def test_request_data_collection_body_out_of_bounds_still_collects_variables(
             FastApiIntegration(),
             StarletteIntegration(),
         ],
-        data_collection={},
         max_request_body_size="small",
     )
     events = capture_events()
