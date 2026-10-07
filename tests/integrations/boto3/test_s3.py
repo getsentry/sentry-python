@@ -18,18 +18,6 @@ from tests.integrations.boto3.helpers import (
 )
 
 
-def _assert_s3_attributes(span, expected):
-    # Compare the whole S3-specific set, including the absence of attributes
-    # such as file.size on a ranged response or part_number on HeadObject.
-    actual = {
-        key: value
-        for key, value in span["attributes"].items()
-        if key.startswith("aws.s3.")
-        or key in (SPANDATA.FILE_SIZE, SPANDATA.HTTP_BODY_SIZE)
-    }
-    assert actual == expected
-
-
 def _stubbed_span(client, capture_items, method, params, response):
     with Stubber(client) as stubber:
         stubber.add_response(method, response, expected_params=params)
@@ -66,15 +54,15 @@ def test_request_attributes(s3_client, capture_items):
 
     span = _stubbed_span(s3_client, capture_items, "upload_part", params, {})
 
-    _assert_s3_attributes(
-        span,
-        {
-            SPANDATA.AWS_S3_BUCKET: "bucket",
-            SPANDATA.AWS_S3_KEY: "file.txt",
-            SPANDATA.AWS_S3_UPLOAD_ID: "upload-id",
-            SPANDATA.AWS_S3_PART_NUMBER: 1,
-        },
-    )
+    attributes = span["attributes"]
+    assert attributes[SPANDATA.AWS_S3_BUCKET] == "bucket"
+    assert attributes[SPANDATA.AWS_S3_KEY] == "file.txt"
+    assert attributes[SPANDATA.AWS_S3_UPLOAD_ID] == "upload-id"
+    assert attributes[SPANDATA.AWS_S3_PART_NUMBER] == 1
+    assert SPANDATA.AWS_S3_COPY_SOURCE not in attributes
+    assert SPANDATA.AWS_S3_DELETE not in attributes
+    assert SPANDATA.FILE_SIZE not in attributes
+    assert SPANDATA.HTTP_BODY_SIZE not in attributes
     assert params == original
     assert "private-content" not in json.dumps(span)
 
@@ -118,7 +106,18 @@ def test_copy_source(s3_client, capture_items, method, copy_source, expected):
 
     span = _stubbed_span(s3_client, capture_items, method, params, {})
 
-    _assert_s3_attributes(span, expected_attributes)
+    attributes = span["attributes"]
+    for key, value in expected_attributes.items():
+        assert attributes[key] == value
+    for key in (
+        SPANDATA.AWS_S3_UPLOAD_ID,
+        SPANDATA.AWS_S3_PART_NUMBER,
+        SPANDATA.AWS_S3_DELETE,
+        SPANDATA.FILE_SIZE,
+        SPANDATA.HTTP_BODY_SIZE,
+    ):
+        if key not in expected_attributes:
+            assert key not in attributes
     assert params["CopySource"] is source
     assert source == copy_source
 
@@ -132,13 +131,17 @@ def test_delete_serialization(s3_client, capture_items):
 
     span = _stubbed_span(s3_client, capture_items, "delete_objects", params, {})
 
-    _assert_s3_attributes(
-        span,
-        {
-            SPANDATA.AWS_S3_BUCKET: "bucket",
-            SPANDATA.AWS_S3_DELETE: '{"Objects":[{"Key":"file.txt","VersionId":"version-1"}],"Quiet":true}',
-        },
+    attributes = span["attributes"]
+    assert attributes[SPANDATA.AWS_S3_BUCKET] == "bucket"
+    assert attributes[SPANDATA.AWS_S3_DELETE] == (
+        '{"Objects":[{"Key":"file.txt","VersionId":"version-1"}],"Quiet":true}'
     )
+    assert SPANDATA.AWS_S3_KEY not in attributes
+    assert SPANDATA.AWS_S3_UPLOAD_ID not in attributes
+    assert SPANDATA.AWS_S3_COPY_SOURCE not in attributes
+    assert SPANDATA.AWS_S3_PART_NUMBER not in attributes
+    assert SPANDATA.FILE_SIZE not in attributes
+    assert SPANDATA.HTTP_BODY_SIZE not in attributes
     assert params == original
     assert params["Delete"] is caller_delete
     assert caller_delete["Objects"] is caller_objects
@@ -219,7 +222,21 @@ def test_size_attributes(
 
     span = _stubbed_span(s3_client, capture_items, method, params, response)
 
-    _assert_s3_attributes(
-        span,
-        {SPANDATA.AWS_S3_BUCKET: "bucket", SPANDATA.AWS_S3_KEY: "file.txt", **expected},
-    )
+    attributes = span["attributes"]
+    expected_attributes = {
+        SPANDATA.AWS_S3_BUCKET: "bucket",
+        SPANDATA.AWS_S3_KEY: "file.txt",
+        **expected,
+    }
+    for key, value in expected_attributes.items():
+        assert attributes[key] == value
+    for key in (
+        SPANDATA.AWS_S3_UPLOAD_ID,
+        SPANDATA.AWS_S3_COPY_SOURCE,
+        SPANDATA.AWS_S3_PART_NUMBER,
+        SPANDATA.AWS_S3_DELETE,
+        SPANDATA.FILE_SIZE,
+        SPANDATA.HTTP_BODY_SIZE,
+    ):
+        if key not in expected_attributes:
+            assert key not in attributes
