@@ -100,7 +100,7 @@ def test_catch_exceptions(
     expected_message,
     expected_tx_name,
 ):
-    sentry_init(integrations=[StarliteIntegration()], data_collection={})
+    sentry_init(integrations=[StarliteIntegration()])
     starlite_app = starlite_app_factory()
     exceptions = capture_exceptions()
     events = capture_events()

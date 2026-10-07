@@ -65,7 +65,7 @@ def get_client(pyramid_config):
 def test_view_exceptions(
     get_client, route, sentry_init, capture_events, capture_exceptions
 ):
-    sentry_init(integrations=[PyramidIntegration()], data_collection={})
+    sentry_init(integrations=[PyramidIntegration()])
     events = capture_events()
     exceptions = capture_exceptions()
 
@@ -93,7 +93,7 @@ def test_view_exceptions(
 
 
 def test_has_context(route, get_client, sentry_init, capture_events):
-    sentry_init(integrations=[PyramidIntegration()], data_collection={})
+    sentry_init(integrations=[PyramidIntegration()])
     events = capture_events()
 
     @route("/context_message/{msg}")
@@ -211,7 +211,7 @@ def test_large_json_request(
 
 @pytest.mark.parametrize("data", [{}, []], ids=["empty-dict", "empty-list"])
 def test_flask_empty_json_request(sentry_init, capture_events, route, get_client, data):
-    sentry_init(integrations=[PyramidIntegration()], data_collection={})
+    sentry_init(integrations=[PyramidIntegration()])
 
     @route("/")
     def index(request):
@@ -305,7 +305,7 @@ def test_bad_request_not_captured(
 ):
     import pyramid.httpexceptions as exc
 
-    sentry_init(integrations=[PyramidIntegration()], data_collection={})
+    sentry_init(integrations=[PyramidIntegration()])
     events = capture_events()
 
     @route("/")
@@ -326,7 +326,7 @@ def test_bad_request_not_captured(
 def test_errorhandler_ok(
     sentry_init, pyramid_config, capture_exceptions, route, get_client
 ):
-    sentry_init(integrations=[PyramidIntegration()], data_collection={})
+    sentry_init(integrations=[PyramidIntegration()])
     errors = capture_exceptions()
 
     @route("/")
@@ -347,7 +347,7 @@ def test_errorhandler_ok(
 def test_errorhandler_500(
     sentry_init, pyramid_config, capture_exceptions, route, get_client
 ):
-    sentry_init(integrations=[PyramidIntegration()], data_collection={})
+    sentry_init(integrations=[PyramidIntegration()])
     errors = capture_exceptions()
 
     @route("/")
@@ -372,7 +372,7 @@ def test_errorhandler_500(
 def test_error_in_errorhandler(
     sentry_init, pyramid_config, capture_events, route, get_client
 ):
-    sentry_init(integrations=[PyramidIntegration()], data_collection={})
+    sentry_init(integrations=[PyramidIntegration()])
 
     @route("/")
     def index(request):
@@ -448,7 +448,7 @@ def tween_factory(handler, registry):
 
 
 def test_tween_ok(sentry_init, pyramid_config, capture_exceptions, route, get_client):
-    sentry_init(integrations=[PyramidIntegration()], data_collection={})
+    sentry_init(integrations=[PyramidIntegration()])
     errors = capture_exceptions()
 
     @route("/")

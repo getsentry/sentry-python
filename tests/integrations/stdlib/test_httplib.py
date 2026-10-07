@@ -198,7 +198,7 @@ def test_httplib_misuse(sentry_init, capture_events, request):
     wrongly.
     """
 
-    sentry_init(data_collection={})
+    sentry_init()
     events = capture_events()
 
     conn = HTTPConnection("localhost", PORT)
