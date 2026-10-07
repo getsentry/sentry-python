@@ -1702,13 +1702,10 @@ def _make_sampling_decision(
             sample_rate = client.options["traces_sampler"](sampling_context)
         except Exception:
             logger.warning(
-                "[Tracing] traces_sampler raised; falling back to parent sample rate or traces_sample_rate",
+                "[Tracing] traces_sampler raised; unsampling trace",
                 exc_info=True,
             )
-            if propagation_context.parent_sampled is not None:
-                sample_rate = propagation_context.parent_sampled
-            else:
-                sample_rate = client.options["traces_sample_rate"]
+            return False, None, None, "callback_error"
     else:
         if propagation_context.parent_sampled is not None:
             sample_rate = propagation_context.parent_sampled

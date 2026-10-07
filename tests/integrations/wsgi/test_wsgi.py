@@ -1333,3 +1333,81 @@ def test_error_event_no_user_ip_address_without_remote_addr(
     (event,) = events
 
     assert "ip_address" not in event.get("user", {})
+
+
+@pytest.mark.parametrize(
+    "client_kwargs, is_localhost",
+    [
+        # Default werkzeug client: REMOTE_ADDR=127.0.0.1, Host=localhost
+        ({"path": "/dogs/"}, True),
+        # IPv6 loopback
+        ({"path": "/dogs/", "environ_base": {"REMOTE_ADDR": "::1"}}, True),
+        # Localhost Host header with non-local IP
+        (
+            {
+                "path": "http://localhost:8000/dogs/",
+                "environ_overrides": {"REMOTE_ADDR": "1.2.3.4"},
+            },
+            True,
+        ),
+        # Non-local IP and non-local host
+        (
+            {
+                "path": "/dogs/",
+                "base_url": "http://example.com",
+                "environ_overrides": {"REMOTE_ADDR": "1.2.3.4"},
+            },
+            False,
+        ),
+    ],
+)
+def test_is_localhost_attribute(
+    sentry_init, capture_items, client_kwargs, is_localhost
+):
+    def dogpark(environ, start_response):
+        with sentry_sdk.traces.start_span(name="child-span"):
+            pass
+        start_response("200 OK", [])
+        return ["woof"]
+
+    sentry_init(traces_sample_rate=1.0, trace_lifecycle="stream")
+    app = SentryWsgiMiddleware(dogpark)
+    client = Client(app)
+
+    items = capture_items("span")
+
+    client.get(**client_kwargs)
+
+    sentry_sdk.flush()
+
+    child_span, server_span = [item.payload for item in items]
+
+    assert server_span["attributes"]["sentry.is_localhost"] is is_localhost
+    assert child_span["attributes"]["sentry.is_localhost"] is is_localhost
+
+
+def test_user_agent_attribute(sentry_init, capture_items):
+    def dogpark(environ, start_response):
+        with sentry_sdk.traces.start_span(name="child-span"):
+            pass
+        start_response("200 OK", [])
+        return ["woof"]
+
+    sentry_init(
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+    )
+
+    app = SentryWsgiMiddleware(dogpark)
+    client = Client(app)
+
+    items = capture_items("span")
+
+    client.get("/dogs/", headers={"User-Agent": "TestBrowser/1.0"})
+
+    sentry_sdk.flush()
+
+    child_span, server_span = [item.payload for item in items]
+
+    assert server_span["attributes"]["user_agent.original"] == "TestBrowser/1.0"
+    assert child_span["attributes"]["user_agent.original"] == "TestBrowser/1.0"

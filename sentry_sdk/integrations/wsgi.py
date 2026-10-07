@@ -18,6 +18,7 @@ from sentry_sdk.tracing import Span, TransactionSource
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
     ContextVar,
+    _is_localhost,
     capture_internal_exceptions,
     event_from_exception,
     has_data_collection_enabled,
@@ -124,6 +125,22 @@ class SentryWsgiMiddleware:
                             _make_wsgi_event_processor(
                                 environ, self.use_x_forwarded_for
                             )
+                        )
+
+                    scope.set_attribute(
+                        SPANDATA.SENTRY_IS_LOCALHOST,
+                        _is_localhost(
+                            client_ip=get_client_ip(environ),
+                            url_host=environ.get("SERVER_NAME")
+                            if not environ.get("HTTP_HOST")
+                            else None,
+                            host_header=environ.get("HTTP_HOST"),
+                            forwarded_host_header=environ.get("HTTP_X_FORWARDED_HOST"),
+                        ),
+                    )
+                    if environ.get("HTTP_USER_AGENT"):
+                        scope.set_attribute(
+                            SPANDATA.USER_AGENT_ORIGINAL, environ["HTTP_USER_AGENT"]
                         )
 
                     method = environ.get("REQUEST_METHOD", "").upper()

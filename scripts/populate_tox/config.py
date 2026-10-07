@@ -244,6 +244,7 @@ TEST_SUITE_CONFIG = {
         "package": "huggingface_hub",
         "deps": {
             "*": ["responses", "pytest-httpx"],
+            ">=2": ["httpx2-pytest"],
         },
     },
     "langchain-base": {
@@ -497,7 +498,6 @@ TEST_SUITE_CONFIG = {
                 "pytest-asyncio",
                 "python-multipart",
                 "requests",
-                "anyio<4.0.0",
                 "jinja2",
                 "httpx",
             ],
@@ -560,6 +560,13 @@ TEST_SUITE_CONFIG = {
     "typer": {
         "package": "typer",
         "num_versions": 2,
+    },
+    "typesafe": {
+        "package": "typesafe-sdk",
+        "integration_name": "typesafe",
+        "deps": {
+            "*": ["pytest-asyncio"],
+        },
     },
     "unleash": {
         "package": "UnleashClient",

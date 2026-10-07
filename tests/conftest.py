@@ -1317,116 +1317,61 @@ def get_rate_limit_model_response():
 
 @pytest.fixture
 def streaming_chat_completions_model_response():
-    return [
-        openai.types.chat.ChatCompletionChunk(
-            id="chatcmpl-test",
-            object="chat.completion.chunk",
-            created=10000000,
-            model="gpt-3.5-turbo",
-            choices=[
-                openai.types.chat.chat_completion_chunk.Choice(
-                    index=0,
-                    delta=openai.types.chat.chat_completion_chunk.ChoiceDelta(
-                        role="assistant"
+    def inner(
+        usage: "openai.types.CompletionUsage",
+        message_contents: "Iterator[str]",
+    ):
+        return [
+            openai.types.chat.ChatCompletionChunk(
+                id="chatcmpl-test",
+                object="chat.completion.chunk",
+                created=10000000,
+                model="gpt-3.5-turbo",
+                choices=[
+                    openai.types.chat.chat_completion_chunk.Choice(
+                        index=0,
+                        delta=openai.types.chat.chat_completion_chunk.ChoiceDelta(
+                            role="assistant"
+                        ),
+                        finish_reason=None,
                     ),
-                    finish_reason=None,
-                ),
-            ],
-        ),
-        openai.types.chat.ChatCompletionChunk(
-            id="chatcmpl-test",
-            object="chat.completion.chunk",
-            created=10000000,
-            model="gpt-3.5-turbo",
-            choices=[
-                openai.types.chat.chat_completion_chunk.Choice(
-                    index=0,
-                    delta=openai.types.chat.chat_completion_chunk.ChoiceDelta(
-                        content="Tes"
-                    ),
-                    finish_reason=None,
-                ),
-            ],
-        ),
-        openai.types.chat.ChatCompletionChunk(
-            id="chatcmpl-test",
-            object="chat.completion.chunk",
-            created=10000000,
-            model="gpt-3.5-turbo",
-            choices=[
-                openai.types.chat.chat_completion_chunk.Choice(
-                    index=0,
-                    delta=openai.types.chat.chat_completion_chunk.ChoiceDelta(
-                        content="t r"
-                    ),
-                    finish_reason=None,
-                ),
-            ],
-        ),
-        openai.types.chat.ChatCompletionChunk(
-            id="chatcmpl-test",
-            object="chat.completion.chunk",
-            created=10000000,
-            model="gpt-3.5-turbo",
-            choices=[
-                openai.types.chat.chat_completion_chunk.Choice(
-                    index=0,
-                    delta=openai.types.chat.chat_completion_chunk.ChoiceDelta(
-                        content="esp"
-                    ),
-                    finish_reason=None,
-                ),
-            ],
-        ),
-        openai.types.chat.ChatCompletionChunk(
-            id="chatcmpl-test",
-            object="chat.completion.chunk",
-            created=10000000,
-            model="gpt-3.5-turbo",
-            choices=[
-                openai.types.chat.chat_completion_chunk.Choice(
-                    index=0,
-                    delta=openai.types.chat.chat_completion_chunk.ChoiceDelta(
-                        content="ons"
-                    ),
-                    finish_reason=None,
-                ),
-            ],
-        ),
-        openai.types.chat.ChatCompletionChunk(
-            id="chatcmpl-test",
-            object="chat.completion.chunk",
-            created=10000000,
-            model="gpt-3.5-turbo",
-            choices=[
-                openai.types.chat.chat_completion_chunk.Choice(
-                    index=0,
-                    delta=openai.types.chat.chat_completion_chunk.ChoiceDelta(
-                        content="e"
-                    ),
-                    finish_reason=None,
-                ),
-            ],
-        ),
-        openai.types.chat.ChatCompletionChunk(
-            id="chatcmpl-test",
-            object="chat.completion.chunk",
-            created=10000000,
-            model="gpt-3.5-turbo",
-            choices=[
-                openai.types.chat.chat_completion_chunk.Choice(
-                    index=0,
-                    delta=openai.types.chat.chat_completion_chunk.ChoiceDelta(),
-                    finish_reason="stop",
-                ),
-            ],
-            usage=openai.types.CompletionUsage(
-                prompt_tokens=10,
-                completion_tokens=20,
-                total_tokens=30,
+                ],
             ),
-        ),
-    ]
+            *[
+                openai.types.chat.ChatCompletionChunk(
+                    id="chatcmpl-test",
+                    object="chat.completion.chunk",
+                    created=10000000,
+                    model="gpt-3.5-turbo",
+                    choices=[
+                        openai.types.chat.chat_completion_chunk.Choice(
+                            index=0,
+                            delta=openai.types.chat.chat_completion_chunk.ChoiceDelta(
+                                content=message_content
+                            ),
+                            finish_reason=None,
+                        ),
+                    ],
+                )
+                for message_content in message_contents
+            ],
+            openai.types.chat.ChatCompletionChunk(
+                id="chatcmpl-test",
+                object="chat.completion.chunk",
+                created=10000000,
+                model="gpt-3.5-turbo",
+                choices=[
+                    openai.types.chat.chat_completion_chunk.Choice(
+                        index=0,
+                        delta=openai.types.chat.chat_completion_chunk.ChoiceDelta(),
+                        finish_reason="stop",
+                    ),
+                ],
+                usage=usage,
+            ),
+        ]
+
+    return inner
 
 
 @pytest.fixture
@@ -1479,42 +1424,38 @@ def openai_embedding_model_response():
 
 @pytest.fixture
 def nonstreaming_responses_model_response():
-    return openai.types.responses.Response(
-        id="resp_123",
-        output=[
-            openai.types.responses.ResponseOutputMessage(
-                id="msg_123",
-                type="message",
-                status="completed",
-                content=[
-                    openai.types.responses.ResponseOutputText(
-                        text="Hello, how can I help you?",
-                        type="output_text",
-                        annotations=[],
-                    )
-                ],
-                role="assistant",
-            )
-        ],
-        parallel_tool_calls=False,
-        tool_choice="none",
-        tools=[],
-        created_at=10000000,
-        model="gpt-4",
-        object="response",
-        usage=openai.types.responses.ResponseUsage(
-            input_tokens=10,
-            input_tokens_details=openai.types.responses.response_usage.InputTokensDetails(
-                cached_tokens=4,
-                cache_write_tokens=6,
-            ),
-            output_tokens=20,
-            output_tokens_details=openai.types.responses.response_usage.OutputTokensDetails(
-                reasoning_tokens=5,
-            ),
-            total_tokens=30,
-        ),
-    )
+    def inner(
+        message_contents: "Iterator[str]",
+        usage: "openai.types.responses.ResponseUsage",
+    ):
+        return openai.types.responses.Response(
+            id="resp_123",
+            output=[
+                openai.types.responses.ResponseOutputMessage(
+                    id="msg_123",
+                    type="message",
+                    status="completed",
+                    content=[
+                        openai.types.responses.ResponseOutputText(
+                            text=message_content,
+                            type="output_text",
+                            annotations=[],
+                        )
+                    ],
+                    role="assistant",
+                )
+                for message_content in message_contents
+            ],
+            parallel_tool_calls=False,
+            tool_choice="none",
+            tools=[],
+            created_at=10000000,
+            model="gpt-4",
+            object="response",
+            usage=usage,
+        )
+
+    return inner
 
 
 @pytest.fixture

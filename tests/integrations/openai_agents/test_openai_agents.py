@@ -390,7 +390,22 @@ async def test_tool_definitions(
     agent = test_agent.clone(model=model, tools=tools)
 
     response = get_model_response(
-        nonstreaming_responses_model_response, serialize_pydantic=True
+        nonstreaming_responses_model_response(
+            message_contents=("Hello, how can I help you?",),
+            usage=ResponseUsage(
+                input_tokens=10,
+                input_tokens_details=InputTokensDetails(
+                    cached_tokens=4,
+                    cache_write_tokens=6,
+                ),
+                output_tokens=20,
+                output_tokens_details=OutputTokensDetails(
+                    reasoning_tokens=5,
+                ),
+                total_tokens=30,
+            ),
+        ),
+        serialize_pydantic=True,
     )
 
     if span_streaming:
@@ -513,7 +528,22 @@ async def test_agent_invocation_span_no_pii(
     agent = test_agent.clone(model=model)
 
     response = get_model_response(
-        nonstreaming_responses_model_response, serialize_pydantic=True
+        nonstreaming_responses_model_response(
+            message_contents=("Hello, how can I help you?",),
+            usage=ResponseUsage(
+                input_tokens=10,
+                input_tokens_details=InputTokensDetails(
+                    cached_tokens=4,
+                    cache_write_tokens=6,
+                ),
+                output_tokens=20,
+                output_tokens_details=OutputTokensDetails(
+                    reasoning_tokens=5,
+                ),
+                total_tokens=30,
+            ),
+        ),
+        serialize_pydantic=True,
     )
 
     if span_streaming:
@@ -764,7 +794,22 @@ async def test_invoke_agent_span_data_collection_inputs(
     agent = test_agent.clone(model=model)
 
     response = get_model_response(
-        nonstreaming_responses_model_response, serialize_pydantic=True
+        nonstreaming_responses_model_response(
+            message_contents=("Hello, how can I help you?",),
+            usage=ResponseUsage(
+                input_tokens=10,
+                input_tokens_details=InputTokensDetails(
+                    cached_tokens=4,
+                    cache_write_tokens=6,
+                ),
+                output_tokens=20,
+                output_tokens_details=OutputTokensDetails(
+                    reasoning_tokens=5,
+                ),
+                total_tokens=30,
+            ),
+        ),
+        serialize_pydantic=True,
     )
 
     system_message = {
@@ -942,7 +987,22 @@ async def test_invoke_agent_span_data_collection_outputs(
     agent = test_agent.clone(model=model)
 
     response = get_model_response(
-        nonstreaming_responses_model_response, serialize_pydantic=True
+        nonstreaming_responses_model_response(
+            message_contents=("Hello, how can I help you?",),
+            usage=ResponseUsage(
+                input_tokens=10,
+                input_tokens_details=InputTokensDetails(
+                    cached_tokens=4,
+                    cache_write_tokens=6,
+                ),
+                output_tokens=20,
+                output_tokens_details=OutputTokensDetails(
+                    reasoning_tokens=5,
+                ),
+                total_tokens=30,
+            ),
+        ),
+        serialize_pydantic=True,
     )
 
     if span_streaming:
@@ -1107,7 +1167,22 @@ async def test_data_collection_inputs(
     agent = test_agent.clone(model=model, tools=[simple_test_tool])
 
     response = get_model_response(
-        nonstreaming_responses_model_response, serialize_pydantic=True
+        nonstreaming_responses_model_response(
+            message_contents=("Hello, how can I help you?",),
+            usage=ResponseUsage(
+                input_tokens=10,
+                input_tokens_details=InputTokensDetails(
+                    cached_tokens=4,
+                    cache_write_tokens=6,
+                ),
+                output_tokens=20,
+                output_tokens_details=OutputTokensDetails(
+                    reasoning_tokens=5,
+                ),
+                total_tokens=30,
+            ),
+        ),
+        serialize_pydantic=True,
     )
 
     init_kwargs = {
@@ -1554,7 +1629,22 @@ async def test_agent_invocation_span(
     agent = test_agent_with_instructions(instructions).clone(model=model)
 
     response = get_model_response(
-        nonstreaming_responses_model_response, serialize_pydantic=True
+        nonstreaming_responses_model_response(
+            message_contents=("Hello, how can I help you?",),
+            usage=ResponseUsage(
+                input_tokens=10,
+                input_tokens_details=InputTokensDetails(
+                    cached_tokens=4,
+                    cache_write_tokens=6,
+                ),
+                output_tokens=20,
+                output_tokens_details=OutputTokensDetails(
+                    reasoning_tokens=5,
+                ),
+                total_tokens=30,
+            ),
+        ),
+        serialize_pydantic=True,
     )
 
     if span_streaming:
@@ -1787,7 +1877,22 @@ async def test_client_span_custom_model(
     agent = test_agent_custom_model.clone(model=model)
 
     response = get_model_response(
-        nonstreaming_responses_model_response, serialize_pydantic=True
+        nonstreaming_responses_model_response(
+            message_contents=("Hello, how can I help you?",),
+            usage=ResponseUsage(
+                input_tokens=10,
+                input_tokens_details=InputTokensDetails(
+                    cached_tokens=4,
+                    cache_write_tokens=6,
+                ),
+                output_tokens=20,
+                output_tokens_details=OutputTokensDetails(
+                    reasoning_tokens=5,
+                ),
+                total_tokens=30,
+            ),
+        ),
+        serialize_pydantic=True,
     )
 
     if span_streaming or stream_gen_ai_spans:
@@ -1870,7 +1975,22 @@ def test_agent_invocation_span_sync_no_pii(
     agent = test_agent.clone(model=model)
 
     response = get_model_response(
-        nonstreaming_responses_model_response, serialize_pydantic=True
+        nonstreaming_responses_model_response(
+            message_contents=("Hello, how can I help you?",),
+            usage=ResponseUsage(
+                input_tokens=10,
+                input_tokens_details=InputTokensDetails(
+                    cached_tokens=4,
+                    cache_write_tokens=6,
+                ),
+                output_tokens=20,
+                output_tokens_details=OutputTokensDetails(
+                    reasoning_tokens=5,
+                ),
+                total_tokens=30,
+            ),
+        ),
+        serialize_pydantic=True,
     )
 
     if span_streaming:
@@ -2262,7 +2382,22 @@ def test_agent_invocation_span_sync(
     agent = test_agent_with_instructions(instructions).clone(model=model)
 
     response = get_model_response(
-        nonstreaming_responses_model_response, serialize_pydantic=True
+        nonstreaming_responses_model_response(
+            message_contents=("Hello, how can I help you?",),
+            usage=ResponseUsage(
+                input_tokens=10,
+                input_tokens_details=InputTokensDetails(
+                    cached_tokens=4,
+                    cache_write_tokens=6,
+                ),
+                output_tokens=20,
+                output_tokens_details=OutputTokensDetails(
+                    reasoning_tokens=5,
+                ),
+                total_tokens=30,
+            ),
+        ),
+        serialize_pydantic=True,
     )
 
     if span_streaming:
@@ -5210,7 +5345,22 @@ async def test_multiple_agents_asyncio(
     agent = test_agent.clone(model=model)
 
     response = get_model_response(
-        nonstreaming_responses_model_response, serialize_pydantic=True
+        nonstreaming_responses_model_response(
+            message_contents=("Hello, how can I help you?",),
+            usage=ResponseUsage(
+                input_tokens=10,
+                input_tokens_details=InputTokensDetails(
+                    cached_tokens=4,
+                    cache_write_tokens=6,
+                ),
+                output_tokens=20,
+                output_tokens_details=OutputTokensDetails(
+                    reasoning_tokens=5,
+                ),
+                total_tokens=30,
+            ),
+        ),
+        serialize_pydantic=True,
     )
 
     if span_streaming:
@@ -6805,7 +6955,22 @@ async def test_conversation_id_on_all_spans(
     agent = test_agent.clone(model=model)
 
     response = get_model_response(
-        nonstreaming_responses_model_response, serialize_pydantic=True
+        nonstreaming_responses_model_response(
+            message_contents=("Hello, how can I help you?",),
+            usage=ResponseUsage(
+                input_tokens=10,
+                input_tokens_details=InputTokensDetails(
+                    cached_tokens=4,
+                    cache_write_tokens=6,
+                ),
+                output_tokens=20,
+                output_tokens_details=OutputTokensDetails(
+                    reasoning_tokens=5,
+                ),
+                total_tokens=30,
+            ),
+        ),
+        serialize_pydantic=True,
     )
 
     if span_streaming:
@@ -7202,7 +7367,22 @@ async def test_no_conversation_id_when_not_provided(
     agent = test_agent.clone(model=model)
 
     response = get_model_response(
-        nonstreaming_responses_model_response, serialize_pydantic=True
+        nonstreaming_responses_model_response(
+            message_contents=("Hello, how can I help you?",),
+            usage=ResponseUsage(
+                input_tokens=10,
+                input_tokens_details=InputTokensDetails(
+                    cached_tokens=4,
+                    cache_write_tokens=6,
+                ),
+                output_tokens=20,
+                output_tokens_details=OutputTokensDetails(
+                    reasoning_tokens=5,
+                ),
+                total_tokens=30,
+            ),
+        ),
+        serialize_pydantic=True,
     )
 
     if span_streaming:
@@ -7341,7 +7521,22 @@ async def test_runner_run_with_starting_agent_kwarg(
     agent = test_agent.clone(model=model)
 
     response = get_model_response(
-        nonstreaming_responses_model_response, serialize_pydantic=True
+        nonstreaming_responses_model_response(
+            message_contents=("Hello, how can I help you?",),
+            usage=ResponseUsage(
+                input_tokens=10,
+                input_tokens_details=InputTokensDetails(
+                    cached_tokens=4,
+                    cache_write_tokens=6,
+                ),
+                output_tokens=20,
+                output_tokens_details=OutputTokensDetails(
+                    reasoning_tokens=5,
+                ),
+                total_tokens=30,
+            ),
+        ),
+        serialize_pydantic=True,
     )
 
     with patch.object(

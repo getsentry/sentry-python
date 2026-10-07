@@ -156,6 +156,33 @@ def asgi3_custom_transaction_app():
     return app
 
 
+@pytest.fixture
+def asgi3_app_with_span():
+    async def app(scope, receive, send):
+        if scope["type"] == "lifespan":
+            while True:
+                message = await receive()
+                if message["type"] == "lifespan.startup":
+                    await send({"type": "lifespan.startup.complete"})
+                elif message["type"] == "lifespan.shutdown":
+                    await send({"type": "lifespan.shutdown.complete"})
+                    return
+
+        with sentry_sdk.traces.start_span(name="child-span"):
+            pass
+
+        await send(
+            {
+                "type": "http.response.start",
+                "status": 200,
+                "headers": [[b"content-type", b"text/plain"]],
+            }
+        )
+        await send({"type": "http.response.body", "body": b"Hello, world!"})
+
+    return app
+
+
 def test_invalid_transaction_style(asgi3_app):
     with pytest.raises(ValueError) as exp:
         SentryAsgiMiddleware(asgi3_app, transaction_style="URL")
@@ -1441,40 +1468,20 @@ async def test_user_ip_address_on_all_spans(
     capture_items,
     init_kwargs,
     expect_ip,
+    asgi3_app_with_span,
 ):
-    async def app(scope, receive, send):
-        if scope["type"] == "lifespan":
-            while True:
-                message = await receive()
-                if message["type"] == "lifespan.startup":
-                    await send({"type": "lifespan.startup.complete"})
-                elif message["type"] == "lifespan.shutdown":
-                    await send({"type": "lifespan.shutdown.complete"})
-                    return
-
-        with sentry_sdk.traces.start_span(name="child-span"):
-            pass
-
-        await send(
-            {
-                "type": "http.response.start",
-                "status": 200,
-                "headers": [[b"content-type", b"text/plain"]],
-            }
-        )
-        await send({"type": "http.response.body", "body": b"Hello, world!"})
-
     kwargs = dict(init_kwargs)
     sentry_init(
         trace_lifecycle="stream",
         traces_sample_rate=1.0,
         **kwargs,
     )
-    sentry_app = SentryAsgiMiddleware(app)
+
+    app = SentryAsgiMiddleware(asgi3_app_with_span)
 
     async def wrapped_app(scope, receive, send):
         scope["client"] = ("127.0.0.1", 0)
-        await sentry_app(scope, receive, send)
+        await app(scope, receive, send)
 
     async with TestClient(wrapped_app) as client:
         items = capture_items("span")
@@ -1490,3 +1497,84 @@ async def test_user_ip_address_on_all_spans(
     else:
         assert "user.ip_address" not in server_span["attributes"]
         assert "user.ip_address" not in child_span["attributes"]
+
+
+@pytest.mark.parametrize(
+    "client_ip, server, host_header, is_localhost",
+    [
+        # Loopback IP
+        ("127.0.0.1", ("example.com", 80), b"example.com", True),
+        # IPv6 loopback
+        ("::1", ("example.com", 80), b"example.com", True),
+        # Localhost host header with non-local IP
+        ("203.0.113.50", ("example.com", 80), b"localhost:8000", True),
+        # Server bound to localhost, but host header is public (reverse proxy)
+        ("203.0.113.50", ("localhost", 8000), b"example.com", False),
+        # Server bound to localhost, no host header (fallback to server)
+        ("203.0.113.50", ("localhost", 8000), None, True),
+        # Non-local everything
+        ("203.0.113.50", ("example.com", 80), b"example.com", False),
+    ],
+)
+@pytest.mark.asyncio
+async def test_is_localhost_attribute(
+    sentry_init,
+    capture_items,
+    client_ip,
+    server,
+    host_header,
+    is_localhost,
+    asgi3_app_with_span,
+):
+    sentry_init(
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+    )
+
+    app = SentryAsgiMiddleware(asgi3_app_with_span)
+
+    async def wrapped_app(scope, receive, send):
+        if scope["type"] != "lifespan":
+            scope["client"] = (client_ip, 0)
+            scope["server"] = server
+            scope["headers"] = [(k, v) for k, v in scope["headers"] if k != b"host"]
+            if host_header is not None:
+                scope["headers"].append((b"host", host_header))
+
+        await app(scope, receive, send)
+
+    async with TestClient(wrapped_app) as client:
+        items = capture_items("span")
+        await client.get("/some_url")
+
+    sentry_sdk.flush()
+
+    child_span, server_span = [item.payload for item in items]
+
+    assert server_span["attributes"]["sentry.is_localhost"] is is_localhost
+    assert child_span["attributes"]["sentry.is_localhost"] is is_localhost
+
+
+@pytest.mark.asyncio
+async def test_user_agent_original_attribute(
+    sentry_init,
+    capture_items,
+    asgi3_app_with_span,
+):
+    sentry_init(
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+    )
+
+    app = SentryAsgiMiddleware(asgi3_app_with_span)
+
+    async with TestClient(app) as client:
+        items = capture_items("span")
+        await client.get("/some_url", headers={"User-Agent": "TestBrowser/1.0"})
+
+    sentry_sdk.flush()
+
+    child_span, server_span = [item.payload for item in items]
+
+    assert server_span["attributes"]["user_agent.original"] == "TestBrowser/1.0"
+    assert child_span["attributes"]["user_agent.original"] == "TestBrowser/1.0"
