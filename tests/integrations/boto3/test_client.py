@@ -1,5 +1,6 @@
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from threading import Thread
+from unittest import mock
 
 import boto3
 import pytest
@@ -10,6 +11,7 @@ from botocore.response import StreamingBody
 from botocore.stub import Stubber
 
 import sentry_sdk
+from sentry_sdk import capture_message
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.boto3 import Boto3Integration
 from sentry_sdk.integrations.boto3._services.base import _ServiceExtension
@@ -21,7 +23,21 @@ from sentry_sdk.integrations.boto3.consts import (
 )
 from sentry_sdk.integrations.stdlib import StdlibIntegration
 from sentry_sdk.traces import Span
+from tests.conftest import ApproxDict
+from tests.integrations.boto3 import read_fixture
 from tests.integrations.boto3.aws_mock import Body, MockResponse
+from tests.integrations.boto3.helpers import (
+    capture_spans_by_op as _capture_boto3_spans_by_op,
+)
+from tests.integrations.boto3.helpers import (
+    client_factory as client_factory,
+)
+from tests.integrations.boto3.helpers import (
+    no_botocore_retry_delay as no_botocore_retry_delay,
+)
+from tests.integrations.boto3.helpers import (
+    require_botocore_model_fields,
+)
 
 session = boto3.Session(  # type: ignore[attr-defined]
     aws_access_key_id="-",
@@ -41,7 +57,7 @@ def streaming_s3_server():
             self.wfile.write(b"x")
             self.wfile.flush()
 
-        def log_message(self, *args):
+        def log_message(self, *args):  # type: ignore
             pass
 
     server = HTTPServer(("127.0.0.1", 0), StreamingS3Handler)
@@ -129,22 +145,23 @@ def test_streaming_span_order_and_scope(
         for span in spans
         if span["name"] == "S3.GetObject"
         and (
-            span["attributes"].get(SPANDATA.SENTRY_ORIGIN) == ORIGIN
-            and span["attributes"].get(SPANDATA.SENTRY_OP) == OP.HTTP_CLIENT
+            span.get("attributes", {}).get(SPANDATA.SENTRY_ORIGIN) == ORIGIN
+            and span.get("attributes", {}).get(SPANDATA.SENTRY_OP) == OP.HTTP_CLIENT
         )
     ]
     http_spans = [
         span
         for span in spans
-        if (
-            span["attributes"].get(SPANDATA.SENTRY_ORIGIN) == "auto.http.stdlib.httplib"
-        )
+        if span.get("attributes", {}).get(SPANDATA.SENTRY_ORIGIN)
+        == "auto.http.stdlib.httplib"
     ]
     stream_spans = [
         span
         for span in spans
         if span["name"] == "S3.GetObject"
-        and (span["attributes"].get(SPANDATA.SENTRY_OP) == OP.HTTP_CLIENT_STREAM)
+        and (
+            span.get("attributes", {}).get(SPANDATA.SENTRY_OP) == OP.HTTP_CLIENT_STREAM
+        )
     ]
     assert len(client_spans) == 1
     assert len(http_spans) == 1
@@ -153,72 +170,218 @@ def test_streaming_span_order_and_scope(
     http_span = http_spans[0]
     stream_span = stream_spans[0]
 
-    assert http_span["parent_span_id"] == client_span["span_id"]
-    assert stream_span["parent_span_id"] == client_span["span_id"]
+    assert http_span.get("parent_span_id") == client_span["span_id"]
+    assert stream_span.get("parent_span_id") == client_span["span_id"]
     assert client_span["span_id"] == request_client_span.span_id
     for span in (client_span, http_span, stream_span):
-        assert span["end_timestamp"] is not None
+        assert span.get("end_timestamp") is not None
 
 
-def test_non_body_stream_does_not_delay_client_span(sentry_init, capture_items):
+@pytest.mark.parametrize(
+    "service_name,method_name,api_params,payload_field",
+    [
+        pytest.param(
+            "lambda",
+            "invoke",
+            {"FunctionName": "function"},
+            "Payload",
+            id="payload",
+        ),
+        pytest.param(
+            "s3",
+            "get_object_annotation",
+            {
+                "Bucket": "bucket",
+                "Key": "file.txt",
+                "AnnotationName": "annotation",
+            },
+            "AnnotationPayload",
+            id="annotation-payload",
+        ),
+    ],
+)
+def test_non_body_stream_delays_client_span(
+    capture_items,
+    client_factory,
+    service_name,
+    method_name,
+    api_params,
+    payload_field,
+):
+    client = client_factory(service_name)
+    require_botocore_model_fields(client, method_name, output_fields=(payload_field,))
+    request_client_spans = []
+
+    def record_client_span(request, **kwargs):
+        request_client_spans.append(request.context["_sentrysdk_span"])
+
+    client.meta.events.register("request-created", record_client_span)
+
+    def invoke():
+        parent = sentry_sdk.get_current_span()
+        with MockResponse(client, 200, {"content-length": "1"}, b"x"):
+            response = getattr(client, method_name)(**api_params)
+        body = response[payload_field]
+        assert isinstance(body, StreamingBody)
+        (request_client_span,) = request_client_spans
+        assert request_client_span.end_timestamp is None
+        assert sentry_sdk.get_current_span() is parent
+        body.close()
+        assert request_client_span.end_timestamp is not None
+        assert sentry_sdk.get_current_span() is parent
+
+    spans_by_op = _capture_boto3_spans_by_op(invoke, capture_items)
+    (client_span,) = spans_by_op[OP.HTTP_CLIENT]
+    (stream_span,) = spans_by_op[OP.HTTP_CLIENT_STREAM]
+    assert stream_span.get("parent_span_id") == client_span["span_id"]
+
+
+@pytest.mark.tests_internal_exceptions
+def test_omit_url_data_if_parsing_fails(capture_items, client_factory):
+    client = client_factory()
+
+    with mock.patch(
+        "sentry_sdk.integrations.boto3._instrumentation.parse_url",
+        side_effect=ValueError,
+    ) as parse_url:
+        with MockResponse(client, 200, {}, b""):
+            spans_by_op = _capture_boto3_spans_by_op(
+                lambda: client.head_object(Bucket="bucket", Key="file.txt"),
+                capture_items,
+            )
+
+    parse_url.assert_called()
+    (span,) = spans_by_op[OP.HTTP_CLIENT]
+    attributes = span.get("attributes", {})
+    assert SPANDATA.URL_FULL not in attributes
+    assert SPANDATA.URL_FRAGMENT not in attributes
+    assert SPANDATA.URL_QUERY not in attributes
+
+
+BUCKET_URL = "https://bucket.s3.eu-north-1.amazonaws.com/"
+
+URL_QUERY_PARAMS = [
+    pytest.param(
+        {},
+        "list-type=2&prefix=foo&continuation-token=%5BFiltered%5D&encoding-type=url",
+        id="defaults",
+    ),
+    pytest.param(
+        {
+            "data_collection": {
+                "url_query_params": {"mode": "denylist", "terms": ["prefix"]}
+            }
+        },
+        "list-type=2&prefix=%5BFiltered%5D&continuation-token=%5BFiltered%5D&encoding-type=url",
+        id="data_collection_denylist_custom_terms",
+    ),
+    pytest.param(
+        {
+            "data_collection": {
+                "url_query_params": {"mode": "allowlist", "terms": ["prefix"]}
+            }
+        },
+        "list-type=%5BFiltered%5D&prefix=foo&continuation-token=%5BFiltered%5D&encoding-type=%5BFiltered%5D",
+        id="data_collection_allowlist",
+    ),
+    pytest.param(
+        {
+            "data_collection": {
+                "url_query_params": {
+                    "mode": "allowlist",
+                    "terms": ["continuation-token"],
+                }
+            }
+        },
+        "list-type=%5BFiltered%5D&prefix=%5BFiltered%5D&continuation-token=%5BFiltered%5D&encoding-type=%5BFiltered%5D",
+        id="data_collection_allowlist_sensitive_term",
+    ),
+    pytest.param(
+        {"data_collection": {"url_query_params": {"mode": "off"}}},
+        "",
+        id="data_collection_off",
+    ),
+]
+
+
+@pytest.mark.parametrize("init_kwargs, expected_query", URL_QUERY_PARAMS)
+def test_url_query_data_collection(
+    sentry_init, capture_items, init_kwargs, expected_query
+):
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[Boto3Integration()],
-        server_name="",
+        default_integrations=False,
+        **init_kwargs,
     )
-    client = session.client("lambda")
-
-    def respond(request, **kwargs):
-        return AWSResponse(
-            request.url,
-            200,
-            {"content-length": "1"},
-            Body(b"x"),
-        )
-
-    client.meta.events.register("before-send", respond)
+    client = session.client("s3")
     items = capture_items("span")
 
-    with sentry_sdk.start_span(name="parent") as parent:  # type: ignore[attr-defined]
-        response = client.invoke(FunctionName="function")
-        assert isinstance(response["Payload"], StreamingBody)
-        assert sentry_sdk.get_current_span() is parent  # type: ignore[attr-defined]
+    with sentry_sdk.start_span(name="parent"), MockResponse(
+        client, 200, {}, read_fixture("s3_list.xml")
+    ):
+        client.list_objects_v2(Bucket="bucket", Prefix="foo", ContinuationToken="abc")
 
     sentry_sdk.flush()
-
-    spans = [item.payload for item in items]
-    boto_spans = [
-        span
-        for span in spans
-        if span["attributes"].get(SPANDATA.SENTRY_ORIGIN) == ORIGIN
+    (span,) = [
+        item.payload
+        for item in items
+        if item.payload.get("attributes", {}).get(SPANDATA.SENTRY_OP) == OP.HTTP_CLIENT
     ]
-    assert len(boto_spans) == 1
-    assert boto_spans[0]["attributes"].get(SPANDATA.SENTRY_OP) == OP.HTTP_CLIENT
-    response["Payload"].close()
+    attributes = span.get("attributes", {})
+
+    if expected_query == "":
+        assert SPANDATA.URL_QUERY not in attributes
+        assert attributes[SPANDATA.URL_FULL] == BUCKET_URL
+    else:
+        assert attributes[SPANDATA.URL_QUERY] == expected_query
+        assert attributes[SPANDATA.URL_FULL] == BUCKET_URL + "?" + expected_query
 
 
-@pytest.fixture
-def client_factory(sentry_init, monkeypatch):
+@pytest.mark.parametrize(
+    "data_collection,expected_query",
+    [
+        pytest.param(
+            {},
+            "list-type=2&prefix=foo&continuation-token=%5BFiltered%5D&encoding-type=url",
+            id="default",
+        ),
+        pytest.param(
+            {"url_query_params": {"mode": "off"}},
+            None,
+            id="query-collection-off",
+        ),
+    ],
+)
+def test_breadcrumb(sentry_init, capture_events, data_collection, expected_query):
     sentry_init(
-        traces_sample_rate=1.0,
         integrations=[Boto3Integration()],
-        # avoid SDK's machine hostname being used as server name.
-        server_name="",
+        default_integrations=False,
+        data_collection=data_collection,
     )
-    # remove retry delay to speed up tests
-    monkeypatch.setattr("botocore.endpoint.time.sleep", lambda delay: None)
+    client = session.client("s3")
+    events = capture_events()
 
-    def make_client(service_name="s3", attempt_count=1, **client_kwargs):
-        return session.client(
-            service_name,
-            config=Config(
-                # `total_max_attempts` includes the initial request.
-                retries={"total_max_attempts": attempt_count, "mode": "standard"}
-            ),
-            **client_kwargs,
+    with MockResponse(client, 200, {}, read_fixture("s3_list.xml")):
+        client.list_objects_v2(Bucket="bucket", Prefix="foo", ContinuationToken="abc")
+
+    capture_message("Testing!")
+    (event,) = events
+    (crumb,) = event["breadcrumbs"]["values"]
+    assert crumb["type"] == "http"
+    assert crumb["category"] == "httplib"
+    assert SPANDATA.URL_FRAGMENT not in crumb["data"]
+
+    if expected_query is None:
+        assert SPANDATA.URL_QUERY not in crumb["data"]
+        assert crumb["data"][SPANDATA.URL_FULL] == BUCKET_URL
+    else:
+        assert crumb["data"] == ApproxDict(
+            {
+                SPANDATA.URL_FULL: BUCKET_URL + "?" + expected_query,
+                SPANDATA.URL_QUERY: expected_query,
+            }
         )
-
-    return make_client
 
 
 def _mock_responses(client, status_codes):
@@ -233,44 +396,19 @@ def _mock_responses(client, status_codes):
         # `request_created` runs before `before_send`, so use zero-based index for current
         # attempt; `min(..., len(status_codes) - 1)` clamps to last status to avoid `IndexError`.
         response_index = min(len(request_span_ids) - 1, len(status_codes) - 1)
-        return AWSResponse(request.url, status_codes[response_index], {}, Body(b""))
+        return AWSResponse(request.url, status_codes[response_index], {}, Body(b""))  # type: ignore
 
     client.meta.events.register("request-created", record_request)
     client.meta.events.register("before-send", respond)
     return request_span_ids
 
 
-def _capture_boto3_spans_by_op(
-    invoke_client_method,
-    capture_items,
-    expected_origin=ORIGIN,
-):
-    items = capture_items()
-
-    with sentry_sdk.start_span(name="parent"):
-        invoke_client_method()
-
-    sentry_sdk.flush()
-    spans = [
-        item.payload
-        for item in items
-        if item.type == "span"
-        and item.payload["attributes"].get(SPANDATA.SENTRY_ORIGIN) == expected_origin
-    ]
-
-    spans_by_op = {}
-    for span in spans:
-        spans_by_op.setdefault(span["attributes"].get(SPANDATA.SENTRY_OP), []).append(
-            span
-        )
-    return spans_by_op
-
-
 def _assert_one_failed_span(spans):
     assert len(spans) == 1
     assert spans[0]["status"] == "error"
-    assert spans[0]["attributes"][SPANDATA.ERROR_TYPE]
-    assert spans[0]["end_timestamp"] is not None
+    attributes = spans[0].get("attributes", {})
+    assert attributes[SPANDATA.ERROR_TYPE]
+    assert spans[0].get("end_timestamp") is not None
 
 
 def _capture_stubbed_client_span(
@@ -288,6 +426,7 @@ def _capture_stubbed_client_span(
             lambda: getattr(client, method_name)(**api_params),
             capture_items,
         )
+        stubber.assert_no_pending_responses()
 
     client_spans = spans_by_op.get(OP.HTTP_CLIENT, [])
     assert len(client_spans) == 1
@@ -342,15 +481,24 @@ def test_service_extension_customizes_client_span(
 
     spans = spans_by_op.get("aws.test", [])
     assert len(spans) == 1
-    attributes = spans[0]["attributes"]
+    span = spans[0]
+    attributes = span.get("attributes", {})
+    assert span["name"] == "S3.HeadObject"
+    assert span.get("end_timestamp") is not None
+    assert attributes[SPANDATA.SENTRY_OP] == "aws.test"
+    assert attributes[SPANDATA.SENTRY_ORIGIN] == "auto.aws.test"
+    assert attributes[SPANDATA.SENTRY_KIND] == "producer"
+    assert attributes[SPANDATA.CLOUD_PROVIDER] == CLOUD_PROVIDER
+    assert attributes[SPANDATA.RPC_SYSTEM_NAME] == AWS_RPC_SYSTEM_NAME
+    assert attributes[SPANDATA.RPC_SERVICE] == "S3"
+    assert attributes[SPANDATA.RPC_METHOD] == "HeadObject"
+    assert attributes[SPANDATA.CLOUD_REGION] == "eu-north-1"
+    assert attributes[SPANDATA.SERVER_ADDRESS] == "s3.eu-north-1.amazonaws.com"
+    assert attributes[SPANDATA.SERVER_PORT] == 443
     assert attributes["aws.test.request"] == "foo"
     assert attributes["aws.test.response"] == "request-id"
-    assert attributes[SPANDATA.SENTRY_KIND] == "producer"
-    assert attributes[SPANDATA.RPC_METHOD] == "HeadObject"
     assert attributes[SPANDATA.HTTP_STATUS_CODE] == 200
     assert attributes[SPANDATA.AWS_EXTENDED_REQUEST_ID] == "extended-request-id"
-    assert spans[0]["end_timestamp"] is not None
-    assert attributes[SPANDATA.SENTRY_ORIGIN] == "auto.aws.test"
 
 
 @pytest.mark.parametrize(
@@ -428,22 +576,24 @@ def test_client_call_has_common_attributes(
             }
         },
     )
-    attributes = span["attributes"]
+    attributes = span.get("attributes", {})
 
     assert span["name"] == span_name
+    assert span.get("end_timestamp") is not None
+    assert attributes[SPANDATA.SENTRY_OP] == OP.HTTP_CLIENT
+    assert attributes[SPANDATA.SENTRY_ORIGIN] == ORIGIN
+    assert attributes[SPANDATA.SENTRY_KIND] == "client"
+    assert attributes[SPANDATA.CLOUD_PROVIDER] == CLOUD_PROVIDER
+    assert attributes[SPANDATA.RPC_SYSTEM_NAME] == AWS_RPC_SYSTEM_NAME
     assert attributes[SPANDATA.RPC_SERVICE] == rpc_service
     assert attributes[SPANDATA.RPC_METHOD] == rpc_method
-    assert attributes[SPANDATA.RPC_SYSTEM_NAME] == AWS_RPC_SYSTEM_NAME
-    assert attributes[SPANDATA.SENTRY_KIND] == "client"
     assert attributes[SPANDATA.CLOUD_REGION] == "eu-north-1"
-    assert attributes[SPANDATA.CLOUD_PROVIDER] == CLOUD_PROVIDER
     assert attributes[SPANDATA.SERVER_ADDRESS] == server_address
     assert attributes[SPANDATA.SERVER_PORT] == server_port
     assert attributes[SPANDATA.HTTP_STATUS_CODE] == 200
     assert attributes[SPANDATA.AWS_REQUEST_ID] == "request-id"
     assert SPANDATA.HTTP_REQUEST_RESEND_COUNT not in attributes
     assert SPANDATA.ERROR_TYPE not in attributes
-    assert span["end_timestamp"] is not None
 
 
 def test_client_call_attributes_are_available_at_span_creation(
@@ -482,7 +632,7 @@ def test_client_call_attributes_are_available_at_span_creation(
     client_spans = [
         item.payload
         for item in items
-        if item.payload["attributes"].get(SPANDATA.SENTRY_ORIGIN) == ORIGIN
+        if item.payload.get("attributes", {}).get(SPANDATA.SENTRY_ORIGIN) == ORIGIN
     ]
     assert client_spans == []
 
@@ -503,14 +653,16 @@ def test_client_call_has_response_header_attributes(
 
     spans = spans_by_op[OP.HTTP_CLIENT]
     assert len(spans) == 1
-    attributes = spans[0]["attributes"]
+    attributes = spans[0].get("attributes", {})
     assert attributes[SPANDATA.HTTP_STATUS_CODE] == 200
     assert attributes[SPANDATA.AWS_REQUEST_ID] == "request-id"
     assert attributes[SPANDATA.AWS_EXTENDED_REQUEST_ID] == "extended-request-id"
     assert SPANDATA.HTTP_REQUEST_RESEND_COUNT not in attributes
 
 
-def test_retry_attempts_share_one_client_span(capture_items, client_factory):
+def test_retry_attempts_share_one_client_span(
+    capture_items, client_factory, no_botocore_retry_delay
+):
     attempt_count = 3
     client = client_factory(attempt_count=attempt_count)
     request_span_ids = _mock_responses(client, [500] * (attempt_count - 1) + [200])
@@ -524,11 +676,13 @@ def test_retry_attempts_share_one_client_span(capture_items, client_factory):
     # all `AWSRequest` instances created during retries reference the same client span.
     assert len(set(request_span_ids)) == 1
     assert len(client_spans) == 1
-    attributes = client_spans[0]["attributes"]
+    attributes = client_spans[0].get("attributes", {})
     assert attributes[SPANDATA.HTTP_REQUEST_RESEND_COUNT] == attempt_count - 1
 
 
-def test_retries_exhausted_has_one_failed_client_span(capture_items, client_factory):
+def test_retries_exhausted_has_one_failed_client_span(
+    capture_items, client_factory, no_botocore_retry_delay
+):
     client = client_factory(attempt_count=2)
     request_span_ids = _mock_responses(client, [500])
 
@@ -544,7 +698,7 @@ def test_retries_exhausted_has_one_failed_client_span(capture_items, client_fact
     assert len(request_span_ids) == 2
     assert len(set(request_span_ids)) == 1
     _assert_one_failed_span(client_spans)
-    attributes = client_spans[0]["attributes"]
+    attributes = client_spans[0].get("attributes", {})
     assert attributes[SPANDATA.HTTP_STATUS_CODE] == 500
     assert attributes[SPANDATA.HTTP_REQUEST_RESEND_COUNT] == 1
 
@@ -578,7 +732,7 @@ def test_client_error_has_response_attributes_and_is_unchanged(
                 "HTTPStatusCode": 403,
                 "RetryAttempts": 1,
             },
-        },
+        },  # type: ignore
         "HeadObject",
     )
 
@@ -597,8 +751,21 @@ def test_client_error_has_response_attributes_and_is_unchanged(
     )
     client_spans = spans_by_op.get(OP.HTTP_CLIENT, [])
     _assert_one_failed_span(client_spans)
-    attributes = client_spans[0]["attributes"]
+    attributes = client_spans[0].get("attributes", {})
 
+    span = client_spans[0]
+    assert span["name"] == "S3.HeadObject"
+    assert span.get("end_timestamp") is not None
+    assert attributes[SPANDATA.SENTRY_OP] == OP.HTTP_CLIENT
+    assert attributes[SPANDATA.SENTRY_ORIGIN] == ORIGIN
+    assert attributes[SPANDATA.SENTRY_KIND] == "client"
+    assert attributes[SPANDATA.CLOUD_PROVIDER] == CLOUD_PROVIDER
+    assert attributes[SPANDATA.RPC_SYSTEM_NAME] == AWS_RPC_SYSTEM_NAME
+    assert attributes[SPANDATA.RPC_SERVICE] == "S3"
+    assert attributes[SPANDATA.RPC_METHOD] == "HeadObject"
+    assert attributes[SPANDATA.CLOUD_REGION] == "eu-north-1"
+    assert attributes[SPANDATA.SERVER_ADDRESS] == "s3.eu-north-1.amazonaws.com"
+    assert attributes[SPANDATA.SERVER_PORT] == 443
     assert attributes[SPANDATA.AWS_REQUEST_ID] == "request-id"
     assert attributes[SPANDATA.HTTP_STATUS_CODE] == 403
     assert attributes[SPANDATA.HTTP_REQUEST_RESEND_COUNT] == 1
@@ -651,7 +818,8 @@ def test_client_call_exception_is_unchanged_and_finishes_span(
         if event_name == "before-send"
         else "ValueError"
     )
-    assert client_spans[0]["attributes"][SPANDATA.ERROR_TYPE] == expected_error_type
+    attributes = client_spans[0].get("attributes", {})
+    assert attributes[SPANDATA.ERROR_TYPE] == expected_error_type
 
 
 @pytest.mark.tests_internal_exceptions
@@ -693,7 +861,7 @@ def test_instrumentation_failure_does_not_change_response(
     assert returned_responses[0] is original_response
     if failing_instrumentation == "_get_response_attributes":
         assert len(client_spans) == 1
-        assert client_spans[0]["end_timestamp"] is not None
+        assert client_spans[0].get("end_timestamp") is not None
     else:
         assert client_spans == []
 
@@ -729,7 +897,7 @@ def test_error_attribute_extraction_failure_does_not_replace_original_exception(
 
     assert len(client_spans) == 1
     assert client_spans[0]["status"] == "error"
-    assert client_spans[0]["end_timestamp"] is not None
+    assert client_spans[0].get("end_timestamp") is not None
 
 
 def test_streaming_response_attributes_belong_to_client_span(
@@ -744,7 +912,7 @@ def test_streaming_response_attributes_belong_to_client_span(
             {
                 "content-length": "5",
                 "x-amz-request-id": "request-id",
-            },
+            },  # type: ignore
             Body(b"hello"),
         )
 
@@ -763,8 +931,8 @@ def test_streaming_response_attributes_belong_to_client_span(
 
     assert len(client_spans) == 1
     assert len(stream_spans) == 1
-    client_attributes = client_spans[0]["attributes"]
-    stream_attributes = stream_spans[0]["attributes"]
+    client_attributes = client_spans[0].get("attributes", {})
+    stream_attributes = stream_spans[0].get("attributes", {})
     assert client_attributes[SPANDATA.AWS_REQUEST_ID] == "request-id"
     assert client_attributes[SPANDATA.HTTP_STATUS_CODE] == 200
     assert SPANDATA.HTTP_REQUEST_RESEND_COUNT not in client_attributes
@@ -792,7 +960,7 @@ def test_streaming_body_read_failure_finishes_stream_span(
         return AWSResponse(
             request.url,
             200,
-            {"content-length": "1"},
+            {"content-length": "1"},  # type: ignore
             _FailingBody(original_exception),
         )
 
@@ -813,4 +981,5 @@ def test_streaming_body_read_failure_finishes_stream_span(
     assert len(client_spans) == 1
     _assert_one_failed_span(client_spans)
     _assert_one_failed_span(stream_spans)
-    assert stream_spans[0]["attributes"][SPANDATA.ERROR_TYPE] == "OSError"
+    attributes = stream_spans[0].get("attributes", {})
+    assert attributes[SPANDATA.ERROR_TYPE] == "OSError"
