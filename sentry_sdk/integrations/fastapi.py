@@ -1,6 +1,5 @@
 import sys
 from copy import deepcopy
-from functools import wraps
 from typing import TYPE_CHECKING
 
 import sentry_sdk
@@ -12,7 +11,6 @@ from sentry_sdk.traces import (
     get_current_span,
 )
 from sentry_sdk.utils import (
-    has_data_collection_enabled,
     parse_version,
 )
 
@@ -26,6 +24,7 @@ try:
         StarletteIntegration,
         StarletteRequestExtractor,
         _get_cached_request_body_attribute,
+        _wrap_sync_handler,
     )
 except DidNotEnable:
     raise DidNotEnable("Starlette is not installed or incompatible")
@@ -116,12 +115,10 @@ async def _wrap_async_handler(
                 if "cookies" in info:
                     request_info["cookies"] = info["cookies"]
                 if "data" in info:
-                    attach_request_data = True
-                    if has_data_collection_enabled(client.options):
-                        attach_request_data = (
-                            "incoming_request"
-                            in client.options["data_collection"]["http_bodies"]
-                        )
+                    attach_request_data = (
+                        "incoming_request"
+                        in client.options["data_collection"]["http_bodies"]
+                    )
 
                     if attach_request_data:
                         request_info["data"] = info["data"]
@@ -142,12 +139,9 @@ async def _wrap_async_handler(
         current_span = get_current_span()
 
         if type(current_span) is Span:
-            attach_request_data = True
-            if has_data_collection_enabled(client.options):
-                attach_request_data = (
-                    "incoming_request"
-                    in client.options["data_collection"]["http_bodies"]
-                )
+            attach_request_data = (
+                "incoming_request" in client.options["data_collection"]["http_bodies"]
+            )
 
             if attach_request_data:
                 request_body = _get_cached_request_body_attribute(
@@ -169,27 +163,8 @@ def patch_get_request_handler() -> None:
             dependant
             and dependant.call is not None
             and not iscoroutinefunction(dependant.call)
-            # FastAPI >= 0.137 calls get_request_handler() on every request
-            # (router-tree traversal) rather than once at registration. Guard
-            # against accumulating _sentry_call wrappers on the shared
-            # dependant object, which would cause a RecursionError after ~987
-            # requests as the call chain grows past Python's recursion limit.
-            and not getattr(dependant.call, "_sentry_is_patched", False)
         ):
-            old_call = dependant.call
-
-            @wraps(old_call)
-            def _sentry_call(*args: "Any", **kwargs: "Any") -> "Any":
-                current_span = sentry_sdk.get_current_span()
-
-                if type(current_span) is Span:
-                    segment = current_span._segment
-                    segment._update_active_thread()
-
-                return old_call(*args, **kwargs)
-
-            _sentry_call._sentry_is_patched = True  # type: ignore[attr-defined]
-            dependant.call = _sentry_call
+            dependant.call = _wrap_sync_handler(dependant.call)
 
         old_app = old_get_request_handler(*args, **kwargs)
 

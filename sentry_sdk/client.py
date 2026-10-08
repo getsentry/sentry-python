@@ -19,7 +19,6 @@ from sentry_sdk.consts import (
     ClientConstructor,
 )
 from sentry_sdk.data_collection import (
-    _map_from_send_default_pii,
     _resolve_data_collection,
 )
 from sentry_sdk.envelope import Envelope, Item
@@ -153,9 +152,10 @@ class BaseClient:
     spotlight: "Optional[SpotlightClient]" = None
 
     def __init__(self, options: "Optional[Dict[str, Any]]" = None) -> None:
-        self.options: "Dict[str, Any]" = (
-            options if options is not None else DEFAULT_OPTIONS
-        )
+        if options is None:
+            options = dict(DEFAULT_OPTIONS)
+            options["data_collection"] = _resolve_data_collection(options)
+        self.options: "Dict[str, Any]" = options
 
         self.transport: "Optional[Transport]" = None
         self.monitor: "Optional[Monitor]" = None
@@ -177,9 +177,6 @@ class BaseClient:
     @property
     def parsed_dsn(self) -> "Optional[Dsn]":
         return None
-
-    def should_send_default_pii(self) -> bool:
-        return False
 
     def is_active(self) -> bool:
         """
@@ -366,18 +363,8 @@ class _Client(BaseClient):
             self.spotlight = setup_spotlight(self.options)
             if self.spotlight is not None and not self.options["dsn"]:
                 sample_all = lambda *_args, **_kwargs: 1.0
-                self.options["send_default_pii"] = True
                 self.options["error_sampler"] = sample_all
                 self.options["traces_sampler"] = sample_all
-                # data_collection was resolved in _get_options() before this
-                # spotlight override flipped send_default_pii on. Re-derive it so
-                # data_collection agrees with should_send_default_pii() in
-                # DSN-less spotlight mode (only when the user did not set
-                # data_collection explicitly).
-                if not self.options["data_collection"]["provided_by_user"]:
-                    self.options["data_collection"] = _map_from_send_default_pii(
-                        send_default_pii=True
-                    )
 
             self.session_flusher = SessionFlusher(capture_func=_capture_envelope)
 
@@ -450,14 +437,6 @@ class _Client(BaseClient):
         Returns whether the client is active (able to send data to Sentry)
         """
         return True
-
-    def should_send_default_pii(self) -> bool:
-        """
-        .. versionadded:: 2.0.0
-
-        Returns whether the client should send default PII (Personally Identifiable Information) data to Sentry.
-        """
-        return self.options.get("send_default_pii") or False
 
     @property
     def dsn(self) -> "Optional[str]":

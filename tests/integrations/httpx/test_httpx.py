@@ -29,7 +29,6 @@ def test_crumb_capture_and_hint_sync(sentry_init, capture_events, httpx_mock):
     sentry_init(
         integrations=[HttpxIntegration()],
         before_breadcrumb=before_breadcrumb,
-        data_collection={},
     )
 
     url = "http://example.com/"
@@ -71,7 +70,6 @@ async def test_crumb_capture_and_hint_async(sentry_init, capture_events, httpx_m
     sentry_init(
         integrations=[HttpxIntegration()],
         before_breadcrumb=before_breadcrumb,
-        data_collection={},
     )
 
     url = "http://example.com/"
@@ -105,10 +103,7 @@ async def test_crumb_capture_and_hint_async(sentry_init, capture_events, httpx_m
 def test_crumb_capture_without_span_sync(sentry_init, capture_events, httpx_mock):
     httpx_mock.add_response()
 
-    sentry_init(
-        integrations=[HttpxIntegration()],
-        data_collection={},
-    )
+    sentry_init(integrations=[HttpxIntegration()])
 
     url = "http://example.com/"
 
@@ -141,10 +136,7 @@ async def test_crumb_capture_without_span_async(
 ):
     httpx_mock.add_response()
 
-    sentry_init(
-        integrations=[HttpxIntegration()],
-        data_collection={},
-    )
+    sentry_init(integrations=[HttpxIntegration()])
 
     url = "http://example.com/"
 
@@ -186,10 +178,7 @@ def test_crumb_capture_client_error_sync(
 ):
     httpx_mock.add_response(status_code=status_code)
 
-    sentry_init(
-        integrations=[HttpxIntegration()],
-        data_collection={},
-    )
+    sentry_init(integrations=[HttpxIntegration()])
 
     url = "http://example.com/"
 
@@ -239,10 +228,7 @@ async def test_crumb_capture_client_error_async(
 ):
     httpx_mock.add_response(status_code=status_code)
 
-    sentry_init(
-        integrations=[HttpxIntegration()],
-        data_collection={},
-    )
+    sentry_init(integrations=[HttpxIntegration()])
 
     url = "http://example.com/"
 
@@ -340,7 +326,6 @@ def test_option_trace_propagation_targets_sync(
         trace_propagation_targets=trace_propagation_targets,
         traces_sample_rate=1.0,
         integrations=[HttpxIntegration()],
-        data_collection={},
     )
 
     httpx.Client().get(url)
@@ -418,7 +403,6 @@ async def test_option_trace_propagation_targets_async(
         trace_propagation_targets=trace_propagation_targets,
         traces_sample_rate=1.0,
         integrations=[HttpxIntegration()],
-        data_collection={},
     )
 
     await httpx.AsyncClient().get(url)
@@ -437,7 +421,6 @@ def test_outgoing_trace_headers_sync(sentry_init, capture_items, httpx_mock):
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[HttpxIntegration()],
-        data_collection={},
     )
 
     url = "http://example.com/"
@@ -467,7 +450,6 @@ async def test_outgoing_trace_headers_async(sentry_init, capture_items, httpx_mo
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[HttpxIntegration()],
-        data_collection={},
     )
 
     url = "http://example.com/"
@@ -499,7 +481,6 @@ def test_outgoing_trace_headers_append_to_baggage_sync(
         traces_sample_rate=1.0,
         integrations=[HttpxIntegration()],
         release="d08ebdb9309e1b004c6f52202de58a09c2268e42",
-        data_collection={},
     )
 
     url = "http://example.com/"
@@ -531,7 +512,6 @@ async def test_outgoing_trace_headers_append_to_baggage_async(
         traces_sample_rate=1.0,
         integrations=[HttpxIntegration()],
         release="d08ebdb9309e1b004c6f52202de58a09c2268e42",
-        data_collection={},
     )
 
     url = "http://example.com/"
@@ -572,7 +552,6 @@ def test_outgoing_trace_headers_no_current_span(sentry_init, httpx_mock):
         traces_sample_rate=1.0,
         trace_propagation_targets=[MATCH_ALL],
         integrations=[HttpxIntegration()],
-        data_collection={},
     )
 
     url = "http://example.com/"
@@ -609,7 +588,6 @@ async def test_outgoing_trace_headers_no_current_span_async(sentry_init, httpx_m
         traces_sample_rate=1.0,
         trace_propagation_targets=[MATCH_ALL],
         integrations=[HttpxIntegration()],
-        data_collection={},
     )
 
     url = "http://example.com/"
@@ -641,7 +619,6 @@ def test_request_source_disabled_sync(sentry_init, capture_items, httpx_mock):
         traces_sample_rate=1.0,
         enable_http_request_source=False,
         http_request_source_threshold_ms=0,
-        data_collection={},
     )
 
     items = capture_items("span")
@@ -670,7 +647,6 @@ async def test_request_source_disabled_async(sentry_init, capture_items, httpx_m
         traces_sample_rate=1.0,
         enable_http_request_source=False,
         http_request_source_threshold_ms=0,
-        data_collection={},
     )
 
     items = capture_items("span")
@@ -707,7 +683,6 @@ def test_request_source_enabled_sync(
         integrations=[HttpxIntegration()],
         traces_sample_rate=1.0,
         http_request_source_threshold_ms=0,
-        data_collection={},
         **kwargs,
     )
 
@@ -743,7 +718,6 @@ async def test_request_source_enabled_async(
         integrations=[HttpxIntegration()],
         traces_sample_rate=1.0,
         http_request_source_threshold_ms=0,
-        data_collection={},
         **kwargs,
     )
 
@@ -772,7 +746,6 @@ def test_request_source_sync(sentry_init, capture_items, httpx_mock):
         traces_sample_rate=1.0,
         enable_http_request_source=True,
         http_request_source_threshold_ms=0,
-        data_collection={},
     )
 
     items = capture_items("span")
@@ -816,7 +789,6 @@ async def test_request_source_async(sentry_init, capture_items, httpx_mock):
         traces_sample_rate=1.0,
         enable_http_request_source=True,
         http_request_source_threshold_ms=0,
-        data_collection={},
     )
 
     items = capture_items("span")
@@ -866,7 +838,6 @@ def test_request_source_with_module_in_search_path_sync(
         traces_sample_rate=1.0,
         enable_http_request_source=True,
         http_request_source_threshold_ms=0,
-        data_collection={},
     )
 
     items = capture_items("span")
@@ -912,7 +883,6 @@ async def test_request_source_with_module_in_search_path_async(
         traces_sample_rate=1.0,
         enable_http_request_source=True,
         http_request_source_threshold_ms=0,
-        data_collection={},
     )
 
     items = capture_items("span")
@@ -958,7 +928,6 @@ def test_no_request_source_if_duration_too_short_sync(
         enable_http_request_source=True,
         # Threshold so high no real request will ever exceed it
         http_request_source_threshold_ms=9999999,
-        data_collection={},
     )
 
     items = capture_items("span")
@@ -990,7 +959,6 @@ async def test_no_request_source_if_duration_too_short_async(
         enable_http_request_source=True,
         # Threshold so high no real request will ever exceed it
         http_request_source_threshold_ms=9999999,
-        data_collection={},
     )
 
     items = capture_items("span")
@@ -1021,7 +989,6 @@ def test_request_source_if_duration_over_threshold_sync(
         enable_http_request_source=True,
         # Threshold of 0 means any non-zero duration qualifies
         http_request_source_threshold_ms=0,
-        data_collection={},
     )
 
     items = capture_items("span")
@@ -1071,7 +1038,6 @@ async def test_request_source_if_duration_over_threshold_async(
         enable_http_request_source=True,
         # Threshold of 0 means any non-zero duration qualifies
         http_request_source_threshold_ms=0,
-        data_collection={},
     )
 
     items = capture_items("span")
@@ -1115,7 +1081,6 @@ def test_span_origin_sync(sentry_init, capture_items, httpx_mock):
     sentry_init(
         integrations=[HttpxIntegration()],
         traces_sample_rate=1.0,
-        data_collection={},
     )
 
     items = capture_items("span")
@@ -1139,7 +1104,6 @@ async def test_span_origin_async(sentry_init, capture_items, httpx_mock):
     sentry_init(
         integrations=[HttpxIntegration()],
         traces_sample_rate=1.0,
-        data_collection={},
     )
 
     items = capture_items("span")
@@ -1275,7 +1239,6 @@ def test_http_url_attributes_no_query_or_fragment_sync(
     sentry_init(
         integrations=[HttpxIntegration()],
         traces_sample_rate=1.0,
-        data_collection={},
     )
 
     items = capture_items("span")
@@ -1305,7 +1268,6 @@ async def test_http_url_attributes_no_query_or_fragment_async(
     sentry_init(
         integrations=[HttpxIntegration()],
         traces_sample_rate=1.0,
-        data_collection={},
     )
 
     items = capture_items("span")
@@ -1595,7 +1557,6 @@ def test_omit_url_data_if_parsing_fails(
     sentry_init(
         integrations=[HttpxIntegration()],
         traces_sample_rate=1.0,
-        data_collection={},
     )
 
     items = capture_items("span")

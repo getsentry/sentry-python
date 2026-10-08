@@ -215,7 +215,6 @@ def test_empty_query_string_is_dropped_with_data_collection(
     # reduce envelope size, so the ``query_string`` key is absent.
     sentry_init(
         integrations=[DjangoIntegration()],
-        data_collection={},
     )
     events = capture_events()
 

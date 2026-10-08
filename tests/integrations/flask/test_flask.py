@@ -83,7 +83,6 @@ def integration_enabled_params(request):
 
 def test_has_context(sentry_init, app, capture_events):
     sentry_init(
-        data_collection={},
         integrations=[flask_sentry.FlaskIntegration()],
     )
     events = capture_events()
@@ -114,7 +113,6 @@ def test_segment_name_and_source(
     expected_source,
 ):
     sentry_init(
-        data_collection={},
         integrations=[flask_sentry.FlaskIntegration()],
         traces_sample_rate=1.0,
     )
@@ -140,7 +138,6 @@ def test_http_route(
     capture_items,
 ):
     sentry_init(
-        data_collection={},
         integrations=[flask_sentry.FlaskIntegration()],
         traces_sample_rate=1.0,
     )
@@ -166,7 +163,7 @@ def test_errors(
     testing,
     integration_enabled_params,
 ):
-    sentry_init(data_collection={}, **integration_enabled_params)
+    sentry_init(**integration_enabled_params)
 
     app.debug = debug
     app.testing = testing
@@ -194,7 +191,7 @@ def test_errors(
 def test_flask_login_not_installed(
     sentry_init, app, capture_events, monkeypatch, integration_enabled_params
 ):
-    sentry_init(data_collection={}, **integration_enabled_params)
+    sentry_init(**integration_enabled_params)
 
     monkeypatch.setattr(flask_sentry, "flask_login", None)
 
@@ -307,7 +304,6 @@ def test_flask_login_configured(
 @pytest.mark.parametrize("max_value_length", [1024, None])
 def test_flask_large_json_request(sentry_init, capture_events, app, max_value_length):
     sentry_init(
-        data_collection={},
         integrations=[flask_sentry.FlaskIntegration()],
         max_request_body_size="always",
         max_value_length=max_value_length,
@@ -344,7 +340,6 @@ def test_flask_large_json_request(sentry_init, capture_events, app, max_value_le
 
 def test_flask_session_tracking(sentry_init, capture_envelopes, app):
     sentry_init(
-        data_collection={},
         integrations=[
             flask_sentry.FlaskIntegration(),
             LoggingIntegration(level=None, event_level=logging.ERROR),
@@ -388,7 +383,7 @@ def test_flask_session_tracking(sentry_init, capture_envelopes, app):
 
 @pytest.mark.parametrize("data", [{}, []], ids=["empty-dict", "empty-list"])
 def test_flask_empty_json_request(sentry_init, capture_events, app, data):
-    sentry_init(data_collection={}, integrations=[flask_sentry.FlaskIntegration()])
+    sentry_init(integrations=[flask_sentry.FlaskIntegration()])
 
     @app.route("/", methods=["POST"])
     def index():
@@ -413,7 +408,6 @@ def test_flask_medium_formdata_request(
     sentry_init, capture_events, app, max_value_length
 ):
     sentry_init(
-        data_collection={},
         integrations=[flask_sentry.FlaskIntegration()],
         max_request_body_size="always",
         max_value_length=max_value_length,
@@ -455,7 +449,6 @@ def test_flask_medium_formdata_request(
 @pytest.mark.parametrize("input_char", ["a", b"a"])
 def test_flask_too_large_raw_request(sentry_init, input_char, capture_events, app):
     sentry_init(
-        data_collection={},
         integrations=[flask_sentry.FlaskIntegration()],
         max_request_body_size="small",
     )
@@ -491,7 +484,6 @@ def test_flask_too_large_raw_request(sentry_init, input_char, capture_events, ap
 @pytest.mark.parametrize("max_value_length", [1024, None])
 def test_flask_files_and_form(sentry_init, capture_events, app, max_value_length):
     sentry_init(
-        data_collection={},
         integrations=[flask_sentry.FlaskIntegration()],
         max_request_body_size="always",
         max_value_length=max_value_length,
@@ -540,7 +532,6 @@ def test_json_not_truncated_if_max_request_body_size_is_always(
     sentry_init, capture_events, app
 ):
     sentry_init(
-        data_collection={},
         integrations=[flask_sentry.FlaskIntegration()],
         max_request_body_size="always",
     )
@@ -574,7 +565,7 @@ def test_json_not_truncated_if_max_request_body_size_is_always(
     ],
 )
 def test_errors_not_reported_twice(sentry_init, integrations, capture_events, app):
-    sentry_init(data_collection={}, integrations=integrations)
+    sentry_init(integrations=integrations)
 
     @app.route("/")
     def index():
@@ -596,7 +587,6 @@ def test_errors_not_reported_twice(sentry_init, integrations, capture_events, ap
 def test_logging(sentry_init, capture_events, app):
     # ensure that Flask's logger magic doesn't break ours
     sentry_init(
-        data_collection={},
         integrations=[
             flask_sentry.FlaskIntegration(),
             LoggingIntegration(event_level="ERROR"),
@@ -618,7 +608,7 @@ def test_logging(sentry_init, capture_events, app):
 
 
 def test_no_errors_without_request(app, sentry_init):
-    sentry_init(data_collection={}, integrations=[flask_sentry.FlaskIntegration()])
+    sentry_init(integrations=[flask_sentry.FlaskIntegration()])
     with app.app_context():
         capture_exception(ValueError())
 
@@ -645,7 +635,7 @@ def test_cli_commands_raise(app):
 def test_wsgi_level_error_is_caught(
     app, capture_exceptions, capture_events, sentry_init
 ):
-    sentry_init(data_collection={}, integrations=[flask_sentry.FlaskIntegration()])
+    sentry_init(integrations=[flask_sentry.FlaskIntegration()])
 
     def wsgi_app(environ, start_response):
         1 / 0
@@ -669,7 +659,7 @@ def test_wsgi_level_error_is_caught(
 
 
 def test_500(sentry_init, app):
-    sentry_init(data_collection={}, integrations=[flask_sentry.FlaskIntegration()])
+    sentry_init(integrations=[flask_sentry.FlaskIntegration()])
 
     app.debug = False
     app.testing = False
@@ -689,7 +679,7 @@ def test_500(sentry_init, app):
 
 
 def test_error_in_errorhandler(sentry_init, capture_events, app):
-    sentry_init(data_collection={}, integrations=[flask_sentry.FlaskIntegration()])
+    sentry_init(integrations=[flask_sentry.FlaskIntegration()])
 
     app.debug = False
     app.testing = False
@@ -719,7 +709,7 @@ def test_error_in_errorhandler(sentry_init, capture_events, app):
 
 
 def test_bad_request_not_captured(sentry_init, capture_events, app):
-    sentry_init(data_collection={}, integrations=[flask_sentry.FlaskIntegration()])
+    sentry_init(integrations=[flask_sentry.FlaskIntegration()])
     events = capture_events()
 
     @app.route("/")
@@ -734,7 +724,7 @@ def test_bad_request_not_captured(sentry_init, capture_events, app):
 
 
 def test_does_not_leak_scope(sentry_init, capture_events, app):
-    sentry_init(data_collection={}, integrations=[flask_sentry.FlaskIntegration()])
+    sentry_init(integrations=[flask_sentry.FlaskIntegration()])
     events = capture_events()
 
     sentry_sdk.get_isolation_scope().set_tag("request_data", False)
@@ -760,7 +750,7 @@ def test_does_not_leak_scope(sentry_init, capture_events, app):
 
 
 def test_scoped_test_client(sentry_init, app):
-    sentry_init(data_collection={}, integrations=[flask_sentry.FlaskIntegration()])
+    sentry_init(integrations=[flask_sentry.FlaskIntegration()])
 
     @app.route("/")
     def index():
@@ -778,7 +768,7 @@ def test_errorhandler_for_exception_swallows_exception(
     # In contrast to error handlers for a status code, error
     # handlers for exceptions can swallow the exception (this is
     # just how the Flask signal works)
-    sentry_init(data_collection={}, integrations=[flask_sentry.FlaskIntegration()])
+    sentry_init(integrations=[flask_sentry.FlaskIntegration()])
     events = capture_events()
 
     @app.route("/")
@@ -802,7 +792,6 @@ def test_tracing_success(
     app,
 ):
     sentry_init(
-        data_collection={},
         traces_sample_rate=1.0,
         integrations=[flask_sentry.FlaskIntegration()],
     )
@@ -845,7 +834,6 @@ def test_tracing_success(
 
 def test_tracing_error(sentry_init, capture_items, app):
     sentry_init(
-        data_collection={},
         traces_sample_rate=1.0,
         integrations=[flask_sentry.FlaskIntegration()],
     )
@@ -881,7 +869,7 @@ def test_tracing_error(sentry_init, capture_items, app):
 
 
 def test_error_has_trace_context_if_tracing_disabled(sentry_init, capture_events, app):
-    sentry_init(data_collection={}, integrations=[flask_sentry.FlaskIntegration()])
+    sentry_init(integrations=[flask_sentry.FlaskIntegration()])
 
     events = capture_events()
 
@@ -900,7 +888,7 @@ def test_error_has_trace_context_if_tracing_disabled(sentry_init, capture_events
 
 
 def test_class_based_views(sentry_init, app, capture_events):
-    sentry_init(data_collection={}, integrations=[flask_sentry.FlaskIntegration()])
+    sentry_init(integrations=[flask_sentry.FlaskIntegration()])
     events = capture_events()
 
     @app.route("/")
@@ -925,7 +913,7 @@ def test_class_based_views(sentry_init, app, capture_events):
     "template_string", ["{{ sentry_trace }}", "{{ sentry_trace_meta }}"]
 )
 def test_template_tracing_meta(sentry_init, app, capture_events, template_string):
-    sentry_init(data_collection={}, integrations=[flask_sentry.FlaskIntegration()])
+    sentry_init(integrations=[flask_sentry.FlaskIntegration()])
     events = capture_events()
 
     @app.route("/")
@@ -954,7 +942,7 @@ def test_template_tracing_meta(sentry_init, app, capture_events, template_string
 
 
 def test_dont_override_sentry_trace_context(sentry_init, app):
-    sentry_init(data_collection={}, integrations=[flask_sentry.FlaskIntegration()])
+    sentry_init(integrations=[flask_sentry.FlaskIntegration()])
 
     @app.route("/")
     def index():
@@ -974,7 +962,6 @@ def test_request_not_modified_by_reference(
             flask_sentry.FlaskIntegration(),
             LoggingIntegration(event_level=logging.ERROR),
         ],
-        data_collection={},
     )
     monkeypatch.setattr(flask_sentry, "flask_login", None)
 
@@ -1009,7 +996,6 @@ def test_request_not_modified_by_reference(
 
 def test_span_origin(sentry_init, app, capture_items):
     sentry_init(
-        data_collection={},
         integrations=[flask_sentry.FlaskIntegration()],
         traces_sample_rate=1.0,
     )
@@ -1036,7 +1022,6 @@ def test_segment_http_method_default(
     By default OPTIONS and HEAD requests do not create a transaction or segment.
     """
     sentry_init(
-        data_collection={},
         traces_sample_rate=1.0,
         integrations=[flask_sentry.FlaskIntegration()],
     )
@@ -1070,7 +1055,6 @@ def test_segment_http_method_custom(
     Configure FlaskIntegration to ONLY capture OPTIONS and HEAD requests.
     """
     sentry_init(
-        data_collection={},
         traces_sample_rate=1.0,
         integrations=[
             flask_sentry.FlaskIntegration(
@@ -1210,7 +1194,6 @@ def test_empty_query_string_is_dropped_with_data_collection(
 ):
     sentry_init(
         integrations=[flask_sentry.FlaskIntegration()],
-        data_collection={},
     )
     events = capture_events()
 

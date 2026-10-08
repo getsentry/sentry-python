@@ -65,7 +65,6 @@ if TYPE_CHECKING:
 
     from sentry_sdk._types import (
         AttributeValue,
-        DataCollection,
         Event,
         ExcInfo,
         Hint,
@@ -477,11 +476,7 @@ def get_lines_from_file(
 ) -> "Tuple[List[Annotated[str]], Optional[Annotated[str]], List[Annotated[str]]]":
     client_options = sentry_sdk.get_client().options
 
-    # This is the default pre-data collection. Should be removed once data collection
-    # is fully released
-    context_lines = 5
-    if has_data_collection_enabled(client_options):
-        context_lines = client_options["data_collection"]["frame_context_lines"]
+    context_lines = client_options["data_collection"]["frame_context_lines"]
 
     source = None
     if loader is not None and hasattr(loader, "get_source"):
@@ -1908,19 +1903,6 @@ def safe_serialize(data: "Any") -> str:
         )
     except Exception:
         return str(data)
-
-
-def has_data_collection_enabled(options: "Optional[dict[str, Any]]") -> bool:
-    if options is None:
-        return False
-
-    data_collection: "Optional[DataCollection]" = options.get("data_collection")
-    # Client options are resolved as part of client initialization, so `data_collection`
-    # being None could be that the user just didn't provide it.
-    # `provided_by_user` is what actually records whether the user actually configured it.
-    return data_collection is not None and data_collection.get(
-        "provided_by_user", False
-    )
 
 
 def get_before_send_log(

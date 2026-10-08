@@ -45,7 +45,7 @@ class ExitingIterable:
 
 
 def test_basic(sentry_init, crashing_app, capture_events):
-    sentry_init(data_collection={})
+    sentry_init()
     app = SentryWsgiMiddleware(crashing_app)
     client = Client(app)
     events = capture_events()
@@ -69,7 +69,7 @@ def test_basic(sentry_init, crashing_app, capture_events):
 def test_script_name_is_respected(
     sentry_init, crashing_app, capture_events, script_name, path_info
 ):
-    sentry_init(data_collection={})
+    sentry_init()
     app = SentryWsgiMiddleware(crashing_app)
     client = Client(app)
     events = capture_events()
@@ -85,7 +85,7 @@ def test_script_name_is_respected(
 
 @pytest.mark.parametrize("zero_code", [0, None])
 def test_systemexit_zero_is_ignored(sentry_init, capture_events, zero_code):
-    sentry_init(data_collection={})
+    sentry_init()
     iterable = ExitingIterable(lambda: SystemExit(zero_code))
     app = SentryWsgiMiddleware(IterableApp(iterable))
     client = Client(app)
@@ -99,7 +99,7 @@ def test_systemexit_zero_is_ignored(sentry_init, capture_events, zero_code):
 
 @pytest.mark.parametrize("nonzero_code", ["", "foo", 1, 2])
 def test_systemexit_nonzero_is_captured(sentry_init, capture_events, nonzero_code):
-    sentry_init(data_collection={})
+    sentry_init()
     iterable = ExitingIterable(lambda: SystemExit(nonzero_code))
     app = SentryWsgiMiddleware(IterableApp(iterable))
     client = Client(app)
@@ -118,7 +118,7 @@ def test_systemexit_nonzero_is_captured(sentry_init, capture_events, nonzero_cod
 
 
 def test_keyboard_interrupt_is_captured(sentry_init, capture_events):
-    sentry_init(data_collection={})
+    sentry_init()
     iterable = ExitingIterable(lambda: KeyboardInterrupt())
     app = SentryWsgiMiddleware(IterableApp(iterable))
     client = Client(app)
@@ -144,7 +144,6 @@ def test_transaction_with_error(
         raise ValueError("Fetch aborted. The ball was not returned.")
 
     sentry_init(
-        data_collection={},
         traces_sample_rate=1.0,
     )
     app = SentryWsgiMiddleware(dogpark)
@@ -244,7 +243,6 @@ def test_has_trace_if_performance_enabled(
         raise ValueError("Fetch aborted. The ball was not returned.")
 
     sentry_init(
-        data_collection={},
         traces_sample_rate=1.0,
     )
     app = SentryWsgiMiddleware(dogpark)
@@ -288,7 +286,7 @@ def test_has_trace_if_performance_disabled(
         capture_message("Attempting to fetch the ball")
         raise ValueError("Fetch aborted. The ball was not returned.")
 
-    sentry_init(data_collection={})
+    sentry_init()
     app = SentryWsgiMiddleware(dogpark)
     client = Client(app)
     events = capture_events()
@@ -314,7 +312,6 @@ def test_trace_from_headers_if_performance_enabled(
         raise ValueError("Fetch aborted. The ball was not returned.")
 
     sentry_init(
-        data_collection={},
         traces_sample_rate=1.0,
     )
     app = SentryWsgiMiddleware(dogpark)
@@ -348,7 +345,7 @@ def test_trace_from_headers_if_performance_disabled(
         capture_message("Attempting to fetch the ball")
         raise ValueError("Fetch aborted. The ball was not returned.")
 
-    sentry_init(data_collection={})
+    sentry_init()
     app = SentryWsgiMiddleware(dogpark)
     client = Client(app)
     events = capture_events()
@@ -383,7 +380,6 @@ def test_traces_sampler_gets_correct_values_in_sampling_context(
 
     traces_sampler = mock.Mock(return_value=True)
     sentry_init(
-        data_collection={},
         traces_sampler=traces_sampler,
     )
     app = SentryWsgiMiddleware(app)
@@ -426,7 +422,6 @@ def test_session_mode_defaults_to_request_mode_in_wsgi_handler(
 
     traces_sampler = mock.Mock(return_value=True)
     sentry_init(
-        data_collection={},
         traces_sampler=traces_sampler,
     )
     app = SentryWsgiMiddleware(app)
@@ -468,7 +463,6 @@ def test_auto_session_tracking_with_aggregates(
 
     traces_sampler = mock.Mock(return_value=True)
     sentry_init(
-        data_collection={},
         traces_sampler=traces_sampler,
     )
     app = SentryWsgiMiddleware(sample_app)
@@ -510,7 +504,6 @@ def test_span_origin_manual(sentry_init, capture_items):
         return ["Go get the ball! Good dog!"]
 
     sentry_init(
-        data_collection={},
         traces_sample_rate=1.0,
     )
     app = SentryWsgiMiddleware(dogpark)
@@ -532,7 +525,6 @@ def test_span_origin_custom(sentry_init, capture_items):
         return ["Go get the ball! Good dog!"]
 
     sentry_init(
-        data_collection={},
         traces_sample_rate=1.0,
     )
     app = SentryWsgiMiddleware(
@@ -563,7 +555,7 @@ def test_span_origin_custom(sentry_init, capture_items):
 def test_file_response_wrapping(
     sentry_init, has_file_wrapper, has_fileno, expect_wrapped
 ):
-    sentry_init(data_collection={})
+    sentry_init()
 
     response_mock = mock.MagicMock()
     if not has_fileno:
@@ -1032,7 +1024,7 @@ def test_is_localhost_attribute(
         start_response("200 OK", [])
         return ["woof"]
 
-    sentry_init(data_collection={}, traces_sample_rate=1.0)
+    sentry_init(traces_sample_rate=1.0)
 
     app = SentryWsgiMiddleware(dogpark)
     client = Client(app)
@@ -1057,7 +1049,6 @@ def test_user_agent_attribute(sentry_init, capture_items):
         return ["woof"]
 
     sentry_init(
-        data_collection={},
         traces_sample_rate=1.0,
     )
 

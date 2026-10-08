@@ -108,7 +108,6 @@ def test_catch_exceptions(
 ):
     sentry_init(
         integrations=[LitestarIntegration()],
-        data_collection={},
     )
     litestar_app = litestar_app_factory()
     client = TestClient(litestar_app)
@@ -155,7 +154,6 @@ def test_segment_name_and_source(
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[LitestarIntegration()],
-        data_collection={},
     )
     litestar_app = litestar_app_factory()
     client = TestClient(litestar_app)
@@ -181,7 +179,6 @@ def test_middleware_spans(
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[LitestarIntegration()],
-        data_collection={},
     )
 
     logging_config = LoggingMiddlewareConfig()
@@ -238,7 +235,6 @@ def test_middleware_callback_spans(
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[LitestarIntegration()],
-        data_collection={},
     )
 
     litestar_app = litestar_app_factory(middleware=[SampleMiddleware])
@@ -319,7 +315,6 @@ def test_middleware_receive_send(
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[LitestarIntegration()],
-        data_collection={},
     )
     litestar_app = litestar_app_factory(middleware=[SampleReceiveSendMiddleware])
 
@@ -355,7 +350,6 @@ def test_middleware_partial_receive_send(
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[LitestarIntegration()],
-        data_collection={},
     )
 
     litestar_app = litestar_app_factory(middleware=[SamplePartialReceiveSendMiddleware])
@@ -425,7 +419,6 @@ def test_span_origin(
     sentry_init(
         integrations=[LitestarIntegration()],
         traces_sample_rate=1.0,
-        data_collection={},
     )
 
     logging_config = LoggingMiddlewareConfig()
@@ -644,7 +637,6 @@ def test_configurable_status_codes_handler(
     )
     sentry_init(
         integrations=[LitestarIntegration(**integration_kwargs)],
-        data_collection={},
     )
 
     @get("/error")
@@ -678,7 +670,6 @@ def test_configurable_status_codes_middleware(
 
     sentry_init(
         integrations=[LitestarIntegration(**integration_kwargs)],
-        data_collection={},
     )
 
     def create_raising_middleware(app):
@@ -707,7 +698,6 @@ def test_catch_non_http_exceptions_in_middleware(
 ):
     sentry_init(
         integrations=[LitestarIntegration()],
-        data_collection={},
     )
 
     def create_raising_middleware(app):

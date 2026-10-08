@@ -52,7 +52,6 @@ async def test_basic(
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
-        data_collection={},
     )
 
     import channels  # type: ignore[import-not-found]
@@ -112,7 +111,6 @@ async def test_async_views(
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
-        data_collection={},
     )
 
     comm = HttpCommunicator(application, "GET", "/async_message")
@@ -171,7 +169,6 @@ async def test_async_views_concurrent_execution(
     settings.MIDDLEWARE = []
     sentry_init(
         integrations=[DjangoIntegration()],
-        data_collection={},
     )
 
     application = make_asgi_application()
@@ -211,7 +208,6 @@ async def test_async_middleware_that_is_function_concurrent_execution(
     ]
     sentry_init(
         integrations=[DjangoIntegration()],
-        data_collection={},
     )
 
     application = make_asgi_application()
@@ -507,7 +503,9 @@ async def test_asgi_request_body(
     body,
     expected_data,
 ):
-    sentry_init(integrations=[DjangoIntegration()], data_collection={})
+    sentry_init(
+        integrations=[DjangoIntegration()],
+    )
 
     comm = HttpCommunicator(
         application,

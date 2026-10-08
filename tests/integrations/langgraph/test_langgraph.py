@@ -802,7 +802,6 @@ def test_langgraph_message_role_mapping(
 def test_graph_bubble_up_ignored(sentry_init, capture_items):
     sentry_init(
         integrations=[LanggraphIntegration()],
-        data_collection={},
     )
 
     events = capture_items("event")

@@ -191,7 +191,6 @@ async def test_capture_transaction(
     capture_items,
 ):
     sentry_init(
-        data_collection={},
         traces_sample_rate=1.0,
     )
     app = SentryAsgiMiddleware(asgi3_app)
@@ -225,7 +224,6 @@ async def test_capture_transaction_with_error(
     capture_items,
 ):
     sentry_init(
-        data_collection={},
         traces_sample_rate=1.0,
     )
 
@@ -403,7 +401,6 @@ async def test_websocket(
     capture_items,
 ):
     sentry_init(
-        data_collection={},
         traces_sample_rate=1.0,
     )
 
@@ -444,7 +441,6 @@ async def test_auto_session_tracking_with_aggregates(
     sentry_init, asgi3_app, capture_envelopes
 ):
     sentry_init(
-        data_collection={},
         traces_sample_rate=1.0,
     )
     app = SentryAsgiMiddleware(asgi3_app)
@@ -490,7 +486,6 @@ async def test_fallback_segment_name_and_source(
     capture_items,
 ):
     sentry_init(
-        data_collection={},
         traces_sample_rate=1.0,
     )
     app = SentryAsgiMiddleware(asgi3_app)

@@ -56,7 +56,6 @@ def test_view_exceptions(
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
-        data_collection={},
     )
     exceptions = capture_exceptions()
     items = capture_items("event")
@@ -85,7 +84,6 @@ def test_ensures_x_forwarded_header_is_honored_in_sdk_when_enabled_in_django(
 
     sentry_init(
         integrations=[DjangoIntegration()],
-        data_collection={},
     )
     exceptions = capture_exceptions()
     items = capture_items("event")
@@ -111,7 +109,6 @@ def test_ensures_x_forwarded_header_is_not_honored_when_unenabled_in_django(
     """
     sentry_init(
         integrations=[DjangoIntegration()],
-        data_collection={},
     )
     exceptions = capture_exceptions()
     items = capture_items("event")
@@ -125,7 +122,9 @@ def test_ensures_x_forwarded_header_is_not_honored_when_unenabled_in_django(
 
 
 def test_middleware_exceptions(sentry_init, client, capture_exceptions):
-    sentry_init(integrations=[DjangoIntegration()], data_collection={})
+    sentry_init(
+        integrations=[DjangoIntegration()],
+    )
     exceptions = capture_exceptions()
     client.get(reverse("middleware_exc"))
 
@@ -140,7 +139,6 @@ def test_request_captured(
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
-        data_collection={},
     )
     items = capture_items("event")
     content, status, headers = unpack_werkzeug_response(client.get(reverse("message")))
@@ -313,7 +311,6 @@ def test_user_captured(
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
-        data_collection={},
     )
     items = capture_items("event")
     content, status, headers = unpack_werkzeug_response(client.get(reverse("mylogin")))
@@ -343,7 +340,6 @@ def test_materialized_user_captured(
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
-        data_collection={},
         traces_sample_rate=1.0,
     )
 
@@ -445,7 +441,9 @@ def test_custom_error_handler_request_context(
 
 
 def test_500(sentry_init, client):
-    sentry_init(integrations=[DjangoIntegration()], data_collection={})
+    sentry_init(
+        integrations=[DjangoIntegration()],
+    )
 
     content, status, headers = unpack_werkzeug_response(client.get("/view-exc"))
     assert status.lower() == "500 internal server error"
@@ -686,7 +684,6 @@ def test_django_connect_trace(
     """
     sentry_init(
         integrations=[DjangoIntegration()],
-        data_collection={},
         traces_sample_rate=1.0,
     )
 
@@ -847,7 +844,6 @@ def test_segment_name(
     sentry_init(
         integrations=[DjangoIntegration()],
         traces_sample_rate=1.0,
-        data_collection={},
     )
     items = capture_items("event", "span")
 
@@ -883,7 +879,6 @@ def test_segment_name_tracing_disabled(
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
-        data_collection={},
     )
     items = capture_items("event")
 
@@ -1217,7 +1212,6 @@ def test_rest_framework_basic(
     pytest.importorskip("rest_framework")
     sentry_init(
         integrations=[DjangoIntegration()],
-        data_collection={},
     )
     exceptions = capture_exceptions()
     items = capture_items("event")

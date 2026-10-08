@@ -488,7 +488,6 @@ def test_streaming_chat_completion(
         integrations=[LiteLLMIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        data_collection={},
     )
 
     messages = [
@@ -558,7 +557,6 @@ async def test_async_streaming_chat_completion(
         integrations=[LiteLLMIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        data_collection={},
     )
 
     messages = [
@@ -1033,7 +1031,6 @@ def test_exception_handling(
         integrations=[LiteLLMIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        data_collection={},
     )
 
     messages = [{"role": "user", "content": "Hello!"}]
@@ -1069,7 +1066,6 @@ async def test_async_exception_handling(
         integrations=[LiteLLMIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        data_collection={},
     )
 
     messages = [{"role": "user", "content": "Hello!"}]
@@ -1106,7 +1102,6 @@ def test_span_origin(
         integrations=[LiteLLMIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        data_collection={},
     )
 
     messages = [{"role": "user", "content": "Hello!"}]
@@ -1162,7 +1157,6 @@ def test_multiple_providers(
         integrations=[LiteLLMIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        data_collection={},
     )
 
     messages = [{"role": "user", "content": "Hello!"}]
@@ -1264,7 +1258,6 @@ async def test_async_multiple_providers(
         integrations=[LiteLLMIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        data_collection={},
     )
 
     messages = [{"role": "user", "content": "Hello!"}]
@@ -1367,7 +1360,6 @@ def test_additional_parameters(
         integrations=[LiteLLMIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        data_collection={},
     )
 
     messages = [{"role": "user", "content": "Hello!"}]
@@ -1438,7 +1430,6 @@ async def test_async_additional_parameters(
         integrations=[LiteLLMIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        data_collection={},
     )
 
     messages = [{"role": "user", "content": "Hello!"}]
@@ -1509,7 +1500,6 @@ def test_no_integration(
     sentry_init(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        data_collection={},
     )
 
     messages = [{"role": "user", "content": "Hello!"}]
@@ -1567,7 +1557,6 @@ async def test_async_no_integration(
     sentry_init(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        data_collection={},
     )
 
     messages = [{"role": "user", "content": "Hello!"}]
@@ -1624,7 +1613,6 @@ def test_response_without_usage(
         integrations=[LiteLLMIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        data_collection={},
     )
 
     messages = [{"role": "user", "content": "Hello!"}]
@@ -1667,7 +1655,6 @@ def test_integration_setup(sentry_init):
         integrations=[LiteLLMIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        data_collection={},
     )
 
     # Check that callbacks are registered

@@ -128,7 +128,6 @@ def test_no_event_if_no_errors_async(sentry_init, capture_events):
             FastApiIntegration(),
             StarletteIntegration(),
         ],
-        data_collection={},
     )
     events = capture_events()
 
@@ -157,7 +156,6 @@ def test_no_event_if_no_errors_sync(sentry_init, capture_events):
             GrapheneIntegration(),
             FlaskIntegration(),
         ],
-        data_collection={},
     )
     events = capture_events()
 
@@ -185,7 +183,6 @@ def test_graphql_span_holds_query_information(sentry_init, capture_items):
         integrations=[GrapheneIntegration(), FlaskIntegration()],
         traces_sample_rate=1.0,
         default_integrations=False,
-        data_collection={},
     )
     items = capture_items("span")
 
@@ -353,7 +350,6 @@ def test_breadcrumbs_hold_query_information_on_error(sentry_init, capture_items)
             GrapheneIntegration(),
         ],
         default_integrations=False,
-        data_collection={},
     )
     items = capture_items("span", "event")
 

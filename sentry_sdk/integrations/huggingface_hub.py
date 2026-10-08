@@ -208,30 +208,31 @@ def _wrap_huggingface_task(f: "Callable[..., Any]", op: str) -> "Callable[..., A
                             text_response,
                         )
 
-            if usage is not None and usage.prompt_tokens is not None:
-                span.set_attribute(
-                    SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, usage.prompt_tokens
-                )
+            if usage is not None:
+                if usage is not None and usage.prompt_tokens is not None:
+                    span.set_attribute(
+                        SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, usage.prompt_tokens
+                    )
 
-            if usage is not None and usage.completion_tokens is not None:
-                span.set_attribute(
-                    SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS, usage.completion_tokens
-                )
+                if usage is not None and usage.completion_tokens is not None:
+                    span.set_attribute(
+                        SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS, usage.completion_tokens
+                    )
 
-            if usage is not None and usage.total_tokens is not None:
-                span.set_attribute(
-                    SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, usage.total_tokens
-                )
+                if usage is not None and usage.total_tokens is not None:
+                    span.set_attribute(
+                        SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, usage.total_tokens
+                    )
 
-            elif (
-                usage is not None
-                and usage.prompt_tokens is not None
-                and usage.completion_tokens is not None
-            ):
-                span.set_attribute(
-                    SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS,
-                    usage.prompt_tokens + usage.completion_tokens,
-                )
+                elif (
+                    usage is not None
+                    and usage.prompt_tokens is not None
+                    and usage.completion_tokens is not None
+                ):
+                    span.set_attribute(
+                        SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS,
+                        usage.prompt_tokens + usage.completion_tokens,
+                    )
             elif tokens_used > 0:
                 span.set_attribute(
                     SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS,

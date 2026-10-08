@@ -79,8 +79,7 @@ def test_cache_basic(sentry_init, capture_items):
     assert payloads[3]["attributes"][SPANDATA.DB_OPERATION_NAME] == "SET"
     assert payloads[4]["attributes"]["sentry.op"] == "cache.put"
     assert (
-        payloads[4]["attributes"][SPANDATA.DB_QUERY_TEXT]
-        == "SET 'mycachekey1' [Filtered]"
+        payloads[4]["attributes"][SPANDATA.DB_QUERY_TEXT] == "SET 'mycachekey1' 'bla'"
     )
 
     # setex: db then cache.put
@@ -89,7 +88,7 @@ def test_cache_basic(sentry_init, capture_items):
     assert payloads[6]["attributes"]["sentry.op"] == "cache.put"
     assert (
         payloads[6]["attributes"][SPANDATA.DB_QUERY_TEXT]
-        == "SETEX 'mycachekey2' [Filtered] [Filtered]"
+        == "SETEX 'mycachekey2' 10 'blub'"
     )
 
     # mget: db then cache.get
@@ -98,7 +97,7 @@ def test_cache_basic(sentry_init, capture_items):
     assert payloads[8]["attributes"]["sentry.op"] == "cache.get"
     assert (
         payloads[8]["attributes"][SPANDATA.DB_QUERY_TEXT]
-        == "MGET 'mycachekey1' [Filtered]"
+        == "MGET 'mycachekey1' 'mycachekey2'"
     )
 
     assert payloads[9]["name"] == "custom parent"

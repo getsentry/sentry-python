@@ -377,7 +377,6 @@ def test_bad_chat(sentry_init, capture_items):
     sentry_init(
         integrations=[CohereIntegration()],
         traces_sample_rate=1.0,
-        data_collection={},
     )
 
     items = capture_items("event", "span")
@@ -401,7 +400,6 @@ def test_span_status_error(sentry_init, capture_items):
     sentry_init(
         integrations=[CohereIntegration()],
         traces_sample_rate=1.0,
-        data_collection={},
     )
     items = capture_items("span")
 
@@ -423,7 +421,6 @@ def test_span_origin_chat(sentry_init, capture_items):
     sentry_init(
         integrations=[CohereIntegration()],
         traces_sample_rate=1.0,
-        data_collection={},
     )
 
     items = capture_items("span")
@@ -459,7 +456,6 @@ def test_span_origin_embed(sentry_init, capture_items):
     sentry_init(
         integrations=[CohereIntegration()],
         traces_sample_rate=1.0,
-        data_collection={},
     )
 
     items = capture_items("span")

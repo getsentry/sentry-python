@@ -858,7 +858,6 @@ async def test_client_span_custom_model(
             integrations=[OpenAIAgentsIntegration()],
             disabled_integrations=[StdlibIntegration],
             traces_sample_rate=1.0,
-            data_collection={},
         )
 
         items = capture_items("span")
@@ -1854,7 +1853,6 @@ async def test_hosted_mcp_tool_propagation_header_streamed(
         integrations=[OpenAIAgentsIntegration()],
         traces_sample_rate=1.0,
         release="d08ebdb9309e1b004c6f52202de58a09c2268e42",
-        data_collection={},
     )
 
     request_headers = {"X-Stainless-Raw-Response": "stream"}
@@ -2022,7 +2020,6 @@ async def test_hosted_mcp_tool_propagation_headers(
         integrations=[OpenAIAgentsIntegration()],
         traces_sample_rate=1.0,
         release="d08ebdb9309e1b004c6f52202de58a09c2268e42",
-        data_collection={},
     )
 
     response = get_model_response(EXAMPLE_RESPONSE, serialize_pydantic=True)
@@ -2179,7 +2176,6 @@ async def test_run_error_handling(
             ],
             disabled_integrations=[StdlibIntegration],
             traces_sample_rate=1.0,
-            data_collection={},
         )
 
         items = capture_items("event", "span")
@@ -2231,7 +2227,6 @@ async def test_run_streamed_error_handling(
             ],
             disabled_integrations=[StdlibIntegration],
             traces_sample_rate=1.0,
-            data_collection={},
         )
 
         items = capture_items("event", "span")
@@ -2348,7 +2343,6 @@ async def test_span_status_error(
             ],
             disabled_integrations=[StdlibIntegration],
             traces_sample_rate=1.0,
-            data_collection={},
         )
 
         items = capture_items("event", "span")
@@ -2687,7 +2681,6 @@ async def test_ai_client_span_response_model_with_chat_completions(
             integrations=[OpenAIAgentsIntegration()],
             disabled_integrations=[StdlibIntegration],
             traces_sample_rate=1.0,
-            data_collection={},
         )
 
         items = capture_items("span")
@@ -3025,7 +3018,6 @@ async def test_streaming_ttft_on_chat_span(
     sentry_init(
         integrations=[OpenAIAgentsIntegration()],
         traces_sample_rate=1.0,
-        data_collection={},
     )
 
     request_headers = {"X-Stainless-Raw-Response": "stream"}
@@ -3183,7 +3175,6 @@ async def test_conversation_id_on_all_spans(
             integrations=[OpenAIAgentsIntegration()],
             disabled_integrations=[StdlibIntegration],
             traces_sample_rate=1.0,
-            data_collection={},
         )
 
         items = capture_items("span")
@@ -3317,7 +3308,6 @@ async def test_conversation_id_on_tool_span(
             integrations=[OpenAIAgentsIntegration()],
             disabled_integrations=[StdlibIntegration],
             traces_sample_rate=1.0,
-            data_collection={},
         )
 
         items = capture_items("span")

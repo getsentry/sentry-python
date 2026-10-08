@@ -613,7 +613,7 @@ def test_request_attributes(run_cloud_function):
         + FUNCTIONS_PRELUDE
         + dedent(
             """
-        init_sdk(traces_sample_rate=1.0, data_collection={})
+        init_sdk(traces_sample_rate=1.0)
         gcp_functions.worker_v1.FunctionHandler.invoke_user_function(functionhandler, event)
         """
         )

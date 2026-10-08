@@ -311,7 +311,6 @@ def _wrap_embed(f: "Callable[..., Any]") -> "Callable[..., Any]":
                         SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS,
                         res.meta.billed_units.input_tokens,
                     )
-
             return res
 
     return new_embed
