@@ -58,7 +58,10 @@ class _S3Extension(_ServiceExtension):
 
         if "Delete" in ctx.params:
             attributes[SPANDATA.AWS_S3_DELETE] = json.dumps(
-                ctx.params["Delete"], separators=(",", ":"), sort_keys=True
+                ctx.params["Delete"],
+                default=str,
+                separators=(",", ":"),
+                sort_keys=True,
             )
 
         if (
