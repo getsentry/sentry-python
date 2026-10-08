@@ -6,6 +6,7 @@ from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.boto3._services.base import _ServiceExtension
 from sentry_sdk.integrations.boto3._utils import (
     _extract_attributes,
+    _get_aws_arn_attributes,
 )
 from sentry_sdk.utils import capture_internal_exceptions
 
@@ -37,6 +38,12 @@ class _S3Extension(_ServiceExtension):
 
     def get_request_attributes(self, ctx: "AwsCallContext") -> "Attributes":
         attributes: "Attributes" = _extract_attributes(ctx.params, _REQUEST_ATTRIBUTES)
+        with capture_internal_exceptions():
+            attributes.update(
+                _get_aws_arn_attributes(
+                    (ctx.params.get("Bucket"),), ("s3", "s3-outposts")
+                )
+            )
 
         if "CopySource" in ctx.params:
             with capture_internal_exceptions():
