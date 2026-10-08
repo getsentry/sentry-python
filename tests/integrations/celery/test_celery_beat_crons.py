@@ -15,7 +15,6 @@ from sentry_sdk.integrations.celery.beat import (
     crons_task_retry,
     crons_task_success,
 )
-from sentry_sdk.integrations.celery.utils import _get_humanized_interval
 
 
 def test_get_headers():
@@ -50,25 +49,6 @@ def test_get_headers():
     )
 
     assert _get_headers(fake_task) == {"bla": "blub", "tri": "blub", "bar": "baz"}
-
-
-@pytest.mark.parametrize(
-    "seconds, expected_tuple",
-    [
-        (0, (0, "second")),
-        (1, (1, "second")),
-        (0.00001, (0, "second")),
-        (59, (59, "second")),
-        (60, (1, "minute")),
-        (100, (1, "minute")),
-        (1000, (16, "minute")),
-        (10000, (2, "hour")),
-        (100000, (1, "day")),
-        (100000000, (1157, "day")),
-    ],
-)
-def test_get_humanized_interval(seconds, expected_tuple):
-    assert _get_humanized_interval(seconds) == expected_tuple
 
 
 def test_crons_task_success():
@@ -337,6 +317,61 @@ def test_get_monitor_config_minutes():
         },
         "timezone": "UTC",  # default timezone from celery integration
     }
+
+
+@pytest.mark.parametrize(
+    "run_every, value, unit",
+    [
+        (datetime.timedelta(minutes=90), 90, "minute"),
+        (datetime.timedelta(hours=2), 2, "hour"),
+        (datetime.timedelta(hours=36), 36, "hour"),
+        (datetime.timedelta(days=1), 1, "day"),
+    ],
+)
+def test_get_monitor_config_interval_not_rounded(run_every, value, unit):
+    app = MagicMock()
+    app.timezone = "Europe/Vienna"
+
+    celery_schedule = schedule(run_every=run_every)
+
+    monitor_config = _get_monitor_config(celery_schedule, app, "foo")
+    assert monitor_config["schedule"] == {
+        "type": "interval",
+        "value": value,
+        "unit": unit,
+    }
+
+
+def test_get_monitor_config_sub_minute_interval():
+    app = MagicMock()
+    app.timezone = "Europe/Vienna"
+
+    celery_schedule = schedule(run_every=datetime.timedelta(seconds=30))
+
+    with mock.patch("sentry_sdk.integrations.logger.warning") as mock_logger_warning:
+        monitor_config = _get_monitor_config(celery_schedule, app, "foo")
+        mock_logger_warning.assert_called_with(
+            "Intervals shorter than one minute are not supported by Sentry Crons. Monitor '%s' has an interval of %s seconds. Use the `exclude_beat_tasks` option in the celery integration to exclude it.",
+            "foo",
+            30,
+        )
+        assert monitor_config == {}
+
+
+def test_get_monitor_config_interval_not_whole_minutes():
+    app = MagicMock()
+    app.timezone = "Europe/Vienna"
+
+    celery_schedule = schedule(run_every=datetime.timedelta(seconds=90))
+
+    with mock.patch("sentry_sdk.integrations.logger.warning") as mock_logger_warning:
+        monitor_config = _get_monitor_config(celery_schedule, app, "foo")
+        mock_logger_warning.assert_called_with(
+            "Sentry Crons only supports intervals of whole minutes. Monitor '%s' has an interval of %s seconds. Use the `exclude_beat_tasks` option in the celery integration to exclude it.",
+            "foo",
+            90,
+        )
+        assert monitor_config == {}
 
 
 def test_get_monitor_config_unknown():
