@@ -145,6 +145,7 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 - The `enable_logs` option was removed. Using Sentry's logging API now works without requiring setting `enable_logs=True`.
 - The `enable_metrics` option was removed.
 - The deprecated `@ai_track` decorator was removed.
+- The deprecated `record_token_usage` function was removed.
 - The deprecated `push_scope` and `configure_scope` APIs have been removed. Use `with new_scope():` to push a new scope and `scope = get_current_scope()` to retrieve the current scope instead.
 - The experimental `max_spans` option was removed.
 - The experimental `before_send_log` option was removed. Use the top-level `before_send_log` instead.
