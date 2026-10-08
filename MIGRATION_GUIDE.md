@@ -170,6 +170,8 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 ### Integrations
 
 - Removed the `transaction_style` option from server integrations (`DjangoIntegration`, `StarletteIntegration`, `FastApiIntegration`, `AioHttpIntegration`, `FlaskIntegration`, `PyramidIntegration`, `QuartIntegration`, `BottleIntegration`, `FalconIntegration`, `StarliteIntegration` and `LitestarIntegration`).
+- Removed the `include_prompts` option from GenAI integrations (`AnthropicIntegration`, `CohereIntegration`, `GoogleGenAIIntegration`, `HuggingfaceHubIntegration`, `LangchainIntegration`, `LanggraphIntegration`, `LiteLLMIntegration`, `MCPIntegration`, `OpenAIIntegration` and `PydanticAIIntegration`)
+- Removed the `LangchainIntegration`'s `max_spans` option.
 - Removed the `RedisIntegration`'s `max_data_size` option.
 - Removed the possibility to supply a specific client to the `LaunchDarklyIntegration`.
 - The `SentrySpanProcessor`, `SentryPropagator`, `instrumenter`, and associated OpenTelemetry compatibility code was removed along with the `opentelemetry` extra and the `SentryPropagator` entrypoint. Use the `OTLPIntegration` instead.
