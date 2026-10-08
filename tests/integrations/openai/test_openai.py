@@ -2836,7 +2836,7 @@ def test_ai_client_span_responses_api_no_sensitive_data(
 
     assert len(spans) == 1
     expected_attributes = {
-        "gen_ai.operation.name": "responses",
+        "gen_ai.operation.name": "chat",
         "gen_ai.request.max_tokens": 100,
         "gen_ai.request.temperature": 0.7,
         "gen_ai.request.top_p": 0.9,
@@ -3118,7 +3118,7 @@ def test_ai_client_span_responses_api(
     assert len(spans) == 1
 
     expected_data = {
-        "gen_ai.operation.name": "responses",
+        "gen_ai.operation.name": "chat",
         "gen_ai.request.max_tokens": 100,
         "gen_ai.request.temperature": 0.7,
         "gen_ai.request.top_p": 0.9,
@@ -3460,7 +3460,7 @@ async def test_ai_client_span_responses_async_api(
     assert len(spans) == 1
 
     expected_data = {
-        "gen_ai.operation.name": "responses",
+        "gen_ai.operation.name": "chat",
         "gen_ai.request.max_tokens": 100,
         "gen_ai.request.temperature": 0.7,
         "gen_ai.request.top_p": 0.9,
@@ -3692,7 +3692,7 @@ async def test_ai_client_span_streaming_responses_async_api(
     assert len(spans) == 1
 
     expected_data = {
-        "gen_ai.operation.name": "responses",
+        "gen_ai.operation.name": "chat",
         "gen_ai.request.max_tokens": 100,
         "gen_ai.request.messages": safe_serialize(expected_request_messages),
         "gen_ai.request.temperature": 0.7,
