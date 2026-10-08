@@ -149,24 +149,24 @@ class Batcher(Generic[T]):
         finally:
             self._active.flag = was_active
 
-    def _add_to_envelope(self, envelope: "Envelope") -> None:
-        envelope.add_item(
-            Item(
-                type=self.TYPE,
-                content_type=self.CONTENT_TYPE,
-                headers={
-                    "item_count": len(self._buffer),
-                },
-                payload=PayloadRef(
-                    json={
-                        "version": 2,
-                        "items": [
-                            self._to_transport_format(item) for item in self._buffer
-                        ],
-                    }
-                ),
-            )
+    @classmethod
+    def _to_envelope_item(cls, items: "list[T]") -> "Item":
+        return Item(
+            type=cls.TYPE,
+            content_type=cls.CONTENT_TYPE,
+            headers={
+                "item_count": len(items),
+            },
+            payload=PayloadRef(
+                json={
+                    "version": 2,
+                    "items": [cls._to_transport_format(item) for item in items],
+                }
+            ),
         )
+
+    def _add_to_envelope(self, envelope: "Envelope") -> None:
+        envelope.add_item(self._to_envelope_item(self._buffer))
 
     def _flush(self) -> "Optional[Envelope]":
         envelope = Envelope(

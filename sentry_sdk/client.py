@@ -1268,6 +1268,27 @@ class _Client(BaseClient):
 
         return return_value
 
+    def _record_lost_telemetry(
+        self, reason: str, ty: str, telemetry: "Union[Log, Metric]"
+    ) -> None:
+        if self.transport is None:
+            return
+
+        batcher_cls: "Union[type[LogBatcher], type[MetricsBatcher]]"
+        if ty == "log":
+            data_category: "EventDataCategory" = "log_item"
+            batcher_cls = LogBatcher
+        else:
+            data_category = "trace_metric"
+            batcher_cls = MetricsBatcher
+
+        # Construct envelope item without sending it to report lost bytes
+        item = None
+        with capture_internal_exceptions():
+            item = batcher_cls._to_envelope_item([telemetry])  # type: ignore[list-item]
+
+        self.transport.record_lost_event(reason, data_category=data_category, item=item)
+
     def _capture_telemetry(
         self,
         telemetry: "Optional[Union[Log, Metric, StreamedSpan]]",
@@ -1308,32 +1329,12 @@ class _Client(BaseClient):
                     exception_raised_in_before_send_func = True
                     raise
 
-            if ty == "log":
+            if ty in ("log", "metric"):
                 if exception_raised_in_before_send_func:
-                    if self.transport:
-                        self.transport.record_lost_event(
-                            "callback_error", data_category="log_item"
-                        )
+                    self._record_lost_telemetry("callback_error", ty, telemetry)  # type: ignore[arg-type]
                     return
                 if serialized is None:
-                    if self.transport:
-                        self.transport.record_lost_event(
-                            "before_send", data_category="log_item"
-                        )
-                    return
-
-            elif ty == "metric":
-                if exception_raised_in_before_send_func:
-                    if self.transport:
-                        self.transport.record_lost_event(
-                            "callback_error", data_category="trace_metric"
-                        )
-                    return
-                if serialized is None:
-                    if self.transport:
-                        self.transport.record_lost_event(
-                            "before_send", data_category="trace_metric"
-                        )
+                    self._record_lost_telemetry("before_send", ty, telemetry)  # type: ignore[arg-type]
                     return
 
             elif ty == "span" and isinstance(telemetry, StreamedSpan):

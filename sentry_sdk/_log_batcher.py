@@ -1,7 +1,6 @@
 from typing import TYPE_CHECKING
 
 from sentry_sdk._batcher import Batcher
-from sentry_sdk.envelope import Item, PayloadRef
 from sentry_sdk.utils import serialize_attribute
 
 if TYPE_CHECKING:
@@ -44,23 +43,9 @@ class LogBatcher(Batcher["Log"]):
 
     def _record_lost(self, item: "Log") -> None:
         # Construct log envelope item without sending it to report lost bytes
-        log_item = Item(
-            type=self.TYPE,
-            content_type=self.CONTENT_TYPE,
-            headers={
-                "item_count": 1,
-            },
-            payload=PayloadRef(
-                json={
-                    "version": 2,
-                    "items": [self._to_transport_format(item)],
-                }
-            ),
-        )
-
         self._record_lost_func(
             reason="queue_overflow",
             data_category="log_item",
-            item=log_item,
+            item=self._to_envelope_item([item]),
             quantity=1,
         )
