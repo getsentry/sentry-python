@@ -356,7 +356,7 @@ def _set_responses_api_input_data(
     kwargs: "dict[str, Any]",
     integration: "OpenAIIntegration",
 ) -> None:
-    set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "responses")
+    set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "chat")
 
     model = kwargs.get("model")
     if model is not None:
