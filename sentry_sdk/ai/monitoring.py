@@ -1,6 +1,7 @@
 from typing import TYPE_CHECKING
 
 from sentry_sdk.consts import SPANDATA
+from sentry_sdk.utils import deprecation_warning
 
 if TYPE_CHECKING:
     from typing import Any, Awaitable, Callable, Optional, TypeVar, Union
@@ -19,6 +20,11 @@ def record_token_usage(
     output_tokens_reasoning: "Optional[int]" = None,
     total_tokens: "Optional[int]" = None,
 ) -> None:
+    deprecation_warning(
+        "record_token_usage() is deprecated and will be removed in version 3.0 of sentry-sdk. "
+        "Use the manual span API instead, e.g. span.set_attribute() (in streaming mode) or span.set_data().",
+    )
+
     if input_tokens is not None:
         span.set_attribute(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, input_tokens)
 
