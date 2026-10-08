@@ -148,7 +148,7 @@ def test_copy_source(s3_client, capture_items, method, copy_source, expected):
                 ]
             },
             ("Delete.Objects.LastModifiedTime",),
-            '{"Objects":[{"ETag":"etag","Key":"file.txt","LastModifiedTime":"2026-10-08 12:34:56+00:00","Size":123,"VersionId":"version-1"}]}',
+            '{"Objects":[{"ETag":"etag","Key":"file.txt","LastModifiedTime":"2026-10-08T12:34:56+00:00","Size":123,"VersionId":"version-1"}]}',
             id="last-modified-time",
         ),
     ],
