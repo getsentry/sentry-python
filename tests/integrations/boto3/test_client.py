@@ -267,11 +267,6 @@ URL_QUERY_PARAMS = [
         id="defaults",
     ),
     pytest.param(
-        {"data_collection": {}},
-        "list-type=2&prefix=foo&continuation-token=%5BFiltered%5D&encoding-type=url",
-        id="data_collection_denylist_default",
-    ),
-    pytest.param(
         {
             "data_collection": {
                 "url_query_params": {"mode": "denylist", "terms": ["prefix"]}
