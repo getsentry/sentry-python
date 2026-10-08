@@ -1,4 +1,5 @@
 import json
+from datetime import datetime
 from typing import TYPE_CHECKING
 
 from sentry_sdk.consts import SPANDATA
@@ -6,6 +7,7 @@ from sentry_sdk.integrations.boto3._services.base import _ServiceExtension
 from sentry_sdk.integrations.boto3._utils import (
     _extract_attributes,
 )
+from sentry_sdk.utils import capture_internal_exceptions
 
 if TYPE_CHECKING:
     from typing import Any, Sequence
@@ -37,16 +39,17 @@ class _S3Extension(_ServiceExtension):
         attributes: "Attributes" = _extract_attributes(ctx.params, _REQUEST_ATTRIBUTES)
 
         if "CopySource" in ctx.params:
-            # boto3 accepts either "bucket/key" or a dict {"bucket": ..., "Key": ..., "VersionId": ...} for `CopySource`.
-            # https://docs.aws.amazon.com/boto3/latest/reference/services/s3/client/upload_part_copy.html
-            copy_source = ctx.params["CopySource"]
-            if isinstance(copy_source, str):
-                attributes[SPANDATA.AWS_S3_COPY_SOURCE] = copy_source
-            else:
-                value = f"{copy_source['Bucket']}/{copy_source['Key']}"
-                if "VersionId" in copy_source:
-                    value += f"?versionId={copy_source['VersionId']}"
-                attributes[SPANDATA.AWS_S3_COPY_SOURCE] = value
+            with capture_internal_exceptions():
+                # boto3 accepts either "bucket/key" or a dict {"bucket": ..., "Key": ..., "VersionId": ...} for `CopySource`.
+                # https://docs.aws.amazon.com/boto3/latest/reference/services/s3/client/upload_part_copy.html
+                copy_source = ctx.params["CopySource"]
+                if isinstance(copy_source, str):
+                    attributes[SPANDATA.AWS_S3_COPY_SOURCE] = copy_source
+                else:
+                    value = f"{copy_source['Bucket']}/{copy_source['Key']}"
+                    if "VersionId" in copy_source:
+                        value += f"?versionId={copy_source['VersionId']}"
+                    attributes[SPANDATA.AWS_S3_COPY_SOURCE] = value
 
         # OTel defines `PartNumber` for `UploadPart` and `UploadPartCopy` only.
         # https://opentelemetry.io/docs/specs/semconv/object-stores/s3/#attributes
@@ -57,12 +60,15 @@ class _S3Extension(_ServiceExtension):
             attributes[SPANDATA.AWS_S3_PART_NUMBER] = ctx.params["PartNumber"]
 
         if "Delete" in ctx.params:
-            attributes[SPANDATA.AWS_S3_DELETE] = json.dumps(
-                ctx.params["Delete"],
-                default=str,
-                separators=(",", ":"),
-                sort_keys=True,
-            )
+            with capture_internal_exceptions():
+                attributes[SPANDATA.AWS_S3_DELETE] = json.dumps(
+                    ctx.params["Delete"],
+                    default=lambda value: (
+                        value.isoformat() if isinstance(value, datetime) else str(value)
+                    ),
+                    separators=(",", ":"),
+                    sort_keys=True,
+                )
 
         if (
             ctx.operation_name == "CompleteMultipartUpload"
