@@ -3,7 +3,6 @@ from functools import wraps
 from typing import TYPE_CHECKING
 
 from sentry_sdk import consts
-from sentry_sdk.ai.monitoring import record_token_usage
 from sentry_sdk.ai.utils import get_start_span_function, set_data_normalized
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.traces import StreamedSpan
@@ -134,18 +133,52 @@ def _wrap_chat(f: "Callable[..., Any]", streaming: bool) -> "Callable[..., Any]"
                 set_data_normalized(span, "ai." + attr, getattr(res, attr))
 
         if hasattr(res, "meta"):
+            set_on_span = (
+                span.set_attribute if isinstance(span, StreamedSpan) else span.set_data
+            )
+
             if hasattr(res.meta, "billed_units"):
-                record_token_usage(
-                    span,
-                    input_tokens=res.meta.billed_units.input_tokens,
-                    output_tokens=res.meta.billed_units.output_tokens,
-                )
+                if res.meta.billed_units.input_tokens is not None:
+                    set_on_span(
+                        SPANDATA.GEN_AI_USAGE_INPUT_TOKENS,
+                        res.meta.billed_units.input_tokens,
+                    )
+
+                if res.meta.billed_units.output_tokens is not None:
+                    set_on_span(
+                        SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS,
+                        res.meta.billed_units.output_tokens,
+                    )
+
+                if (
+                    res.meta.billed_units.input_tokens is not None
+                    and res.meta.billed_units.output_tokens is not None
+                ):
+                    set_on_span(
+                        SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS,
+                        res.meta.billed_units.input_tokens
+                        + res.meta.billed_units.output_tokens,
+                    )
             elif hasattr(res.meta, "tokens"):
-                record_token_usage(
-                    span,
-                    input_tokens=res.meta.tokens.input_tokens,
-                    output_tokens=res.meta.tokens.output_tokens,
-                )
+                if res.meta.tokens.input_tokens is not None:
+                    set_on_span(
+                        SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, res.meta.tokens.input_tokens
+                    )
+
+                if res.meta.tokens.output_tokens is not None:
+                    set_on_span(
+                        SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS,
+                        res.meta.tokens.output_tokens,
+                    )
+
+                if (
+                    res.meta.tokens.input_tokens is not None
+                    and res.meta.tokens.output_tokens is not None
+                ):
+                    set_on_span(
+                        SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS,
+                        res.meta.tokens.input_tokens + res.meta.tokens.output_tokens,
+                    )
 
             if hasattr(res.meta, "warnings"):
                 set_data_normalized(span, SPANDATA.AI_WARNINGS, res.meta.warnings)
@@ -268,12 +301,16 @@ def _wrap_embed(f: "Callable[..., Any]") -> "Callable[..., Any]":
                     "sentry.origin": CohereIntegration.origin,
                 },
             )
+
+            set_on_span = span_ctx.set_attribute
         else:
             span_ctx = get_start_span_function()(
                 op=consts.OP.COHERE_EMBEDDINGS_CREATE,
                 name="Cohere Embedding Creation",
                 origin=CohereIntegration.origin,
             )
+
+            set_on_span = span_ctx.set_data
 
         with span_ctx as span:
             if "texts" in kwargs and _should_record(integration, "inputs"):
@@ -302,11 +339,16 @@ def _wrap_embed(f: "Callable[..., Any]") -> "Callable[..., Any]":
                 and hasattr(res.meta, "billed_units")
                 and hasattr(res.meta.billed_units, "input_tokens")
             ):
-                record_token_usage(
-                    span,
-                    input_tokens=res.meta.billed_units.input_tokens,
-                    total_tokens=res.meta.billed_units.input_tokens,
-                )
+                if res.meta.billed_units.input_tokens is not None:
+                    set_on_span(
+                        SPANDATA.GEN_AI_USAGE_INPUT_TOKENS,
+                        res.meta.billed_units.input_tokens,
+                    )
+
+                    set_on_span(
+                        SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS,
+                        res.meta.billed_units.input_tokens,
+                    )
             return res
 
     return new_embed
