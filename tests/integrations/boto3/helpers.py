@@ -67,7 +67,17 @@ def require_botocore_model_fields(
     input_fields=(),
     output_fields=(),
 ):
-    """Botocore models differ across versions. Skip tests if model is missing required fields."""
+    """Skip tests when botocore lacks required fields, including nested paths."""
+
+    def has_field(shape, field):
+        for part in field.split("."):
+            while shape is not None and shape.type_name == "list":
+                shape = shape.member
+            if shape is None or part not in getattr(shape, "members", {}):
+                return False
+            shape = shape.members[part]
+        return True
+
     operation_name = client.meta.method_to_api_mapping.get(method)
     if operation_name is None:
         pytest.skip("%s is absent from this botocore model; skipping test" % method)
@@ -77,7 +87,7 @@ def require_botocore_model_fields(
         (model.output_shape, output_fields),
     ):
         for field in fields:
-            if shape is None or field not in shape.members:
+            if not has_field(shape, field):
                 pytest.skip(
                     "%s.%s is absent from this botocore model; skipping test"
                     % (method, field)
