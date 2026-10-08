@@ -45,8 +45,9 @@ def _stubbed_span(client, capture_items, method, params, response):
 
 
 def test_request_attributes(s3_client, capture_items):
+    bucket_arn = "arn:aws:s3:eu-north-1:123456789012:accesspoint/orders"
     params = {
-        "Bucket": "bucket",
+        "Bucket": bucket_arn,
         "Key": "file.txt",
         "UploadId": "upload-id",
         "PartNumber": 1,
@@ -57,7 +58,9 @@ def test_request_attributes(s3_client, capture_items):
     span = _stubbed_span(s3_client, capture_items, "upload_part", params, {})
 
     attributes = span.get("attributes", {})
-    assert attributes[SPANDATA.AWS_S3_BUCKET] == "bucket"
+    assert attributes[SPANDATA.CLOUD_ACCOUNT_ID] == "123456789012"
+    assert attributes[SPANDATA.CLOUD_RESOURCE_ID] == bucket_arn
+    assert attributes[SPANDATA.AWS_S3_BUCKET] == bucket_arn
     assert attributes[SPANDATA.AWS_S3_KEY] == "file.txt"
     assert attributes[SPANDATA.AWS_S3_UPLOAD_ID] == "upload-id"
     assert attributes[SPANDATA.AWS_S3_PART_NUMBER] == 1
