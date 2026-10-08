@@ -1,5 +1,6 @@
 import json
 from copy import deepcopy
+from datetime import datetime, timezone
 
 import pytest
 from botocore.stub import Stubber
@@ -123,8 +124,44 @@ def test_copy_source(s3_client, capture_items, method, copy_source, expected):
     assert source == copy_source
 
 
-def test_delete_serialization(s3_client, capture_items):
-    delete = {"Quiet": True, "Objects": [{"VersionId": "version-1", "Key": "file.txt"}]}
+@pytest.mark.parametrize(
+    "delete, input_fields, expected_serialized_delete",
+    [
+        pytest.param(
+            {"Quiet": True, "Objects": [{"VersionId": "version-1", "Key": "file.txt"}]},
+            (),
+            '{"Objects":[{"Key":"file.txt","VersionId":"version-1"}],"Quiet":true}',
+            id="basic",
+        ),
+        pytest.param(
+            {
+                "Objects": [
+                    {
+                        "Key": "file.txt",
+                        "VersionId": "version-1",
+                        "ETag": "etag",
+                        "LastModifiedTime": datetime(
+                            2026, 10, 8, 12, 34, 56, tzinfo=timezone.utc
+                        ),
+                        "Size": 123,
+                    }
+                ]
+            },
+            ("Delete.Objects.LastModifiedTime",),
+            '{"Objects":[{"ETag":"etag","Key":"file.txt","LastModifiedTime":"2026-10-08 12:34:56+00:00","Size":123,"VersionId":"version-1"}]}',
+            id="last-modified-time",
+        ),
+    ],
+)
+def test_delete_serialization(
+    s3_client, capture_items, delete, input_fields, expected_serialized_delete
+):
+    require_botocore_model_fields(
+        s3_client,
+        "delete_objects",
+        input_fields=input_fields,
+    )
+
     params = {"Bucket": "bucket", "Delete": deepcopy(delete)}
     original = deepcopy(params)
     caller_delete = params["Delete"]
@@ -134,9 +171,7 @@ def test_delete_serialization(s3_client, capture_items):
 
     attributes = span.get("attributes", {})
     assert attributes[SPANDATA.AWS_S3_BUCKET] == "bucket"
-    assert attributes[SPANDATA.AWS_S3_DELETE] == (
-        '{"Objects":[{"Key":"file.txt","VersionId":"version-1"}],"Quiet":true}'
-    )
+    assert attributes[SPANDATA.AWS_S3_DELETE] == expected_serialized_delete
     assert SPANDATA.AWS_S3_KEY not in attributes
     assert SPANDATA.AWS_S3_UPLOAD_ID not in attributes
     assert SPANDATA.AWS_S3_COPY_SOURCE not in attributes
