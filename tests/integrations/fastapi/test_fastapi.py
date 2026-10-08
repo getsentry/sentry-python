@@ -12,12 +12,14 @@ import starlette
 from fastapi import (
     APIRouter,
     Body,
+    Depends,
     FastAPI,
     File,
     Form,
     HTTPException,
     Request,
     UploadFile,
+    WebSocket,
 )
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.testclient import TestClient
@@ -605,6 +607,147 @@ def test_active_thread_id(sentry_init, capture_envelopes, teardown_profiling, en
         transaction = item.payload.json
         trace_context = transaction["contexts"]["trace"]
         assert str(data["active"]) == trace_context["data"]["thread.id"]
+
+
+def test_active_thread_id_with_prefixed_router(
+    sentry_init, capture_envelopes
+):
+    sentry_init(
+        auto_enabling_integrations=False,
+        integrations=[StarletteIntegration(), FastApiIntegration()],
+        traces_sample_rate=1.0,
+    )
+
+    app = FastAPI()
+    router = APIRouter()
+
+    @router.get("/sync")
+    def _sync():
+        return {"active": str(threading.current_thread().ident)}
+
+    app.include_router(router, prefix="/api")
+
+    envelopes = capture_envelopes()
+    response = TestClient(app).get("/api/sync")
+
+    assert response.status_code == 200
+    assert len(envelopes) == 1
+
+    transaction = next(
+        item.payload.json
+        for item in envelopes[0].items
+        if item.type == "transaction"
+    )
+    assert (
+        response.json()["active"] == transaction["contexts"]["trace"]["data"]["thread.id"]
+    )
+
+
+def test_global_dependency_preserves_existing_dependencies(sentry_init):
+    calls = []
+
+    def custom_dependency():
+        calls.append(True)
+
+    sentry_init(integrations=[FastApiIntegration()])
+
+    app = FastAPI(dependencies=[Depends(custom_dependency)])
+
+    @app.get("/")
+    async def _root():
+        return {"message": "ok"}
+
+    client = TestClient(app)
+    response = client.get("/")
+
+    assert response.json() == {"message": "ok"}
+    assert calls == [True]
+
+
+def test_global_dependency_runs_before_existing_dependencies(sentry_init):
+    seen_transaction_names = []
+
+    def custom_dependency():
+        transaction = sentry_sdk.get_current_scope().transaction
+        seen_transaction_names.append(transaction.name if transaction else None)
+
+    sentry_init(
+        auto_enabling_integrations=False,
+        integrations=[StarletteIntegration(), FastApiIntegration()],
+        traces_sample_rate=1.0,
+    )
+
+    app = FastAPI(dependencies=[Depends(custom_dependency)])
+
+    @app.get("/items/{item_id}")
+    async def _get_item(item_id: int):
+        return {"item_id": item_id}
+
+    response = TestClient(app).get("/items/123")
+
+    assert response.status_code == 200
+    assert seen_transaction_names == ["/items/{item_id}"]
+
+
+def test_global_dependency_captures_request_data(sentry_init, capture_events):
+    sentry_init(
+        auto_enabling_integrations=False,
+        integrations=[StarletteIntegration(), FastApiIntegration()],
+        send_default_pii=True,
+    )
+
+    app = FastAPI()
+
+    @app.post("/message")
+    async def _message():
+        capture_message("request body captured")
+        return {"message": "ok"}
+
+    events = capture_events()
+
+    response = TestClient(app).post("/message", json=BODY_JSON)
+
+    assert response.status_code == 200
+    (event,) = events
+    assert event["request"]["data"] == BODY_JSON
+
+
+def test_global_dependency_request_processors_are_isolated(sentry_init, capture_events):
+    sentry_init(integrations=[FastApiIntegration()], send_default_pii=True)
+
+    app = FastAPI()
+
+    @app.get("/")
+    async def _root():
+        capture_message("request")
+        return {"message": "ok"}
+
+    events = capture_events()
+    client = TestClient(app)
+
+    assert client.get("/", cookies={"request": "one"}).status_code == 200
+    assert client.get("/", cookies={"request": "two"}).status_code == 200
+
+    assert [event["request"]["cookies"] for event in events] == [
+        {"request": "one"},
+        {"request": "two"},
+    ]
+
+
+def test_global_dependency_does_not_break_websockets(sentry_init):
+    sentry_init(integrations=[FastApiIntegration()])
+
+    app = FastAPI()
+
+    @app.websocket("/ws")
+    async def websocket_endpoint(websocket: WebSocket):
+        await websocket.accept()
+        await websocket.send_text("ok")
+
+    client = TestClient(app)
+
+    with client.websocket_connect("/ws") as websocket:
+        assert websocket.receive_text() == "ok"
 
 
 @pytest.mark.parametrize("endpoint", ["/sync/thread_ids", "/async/thread_ids"])
