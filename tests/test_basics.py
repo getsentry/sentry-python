@@ -964,101 +964,100 @@ class TracingTestClass:
         return cls, arg
 
 
-# We need to fork here because the test modifies tests.test_basics.TracingTestClass
-@pytest.mark.forked
-def test_staticmethod_class_tracing(sentry_init, capture_items):
-    sentry_init(
-        debug=True,
-        traces_sample_rate=1.0,
-        functions_to_trace=[
-            {"qualified_name": "tests.test_basics.TracingTestClass.static"}
-        ],
-    )
+class TestTracingTestClassTracing:
+    def setup_method(self):
+        self.originals = {
+            name: TracingTestClass.__dict__[name] for name in ("static", "class_")
+        }
 
-    items = capture_items("span")
+    def teardown_method(self):
+        for name, original in self.originals.items():
+            setattr(TracingTestClass, name, original)
 
-    with sentry_sdk.start_span(name="test"):
-        assert TracingTestClass.static(1) == 1
+    def test_staticmethod_class_tracing(self, sentry_init, capture_items):
+        sentry_init(
+            debug=True,
+            traces_sample_rate=1.0,
+            functions_to_trace=[
+                {"qualified_name": "tests.test_basics.TracingTestClass.static"}
+            ],
+        )
 
-    sentry_sdk.flush()
+        items = capture_items("span")
 
-    spans = [item.payload for item in items]
-    child_spans = [s for s in spans if not s.get("is_segment")]
+        with sentry_sdk.start_span(name="test"):
+            assert TracingTestClass.static(1) == 1
 
-    assert len(child_spans) == 1
-    assert child_spans[0]["name"] == "tests.test_basics.TracingTestClass.static"
+        sentry_sdk.flush()
 
+        spans = [item.payload for item in items]
+        child_spans = [s for s in spans if not s.get("is_segment")]
 
-# We need to fork here because the test modifies tests.test_basics.TracingTestClass
-@pytest.mark.forked
-def test_staticmethod_instance_tracing(sentry_init, capture_items):
-    sentry_init(
-        debug=True,
-        traces_sample_rate=1.0,
-        functions_to_trace=[
-            {"qualified_name": "tests.test_basics.TracingTestClass.static"}
-        ],
-    )
+        assert len(child_spans) == 1
+        assert child_spans[0]["name"] == "tests.test_basics.TracingTestClass.static"
 
-    items = capture_items("span")
+    def test_staticmethod_instance_tracing(self, sentry_init, capture_items):
+        sentry_init(
+            debug=True,
+            traces_sample_rate=1.0,
+            functions_to_trace=[
+                {"qualified_name": "tests.test_basics.TracingTestClass.static"}
+            ],
+        )
 
-    with sentry_sdk.start_span(name="test"):
-        assert TracingTestClass().static(1) == 1
+        items = capture_items("span")
 
-    sentry_sdk.flush()
-    spans = [item.payload for item in items]
-    child_spans = [s for s in spans if not s.get("is_segment")]
+        with sentry_sdk.start_span(name="test"):
+            assert TracingTestClass().static(1) == 1
 
-    assert len(child_spans) == 1
-    assert child_spans[0]["name"] == "tests.test_basics.TracingTestClass.static"
+        sentry_sdk.flush()
+        spans = [item.payload for item in items]
+        child_spans = [s for s in spans if not s.get("is_segment")]
 
+        assert len(child_spans) == 1
+        assert child_spans[0]["name"] == "tests.test_basics.TracingTestClass.static"
 
-# We need to fork here because the test modifies tests.test_basics.TracingTestClass
-@pytest.mark.forked
-def test_classmethod_class_tracing(sentry_init, capture_items):
-    sentry_init(
-        debug=True,
-        traces_sample_rate=1.0,
-        functions_to_trace=[
-            {"qualified_name": "tests.test_basics.TracingTestClass.class_"}
-        ],
-    )
+    def test_classmethod_class_tracing(self, sentry_init, capture_items):
+        sentry_init(
+            debug=True,
+            traces_sample_rate=1.0,
+            functions_to_trace=[
+                {"qualified_name": "tests.test_basics.TracingTestClass.class_"}
+            ],
+        )
 
-    items = capture_items("span")
+        items = capture_items("span")
 
-    with sentry_sdk.start_span(name="test"):
-        assert TracingTestClass.class_(1) == (TracingTestClass, 1)
+        with sentry_sdk.start_span(name="test"):
+            assert TracingTestClass.class_(1) == (TracingTestClass, 1)
 
-    sentry_sdk.flush()
-    spans = [item.payload for item in items]
-    child_spans = [s for s in spans if not s.get("is_segment")]
+        sentry_sdk.flush()
+        spans = [item.payload for item in items]
+        child_spans = [s for s in spans if not s.get("is_segment")]
 
-    assert len(child_spans) == 1
-    assert child_spans[0]["name"] == "tests.test_basics.TracingTestClass.class_"
+        assert len(child_spans) == 1
+        assert child_spans[0]["name"] == "tests.test_basics.TracingTestClass.class_"
 
+    def test_classmethod_instance_tracing(self, sentry_init, capture_items):
+        sentry_init(
+            debug=True,
+            traces_sample_rate=1.0,
+            functions_to_trace=[
+                {"qualified_name": "tests.test_basics.TracingTestClass.class_"}
+            ],
+        )
 
-# We need to fork here because the test modifies tests.test_basics.TracingTestClass
-@pytest.mark.forked
-def test_classmethod_instance_tracing(sentry_init, capture_items):
-    sentry_init(
-        debug=True,
-        traces_sample_rate=1.0,
-        functions_to_trace=[
-            {"qualified_name": "tests.test_basics.TracingTestClass.class_"}
-        ],
-    )
+        items = capture_items("span")
 
-    items = capture_items("span")
+        with sentry_sdk.start_span(name="test"):
+            assert TracingTestClass().class_(1) == (TracingTestClass, 1)
 
-    with sentry_sdk.start_span(name="test"):
-        assert TracingTestClass().class_(1) == (TracingTestClass, 1)
+        sentry_sdk.flush()
+        spans = [item.payload for item in items]
+        child_spans = [s for s in spans if not s.get("is_segment")]
 
-    sentry_sdk.flush()
-    spans = [item.payload for item in items]
-    child_spans = [s for s in spans if not s.get("is_segment")]
-
-    assert len(child_spans) == 1
-    assert child_spans[0]["name"] == "tests.test_basics.TracingTestClass.class_"
+        assert len(child_spans) == 1
+        assert child_spans[0]["name"] == "tests.test_basics.TracingTestClass.class_"
 
 
 def test_functions_to_trace_no_dot_does_not_crash(sentry_init):
