@@ -843,7 +843,7 @@ def test_log_item_limits(capturing_server, response_code, item, make_client):
     assert {
         "category": "log_item",
         "reason": "ratelimit_backoff",
-        "quantity": 1,
+        "quantity": item.headers.get("item_count", 1),
     } in report["discarded_events"]
 
     expected_lost_bytes = 1243
@@ -929,6 +929,121 @@ def test_record_lost_event_transaction_item(capturing_server, make_client, span_
         "reason": "test",
         "quantity": span_count + 1,
     } in discarded_events
+
+
+@pytest.mark.parametrize(
+    "item_type,content_type,data_category,byte_category",
+    [
+        (
+            "span",
+            "application/vnd.sentry.items.span.v2+json",
+            "span",
+            None,
+        ),
+        (
+            "log",
+            "application/vnd.sentry.items.log+json",
+            "log_item",
+            "log_byte",
+        ),
+        (
+            "trace_metric",
+            "application/vnd.sentry.items.trace-metric+json",
+            "trace_metric",
+            "trace_metric_byte",
+        ),
+    ],
+)
+@pytest.mark.parametrize("item_count", (1, 2, 10))
+def test_record_lost_event_batched_item(
+    capturing_server,
+    make_client,
+    item_type,
+    content_type,
+    data_category,
+    byte_category,
+    item_count,
+):
+    client = make_client()
+    transport = client.transport
+
+    batched_item = Item(
+        type=item_type,
+        content_type=content_type,
+        headers={"item_count": item_count},
+        payload=PayloadRef(
+            json={"version": 2, "items": [{"index": i} for i in range(item_count)]}
+        ),
+    )
+
+    transport.record_lost_event(reason="test", item=batched_item)
+    client.flush()
+
+    (captured,) = capturing_server.captured  # Should only be one envelope
+    envelope = captured.envelope
+    (item,) = envelope.items  # Envelope should only have one item
+
+    assert item.type == "client_report"
+
+    report = parse_json(item.get_bytes())
+    discarded_events = report["discarded_events"]
+
+    assert {
+        "category": data_category,
+        "reason": "test",
+        "quantity": item_count,
+    } in discarded_events
+
+    if byte_category is None:
+        assert len(discarded_events) == 1
+    else:
+        assert len(discarded_events) == 2
+        assert {
+            "category": byte_category,
+            "reason": "test",
+            "quantity": len(batched_item.get_bytes()),
+        } in discarded_events
+
+
+def test_failed_batched_items_record_item_count(capturing_server, make_client):
+    client = make_client()
+    capturing_server.respond_with(code=500)
+
+    envelope = Envelope()
+    for item_type, content_type in (
+        ("span", "application/vnd.sentry.items.span.v2+json"),
+        ("log", "application/vnd.sentry.items.log+json"),
+        ("trace_metric", "application/vnd.sentry.items.trace-metric+json"),
+    ):
+        envelope.add_item(
+            Item(
+                type=item_type,
+                content_type=content_type,
+                headers={"item_count": 5},
+                payload=PayloadRef(
+                    json={"version": 2, "items": [{"index": i} for i in range(5)]}
+                ),
+            )
+        )
+
+    client.transport.capture_envelope(envelope)
+    client.flush()
+
+    assert len(capturing_server.captured) == 2
+    client_report_envelope = capturing_server.captured[1].envelope
+    (client_report,) = client_report_envelope.items
+    assert client_report.type == "client_report"
+
+    discarded_events = {
+        (event["category"], event["reason"]): event["quantity"]
+        for event in parse_json(client_report.get_bytes())["discarded_events"]
+    }
+
+    assert discarded_events[("span", "network_error")] == 5
+    assert discarded_events[("log_item", "network_error")] == 5
+    assert discarded_events[("trace_metric", "network_error")] == 5
+    assert discarded_events[("log_byte", "network_error")] > 0
+    assert discarded_events[("trace_metric_byte", "network_error")] > 0
 
 
 @skip_under_gevent

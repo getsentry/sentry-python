@@ -305,7 +305,15 @@ def test_metrics_before_send_raises_records_callback_error(
     get_client().flush()
 
     assert not items
-    assert ("callback_error", "trace_metric", None, 1) in record_lost_event_calls
+    (lost_event_call,) = [
+        call for call in record_lost_event_calls if call[0] == "callback_error"
+    ]
+    reason, data_category, item, quantity = lost_event_call
+    assert data_category == "trace_metric"
+    assert quantity == 1
+    assert item.type == "trace_metric"
+    assert item.headers["item_count"] == 1
+    assert item.payload.json["items"][0]["name"] == "test.keep"
 
 
 def test_metrics_before_send_returns_none_records_before_send(
@@ -323,7 +331,15 @@ def test_metrics_before_send_returns_none_records_before_send(
     get_client().flush()
 
     assert not items
-    assert ("before_send", "trace_metric", None, 1) in record_lost_event_calls
+    (lost_event_call,) = [
+        call for call in record_lost_event_calls if call[0] == "before_send"
+    ]
+    reason, data_category, item, quantity = lost_event_call
+    assert data_category == "trace_metric"
+    assert quantity == 1
+    assert item.type == "trace_metric"
+    assert item.headers["item_count"] == 1
+    assert item.payload.json["items"][0]["name"] == "test.drop"
 
 
 def test_transport_format(sentry_init, capture_envelopes):
@@ -400,8 +416,8 @@ def test_batcher_drops_metrics(sentry_init, monkeypatch):
 
     lost_event_calls = []
 
-    def record_lost_event(reason, data_category, quantity):
-        lost_event_calls.append((reason, data_category, quantity))
+    def record_lost_event(reason, data_category=None, item=None, *, quantity=1):
+        lost_event_calls.append((reason, data_category, item, quantity))
 
     monkeypatch.setattr(client.metrics_batcher, "_record_lost_func", record_lost_event)
 
@@ -410,7 +426,19 @@ def test_batcher_drops_metrics(sentry_init, monkeypatch):
 
     assert len(lost_event_calls) == 5
     for lost_event_call in lost_event_calls:
-        assert lost_event_call == ("queue_overflow", "trace_metric", 1)
+        reason, data_category, item, quantity = lost_event_call
+
+        assert reason == "queue_overflow"
+        assert data_category == "trace_metric"
+        assert quantity == 1
+
+        assert item.type == "trace_metric"
+        assert item.headers == {
+            "type": "trace_metric",
+            "item_count": 1,
+            "content_type": "application/vnd.sentry.items.trace-metric+json",
+        }
+        assert item.payload.json["items"][0]["name"] == "test.counter"
 
 
 def test_metric_gets_attributes_from_scopes(sentry_init, capture_items):

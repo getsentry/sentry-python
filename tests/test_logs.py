@@ -199,7 +199,15 @@ def test_logs_before_send_log_raises_records_callback_error(
     get_client().flush()
 
     assert not items
-    assert ("callback_error", "log_item", None, 1) in record_lost_event_calls
+    (lost_event_call,) = [
+        call for call in record_lost_event_calls if call[0] == "callback_error"
+    ]
+    reason, data_category, item, quantity = lost_event_call
+    assert data_category == "log_item"
+    assert quantity == 1
+    assert item.type == "log"
+    assert item.headers["item_count"] == 1
+    assert item.payload.json["items"][0]["body"] == "This is an error log..."
 
 
 @minimum_python_37
@@ -218,7 +226,15 @@ def test_logs_before_send_log_returns_none_records_before_send(
     get_client().flush()
 
     assert not items
-    assert ("before_send", "log_item", None, 1) in record_lost_event_calls
+    (lost_event_call,) = [
+        call for call in record_lost_event_calls if call[0] == "before_send"
+    ]
+    reason, data_category, item, quantity = lost_event_call
+    assert data_category == "log_item"
+    assert quantity == 1
+    assert item.type == "log"
+    assert item.headers["item_count"] == 1
+    assert item.payload.json["items"][0]["body"] == "This is an error log..."
 
 
 @minimum_python_37

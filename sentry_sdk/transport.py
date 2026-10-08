@@ -292,7 +292,7 @@ class HttpTransportCore(Transport):
 
         if item is not None:
             data_category = item.data_category
-            quantity = 1  # If an item is provided, we always count it as 1 (except for attachments, handled below).
+            quantity = 1  # If an item is provided, we count it as 1 unless it's a batched item or an attachment (handled below).
 
             if data_category == "transaction":
                 # Also record the lost spans
@@ -304,10 +304,21 @@ class HttpTransportCore(Transport):
                 )
                 self.record_lost_event(reason, "span", quantity=span_count)
 
-            elif data_category == "log_item" and item:
-                # Also record size of lost logs in bytes
-                bytes_size = len(item.get_bytes())
-                self.record_lost_event(reason, "log_byte", quantity=bytes_size)
+            elif data_category in ("span", "log_item", "trace_metric"):
+                # Batched items can contain multiple spans, logs or metrics
+                item_count = item.headers.get("item_count")
+                if isinstance(item_count, int) and item_count > 0:
+                    quantity = item_count
+
+                # Also record size of lost logs and metrics in bytes
+                if data_category == "log_item":
+                    bytes_size = len(item.get_bytes())
+                    self.record_lost_event(reason, "log_byte", quantity=bytes_size)
+                elif data_category == "trace_metric":
+                    bytes_size = len(item.get_bytes())
+                    self.record_lost_event(
+                        reason, "trace_metric_byte", quantity=bytes_size
+                    )
 
             elif data_category == "attachment":
                 # quantity of 0 is actually 1 as we do not want to count
