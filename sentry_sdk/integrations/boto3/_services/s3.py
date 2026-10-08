@@ -41,7 +41,8 @@ class _S3Extension(_ServiceExtension):
         with capture_internal_exceptions():
             attributes.update(
                 _get_aws_arn_attributes(
-                    (ctx.params.get("Bucket"),), ("s3", "s3-outposts")
+                    (ctx.params.get("Bucket"),),
+                    ("s3", "s3-object-lambda", "s3-outposts"),
                 )
             )
 
