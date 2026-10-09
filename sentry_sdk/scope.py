@@ -903,6 +903,7 @@ class Scope:
 
     @span.setter
     def span(self, span: "Optional[Span]") -> None:
+        previous_span = self._span
         self._span = span
         # XXX: this differs from the implementation in JS, there Scope.setSpan
         # does not set Scope._transactionName.
@@ -912,11 +913,13 @@ class Scope:
                 self._transaction = transaction.name
                 if transaction.source:
                     self._transaction_info["source"] = transaction.source
-        elif span is None:
+        elif span is None and isinstance(previous_span, Transaction):
+            # The transaction that named this scope has exited: drop the name
+            # (and its source) so later events aren't attributed to it. A plain
+            # span being unset must not wipe a name that was set independently
+            # of the span lifecycle (e.g. via set_transaction_name with no
+            # active transaction).
             self._transaction = None
-            # The transaction source describes the transaction name; leaving
-            # it behind would stamp stale transaction_info on later events
-            # that no longer carry a transaction.
             self._transaction_info = {}
 
     @property

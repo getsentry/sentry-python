@@ -1112,11 +1112,12 @@ def test_conversation_id_clear():
     assert scope.get_conversation_id() is None
 
 
-def test_transaction_name_cleared_when_span_unset():
-    """Scope._transaction follows the span lifecycle (GH-7774).
+def test_transaction_name_cleared_when_transaction_unset():
+    """Scope._transaction follows the transaction lifecycle (GH-7774).
 
-    Set by a Transaction, preserved while a child span is active, cleared
-    when the span is set back to None (top-level transaction exit).
+    The name is set while the transaction is the active span and cleared
+    when the transaction itself is unset, so later events aren't attributed
+    to the finished transaction.
     """
     from sentry_sdk.tracing import Transaction
 
@@ -1127,13 +1128,33 @@ def test_transaction_name_cleared_when_span_unset():
     assert scope._transaction == "my-transaction"
     assert scope._transaction_info.get("source")  # info follows the name
 
-    child = transaction.start_child(op="child")
-    scope.span = child
-    assert scope._transaction == "my-transaction"
-
+    # Unsetting the transaction clears the name and its source
     scope.span = None
     assert scope._transaction is None
-    assert scope._transaction_info == {}  # no stale source left behind
+    assert scope._transaction_info == {}
+
+
+def test_transaction_name_survives_plain_span_unset():
+    """A name set without an active transaction is not wiped by a plain
+    span being assigned and unset.
+
+    Regression test for the Cursor Bugbot finding on GH-7934: previously,
+    unsetting any span cleared _transaction, so a name stored via
+    set_transaction_name while no transaction was active was lost once a
+    stray non-transaction span exited.
+    """
+    from sentry_sdk.tracing import Span
+
+    scope = Scope()
+    scope.set_transaction_name("explicit-name")
+    assert scope._transaction == "explicit-name"
+
+    span = Span(op="op")
+    scope.span = span
+    assert scope._transaction == "explicit-name"
+
+    scope.span = None
+    assert scope._transaction == "explicit-name"
 
 
 def test_transaction_name_survives_nested_span_exit():
