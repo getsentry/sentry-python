@@ -171,46 +171,54 @@ def _wrap_handler(handler: "F") -> "F":
             }
 
             function_name = aws_context.function_name
-            invoked_function_arn = aws_context.invoked_function_arn
-            function_version = aws_context.function_version
-
-            attributes: "Attributes" = {
-                SPANDATA.SENTRY_OP: OP.FUNCTION_AWS,
-                SPANDATA.SENTRY_ORIGIN: ORIGIN,
-                SPANDATA.SENTRY_KIND: "server",
-                SPANDATA.SENTRY_SEGMENT_NAME_SOURCE: SegmentNameSource.COMPONENT,
-                SPANDATA.CLOUD_PROVIDER: CLOUD_PROVIDER,
-                SPANDATA.CLOUD_PLATFORM: CLOUD_PLATFORM,
-                SPANDATA.CLOUD_REGION: environ["AWS_REGION"],
-                SPANDATA.FAAS_NAME: environ["AWS_LAMBDA_FUNCTION_NAME"],
-                SPANDATA.FAAS_VERSION: environ["AWS_LAMBDA_FUNCTION_VERSION"],
-                SPANDATA.FAAS_INVOCATION_ID: aws_context.aws_request_id,
-                SPANDATA.AWS_LAMBDA_INVOKED_ARN: invoked_function_arn,
-                SPANDATA.AWS_LOG_GROUP_NAMES: [aws_context.log_group_name],
-                SPANDATA.AWS_LOG_STREAM_NAMES: [aws_context.log_stream_name],
-                SPANDATA.MESSAGING_BATCH_MESSAGE_COUNT: batch_size,
-                **header_attributes,
-                **additional_attributes,
-            }
-
-            arn_parts = invoked_function_arn.split(":")
-            with capture_internal_exceptions():
-                attributes[SPANDATA.CLOUD_ACCOUNT_ID] = arn_parts[4]
-
-            resource_id = ":".join(arn_parts[:7])
-            if function_version != LATEST_FUNCTION_VERSION:
-                resource_id = f"{resource_id}:{function_version}"
-            attributes[SPANDATA.CLOUD_RESOURCE_ID] = resource_id
-
-            if "AWS_LAMBDA_METADATA_API" in environ and has_span_streaming_enabled(
-                client.options
-            ):
-                with capture_internal_exceptions():
-                    availability_zone = _get_availability_zone()
-                    if availability_zone is not None:
-                        attributes[SPANDATA.CLOUD_AVAILABILITY_ZONE] = availability_zone
 
             if has_span_streaming_enabled(client.options):
+                attributes: "Attributes" = {
+                    SPANDATA.SENTRY_OP: OP.FUNCTION_AWS,
+                    SPANDATA.SENTRY_ORIGIN: ORIGIN,
+                    SPANDATA.SENTRY_KIND: "server",
+                    SPANDATA.SENTRY_SEGMENT_NAME_SOURCE: SegmentNameSource.COMPONENT,
+                    SPANDATA.CLOUD_PROVIDER: CLOUD_PROVIDER,
+                    SPANDATA.CLOUD_PLATFORM: CLOUD_PLATFORM,
+                    SPANDATA.MESSAGING_BATCH_MESSAGE_COUNT: batch_size,
+                    **header_attributes,
+                    **additional_attributes,
+                }
+
+                with capture_internal_exceptions():
+                    invoked_function_arn = aws_context.invoked_function_arn
+                    function_version = aws_context.function_version
+                    arn_parts = invoked_function_arn.split(":")
+                    resource_id = ":".join(arn_parts[:7])
+                    if function_version != LATEST_FUNCTION_VERSION:
+                        resource_id = f"{resource_id}:{function_version}"
+
+                    attributes.update(
+                        {
+                            SPANDATA.CLOUD_REGION: environ["AWS_REGION"],
+                            SPANDATA.CLOUD_ACCOUNT_ID: arn_parts[4],
+                            SPANDATA.CLOUD_RESOURCE_ID: resource_id,
+                            SPANDATA.FAAS_NAME: environ["AWS_LAMBDA_FUNCTION_NAME"],
+                            SPANDATA.FAAS_VERSION: environ[
+                                "AWS_LAMBDA_FUNCTION_VERSION"
+                            ],
+                            SPANDATA.FAAS_INVOCATION_ID: aws_context.aws_request_id,
+                            SPANDATA.AWS_LAMBDA_INVOKED_ARN: invoked_function_arn,
+                            SPANDATA.AWS_LOG_GROUP_NAMES: [aws_context.log_group_name],
+                            SPANDATA.AWS_LOG_STREAM_NAMES: [
+                                aws_context.log_stream_name
+                            ],
+                        }
+                    )
+
+                if "AWS_LAMBDA_METADATA_API" in environ:
+                    with capture_internal_exceptions():
+                        availability_zone = _get_availability_zone()
+                        if availability_zone is not None:
+                            attributes[SPANDATA.CLOUD_AVAILABILITY_ZONE] = (
+                                availability_zone
+                            )
+
                 sentry_sdk.traces.continue_trace(headers)
                 Scope.set_custom_sampling_context(sampling_context)
                 span_ctx = sentry_sdk.traces.start_span(

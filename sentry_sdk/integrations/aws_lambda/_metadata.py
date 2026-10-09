@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 import urllib3
 
 from sentry_sdk.integrations.aws_lambda.consts import (
+    LAMBDA_METADATA_FAILURE_CACHE_SECONDS,
     LAMBDA_METADATA_PATH,
 )
 
@@ -21,7 +22,7 @@ _lambda_metadata_cache: "Optional[Tuple[float, str]]" = None
 
 
 def _get_availability_zone() -> "Optional[str]":
-    now = time.monotonic()
+    now = time.time()
     global _lambda_metadata_cache
     if _lambda_metadata_cache is not None and _lambda_metadata_cache[0] > now:
         return _lambda_metadata_cache[1]
