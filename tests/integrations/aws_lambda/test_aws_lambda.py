@@ -965,12 +965,19 @@ def test_span_streaming_no_error(lambda_client, test_environment):
 
     assert _get_span_attr(attrs, SPANDATA.SENTRY_OP) == OP.FUNCTION_AWS
     assert _get_span_attr(attrs, SPANDATA.SENTRY_ORIGIN) == ORIGIN
+    assert _get_span_attr(attrs, SPANDATA.SENTRY_KIND) == "server"
     assert (
         _get_span_attr(attrs, SPANDATA.SENTRY_SEGMENT_NAME_SOURCE)
         == SegmentNameSource.COMPONENT
     )
     assert _get_span_attr(attrs, SPANDATA.CLOUD_PROVIDER) == CLOUD_PROVIDER
     assert _get_span_attr(attrs, SPANDATA.CLOUD_PLATFORM) == CLOUD_PLATFORM
+    assert _get_span_attr(attrs, SPANDATA.CLOUD_ACCOUNT_ID) == "012345678912"
+    assert _get_span_attr(attrs, SPANDATA.CLOUD_REGION) == "us-east-1"
+    assert (
+        _get_span_attr(attrs, SPANDATA.CLOUD_RESOURCE_ID)
+        == "arn:aws:lambda:us-east-1:012345678912:function:BasicOkSpanStreaming"
+    )
     assert _get_span_attr(attrs, SPANDATA.FAAS_NAME) == "BasicOkSpanStreaming"
     assert _get_span_attr(attrs, SPANDATA.FAAS_VERSION) == LATEST_FUNCTION_VERSION
     assert SPANDATA.FAAS_INVOCATION_ID in attrs
@@ -1129,6 +1136,8 @@ def test_span_streaming_request_attributes(lambda_client, test_environment):
 def test_span_streaming_url_query_params_with_data_collection(
     lambda_client, test_environment
 ):
+    server = test_environment["server"]
+    initial_metadata_requests = server.lambda_metadata_requests
     payload = {
         "httpMethod": "GET",
         "queryStringParameters": {
@@ -1143,7 +1152,7 @@ def test_span_streaming_url_query_params_with_data_collection(
         FunctionName="BasicOkSpanStreamingDataCollection",
         Payload=json.dumps(payload),
     )
-    span_items = test_environment["server"].span_items
+    span_items = server.span_items
 
     segment_spans = [s for s in span_items if s["is_segment"]]
     assert len(segment_spans) == 1
@@ -1156,6 +1165,22 @@ def test_span_streaming_url_query_params_with_data_collection(
         _get_span_attr(attrs, SPANDATA.URL_QUERY)
         == "page=2&tracking=%5BFiltered%5D&token=%5BFiltered%5D"
     )
+    assert _get_span_attr(attrs, SPANDATA.CLOUD_AVAILABILITY_ZONE) == "use1-az1"
+    assert server.lambda_metadata_requests == initial_metadata_requests + 1
+
+    server.clear_envelopes()
+    lambda_client.invoke(
+        FunctionName="BasicOkSpanStreamingDataCollection",
+        Payload=json.dumps(payload),
+    )
+    segment_spans = [s for s in server.span_items if s["is_segment"]]
+
+    assert len(segment_spans) == 1
+    assert (
+        _get_span_attr(segment_spans[0]["attributes"], SPANDATA.CLOUD_AVAILABILITY_ZONE)
+        == "use1-az1"
+    )
+    assert server.lambda_metadata_requests == initial_metadata_requests + 1
 
 
 def test_span_streaming_user_info_with_send_default_pii(

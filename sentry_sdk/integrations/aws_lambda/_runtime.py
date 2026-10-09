@@ -4,8 +4,8 @@ import sys
 from typing import TYPE_CHECKING
 
 import sentry_sdk
-from sentry_sdk.integrations.aws_lambda import AwsLambdaIntegration
 from sentry_sdk.integrations.aws_lambda._handler import _wrap_handler
+from sentry_sdk.integrations.aws_lambda.consts import IDENTIFIER
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
@@ -22,6 +22,8 @@ if TYPE_CHECKING:
 
 
 def _wrap_init_error(init_error: "F") -> "F":
+    from sentry_sdk.integrations.aws_lambda import AwsLambdaIntegration
+
     @ensure_integration_enabled(AwsLambdaIntegration, init_error)
     def sentry_init_error(*args: "Any", **kwargs: "Any") -> "Any":
         client = sentry_sdk.get_client()
@@ -34,7 +36,7 @@ def _wrap_init_error(init_error: "F") -> "F":
                 sentry_event, hint = event_from_exception(
                     exc_info,
                     client_options=client.options,
-                    mechanism={"type": "aws_lambda", "handled": False},
+                    mechanism={"type": IDENTIFIER, "handled": False},
                 )
                 sentry_sdk.capture_event(sentry_event, hint=hint)
 
@@ -54,7 +56,7 @@ def _wrap_init_error(init_error: "F") -> "F":
 def _drain_queue() -> None:
     with capture_internal_exceptions():
         client = sentry_sdk.get_client()
-        integration = client.get_integration(AwsLambdaIntegration)
+        integration = client.get_integration(IDENTIFIER)
         if integration is not None:
             # Flush out the event queue before AWS kills the
             # process.
@@ -226,7 +228,7 @@ def _event_from_error_json(error_json: "dict[str, Any]") -> "Event":
                         ),
                     },
                     "mechanism": {
-                        "type": "aws_lambda",
+                        "type": IDENTIFIER,
                         "handled": False,
                     },
                 }

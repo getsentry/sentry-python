@@ -17,14 +17,17 @@ from aws_cdk import (
 )
 from constructs import Construct
 from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 
 from scripts.build_aws_lambda_layer import DIST_PATH, build_packaged_zip
+from sentry_sdk.integrations.aws_lambda.consts import LAMBDA_METADATA_PATH
 
 LAMBDA_FUNCTION_DIR = "./tests/integrations/aws_lambda/lambda_functions/"
 LAMBDA_FUNCTION_WITH_EMBEDDED_SDK_DIR = (
     "./tests/integrations/aws_lambda/lambda_functions_with_embedded_sdk/"
 )
 LAMBDA_FUNCTION_TIMEOUT = 10
+LAMBDA_METADATA_TOKEN = "test-token"
 SAM_PORT = 3001
 
 PYTHON_VERSION = f"python{sys.version_info.major}.{sys.version_info.minor}"
@@ -145,12 +148,11 @@ class LocalLambdaStack(Stack):
             sdk_path = os.path.join(
                 LAMBDA_FUNCTION_WITH_EMBEDDED_SDK_DIR, lambda_dir, "sentry_sdk"
             )
-            if not os.path.exists(sdk_path):
-                # Find the Sentry SDK in the current environment
-                import sentry_sdk as sdk_module
+            # refresh the embedded SDK so repeated runs cannot use stale source files.
+            import sentry_sdk as sdk_module
 
-                sdk_source = os.path.dirname(sdk_module.__file__)
-                shutil.copytree(sdk_source, sdk_path)
+            sdk_source = os.path.dirname(sdk_module.__file__)
+            shutil.copytree(sdk_source, sdk_path, dirs_exist_ok=True)
 
             # Install the requirements of Sentry SDK into the function directory
             subprocess.check_call(
@@ -166,6 +168,22 @@ class LocalLambdaStack(Stack):
                 ]
             )
 
+            environment = {"SENTRY_DSN": dsn}
+            if lambda_dir == "BasicOkSpanStreamingDataCollection":
+                # AWS exposes these env. vars when the metadata endpoint
+                # (`2026-01-15/metadata/execution-environment`) is available.
+                # We set et them only on the function that exercises `cloud.availability_zone`.
+                environment.update(
+                    {
+                        "SENTRY_TEST_AWS_LAMBDA_METADATA_API": (
+                            f"{get_host_ip()}:9999"
+                        ),
+                        "SENTRY_TEST_AWS_LAMBDA_METADATA_TOKEN": (
+                            LAMBDA_METADATA_TOKEN
+                        ),
+                    }
+                )
+
             CfnResource(
                 self,
                 lambda_dir,
@@ -179,9 +197,7 @@ class LocalLambdaStack(Stack):
                     "Timeout": LAMBDA_FUNCTION_TIMEOUT,
                     "Architectures": [ARCHITECTURE],
                     "Environment": {
-                        "Variables": {
-                            "SENTRY_DSN": dsn,
-                        }
+                        "Variables": environment,
                     },
                 },
             )
@@ -225,6 +241,7 @@ class SentryServerForTesting:
     def __init__(self, host="0.0.0.0", port=9999, log_level="warning"):
         self.envelopes = []
         self.span_items = []
+        self.lambda_metadata_requests = 0
         self.host = host
         self.port = port
         self.log_level = log_level
@@ -271,6 +288,26 @@ class SentryServerForTesting:
                 current_line += 1
 
             return {"status": "ok"}
+
+        @self.app.get(LAMBDA_METADATA_PATH)
+        async def lambda_metadata(request: Request):
+            """
+            Mirrors the Lambda execution-environment metadata endpoint
+            (`2026-01-15/metadata/execution-environment`) used to collect
+            `AvailabilityZoneID`, including its cache lifetime.
+            https://docs.aws.amazon.com/lambda/latest/dg/configuration-metadata-endpoint.html
+            """
+            self.lambda_metadata_requests += 1
+
+            if request.headers.get("Authorization") != (
+                f"Bearer {LAMBDA_METADATA_TOKEN}"
+            ):
+                return JSONResponse({"message": "Unauthorized"}, status_code=401)
+
+            return JSONResponse(
+                {"AvailabilityZoneID": "use1-az1"},
+                headers={"Cache-Control": "private, max-age=43200, immutable"},
+            )
 
     def run_server(self):
         uvicorn.run(self.app, host=self.host, port=self.port, log_level=self.log_level)
