@@ -4,7 +4,7 @@ from functools import wraps
 import sentry_sdk
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.integrations._wsgi_common import _filter_headers
-from sentry_sdk.integrations.aws_lambda import _make_request_event_processor
+from sentry_sdk.integrations.aws_lambda._request import _make_request_event_processor
 from sentry_sdk.traces import (
     SegmentNameSource,
     Span,
