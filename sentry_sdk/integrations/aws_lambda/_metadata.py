@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING
 import urllib3
 
 from sentry_sdk.integrations.aws_lambda.consts import (
-    LAMBDA_METADATA_FAILURE_CACHE_SECONDS,
     LAMBDA_METADATA_PATH,
 )
 
