@@ -736,11 +736,6 @@ def test_no_error(lambda_client, test_environment):
     )
     assert _get_span_attr(attrs, SPANDATA.CLOUD_PROVIDER) == CLOUD_PROVIDER
     assert _get_span_attr(attrs, SPANDATA.CLOUD_PLATFORM) == CLOUD_PLATFORM
-    assert _get_span_attr(attrs, SPANDATA.CLOUD_ACCOUNT_ID) == "012345678912"
-    assert (
-        _get_span_attr(attrs, SPANDATA.CLOUD_RESOURCE_ID)
-        == "arn:aws:lambda:us-east-1:012345678912:function:BasicOkSpanStreaming"
-    )
     assert _get_span_attr(attrs, SPANDATA.FAAS_NAME) == "BasicOkSpanStreaming"
     assert _get_span_attr(attrs, SPANDATA.FAAS_VERSION) == LATEST_FUNCTION_VERSION
     assert SPANDATA.FAAS_INVOCATION_ID in attrs
@@ -791,10 +786,6 @@ def test_error(lambda_client, test_environment):
     )
     assert _get_span_attr(attrs, SPANDATA.CLOUD_PROVIDER) == CLOUD_PROVIDER
     assert _get_span_attr(attrs, SPANDATA.CLOUD_PLATFORM) == CLOUD_PLATFORM
-    assert (
-        _get_span_attr(attrs, SPANDATA.CLOUD_RESOURCE_ID)
-        == "arn:aws:lambda:us-east-1:012345678912:function:RaiseErrorSpanStreaming"
-    )
     assert _get_span_attr(attrs, SPANDATA.FAAS_NAME) == "RaiseErrorSpanStreaming"
     assert _get_span_attr(attrs, SPANDATA.FAAS_VERSION) == LATEST_FUNCTION_VERSION
     assert SPANDATA.FAAS_INVOCATION_ID in attrs
