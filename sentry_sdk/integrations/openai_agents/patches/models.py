@@ -73,7 +73,7 @@ def _get_model(
 
     # Capture the request model name for spans (agent.model can be None when using defaults)
     request_model_name = model.model if hasattr(model, "model") else str(model)
-    agent._sentry_request_model = request_model_name  # type: ignore[attr-defined]
+    agent._sentry_request_model = request_model_name
 
     # Wrap _fetch_response if it exists (for OpenAI models) to capture response model
     if hasattr(model, "_fetch_response"):
@@ -83,7 +83,7 @@ def _get_model(
         async def wrapped_fetch_response(*args: "Any", **kwargs: "Any") -> "Any":
             response = await original_fetch_response(*args, **kwargs)
             if hasattr(response, "model") and response.model:
-                agent._sentry_response_model = str(response.model)  # type: ignore[attr-defined]
+                agent._sentry_response_model = str(response.model)
             return response
 
         model._fetch_response = wrapped_fetch_response
