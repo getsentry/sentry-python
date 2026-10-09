@@ -1,10 +1,11 @@
 import functools
 import sys
+from os import environ
 from typing import TYPE_CHECKING
 from urllib.parse import urlencode
 
 import sentry_sdk
-from sentry_sdk.consts import OP
+from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.data_collection import _apply_key_value_collection_filtering
 from sentry_sdk.integrations._wsgi_common import _filter_headers
 from sentry_sdk.integrations.aws_lambda._request import (
@@ -12,13 +13,11 @@ from sentry_sdk.integrations.aws_lambda._request import (
     _make_request_event_processor,
 )
 from sentry_sdk.integrations.aws_lambda.consts import (
-    MILLIS_TO_SECONDS,
-    ORIGIN,
-    TIMEOUT_WARNING_BUFFER,
-)
-from sentry_sdk.integrations.cloud_resource_context import (
     CLOUD_PLATFORM,
     CLOUD_PROVIDER,
+    IDENTIFIER,
+    LATEST_FUNCTION_VERSION,
+    ORIGIN,
 )
 from sentry_sdk.scope import Scope
 from sentry_sdk.traces import SegmentNameSource
@@ -30,9 +29,14 @@ from sentry_sdk.utils import (
 )
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, TypeVar
+    from typing import Any, Callable, Mapping, TypeVar
+
+    from sentry_sdk._types import Attributes
 
     F = TypeVar("F", bound=Callable[..., Any])
+
+TIMEOUT_WARNING_BUFFER = 1500
+MILLIS_TO_SECONDS = 1000.0
 
 
 def _wrap_handler(handler: "F") -> "F":
@@ -72,8 +76,6 @@ def _wrap_handler(handler: "F") -> "F":
             request_data = {}
 
         configured_time = aws_context.get_remaining_time_in_millis()
-        aws_region = aws_context.invoked_function_arn.split(":")[3]
-
         with sentry_sdk.isolation_scope() as scope:
             timeout_thread = None
             with capture_internal_exceptions():
@@ -111,14 +113,18 @@ def _wrap_handler(handler: "F") -> "F":
                 headers = {}
 
             header_attributes: "dict[str, Any]" = {}
-            for header, header_value in _filter_headers(headers).items():
-                header_attributes[f"http.request.header.{header.lower()}"] = [
-                    header_value
-                ]
+            filtered_headers: "Mapping[str, Any]" = {}
+            with capture_internal_exceptions():
+                filtered_headers = _filter_headers(headers)
+            for header, header_value in filtered_headers.items():
+                with capture_internal_exceptions():
+                    header_attributes[
+                        f"{SPANDATA.HTTP_REQUEST_HEADER}.{header.lower()}"
+                    ] = [header_value]
 
             additional_attributes: "dict[str, Any]" = {}
             if "httpMethod" in request_data:
-                additional_attributes["http.request.method"] = request_data[
+                additional_attributes[SPANDATA.HTTP_REQUEST_METHOD] = request_data[
                     "httpMethod"
                 ]
 
@@ -131,7 +137,9 @@ def _wrap_handler(handler: "F") -> "F":
                         behaviour=data_collection["url_query_params"],
                     )
                     if filtered_qs:
-                        additional_attributes["url.query"] = urlencode(filtered_qs)
+                        additional_attributes[SPANDATA.URL_QUERY] = urlencode(
+                            filtered_qs
+                        )
 
             if not scope._user and data_collection["user_info"]:
                 user_info = _get_user_from_event(request_data)
@@ -144,30 +152,49 @@ def _wrap_handler(handler: "F") -> "F":
             }
 
             function_name = aws_context.function_name
+            invoked_function_arn = aws_context.invoked_function_arn
+            function_version = aws_context.function_version
+
+            attributes: "Attributes" = {
+                SPANDATA.SENTRY_OP: OP.FUNCTION_AWS,
+                SPANDATA.SENTRY_ORIGIN: ORIGIN,
+                SPANDATA.SENTRY_KIND: "server",
+                SPANDATA.SENTRY_SEGMENT_NAME_SOURCE: SegmentNameSource.COMPONENT,
+                SPANDATA.CLOUD_PROVIDER: CLOUD_PROVIDER,
+                SPANDATA.CLOUD_PLATFORM: CLOUD_PLATFORM,
+                SPANDATA.CLOUD_REGION: environ["AWS_REGION"],
+                SPANDATA.FAAS_NAME: environ["AWS_LAMBDA_FUNCTION_NAME"],
+                SPANDATA.FAAS_VERSION: environ["AWS_LAMBDA_FUNCTION_VERSION"],
+                SPANDATA.FAAS_INVOCATION_ID: aws_context.aws_request_id,
+                SPANDATA.AWS_LAMBDA_INVOKED_ARN: invoked_function_arn,
+                SPANDATA.AWS_LOG_GROUP_NAMES: [aws_context.log_group_name],
+                SPANDATA.AWS_LOG_STREAM_NAMES: [aws_context.log_stream_name],
+                SPANDATA.MESSAGING_BATCH_MESSAGE_COUNT: batch_size,
+                **header_attributes,
+                **additional_attributes,
+            }
+
+            arn_parts = invoked_function_arn.split(":")
+            with capture_internal_exceptions():
+                attributes[SPANDATA.CLOUD_ACCOUNT_ID] = arn_parts[4]
+
+            resource_id = ":".join(arn_parts[:7])
+            if function_version != LATEST_FUNCTION_VERSION:
+                resource_id = f"{resource_id}:{function_version}"
+            attributes[SPANDATA.CLOUD_RESOURCE_ID] = resource_id
+
+            if "AWS_LAMBDA_METADATA_API" in environ:
+                with capture_internal_exceptions():
+                    availability_zone = _get_availability_zone()
+                    if availability_zone is not None:
+                        attributes[SPANDATA.CLOUD_AVAILABILITY_ZONE] = availability_zone
 
             sentry_sdk.continue_trace(headers)
             Scope.set_custom_sampling_context(sampling_context)
             with sentry_sdk.start_span(
                 name=function_name,
                 parent_span=None,
-                attributes={
-                    "sentry.op": OP.FUNCTION_AWS,
-                    "sentry.origin": ORIGIN,
-                    "sentry.segment.name.source": SegmentNameSource.COMPONENT,
-                    "cloud.region": aws_region,
-                    "cloud.resource_id": aws_context.invoked_function_arn,
-                    "cloud.platform": CLOUD_PLATFORM.AWS_LAMBDA,
-                    "cloud.provider": CLOUD_PROVIDER.AWS,
-                    "faas.name": function_name,
-                    "faas.invocation_id": aws_context.aws_request_id,
-                    "faas.version": aws_context.function_version,
-                    "aws.lambda.invoked_arn": aws_context.invoked_function_arn,
-                    "aws.log.group.names": [aws_context.log_group_name],
-                    "aws.log.stream.names": [aws_context.log_stream_name],
-                    "messaging.batch.message_count": batch_size,
-                    **header_attributes,
-                    **additional_attributes,
-                },
+                attributes=attributes,
             ):
                 try:
                     return handler(aws_event, aws_context, *args, **kwargs)
@@ -175,7 +202,7 @@ def _wrap_handler(handler: "F") -> "F":
                     exc_info = sys.exc_info()
                     sentry_event, hint = event_from_exception(
                         exc_info,
-                        mechanism={"type": "aws_lambda", "handled": False},
+                        mechanism={"type": IDENTIFIER, "handled": False},
                     )
                     sentry_sdk.capture_event(sentry_event, hint=hint)
                     reraise(*exc_info)
