@@ -10,6 +10,16 @@ import pytest
 import yaml
 from aws_cdk import App
 
+from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.integrations.aws_lambda.consts import (
+    CLOUD_PLATFORM,
+    CLOUD_PROVIDER,
+    IDENTIFIER,
+    LATEST_FUNCTION_VERSION,
+    ORIGIN,
+)
+from sentry_sdk.traces import SegmentNameSource
+
 from .utils import SAM_PORT, LocalLambdaStack, SentryServerForTesting
 
 DOCKER_NETWORK_NAME = "lambda-test-network"
@@ -130,17 +140,17 @@ def test_basic_no_exception(lambda_client, test_environment):
         "aws_request_id": mock.ANY,
         "execution_duration_in_millis": mock.ANY,
         "function_name": "BasicOk",
-        "function_version": "$LATEST",
+        "function_version": LATEST_FUNCTION_VERSION,
         "invoked_function_arn": "arn:aws:lambda:us-east-1:012345678912:function:BasicOk",
         "remaining_time_in_millis": mock.ANY,
     }
     assert transaction_event["contexts"]["trace"] == {
-        "op": "function.aws",
+        "op": OP.FUNCTION_AWS,
         "description": mock.ANY,
         "span_id": mock.ANY,
         "parent_span_id": mock.ANY,
         "trace_id": mock.ANY,
-        "origin": "auto.function.aws_lambda",
+        "origin": ORIGIN,
         "data": mock.ANY,
     }
 
@@ -171,17 +181,17 @@ def test_basic_exception(lambda_client, test_environment):
         "aws_request_id": mock.ANY,
         "execution_duration_in_millis": mock.ANY,
         "function_name": "BasicException",
-        "function_version": "$LATEST",
+        "function_version": LATEST_FUNCTION_VERSION,
         "invoked_function_arn": "arn:aws:lambda:us-east-1:012345678912:function:BasicException",
         "remaining_time_in_millis": mock.ANY,
     }
     assert error_event["contexts"]["trace"] == {
-        "op": "function.aws",
+        "op": OP.FUNCTION_AWS,
         "description": mock.ANY,
         "span_id": mock.ANY,
         "parent_span_id": mock.ANY,
         "trace_id": mock.ANY,
-        "origin": "auto.function.aws_lambda",
+        "origin": ORIGIN,
         "data": mock.ANY,
     }
 
@@ -310,7 +320,7 @@ def test_non_dict_event(
     assert error_event["sdk"]["name"] == "sentry.python.aws_lambda"
     assert error_event["exception"]["values"][0]["type"] == "RuntimeError"
     assert error_event["exception"]["values"][0]["value"] == "Oh!"
-    assert error_event["exception"]["values"][0]["mechanism"]["type"] == "aws_lambda"
+    assert error_event["exception"]["values"][0]["mechanism"]["type"] == IDENTIFIER
 
     if has_request_data:
         request_data = {
@@ -809,7 +819,7 @@ def test_trace_continuation(lambda_client, test_environment):
     trace_id = "471a43a4192642f0b136d5159a501701"
     parent_span_id = "6e8f22c393e68f19"
     parent_sampled = 1
-    sentry_trace_header = "{}-{}-{}".format(trace_id, parent_span_id, parent_sampled)
+    sentry_trace_header = f"{trace_id}-{parent_span_id}-{parent_sampled}"
 
     # We simulate here AWS Api Gateway's behavior of passing HTTP headers
     # as the `headers` dict in the event passed to the Lambda function.
@@ -874,9 +884,7 @@ def test_span_origin(lambda_client, test_environment):
 
     (transaction_event,) = envelopes
 
-    assert (
-        transaction_event["contexts"]["trace"]["origin"] == "auto.function.aws_lambda"
-    )
+    assert transaction_event["contexts"]["trace"]["origin"] == ORIGIN
 
 
 def test_traces_sampler_has_correct_sampling_context(lambda_client, test_environment):
@@ -955,28 +963,28 @@ def test_span_streaming_no_error(lambda_client, test_environment):
 
     attrs = segment_span["attributes"]
 
-    assert _get_span_attr(attrs, "sentry.op") == "function.aws"
-    assert _get_span_attr(attrs, "sentry.origin") == "auto.function.aws_lambda"
-    assert _get_span_attr(attrs, "sentry.segment.name.source") == "component"
-    assert _get_span_attr(attrs, "cloud.provider") == "aws"
-    assert _get_span_attr(attrs, "cloud.platform") == "aws_lambda"
+    assert _get_span_attr(attrs, SPANDATA.SENTRY_OP) == OP.FUNCTION_AWS
+    assert _get_span_attr(attrs, SPANDATA.SENTRY_ORIGIN) == ORIGIN
     assert (
-        _get_span_attr(attrs, "cloud.resource_id")
+        _get_span_attr(attrs, SPANDATA.SENTRY_SEGMENT_NAME_SOURCE)
+        == SegmentNameSource.COMPONENT
+    )
+    assert _get_span_attr(attrs, SPANDATA.CLOUD_PROVIDER) == CLOUD_PROVIDER
+    assert _get_span_attr(attrs, SPANDATA.CLOUD_PLATFORM) == CLOUD_PLATFORM
+    assert _get_span_attr(attrs, SPANDATA.FAAS_NAME) == "BasicOkSpanStreaming"
+    assert _get_span_attr(attrs, SPANDATA.FAAS_VERSION) == LATEST_FUNCTION_VERSION
+    assert SPANDATA.FAAS_INVOCATION_ID in attrs
+    assert (
+        _get_span_attr(attrs, SPANDATA.AWS_LAMBDA_INVOKED_ARN)
         == "arn:aws:lambda:us-east-1:012345678912:function:BasicOkSpanStreaming"
     )
-    assert _get_span_attr(attrs, "cloud.region") == "us-east-1"
-    assert _get_span_attr(attrs, "faas.name") == "BasicOkSpanStreaming"
-    assert _get_span_attr(attrs, "faas.version") == "$LATEST"
-    assert "faas.invocation_id" in attrs
-    assert (
-        _get_span_attr(attrs, "aws.lambda.invoked_arn")
-        == "arn:aws:lambda:us-east-1:012345678912:function:BasicOkSpanStreaming"
-    )
-    assert _get_span_attr(attrs, "aws.log.group.names") == [
+    assert _get_span_attr(attrs, SPANDATA.AWS_LOG_GROUP_NAMES) == [
         "aws/lambda/BasicOkSpanStreaming"
     ]
-    assert _get_span_attr(attrs, "aws.log.stream.names") == ["$LATEST"]
-    assert _get_span_attr(attrs, "messaging.batch.message_count") == 1
+    assert _get_span_attr(attrs, SPANDATA.AWS_LOG_STREAM_NAMES) == [
+        LATEST_FUNCTION_VERSION
+    ]
+    assert _get_span_attr(attrs, SPANDATA.MESSAGING_BATCH_MESSAGE_COUNT) == 1
 
 
 def test_span_streaming_error(lambda_client, test_environment):
@@ -993,7 +1001,7 @@ def test_span_streaming_error(lambda_client, test_environment):
     (exception,) = error_event["exception"]["values"]
     assert exception["type"] == "Exception"
     assert exception["value"] == "Oh!"
-    assert exception["mechanism"]["type"] == "aws_lambda"
+    assert exception["mechanism"]["type"] == IDENTIFIER
     assert not exception["mechanism"]["handled"]
 
     segment_spans = [s for s in span_items if s["is_segment"]]
@@ -1005,35 +1013,35 @@ def test_span_streaming_error(lambda_client, test_environment):
 
     attrs = segment_span["attributes"]
 
-    assert _get_span_attr(attrs, "sentry.op") == "function.aws"
-    assert _get_span_attr(attrs, "sentry.origin") == "auto.function.aws_lambda"
-    assert _get_span_attr(attrs, "sentry.segment.name.source") == "component"
-    assert _get_span_attr(attrs, "cloud.provider") == "aws"
-    assert _get_span_attr(attrs, "cloud.platform") == "aws_lambda"
+    assert _get_span_attr(attrs, SPANDATA.SENTRY_OP) == OP.FUNCTION_AWS
+    assert _get_span_attr(attrs, SPANDATA.SENTRY_ORIGIN) == ORIGIN
     assert (
-        _get_span_attr(attrs, "cloud.resource_id")
+        _get_span_attr(attrs, SPANDATA.SENTRY_SEGMENT_NAME_SOURCE)
+        == SegmentNameSource.COMPONENT
+    )
+    assert _get_span_attr(attrs, SPANDATA.CLOUD_PROVIDER) == CLOUD_PROVIDER
+    assert _get_span_attr(attrs, SPANDATA.CLOUD_PLATFORM) == CLOUD_PLATFORM
+    assert _get_span_attr(attrs, SPANDATA.FAAS_NAME) == "RaiseErrorSpanStreaming"
+    assert _get_span_attr(attrs, SPANDATA.FAAS_VERSION) == LATEST_FUNCTION_VERSION
+    assert SPANDATA.FAAS_INVOCATION_ID in attrs
+    assert (
+        _get_span_attr(attrs, SPANDATA.AWS_LAMBDA_INVOKED_ARN)
         == "arn:aws:lambda:us-east-1:012345678912:function:RaiseErrorSpanStreaming"
     )
-    assert _get_span_attr(attrs, "cloud.region") == "us-east-1"
-    assert _get_span_attr(attrs, "faas.name") == "RaiseErrorSpanStreaming"
-    assert _get_span_attr(attrs, "faas.version") == "$LATEST"
-    assert "faas.invocation_id" in attrs
-    assert (
-        _get_span_attr(attrs, "aws.lambda.invoked_arn")
-        == "arn:aws:lambda:us-east-1:012345678912:function:RaiseErrorSpanStreaming"
-    )
-    assert _get_span_attr(attrs, "aws.log.group.names") == [
+    assert _get_span_attr(attrs, SPANDATA.AWS_LOG_GROUP_NAMES) == [
         "aws/lambda/RaiseErrorSpanStreaming"
     ]
-    assert _get_span_attr(attrs, "aws.log.stream.names") == ["$LATEST"]
-    assert _get_span_attr(attrs, "messaging.batch.message_count") == 1
+    assert _get_span_attr(attrs, SPANDATA.AWS_LOG_STREAM_NAMES) == [
+        LATEST_FUNCTION_VERSION
+    ]
+    assert _get_span_attr(attrs, SPANDATA.MESSAGING_BATCH_MESSAGE_COUNT) == 1
 
 
 def test_span_streaming_trace_continuation(lambda_client, test_environment):
     trace_id = "471a43a4192642f0b136d5159a501701"
     parent_span_id = "6e8f22c393e68f19"
     parent_sampled = 1
-    sentry_trace_header = "{}-{}-{}".format(trace_id, parent_span_id, parent_sampled)
+    sentry_trace_header = f"{trace_id}-{parent_span_id}-{parent_sampled}"
 
     payload = {
         "headers": {
@@ -1058,15 +1066,17 @@ def test_span_streaming_trace_continuation(lambda_client, test_environment):
     assert segment_span["trace_id"] == trace_id
     assert segment_span["name"] == "RaiseErrorSpanStreaming"
     attrs = segment_span["attributes"]
-    assert _get_span_attr(attrs, "sentry.op") == "function.aws"
-    assert _get_span_attr(attrs, "sentry.origin") == "auto.function.aws_lambda"
-    assert _get_span_attr(attrs, "sentry.segment.name.source") == "component"
-    assert _get_span_attr(attrs, "cloud.provider") == "aws"
-    assert _get_span_attr(attrs, "cloud.platform") == "aws_lambda"
-    assert _get_span_attr(attrs, "cloud.region") == "us-east-1"
-    assert _get_span_attr(attrs, "faas.name") == "RaiseErrorSpanStreaming"
-    assert _get_span_attr(attrs, "faas.version") == "$LATEST"
-    assert "faas.invocation_id" in attrs
+    assert _get_span_attr(attrs, SPANDATA.SENTRY_OP) == OP.FUNCTION_AWS
+    assert _get_span_attr(attrs, SPANDATA.SENTRY_ORIGIN) == ORIGIN
+    assert (
+        _get_span_attr(attrs, SPANDATA.SENTRY_SEGMENT_NAME_SOURCE)
+        == SegmentNameSource.COMPONENT
+    )
+    assert _get_span_attr(attrs, SPANDATA.CLOUD_PROVIDER) == CLOUD_PROVIDER
+    assert _get_span_attr(attrs, SPANDATA.CLOUD_PLATFORM) == CLOUD_PLATFORM
+    assert _get_span_attr(attrs, SPANDATA.FAAS_NAME) == "RaiseErrorSpanStreaming"
+    assert _get_span_attr(attrs, SPANDATA.FAAS_VERSION) == LATEST_FUNCTION_VERSION
+    assert SPANDATA.FAAS_INVOCATION_ID in attrs
 
 
 def test_span_streaming_request_attributes(lambda_client, test_environment):
@@ -1091,25 +1101,29 @@ def test_span_streaming_request_attributes(lambda_client, test_environment):
     segment_span = segment_spans[0]
     attrs = segment_span["attributes"]
 
-    assert _get_span_attr(attrs, "http.request.method") == "POST"
+    assert _get_span_attr(attrs, SPANDATA.HTTP_REQUEST_METHOD) == "POST"
     assert (
-        _get_span_attr(attrs, "url.query")
+        _get_span_attr(attrs, SPANDATA.URL_QUERY)
         == "foo=bar&a-complicated-value=a%3Db%26c%3Dd"
     )
     assert (
-        _get_span_attr(attrs, "http.request.header.content-type") == "application/json"
+        _get_span_attr(attrs, f"{SPANDATA.HTTP_REQUEST_HEADER}.content-type")
+        == "application/json"
     )
-    assert _get_span_attr(attrs, "http.request.header.accept") == "text/html"
-    assert _get_span_attr(attrs, "faas.name") == "BasicOkSpanStreamingPii"
-    assert _get_span_attr(attrs, "cloud.provider") == "aws"
-    assert _get_span_attr(attrs, "cloud.platform") == "aws_lambda"
-    assert _get_span_attr(attrs, "cloud.region") == "us-east-1"
-    assert _get_span_attr(attrs, "faas.version") == "$LATEST"
-    assert "faas.invocation_id" in attrs
-    assert _get_span_attr(attrs, "aws.log.group.names") == [
+    assert (
+        _get_span_attr(attrs, f"{SPANDATA.HTTP_REQUEST_HEADER}.accept") == "text/html"
+    )
+    assert _get_span_attr(attrs, SPANDATA.FAAS_NAME) == "BasicOkSpanStreamingPii"
+    assert _get_span_attr(attrs, SPANDATA.CLOUD_PROVIDER) == CLOUD_PROVIDER
+    assert _get_span_attr(attrs, SPANDATA.CLOUD_PLATFORM) == CLOUD_PLATFORM
+    assert _get_span_attr(attrs, SPANDATA.FAAS_VERSION) == LATEST_FUNCTION_VERSION
+    assert SPANDATA.FAAS_INVOCATION_ID in attrs
+    assert _get_span_attr(attrs, SPANDATA.AWS_LOG_GROUP_NAMES) == [
         "aws/lambda/BasicOkSpanStreamingPii"
     ]
-    assert _get_span_attr(attrs, "aws.log.stream.names") == ["$LATEST"]
+    assert _get_span_attr(attrs, SPANDATA.AWS_LOG_STREAM_NAMES) == [
+        LATEST_FUNCTION_VERSION
+    ]
 
 
 def test_span_streaming_url_query_params_with_data_collection(
@@ -1139,7 +1153,7 @@ def test_span_streaming_url_query_params_with_data_collection(
     # "page" passes through; "tracking" is denied by a custom term and "token"
     # by the built-in sensitive denylist.
     assert (
-        _get_span_attr(attrs, "url.query")
+        _get_span_attr(attrs, SPANDATA.URL_QUERY)
         == "page=2&tracking=%5BFiltered%5D&token=%5BFiltered%5D"
     )
 
@@ -1228,7 +1242,7 @@ def test_error_has_existing_trace_context(
     trace_id = "471a43a4192642f0b136d5159a501701"
     parent_span_id = "6e8f22c393e68f19"
     parent_sampled = 1
-    sentry_trace_header = "{}-{}-{}".format(trace_id, parent_span_id, parent_sampled)
+    sentry_trace_header = f"{trace_id}-{parent_span_id}-{parent_sampled}"
 
     # We simulate here AWS Api Gateway's behavior of passing HTTP headers
     # as the `headers` dict in the event passed to the Lambda function.

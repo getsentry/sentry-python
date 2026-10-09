@@ -15,6 +15,7 @@ from sentry_sdk.integrations.aws_lambda._request import (
 )
 from sentry_sdk.integrations.aws_lambda.consts import (
     MILLIS_TO_SECONDS,
+    ORIGIN,
     TIMEOUT_WARNING_BUFFER,
 )
 from sentry_sdk.integrations.cloud_resource_context import (
@@ -171,7 +172,7 @@ def _wrap_handler(handler: "F") -> "F":
                     parent_span=None,
                     attributes={
                         "sentry.op": OP.FUNCTION_AWS,
-                        "sentry.origin": AwsLambdaIntegration.origin,
+                        "sentry.origin": ORIGIN,
                         "sentry.segment.name.source": SegmentNameSource.COMPONENT,
                         "cloud.region": aws_region,
                         "cloud.resource_id": aws_context.invoked_function_arn,
@@ -194,7 +195,7 @@ def _wrap_handler(handler: "F") -> "F":
                     op=OP.FUNCTION_AWS,
                     name=function_name,
                     source=TransactionSource.COMPONENT,
-                    origin=AwsLambdaIntegration.origin,
+                    origin=ORIGIN,
                 )
 
                 span_ctx = sentry_sdk.start_transaction(

@@ -396,6 +396,24 @@ class SPANDATA:
     Example: "wzHcyEWfmOGDIE5QOhTAqFDoDWP3y8IUvpNINCwL9N4TEHbUw0/gZJ+VZTmCNCWR7fezEN3eCiQ="
     """
 
+    AWS_LAMBDA_INVOKED_ARN = "aws.lambda.invoked_arn"
+    """
+    The full ARN of the Lambda function that was invoked.
+    Example: "arn:aws:lambda:us-east-1:123456789012:function:my-function"
+    """
+
+    AWS_LOG_GROUP_NAMES = "aws.log.group.names"
+    """
+    The name(s) of the AWS log group(s) an application is writing to.
+    Example: ["/aws/lambda/my-function", "opentelemetry-service"]
+    """
+
+    AWS_LOG_STREAM_NAMES = "aws.log.stream.names"
+    """
+    The name(s) of the AWS log stream(s) an application is writing to.
+    Example: ["logs/main/10838bed-421f-43ef-870a-f43feacbbb5b"]
+    """
+
     AWS_REQUEST_ID = "aws.request_id"
     """
     The AWS request ID as returned in the response headers.
@@ -426,10 +444,41 @@ class SPANDATA:
     Example: "10.1.2.80"
     """
 
+    CLOUD_ACCOUNT_ID = "cloud.account.id"
+    """
+    The cloud account ID the resource is assigned to.
+    Example: "123456789012"
+    """
+
+    CLOUD_AVAILABILITY_ZONE = "cloud.availability_zone"
+    """
+    Cloud regions often have multiple, isolated locations known as zones to increase availability
+    Example: "us-east-1c"
+    """
+
+    CLOUD_PLATFORM = "cloud.platform"
+    """
+    The cloud platform in use.
+    Example: "aws_lambda"
+    """
+
+    CLOUD_PROVIDER = "cloud.provider"
+    """
+    Name of the cloud provider.
+
+    Example: "aws"
+    """
+
     CLOUD_REGION = "cloud.region"
     """
     The geographical region the resource is running.
     Example: "us-east-1"
+    """
+
+    CLOUD_RESOURCE_ID = "cloud.resource_id"
+    """
+    Cloud provider-specific native identifier of the monitored cloud resource
+    Example: "arn:aws:lambda:REGION:ACCOUNT_ID:function:my-function"
     """
 
     CODE_FILEPATH = "code.filepath"
@@ -563,6 +612,24 @@ class SPANDATA:
     """
     Describes a class of error the operation ended with.
     Example: "timeout"
+    """
+
+    FAAS_INVOCATION_ID = "faas.invocation_id"
+    """
+    The invocation ID of the current function invocation.
+    Example: "af9d5aa4-a685-4c5f-a22b-444f80b3cc28"
+    """
+
+    FAAS_NAME = "faas.name"
+    """
+    The name of the serverless function.
+    Example: "my_function"
+    """
+
+    FAAS_VERSION = "faas.version"
+    """
+    The version of the function that was invoked.
+    Example: "$LATEST"
     """
 
     GEN_AI_AGENT_NAME = "gen_ai.agent.name"
@@ -928,6 +995,12 @@ class SPANDATA:
     Example: 418
     """
 
+    MESSAGING_BATCH_MESSAGE_COUNT = "messaging.batch.message_count"
+    """
+    The number of messages sent, received, or processed in the scope of the batching operation.
+    Example: 10
+    """
+
     MESSAGING_DESTINATION_NAME = "messaging.destination.name"
     """
     The destination name where the message is being consumed from,
@@ -1260,6 +1333,12 @@ class SPANDATA:
     """
     A list of names identifying enabled integrations.
     Example: ["AtexitIntegration", "StdlibIntegration"]
+    """
+
+    SENTRY_SEGMENT_NAME_SOURCE = "sentry.segment.name.source"
+    """
+    The source of the segment span name. Should only be set on segment spans.
+    Example: "route", "component", "view", "task", "custom", "url"
     """
 
     USER_AGENT_ORIGINAL = "user_agent.original"
