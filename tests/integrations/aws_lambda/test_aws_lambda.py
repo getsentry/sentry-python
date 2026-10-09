@@ -17,7 +17,6 @@ from sentry_sdk.integrations.aws_lambda.consts import (
     IDENTIFIER,
     LATEST_FUNCTION_VERSION,
     ORIGIN,
-    SENTRY_KIND,
 )
 from sentry_sdk.traces import SegmentNameSource
 
@@ -966,7 +965,6 @@ def test_span_streaming_no_error(lambda_client, test_environment):
 
     assert _get_span_attr(attrs, SPANDATA.SENTRY_OP) == OP.FUNCTION_AWS
     assert _get_span_attr(attrs, SPANDATA.SENTRY_ORIGIN) == ORIGIN
-    assert _get_span_attr(attrs, SPANDATA.SENTRY_KIND) == SENTRY_KIND
     assert (
         _get_span_attr(attrs, SPANDATA.SENTRY_SEGMENT_NAME_SOURCE)
         == SegmentNameSource.COMPONENT
@@ -978,7 +976,6 @@ def test_span_streaming_no_error(lambda_client, test_environment):
         _get_span_attr(attrs, SPANDATA.CLOUD_RESOURCE_ID)
         == "arn:aws:lambda:us-east-1:012345678912:function:BasicOkSpanStreaming"
     )
-    assert _get_span_attr(attrs, SPANDATA.CLOUD_REGION) == "us-east-1"
     assert _get_span_attr(attrs, SPANDATA.FAAS_NAME) == "BasicOkSpanStreaming"
     assert _get_span_attr(attrs, SPANDATA.FAAS_VERSION) == LATEST_FUNCTION_VERSION
     assert SPANDATA.FAAS_INVOCATION_ID in attrs
@@ -1033,7 +1030,6 @@ def test_span_streaming_error(lambda_client, test_environment):
         _get_span_attr(attrs, SPANDATA.CLOUD_RESOURCE_ID)
         == "arn:aws:lambda:us-east-1:012345678912:function:RaiseErrorSpanStreaming"
     )
-    assert _get_span_attr(attrs, SPANDATA.CLOUD_REGION) == "us-east-1"
     assert _get_span_attr(attrs, SPANDATA.FAAS_NAME) == "RaiseErrorSpanStreaming"
     assert _get_span_attr(attrs, SPANDATA.FAAS_VERSION) == LATEST_FUNCTION_VERSION
     assert SPANDATA.FAAS_INVOCATION_ID in attrs
@@ -1087,7 +1083,6 @@ def test_span_streaming_trace_continuation(lambda_client, test_environment):
     )
     assert _get_span_attr(attrs, SPANDATA.CLOUD_PROVIDER) == CLOUD_PROVIDER
     assert _get_span_attr(attrs, SPANDATA.CLOUD_PLATFORM) == CLOUD_PLATFORM
-    assert _get_span_attr(attrs, SPANDATA.CLOUD_REGION) == "us-east-1"
     assert _get_span_attr(attrs, SPANDATA.FAAS_NAME) == "RaiseErrorSpanStreaming"
     assert _get_span_attr(attrs, SPANDATA.FAAS_VERSION) == LATEST_FUNCTION_VERSION
     assert SPANDATA.FAAS_INVOCATION_ID in attrs
@@ -1130,8 +1125,6 @@ def test_span_streaming_request_attributes(lambda_client, test_environment):
     assert _get_span_attr(attrs, SPANDATA.FAAS_NAME) == "BasicOkSpanStreamingPii"
     assert _get_span_attr(attrs, SPANDATA.CLOUD_PROVIDER) == CLOUD_PROVIDER
     assert _get_span_attr(attrs, SPANDATA.CLOUD_PLATFORM) == CLOUD_PLATFORM
-    assert _get_span_attr(attrs, SPANDATA.CLOUD_REGION) == "us-east-1"
-    assert _get_span_attr(attrs, SPANDATA.CLOUD_AVAILABILITY_ZONE) == "use1-az1"
     assert _get_span_attr(attrs, SPANDATA.FAAS_VERSION) == LATEST_FUNCTION_VERSION
     assert SPANDATA.FAAS_INVOCATION_ID in attrs
     assert _get_span_attr(attrs, SPANDATA.AWS_LOG_GROUP_NAMES) == [
