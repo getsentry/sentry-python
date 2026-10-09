@@ -113,9 +113,9 @@ def build_packaged_zip(base_dir=None, out_zip_filename=None):
     # Just for debugging
     dist_path = os.path.abspath(DIST_PATH)
     print("Created Lambda Layer package with this information:")
-    print(" - Base directory for generating package: {}".format(layer_builder.base_dir))
-    print(" - Package zip filename: {}".format(layer_builder.out_zip_filename))
-    print(" - Copied package zip to: {}".format(dist_path))
+    print(f" - Base directory for generating package: {layer_builder.base_dir}")
+    print(f" - Package zip filename: {layer_builder.out_zip_filename}")
+    print(f" - Copied package zip to: {dist_path}")
 
 
 if __name__ == "__main__":
