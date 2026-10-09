@@ -322,16 +322,16 @@ class SentryAsyncExtension(SchemaExtension):
 
     def should_skip_tracing(
         self,
-        _next: "Callable[[Any, GraphQLResolveInfo, Any, Any], Any]",
-        info: "GraphQLResolveInfo",
+        _next: "Callable[[Any, GraphQLResolveInfo[Any], Any, Any], Any]",
+        info: "GraphQLResolveInfo[Any]",
     ) -> bool:
         return strawberry_should_skip_tracing(_next, info)
 
     async def _resolve(
         self,
-        _next: "Callable[[Any, GraphQLResolveInfo, Any, Any], Any]",
+        _next: "Callable[[Any, GraphQLResolveInfo[Any], Any, Any], Any]",
         root: "Any",
-        info: "GraphQLResolveInfo",
+        info: "GraphQLResolveInfo[Any]",
         *args: str,
         **kwargs: "Any",
     ) -> "Any":
@@ -344,9 +344,9 @@ class SentryAsyncExtension(SchemaExtension):
 
     async def resolve(
         self,
-        _next: "Callable[[Any, GraphQLResolveInfo, Any, Any], Any]",
+        _next: "Callable[[Any, GraphQLResolveInfo[Any], Any, Any], Any]",
         root: "Any",
-        info: "GraphQLResolveInfo",
+        info: "GraphQLResolveInfo[Any]",
         *args: str,
         **kwargs: "Any",
     ) -> "Any":
@@ -388,7 +388,7 @@ class SentrySyncExtension(SentryAsyncExtension):
         self,
         _next: "Callable[[Any, Any, Any, Any], Any]",
         root: "Any",
-        info: "GraphQLResolveInfo",
+        info: "GraphQLResolveInfo[Any]",
         *args: str,
         **kwargs: "Any",
     ) -> "Any":

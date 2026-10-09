@@ -40,7 +40,9 @@ if TYPE_CHECKING:
 
     from sentry_sdk._types import Event, EventProcessor
 
-    EventDataType = Dict[str, Union[str, Tuple[VariableDefinitionNode, ...]]]
+    EventDataType = Union[
+        Dict[str, Union[str, Tuple[VariableDefinitionNode, ...], None]]
+    ]
 
 
 class GQLIntegration(Integration):
