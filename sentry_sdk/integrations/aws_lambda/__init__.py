@@ -1,4 +1,5 @@
 from sentry_sdk.integrations import Integration
+from sentry_sdk.integrations.aws_lambda._runtime import _setup_once
 from sentry_sdk.integrations.aws_lambda.consts import IDENTIFIER, ORIGIN
 
 
@@ -11,6 +12,4 @@ class AwsLambdaIntegration(Integration):
 
     @staticmethod
     def setup_once() -> None:
-        from sentry_sdk.integrations.aws_lambda._runtime import _setup_once
-
         _setup_once()
