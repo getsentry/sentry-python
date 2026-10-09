@@ -11,21 +11,19 @@ from sentry_sdk.integrations.boto3._instrumentation import (
     _instrument_streaming_body,
     _sentry_before_sign,
     _sentry_request_created,
-    _set_span_attributes,
     _start_client_span,
 )
 from sentry_sdk.integrations.boto3._services.registry import (
     _resolve_service,
 )
 from sentry_sdk.integrations.boto3.consts import IDENTIFIER
-from sentry_sdk.traces import NoOpStreamedSpan, StreamedSpan
+from sentry_sdk.traces import NoOpSpan, Span
 from sentry_sdk.utils import capture_internal_exceptions
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, Iterator, Optional, Union
+    from typing import Any, Dict, Iterator, Optional
 
     from sentry_sdk._types import Attributes
-    from sentry_sdk.tracing import Span
 
 try:
     from botocore.client import BaseClient
@@ -36,8 +34,8 @@ except ImportError:
 
 @contextmanager
 def _activate_client_span(
-    span: "Union[Span, StreamedSpan]",
-) -> "Iterator[Union[Span, StreamedSpan]]":
+    span: "Span",
+) -> "Iterator[Span]":
     """
     Activate the client span temporarily during `_make_api_call()` without ending it.
 
@@ -51,26 +49,17 @@ def _activate_client_span(
            http     [request]                     http       [request]
            stream               [read]            stream                [read]
     """
-    if isinstance(span, NoOpStreamedSpan):
+    if isinstance(span, NoOpSpan):
         yield span
         return
 
     scope = sentry_sdk.get_current_scope()
-    if not isinstance(span, StreamedSpan):
-        previous_span = scope.span
-        scope.span = span
-        try:
-            yield span
-        finally:
-            scope.span = previous_span
-        return
-
-    previous_streamed_span = scope.streamed_span
-    scope.streamed_span = span
+    previous_span = scope.span
+    scope.span = span
     try:
         yield span
     finally:
-        scope.streamed_span = previous_streamed_span
+        scope.span = previous_span
 
 
 def _patch_botocore_client() -> None:
@@ -98,7 +87,7 @@ def _patch_botocore_client() -> None:
         if client.get_integration(IDENTIFIER) is None:
             return orig_make_api_call(self, operation_name, api_params)
 
-        span: "Optional[Union[Span, StreamedSpan]]" = None
+        span: "Optional[Span]" = None
         with capture_internal_exceptions():
             ctx = AwsCallContext(operation_name, api_params)
             with capture_internal_exceptions():
@@ -111,11 +100,9 @@ def _patch_botocore_client() -> None:
             return orig_make_api_call(self, operation_name, api_params)
 
         # activate without finishing; a streaming response may outlive the call.
-        span_ctx = _activate_client_span(span)
-
         attributes: "Attributes" = {}
         try:
-            with span_ctx:
+            with _activate_client_span(span):
                 try:
                     parsed = orig_make_api_call(self, operation_name, api_params)
                 except BaseException as error:
@@ -127,7 +114,7 @@ def _patch_botocore_client() -> None:
                     with capture_internal_exceptions():
                         attributes.update(_get_error_attributes(error))
                     with capture_internal_exceptions():
-                        _set_span_attributes(span, attributes)
+                        span.set_attributes(attributes)
                     raise
                 if service_ext is not None:
                     with capture_internal_exceptions():
@@ -137,7 +124,7 @@ def _patch_botocore_client() -> None:
                 with capture_internal_exceptions():
                     attributes.update(_get_response_attributes(parsed))
                 with capture_internal_exceptions():
-                    _set_span_attributes(span, attributes)
+                    span.set_attributes(attributes)
         except BaseException as error:
             _finish_span(span, error)
             raise

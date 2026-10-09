@@ -1,10 +1,9 @@
-import weakref
 from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk.integrations import Integration
 from sentry_sdk.scope import add_global_event_processor
-from sentry_sdk.utils import ContextVar, logger
+from sentry_sdk.utils import capture_internal_exceptions, logger
 
 if TYPE_CHECKING:
     from typing import Optional
@@ -14,9 +13,6 @@ if TYPE_CHECKING:
 
 class DedupeIntegration(Integration):
     identifier = "dedupe"
-
-    def __init__(self) -> None:
-        self._last_seen = ContextVar("last-seen")
 
     @staticmethod
     def setup_once() -> None:
@@ -33,30 +29,12 @@ class DedupeIntegration(Integration):
             if exc_info is None:
                 return event
 
-            last_seen = integration._last_seen.get(None)
-            if last_seen is not None:
-                # last_seen is either a weakref or the original instance
-                last_seen = (
-                    last_seen() if isinstance(last_seen, weakref.ref) else last_seen
-                )
-
             exc = exc_info[1]
-            if last_seen is exc:
+
+            if getattr(exc, "_handled_by_sentry", False):
                 logger.info("DedupeIntegration dropped duplicated error event %s", exc)
                 return None
-
-            # we can only weakref non builtin types
-            try:
-                integration._last_seen.set(weakref.ref(exc))
-            except TypeError:
-                integration._last_seen.set(exc)
-
-            return event
-
-    @staticmethod
-    def reset_last_seen() -> None:
-        integration = sentry_sdk.get_client().get_integration(DedupeIntegration)
-        if integration is None:
-            return
-
-        integration._last_seen.set(None)
+            else:
+                with capture_internal_exceptions():
+                    exc._handled_by_sentry = True
+                return event

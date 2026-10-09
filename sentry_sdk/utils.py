@@ -4,7 +4,6 @@ import linecache
 import logging
 import math
 import os
-import random
 import re
 import subprocess
 import sys
@@ -13,6 +12,7 @@ import time
 import warnings
 from collections import namedtuple
 from contextlib import contextmanager
+from contextvars import ContextVar
 from datetime import datetime, timezone
 from decimal import Decimal
 from functools import partial, partialmethod, wraps
@@ -65,7 +65,6 @@ if TYPE_CHECKING:
 
     from sentry_sdk._types import (
         AttributeValue,
-        DataCollection,
         Event,
         ExcInfo,
         Hint,
@@ -271,7 +270,8 @@ def datetime_from_isoformat(value: str) -> "datetime":
     try:
         result = datetime.fromisoformat(value)
     except (AttributeError, ValueError):
-        # py 3.6
+        # until 3.11, datetime.fromisoformat didn't support all possible formats,
+        # so we still need this manual fallback
         timestamp_format = (
             "%Y-%m-%dT%H:%M:%S.%f" if "." in value else "%Y-%m-%dT%H:%M:%S"
         )
@@ -476,11 +476,7 @@ def get_lines_from_file(
 ) -> "Tuple[List[Annotated[str]], Optional[Annotated[str]], List[Annotated[str]]]":
     client_options = sentry_sdk.get_client().options
 
-    # This is the default pre-data collection. Should be removed once data collection
-    # is fully released
-    context_lines = 5
-    if has_data_collection_enabled(client_options):
-        context_lines = client_options["data_collection"]["frame_context_lines"]
+    context_lines = client_options["data_collection"]["frame_context_lines"]
 
     source = None
     if loader is not None and hasattr(loader, "get_source"):
@@ -588,8 +584,6 @@ def filename_for_module(
 def serialize_frame(
     frame: "FrameType",
     tb_lineno: "Optional[int]" = None,
-    include_local_variables: bool = True,
-    include_source_context: bool = True,
     max_value_length: "Optional[int]" = None,
     custom_repr: "Optional[Callable[..., Optional[str]]]" = None,
 ) -> "Dict[str, Any]":
@@ -623,53 +617,38 @@ def serialize_frame(
         "lineno": tb_lineno,
     }
 
-    client_options = sentry_sdk.get_client().options
-    if has_data_collection_enabled(client_options):
-        include_source_context = bool(
-            client_options["data_collection"]["frame_context_lines"]
-        )
+    data_collection = sentry_sdk.get_client().options["data_collection"]
 
+    include_source_context = bool(data_collection["frame_context_lines"])
     if include_source_context:
         rv["pre_context"], rv["context_line"], rv["post_context"] = get_source_context(
             frame, tb_lineno, max_value_length
         )
 
-    if has_data_collection_enabled(client_options):
-        dc_stack_frame_vars_config = client_options["data_collection"][
-            "stack_frame_variables"
-        ]
+    dc_stack_frame_vars_config = data_collection["stack_frame_variables"]
 
-        if isinstance(dc_stack_frame_vars_config, bool):
-            if dc_stack_frame_vars_config:
-                rv["vars"] = serialize(
-                    dict(frame.f_locals), is_vars=True, custom_repr=custom_repr
-                )
-        else:
-            local_variables_to_send = _apply_key_value_collection_filtering(
-                items=dict(frame.f_locals),
-                behaviour=dc_stack_frame_vars_config,
+    if isinstance(dc_stack_frame_vars_config, bool):
+        if dc_stack_frame_vars_config:
+            rv["vars"] = serialize(
+                dict(frame.f_locals), is_vars=True, custom_repr=custom_repr
+            )
+    else:
+        local_variables_to_send = _apply_key_value_collection_filtering(
+            items=dict(frame.f_locals),
+            behaviour=dc_stack_frame_vars_config,
+        )
+
+        if local_variables_to_send:
+            serialized_variables = serialize(
+                local_variables_to_send, is_vars=True, custom_repr=custom_repr
             )
 
-            if local_variables_to_send:
-                serialized_variables = serialize(
-                    local_variables_to_send, is_vars=True, custom_repr=custom_repr
-                )
-
-                rv["vars"] = serialized_variables
-
-    elif include_local_variables:
-        rv["vars"] = serialize(
-            dict(frame.f_locals), is_vars=True, custom_repr=custom_repr
-        )
+            rv["vars"] = serialized_variables
 
     return rv
 
 
-def current_stacktrace(
-    include_local_variables: bool = True,
-    include_source_context: bool = True,
-    max_value_length: "Optional[int]" = None,
-) -> "Dict[str, Any]":
+def current_stacktrace(max_value_length: "Optional[int]" = None) -> "Dict[str, Any]":
     __tracebackhide__ = True
     frames = []
 
@@ -679,8 +658,6 @@ def current_stacktrace(
             frames.append(
                 serialize_frame(
                     f,
-                    include_local_variables=include_local_variables,
-                    include_source_context=include_source_context,
                     max_value_length=max_value_length,
                 )
             )
@@ -769,13 +746,9 @@ def single_exception_from_error_tuple(
     exception_value["value"] = get_error_message(exc_value)
 
     if client_options is None:
-        include_local_variables = True
-        include_source_context = True
         max_value_length = None  # fallback
         custom_repr = None
     else:
-        include_local_variables = client_options["include_local_variables"]
-        include_source_context = client_options["include_source_context"]
         max_value_length = client_options["max_value_length"]
         custom_repr = client_options.get("custom_repr")
 
@@ -783,8 +756,6 @@ def single_exception_from_error_tuple(
         serialize_frame(
             tb.tb_frame,
             tb_lineno=tb.tb_lineno,
-            include_local_variables=include_local_variables,
-            include_source_context=include_source_context,
             max_value_length=max_value_length,
             custom_repr=custom_repr,
         )
@@ -868,27 +839,16 @@ def exceptions_from_error(
     seen_exception_ids: "Optional[Set[int]]" = None,
 ) -> "Tuple[int, List[Dict[str, Any]]]":
     """
-    Creates the list of exceptions.
-    This can include chained exceptions and exceptions from an ExceptionGroup.
+    Convert the given exception information into the Sentry "exception" format.
 
-    See the Exception Interface documentation for more details:
-    https://develop.sentry.dev/sdk/event-payloads/exception/
+    This will return a list of exceptions (a flattened tree of exceptions) in the
+    format of the Exception Interface documentation:
+    https://develop.sentry.dev/sdk/telemetry/errors/#exception-interface
 
-    Args:
-        exception_id (int):
-
-            Sequential counter for assigning ``mechanism.exception_id``
-            to each processed exception. Is NOT the result of calling `id()` on the exception itself.
-
-        parent_id (int):
-
-            The ``mechanism.exception_id`` of the parent exception.
-
-            Written into ``mechanism.parent_id`` in the event payload so Sentry can
-            reconstruct the exception tree.
-
-            Not to be confused with ``seen_exception_ids``, which tracks Python ``id()``
-            values for cycle detection.
+    This function can handle:
+    - simple exceptions
+    - chained exceptions (raise .. from ..)
+    - exception groups
     """
 
     if seen_exception_ids is None:
@@ -904,7 +864,7 @@ def exceptions_from_error(
         seen_exceptions.append(exc_value)
         seen_exception_ids.add(id(exc_value))
 
-    parent = single_exception_from_error_tuple(
+    base_exception = single_exception_from_error_tuple(
         exc_type=exc_type,
         exc_value=exc_value,
         tb=tb,
@@ -915,70 +875,60 @@ def exceptions_from_error(
         source=source,
         full_stack=full_stack,
     )
-    exceptions = [parent]
+    exceptions = [base_exception]
 
     parent_id = exception_id
     exception_id += 1
 
-    should_supress_context = (
+    causing_exception = None
+    exception_source = None
+
+    should_suppress_context = (
         hasattr(exc_value, "__suppress_context__") and exc_value.__suppress_context__  # type: ignore
     )
-    if should_supress_context:
-        # Add direct cause.
-        # The field `__cause__` is set when raised with the exception (using the `from` keyword).
-        exception_has_cause = (
+    if should_suppress_context:
+        has_explicit_causing_exception = (
             exc_value
             and hasattr(exc_value, "__cause__")
             and exc_value.__cause__ is not None
         )
-        if exception_has_cause:
-            cause = exc_value.__cause__  # type: ignore
-            (exception_id, child_exceptions) = exceptions_from_error(
-                exc_type=type(cause),
-                exc_value=cause,
-                tb=getattr(cause, "__traceback__", None),
-                client_options=client_options,
-                mechanism=mechanism,
-                exception_id=exception_id,
-                source="__cause__",
-                full_stack=full_stack,
-                seen_exceptions=seen_exceptions,
-                seen_exception_ids=seen_exception_ids,
-            )
-            exceptions.extend(child_exceptions)
-
+        if has_explicit_causing_exception:
+            exception_source = "__cause__"
+            causing_exception = exc_value.__cause__  # type: ignore
     else:
-        # Add indirect cause.
-        # The field `__context__` is assigned if another exception occurs while handling the exception.
-        exception_has_content = (
+        has_implicit_causing_exception = (
             exc_value
             and hasattr(exc_value, "__context__")
             and exc_value.__context__ is not None
         )
-        if exception_has_content:
-            context = exc_value.__context__  # type: ignore
-            (exception_id, child_exceptions) = exceptions_from_error(
-                exc_type=type(context),
-                exc_value=context,
-                tb=getattr(context, "__traceback__", None),
-                client_options=client_options,
-                mechanism=mechanism,
-                exception_id=exception_id,
-                source="__context__",
-                full_stack=full_stack,
-                seen_exceptions=seen_exceptions,
-                seen_exception_ids=seen_exception_ids,
-            )
-            exceptions.extend(child_exceptions)
+        if has_implicit_causing_exception:
+            exception_source = "__context__"
+            causing_exception = exc_value.__context__  # type: ignore
 
-    # Add exceptions from an ExceptionGroup.
+    if causing_exception:
+        (exception_id, child_exceptions) = exceptions_from_error(
+            exc_type=type(causing_exception),
+            exc_value=causing_exception,
+            tb=getattr(causing_exception, "__traceback__", None),
+            client_options=client_options,
+            mechanism=mechanism,
+            exception_id=exception_id,
+            parent_id=parent_id,
+            source=exception_source,
+            full_stack=full_stack,
+            seen_exceptions=seen_exceptions,
+            seen_exception_ids=seen_exception_ids,
+        )
+        exceptions.extend(child_exceptions)
+
+    # Add child exceptions from an ExceptionGroup.
     is_exception_group = exc_value and hasattr(exc_value, "exceptions")
     if is_exception_group:
-        for idx, e in enumerate(exc_value.exceptions):  # type: ignore
+        for idx, causing_exception in enumerate(exc_value.exceptions):  # type: ignore
             (exception_id, child_exceptions) = exceptions_from_error(
-                exc_type=type(e),
-                exc_value=e,
-                tb=getattr(e, "__traceback__", None),
+                exc_type=type(causing_exception),
+                exc_value=causing_exception,
+                tb=getattr(causing_exception, "__traceback__", None),
                 client_options=client_options,
                 mechanism=mechanism,
                 exception_id=exception_id,
@@ -999,37 +949,24 @@ def exceptions_from_error_tuple(
     mechanism: "Optional[Dict[str, Any]]" = None,
     full_stack: "Optional[list[dict[str, Any]]]" = None,
 ) -> "List[Dict[str, Any]]":
+    """
+    Convert an exception into Sentry's structured "exception" format.
+
+    See https://develop.sentry.dev/sdk/telemetry/errors/#exception-interface
+    This is the entry point for exception handling.
+    """
     exc_type, exc_value, tb = exc_info
 
-    is_exception_group = BaseExceptionGroup is not None and isinstance(
-        exc_value, BaseExceptionGroup
+    _, exceptions = exceptions_from_error(
+        exc_type=exc_type,
+        exc_value=exc_value,
+        tb=tb,
+        client_options=client_options,
+        mechanism=mechanism,
+        exception_id=0,
+        parent_id=0,
+        full_stack=full_stack,
     )
-
-    if is_exception_group:
-        (_, exceptions) = exceptions_from_error(
-            exc_type=exc_type,
-            exc_value=exc_value,
-            tb=tb,
-            client_options=client_options,
-            mechanism=mechanism,
-            exception_id=0,
-            parent_id=0,
-            full_stack=full_stack,
-        )
-
-    else:
-        exceptions = []
-        for exc_type, exc_value, tb in walk_exception_chain(exc_info):
-            exceptions.append(
-                single_exception_from_error_tuple(
-                    exc_type=exc_type,
-                    exc_value=exc_value,
-                    tb=tb,
-                    client_options=client_options,
-                    mechanism=mechanism,
-                    full_stack=full_stack,
-                )
-            )
 
     exceptions.reverse()
 
@@ -1201,15 +1138,14 @@ def merge_stack_frames(
 
 def event_from_exception(
     exc_info: "Union[BaseException, ExcInfo]",
-    client_options: "Optional[Dict[str, Any]]" = None,
     mechanism: "Optional[Dict[str, Any]]" = None,
 ) -> "Tuple[Event, Dict[str, Any]]":
     exc_info = exc_info_from_error(exc_info)
     hint = event_hint_with_exc_info(exc_info)
+    client_options = sentry_sdk.get_client().options
 
-    if client_options and client_options.get("add_full_stack", DEFAULT_ADD_FULL_STACK):
+    if client_options.get("add_full_stack", DEFAULT_ADD_FULL_STACK):
         full_stack = current_stacktrace(
-            include_local_variables=client_options["include_local_variables"],
             max_value_length=client_options["max_value_length"],
         )["frames"]
     else:
@@ -1360,133 +1296,6 @@ def parse_version(version: str) -> "Optional[Tuple[int, ...]]":
     return release_tuple
 
 
-def _is_contextvars_broken() -> bool:
-    """
-    Returns whether gevent/eventlet have patched the stdlib in a way where thread locals are now more "correct" than contextvars.
-    """
-    try:
-        import gevent
-        from gevent.monkey import is_object_patched
-
-        # Get the MAJOR and MINOR version numbers of Gevent
-        version_tuple = tuple(
-            [int(part) for part in re.split(r"a|b|rc|\.", gevent.__version__)[:2]]
-        )
-        if is_object_patched("threading", "local"):
-            # Gevent 20.9.0 depends on Greenlet 0.4.17 which natively handles switching
-            # context vars when greenlets are switched, so, Gevent 20.9.0+ is all fine.
-            # Ref: https://github.com/gevent/gevent/blob/83c9e2ae5b0834b8f84233760aabe82c3ba065b4/src/gevent/monkey.py#L604-L609
-            # Gevent 20.5, that doesn't depend on Greenlet 0.4.17 with native support
-            # for contextvars, is able to patch both thread locals and contextvars, in
-            # that case, check if contextvars are effectively patched.
-            if (
-                # Gevent 20.9.0+
-                (sys.version_info >= (3, 7) and version_tuple >= (20, 9))
-                # Gevent 20.5.0+ or Python < 3.7
-                or (is_object_patched("contextvars", "ContextVar"))
-            ):
-                return False
-
-            return True
-    except ImportError:
-        pass
-
-    try:
-        import greenlet
-        from eventlet.patcher import is_monkey_patched  # type: ignore
-
-        greenlet_version = parse_version(greenlet.__version__)
-
-        if greenlet_version is None:
-            logger.error(
-                "Internal error in Sentry SDK: Could not parse Greenlet version from greenlet.__version__."
-            )
-            return False
-
-        if is_monkey_patched("thread") and greenlet_version < (0, 5):
-            return True
-    except ImportError:
-        pass
-
-    return False
-
-
-def _make_threadlocal_contextvars(local: type) -> type:
-    class ContextVar:
-        # Super-limited impl of ContextVar
-
-        def __init__(self, name: str, default: "Any" = None) -> None:
-            self._name = name
-            self._default = default
-            self._local = local()
-            self._original_local = local()
-
-        def get(self, default: "Any" = None) -> "Any":
-            return getattr(self._local, "value", default or self._default)
-
-        def set(self, value: "Any") -> "Any":
-            token = str(random.getrandbits(64))
-            original_value = self.get()
-            setattr(self._original_local, token, original_value)
-            self._local.value = value
-            return token
-
-        def reset(self, token: "Any") -> None:
-            self._local.value = getattr(self._original_local, token)
-            # delete the original value (this way it works in Python 3.6+)
-            del self._original_local.__dict__[token]
-
-    return ContextVar
-
-
-def _get_contextvars() -> "Tuple[bool, type]":
-    """
-    Figure out the "right" contextvars installation to use. Returns a
-    `contextvars.ContextVar`-like class with a limited API.
-
-    See https://docs.sentry.io/platforms/python/contextvars/ for more information.
-    """
-    if not _is_contextvars_broken():
-        # aiocontextvars is a PyPI package that ensures that the contextvars
-        # backport (also a PyPI package) works with asyncio under Python 3.6
-        #
-        # Import it if available.
-        if sys.version_info < (3, 7):
-            # `aiocontextvars` is absolutely required for functional
-            # contextvars on Python 3.6.
-            try:
-                from aiocontextvars import ContextVar
-
-                return True, ContextVar
-            except ImportError:
-                pass
-        else:
-            # On Python 3.7 contextvars are functional.
-            try:
-                from contextvars import ContextVar
-
-                return True, ContextVar
-            except ImportError:
-                pass
-
-    # Fall back to basic thread-local usage.
-
-    from threading import local
-
-    return False, _make_threadlocal_contextvars(local)
-
-
-HAS_REAL_CONTEXTVARS, ContextVar = _get_contextvars()
-
-CONTEXTVARS_ERROR_MESSAGE = """
-
-With asyncio/ASGI applications, the Sentry SDK requires a functional
-installation of `contextvars` to avoid leaking scope/context data across
-requests.
-
-Please refer to https://docs.sentry.io/platforms/python/contextvars/ for more information.
-"""
-
 _is_sentry_internal_task = ContextVar("is_sentry_internal_task", default=False)
 
 # These exceptions won't set the span status to error if they occur. Use
@@ -1544,7 +1353,7 @@ def transaction_from_function(func: "Callable[..., Any]") -> "Optional[str]":
     return qualname_from_function(func)
 
 
-disable_capture_event = ContextVar("disable_capture_event")
+disable_capture_event: "ContextVar[bool]" = ContextVar("disable_capture_event")
 
 
 class ServerlessTimeoutWarning(Exception):  # noqa: N818
@@ -1580,10 +1389,8 @@ class TimeoutThread(threading.Thread):
     def _capture_exception(self) -> "ExcInfo":
         exc_info = sys.exc_info()
 
-        client = sentry_sdk.get_client()
         event, hint = event_from_exception(
             exc_info,
-            client_options=client.options,
             mechanism={"type": "threading", "handled": False},
         )
         sentry_sdk.capture_event(event, hint=hint)
@@ -1596,30 +1403,18 @@ class TimeoutThread(threading.Thread):
         if self._stop_event.is_set():
             return
 
-        integer_configured_timeout = int(self.configured_timeout)
-
-        # Setting up the exact integer value of configured time(in seconds)
-        if integer_configured_timeout < self.configured_timeout:
-            integer_configured_timeout = integer_configured_timeout + 1
-
         # Raising Exception after timeout duration is reached
         if self.isolation_scope is not None and self.current_scope is not None:
             with sentry_sdk.scope.use_isolation_scope(self.isolation_scope):
                 with sentry_sdk.scope.use_scope(self.current_scope):
                     try:
                         raise ServerlessTimeoutWarning(
-                            "WARNING : Function is expected to get timed out. Configured timeout duration = {} seconds.".format(
-                                integer_configured_timeout
-                            )
+                            "WARNING: Function is about to time out."
                         )
                     except Exception:
                         reraise(*self._capture_exception())
 
-        raise ServerlessTimeoutWarning(
-            "WARNING : Function is expected to get timed out. Configured timeout duration = {} seconds.".format(
-                integer_configured_timeout
-            )
-        )
+        raise ServerlessTimeoutWarning("WARNING: Function is about to time out.")
 
 
 Components = namedtuple("Components", ["scheme", "netloc", "path", "query", "fragment"])
@@ -1909,7 +1704,7 @@ def ensure_integration_enabled(
     ```python
     @ensure_integration_enabled(MyIntegration, my_function)
     def patch_my_function():
-        with sentry_sdk.start_transaction(...):
+        with sentry_sdk.start_span(...):
             return my_function()
     ```
     """
@@ -2110,28 +1905,13 @@ def safe_serialize(data: "Any") -> str:
         return str(data)
 
 
-def has_data_collection_enabled(options: "Optional[dict[str, Any]]") -> bool:
-    if options is None:
-        return False
-
-    data_collection: "Optional[DataCollection]" = options.get("data_collection")
-    # Client options are resolved as part of client initialization, so `data_collection`
-    # being None could be that the user just didn't provide it.
-    # `provided_by_user` is what actually records whether the user actually configured it.
-    return data_collection is not None and data_collection.get(
-        "provided_by_user", False
-    )
-
-
 def get_before_send_log(
     options: "Optional[dict[str, Any]]",
 ) -> "Optional[Callable[[Log, Hint], Optional[Log]]]":
     if options is None:
         return None
 
-    return options.get("before_send_log") or options["_experiments"].get(
-        "before_send_log"
-    )
+    return options.get("before_send_log")
 
 
 def get_before_send_metric(
@@ -2140,9 +1920,7 @@ def get_before_send_metric(
     if options is None:
         return None
 
-    return options.get("before_send_metric") or options["_experiments"].get(
-        "before_send_metric"
-    )
+    return options.get("before_send_metric")
 
 
 def get_before_send_span(
@@ -2151,9 +1929,7 @@ def get_before_send_span(
     if options is None:
         return None
 
-    return options.get("before_send_span") or options["_experiments"].get(
-        "before_send_span"
-    )
+    return options.get("before_send_span")
 
 
 def format_attribute(val: "Any") -> "AttributeValue":
@@ -2209,6 +1985,15 @@ def serialize_attribute(val: "AttributeValue") -> "SerializedAttributeValue":
     return {"value": safe_repr(val), "type": "string"}
 
 
+def deprecation_warning(msg: str) -> None:
+    """
+    Emit a warnings.warn about a deprecation.
+
+    For other types of warnings, use logger.warning().
+    """
+    warnings.warn(msg, stacklevel=3, category=DeprecationWarning)
+
+
 def _host_matches_local_domain(host: str) -> bool:
     """Check if host matches a local domain, including subdomains like foo.localhost."""
     if host in _LOCAL_DOMAINS:
@@ -2248,18 +2033,3 @@ def _is_localhost(
                 return True
 
     return False
-
-
-# This noop context manager can be replaced with "from contextlib import nullcontext" when we drop Python 3.6 support
-@contextmanager
-def nullcontext() -> "Iterator[None]":
-    yield
-
-
-def deprecation_warning(msg: str) -> None:
-    """
-    Emit a warnings.warn about a deprecation.
-
-    For other types of warnings, use logger.warning().
-    """
-    warnings.warn(msg, stacklevel=3, category=DeprecationWarning)

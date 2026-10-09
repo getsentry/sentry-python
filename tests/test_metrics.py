@@ -9,21 +9,6 @@ from sentry_sdk import get_client
 from sentry_sdk.consts import SPANDATA, VERSION
 
 
-def test_metrics_enable_metrics_noop(sentry_init, capture_envelopes):
-    # The enable_metrics option has no effect anymore.
-    sentry_init(enable_metrics=False)
-
-    envelopes = capture_envelopes()
-
-    sentry_sdk.metrics.count("test.counter", 1)
-    sentry_sdk.metrics.gauge("test.gauge", 42)
-    sentry_sdk.metrics.distribution("test.distribution", 200)
-
-    sentry_sdk.flush()
-
-    assert envelopes
-
-
 def test_metrics_basics(sentry_init, capture_items):
     sentry_init()
     items = capture_items("trace_metric")
@@ -55,22 +40,6 @@ def test_metrics_basics(sentry_init, capture_items):
     assert metrics[2]["unit"] == "second"
 
 
-def test_metrics_experimental_option(sentry_init, capture_items):
-    sentry_init()
-    items = capture_items("trace_metric")
-
-    sentry_sdk.metrics.count("test.counter", 5)
-
-    get_client().flush()
-
-    metrics = [item.payload for item in items]
-    assert len(metrics) == 1
-
-    assert metrics[0]["name"] == "test.counter"
-    assert metrics[0]["type"] == "counter"
-    assert metrics[0]["value"] == 5.0
-
-
 def test_metrics_with_attributes(sentry_init, capture_items):
     sentry_init(release="1.0.0", environment="test", server_name="test-server")
     items = capture_items("trace_metric")
@@ -95,7 +64,7 @@ def test_metrics_with_attributes(sentry_init, capture_items):
 
 
 def test_metrics_with_user(sentry_init, capture_items):
-    sentry_init(send_default_pii=True)
+    sentry_init(data_collection={"user_info": True})
     items = capture_items("trace_metric")
 
     sentry_sdk.set_user(
@@ -113,8 +82,8 @@ def test_metrics_with_user(sentry_init, capture_items):
     assert metrics[0]["attributes"]["user.name"] == "testuser"
 
 
-def test_metrics_no_user_if_pii_off(sentry_init, capture_items):
-    sentry_init(send_default_pii=False)
+def test_metrics_no_user_if_user_info_off(sentry_init, capture_items):
+    sentry_init(data_collection={"user_info": False})
     items = capture_items("trace_metric")
 
     sentry_sdk.set_user(
@@ -136,24 +105,7 @@ def test_metrics_with_span(sentry_init, capture_items):
     sentry_init(traces_sample_rate=1.0)
     items = capture_items("trace_metric")
 
-    with sentry_sdk.start_transaction(op="test", name="test-span") as transaction:
-        sentry_sdk.metrics.count("test.span.counter", 1)
-
-    get_client().flush()
-
-    metrics = [item.payload for item in items]
-    assert len(metrics) == 1
-
-    assert metrics[0]["trace_id"] is not None
-    assert metrics[0]["trace_id"] == transaction.trace_id
-    assert metrics[0]["span_id"] == transaction.span_id
-
-
-def test_metrics_with_span_span_streaming(sentry_init, capture_items):
-    sentry_init(traces_sample_rate=1.0, trace_lifecycle="stream")
-    items = capture_items("trace_metric")
-
-    with sentry_sdk.traces.start_span(name="test-span") as segment:
+    with sentry_sdk.start_span(name="test-span") as segment:
         sentry_sdk.metrics.count("test.span.counter", 1)
 
     sentry_sdk.flush()
@@ -212,47 +164,6 @@ def test_metrics_before_send(sentry_init, capture_items):
 
     sentry_init(
         before_send_metric=_before_metric,
-    )
-    items = capture_items("trace_metric")
-
-    sentry_sdk.metrics.count("test.skip", 1)
-    sentry_sdk.metrics.count("test.keep", 1)
-
-    get_client().flush()
-
-    metrics = [item.payload for item in items]
-    assert len(metrics) == 1
-    assert metrics[0]["name"] == "test.keep"
-    assert before_metric_called
-
-
-def test_metrics_experimental_before_send(sentry_init, capture_items):
-    before_metric_called = False
-
-    def _before_metric(record, hint):
-        nonlocal before_metric_called
-
-        assert set(record.keys()) == {
-            "timestamp",
-            "trace_id",
-            "span_id",
-            "name",
-            "type",
-            "value",
-            "unit",
-            "attributes",
-        }
-
-        if record["name"] == "test.skip":
-            return None
-
-        before_metric_called = True
-        return record
-
-    sentry_init(
-        _experiments={
-            "before_send_metric": _before_metric,
-        },
     )
     items = capture_items("trace_metric")
 
@@ -555,7 +466,7 @@ def test_attributes_preserialized_in_before_send(sentry_init, capture_items):
     assert isinstance(metric["attributes"]["dictionary"], str)
 
 
-def test_array_attributes_deep_copied_in_before_send(sentry_init, capture_envelopes):
+def test_array_attributes_deep_copied_in_before_send(sentry_init):
     """We don't surface user-held references to objects in attributes."""
 
     strings = ["value1", "value2"]

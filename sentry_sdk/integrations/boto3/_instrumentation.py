@@ -2,21 +2,20 @@ from typing import TYPE_CHECKING, cast
 from urllib.parse import urlsplit
 
 import sentry_sdk
-from sentry_sdk.consts import OP, SPANDATA, SPANSTATUS
+from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.integrations.boto3.consts import (
     AWS_RPC_SYSTEM_NAME,
+    CLOUD_PROVIDER,
     DEFAULT_PORTS,
     IDENTIFIER,
     ORIGIN,
 )
-from sentry_sdk.traces import NoOpStreamedSpan, StreamedSpan
-from sentry_sdk.tracing import BAGGAGE_HEADER_NAME, Span
+from sentry_sdk.traces import BAGGAGE_HEADER_NAME, NoOpSpan, Span
 from sentry_sdk.tracing_utils import (
     add_http_breadcrumb,
     add_sentry_baggage_to_headers,
     get_url_attributes,
-    has_span_streaming_enabled,
     should_propagate_trace,
 )
 from sentry_sdk.utils import (
@@ -25,7 +24,7 @@ from sentry_sdk.utils import (
 )
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, Mapping, Optional, Union
+    from typing import Any, Dict, Mapping, Optional
 
     from sentry_sdk._types import Attributes
     from sentry_sdk.integrations.boto3._context import AwsCallContext
@@ -39,20 +38,12 @@ except ImportError:
     raise DidNotEnable("botocore not installed")
 
 
-def _set_span_attributes(
-    span: "Union[Span, StreamedSpan]", attributes: "Attributes"
-) -> None:
-    """
-    Will be removed in the next major version (3.0). This helper makes
-    it easier to migrate to `StreamedSpan` without having to remove
-    multiple conditional blocks intertwined with other logic.
-    """
-    if isinstance(span, StreamedSpan):
-        span.set_attributes(attributes)
-        return
-
-    for key, value in attributes.items():
-        span.set_data(key, value)
+def _finish_span(span: "Span", error: "Optional[BaseException]" = None) -> None:
+    with capture_internal_exceptions():
+        if error is None:
+            span.end()
+        else:
+            span.__exit__(type(error), error, error.__traceback__)
 
 
 def _get_server_attributes(endpoint_url: "Optional[str]") -> "Attributes":
@@ -158,15 +149,15 @@ def _get_error_attributes(exception: "BaseException") -> "Attributes":
 def _start_client_span(
     ctx: "AwsCallContext",
     service_ext: "Optional[_ServiceExtension]" = None,
-) -> "Optional[Union[Span, StreamedSpan]]":
+) -> "Optional[Span]":
+    if sentry_sdk.get_current_span() is None:
+        return None
 
-    client = sentry_sdk.get_client()
-
-    # use "unknown" if `service_id_hyphenized` is not set so span name can still be created.
-    # e.g. "aws.unknown.GetObject"
-    service_name = ctx.service_id_hyphenized or "unknown"
-    span_name = f"aws.{service_name}.{ctx.operation_name}"
+    # https://opentelemetry.io/docs/specs/semconv/cloud-providers/aws-sdk/#aws-sdk-spans
+    service_name = ctx.service_id or "unknown"
+    span_name = f"{service_name}.{ctx.operation_name}"
     attributes: "Attributes" = {
+        SPANDATA.CLOUD_PROVIDER: CLOUD_PROVIDER,
         SPANDATA.RPC_METHOD: ctx.operation_name,
         SPANDATA.RPC_SYSTEM_NAME: AWS_RPC_SYSTEM_NAME,
         # all client call spans are by default "client" spans.
@@ -176,7 +167,7 @@ def _start_client_span(
     with capture_internal_exceptions():
         attributes.update(_get_client_attributes(ctx))
 
-    # `sentry.span_op` and `sentry.span_origin` are set to generic defaults;
+    # `sentry.op` and `sentry.origin` are set to generic defaults;
     # a service extension can override them with `get_span_op()` and `get_span_origin()`.
     span_op = OP.HTTP_CLIENT
     span_origin = ORIGIN
@@ -195,89 +186,50 @@ def _start_client_span(
         with capture_internal_exceptions():
             attributes.update(service_ext.get_request_attributes(ctx))
 
-    if has_span_streaming_enabled(client.options):
-        if sentry_sdk.traces.get_current_span() is None:
-            return None
-
-        # `start_span()` evaluates `ignore_spans` against the initial attributes.
-        # https://opentelemetry.io/docs/specs/semconv/rpc/rpc-spans/#rpc-client-span
-        attributes.update(
-            {
-                SPANDATA.SENTRY_OP: span_op,
-                SPANDATA.SENTRY_ORIGIN: span_origin,
-            }
-        )
-        return sentry_sdk.traces.start_span(
-            name=span_name,
-            attributes=attributes,
-            # `StreamingBody` responses outlive `_make_api_call()`. `_activate_client_span()`
-            # activates this span only while the call itself runs.
-            active=False,
-        )
-
-    span = sentry_sdk.start_span(
-        name=span_name,
-        op=span_op,
-        origin=span_origin,
+    # `start_span()` evaluates `ignore_spans` against the initial attributes.
+    # https://opentelemetry.io/docs/specs/semconv/rpc/rpc-spans/#rpc-client-span
+    attributes.update(
+        {
+            SPANDATA.SENTRY_OP: span_op,
+            SPANDATA.SENTRY_ORIGIN: span_origin,
+        }
     )
-    with capture_internal_exceptions():
-        _set_span_attributes(span, attributes)
-    with capture_internal_exceptions():
-        if ctx.service_id_hyphenized is not None:
-            span.set_tag("aws.service_id", ctx.service_id_hyphenized)
-        span.set_tag("aws.operation_name", ctx.operation_name)
-    return span
+    return sentry_sdk.start_span(
+        name=span_name,
+        attributes=attributes,
+        # `StreamingBody` responses outlive `_make_api_call()`. `_activate_client_span()`
+        # activates this span only while the call itself runs.
+        active=False,
+    )
 
 
-def _finish_span(
-    span: "Union[Span, StreamedSpan]",
-    error: "Optional[BaseException]" = None,
-) -> None:
-    with capture_internal_exceptions():
-        if not isinstance(span, StreamedSpan):
-            if error is not None:
-                span.set_status(SPANSTATUS.INTERNAL_ERROR)
-            span.finish()
-            return
-
-        if error is None:
-            span.end()
-        else:
-            span.__exit__(type(error), error, error.__traceback__)
-
-
-def _instrument_streaming_body(
-    span: "Union[Span, StreamedSpan]", parsed: "Dict[str, Any]"
-) -> bool:
-    if isinstance(span, NoOpStreamedSpan):
+def _instrument_streaming_body(span: "Span", parsed: "Dict[str, Any]") -> bool:
+    if isinstance(span, NoOpSpan):
         return False
 
-    body = parsed.get("Body")
+    # botocore uses service-specific response key for streaming payload; e.g. `Payload`
+    # for Lambda Invoke, `Body` for S3 GetObject. Find it by type so every streaming
+    # response is handled.
+    body = next(
+        (value for value in parsed.values() if isinstance(value, StreamingBody)),
+        None,
+    )
     if not isinstance(body, StreamingBody):
         return False
 
-    streaming_span: "Union[Span, StreamedSpan]"
-    if isinstance(span, StreamedSpan):
-        streaming_span = sentry_sdk.traces.start_span(
-            name=span.name,
-            # keep the stream span under the client span after
-            # `_make_api_call()` returns.
-            parent_span=span,
-            # the body may outlive the api call, so keep it inactive. Otherwise it
-            # 1. could restore the already-finished client span when it ends; 2. make
-            # unrelated new spans attach to the stream span since it's the current span.
-            active=False,
-            attributes={
-                SPANDATA.SENTRY_OP: OP.HTTP_CLIENT_STREAM,
-                SPANDATA.SENTRY_ORIGIN: ORIGIN,
-            },
-        )
-    else:
-        streaming_span = span.start_child(
-            op=OP.HTTP_CLIENT_STREAM,
-            name=span.description,
-            origin=ORIGIN,
-        )
+    streaming_span = sentry_sdk.start_span(
+        name=span.name,
+        # keep stream span under the boto span after `_make_api_call()` returns.
+        parent_span=span,
+        # the body may outlive the api call, so keep it inactive. Otherwise it
+        # 1. could restore the already-finished client span when it ends; 2. make
+        # unrelated new spans attach to the stream span since it's the current span.
+        active=False,
+        attributes={
+            SPANDATA.SENTRY_OP: OP.HTTP_CLIENT_STREAM,
+            SPANDATA.SENTRY_ORIGIN: ORIGIN,
+        },
+    )
 
     finished = False
     read_in_progress = False
@@ -293,8 +245,8 @@ def _instrument_streaming_body(
         if error is not None:
             with capture_internal_exceptions():
                 attributes = _get_error_attributes(error)
-                _set_span_attributes(streaming_span, attributes)
-                _set_span_attributes(span, attributes)
+                streaming_span.set_attributes(attributes)
+                span.set_attributes(attributes)
 
         _finish_span(streaming_span, error)
         _finish_span(span, error)
@@ -358,10 +310,7 @@ def _instrument_streaming_body(
     return True
 
 
-def _set_request_attributes(
-    span: "Union[Span, StreamedSpan]",
-    request: "AWSRequest",
-) -> None:
+def _set_request_attributes(span: "Span", request: "AWSRequest") -> None:
     client = sentry_sdk.get_client()
 
     parsed_url = None
@@ -369,19 +318,10 @@ def _set_request_attributes(
         parsed_url = parse_url(cast(str, request.url), sanitize=False)
 
     # overwrite server attributes when actual request URL is resolved.
-    _set_span_attributes(span, _get_server_attributes(request.url))
+    span.set_attributes(_get_server_attributes(request.url))
 
-    if isinstance(span, StreamedSpan):
-        span.set_attributes(get_url_attributes(client, parsed_url))
-        span.set_attribute(SPANDATA.HTTP_REQUEST_METHOD, cast(str, request.method))
-        return
-
-    if parsed_url is not None:
-        span.set_data("aws.request.url", parsed_url.url)
-        span.set_data(SPANDATA.HTTP_QUERY, parsed_url.query)
-        span.set_data(SPANDATA.HTTP_FRAGMENT, parsed_url.fragment)
-
-    span.set_data(SPANDATA.HTTP_METHOD, request.method)
+    span.set_attributes(get_url_attributes(client, parsed_url))
+    span.set_attribute(SPANDATA.HTTP_REQUEST_METHOD, cast(str, request.method))
 
 
 def _add_request_breadcrumb(request: "AWSRequest") -> None:
@@ -393,20 +333,8 @@ def _add_request_breadcrumb(request: "AWSRequest") -> None:
 
     breadcrumb: "dict[str, Any]" = {}
 
-    if has_span_streaming_enabled(client.options):
-        breadcrumb.update(get_url_attributes(client, parsed_url))
-        breadcrumb[SPANDATA.HTTP_REQUEST_METHOD] = request.method
-    else:
-        if parsed_url is not None:
-            breadcrumb.update(
-                {
-                    "aws.request.url": parsed_url.url,
-                    SPANDATA.HTTP_QUERY: parsed_url.query,
-                    SPANDATA.HTTP_FRAGMENT: parsed_url.fragment,
-                }
-            )
-
-        breadcrumb[SPANDATA.HTTP_METHOD] = request.method
+    breadcrumb.update(get_url_attributes(client, parsed_url))
+    breadcrumb[SPANDATA.HTTP_REQUEST_METHOD] = request.method
 
     add_http_breadcrumb(None, breadcrumb)
 
@@ -427,16 +355,12 @@ def _sentry_request_created(
     with capture_internal_exceptions():
         _add_request_breadcrumb(request)
 
-        span = (
-            sentry_sdk.traces.get_current_span()
-            if has_span_streaming_enabled(client.options)
-            else sentry_sdk.get_current_span()
-        )
+        span = sentry_sdk.get_current_span()
         if span is None:
             return
 
-        # an ignored streamed span is not active; avoid enriching its parent.
-        if isinstance(span, StreamedSpan) and span.active:
+        # an ignored span is not active; avoid enriching its parent.
+        if span.active:
             return
 
         _set_request_attributes(span, request)

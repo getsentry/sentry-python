@@ -1,28 +1,24 @@
 import sys
+from contextlib import nullcontext
+from contextvars import ContextVar
 from functools import partial
 from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk._werkzeug import _get_headers, get_host
-from sentry_sdk.api import continue_trace
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.data_collection import _apply_data_collection_filtering_to_query_string
 from sentry_sdk.integrations._wsgi_common import (
     DEFAULT_HTTP_METHODS_TO_CAPTURE,
     _filter_headers,
 )
-from sentry_sdk.scope import Scope, should_send_default_pii, use_isolation_scope
+from sentry_sdk.scope import Scope, use_isolation_scope
 from sentry_sdk.sessions import track_session
-from sentry_sdk.traces import SegmentNameSource, StreamedSpan
-from sentry_sdk.tracing import Span, TransactionSource
-from sentry_sdk.tracing_utils import has_span_streaming_enabled
+from sentry_sdk.traces import SegmentNameSource
 from sentry_sdk.utils import (
-    ContextVar,
     _is_localhost,
     capture_internal_exceptions,
     event_from_exception,
-    has_data_collection_enabled,
-    nullcontext,
     reraise,
 )
 
@@ -41,6 +37,7 @@ if TYPE_CHECKING:
     )
 
     from sentry_sdk._types import Event, EventProcessor
+    from sentry_sdk.traces import Span
     from sentry_sdk.utils import ExcInfo
 
     WsgiResponseIter = TypeVar("WsgiResponseIter")
@@ -57,7 +54,9 @@ if TYPE_CHECKING:
             pass
 
 
-_wsgi_middleware_applied = ContextVar("sentry_wsgi_middleware_applied")
+_wsgi_middleware_applied: "ContextVar[bool]" = ContextVar(
+    "sentry_wsgi_middleware_applied"
+)
 _DEFAULT_TRANSACTION_NAME = "generic WSGI request"
 
 
@@ -112,7 +111,6 @@ class SentryWsgiMiddleware:
             return self.app(environ, start_response)
 
         client = sentry_sdk.get_client()
-        span_streaming = has_span_streaming_enabled(client.options)
 
         _wsgi_middleware_applied.set(True)
         try:
@@ -145,56 +143,29 @@ class SentryWsgiMiddleware:
 
                     method = environ.get("REQUEST_METHOD", "").upper()
 
-                    span_ctx: "Optional[ContextManager[Union[Span, StreamedSpan, None]]]" = None
+                    span_ctx: "ContextManager[Union[Span, None]]" = nullcontext()
                     if method in self.http_methods_to_capture:
-                        if span_streaming:
-                            sentry_sdk.traces.continue_trace(
-                                dict(_get_headers(environ))
-                            )
-                            Scope.set_custom_sampling_context({"wsgi_environ": environ})
+                        sentry_sdk.continue_trace(dict(_get_headers(environ)))
+                        Scope.set_custom_sampling_context({"wsgi_environ": environ})
 
-                            if has_data_collection_enabled(client.options):
-                                if client.options["data_collection"]["user_info"]:
-                                    client_ip = get_client_ip(environ)
-                                    if client_ip:
-                                        scope.set_attribute(
-                                            SPANDATA.USER_IP_ADDRESS, client_ip
-                                        )
-                            elif should_send_default_pii():
-                                client_ip = get_client_ip(environ)
-                                if client_ip:
-                                    scope.set_attribute(
-                                        SPANDATA.USER_IP_ADDRESS, client_ip
-                                    )
+                        if client.options["data_collection"]["user_info"]:
+                            client_ip = get_client_ip(environ)
+                            if client_ip:
+                                scope.set_attribute(SPANDATA.USER_IP_ADDRESS, client_ip)
 
-                            span_ctx = sentry_sdk.traces.start_span(
-                                name=_DEFAULT_TRANSACTION_NAME,
-                                attributes={
-                                    "sentry.segment.name.source": SegmentNameSource.ROUTE,
-                                    "sentry.origin": self.span_origin,
-                                    "sentry.op": OP.HTTP_SERVER,
-                                },
-                                parent_span=None,
-                            )
-                            scope.get_current_scope()._server_segment_span = span_ctx
-                        else:
-                            transaction = continue_trace(
-                                environ,
-                                op=OP.HTTP_SERVER,
-                                name=_DEFAULT_TRANSACTION_NAME,
-                                source=TransactionSource.ROUTE,
-                                origin=self.span_origin,
-                            )
-
-                            span_ctx = sentry_sdk.start_transaction(
-                                transaction,
-                                custom_sampling_context={"wsgi_environ": environ},
-                            )
-
-                    span_ctx = span_ctx or nullcontext()
+                        span_ctx = sentry_sdk.start_span(
+                            name=_DEFAULT_TRANSACTION_NAME,
+                            attributes={
+                                "sentry.segment.name.source": SegmentNameSource.ROUTE,
+                                "sentry.origin": self.span_origin,
+                                "sentry.op": OP.HTTP_SERVER,
+                            },
+                            parent_span=None,
+                        )
+                        scope.get_current_scope()._server_segment_span = span_ctx
 
                     with span_ctx as span:
-                        if isinstance(span, StreamedSpan):
+                        if span is not None:
                             with capture_internal_exceptions():
                                 for attr, value in _get_request_attributes(
                                     environ, self.use_x_forwarded_for
@@ -239,7 +210,7 @@ class SentryWsgiMiddleware:
 
 def _sentry_start_response(
     old_start_response: "StartResponse",
-    span: "Optional[Union[Span, StreamedSpan]]",
+    span: "Optional[Union[Span]]",
     status: str,
     response_headers: "WsgiResponseHeaders",
     exc_info: "Optional[WsgiExcInfo]" = None,
@@ -247,11 +218,8 @@ def _sentry_start_response(
     with capture_internal_exceptions():
         status_int = int(status.split(" ", 1)[0])
         if span is not None:
-            if isinstance(span, StreamedSpan):
-                span.status = "error" if status_int >= 400 else "ok"
-                span.set_attribute("http.response.status_code", status_int)
-            else:
-                span.set_http_status(status_int)
+            span.status = "error" if status_int >= 400 else "ok"
+            span.set_attribute("http.response.status_code", status_int)
 
     if exc_info is None:
         # The Django Rest Framework WSGI test client, and likely other
@@ -265,17 +233,14 @@ def _sentry_start_response(
 def _get_environ(environ: "Dict[str, str]") -> "Iterator[Tuple[str, str]]":
     """
     Returns our explicitly included environment variables we want to
-    capture (server name, port and remote addr if pii is enabled).
+    capture (server name, port and remote addr if user info collection is enabled).
     """
     keys = ["SERVER_NAME", "SERVER_PORT"]
     client_options = sentry_sdk.get_client().options
 
     # make debugging of proxy setup easier. Proxy headers are
     # in headers.
-    if has_data_collection_enabled(client_options):
-        if client_options["data_collection"]["user_info"]:
-            keys += ["REMOTE_ADDR"]
-    elif should_send_default_pii():
+    if client_options["data_collection"]["user_info"]:
         keys += ["REMOTE_ADDR"]
 
     for key in keys:
@@ -315,7 +280,6 @@ def _capture_exception() -> "ExcInfo":
     if not should_skip_capture:
         event, hint = event_from_exception(
             exc_info,
-            client_options=sentry_sdk.get_client().options,
             mechanism={"type": "wsgi", "handled": False},
         )
         sentry_sdk.capture_event(event, hint=hint)
@@ -394,12 +358,7 @@ def _make_wsgi_event_processor(
             # if the code below fails halfway through we at least have some data
             request_info = event.setdefault("request", {})
 
-            if has_data_collection_enabled(client_options):
-                if client_options["data_collection"]["user_info"]:
-                    user_info = event.setdefault("user", {})
-                    if client_ip:
-                        user_info.setdefault("ip_address", client_ip)
-            elif should_send_default_pii():
+            if client_options["data_collection"]["user_info"]:
                 user_info = event.setdefault("user", {})
                 if client_ip:
                     user_info.setdefault("ip_address", client_ip)
@@ -409,17 +368,13 @@ def _make_wsgi_event_processor(
             request_info["env"] = env
             request_info["headers"] = headers
 
-            if has_data_collection_enabled(client_options):
-                if query_string:
-                    filtered_qs = _apply_data_collection_filtering_to_query_string(
-                        query_string=query_string,
-                        behaviour=client_options["data_collection"]["url_query_params"],
-                    )
-                    if filtered_qs:
-                        request_info["query_string"] = filtered_qs
-            else:
-                # This was not originally gated so if data collection is not enabled, leave as-is.
-                request_info["query_string"] = query_string
+            if query_string:
+                filtered_qs = _apply_data_collection_filtering_to_query_string(
+                    query_string=query_string,
+                    behaviour=client_options["data_collection"]["url_query_params"],
+                )
+                if filtered_qs:
+                    request_info["query_string"] = filtered_qs
 
         return event
 
@@ -439,9 +394,9 @@ def _get_request_attributes(
     if method:
         attributes["http.request.method"] = method.upper()
 
-    headers = _filter_headers(dict(_get_headers(environ)), use_annotated_value=False)
+    headers = _filter_headers(dict(_get_headers(environ)))
     for header, value in headers.items():
-        attributes[f"http.request.header.{header.lower()}"] = value
+        attributes[f"http.request.header.{header.lower()}"] = [value]
 
     url_scheme = environ.get("wsgi.url_scheme")
     if url_scheme:
@@ -460,47 +415,27 @@ def _get_request_attributes(
 
     client_options = sentry_sdk.get_client().options
 
-    if has_data_collection_enabled(client_options):
-        query_string = environ.get("QUERY_STRING")
-        filtered_qs = None
-        if query_string:
-            filtered_qs = _apply_data_collection_filtering_to_query_string(
-                query_string=query_string,
-                behaviour=client_options["data_collection"]["url_query_params"],
-            )
+    query_string = environ.get("QUERY_STRING")
+    filtered_qs = None
+    if query_string:
+        filtered_qs = _apply_data_collection_filtering_to_query_string(
+            query_string=query_string,
+            behaviour=client_options["data_collection"]["url_query_params"],
+        )
+        if filtered_qs:
+            attributes["http.query"] = filtered_qs
 
-            if filtered_qs:
-                attributes["http.query"] = filtered_qs
+    path = environ.get("PATH_INFO", "")
+    if path:
+        attributes["url.path"] = path
 
-        path = environ.get("PATH_INFO", "")
-        if path:
-            attributes["url.path"] = path
+    attributes["url.full"] = get_request_url(environ, use_x_forwarded_for)
+    if filtered_qs is not None:
+        attributes["url.full"] += f"?{filtered_qs}"
 
-        attributes["url.full"] = get_request_url(environ, use_x_forwarded_for)
-        if filtered_qs is not None:
-            attributes["url.full"] += f"?{filtered_qs}"
-
-        if client_options["data_collection"]["user_info"]:
-            client_ip = get_client_ip(environ)
-            if client_ip:
-                attributes["client.address"] = client_ip
-
-    elif should_send_default_pii():
+    if client_options["data_collection"]["user_info"]:
         client_ip = get_client_ip(environ)
         if client_ip:
             attributes["client.address"] = client_ip
-
-        query_string = environ.get("QUERY_STRING")
-        if query_string:
-            attributes["http.query"] = query_string
-
-        path = environ.get("PATH_INFO", "")
-        if path:
-            attributes["url.path"] = path
-
-        url_full = get_request_url(environ, use_x_forwarded_for)
-        if query_string:
-            url_full += "?" + query_string
-        attributes["url.full"] = url_full
 
     return attributes

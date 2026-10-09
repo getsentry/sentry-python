@@ -5,14 +5,9 @@ import sentry_sdk
 from sentry_sdk.ai.utils import (
     normalize_message_roles,
     set_data_normalized,
-    truncate_and_annotate_messages,
 )
 from sentry_sdk.consts import OP, SPANDATA
-from sentry_sdk.traces import StreamedSpan
-from sentry_sdk.tracing_utils import (
-    has_span_streaming_enabled,
-    should_truncate_gen_ai_input,
-)
+from sentry_sdk.traces import Span, _AgentFrameworkChatGenerationContext
 from sentry_sdk.utils import safe_serialize
 
 from ..consts import SPAN_ORIGIN
@@ -20,11 +15,6 @@ from ..utils import (
     _get_model_name,
     _set_agent_data,
     _set_available_tools,
-    _set_model_data,
-    _should_send_inputs,
-    _should_send_outputs,
-    get_current_agent,
-    get_is_streaming,
 )
 from .utils import (
     _serialize_binary_content_item,
@@ -35,7 +25,10 @@ from .utils import (
 if TYPE_CHECKING:
     from typing import Any, Dict, List, Optional, Union
 
+    from pydantic_ai import Agent
     from pydantic_ai.messages import ModelMessage, ModelResponse, SystemPromptPart
+    from pydantic_ai.models import Model
+    from pydantic_ai.settings import ModelSettings
 
     from sentry_sdk import _types
 
@@ -104,11 +97,9 @@ def _get_system_instructions(
     return permanent_instructions, current_instructions
 
 
-def _set_input_messages(
-    span: "Union[sentry_sdk.tracing.Span, StreamedSpan]", messages: "Any"
-) -> None:
+def _set_input_messages(span: "Span", messages: "list[ModelMessage]") -> None:
     """Set input messages data on a span."""
-    if not _should_send_inputs():
+    if not sentry_sdk.get_client().options["data_collection"]["gen_ai"]["inputs"]:
         return
 
     if not messages:
@@ -116,24 +107,14 @@ def _set_input_messages(
 
     permanent_instructions, current_instructions = _get_system_instructions(messages)
     if len(permanent_instructions) > 0 or len(current_instructions) > 0:
-        if isinstance(span, StreamedSpan):
-            span.set_attribute(
-                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
-                json.dumps(
-                    _transform_system_instructions(
-                        permanent_instructions, current_instructions
-                    )
-                ),
-            )
-        else:
-            span.set_data(
-                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
-                json.dumps(
-                    _transform_system_instructions(
-                        permanent_instructions, current_instructions
-                    )
-                ),
-            )
+        span.set_attribute(
+            SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+            json.dumps(
+                _transform_system_instructions(
+                    permanent_instructions, current_instructions
+                )
+            ),
+        )
 
     try:
         formatted_messages = []
@@ -217,15 +198,11 @@ def _set_input_messages(
 
         if formatted_messages:
             normalized_messages = normalize_message_roles(formatted_messages)
-            client = sentry_sdk.get_client()
-            scope = sentry_sdk.get_current_scope()
-            messages_data = (
-                truncate_and_annotate_messages(normalized_messages, span, scope)
-                if should_truncate_gen_ai_input(client.options)
-                else normalized_messages
-            )
             set_data_normalized(
-                span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data, unpack=False
+                span,
+                SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                normalized_messages,
+                unpack=False,
             )
     except Exception:
         # If we fail to format messages, just skip it
@@ -233,21 +210,16 @@ def _set_input_messages(
 
 
 def _set_output_data(
-    span: "Union[sentry_sdk.tracing.Span, StreamedSpan]",
+    span: "Span",
     response: "Optional[ModelResponse]",
 ) -> None:
     """Set output data on a span."""
-    record_outputs = _should_send_outputs()
-
     if not response:
         return
 
-    set_on_span = (
-        span.set_attribute if isinstance(span, StreamedSpan) else span.set_data
-    )
-    set_on_span(SPANDATA.GEN_AI_RESPONSE_MODEL, response.model_name)  # type: ignore[arg-type]
+    span.set_attribute(SPANDATA.GEN_AI_RESPONSE_MODEL, response.model_name)  # type: ignore[arg-type]
 
-    if not record_outputs:
+    if not sentry_sdk.get_client().options["data_collection"]["gen_ai"]["outputs"]:
         return
 
     try:
@@ -281,7 +253,7 @@ def _set_output_data(
                     parts.append(tool_part)
 
             if parts:
-                set_on_span(
+                span.set_attribute(
                     SPANDATA.GEN_AI_OUTPUT_MESSAGES,
                     json.dumps([{"role": "assistant", "parts": parts}]),
                 )
@@ -291,9 +263,12 @@ def _set_output_data(
         pass
 
 
-def ai_client_span(
-    messages: "Any", agent: "Any", model: "Any", model_settings: "Any"
-) -> "Union[sentry_sdk.tracing.Span, StreamedSpan]":
+def ai_client_context(
+    messages: "list[ModelMessage]",
+    agent: "Optional[Agent[Any, Any]]",
+    model: "Model",
+    model_settings: "Optional[ModelSettings]",
+) -> "_AgentFrameworkChatGenerationContext":
     """Create a span for an AI client call (model request).
 
     Args:
@@ -302,51 +277,73 @@ def ai_client_span(
         model: Model object
         model_settings: Model settings
     """
-    # Determine model name for span name
+    model_name = _get_model_name(model) or "unknown"
+
+    context = _AgentFrameworkChatGenerationContext(
+        name=f"chat {model_name}",
+        attributes={
+            "sentry.op": OP.GEN_AI_CHAT,
+            "sentry.origin": SPAN_ORIGIN,
+            SPANDATA.GEN_AI_OPERATION_NAME: "chat",
+        },
+    )
+
+    _set_agent_data(context.span, agent)
+
+    # Extract model information
     model_obj = model
-    if agent and hasattr(agent, "model"):
+    if not model_obj and agent and hasattr(agent, "model"):
         model_obj = agent.model
 
-    model_name = _get_model_name(model_obj) or "unknown"
+    if model_obj:
+        # Set system from model
+        if hasattr(model_obj, "system"):
+            context.span.set_attribute(SPANDATA.GEN_AI_PROVIDER_NAME, model_obj.system)
 
-    span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
-    if span_streaming:
-        span = sentry_sdk.traces.start_span(
-            name=f"chat {model_name}",
-            attributes={
-                "sentry.op": OP.GEN_AI_CHAT,
-                "sentry.origin": SPAN_ORIGIN,
-                SPANDATA.GEN_AI_OPERATION_NAME: "chat",
-                SPANDATA.GEN_AI_RESPONSE_STREAMING: get_is_streaming(),
-            },
-        )
-    else:
-        span = sentry_sdk.start_span(
-            op=OP.GEN_AI_CHAT,
-            name=f"chat {model_name}",
-            origin=SPAN_ORIGIN,
-        )
+        # Set model name
+        model_name = _get_model_name(model_obj)
+        if model_name:
+            context.span.set_attribute(SPANDATA.GEN_AI_REQUEST_MODEL, model_name)
 
-        span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "chat")
-        # Set streaming flag from contextvar
-        span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, get_is_streaming())
+    # Extract model settings
+    settings = model_settings
+    if not settings and agent and hasattr(agent, "model_settings"):
+        settings = agent.model_settings
 
-    _set_agent_data(span, agent)
-    _set_model_data(span, model, model_settings)
+    if settings:
+        settings_map = {
+            "max_tokens": SPANDATA.GEN_AI_REQUEST_MAX_TOKENS,
+            "temperature": SPANDATA.GEN_AI_REQUEST_TEMPERATURE,
+            "top_p": SPANDATA.GEN_AI_REQUEST_TOP_P,
+            "frequency_penalty": SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY,
+            "presence_penalty": SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY,
+        }
 
-    # Add available tools if agent is available
-    agent_obj = agent or get_current_agent()
-    _set_available_tools(span, agent_obj)
+        # ModelSettings is a TypedDict (dict at runtime), so use dict access
+        if isinstance(settings, dict):
+            for setting_name, spandata_key in settings_map.items():
+                value = settings.get(setting_name)
+                if value is not None:
+                    context.span.set_attribute(spandata_key, value)  # type: ignore[arg-type]
+        else:
+            # Fallback for object-style settings
+            for setting_name, spandata_key in settings_map.items():
+                if hasattr(settings, setting_name):
+                    value = getattr(settings, setting_name)
+                    if value is not None:
+                        context.span.set_attribute(spandata_key, value)
+
+    _set_available_tools(context.span, agent)
 
     # Set input messages (full conversation history)
     if messages:
-        _set_input_messages(span, messages)
+        _set_input_messages(context.span, messages)
 
-    return span
+    return context
 
 
 def update_ai_client_span(
-    span: "Union[sentry_sdk.tracing.Span, StreamedSpan]",
+    span: "Span",
     model_response: "Optional[ModelResponse]",
 ) -> None:
     """Update the AI client span with response data."""
