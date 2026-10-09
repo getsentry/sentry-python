@@ -202,7 +202,7 @@ def _wrap_handler(handler: "F") -> "F":
                 resource_id = f"{resource_id}:{function_version}"
             attributes[SPANDATA.CLOUD_RESOURCE_ID] = resource_id
 
-            if "AWS_LAMBDA_METADATA_API" in environ:
+            if "AWS_LAMBDA_METADATA_API" in environ and has_span_streaming_enabled(client.options):
                 with capture_internal_exceptions():
                     availability_zone = _get_availability_zone()
                     if availability_zone is not None:
