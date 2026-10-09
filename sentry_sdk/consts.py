@@ -429,6 +429,12 @@ class SPANDATA:
     Example: "10.1.2.80"
     """
 
+    CLOUD_ACCOUNT_ID = "cloud.account.id"
+    """
+    The cloud account ID the resource is assigned to.
+    Example: "123456789012"
+    """
+
     CLOUD_PROVIDER = "cloud.provider"
     """
     Name of the cloud provider.
@@ -440,6 +446,12 @@ class SPANDATA:
     """
     The geographical region the resource is running.
     Example: "us-east-1"
+    """
+
+    CLOUD_RESOURCE_ID = "cloud.resource_id"
+    """
+    The cloud provider-specific native identifier of the monitored resource.
+    Example: "arn:aws:lambda:us-east-1:123456789012:function:my-function"
     """
 
     CODE_FILEPATH = "code.filepath"
