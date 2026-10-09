@@ -49,7 +49,7 @@ class _SentryRunHooks(RunHooks[TContext]):
         context: "ToolContext[TContext]",
         agent: "Agent[TContext]",
         tool: "Tool",
-    ) -> "None":
+    ) -> None:
         if not isinstance(tool, FunctionTool):
             return
 
@@ -75,7 +75,7 @@ class _SentryRunHooks(RunHooks[TContext]):
         agent: "Agent[TContext]",
         tool: "Tool",
         result: "object",
-    ) -> "None":
+    ) -> None:
         if not isinstance(tool, FunctionTool):
             return
 
@@ -104,7 +104,7 @@ def _patch_run_hooks(hooks: "RunHooks[TContext]") -> None:
     @wraps(original_on_tool_start)
     async def on_tool_start(
         context: "ToolContext[TContext]", agent: "Agent[TContext]", tool: "Tool"
-    ) -> "None":
+    ) -> None:
         with capture_internal_exceptions():
             await sentry_hooks.on_tool_start(context, agent, tool)
         await original_on_tool_start(context, agent, tool)
@@ -115,7 +115,7 @@ def _patch_run_hooks(hooks: "RunHooks[TContext]") -> None:
         agent: "Agent[TContext]",
         tool: "Tool",
         result: "object",
-    ) -> "None":
+    ) -> None:
         with capture_internal_exceptions():
             await sentry_hooks.on_tool_end(context, agent, tool, result)
         await original_on_tool_end(context, agent, tool, result)
