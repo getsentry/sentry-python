@@ -15,10 +15,10 @@ from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk.ai.utils import _set_span_data_attribute, get_start_span_function
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.consts import OP, SPANDATA, SPANSTATUS
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.traces import StreamedSpan
+from sentry_sdk.traces import SpanStatus, StreamedSpan
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
     capture_internal_exceptions,
@@ -270,6 +270,13 @@ def _extract_text_from_content_blocks(content_blocks: "Any") -> "Any":
     return " ".join(texts) if texts else content_blocks
 
 
+def _set_span_error_status(span: "Union[StreamedSpan, Span]") -> None:
+    if isinstance(span, StreamedSpan):
+        span.status = SpanStatus.ERROR
+    else:
+        span.set_status(SPANSTATUS.INTERNAL_ERROR)
+
+
 async def _tool_handler_wrapper(
     func: "Callable[..., Awaitable[Union[CallToolResult, InputRequiredResult]]]",
     original_args: "tuple[Any, ...]",
@@ -463,6 +470,9 @@ async def _instrument_v2_tool_call(
 
             if not isinstance(result, dict):
                 return result
+
+            if result.get("isError"):
+                _set_span_error_status(span)
 
             # Get integration to check PII settings
             integration = client.get_integration(MCPIntegration)
