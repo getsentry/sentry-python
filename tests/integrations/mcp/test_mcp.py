@@ -789,6 +789,63 @@ async def test_tool_handler_with_error(
 
 
 @pytest.mark.asyncio
+@pytest.mark.skipif(not IS_MCP_V2, reason="isError results are MCP v2 only")
+@pytest.mark.parametrize("span_streaming", [True, False])
+async def test_tool_handler_returning_is_error(
+    sentry_init, capture_events, capture_items, span_streaming, stdio
+):
+    """Tool results flagged with isError must mark the span as failed"""
+    sentry_init(
+        integrations=[MCPIntegration()],
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
+
+    async def failing_tool(ctx, params):
+        return CallToolResult(
+            content=[TextContent(type="text", text="Tool execution failed")],
+            is_error=True,
+        )
+
+    server = Server("test-server", on_call_tool=failing_tool)
+
+    if span_streaming:
+        items = capture_items("span")
+        with sentry_sdk.traces.start_span(name="mcp tx"):
+            result = await stdio(
+                server,
+                method="tools/call",
+                params={"name": "bad_tool", "arguments": {}},
+                request_id="req-is-error",
+            )
+        sentry_sdk.flush()
+
+        assert _get_response(result).result["isError"] is True
+
+        span = _find_mcp_span(items, method_name="tools/call")
+        assert span is not None
+        assert span["status"] == "error"
+    else:
+        events = capture_events()
+        with start_transaction(name="mcp tx"):
+            result = await stdio(
+                server,
+                method="tools/call",
+                params={"name": "bad_tool", "arguments": {}},
+                request_id="req-is-error",
+            )
+
+        assert _get_response(result).result["isError"] is True
+
+        (tx,) = events
+        assert len(tx["spans"]) == 1
+        span = tx["spans"][0]
+
+        assert span["status"] == "internal_error"
+        assert span["tags"]["status"] == "internal_error"
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize(
     "send_default_pii, include_prompts",
