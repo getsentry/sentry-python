@@ -3,11 +3,14 @@ from copy import deepcopy
 
 import boto3
 import pytest
+from boto3.dynamodb.conditions import Attr, Key
 from botocore.exceptions import ClientError
 from botocore.stub import Stubber
 
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.boto3 import Boto3Integration
+from sentry_sdk.integrations.boto3._context import AwsCallContext
+from sentry_sdk.integrations.boto3._services.dynamodb import _DynamoDBExtension
 from sentry_sdk.integrations.boto3.consts import AWS_RPC_SYSTEM_NAME, ORIGIN
 from tests.integrations.boto3.helpers import (
     capture_spans_by_op,
@@ -147,6 +150,8 @@ def test_get_item(dynamodb_client, capture_items, table_name):
     ]
     assert SPANDATA.DB_OPERATION_BATCH_SIZE not in attributes
     assert SPANDATA.DB_QUERY_TEXT not in attributes
+    # a call without query text is normalized to its operation and table.
+    assert attributes[SPANDATA.SENTRY_NORMALIZED_DB_QUERY] == "GetItem orders"
     assert "private-key" not in json.dumps(span)
 
 
@@ -208,6 +213,8 @@ def test_list_tables(dynamodb_client, capture_items):
     assert attributes[SPANDATA.AWS_DYNAMODB_TABLE_COUNT] == 2
     assert SPANDATA.DB_COLLECTION_NAME not in attributes
     assert SPANDATA.AWS_DYNAMODB_TABLE_NAMES not in attributes
+    # without the endpoint, unlike the name.
+    assert attributes[SPANDATA.SENTRY_NORMALIZED_DB_QUERY] == "ListTables"
 
 
 def test_create_table(dynamodb_client, capture_items):
@@ -339,6 +346,8 @@ def test_batch_get_item(
     )
     assert attributes.get(SPANDATA.DB_COLLECTION_NAME) == expected_collection
     assert attributes.get(SPANDATA.DB_OPERATION_BATCH_SIZE) == expected_batch_size
+    # the operation and its sorted tables, like the name.
+    assert attributes[SPANDATA.SENTRY_NORMALIZED_DB_QUERY] == expected_name
     assert attributes[SPANDATA.AWS_DYNAMODB_CONSUMED_CAPACITY] == [
         '{"TableName":"orders","CapacityUnits":1.0}',
         '{"TableName":"invoices","CapacityUnits":0.5}',
@@ -557,26 +566,6 @@ def test_execute_statement_resource_client(dynamodb_resource, capture_items):
     "method,params,response,expected",
     [
         pytest.param(
-            "get_item",
-            {"TableName": TABLE_ARN, "Key": {"id": {"S": "1"}}},
-            {},
-            "GetItem orders",
-            id="table",
-        ),
-        pytest.param(
-            "batch_get_item",
-            {
-                "RequestItems": {
-                    "orders": {"Keys": [{"id": {"S": "1"}}]},
-                    "customers": {"Keys": [{"id": {"S": "2"}}]},
-                }
-            },
-            {},
-            "BatchGetItem customers, orders",
-            id="tables",
-        ),
-        pytest.param("list_tables", {}, {}, "ListTables", id="no-table"),
-        pytest.param(
             "execute_statement",
             {
                 "Statement": 'SELECT * FROM "orders"."by-status" WHERE s = ? AND t = \'inline\'',
@@ -638,16 +627,48 @@ def test_execute_statement_resource_client(dynamodb_resource, capture_items):
         ),
     ],
 )
-def test_normalized_db_query(
+def test_partiql_normalized_db_query(
     dynamodb_client, capture_items, method, params, response, expected
 ):
     require_botocore_model_fields(dynamodb_client, method)
 
     span = _stubbed_span(dynamodb_client, capture_items, method, params, response)
 
-    # set by the sdk, so the queries insight lists every dynamodb call and relay doesn't
-    # normalize partiql as sql.
+    # set by the sdk, so relay doesn't normalize partiql as sql; calls without query
+    # text are covered by `test_get_item`, `test_batch_get_item` and `test_list_tables`.
     assert span["attributes"][SPANDATA.SENTRY_NORMALIZED_DB_QUERY] == expected
+
+
+def test_query_resource(dynamodb_resource, capture_items):
+    table = dynamodb_resource.Table("orders")
+
+    span = _stubbed_resource_span(
+        dynamodb_resource,
+        capture_items,
+        "query",
+        # the resource api builds condition objects into expressions after the span starts.
+        lambda: table.query(
+            IndexName="by-customer",
+            KeyConditionExpression=Key("customer").eq("private-customer")
+            & Key("created").gte(5),
+            FilterExpression=Attr("total").gt(10),
+        ),
+        {"Items": [], "Count": 0, "ScannedCount": 0},
+    )
+
+    assert span["name"] == "Query orders"
+    attributes = span["attributes"]
+    assert attributes[SPANDATA.DB_COLLECTION_NAME] == "orders"
+    assert attributes[SPANDATA.AWS_DYNAMODB_INDEX_NAME] == "by-customer"
+    assert attributes[SPANDATA.SENTRY_NORMALIZED_DB_QUERY] == "Query orders"
+    assert SPANDATA.DB_QUERY_TEXT not in attributes
+    assert "private-customer" not in json.dumps(span)
+
+
+def test_span_name_without_endpoint():
+    # botocore always resolves an endpoint; without one, the generic name is kept.
+    ctx = AwsCallContext("ListTables", {})
+    assert _DynamoDBExtension().get_span_name(ctx, {}) is None
 
 
 def test_client_error(dynamodb_client, capture_items):
@@ -853,6 +874,13 @@ def test_execute_statement_parameters_with_comment(dynamodb_client, capture_item
             "SELECT orders",
             "orders",
             id="unterminated-list",
+        ),
+        pytest.param(
+            "SELECT * FROM orders WHERE id IN ['a', 'b]",
+            None,
+            "SELECT orders",
+            "orders",
+            id="unterminated-string-in-list",
         ),
         pytest.param(
             "REMOVE x",
