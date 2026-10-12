@@ -77,7 +77,7 @@ def _maybe_start_agent_span(
     context_wrapper._sentry_current_agent = agent  # type: ignore[attr-defined]
     span = invoke_agent_span(context_wrapper, agent, span_kwargs)
     context_wrapper._sentry_agent_span = span  # type: ignore[attr-defined]
-    agent._sentry_agent_span = span  # type: ignore[attr-defined]
+    agent._sentry_agent_span = span
 
     if not is_streaming:
         return span
