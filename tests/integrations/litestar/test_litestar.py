@@ -208,7 +208,8 @@ def test_middleware_spans(
     litestar_spans = (
         span
         for span in spans
-        if span["attributes"]["sentry.op"] == "middleware.litestar"
+        if span["attributes"]["sentry.op"] == "middleware"
+        and span["name"] == span["attributes"].get("middleware.name")
     )
 
     for span in litestar_spans:
@@ -251,7 +252,7 @@ def test_middleware_callback_spans(
             "attributes": ApproxDict(
                 {
                     "middleware.name": "SampleMiddleware",
-                    "sentry.op": "middleware.litestar",
+                    "sentry.op": "middleware",
                 },
             ),
         },
@@ -260,7 +261,7 @@ def test_middleware_callback_spans(
             "attributes": ApproxDict(
                 {
                     "middleware.name": "SampleMiddleware",
-                    "sentry.op": "middleware.litestar.send",
+                    "sentry.op": "middleware",
                 }
             ),
         },
@@ -269,7 +270,7 @@ def test_middleware_callback_spans(
             "attributes": ApproxDict(
                 {
                     "middleware.name": "SampleMiddleware",
-                    "sentry.op": "middleware.litestar.send",
+                    "sentry.op": "middleware",
                 }
             ),
         },
@@ -284,9 +285,7 @@ def test_middleware_callback_spans(
     sentry_sdk.flush()
     spans = [item.payload for item in items]
     actual_litestar_spans = list(
-        span
-        for span in spans
-        if "middleware.litestar" in span["attributes"].get("sentry.op")
+        span for span in spans if span["attributes"].get("sentry.op") == "middleware"
     )
 
     assert len(actual_litestar_spans) == 3
@@ -368,7 +367,7 @@ def test_middleware_partial_receive_send(
             "attributes": ApproxDict(
                 {
                     "middleware.name": "SamplePartialReceiveSendMiddleware",
-                    "sentry.op": "middleware.litestar",
+                    "sentry.op": "middleware",
                 }
             ),
         },
@@ -377,7 +376,7 @@ def test_middleware_partial_receive_send(
             "attributes": ApproxDict(
                 {
                     "middleware.name": "SamplePartialReceiveSendMiddleware",
-                    "sentry.op": "middleware.litestar.receive",
+                    "sentry.op": "middleware",
                 }
             ),
         },
@@ -386,7 +385,7 @@ def test_middleware_partial_receive_send(
             "attributes": ApproxDict(
                 {
                     "middleware.name": "SamplePartialReceiveSendMiddleware",
-                    "sentry.op": "middleware.litestar.send",
+                    "sentry.op": "middleware",
                 }
             ),
         },
@@ -399,9 +398,7 @@ def test_middleware_partial_receive_send(
         )
 
     actual_litestar_spans = list(
-        span
-        for span in spans
-        if "middleware.litestar" in span["attributes"].get("sentry.op")
+        span for span in spans if span["attributes"].get("sentry.op") == "middleware"
     )
     assert len(actual_litestar_spans) == 3
 

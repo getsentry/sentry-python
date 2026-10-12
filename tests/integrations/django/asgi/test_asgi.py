@@ -277,11 +277,11 @@ async def test_async_middleware_spans(
         render_span_tree(spans)
         == """\
 - sentry.op="http.server": name="/simple_async_view"
-  - sentry.op="middleware.django": name="django.contrib.sessions.middleware.SessionMiddleware.__acall__"
-    - sentry.op="middleware.django": name="django.contrib.auth.middleware.AuthenticationMiddleware.__acall__"
-      - sentry.op="middleware.django": name="django.middleware.csrf.CsrfViewMiddleware.__acall__"
-        - sentry.op="middleware.django": name="tests.integrations.django.myapp.settings.TestMiddleware.__acall__"
-          - sentry.op="middleware.django": name="django.middleware.csrf.CsrfViewMiddleware.process_view"
+  - sentry.op="middleware": name="django.contrib.sessions.middleware.SessionMiddleware.__acall__"
+    - sentry.op="middleware": name="django.contrib.auth.middleware.AuthenticationMiddleware.__acall__"
+      - sentry.op="middleware": name="django.middleware.csrf.CsrfViewMiddleware.__acall__"
+        - sentry.op="middleware": name="tests.integrations.django.myapp.settings.TestMiddleware.__acall__"
+          - sentry.op="middleware": name="django.middleware.csrf.CsrfViewMiddleware.process_view"
           - sentry.op="view.render": name="simple_async_view\""""
     )
 

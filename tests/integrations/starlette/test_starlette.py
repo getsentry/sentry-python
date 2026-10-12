@@ -1033,10 +1033,10 @@ def test_middleware_spans(sentry_init, capture_items):
         "ServerErrorMiddleware",
         "AuthenticationMiddleware",
         "ExceptionMiddleware",
-        "AuthenticationMiddleware",  # 'op': 'middleware.starlette.send'
-        "ServerErrorMiddleware",  # 'op': 'middleware.starlette.send'
-        "AuthenticationMiddleware",  # 'op': 'middleware.starlette.send'
-        "ServerErrorMiddleware",  # 'op': 'middleware.starlette.send'
+        "AuthenticationMiddleware",  # 'op': 'middleware'
+        "ServerErrorMiddleware",  # 'op': 'middleware'
+        "AuthenticationMiddleware",  # 'op': 'middleware'
+        "ServerErrorMiddleware",  # 'op': 'middleware'
     ]
 
     sentry_sdk.flush()
@@ -1044,7 +1044,7 @@ def test_middleware_spans(sentry_init, capture_items):
     segment = items.pop().payload
     middleware_spans = [item.payload for item in items]
 
-    # In span-first, the `middleware.starlette.send` ops appear first,
+    # In span-first, the middleware send ops appear first,
     # so the list needs to be reversed for the assertions below
     middleware_spans.reverse()
 
@@ -1105,47 +1105,47 @@ def test_middleware_callback_spans(sentry_init, capture_items):
 
     expected = [
         {
-            "op": "middleware.starlette",
+            "op": "middleware",
             "description": "ServerErrorMiddleware",
             "middleware_name": "ServerErrorMiddleware",
         },
         {
-            "op": "middleware.starlette",
+            "op": "middleware",
             "description": "SampleMiddleware",
             "middleware_name": "SampleMiddleware",
         },
         {
-            "op": "middleware.starlette",
+            "op": "middleware",
             "description": "ExceptionMiddleware",
             "middleware_name": "ExceptionMiddleware",
         },
         {
-            "op": "middleware.starlette.send",
+            "op": "middleware",
             "description": "SampleMiddleware.__call__.<locals>.do_stuff",
             "middleware_name": "ExceptionMiddleware",
         },
         {
-            "op": "middleware.starlette.send",
+            "op": "middleware",
             "description": "ServerErrorMiddleware.__call__.<locals>._send",
             "middleware_name": "SampleMiddleware",
         },
         {
-            "op": "middleware.starlette.send",
+            "op": "middleware",
             "description": "SentryAsgiMiddleware._run_app.<locals>._sentry_wrapped_send",
             "middleware_name": "ServerErrorMiddleware",
         },
         {
-            "op": "middleware.starlette.send",
+            "op": "middleware",
             "description": "SampleMiddleware.__call__.<locals>.do_stuff",
             "middleware_name": "ExceptionMiddleware",
         },
         {
-            "op": "middleware.starlette.send",
+            "op": "middleware",
             "description": "ServerErrorMiddleware.__call__.<locals>._send",
             "middleware_name": "SampleMiddleware",
         },
         {
-            "op": "middleware.starlette.send",
+            "op": "middleware",
             "description": "SentryAsgiMiddleware._run_app.<locals>._sentry_wrapped_send",
             "middleware_name": "ServerErrorMiddleware",
         },
@@ -1156,7 +1156,7 @@ def test_middleware_callback_spans(sentry_init, capture_items):
     segment = items.pop().payload
     middleware_spans = [item.payload for item in items]
 
-    # In span-first, the `middleware.starlette.send` ops appear first,
+    # In span-first, the middleware send ops appear first,
     # so the list needs to be reversed for the assertions below
     middleware_spans.reverse()
 
@@ -1212,27 +1212,27 @@ def test_middleware_partial_receive_send(sentry_init, capture_items):
 
     expected = [
         {
-            "op": "middleware.starlette.send",
+            "op": "middleware",
             "description": "functools.partial(<function SamplePartialReceiveSendMiddleware.__call__.<locals>.my_send at ",
         },
         {
-            "op": "middleware.starlette.send",
+            "op": "middleware",
             "description": "functools.partial(<function SamplePartialReceiveSendMiddleware.__call__.<locals>.my_send at ",
         },
         {
-            "op": "middleware.starlette",
+            "op": "middleware",
             "description": "ExceptionMiddleware",
         },
         {
-            "op": "middleware.starlette.send",
+            "op": "middleware",
             "description": "SentryAsgiMiddleware._run_app.<locals>._sentry_wrapped_send",
         },
         {
-            "op": "middleware.starlette.send",
+            "op": "middleware",
             "description": "ServerErrorMiddleware.__call__.<locals>._send",
         },
         {
-            "op": "middleware.starlette.receive",
+            "op": "middleware",
             "description": (
                 "_ASGIAdapter.send.<locals>.receive"
                 if STARLETTE_VERSION < (0, 21)
@@ -1240,11 +1240,11 @@ def test_middleware_partial_receive_send(sentry_init, capture_items):
             ),
         },
         {
-            "op": "middleware.starlette",
+            "op": "middleware",
             "description": "SamplePartialReceiveSendMiddleware",
         },
         {
-            "op": "middleware.starlette",
+            "op": "middleware",
             "description": "ServerErrorMiddleware",
         },
     ]

@@ -82,7 +82,7 @@ def _wrap_middleware(middleware: "Any", middleware_name: str) -> "Any":
         middleware_span = sentry_sdk.start_span(
             name=description,
             attributes={
-                "sentry.op": OP.MIDDLEWARE_DJANGO,
+                "sentry.op": OP.MIDDLEWARE,
                 "sentry.origin": DjangoIntegration.origin,
                 SPANDATA.MIDDLEWARE_NAME: middleware_name,
             },

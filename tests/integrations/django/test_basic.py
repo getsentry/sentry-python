@@ -1499,25 +1499,25 @@ def test_middleware_spans(
     if DJANGO_VERSION >= (1, 10):
         EXPECTED_MIDDLEWARE_SPANS = """\
 - sentry.op="http.server": name="/message"
-  - sentry.op="middleware.django": name="django.contrib.sessions.middleware.SessionMiddleware.__call__"
-    - sentry.op="middleware.django": name="django.contrib.auth.middleware.AuthenticationMiddleware.__call__"
-      - sentry.op="middleware.django": name="django.middleware.csrf.CsrfViewMiddleware.__call__"
-        - sentry.op="middleware.django": name="tests.integrations.django.myapp.settings.TestMiddleware.__call__"
-          - sentry.op="middleware.django": name="tests.integrations.django.myapp.settings.TestFunctionMiddleware.__call__"
-            - sentry.op="middleware.django": name="django.middleware.csrf.CsrfViewMiddleware.process_view"
+  - sentry.op="middleware": name="django.contrib.sessions.middleware.SessionMiddleware.__call__"
+    - sentry.op="middleware": name="django.contrib.auth.middleware.AuthenticationMiddleware.__call__"
+      - sentry.op="middleware": name="django.middleware.csrf.CsrfViewMiddleware.__call__"
+        - sentry.op="middleware": name="tests.integrations.django.myapp.settings.TestMiddleware.__call__"
+          - sentry.op="middleware": name="tests.integrations.django.myapp.settings.TestFunctionMiddleware.__call__"
+            - sentry.op="middleware": name="django.middleware.csrf.CsrfViewMiddleware.process_view"
             - sentry.op="view.render": name="message"\
 """
     else:
         EXPECTED_MIDDLEWARE_SPANS = """\
 - sentry.op="http.server": name="/message"
-  - sentry.op="middleware.django": name="django.contrib.sessions.middleware.SessionMiddleware.process_request"
-  - sentry.op="middleware.django": name="django.contrib.auth.middleware.AuthenticationMiddleware.process_request"
-  - sentry.op="middleware.django": name="tests.integrations.django.myapp.settings.TestMiddleware.process_request"
-  - sentry.op="middleware.django": name="django.middleware.csrf.CsrfViewMiddleware.process_view"
+  - sentry.op="middleware": name="django.contrib.sessions.middleware.SessionMiddleware.process_request"
+  - sentry.op="middleware": name="django.contrib.auth.middleware.AuthenticationMiddleware.process_request"
+  - sentry.op="middleware": name="tests.integrations.django.myapp.settings.TestMiddleware.process_request"
+  - sentry.op="middleware": name="django.middleware.csrf.CsrfViewMiddleware.process_view"
   - sentry.op="view.render": name="message"
-  - sentry.op="middleware.django": name="tests.integrations.django.myapp.settings.TestMiddleware.process_response"
-  - sentry.op="middleware.django": name="django.middleware.csrf.CsrfViewMiddleware.process_response"
-  - sentry.op="middleware.django": name="django.contrib.sessions.middleware.SessionMiddleware.process_response"\
+  - sentry.op="middleware": name="tests.integrations.django.myapp.settings.TestMiddleware.process_response"
+  - sentry.op="middleware": name="django.middleware.csrf.CsrfViewMiddleware.process_response"
+  - sentry.op="middleware": name="django.contrib.sessions.middleware.SessionMiddleware.process_response"\
 """
     assert render_span_tree(spans) == EXPECTED_MIDDLEWARE_SPANS
 
