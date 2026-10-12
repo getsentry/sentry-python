@@ -7,7 +7,7 @@ from cohere import ChatMessage, Client
 from httpx import Client as HTTPXClient
 
 import sentry_sdk
-from sentry_sdk.consts import SPANDATA
+from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.cohere import CohereIntegration
 
 
@@ -55,7 +55,7 @@ def test_nonstreaming_chat(
     assert len(items) == 1
     span = items[0].payload
 
-    assert span["attributes"]["sentry.op"] == "ai.chat_completions.create.cohere"
+    assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
     assert span["attributes"][SPANDATA.AI_MODEL_ID] == "some-model"
 
     assert (
@@ -117,7 +117,7 @@ def test_nonstreaming_chat_no_sensitive_data(
     assert len(items) == 1
     span = items[0].payload
 
-    assert span["attributes"]["sentry.op"] == "ai.chat_completions.create.cohere"
+    assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
     assert span["attributes"][SPANDATA.AI_MODEL_ID] == "some-model"
 
     assert SPANDATA.AI_INPUT_MESSAGES not in span["attributes"]
@@ -187,7 +187,7 @@ def test_streaming_chat(
     assert len(items) == 1
     span = items[0].payload
 
-    assert span["attributes"]["sentry.op"] == "ai.chat_completions.create.cohere"
+    assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
     assert span["attributes"][SPANDATA.AI_MODEL_ID] == "some-model"
 
     assert (
@@ -264,7 +264,7 @@ def test_streaming_chat_no_sensitive_data(
     assert len(items) == 1
     span = items[0].payload
 
-    assert span["attributes"]["sentry.op"] == "ai.chat_completions.create.cohere"
+    assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
     assert span["attributes"][SPANDATA.AI_MODEL_ID] == "some-model"
 
     assert SPANDATA.AI_INPUT_MESSAGES not in span["attributes"]
@@ -317,7 +317,7 @@ def test_embed(
     assert len(items) == 1
     span = items[0].payload
 
-    assert span["attributes"]["sentry.op"] == "ai.embeddings.create.cohere"
+    assert span["attributes"]["sentry.op"] == OP.GEN_AI_EMBEDDINGS
     assert "hello" in span["attributes"][SPANDATA.AI_INPUT_MESSAGES]
 
     assert span["attributes"]["gen_ai.usage.input_tokens"] == 10
@@ -366,7 +366,7 @@ def test_embed_no_sensitive_data(
     assert len(items) == 1
     span = items[0].payload
 
-    assert span["attributes"]["sentry.op"] == "ai.embeddings.create.cohere"
+    assert span["attributes"]["sentry.op"] == OP.GEN_AI_EMBEDDINGS
     assert SPANDATA.AI_INPUT_MESSAGES not in span["attributes"]
 
     assert span["attributes"]["gen_ai.usage.input_tokens"] == 10
