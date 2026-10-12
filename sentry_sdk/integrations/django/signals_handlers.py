@@ -69,7 +69,7 @@ def patch_signals() -> None:
                 with sentry_sdk.start_span(
                     name=signal_name,
                     attributes={
-                        "sentry.op": OP.EVENT_DJANGO,
+                        "sentry.op": OP.FUNCTION,
                         "sentry.origin": DjangoIntegration.origin,
                         SPANDATA.CODE_FUNCTION_NAME: signal_name,
                     },

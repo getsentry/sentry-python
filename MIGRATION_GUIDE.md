@@ -42,7 +42,7 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 Span ops are now a smaller, framework-neutral set.
 
 - The Cohere integration now emits `gen_ai.chat` instead of `ai.chat_completions.create.cohere`, and `gen_ai.embeddings` instead of `ai.embeddings.create.cohere`.
-- The Django integration now emits `view.render` instead of `view.response.render`, and `view` instead of `view.authenticate`.
+- The Django integration now emits `view.render` instead of `view.response.render`, `view` instead of `view.authenticate`, and `function` instead of `event.django`.
 
 #### Django
 
