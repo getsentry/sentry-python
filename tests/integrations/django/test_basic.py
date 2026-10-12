@@ -557,9 +557,8 @@ def test_response_trace(
     sentry_sdk.flush()
     spans = [item.payload for item in items]
 
-    assert (
-        '- sentry.op="view.response.render": name="serialize response"'
-        in render_span_tree(spans)
+    assert '- sentry.op="view.render": name="serialize response"' in render_span_tree(
+        spans
     )
 
 
@@ -1260,7 +1259,7 @@ def test_rest_framework_authentication_span(
         render_span_tree(spans)
         == """\
 - sentry.op="http.server": name="/rest-authenticated-hello"
-  - sentry.op="view.authenticate": name="authenticate"\
+  - sentry.op="view": name="authenticate"\
 """
     )
 
