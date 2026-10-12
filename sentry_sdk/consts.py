@@ -1360,6 +1360,7 @@ class OP:
     HTTP_CLIENT = "http.client"
     HTTP_CLIENT_STREAM = "http.client.stream"
     HTTP_SERVER = "http.server"
+    MIDDLEWARE = "middleware"
     MIDDLEWARE_DJANGO = "middleware.django"
     MIDDLEWARE_LITESTAR = "middleware.litestar"
     MIDDLEWARE_LITESTAR_RECEIVE = "middleware.litestar.receive"
