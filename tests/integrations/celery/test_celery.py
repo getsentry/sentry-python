@@ -304,7 +304,7 @@ def test_transaction_events(
     assert submission_span["is_segment"] is True
 
     assert submit_span["name"] == "dummy_task"
-    assert submit_span["attributes"]["sentry.op"] == "queue.submit.celery"
+    assert submit_span["attributes"]["sentry.op"] == "queue.publish"
     assert submit_span["attributes"]["sentry.origin"] == "auto.queue.celery"
     assert submit_span["parent_span_id"] == submission_span["span_id"] == span.span_id
     assert submit_span["trace_id"] == span.trace_id
@@ -941,7 +941,7 @@ def test_send_task_wrapped(
     assert outer["is_segment"] is True
 
     assert submit_span["name"] == "very_creative_task_name"
-    assert submit_span["attributes"]["sentry.op"] == "queue.submit.celery"
+    assert submit_span["attributes"]["sentry.op"] == "queue.publish"
     assert submit_span["trace_id"] == outer_span.trace_id
     assert submit_span["trace_id"] == kwargs["headers"]["sentry-trace"].split("-")[0]
 

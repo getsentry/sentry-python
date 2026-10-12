@@ -222,7 +222,7 @@ def test_tracing_in_ray_tasks(
     )
 
     span = client_spans[0]
-    assert span["attributes"]["sentry.op"]["value"] == "queue.submit.ray"
+    assert span["attributes"]["sentry.op"]["value"] == "queue.publish"
     assert span["attributes"]["sentry.origin"]["value"] == "auto.queue.ray"
     assert span["name"] == f"tests.integrations.ray.test_ray.{task.__name__}"
     assert span["parent_span_id"] == client_spans[1]["span_id"]

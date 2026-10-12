@@ -244,10 +244,10 @@ async def test_job_retry(
     spans = [item.payload for item in items]
 
     # The retry re-enqueue happens without an active span, so no producer
-    # (queue.submit.arq) span is created for it; only the consumer segment
+    # (queue.publish) span is created for it; only the consumer segment
     # is emitted. The consumer segment is preceded by the redis spans for
     # the re-enqueue, so it lands at index 2.
-    assert spans[2]["attributes"]["sentry.op"] == "queue.task.arq"
+    assert spans[2]["attributes"]["sentry.op"] == "queue.process"
     assert spans[2]["status"] == "ok"
     assert spans[2]["name"] == "retry_job"
 
@@ -256,7 +256,7 @@ async def test_job_retry(
     sentry_sdk.flush()
     spans = [item.payload for item in items]
 
-    assert spans[5]["attributes"]["sentry.op"] == "queue.task.arq"
+    assert spans[5]["attributes"]["sentry.op"] == "queue.process"
     assert spans[5]["status"] == "ok"
     assert spans[5]["name"] == "retry_job"
 
@@ -327,9 +327,7 @@ async def test_worker_jobs(
     spans = [item.payload for item in items if item.type == "span"]
 
     task_spans = [
-        span
-        for span in spans
-        if span["attributes"].get("sentry.op") == "queue.task.arq"
+        span for span in spans if span["attributes"].get("sentry.op") == "queue.process"
     ]
 
     division_span = next(span for span in task_spans if span["name"] == "division")
@@ -413,7 +411,7 @@ async def test_enqueue_job(
     assert spans[2]["trace_id"] == span.trace_id
     assert spans[2]["span_id"] == span.span_id
 
-    assert spans[1]["attributes"]["sentry.op"] == "queue.submit.arq"
+    assert spans[1]["attributes"]["sentry.op"] == "queue.publish"
     assert spans[1]["name"] == "dummy_job"
 
 
@@ -497,10 +495,10 @@ async def test_span_origin_consumer(
     sentry_sdk.flush()
     spans = [item.payload for item in items]
 
-    # No producer (queue.submit.arq) span is created for the re-enqueue
+    # No producer (queue.publish) span is created for the re-enqueue
     # triggered by the retry, since it happens without an active span, so
     # the consumer segment lands at index 2.
-    assert spans[2]["attributes"]["sentry.op"] == "queue.task.arq"
+    assert spans[2]["attributes"]["sentry.op"] == "queue.process"
     assert spans[2]["attributes"]["sentry.origin"] == "auto.queue.arq"
     assert spans[1]["attributes"]["sentry.origin"] == "auto.db.redis"
     assert spans[0]["attributes"]["sentry.origin"] == "auto.db.redis"

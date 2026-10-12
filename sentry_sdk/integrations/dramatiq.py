@@ -141,7 +141,7 @@ class SentryMiddleware(Middleware):  # type: ignore[misc]
         span = sentry_sdk.start_span(
             name=message.actor_name,
             attributes={
-                "sentry.op": OP.QUEUE_TASK_DRAMATIQ,
+                "sentry.op": OP.QUEUE_PROCESS,
                 "sentry.origin": DramatiqIntegration.origin,
                 "sentry.segment.name.source": SegmentNameSource.TASK.value,
                 SPANDATA.MESSAGING_DESTINATION_NAME: message.queue_name,

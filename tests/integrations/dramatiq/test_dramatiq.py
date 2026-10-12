@@ -146,7 +146,7 @@ def test_task_transaction(
     assert segment_item.type == "span"
     assert segment["name"] == "dummy_actor"
     assert segment["is_segment"] is True
-    assert segment["attributes"]["sentry.op"] == "queue.task.dramatiq"
+    assert segment["attributes"]["sentry.op"] == "queue.process"
     assert segment["attributes"]["sentry.segment.name.source"] == "task"
     assert (
         segment["attributes"][SPANDATA.MESSAGING_DESTINATION_NAME]
@@ -181,7 +181,7 @@ def test_dramatiq_propagate_trace(broker, worker, capture_items):
 
     inner_segment, outer_segment = [i.payload for i in items]
     assert inner_segment["name"] == "propagated_trace_task"
-    assert inner_segment["attributes"]["sentry.op"] == "queue.task.dramatiq"
+    assert inner_segment["attributes"]["sentry.op"] == "queue.process"
     assert inner_segment["trace_id"] == outer_span.trace_id
     assert outer_segment["name"] == "outer"
 

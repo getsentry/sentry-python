@@ -59,7 +59,7 @@ def test_task_span_is_created(
     capture_items,
     immediate_backend,
 ):
-    """Test that the queue.submit.django span is created when a task is enqueued."""
+    """Test that the queue.publish span is created when a task is enqueued."""
     sentry_init(
         integrations=[DjangoIntegration()],
         traces_sample_rate=1.0,
@@ -75,7 +75,7 @@ def test_task_span_is_created(
     queue_submit_spans = [
         span
         for span in spans
-        if span["attributes"].get("sentry.op") == OP.QUEUE_SUBMIT_DJANGO
+        if span["attributes"].get("sentry.op") == OP.QUEUE_PUBLISH
     ]
     assert len(queue_submit_spans) == 1
     assert (
@@ -129,7 +129,7 @@ def test_task_enqueue_with_kwargs(
     queue_submit_spans = [
         span
         for span in spans
-        if span["attributes"].get("sentry.op") == OP.QUEUE_SUBMIT_DJANGO
+        if span["attributes"].get("sentry.op") == OP.QUEUE_PUBLISH
     ]
     assert len(queue_submit_spans) == 1
     assert queue_submit_spans[0]["name"] == "tests.integrations.django.test_tasks.greet"
@@ -166,7 +166,7 @@ def test_task_error_reporting(
     queue_submit_spans = [
         span
         for span in spans
-        if span["attributes"].get("sentry.op") == OP.QUEUE_SUBMIT_DJANGO
+        if span["attributes"].get("sentry.op") == OP.QUEUE_PUBLISH
     ]
 
     assert len(queue_submit_spans) == 1
@@ -203,7 +203,7 @@ def test_multiple_task_enqueues_create_multiple_spans(
     queue_submit_spans = [
         span
         for span in spans
-        if span["attributes"].get("sentry.op") == OP.QUEUE_SUBMIT_DJANGO
+        if span["attributes"].get("sentry.op") == OP.QUEUE_PUBLISH
     ]
     assert len(queue_submit_spans) == 3
 

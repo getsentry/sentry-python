@@ -82,7 +82,7 @@ class RqIntegration(Integration):
                 with sentry_sdk.start_span(
                     name="unknown RQ task" if func_name is None else func_name,
                     attributes={
-                        "sentry.op": OP.QUEUE_TASK_RQ,
+                        "sentry.op": OP.QUEUE_PROCESS,
                         "sentry.origin": RqIntegration.origin,
                         "sentry.segment.name.source": SegmentNameSource.TASK,
                         SPANDATA.MESSAGING_MESSAGE_ID: job.id,
