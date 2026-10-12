@@ -147,6 +147,11 @@ class OpenAIIntegration(Integration):
             Responses.create = _wrap_responses_create(Responses.create)  # type: ignore[method-assign]
             AsyncResponses.create = _wrap_async_responses_create(AsyncResponses.create)  # type: ignore[assignment,method-assign]
 
+        # Finish the AI Client Span when a stream is closed before it has been
+        # read to the end (see _wrap_stream_close).
+        Stream.close = _wrap_stream_close(Stream.close)  # type: ignore[method-assign]
+        AsyncStream.close = _wrap_async_stream_close(AsyncStream.close)  # type: ignore[method-assign]
+
     def count_tokens(self: "OpenAIIntegration", s: str) -> int:
         if self.tiktoken_encoding is None:
             return 0
@@ -915,6 +920,10 @@ def _new_sync_chat_completion(
             finish_span=True,
         )
 
+        # The close() patch (see _wrap_stream_close) uses this to finish the
+        # span when the stream is closed before it has been read to the end.
+        setattr(response, "_span", span)
+
     else:
         _set_completions_api_output_data(
             span, response, kwargs, integration, finish_span=True
@@ -998,6 +1007,10 @@ async def _new_async_chat_completion(
             old_iterator=response._iterator,
             finish_span=True,
         )
+
+        # The close() patch (see _wrap_stream_close) uses this to finish the
+        # span when the stream is closed before it has been read to the end.
+        setattr(response, "_span", span)
     else:
         _set_completions_api_output_data(
             span, response, kwargs, integration, finish_span=True
@@ -1046,56 +1059,78 @@ def _wrap_synchronous_completions_chunk_iterator(
     streaming_message_total_token_usage = None
     client = sentry_sdk.get_client()
 
-    for x in old_iterator:
-        if isinstance(span, StreamedSpan):
-            span.set_attribute(SPANDATA.GEN_AI_RESPONSE_MODEL, x.model)
-        else:
-            span.set_data(SPANDATA.GEN_AI_RESPONSE_MODEL, x.model)
+    try:
+        for x in old_iterator:
+            if isinstance(span, StreamedSpan):
+                span.set_attribute(SPANDATA.GEN_AI_RESPONSE_MODEL, x.model)
+            else:
+                span.set_data(SPANDATA.GEN_AI_RESPONSE_MODEL, x.model)
+
+            with capture_internal_exceptions():
+                if hasattr(x, "choices") and x.choices is not None:
+                    choice_index = 0
+                    for choice in x.choices:
+                        if hasattr(choice, "delta") and hasattr(
+                            choice.delta, "content"
+                        ):
+                            if start_time is not None and ttft is None:
+                                ttft = time.perf_counter() - start_time
+                            content = choice.delta.content
+                            if len(data_buf) <= choice_index:
+                                data_buf.append([])
+                            data_buf[choice_index].append(content or "")
+                        choice_index += 1
+                if hasattr(x, "usage"):
+                    streaming_message_total_token_usage = x.usage
+
+            yield x
+
+    finally:
+        # The exception that ended iteration, if any: a mid-stream error, or
+        # GeneratorExit when the stream is closed early. GeneratorExit is normal
+        # control flow (the user closed the stream), not an error, so the span
+        # still finishes cleanly in that case.
+        exc_info = sys.exc_info()
+        if exc_info[0] is not None and issubclass(exc_info[0], GeneratorExit):
+            exc_info = (None, None, None)
 
         with capture_internal_exceptions():
-            if hasattr(x, "choices") and x.choices is not None:
-                choice_index = 0
-                for choice in x.choices:
-                    if hasattr(choice, "delta") and hasattr(choice.delta, "content"):
-                        if start_time is not None and ttft is None:
-                            ttft = time.perf_counter() - start_time
-                        content = choice.delta.content
-                        if len(data_buf) <= choice_index:
-                            data_buf.append([])
-                        data_buf[choice_index].append(content or "")
-                    choice_index += 1
-            if hasattr(x, "usage"):
-                streaming_message_total_token_usage = x.usage
-
-        yield x
-
-    with capture_internal_exceptions():
-        if ttft is not None:
-            set_data_normalized(
-                span, SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN, ttft
-            )
-        all_responses = None
-        if len(data_buf) > 0:
-            all_responses = ["".join(chunk) for chunk in data_buf]
-            if has_data_collection_enabled(client.options):
-                if client.options["data_collection"]["gen_ai"]["outputs"]:
+            if ttft is not None:
+                set_data_normalized(
+                    span, SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN, ttft
+                )
+            all_responses = None
+            if len(data_buf) > 0:
+                all_responses = ["".join(chunk) for chunk in data_buf]
+                if has_data_collection_enabled(client.options):
+                    if client.options["data_collection"]["gen_ai"]["outputs"]:
+                        set_data_normalized(
+                            span, SPANDATA.GEN_AI_RESPONSE_TEXT, all_responses
+                        )
+                elif should_send_default_pii() and integration.include_prompts:
                     set_data_normalized(
                         span, SPANDATA.GEN_AI_RESPONSE_TEXT, all_responses
                     )
-            elif should_send_default_pii() and integration.include_prompts:
-                set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, all_responses)
 
-        _calculate_completions_token_usage(
-            messages=messages,
-            response=response,
-            span=span,
-            streaming_message_responses=all_responses,
-            streaming_message_total_token_usage=streaming_message_total_token_usage,
-            count_tokens=integration.count_tokens,
-        )
+            _calculate_completions_token_usage(
+                messages=messages,
+                response=response,
+                span=span,
+                streaming_message_responses=all_responses,
+                streaming_message_total_token_usage=streaming_message_total_token_usage,
+                count_tokens=integration.count_tokens,
+            )
 
-    if finish_span:
-        span.__exit__(None, None, None)
+        if finish_span:
+            with capture_internal_exceptions():
+                span.__exit__(*exc_info)
+
+        with capture_internal_exceptions():
+            # The span is no longer unfinished on this stream: either it was
+            # finished above, or iteration ended without finishing it. Either
+            # way the close() patch must not finish it again.
+            if getattr(response, "_span", None) is span:
+                delattr(response, "_span")
 
 
 async def _wrap_asynchronous_completions_chunk_iterator(
@@ -1117,56 +1152,78 @@ async def _wrap_asynchronous_completions_chunk_iterator(
     streaming_message_total_token_usage = None
     client = sentry_sdk.get_client()
 
-    async for x in old_iterator:
-        if isinstance(span, StreamedSpan):
-            span.set_attribute(SPANDATA.GEN_AI_RESPONSE_MODEL, x.model)
-        else:
-            span.set_data(SPANDATA.GEN_AI_RESPONSE_MODEL, x.model)
+    try:
+        async for x in old_iterator:
+            if isinstance(span, StreamedSpan):
+                span.set_attribute(SPANDATA.GEN_AI_RESPONSE_MODEL, x.model)
+            else:
+                span.set_data(SPANDATA.GEN_AI_RESPONSE_MODEL, x.model)
+
+            with capture_internal_exceptions():
+                if hasattr(x, "choices") and x.choices is not None:
+                    choice_index = 0
+                    for choice in x.choices:
+                        if hasattr(choice, "delta") and hasattr(
+                            choice.delta, "content"
+                        ):
+                            if start_time is not None and ttft is None:
+                                ttft = time.perf_counter() - start_time
+                            content = choice.delta.content
+                            if len(data_buf) <= choice_index:
+                                data_buf.append([])
+                            data_buf[choice_index].append(content or "")
+                        choice_index += 1
+                if hasattr(x, "usage"):
+                    streaming_message_total_token_usage = x.usage
+
+            yield x
+
+    finally:
+        # The exception that ended iteration, if any: a mid-stream error, or
+        # GeneratorExit when the stream is closed early. GeneratorExit is normal
+        # control flow (the user closed the stream), not an error, so the span
+        # still finishes cleanly in that case.
+        exc_info = sys.exc_info()
+        if exc_info[0] is not None and issubclass(exc_info[0], GeneratorExit):
+            exc_info = (None, None, None)
 
         with capture_internal_exceptions():
-            if hasattr(x, "choices") and x.choices is not None:
-                choice_index = 0
-                for choice in x.choices:
-                    if hasattr(choice, "delta") and hasattr(choice.delta, "content"):
-                        if start_time is not None and ttft is None:
-                            ttft = time.perf_counter() - start_time
-                        content = choice.delta.content
-                        if len(data_buf) <= choice_index:
-                            data_buf.append([])
-                        data_buf[choice_index].append(content or "")
-                    choice_index += 1
-            if hasattr(x, "usage"):
-                streaming_message_total_token_usage = x.usage
-
-        yield x
-
-    with capture_internal_exceptions():
-        if ttft is not None:
-            set_data_normalized(
-                span, SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN, ttft
-            )
-        all_responses = None
-        if len(data_buf) > 0:
-            all_responses = ["".join(chunk) for chunk in data_buf]
-            if has_data_collection_enabled(client.options):
-                if client.options["data_collection"]["gen_ai"]["outputs"]:
+            if ttft is not None:
+                set_data_normalized(
+                    span, SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN, ttft
+                )
+            all_responses = None
+            if len(data_buf) > 0:
+                all_responses = ["".join(chunk) for chunk in data_buf]
+                if has_data_collection_enabled(client.options):
+                    if client.options["data_collection"]["gen_ai"]["outputs"]:
+                        set_data_normalized(
+                            span, SPANDATA.GEN_AI_RESPONSE_TEXT, all_responses
+                        )
+                elif should_send_default_pii() and integration.include_prompts:
                     set_data_normalized(
                         span, SPANDATA.GEN_AI_RESPONSE_TEXT, all_responses
                     )
-            elif should_send_default_pii() and integration.include_prompts:
-                set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, all_responses)
 
-        _calculate_completions_token_usage(
-            messages=messages,
-            response=response,
-            span=span,
-            streaming_message_responses=all_responses,
-            streaming_message_total_token_usage=streaming_message_total_token_usage,
-            count_tokens=integration.count_tokens,
-        )
+            _calculate_completions_token_usage(
+                messages=messages,
+                response=response,
+                span=span,
+                streaming_message_responses=all_responses,
+                streaming_message_total_token_usage=streaming_message_total_token_usage,
+                count_tokens=integration.count_tokens,
+            )
 
-    if finish_span:
-        span.__exit__(None, None, None)
+        if finish_span:
+            with capture_internal_exceptions():
+                span.__exit__(*exc_info)
+
+        with capture_internal_exceptions():
+            # The span is no longer unfinished on this stream: either it was
+            # finished above, or iteration ended without finishing it. Either
+            # way the close() patch must not finish it again.
+            if getattr(response, "_span", None) is span:
+                delattr(response, "_span")
 
 
 def _wrap_synchronous_responses_event_iterator(
@@ -1188,58 +1245,80 @@ def _wrap_synchronous_responses_event_iterator(
     client = sentry_sdk.get_client()
 
     count_tokens_manually = True
-    for x in old_iterator:
+    try:
+        for x in old_iterator:
+            with capture_internal_exceptions():
+                if isinstance(x, ResponseTextDeltaEvent):
+                    if start_time is not None and ttft is None:
+                        ttft = time.perf_counter() - start_time
+                    if len(data_buf) == 0:
+                        data_buf.append([])
+                    data_buf[0].append(x.delta or "")
+
+                elif isinstance(x, ResponseCompletedEvent):
+                    if isinstance(span, StreamedSpan):
+                        span.set_attribute(
+                            SPANDATA.GEN_AI_RESPONSE_MODEL, x.response.model
+                        )
+                    else:
+                        span.set_data(SPANDATA.GEN_AI_RESPONSE_MODEL, x.response.model)
+
+                    _calculate_responses_token_usage(
+                        input=input,
+                        response=x.response,
+                        span=span,
+                        streaming_message_responses=None,
+                        count_tokens=integration.count_tokens,
+                    )
+                    count_tokens_manually = False
+
+            yield x
+
+    finally:
+        # The exception that ended iteration, if any: a mid-stream error, or
+        # GeneratorExit when the stream is closed early. GeneratorExit is normal
+        # control flow (the user closed the stream), not an error, so the span
+        # still finishes cleanly in that case.
+        exc_info = sys.exc_info()
+        if exc_info[0] is not None and issubclass(exc_info[0], GeneratorExit):
+            exc_info = (None, None, None)
+
         with capture_internal_exceptions():
-            if isinstance(x, ResponseTextDeltaEvent):
-                if start_time is not None and ttft is None:
-                    ttft = time.perf_counter() - start_time
-                if len(data_buf) == 0:
-                    data_buf.append([])
-                data_buf[0].append(x.delta or "")
-
-            elif isinstance(x, ResponseCompletedEvent):
-                if isinstance(span, StreamedSpan):
-                    span.set_attribute(SPANDATA.GEN_AI_RESPONSE_MODEL, x.response.model)
-                else:
-                    span.set_data(SPANDATA.GEN_AI_RESPONSE_MODEL, x.response.model)
-
-                _calculate_responses_token_usage(
-                    input=input,
-                    response=x.response,
-                    span=span,
-                    streaming_message_responses=None,
-                    count_tokens=integration.count_tokens,
+            if ttft is not None:
+                set_data_normalized(
+                    span, SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN, ttft
                 )
-                count_tokens_manually = False
-
-        yield x
-
-    with capture_internal_exceptions():
-        if ttft is not None:
-            set_data_normalized(
-                span, SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN, ttft
-            )
-        if len(data_buf) > 0:
-            all_responses = ["".join(chunk) for chunk in data_buf]
-            if has_data_collection_enabled(client.options):
-                if client.options["data_collection"]["gen_ai"]["outputs"]:
+            if len(data_buf) > 0:
+                all_responses = ["".join(chunk) for chunk in data_buf]
+                if has_data_collection_enabled(client.options):
+                    if client.options["data_collection"]["gen_ai"]["outputs"]:
+                        set_data_normalized(
+                            span, SPANDATA.GEN_AI_RESPONSE_TEXT, all_responses
+                        )
+                elif should_send_default_pii() and integration.include_prompts:
                     set_data_normalized(
                         span, SPANDATA.GEN_AI_RESPONSE_TEXT, all_responses
                     )
-            elif should_send_default_pii() and integration.include_prompts:
-                set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, all_responses)
 
-            if count_tokens_manually:
-                _calculate_responses_token_usage(
-                    input=input,
-                    response=response,
-                    span=span,
-                    streaming_message_responses=all_responses,
-                    count_tokens=integration.count_tokens,
-                )
+                if count_tokens_manually:
+                    _calculate_responses_token_usage(
+                        input=input,
+                        response=response,
+                        span=span,
+                        streaming_message_responses=all_responses,
+                        count_tokens=integration.count_tokens,
+                    )
 
-    if finish_span:
-        span.__exit__(None, None, None)
+        if finish_span:
+            with capture_internal_exceptions():
+                span.__exit__(*exc_info)
+
+        with capture_internal_exceptions():
+            # The span is no longer unfinished on this stream: either it was
+            # finished above, or iteration ended without finishing it. Either
+            # way the close() patch must not finish it again.
+            if getattr(response, "_span", None) is span:
+                delattr(response, "_span")
 
 
 async def _wrap_asynchronous_responses_event_iterator(
@@ -1261,58 +1340,135 @@ async def _wrap_asynchronous_responses_event_iterator(
     client = sentry_sdk.get_client()
 
     count_tokens_manually = True
-    async for x in old_iterator:
+    try:
+        async for x in old_iterator:
+            with capture_internal_exceptions():
+                if isinstance(x, ResponseTextDeltaEvent):
+                    if start_time is not None and ttft is None:
+                        ttft = time.perf_counter() - start_time
+                    if len(data_buf) == 0:
+                        data_buf.append([])
+                    data_buf[0].append(x.delta or "")
+
+                elif isinstance(x, ResponseCompletedEvent):
+                    if isinstance(span, StreamedSpan):
+                        span.set_attribute(
+                            SPANDATA.GEN_AI_RESPONSE_MODEL, x.response.model
+                        )
+                    else:
+                        span.set_data(SPANDATA.GEN_AI_RESPONSE_MODEL, x.response.model)
+
+                    _calculate_responses_token_usage(
+                        input=input,
+                        response=x.response,
+                        span=span,
+                        streaming_message_responses=None,
+                        count_tokens=integration.count_tokens,
+                    )
+                    count_tokens_manually = False
+
+            yield x
+
+    finally:
+        # The exception that ended iteration, if any: a mid-stream error, or
+        # GeneratorExit when the stream is closed early. GeneratorExit is normal
+        # control flow (the user closed the stream), not an error, so the span
+        # still finishes cleanly in that case.
+        exc_info = sys.exc_info()
+        if exc_info[0] is not None and issubclass(exc_info[0], GeneratorExit):
+            exc_info = (None, None, None)
+
         with capture_internal_exceptions():
-            if isinstance(x, ResponseTextDeltaEvent):
-                if start_time is not None and ttft is None:
-                    ttft = time.perf_counter() - start_time
-                if len(data_buf) == 0:
-                    data_buf.append([])
-                data_buf[0].append(x.delta or "")
-
-            elif isinstance(x, ResponseCompletedEvent):
-                if isinstance(span, StreamedSpan):
-                    span.set_attribute(SPANDATA.GEN_AI_RESPONSE_MODEL, x.response.model)
-                else:
-                    span.set_data(SPANDATA.GEN_AI_RESPONSE_MODEL, x.response.model)
-
-                _calculate_responses_token_usage(
-                    input=input,
-                    response=x.response,
-                    span=span,
-                    streaming_message_responses=None,
-                    count_tokens=integration.count_tokens,
+            if ttft is not None:
+                set_data_normalized(
+                    span, SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN, ttft
                 )
-                count_tokens_manually = False
+            if len(data_buf) > 0:
+                all_responses = ["".join(chunk) for chunk in data_buf]
 
-        yield x
-
-    with capture_internal_exceptions():
-        if ttft is not None:
-            set_data_normalized(
-                span, SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN, ttft
-            )
-        if len(data_buf) > 0:
-            all_responses = ["".join(chunk) for chunk in data_buf]
-
-            if has_data_collection_enabled(client.options):
-                if client.options["data_collection"]["gen_ai"]["outputs"]:
+                if has_data_collection_enabled(client.options):
+                    if client.options["data_collection"]["gen_ai"]["outputs"]:
+                        set_data_normalized(
+                            span, SPANDATA.GEN_AI_RESPONSE_TEXT, all_responses
+                        )
+                elif should_send_default_pii() and integration.include_prompts:
                     set_data_normalized(
                         span, SPANDATA.GEN_AI_RESPONSE_TEXT, all_responses
                     )
-            elif should_send_default_pii() and integration.include_prompts:
-                set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, all_responses)
 
-            if count_tokens_manually:
-                _calculate_responses_token_usage(
-                    input=input,
-                    response=response,
-                    span=span,
-                    streaming_message_responses=all_responses,
-                    count_tokens=integration.count_tokens,
-                )
-    if finish_span:
-        span.__exit__(None, None, None)
+                if count_tokens_manually:
+                    _calculate_responses_token_usage(
+                        input=input,
+                        response=response,
+                        span=span,
+                        streaming_message_responses=all_responses,
+                        count_tokens=integration.count_tokens,
+                    )
+
+        if finish_span:
+            with capture_internal_exceptions():
+                span.__exit__(*exc_info)
+
+        with capture_internal_exceptions():
+            # The span is no longer unfinished on this stream: either it was
+            # finished above, or iteration ended without finishing it. Either
+            # way the close() patch must not finish it again.
+            if getattr(response, "_span", None) is span:
+                delattr(response, "_span")
+
+
+def _wrap_stream_close(
+    f: "Callable[..., None]",
+) -> "Callable[..., None]":
+    """
+    Finishes the AI Client Span when the stream is closed before it has been
+    read to the end (``Stream.__exit__`` calls ``close()`` too, so this also
+    covers leaving a ``with`` block early).
+
+    Closing the wrapped ``_iterator`` raises ``GeneratorExit`` inside it, so the
+    ``finally`` block in the iterator wrapper finishes the span with the data
+    accumulated so far. If iteration never started, the span is finished
+    directly instead. The span is finished at most once: the iterator wrapper
+    removes it from the stream when iteration ends.
+    """
+
+    @wraps(f)
+    def close(self: "Any") -> None:
+        with capture_internal_exceptions():
+            iterator = getattr(self, "_iterator", None)
+            close_iterator = getattr(iterator, "close", None)
+            if callable(close_iterator):
+                close_iterator()
+            span = getattr(self, "_span", None)
+            if span is not None:
+                span.__exit__(None, None, None)
+                delattr(self, "_span")
+        return f(self)
+
+    return close
+
+
+def _wrap_async_stream_close(
+    f: "Callable[..., Coroutine[Any, Any, None]]",
+) -> "Callable[..., Coroutine[Any, Any, None]]":
+    """
+    Async variant of `_wrap_stream_close`.
+    """
+
+    @wraps(f)
+    async def close(self: "Any") -> None:
+        with capture_internal_exceptions():
+            iterator = getattr(self, "_iterator", None)
+            aclose_iterator = getattr(iterator, "aclose", None)
+            if callable(aclose_iterator):
+                await aclose_iterator()
+            span = getattr(self, "_span", None)
+            if span is not None:
+                span.__exit__(None, None, None)
+                delattr(self, "_span")
+        return await f(self)
+
+    return close
 
 
 def _set_responses_api_output_data(
@@ -1597,6 +1753,10 @@ def _new_sync_responses_create(
             finish_span=True,
         )
 
+        # The close() patch (see _wrap_stream_close) uses this to finish the
+        # span when the stream is closed before it has been read to the end.
+        setattr(response, "_span", span)
+
     else:
         _set_responses_api_output_data(
             span, response, kwargs, integration, finish_span=True
@@ -1672,6 +1832,10 @@ async def _new_async_responses_create(
             old_iterator=response._iterator,
             finish_span=True,
         )
+
+        # The close() patch (see _wrap_stream_close) uses this to finish the
+        # span when the stream is closed before it has been read to the end.
+        setattr(response, "_span", span)
     else:
         _set_responses_api_output_data(
             span, response, kwargs, integration, finish_span=True

@@ -8271,3 +8271,354 @@ async def test_streaming_responses_api_ttft_async(
 
     assert isinstance(ttft, float)
     assert ttft > 0
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+def test_streaming_chat_completion_early_close(
+    sentry_init,
+    capture_events,
+    capture_items,
+    get_model_response,
+    server_side_event_chunks,
+    stream_gen_ai_spans,
+    span_streaming,
+):
+    """
+    Closing a chat stream before it is read to the end must still finish the
+    gen_ai.chat span. Regression test for
+    https://github.com/getsentry/sentry-python/issues/7847
+    """
+    sentry_init(
+        integrations=[OpenAIIntegration(include_prompts=True)],
+        disabled_integrations=[StdlibIntegration],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
+
+    client = OpenAI(api_key="z")
+    returned_stream = get_model_response(
+        server_side_event_chunks(
+            [
+                ChatCompletionChunk(
+                    id="1",
+                    choices=[
+                        DeltaChoice(
+                            index=0,
+                            delta=ChoiceDelta(content="hel"),
+                            finish_reason=None,
+                        )
+                    ],
+                    created=100000,
+                    model="model-id",
+                    object="chat.completion.chunk",
+                ),
+                ChatCompletionChunk(
+                    id="1",
+                    choices=[
+                        DeltaChoice(
+                            index=0,
+                            delta=ChoiceDelta(content="lo "),
+                            finish_reason=None,
+                        )
+                    ],
+                    created=100000,
+                    model="model-id",
+                    object="chat.completion.chunk",
+                ),
+            ],
+            include_event_type=False,
+        )
+    )
+
+    def _run():
+        with mock.patch.object(
+            client.chat._client._client,
+            "send",
+            return_value=returned_stream,
+        ), start_transaction(name="openai tx"):
+            response_stream = client.chat.completions.create(
+                model="some-model",
+                messages=[{"role": "user", "content": "hello"}],
+                stream=True,
+            )
+            first_chunk = next(response_stream)
+            assert first_chunk.choices[0].delta.content == "hel"
+            response_stream.close()
+
+    if span_streaming or stream_gen_ai_spans:
+        items = capture_items("span")
+        _run()
+        sentry_sdk.flush()
+        span = next(
+            item.payload
+            for item in items
+            if item.payload["attributes"]["sentry.op"] == "gen_ai.chat"
+        )
+        assert span["attributes"]["sentry.op"] == "gen_ai.chat"
+        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+        # only the chunks seen before close() are recorded
+        assert "hel" in span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+    else:
+        events = capture_events()
+        _run()
+        (tx,) = events
+        span = next(s for s in tx["spans"] if s["op"] == "gen_ai.chat")
+        assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+        assert "hel" in span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+@pytest.mark.asyncio
+async def test_streaming_chat_completion_async_early_close(
+    sentry_init,
+    capture_events,
+    capture_items,
+    get_model_response,
+    async_iterator,
+    server_side_event_chunks,
+    stream_gen_ai_spans,
+    span_streaming,
+):
+    """
+    Closing an async chat stream before it is read to the end must still
+    finish the gen_ai.chat span. Regression test for
+    https://github.com/getsentry/sentry-python/issues/7847
+    """
+    sentry_init(
+        integrations=[OpenAIIntegration(include_prompts=True)],
+        disabled_integrations=[StdlibIntegration],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
+
+    client = AsyncOpenAI(api_key="z")
+    returned_stream = get_model_response(
+        async_iterator(
+            server_side_event_chunks(
+                [
+                    ChatCompletionChunk(
+                        id="1",
+                        choices=[
+                            DeltaChoice(
+                                index=0,
+                                delta=ChoiceDelta(content="hel"),
+                                finish_reason=None,
+                            )
+                        ],
+                        created=100000,
+                        model="model-id",
+                        object="chat.completion.chunk",
+                    ),
+                    ChatCompletionChunk(
+                        id="1",
+                        choices=[
+                            DeltaChoice(
+                                index=0,
+                                delta=ChoiceDelta(content="lo "),
+                                finish_reason=None,
+                            )
+                        ],
+                        created=100000,
+                        model="model-id",
+                        object="chat.completion.chunk",
+                    ),
+                ],
+                include_event_type=False,
+            )
+        )
+    )
+
+    async def _run():
+        with mock.patch.object(
+            client.chat._client._client,
+            "send",
+            return_value=returned_stream,
+        ), start_transaction(name="openai tx"):
+            response_stream = await client.chat.completions.create(
+                model="some-model",
+                messages=[{"role": "user", "content": "hello"}],
+                stream=True,
+            )
+            async for chunk in response_stream:
+                assert chunk.choices[0].delta.content == "hel"
+                break
+            await response_stream.close()
+
+    if span_streaming or stream_gen_ai_spans:
+        items = capture_items("span")
+        await _run()
+        sentry_sdk.flush()
+        span = next(
+            item.payload
+            for item in items
+            if item.payload["attributes"]["sentry.op"] == "gen_ai.chat"
+        )
+        assert span["attributes"]["sentry.op"] == "gen_ai.chat"
+        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+        assert "hel" in span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+    else:
+        events = capture_events()
+        await _run()
+        (tx,) = events
+        span = next(s for s in tx["spans"] if s["op"] == "gen_ai.chat")
+        assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+        assert "hel" in span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+@pytest.mark.skipif(SKIP_RESPONSES_TESTS, reason="Responses API not available")
+def test_streaming_responses_api_early_close(
+    sentry_init,
+    capture_events,
+    capture_items,
+    get_model_response,
+    server_side_event_chunks,
+    stream_gen_ai_spans,
+    span_streaming,
+):
+    """
+    Leaving a responses stream's context manager early must still finish the
+    gen_ai.responses span. Regression test for
+    https://github.com/getsentry/sentry-python/issues/7847
+    """
+    sentry_init(
+        integrations=[OpenAIIntegration(include_prompts=True)],
+        disabled_integrations=[StdlibIntegration],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
+
+    client = OpenAI(api_key="z")
+    returned_stream = get_model_response(
+        server_side_event_chunks(EXAMPLE_RESPONSES_STREAM)
+    )
+
+    def _run():
+        with mock.patch.object(
+            client.responses._client._client,
+            "send",
+            return_value=returned_stream,
+        ), start_transaction(name="openai tx"):
+            with client.responses.create(
+                model="some-model",
+                input="hello",
+                stream=True,
+            ) as response_stream:
+                for _ in response_stream:
+                    break
+
+    if span_streaming or stream_gen_ai_spans:
+        items = capture_items("span")
+        _run()
+        sentry_sdk.flush()
+        span = next(
+            item.payload
+            for item in items
+            if item.payload["attributes"]["sentry.op"] == "gen_ai.responses"
+        )
+        assert span["attributes"]["sentry.op"] == "gen_ai.responses"
+        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    else:
+        events = capture_events()
+        _run()
+        (tx,) = events
+        span = next(s for s in tx["spans"] if s["op"] == "gen_ai.responses")
+        assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+def test_streaming_chat_completion_mid_stream_error(
+    sentry_init,
+    capture_events,
+    capture_items,
+    get_model_response,
+    server_side_event_chunks,
+    stream_gen_ai_spans,
+    span_streaming,
+):
+    """
+    An error raised while a chat stream is being read must still finish the
+    gen_ai.chat span (with an error status). Regression test for
+    https://github.com/getsentry/sentry-python/issues/7847
+    """
+    sentry_init(
+        integrations=[OpenAIIntegration(include_prompts=True)],
+        disabled_integrations=[StdlibIntegration],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
+
+    client = OpenAI(api_key="z")
+
+    def _failing_content():
+        yield b"".join(
+            server_side_event_chunks(
+                [
+                    ChatCompletionChunk(
+                        id="1",
+                        choices=[
+                            DeltaChoice(
+                                index=0,
+                                delta=ChoiceDelta(content="hel"),
+                                finish_reason=None,
+                            )
+                        ],
+                        created=100000,
+                        model="model-id",
+                        object="chat.completion.chunk",
+                    ),
+                ],
+                include_event_type=False,
+            )
+        )
+        raise RuntimeError("connection lost")
+
+    returned_stream = get_model_response(_failing_content())
+
+    def _run():
+        with mock.patch.object(
+            client.chat._client._client,
+            "send",
+            return_value=returned_stream,
+        ), start_transaction(name="openai tx"):
+            response_stream = client.chat.completions.create(
+                model="some-model",
+                messages=[{"role": "user", "content": "hello"}],
+                stream=True,
+            )
+            with pytest.raises(RuntimeError, match="connection lost"):
+                for _ in response_stream:
+                    pass
+
+    if span_streaming or stream_gen_ai_spans:
+        items = capture_items("span")
+        _run()
+        sentry_sdk.flush()
+        span = next(
+            item.payload
+            for item in items
+            if item.payload["attributes"]["sentry.op"] == "gen_ai.chat"
+        )
+        assert span["attributes"]["sentry.op"] == "gen_ai.chat"
+        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+        assert "hel" in span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+    else:
+        events = capture_events()
+        _run()
+        tx = next(e for e in events if e["type"] == "transaction")
+        span = next(s for s in tx["spans"] if s["op"] == "gen_ai.chat")
+        assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+        assert "hel" in span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+        assert span["status"] == "internal_error"
