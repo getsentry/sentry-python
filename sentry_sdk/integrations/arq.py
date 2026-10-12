@@ -80,7 +80,7 @@ def patch_enqueue_job() -> None:
         with sentry_sdk.start_span(
             name=function,
             attributes={
-                "sentry.op": OP.QUEUE_SUBMIT_ARQ,
+                "sentry.op": OP.QUEUE_PUBLISH,
                 "sentry.origin": ArqIntegration.origin,
             },
         ):
@@ -105,7 +105,7 @@ def patch_run_job() -> None:
             with sentry_sdk.start_span(
                 name="unknown arq task",
                 attributes={
-                    "sentry.op": OP.QUEUE_TASK_ARQ,
+                    "sentry.op": OP.QUEUE_PROCESS,
                     "sentry.origin": ArqIntegration.origin,
                     "sentry.segment.name.source": SegmentNameSource.TASK,
                     SPANDATA.MESSAGING_MESSAGE_ID: job_id,
