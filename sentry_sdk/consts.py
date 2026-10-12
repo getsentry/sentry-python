@@ -1434,6 +1434,13 @@ class SPANDATA:
     Example: "client", "server", "producer", "consumer", "internal"
     """
 
+    SENTRY_NORMALIZED_DB_QUERY = "sentry.normalized_db_query"
+    """
+    The normalized version of `db.query.text`, without values. Relay computes it from
+    `db.query.text` unless it is set, and the Queries insight groups spans by it.
+    Example: "SELECT .. FROM sentry_project WHERE (project_id = %s)"
+    """
+
     SENTRY_OP = "sentry.op"
     """
     The operation of a span.

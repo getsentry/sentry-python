@@ -553,6 +553,103 @@ def test_execute_statement_resource_client(dynamodb_resource, capture_items):
     }
 
 
+@pytest.mark.parametrize(
+    "method,params,response,expected",
+    [
+        pytest.param(
+            "get_item",
+            {"TableName": TABLE_ARN, "Key": {"id": {"S": "1"}}},
+            {},
+            "GetItem orders",
+            id="table",
+        ),
+        pytest.param(
+            "batch_get_item",
+            {
+                "RequestItems": {
+                    "orders": {"Keys": [{"id": {"S": "1"}}]},
+                    "customers": {"Keys": [{"id": {"S": "2"}}]},
+                }
+            },
+            {},
+            "BatchGetItem customers, orders",
+            id="tables",
+        ),
+        pytest.param("list_tables", {}, {}, "ListTables", id="no-table"),
+        pytest.param(
+            "execute_statement",
+            {
+                "Statement": 'SELECT * FROM "orders"."by-status" WHERE s = ? AND t = \'inline\'',
+                "Parameters": [{"S": "paid"}],
+            },
+            {"Items": []},
+            'SELECT * FROM "orders"."by-status" WHERE s = %s AND t = %s',
+            id="parameterized-with-literal",
+        ),
+        pytest.param(
+            "execute_statement",
+            {
+                "Statement": "-- report\nDELETE FROM orders WHERE id = 'o-2025' /* old */"
+            },
+            {"Items": []},
+            "DELETE FROM orders WHERE id = %s",
+            id="literals-and-comments",
+        ),
+        pytest.param(
+            "execute_statement",
+            {
+                "Statement": "SELECT *\n  FROM orders\n  WHERE id = ?",
+                "Parameters": [{"S": "1"}],
+            },
+            {"Items": []},
+            "SELECT * FROM orders WHERE id = %s",
+            id="whitespace",
+        ),
+        pytest.param(
+            "batch_execute_statement",
+            {
+                "Statements": [
+                    {"Statement": "UPDATE orders SET s = 'paid' WHERE id = '1'"},
+                    {"Statement": "UPDATE orders SET s = 'sent' WHERE id = '2'"},
+                ]
+            },
+            {"Responses": []},
+            "BATCH UPDATE orders SET s = %s WHERE id = %s",
+            id="batch-shared",
+        ),
+        pytest.param(
+            "batch_execute_statement",
+            {
+                "Statements": [
+                    {"Statement": "SELECT * FROM orders WHERE id = '1'"},
+                    {"Statement": "SELECT * FROM customers WHERE id = '2'"},
+                ]
+            },
+            {"Responses": []},
+            "SELECT * FROM orders WHERE id = %s; SELECT * FROM customers WHERE id = %s",
+            id="batch-different",
+        ),
+        pytest.param(
+            "execute_statement",
+            {"Statement": "SELECT * FROM orders WHERE id = 'unterminated"},
+            {"Items": []},
+            "ExecuteStatement orders",
+            id="unsanitizable",
+        ),
+    ],
+)
+def test_normalized_db_query(
+    dynamodb_client, capture_items, method, params, response, expected
+):
+    require_botocore_model_fields(dynamodb_client, method)
+
+    span = _stubbed_span(dynamodb_client, capture_items, method, params, response)
+
+    # set by the sdk, so the queries insight lists every dynamodb call and relay doesn't
+    # normalize partiql as sql.
+    assert span["attributes"][SPANDATA.SENTRY_NORMALIZED_DB_QUERY] == expected
+
+
 def test_client_error(dynamodb_client, capture_items):
     params = {"TableName": "orders", "Key": {"id": {"S": "1"}}}
 
@@ -1091,5 +1188,13 @@ def test_database_query_data_disabled(dynamodb_client, sentry_init, capture_item
     assert statement_span["attributes"][SPANDATA.DB_QUERY_TEXT] == statement
     assert statement_span["attributes"][SPANDATA.DB_QUERY_SUMMARY] == "SELECT orders"
     assert _query_parameters(statement_span["attributes"]) == {}
+    # the normalized query holds no values, so it's set either way.
+    assert (
+        statement_span["attributes"][SPANDATA.SENTRY_NORMALIZED_DB_QUERY]
+        == 'SELECT * FROM "orders" WHERE id = %s'
+    )
+    assert (
+        put_span["attributes"][SPANDATA.SENTRY_NORMALIZED_DB_QUERY] == "PutItem orders"
+    )
     assert SPANDATA.AWS_DYNAMODB_ITEM_COLLECTION_METRICS not in put_span["attributes"]
     assert "private-id" not in json.dumps([statement_span, put_span])

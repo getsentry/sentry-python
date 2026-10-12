@@ -270,8 +270,8 @@ def _find_collection_end(statement: str, start: int) -> "Optional[int]":
     return None
 
 
-def _sanitize_partiql(statement: str) -> "Optional[str]":
-    """Replace every literal in a statement with `?`, or return `None` if the statement can't be tokenized."""
+def _sanitize_partiql(statement: str, placeholder: str = "?") -> "Optional[str]":
+    """Replace every literal in a statement with `placeholder`, or return `None` if the statement can't be tokenized."""
     # https://partiql.org/partiql-lang/#sec:literals
     # https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/ql-reference.data-types.html
     sanitized = []
@@ -302,24 +302,25 @@ def _sanitize_partiql(statement: str) -> "Optional[str]":
         else:
             match = _PARTIQL_TOKEN.match(statement, index)
             if match is None:
-                sanitized.append(char)
+                # a `?` is a parameter.
+                sanitized.append(placeholder if char == "?" else char)
                 index += 1
             elif match.lastgroup == "number":
-                sanitized.append("?")
+                sanitized.append(placeholder)
                 index = match.end()
             else:
                 word = match.group().lower()
                 is_literal = word in _PARTIQL_LITERAL_KEYWORDS and not (
                     previous_words[1] == "is" or previous_words == ("is", "not")
                 )
-                sanitized.append("?" if is_literal else match.group())
+                sanitized.append(placeholder if is_literal else match.group())
                 previous_words = (previous_words[1], word)
                 index = match.end()
             continue
 
         if end is None:
             return None
-        sanitized.append(statement[index:end] if char == '"' else "?")
+        sanitized.append(statement[index:end] if char == '"' else placeholder)
         index = end
     return "".join(sanitized)
 
@@ -484,6 +485,49 @@ def _get_partiql_attributes(statements: "List[Dict[str, Any]]") -> "Attributes":
     return attributes
 
 
+def _get_table_label(attributes: "Attributes") -> "Optional[str]":
+    """Return the table names sorted and joined with ", ", or `None` for a call without a table."""
+    # sorted, so it doesn't depend on the request order.
+    table_names = attributes.get(SPANDATA.AWS_DYNAMODB_TABLE_NAMES)
+    if isinstance(table_names, list) and table_names:
+        return ", ".join(sorted(str(table) for table in table_names))
+    return None
+
+
+def _get_normalized_query(ctx: "AwsCallContext", attributes: "Attributes") -> str:
+    """
+    Return the value of `sentry.normalized_db_query`: the partiql statements with every
+    literal and parameter replaced by `%s`, otherwise the operation and its tables
+    (`GetItem orders`).
+    """
+    statements = _get_partiql_statements(ctx)
+    if statements:
+        texts = []
+        for statement in statements:
+            # unlike `db.query.text`, parameterized statements are sanitized as well:
+            # this is a grouping key, so an inline literal must not make it unique. like
+            # relay's normalized queries, values and parameters become `%s` and
+            # whitespace is collapsed.
+            text = _sanitize_partiql(
+                _strip_partiql_comments(statement["Statement"]), placeholder="%s"
+            )
+            if text is None:
+                break
+            texts.append(" ".join(text.split()))
+        else:
+            distinct_texts = list(dict.fromkeys(texts))
+            normalized_query = "; ".join(distinct_texts)
+            # like the summary, a batch of one shared statement is grouped apart from it.
+            if len(statements) > 1 and len(distinct_texts) == 1:
+                return f"BATCH {normalized_query}"
+            return normalized_query
+
+    table_label = _get_table_label(attributes)
+    if table_label is None:
+        return ctx.operation_name
+    return f"{ctx.operation_name} {table_label}"
+
+
 class _DynamoDBExtension(_ServiceExtension):
     __slots__ = ()
 
@@ -500,12 +544,10 @@ class _DynamoDBExtension(_ServiceExtension):
             return str(attributes[SPANDATA.DB_QUERY_SUMMARY])
 
         # a multi-table call is named after its tables rather than its comma-wrapped
-        # `db.collection.name`, sorted so the name doesn't depend on the request order.
-        table_names = attributes.get(SPANDATA.AWS_DYNAMODB_TABLE_NAMES)
-        if isinstance(table_names, list) and table_names:
-            return "{} {}".format(
-                ctx.operation_name, ", ".join(sorted(str(t) for t in table_names))
-            )
+        # `db.collection.name`.
+        table_label = _get_table_label(attributes)
+        if table_label is not None:
+            return f"{ctx.operation_name} {table_label}"
 
         # calls without a table. `server.address` is still the configured endpoint here;
         # botocore may resolve an account-based one (`<account>.ddb.<region>.amazonaws.com`)
@@ -560,6 +602,17 @@ class _DynamoDBExtension(_ServiceExtension):
                 )
             else:
                 attributes.update(_get_partiql_attributes(statements))
+
+        # the queries insight only lists `db` spans with a normalized query. relay derives
+        # it from `db.query.text`, which most dynamodb calls don't have, and normalizes
+        # partiql as sql (`FROM "orders"."by-status"` becomes `FROM by-status`); it keeps
+        # a normalized query that is already set. it holds no values, so it isn't gated
+        # by `database_query_data`.
+        # https://github.com/getsentry/relay/blob/master/relay-event-normalization/src/eap/mod.rs
+        with capture_internal_exceptions():
+            attributes[SPANDATA.SENTRY_NORMALIZED_DB_QUERY] = _get_normalized_query(
+                ctx, attributes
+            )
 
         # a single operation is not a batch.
         # https://opentelemetry.io/docs/specs/semconv/registry/attributes/db/#db-operation-batch-size
