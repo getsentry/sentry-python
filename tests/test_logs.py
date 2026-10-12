@@ -889,12 +889,12 @@ def test_reentrant_add_does_not_deadlock(sentry_init, capture_envelopes):
     reentrant_add_called = False
     original_add_to_envelope = batcher._add_to_envelope
 
-    def add_to_envelope_with_reentrant_add(envelope):
+    def add_to_envelope_with_reentrant_add(envelope, items):
         nonlocal reentrant_add_called
         # Simulate a GC warning routing back into add() during flush
         batcher.add({"fake": "log"})
         reentrant_add_called = True
-        original_add_to_envelope(envelope)
+        original_add_to_envelope(envelope, items)
 
     batcher._add_to_envelope = add_to_envelope_with_reentrant_add
 
@@ -994,3 +994,46 @@ def test_flush_loop_swallows_flush_exception():
     batcher._flush_loop()
 
     assert calls == [1]
+
+
+def test_flush_does_not_hold_lock_during_serialization():
+    """Regression test for https://github.com/getsentry/sentry-python/issues/7775.
+
+    _flush must swap the buffer out under the lock and serialize outside of
+    it. Holding the lock during serialization deadlocks when a cyclic GC run
+    collects an object whose finalizer logs: the finalizer blocks acquiring
+    the logging handler lock while another thread holds that handler lock
+    inside emit() and waits on the batcher lock in add() (lock-order
+    inversion).
+
+    Driven synchronously on a bare batcher: _to_transport_format records
+    whether the batcher lock is held at serialization time. It runs to
+    completion in milliseconds, so it cannot hang CI.
+    """
+    from sentry_sdk._batcher import Batcher
+
+    captured = []
+    lock_held_during_serialization = []
+
+    batcher = Batcher(
+        capture_func=captured.append,
+        record_lost_func=lambda *a, **k: None,
+    )
+    batcher.TYPE = "log"
+    batcher.CONTENT_TYPE = "application/vnd.sentry.items.log+json"
+
+    def spying_to_transport_format(item):
+        lock_held_during_serialization.append(batcher._lock.locked())
+        return {"item": item}
+
+    batcher._to_transport_format = spying_to_transport_format
+    batcher._buffer.append({"fake": "log"})
+
+    batcher._flush()
+
+    assert captured, "expected _flush to capture an envelope"
+    assert lock_held_during_serialization == [False], (
+        "_flush serialized while holding the batcher lock; "
+        "this is the lock-order inversion from getsentry/sentry-python#7775"
+    )
+    assert batcher._buffer == [], "the buffer must be drained by the flush"

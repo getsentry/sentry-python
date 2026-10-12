@@ -149,20 +149,18 @@ class Batcher(Generic[T]):
         finally:
             self._active.flag = was_active
 
-    def _add_to_envelope(self, envelope: "Envelope") -> None:
+    def _add_to_envelope(self, envelope: "Envelope", items: "list[T]") -> None:
         envelope.add_item(
             Item(
                 type=self.TYPE,
                 content_type=self.CONTENT_TYPE,
                 headers={
-                    "item_count": len(self._buffer),
+                    "item_count": len(items),
                 },
                 payload=PayloadRef(
                     json={
                         "version": 2,
-                        "items": [
-                            self._to_transport_format(item) for item in self._buffer
-                        ],
+                        "items": [self._to_transport_format(item) for item in items],
                     }
                 ),
             )
@@ -173,11 +171,18 @@ class Batcher(Generic[T]):
             headers={"sent_at": format_timestamp(datetime.now(timezone.utc))}
         )
         with self._lock:
-            if len(self._buffer) == 0:
+            if not self._buffer:
                 return None
 
-            self._add_to_envelope(envelope)
-            self._buffer.clear()
+            # Swap the buffer out under the lock and serialize outside of it.
+            # Holding the lock during serialization can deadlock: serializing
+            # may trigger GC, and a collected object's finalizer that logs
+            # blocks on the logging handler lock while another thread holds
+            # that handler lock and waits on this lock in add() (lock-order
+            # inversion). See https://github.com/getsentry/sentry-python/issues/7775
+            items, self._buffer = self._buffer, []
+
+        self._add_to_envelope(envelope, items)
 
         self._capture_func(envelope)
         return envelope
