@@ -1,6 +1,7 @@
 import json
 from copy import deepcopy
 
+import boto3
 import pytest
 from botocore.exceptions import ClientError
 from botocore.stub import Stubber
@@ -21,6 +22,32 @@ TABLE_ARN = "arn:aws:dynamodb:eu-north-1:123456789012:table/orders"
 @pytest.fixture
 def dynamodb_client(client_factory):
     return client_factory("dynamodb")
+
+
+@pytest.fixture
+def dynamodb_resource(client_factory):
+    # `client_factory` initializes the sdk with the boto3 integration.
+    session = boto3.Session(
+        aws_access_key_id="-", aws_secret_access_key="-", region_name="eu-north-1"
+    )
+    resource = session.resource("dynamodb")
+    yield resource
+    # older supported botocore versions do not expose `BaseClient.close()`.
+    close = getattr(resource.meta.client, "close", None)
+    if close is not None:
+        close()
+
+
+def _stubbed_resource_span(resource, capture_items, method, call, response):
+    """Return the span of `call`, which uses the resource api and makes one `method` call."""
+    with Stubber(resource.meta.client) as stubber:
+        stubber.add_response(method, response)
+        spans = capture_spans_by_op(call, capture_items)
+        stubber.assert_no_pending_responses()
+
+    (span,) = spans[OP.DB]
+    assert span["attributes"][SPANDATA.DB_SYSTEM_NAME] == "aws.dynamodb"
+    return span
 
 
 def _stubbed_span(client, capture_items, method, params, response):
@@ -426,6 +453,73 @@ def test_item_collection_metrics_binary_key(dynamodb_client, capture_items):
 
     assert span["name"] == "PutItem orders"
     assert SPANDATA.AWS_DYNAMODB_ITEM_COLLECTION_METRICS not in span["attributes"]
+
+
+@pytest.mark.parametrize(
+    "key,expected_key",
+    [
+        pytest.param({"id": {"S": "1"}}, '{"id":{"S":"1"}}', id="string"),
+        pytest.param({"id": {"N": "10"}}, '{"id":{"N":"10"}}', id="number"),
+        pytest.param({"id": {"B": b"\x00"}}, None, id="binary"),
+    ],
+)
+def test_item_collection_metrics_resource(
+    dynamodb_resource, capture_items, key, expected_key
+):
+    table = dynamodb_resource.Table("orders")
+    response = {
+        "ItemCollectionMetrics": {
+            "ItemCollectionKey": key,
+            "SizeEstimateRangeGB": [0.0, 1.0],
+        }
+    }
+
+    span = _stubbed_resource_span(
+        dynamodb_resource,
+        capture_items,
+        "put_item",
+        lambda: table.put_item(Item={"id": "1"}, ReturnItemCollectionMetrics="SIZE"),
+        response,
+    )
+
+    # the resource api parses the key to python values; it's sent typed, like the
+    # low-level client's.
+    attributes = span["attributes"]
+    if expected_key is None:
+        assert SPANDATA.AWS_DYNAMODB_ITEM_COLLECTION_METRICS not in attributes
+    else:
+        assert attributes[SPANDATA.AWS_DYNAMODB_ITEM_COLLECTION_METRICS] == (
+            '{"ItemCollectionKey":%s,"SizeEstimateRangeGB":[0.0,1.0]}' % expected_key
+        )
+
+
+def test_item_collection_metrics_resource_batch(dynamodb_resource, capture_items):
+    response = {
+        "UnprocessedItems": {},
+        "ItemCollectionMetrics": {
+            "orders": [
+                {
+                    "ItemCollectionKey": {"customer": {"N": "7"}},
+                    "SizeEstimateRangeGB": [0.0, 1.0],
+                }
+            ]
+        },
+    }
+
+    span = _stubbed_resource_span(
+        dynamodb_resource,
+        capture_items,
+        "batch_write_item",
+        lambda: dynamodb_resource.batch_write_item(
+            RequestItems={"orders": [{"PutRequest": {"Item": {"customer": 7}}}]},
+            ReturnItemCollectionMetrics="SIZE",
+        ),
+        response,
+    )
+
+    assert span["attributes"][SPANDATA.AWS_DYNAMODB_ITEM_COLLECTION_METRICS] == (
+        '{"orders":[{"ItemCollectionKey":{"customer":{"N":"7"}},"SizeEstimateRangeGB":[0.0,1.0]}]}'
+    )
 
 
 def test_client_error(dynamodb_client, capture_items):

@@ -367,6 +367,38 @@ def _get_parameter_value(parameter: "Dict[str, Any]") -> "Optional[str]":
     return json.dumps(parameter, separators=_JSON_SEPARATORS)
 
 
+def _to_attribute_value(value: "Any") -> "Dict[str, Any]":
+    """Return a value as a typed `AttributeValue`, e.g. {"S": "1"}."""
+    if isinstance(value, dict):
+        # the low-level client keeps the data type.
+        return value
+    # the resource api (`boto3.resource("dynamodb")`) parses typed values to python
+    # values in an `after-call` handler, e.g. {"N": "10"} to `Decimal("10")`; key
+    # attributes are only strings, numbers or binary.
+    # https://boto3.amazonaws.com/v1/documentation/api/latest/reference/customizations/dynamodb.html
+    from boto3.dynamodb.types import TypeSerializer  # type: ignore[import-not-found]
+
+    return TypeSerializer().serialize(value)
+
+
+def _get_typed_item_collection_metrics(metrics: "Any") -> "Any":
+    """Return `ItemCollectionMetrics` with typed key values, whether returned by the low-level client or the resource api."""
+    # single-item writes return one metrics object, batch and transaction writes map each
+    # table to a list of them.
+    if isinstance(metrics, list):
+        return [_get_typed_item_collection_metrics(entry) for entry in metrics]
+    if not isinstance(metrics, dict):
+        return metrics
+    return {
+        key: (
+            {name: _to_attribute_value(value) for name, value in value.items()}
+            if key == "ItemCollectionKey"
+            else _get_typed_item_collection_metrics(value)
+        )
+        for key, value in metrics.items()
+    }
+
+
 def _get_partiql_attributes(statements: "List[Dict[str, Any]]") -> "Attributes":
     """
     Attributes for `ExecuteStatement`, `BatchExecuteStatement` and `ExecuteTransaction`.
@@ -553,7 +585,10 @@ class _DynamoDBExtension(_ServiceExtension):
             # https://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_ItemCollectionMetrics.html
             try:
                 attributes[SPANDATA.AWS_DYNAMODB_ITEM_COLLECTION_METRICS] = json.dumps(
-                    response["ItemCollectionMetrics"], separators=_JSON_SEPARATORS
+                    _get_typed_item_collection_metrics(
+                        response["ItemCollectionMetrics"]
+                    ),
+                    separators=_JSON_SEPARATORS,
                 )
             except TypeError:
                 # binary partition keys are parsed to `bytes`, which aren't json serializable;
