@@ -63,7 +63,7 @@ if IS_MCP_V2:
         TextResourceContents,
     )
 else:
-    from mcp.types import GetPromptResult, PromptMessage, TextContent
+    from mcp.types import CallToolResult, GetPromptResult, PromptMessage, TextContent
 
 from mcp.server.sse import SseServerTransport
 from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
@@ -786,6 +786,78 @@ async def test_tool_handler_with_error(
 
         assert span["status"] == "internal_error"
         assert span["tags"]["status"] == "internal_error"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("span_streaming", [True, False])
+async def test_tool_handler_is_error_result(
+    sentry_init, capture_events, capture_items, span_streaming, stdio
+):
+    """A tool returning isError=True must mark the tools/call span as failed."""
+    sentry_init(
+        integrations=[MCPIntegration()],
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
+
+    server = Server("test-server")
+
+    if IS_MCP_V2:
+
+        async def error_tool(ctx, params):
+            return CallToolResult(
+                content=[TextContent(type="text", text="Tool reported an error")],
+                is_error=True,
+            )
+
+        server.add_request_handler("tools/call", CallToolRequestParams, error_tool)
+    else:
+
+        @server.call_tool()
+        def error_tool(tool_name, arguments):
+            return CallToolResult(
+                content=[TextContent(type="text", text="Tool reported an error")],
+                isError=True,
+            )
+
+    if span_streaming:
+        items = capture_items("event", "span")
+        with sentry_sdk.traces.start_span(name="mcp tx"):
+            result = await stdio(
+                server,
+                method="tools/call",
+                params={"name": "error_tool", "arguments": {}},
+                request_id="req-is-error",
+            )
+        sentry_sdk.flush()
+
+        resp = _get_response(result)
+        assert resp.result["isError"] is True
+
+        span = _find_mcp_span(items, method_name="tools/call")
+        assert span is not None
+        assert span["status"] == "error"
+        assert span["attributes"]["error.type"] == "tool_error"
+    else:
+        events = capture_events()
+        with start_transaction(name="mcp tx"):
+            result = await stdio(
+                server,
+                method="tools/call",
+                params={"name": "error_tool", "arguments": {}},
+                request_id="req-is-error",
+            )
+
+        resp = _get_response(result)
+        assert resp.result["isError"] is True
+
+        # Nothing raised, so only the transaction is captured (no error event)
+        (tx,) = events
+        assert tx["type"] == "transaction"
+        assert len(tx["spans"]) == 1
+        span = tx["spans"][0]
+        assert span["status"] == "internal_error"
+        assert span["data"]["error.type"] == "tool_error"
 
 
 @pytest.mark.asyncio
