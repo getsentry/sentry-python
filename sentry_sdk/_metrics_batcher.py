@@ -39,12 +39,3 @@ class MetricsBatcher(Batcher["Metric"]):
             res["unit"] = item["unit"]
 
         return res
-
-    def _record_lost(self, item: "Metric") -> None:
-        # Construct metric envelope item without sending it to report lost bytes
-        self._record_lost_func(
-            reason="queue_overflow",
-            data_category="trace_metric",
-            item=self._to_envelope_item([item]),
-            quantity=1,
-        )

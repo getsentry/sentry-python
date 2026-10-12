@@ -183,7 +183,12 @@ class Batcher(Generic[T]):
         return envelope
 
     def _record_lost(self, item: "T") -> None:
-        pass
+        self._record_lost_func(
+            reason="queue_overflow",
+            data_category=self.TYPE,
+            item=self._to_envelope_item([item]),
+            quantity=1,
+        )
 
     @staticmethod
     def _to_transport_format(item: "T") -> "Any":

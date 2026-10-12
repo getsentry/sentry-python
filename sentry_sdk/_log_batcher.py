@@ -40,12 +40,3 @@ class LogBatcher(Batcher["Log"]):
             res["span_id"] = item["span_id"]
 
         return res
-
-    def _record_lost(self, item: "Log") -> None:
-        # Construct log envelope item without sending it to report lost bytes
-        self._record_lost_func(
-            reason="queue_overflow",
-            data_category="log_item",
-            item=self._to_envelope_item([item]),
-            quantity=1,
-        )
