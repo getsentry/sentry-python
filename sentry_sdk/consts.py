@@ -1341,6 +1341,7 @@ class OP:
     FUNCTION_GCP = "function.gcp"
     GEN_AI_CHAT = "gen_ai.chat"
     GEN_AI_CREATE_AGENT = "gen_ai.create_agent"
+    GEN_AI_DECIDE = "gen_ai.decide"
     GEN_AI_EMBEDDINGS = "gen_ai.embeddings"
     GEN_AI_EVALUATE = "gen_ai.evaluate"
     GEN_AI_EXECUTE_TOOL = "gen_ai.execute_tool"
