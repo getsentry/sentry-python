@@ -319,7 +319,7 @@ def _sanitize_partiql(statement: str) -> "Optional[str]":
 
 
 def _get_query_text(statements: "List[Dict[str, Any]]") -> "Optional[str]":
-    """Return the shared query text, all texts joined with "; " if they differ, or `None` if one can't be sanitized."""
+    """Return the shared query text, the distinct texts joined with "; " if they differ, or `None` if one can't be sanitized."""
     query_texts = []
     for statement in statements:
         # parameterized statements carry their values in `Parameters`, so they're used as provided.
@@ -333,9 +333,9 @@ def _get_query_text(statements: "List[Dict[str, Any]]") -> "Optional[str]":
             return None
         query_texts.append(query_text)
 
-    if len(set(query_texts)) == 1:
-        return query_texts[0]
-    return "; ".join(query_texts)
+    # a batch of up to 100 statements usually repeats a few; repeating them in the text
+    # would only make it longer and unique per batch size.
+    return "; ".join(dict.fromkeys(query_texts))
 
 
 def _has_binary(attribute_value: "Dict[str, Any]") -> bool:

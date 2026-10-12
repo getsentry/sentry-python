@@ -728,6 +728,28 @@ def test_execute_statement_without_parameters(
         ),
         pytest.param(
             [
+                {
+                    "Statement": 'UPDATE "orders" SET s = ? WHERE id = ?',
+                    "Parameters": [{"S": "paid"}, {"S": str(i)}],
+                }
+                for i in range(3)
+            ]
+            + [
+                {"Statement": "SELECT * FROM customers WHERE id = '4'"},
+                {"Statement": "SELECT * FROM customers WHERE id = '5'"},
+            ],
+            {
+                "name": "BatchExecuteStatement customers, orders",
+                SPANDATA.DB_QUERY_TEXT: 'UPDATE "orders" SET s = ? WHERE id = ?; '
+                "SELECT * FROM customers WHERE id = ?",
+                SPANDATA.DB_COLLECTION_NAME: ",customers,orders,",
+                SPANDATA.AWS_DYNAMODB_TABLE_NAMES: ["orders", "customers"],
+                SPANDATA.DB_OPERATION_BATCH_SIZE: 5,
+            },
+            id="repeated",
+        ),
+        pytest.param(
+            [
                 {"Statement": "SELECT * FROM orders WHERE id = '1'"},
                 {"Statement": "SELECT * FROM orders WHERE id = 'unterminated"},
             ],
