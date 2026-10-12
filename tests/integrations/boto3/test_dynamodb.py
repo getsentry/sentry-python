@@ -816,6 +816,54 @@ def test_batch_execute_statement(dynamodb_client, capture_items, statements, exp
     }
 
 
+@pytest.mark.parametrize(
+    "responses,expected_error_type",
+    [
+        pytest.param([{"TableName": "orders"}, {"TableName": "orders"}], None, id="ok"),
+        pytest.param(
+            [
+                {"TableName": "orders"},
+                {"Error": {"Code": "ConditionalCheckFailed", "Message": "failed"}},
+            ],
+            "ConditionalCheckFailed",
+            id="one-code",
+        ),
+        pytest.param(
+            [
+                {"Error": {"Code": "ConditionalCheckFailed", "Message": "failed"}},
+                {"Error": {"Code": "ThrottlingError", "Message": "throttled"}},
+            ],
+            "aws_batch_partial_failure",
+            id="different-codes",
+        ),
+    ],
+)
+def test_batch_execute_statement_errors(
+    dynamodb_client, capture_items, responses, expected_error_type
+):
+    require_botocore_model_fields(dynamodb_client, "batch_execute_statement")
+    params = {
+        "Statements": [
+            {
+                "Statement": 'UPDATE "orders" SET s = ? WHERE id = ?',
+                "Parameters": [{"S": "paid"}, {"S": str(i)}],
+            }
+            for i in range(2)
+        ]
+    }
+
+    span = _stubbed_span(
+        dynamodb_client,
+        capture_items,
+        "batch_execute_statement",
+        params,
+        {"Responses": responses},
+    )
+
+    assert span["status"] == ("ok" if expected_error_type is None else "error")
+    assert span["attributes"].get(SPANDATA.ERROR_TYPE) == expected_error_type
+
+
 def test_execute_transaction(dynamodb_client, capture_items):
     require_botocore_model_fields(dynamodb_client, "execute_transaction")
     params = {

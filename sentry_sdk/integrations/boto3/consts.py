@@ -11,3 +11,7 @@ DEFAULT_PORTS = {
     "http": 80,
     "https": 443,
 }
+
+# `error.type` of a call whose failed batch entries are reported in a successful
+# response, when they don't share one error code.
+BATCH_PARTIAL_FAILURE_ERROR_TYPE = "aws_batch_partial_failure"

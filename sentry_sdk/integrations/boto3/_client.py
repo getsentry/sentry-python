@@ -2,6 +2,7 @@ from contextlib import contextmanager
 from typing import TYPE_CHECKING
 
 import sentry_sdk
+from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.integrations.boto3._context import AwsCallContext
 from sentry_sdk.integrations.boto3._instrumentation import (
@@ -17,7 +18,7 @@ from sentry_sdk.integrations.boto3._services.registry import (
     _resolve_service,
 )
 from sentry_sdk.integrations.boto3.consts import IDENTIFIER
-from sentry_sdk.traces import NoOpSpan, Span
+from sentry_sdk.traces import NoOpSpan, Span, SpanStatus
 from sentry_sdk.utils import capture_internal_exceptions
 
 if TYPE_CHECKING:
@@ -125,6 +126,10 @@ def _patch_botocore_client() -> None:
                     attributes.update(_get_response_attributes(parsed))
                 with capture_internal_exceptions():
                     span.set_attributes(attributes)
+                    # a service extension reports a failure that didn't raise, e.g. failed
+                    # batch entries in a successful response, with `error.type`.
+                    if SPANDATA.ERROR_TYPE in attributes:
+                        span.status = SpanStatus.ERROR
         except BaseException as error:
             _finish_span(span, error)
             raise

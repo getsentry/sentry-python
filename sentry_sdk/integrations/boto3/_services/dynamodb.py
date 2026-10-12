@@ -9,6 +9,7 @@ from sentry_sdk.integrations.boto3._utils import (
     _extract_attributes,
     _get_aws_arn_attributes,
 )
+from sentry_sdk.integrations.boto3.consts import BATCH_PARTIAL_FAILURE_ERROR_TYPE
 from sentry_sdk.utils import capture_internal_exceptions
 
 if TYPE_CHECKING:
@@ -515,6 +516,21 @@ class _DynamoDBExtension(_ServiceExtension):
 
         if "TableNames" in response:
             attributes[SPANDATA.AWS_DYNAMODB_TABLE_COUNT] = len(response["TableNames"])
+
+        if ctx.operation_name == "BatchExecuteStatement":
+            # failed statements are reported per entry in a successful response, not raised.
+            # https://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_BatchStatementResponse.html
+            error_codes = {
+                entry["Error"].get("Code") or BATCH_PARTIAL_FAILURE_ERROR_TYPE
+                for entry in response.get("Responses", ())
+                if entry.get("Error")
+            }
+            if error_codes:
+                attributes[SPANDATA.ERROR_TYPE] = (
+                    error_codes.pop()
+                    if len(error_codes) == 1
+                    else BATCH_PARTIAL_FAILURE_ERROR_TYPE
+                )
 
         if "ConsumedCapacity" in response:
             # single-request operations return one object, batch and transaction operations a list.
