@@ -15,6 +15,7 @@ class MetricsBatcher(Batcher["Metric"]):
     FLUSH_WAIT_TIME = 5.0
 
     TYPE = "trace_metric"
+    CLIENT_REPORT_TYPE = "trace_metric"
     CONTENT_TYPE = "application/vnd.sentry.items.trace-metric+json"
 
     @staticmethod
