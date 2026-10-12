@@ -157,6 +157,7 @@ def _get_partiql_statements(
 
 def _parse_partiql_statement(statement: str) -> "Optional[Tuple[str, str]]":
     """Return the query summary operation and table of a statement, or `None` if not recognized."""
+    statement = _strip_partiql_comments(statement)
     for operation, pattern in _PARTIQL_STATEMENTS:
         match = pattern.match(statement)
         if match is not None:
@@ -172,6 +173,45 @@ def _find_quote_end(statement: str, start: int) -> "Optional[int]":
     while end != -1 and statement.startswith(quote, end + 1):
         end = statement.find(quote, end + 2)
     return None if end == -1 else end + 1
+
+
+def _strip_partiql_comments(statement: str) -> str:
+    """Remove `--` line and `/* */` block comments outside quoted tokens, each with its surrounding whitespace."""
+    # comments are free text that may contain literals (or an apostrophe that would
+    # look like an unterminated string), and they can precede the statement itself.
+    # https://partiql.org/partiql-lang/
+    parts = []
+    chunk_start = 0
+    index = 0
+    while index < len(statement):
+        char = statement[index]
+        if char in "'\"`":
+            end = _find_quote_end(statement, index)
+            if end is None:
+                # an unterminated token is left to the sanitizer, which rejects it.
+                break
+            index = end
+            continue
+
+        if statement.startswith("--", index):
+            comment_end = statement.find("\n", index)
+        elif statement.startswith("/*", index):
+            comment_end = statement.find("*/", index + 2)
+            if comment_end != -1:
+                comment_end += 2
+        else:
+            index += 1
+            continue
+
+        parts.append(statement[chunk_start:index].rstrip())
+        parts.append(" ")
+        index = len(statement) if comment_end == -1 else comment_end
+        while index < len(statement) and statement[index].isspace():
+            index += 1
+        chunk_start = index
+
+    parts.append(statement[chunk_start:])
+    return "".join(parts).strip()
 
 
 def _find_collection_end(statement: str, start: int) -> "Optional[int]":
@@ -270,7 +310,9 @@ def _get_query_text(statements: "List[Dict[str, Any]]") -> "Optional[str]":
         if statement.get("Parameters"):
             query_text: "Optional[str]" = statement["Statement"]
         else:
-            query_text = _sanitize_partiql(statement["Statement"])
+            query_text = _sanitize_partiql(
+                _strip_partiql_comments(statement["Statement"])
+            )
         if query_text is None:
             return None
         query_texts.append(query_text)

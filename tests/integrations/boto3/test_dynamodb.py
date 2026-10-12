@@ -513,6 +513,22 @@ def test_execute_statement_parameters(
     assert SPANDATA.DB_OPERATION_BATCH_SIZE not in attributes
 
 
+def test_execute_statement_parameters_with_comment(dynamodb_client, capture_items):
+    require_botocore_model_fields(dynamodb_client, "execute_statement")
+    statement = '/* order lookup */ SELECT * FROM "orders" WHERE id = ? -- don\'t cache'
+    params = {"Statement": statement, "Parameters": [{"S": "1"}]}
+
+    span = _stubbed_span(
+        dynamodb_client, capture_items, "execute_statement", params, {"Items": []}
+    )
+
+    assert span["name"] == "SELECT orders"
+    attributes = span["attributes"]
+    # parameterized statements are used as provided, comments included.
+    assert attributes[SPANDATA.DB_QUERY_TEXT] == statement
+    assert attributes[SPANDATA.DB_COLLECTION_NAME] == "orders"
+
+
 @pytest.mark.parametrize(
     "statement,expected_text,expected_summary,expected_table",
     [
@@ -566,6 +582,28 @@ def test_execute_statement_parameters(
             None,
             None,
             id="unrecognized",
+        ),
+        pytest.param(
+            "-- monthly report\nSELECT * FROM \"orders\" WHERE id = 'a' "
+            "/* customer's lookup */ AND total > 5 -- don't log",
+            'SELECT * FROM "orders" WHERE id = ? AND total > ?',
+            "SELECT orders",
+            "orders",
+            id="comments",
+        ),
+        pytest.param(
+            "SELECT * FROM \"orders--archive\" WHERE note = '-- /* not a comment'",
+            'SELECT * FROM "orders--archive" WHERE note = ?',
+            "SELECT orders--archive",
+            "orders--archive",
+            id="comment-markers-in-tokens",
+        ),
+        pytest.param(
+            "SELECT * FROM orders WHERE id = 'a' /* unterminated",
+            "SELECT * FROM orders WHERE id = ?",
+            "SELECT orders",
+            "orders",
+            id="unterminated-comment",
         ),
     ],
 )
