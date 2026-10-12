@@ -1260,7 +1260,7 @@ def test_rest_framework_authentication_span(
         render_span_tree(spans)
         == """\
 - sentry.op="http.server": name="/rest-authenticated-hello"
-  - sentry.op="view.authenticate": name="authenticate"\
+  - sentry.op="view": name="authenticate"\
 """
     )
 

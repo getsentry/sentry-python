@@ -341,7 +341,7 @@ def _patch_drf() -> None:
                     with sentry_sdk.start_span(
                         name="authenticate",
                         attributes={
-                            "sentry.op": OP.VIEW_AUTHENTICATE,
+                            "sentry.op": OP.VIEW,
                             "sentry.origin": DjangoIntegration.origin,
                         },
                     ):
