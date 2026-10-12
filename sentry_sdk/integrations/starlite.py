@@ -163,7 +163,7 @@ def enable_span_for_middleware(middleware: "Middleware") -> "Middleware":
                 },
             )
 
-        with _start_middleware_span(op=OP.MIDDLEWARE_STARLITE, name=middleware_name):
+        with _start_middleware_span(op=OP.MIDDLEWARE, name=middleware_name):
             # Creating spans for the "receive" callback
             async def _sentry_receive(
                 *args: "Any", **kwargs: "Any"
@@ -171,7 +171,7 @@ def enable_span_for_middleware(middleware: "Middleware") -> "Middleware":
                 if sentry_sdk.get_client().get_integration(StarliteIntegration) is None:
                     return await receive(*args, **kwargs)
                 with _start_middleware_span(
-                    op=OP.MIDDLEWARE_STARLITE_RECEIVE,
+                    op=OP.MIDDLEWARE,
                     name=getattr(receive, "__qualname__", str(receive)),
                 ):
                     return await receive(*args, **kwargs)
@@ -185,7 +185,7 @@ def enable_span_for_middleware(middleware: "Middleware") -> "Middleware":
                 if sentry_sdk.get_client().get_integration(StarliteIntegration) is None:
                     return await send(message)
                 with _start_middleware_span(
-                    op=OP.MIDDLEWARE_STARLITE_SEND,
+                    op=OP.MIDDLEWARE,
                     name=getattr(send, "__qualname__", str(send)),
                 ):
                     return await send(message)

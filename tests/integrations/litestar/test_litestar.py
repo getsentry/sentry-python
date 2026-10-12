@@ -15,6 +15,7 @@ from litestar.testing import TestClient
 
 import sentry_sdk
 from sentry_sdk import capture_message
+from sentry_sdk.consts import OP
 from sentry_sdk.integrations.litestar import LitestarIntegration
 from sentry_sdk.utils import SENSITIVE_DATA_SUBSTITUTE
 from tests.conftest import ApproxDict
@@ -208,11 +209,10 @@ def test_middleware_spans(
     litestar_spans = (
         span
         for span in spans
-        if span["attributes"]["sentry.op"] == "middleware.litestar"
+        if span["attributes"]["sentry.op"] == OP.MIDDLEWARE and span["name"] in expected
     )
 
     for span in litestar_spans:
-        assert span["name"] in expected
         assert span["name"] not in found
         found.add(span["name"])
         assert span["name"] == span["attributes"]["middleware.name"]
@@ -251,7 +251,7 @@ def test_middleware_callback_spans(
             "attributes": ApproxDict(
                 {
                     "middleware.name": "SampleMiddleware",
-                    "sentry.op": "middleware.litestar",
+                    "sentry.op": OP.MIDDLEWARE,
                 },
             ),
         },
@@ -260,7 +260,7 @@ def test_middleware_callback_spans(
             "attributes": ApproxDict(
                 {
                     "middleware.name": "SampleMiddleware",
-                    "sentry.op": "middleware.litestar.send",
+                    "sentry.op": OP.MIDDLEWARE,
                 }
             ),
         },
@@ -269,7 +269,7 @@ def test_middleware_callback_spans(
             "attributes": ApproxDict(
                 {
                     "middleware.name": "SampleMiddleware",
-                    "sentry.op": "middleware.litestar.send",
+                    "sentry.op": OP.MIDDLEWARE,
                 }
             ),
         },
@@ -284,9 +284,7 @@ def test_middleware_callback_spans(
     sentry_sdk.flush()
     spans = [item.payload for item in items]
     actual_litestar_spans = list(
-        span
-        for span in spans
-        if "middleware.litestar" in span["attributes"].get("sentry.op")
+        span for span in spans if OP.MIDDLEWARE in span["attributes"].get("sentry.op")
     )
 
     assert len(actual_litestar_spans) == 3
@@ -368,7 +366,7 @@ def test_middleware_partial_receive_send(
             "attributes": ApproxDict(
                 {
                     "middleware.name": "SamplePartialReceiveSendMiddleware",
-                    "sentry.op": "middleware.litestar",
+                    "sentry.op": OP.MIDDLEWARE,
                 }
             ),
         },
@@ -377,7 +375,7 @@ def test_middleware_partial_receive_send(
             "attributes": ApproxDict(
                 {
                     "middleware.name": "SamplePartialReceiveSendMiddleware",
-                    "sentry.op": "middleware.litestar.receive",
+                    "sentry.op": OP.MIDDLEWARE,
                 }
             ),
         },
@@ -386,7 +384,7 @@ def test_middleware_partial_receive_send(
             "attributes": ApproxDict(
                 {
                     "middleware.name": "SamplePartialReceiveSendMiddleware",
-                    "sentry.op": "middleware.litestar.send",
+                    "sentry.op": OP.MIDDLEWARE,
                 }
             ),
         },
@@ -399,9 +397,7 @@ def test_middleware_partial_receive_send(
         )
 
     actual_litestar_spans = list(
-        span
-        for span in spans
-        if "middleware.litestar" in span["attributes"].get("sentry.op")
+        span for span in spans if OP.MIDDLEWARE in span["attributes"].get("sentry.op")
     )
     assert len(actual_litestar_spans) == 3
 

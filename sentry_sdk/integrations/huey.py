@@ -93,7 +93,7 @@ def patch_enqueue() -> None:
         with sentry_sdk.start_span(
             name=span_name,
             attributes={
-                "sentry.op": OP.QUEUE_SUBMIT_HUEY,
+                "sentry.op": OP.QUEUE_PUBLISH,
                 "sentry.origin": HueyIntegration.origin,
                 SPANDATA.MESSAGING_DESTINATION_NAME: self.name,
             },
@@ -191,7 +191,7 @@ def patch_execute() -> None:
             span_ctx = sentry_sdk.start_span(
                 name=task.name,
                 attributes={
-                    "sentry.op": OP.QUEUE_TASK_HUEY,
+                    "sentry.op": OP.QUEUE_PROCESS,
                     "sentry.origin": HueyIntegration.origin,
                     "sentry.segment.name.source": SegmentNameSource.TASK,
                     SPANDATA.MESSAGING_DESTINATION_NAME: self.name,

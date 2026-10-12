@@ -37,6 +37,15 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 - We now don't suppress chained exceptions in the ASGI and asyncio integrations by default. The related `suppress_asgi_chained_exceptions` experimental option was removed.
 - In the AWS Lambda and GCP integrations, the text of the message of the warning the SDK optionally emits if a function is about to time out has changed.
 
+#### Span operation consolidation
+
+Span ops are now a smaller, framework-neutral set.
+
+- The Cohere integration now emits `gen_ai.chat` instead of `ai.chat_completions.create.cohere`, and `gen_ai.embeddings` instead of `ai.embeddings.create.cohere`.
+- The Django integration now emits `view.render` instead of `view.response.render`, `view` instead of `view.authenticate`, and `function` instead of `event.django`.
+- The Django, Starlette, Starlite, and Litestar integrations now emit `middleware` instead of `middleware.django`, `middleware.starlette`, `middleware.starlette.receive`, `middleware.starlette.send`, `middleware.starlite`, `middleware.starlite.receive`, `middleware.starlite.send`, `middleware.litestar`, `middleware.litestar.receive`, and `middleware.litestar.send`.
+- The ARQ, Celery, Django, Dramatiq, Huey, RQ, and Ray integrations now emit `queue.publish` and `queue.process` instead of `queue.submit.arq`, `queue.task.arq`, `queue.submit.celery`, `queue.task.celery`, `queue.submit.django`, `queue.task.dramatiq`, `queue.submit.huey`, `queue.task.huey`, `queue.task.rq`, `queue.submit.ray`, and `queue.task.ray`.
+
 #### Django
 
 - The Django integration now creates spans for cache operations by default. Pass `DjangoIntegration(cache_spans=False)` to `sentry_sdk.init()` to turn them off.

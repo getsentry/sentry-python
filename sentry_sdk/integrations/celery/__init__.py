@@ -267,7 +267,7 @@ def _wrap_task_run(f: "F") -> "F":
             span = sentry_sdk.start_span(
                 name=task_name,
                 attributes={
-                    "sentry.op": OP.QUEUE_SUBMIT_CELERY,
+                    "sentry.op": OP.QUEUE_PUBLISH,
                     "sentry.origin": CeleryIntegration.origin,
                 },
             )
@@ -329,7 +329,7 @@ def _wrap_tracer(task: "Any", f: "F") -> "F":
                     attributes={
                         "sentry.origin": CeleryIntegration.origin,
                         "sentry.segment.name.source": SegmentNameSource.TASK.value,
-                        "sentry.op": OP.QUEUE_TASK_CELERY,
+                        "sentry.op": OP.QUEUE_PROCESS,
                     },
                 )
 
