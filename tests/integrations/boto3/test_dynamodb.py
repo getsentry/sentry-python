@@ -701,9 +701,9 @@ def test_execute_statement_without_parameters(
                 },
             ],
             {
-                "name": "SELECT orders",
+                "name": "BATCH SELECT orders",
                 SPANDATA.DB_QUERY_TEXT: 'SELECT * FROM "orders" WHERE id = ?',
-                SPANDATA.DB_QUERY_SUMMARY: "SELECT orders",
+                SPANDATA.DB_QUERY_SUMMARY: "BATCH SELECT orders",
                 SPANDATA.DB_COLLECTION_NAME: "orders",
                 SPANDATA.AWS_DYNAMODB_TABLE_NAMES: ["orders"],
                 SPANDATA.DB_OPERATION_BATCH_SIZE: 2,
@@ -732,8 +732,8 @@ def test_execute_statement_without_parameters(
                 {"Statement": "SELECT * FROM orders WHERE id = 'unterminated"},
             ],
             {
-                "name": "SELECT orders",
-                SPANDATA.DB_QUERY_SUMMARY: "SELECT orders",
+                "name": "BATCH SELECT orders",
+                SPANDATA.DB_QUERY_SUMMARY: "BATCH SELECT orders",
                 SPANDATA.DB_COLLECTION_NAME: "orders",
                 SPANDATA.AWS_DYNAMODB_TABLE_NAMES: ["orders"],
                 SPANDATA.DB_OPERATION_BATCH_SIZE: 2,

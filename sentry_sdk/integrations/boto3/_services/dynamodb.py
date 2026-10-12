@@ -385,12 +385,18 @@ def _get_partiql_attributes(statements: "List[Dict[str, Any]]") -> "Attributes":
         parsed for parsed in parsed_statements if parsed is not None
     ]
     all_recognized = len(recognized_statements) == len(statements)
-    # a batch only has a summary when every statement shares the same one.
+    # a batch only has a summary when every statement shares the same one, prefixed with
+    # `BATCH ` so it's named apart from a single statement. otel uses `BATCH` alone for
+    # differing statements; they keep no summary, so they're named after their tables.
+    # https://opentelemetry.io/docs/specs/semconv/registry/attributes/db/#db-query-summary
     summaries = {
         f"{operation} {table}" for operation, table, _ in recognized_statements
     }
     if all_recognized and len(summaries) == 1:
-        attributes[SPANDATA.DB_QUERY_SUMMARY] = summaries.pop()
+        summary = summaries.pop()
+        attributes[SPANDATA.DB_QUERY_SUMMARY] = (
+            f"BATCH {summary}" if len(statements) > 1 else summary
+        )
 
     # like `IndexName` of `Query` and `Scan`, when every statement reads the same index.
     indexes = {(table, index) for _, table, index in recognized_statements}
