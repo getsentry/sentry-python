@@ -97,10 +97,17 @@ def _get_table_attributes(tables: "Iterable[str]") -> "Attributes":
     attributes: "Attributes" = {}
     if table_names:
         attributes[SPANDATA.AWS_DYNAMODB_TABLE_NAMES] = table_names
-    # `db.collection.name` is only defined when the call targets exactly one table.
-    # https://opentelemetry.io/docs/specs/semconv/db/dynamodb/
     if len(table_names) == 1:
         attributes[SPANDATA.DB_COLLECTION_NAME] = table_names[0]
+    elif len(table_names) > 1:
+        # relay stores the tables it infers from a query as a sorted, comma-wrapped list
+        # (`,orders,users,`) and keeps a collection name set by the sdk. use the same format
+        # (keeping the case, table names are case-sensitive), so multi-table calls can be
+        # filtered by table like other db spans and relay doesn't infer one from the query.
+        # https://github.com/getsentry/relay/blob/master/relay-event-normalization/src/normalize/span/tag_extraction.rs
+        attributes[SPANDATA.DB_COLLECTION_NAME] = ",{},".format(
+            ",".join(sorted(table_names))
+        )
     return attributes
 
 
@@ -348,16 +355,31 @@ class _DynamoDBExtension(_ServiceExtension):
     def get_span_op(self, ctx: "AwsCallContext") -> "Optional[str]":
         return OP.DB
 
-    def get_span_name(self, ctx: "AwsCallContext", attributes: "Attributes") -> str:
+    def get_span_name(
+        self, ctx: "AwsCallContext", attributes: "Attributes"
+    ) -> "Optional[str]":
         # sentry's ordered db name templates; dynamodb always sets `db.operation.name`
-        # and never `db.stored_procedure.name` or `db.namespace`, and botocore always
-        # resolves an endpoint (`server.address`, `server.port`), so later templates never apply.
+        # and never `db.stored_procedure.name` or `db.namespace`.
         # https://github.com/getsentry/sentry-conventions/blob/main/model/name/db.json
         if SPANDATA.DB_QUERY_SUMMARY in attributes:
             return str(attributes[SPANDATA.DB_QUERY_SUMMARY])
-        if SPANDATA.DB_COLLECTION_NAME in attributes:
-            return f"{ctx.operation_name} {attributes[SPANDATA.DB_COLLECTION_NAME]}"
-        return f"{ctx.operation_name} {attributes[SPANDATA.SERVER_ADDRESS]}:{attributes[SPANDATA.SERVER_PORT]}"
+
+        # a multi-table call is named after its tables rather than its comma-wrapped
+        # `db.collection.name`, sorted so the name doesn't depend on the request order.
+        table_names = attributes.get(SPANDATA.AWS_DYNAMODB_TABLE_NAMES)
+        if isinstance(table_names, list) and table_names:
+            return "{} {}".format(
+                ctx.operation_name, ", ".join(sorted(str(t) for t in table_names))
+            )
+
+        # calls without a table. `server.address` is still the configured endpoint here;
+        # botocore may resolve an account-based one (`<account>.ddb.<region>.amazonaws.com`)
+        # later, which keeps the name stable and free of account ids.
+        server_address = attributes.get(SPANDATA.SERVER_ADDRESS)
+        server_port = attributes.get(SPANDATA.SERVER_PORT)
+        if server_address is None or server_port is None:
+            return None
+        return f"{ctx.operation_name} {server_address}:{server_port}"
 
     def get_request_attributes(self, ctx: "AwsCallContext") -> "Attributes":
         attributes: "Attributes" = {
