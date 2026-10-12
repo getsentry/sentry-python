@@ -179,7 +179,7 @@ def _wrap_chat(f: "Callable[..., Any]", streaming: bool) -> "Callable[..., Any]"
         span = sentry_sdk.start_span(
             name="cohere.client.Chat",
             attributes={
-                "sentry.op": consts.OP.COHERE_CHAT_COMPLETIONS_CREATE,
+                "sentry.op": consts.OP.GEN_AI_CHAT,
                 "sentry.origin": CohereIntegration.origin,
             },
         )
@@ -266,7 +266,7 @@ def _wrap_embed(f: "Callable[..., Any]") -> "Callable[..., Any]":
         with sentry_sdk.start_span(
             name="Cohere Embedding Creation",
             attributes={
-                "sentry.op": consts.OP.COHERE_EMBEDDINGS_CREATE,
+                "sentry.op": consts.OP.GEN_AI_EMBEDDINGS,
                 "sentry.origin": CohereIntegration.origin,
             },
         ) as span:
