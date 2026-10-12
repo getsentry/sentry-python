@@ -1,9 +1,61 @@
+import json
+from copy import deepcopy
+
 import pytest
+from botocore.exceptions import ClientError
 from botocore.stub import Stubber
 
 from sentry_sdk.consts import OP, SPANDATA
-from tests.integrations.boto3.helpers import capture_spans_by_op
+from sentry_sdk.integrations.boto3 import Boto3Integration
+from sentry_sdk.integrations.boto3.consts import AWS_RPC_SYSTEM_NAME, ORIGIN
+from tests.integrations.boto3.helpers import (
+    capture_spans_by_op,
+    require_botocore_model_fields,
+)
 from tests.integrations.boto3.helpers import client_factory as client_factory
+
+ENDPOINT = "dynamodb.eu-north-1.amazonaws.com:443"
+TABLE_ARN = "arn:aws:dynamodb:eu-north-1:123456789012:table/orders"
+
+
+@pytest.fixture
+def dynamodb_client(client_factory):
+    return client_factory("dynamodb")
+
+
+def _stubbed_span(client, capture_items, method, params, response):
+    original = deepcopy(params)
+    with Stubber(client) as stubber:
+        stubber.add_response(method, response, expected_params=params)
+        spans = capture_spans_by_op(
+            lambda: getattr(client, method)(**params), capture_items
+        )
+        stubber.assert_no_pending_responses()
+    assert params == original
+
+    (span,) = spans[OP.DB]
+    operation = client.meta.method_to_api_mapping[method]
+    assert span.get("end_timestamp") is not None
+    attributes = span.get("attributes", {})
+    assert attributes[SPANDATA.SENTRY_OP] == OP.DB
+    assert attributes[SPANDATA.SENTRY_ORIGIN] == ORIGIN
+    assert attributes[SPANDATA.SENTRY_KIND] == "client"
+    assert attributes[SPANDATA.CLOUD_PROVIDER] == "aws"
+    assert attributes[SPANDATA.RPC_SYSTEM_NAME] == AWS_RPC_SYSTEM_NAME
+    assert attributes[SPANDATA.RPC_SERVICE] == "DynamoDB"
+    assert attributes[SPANDATA.RPC_METHOD] == operation
+    assert attributes[SPANDATA.DB_SYSTEM_NAME] == "aws.dynamodb"
+    assert attributes[SPANDATA.DB_OPERATION_NAME] == operation
+    return span
+
+
+def _query_parameters(attributes):
+    prefix = SPANDATA.DB_QUERY_PARAMETER + "."
+    return {
+        key[len(prefix) :]: value
+        for key, value in attributes.items()
+        if key.startswith(prefix)
+    }
 
 
 @pytest.mark.parametrize(
@@ -11,9 +63,9 @@ from tests.integrations.boto3.helpers import client_factory as client_factory
     [
         pytest.param(
             "list_tags_of_resource",
-            {"ResourceArn": ("arn:aws:dynamodb:eu-north-1:123456789012:table/orders")},
+            {"ResourceArn": TABLE_ARN},
             {"Tags": []},
-            "arn:aws:dynamodb:eu-north-1:123456789012:table/orders",
+            TABLE_ARN,
             id="arn",
         ),
         pytest.param(
@@ -25,18 +77,11 @@ from tests.integrations.boto3.helpers import client_factory as client_factory
         ),
     ],
 )
-def test_request_attributes(
-    client_factory, capture_items, method, params, response, expected_resource_id
+def test_resource_attributes(
+    dynamodb_client, capture_items, method, params, response, expected_resource_id
 ):
-    client = client_factory("dynamodb")
+    span = _stubbed_span(dynamodb_client, capture_items, method, params, response)
 
-    with Stubber(client) as stubber:
-        stubber.add_response(method, response, params)
-        spans = capture_spans_by_op(
-            lambda: getattr(client, method)(**params), capture_items
-        )
-
-    (span,) = spans[OP.HTTP_CLIENT]
     attributes = span["attributes"]
     if expected_resource_id is None:
         assert SPANDATA.CLOUD_ACCOUNT_ID not in attributes
@@ -44,3 +89,665 @@ def test_request_attributes(
     else:
         assert attributes[SPANDATA.CLOUD_ACCOUNT_ID] == "123456789012"
         assert attributes[SPANDATA.CLOUD_RESOURCE_ID] == expected_resource_id
+
+
+@pytest.mark.parametrize(
+    "table_name", [pytest.param("orders", id="name"), pytest.param(TABLE_ARN, id="arn")]
+)
+def test_get_item(dynamodb_client, capture_items, table_name):
+    params = {
+        "TableName": table_name,
+        "Key": {"id": {"S": "private-key"}},
+        "ConsistentRead": True,
+        "ProjectionExpression": "id, total",
+        "ReturnConsumedCapacity": "TOTAL",
+    }
+    response = {
+        "Item": {"id": {"S": "private-key"}, "total": {"N": "42"}},
+        "ConsumedCapacity": {"TableName": "orders", "CapacityUnits": 0.5},
+    }
+
+    span = _stubbed_span(dynamodb_client, capture_items, "get_item", params, response)
+
+    assert span["name"] == "GetItem orders"
+    attributes = span["attributes"]
+    assert attributes[SPANDATA.DB_COLLECTION_NAME] == "orders"
+    assert attributes[SPANDATA.AWS_DYNAMODB_TABLE_NAMES] == ["orders"]
+    assert attributes[SPANDATA.AWS_DYNAMODB_CONSISTENT_READ] is True
+    assert attributes[SPANDATA.AWS_DYNAMODB_PROJECTION] == "id, total"
+    assert attributes[SPANDATA.AWS_DYNAMODB_CONSUMED_CAPACITY] == [
+        '{"TableName":"orders","CapacityUnits":0.5}'
+    ]
+    assert SPANDATA.DB_OPERATION_BATCH_SIZE not in attributes
+    assert SPANDATA.DB_QUERY_TEXT not in attributes
+    assert "private-key" not in json.dumps(span)
+
+
+def test_query(dynamodb_client, capture_items):
+    params = {
+        "TableName": "orders",
+        "IndexName": "by-customer",
+        "KeyConditionExpression": "customer = :customer",
+        "ExpressionAttributeValues": {":customer": {"S": "private-customer"}},
+        "AttributesToGet": ["id", "total"],
+        "Limit": 10,
+        "ScanIndexForward": False,
+        "Select": "SPECIFIC_ATTRIBUTES",
+    }
+    response = {"Items": [], "Count": 0, "ScannedCount": 3}
+
+    span = _stubbed_span(dynamodb_client, capture_items, "query", params, response)
+
+    assert span["name"] == "Query orders"
+    attributes = span["attributes"]
+    assert attributes[SPANDATA.AWS_DYNAMODB_INDEX_NAME] == "by-customer"
+    assert attributes[SPANDATA.AWS_DYNAMODB_ATTRIBUTES_TO_GET] == ["id", "total"]
+    assert attributes[SPANDATA.AWS_DYNAMODB_LIMIT] == 10
+    assert attributes[SPANDATA.AWS_DYNAMODB_SCAN_FORWARD] is False
+    assert attributes[SPANDATA.AWS_DYNAMODB_SELECT] == "SPECIFIC_ATTRIBUTES"
+    assert attributes[SPANDATA.AWS_DYNAMODB_COUNT] == 0
+    assert attributes[SPANDATA.AWS_DYNAMODB_SCANNED_COUNT] == 3
+    assert "private-customer" not in json.dumps(span)
+
+
+def test_scan(dynamodb_client, capture_items):
+    params = {"TableName": "orders", "Segment": 1, "TotalSegments": 4}
+
+    span = _stubbed_span(
+        dynamodb_client, capture_items, "scan", params, {"Count": 2, "ScannedCount": 2}
+    )
+
+    assert span["name"] == "Scan orders"
+    attributes = span["attributes"]
+    assert attributes[SPANDATA.AWS_DYNAMODB_SEGMENT] == 1
+    assert attributes[SPANDATA.AWS_DYNAMODB_TOTAL_SEGMENTS] == 4
+
+
+def test_list_tables(dynamodb_client, capture_items):
+    params = {"ExclusiveStartTableName": "customers", "Limit": 2}
+
+    span = _stubbed_span(
+        dynamodb_client,
+        capture_items,
+        "list_tables",
+        params,
+        {"TableNames": ["invoices", "orders"]},
+    )
+
+    assert span["name"] == "ListTables " + ENDPOINT
+    attributes = span["attributes"]
+    assert attributes[SPANDATA.AWS_DYNAMODB_EXCLUSIVE_START_TABLE] == "customers"
+    assert attributes[SPANDATA.AWS_DYNAMODB_LIMIT] == 2
+    assert attributes[SPANDATA.AWS_DYNAMODB_TABLE_COUNT] == 2
+    assert SPANDATA.DB_COLLECTION_NAME not in attributes
+    assert SPANDATA.AWS_DYNAMODB_TABLE_NAMES not in attributes
+
+
+def test_create_table(dynamodb_client, capture_items):
+    key_schema = [{"AttributeName": "id", "KeyType": "HASH"}]
+    params = {
+        "TableName": "orders",
+        "AttributeDefinitions": [
+            {"AttributeName": "id", "AttributeType": "S"},
+            {"AttributeName": "customer", "AttributeType": "S"},
+        ],
+        "KeySchema": key_schema,
+        "GlobalSecondaryIndexes": [
+            {
+                "IndexName": "by-customer",
+                "KeySchema": [{"AttributeName": "customer", "KeyType": "HASH"}],
+                "Projection": {"ProjectionType": "ALL"},
+                "ProvisionedThroughput": {
+                    "ReadCapacityUnits": 1,
+                    "WriteCapacityUnits": 1,
+                },
+            }
+        ],
+        "LocalSecondaryIndexes": [
+            {
+                "IndexName": "by-id",
+                "KeySchema": key_schema,
+                "Projection": {"ProjectionType": "KEYS_ONLY"},
+            }
+        ],
+        "ProvisionedThroughput": {"ReadCapacityUnits": 5, "WriteCapacityUnits": 2},
+    }
+
+    span = _stubbed_span(dynamodb_client, capture_items, "create_table", params, {})
+
+    assert span["name"] == "CreateTable orders"
+    attributes = span["attributes"]
+    assert attributes[SPANDATA.AWS_DYNAMODB_ATTRIBUTE_DEFINITIONS] == [
+        '{"AttributeName":"id","AttributeType":"S"}',
+        '{"AttributeName":"customer","AttributeType":"S"}',
+    ]
+    assert attributes[SPANDATA.AWS_DYNAMODB_GLOBAL_SECONDARY_INDEXES] == [
+        '{"IndexName":"by-customer","KeySchema":[{"AttributeName":"customer","KeyType":"HASH"}],'
+        '"Projection":{"ProjectionType":"ALL"},'
+        '"ProvisionedThroughput":{"ReadCapacityUnits":1,"WriteCapacityUnits":1}}'
+    ]
+    assert attributes[SPANDATA.AWS_DYNAMODB_LOCAL_SECONDARY_INDEXES] == [
+        '{"IndexName":"by-id","KeySchema":[{"AttributeName":"id","KeyType":"HASH"}],'
+        '"Projection":{"ProjectionType":"KEYS_ONLY"}}'
+    ]
+    assert attributes[SPANDATA.AWS_DYNAMODB_PROVISIONED_READ_CAPACITY] == 5.0
+    assert attributes[SPANDATA.AWS_DYNAMODB_PROVISIONED_WRITE_CAPACITY] == 2.0
+
+
+def test_update_table(dynamodb_client, capture_items):
+    params = {
+        "TableName": "orders",
+        "GlobalSecondaryIndexUpdates": [{"Delete": {"IndexName": "by-customer"}}],
+    }
+
+    span = _stubbed_span(dynamodb_client, capture_items, "update_table", params, {})
+
+    attributes = span["attributes"]
+    assert attributes[SPANDATA.AWS_DYNAMODB_GLOBAL_SECONDARY_INDEX_UPDATES] == [
+        '{"Delete":{"IndexName":"by-customer"}}'
+    ]
+    assert SPANDATA.AWS_DYNAMODB_PROVISIONED_READ_CAPACITY not in attributes
+
+
+@pytest.mark.parametrize(
+    "request_items,expected_name,expected_collection,expected_batch_size",
+    [
+        pytest.param(
+            {
+                "orders": {"Keys": [{"id": {"S": "1"}}, {"id": {"S": "2"}}]},
+                TABLE_ARN.replace("orders", "invoices"): {"Keys": [{"id": {"S": "3"}}]},
+            },
+            "BatchGetItem " + ENDPOINT,
+            None,
+            3,
+            id="two-tables",
+        ),
+        pytest.param(
+            {"orders": {"Keys": [{"id": {"S": "1"}}, {"id": {"S": "2"}}]}},
+            "BatchGetItem orders",
+            "orders",
+            2,
+            id="one-table",
+        ),
+        pytest.param(
+            {"orders": {"Keys": [{"id": {"S": "1"}}]}},
+            "BatchGetItem orders",
+            "orders",
+            None,
+            id="one-key",
+        ),
+    ],
+)
+def test_batch_get_item(
+    dynamodb_client,
+    capture_items,
+    request_items,
+    expected_name,
+    expected_collection,
+    expected_batch_size,
+):
+    params = {"RequestItems": request_items, "ReturnConsumedCapacity": "TOTAL"}
+    response = {
+        "Responses": {},
+        "UnprocessedKeys": {},
+        "ConsumedCapacity": [
+            {"TableName": "orders", "CapacityUnits": 1.0},
+            {"TableName": "invoices", "CapacityUnits": 0.5},
+        ],
+    }
+
+    span = _stubbed_span(
+        dynamodb_client, capture_items, "batch_get_item", params, response
+    )
+
+    assert span["name"] == expected_name
+    assert span["status"] == "ok"
+    attributes = span["attributes"]
+    assert (
+        attributes[SPANDATA.AWS_DYNAMODB_TABLE_NAMES]
+        == [
+            "orders",
+            "invoices",
+        ][: len(request_items)]
+    )
+    assert attributes.get(SPANDATA.DB_COLLECTION_NAME) == expected_collection
+    assert attributes.get(SPANDATA.DB_OPERATION_BATCH_SIZE) == expected_batch_size
+    assert attributes[SPANDATA.AWS_DYNAMODB_CONSUMED_CAPACITY] == [
+        '{"TableName":"orders","CapacityUnits":1.0}',
+        '{"TableName":"invoices","CapacityUnits":0.5}',
+    ]
+
+
+def test_batch_write_item(dynamodb_client, capture_items):
+    params = {
+        "RequestItems": {
+            "orders": [
+                {"PutRequest": {"Item": {"id": {"S": "1"}}}},
+                {"DeleteRequest": {"Key": {"id": {"S": "2"}}}},
+            ]
+        }
+    }
+
+    span = _stubbed_span(dynamodb_client, capture_items, "batch_write_item", params, {})
+
+    assert span["name"] == "BatchWriteItem orders"
+    assert span["attributes"][SPANDATA.DB_OPERATION_BATCH_SIZE] == 2
+
+
+def test_transact_write_items(dynamodb_client, capture_items):
+    params = {
+        "TransactItems": [
+            {"Put": {"TableName": "orders", "Item": {"id": {"S": "1"}}}},
+            {
+                "ConditionCheck": {
+                    "TableName": "customers",
+                    "Key": {"id": {"S": "2"}},
+                    "ConditionExpression": "attribute_exists(id)",
+                }
+            },
+            {"Delete": {"TableName": "orders", "Key": {"id": {"S": "3"}}}},
+        ],
+        "ReturnItemCollectionMetrics": "SIZE",
+    }
+    response = {
+        "ItemCollectionMetrics": {
+            "orders": [
+                {
+                    "ItemCollectionKey": {"id": {"S": "1"}},
+                    "SizeEstimateRangeGB": [0.0, 1.0],
+                }
+            ]
+        }
+    }
+
+    span = _stubbed_span(
+        dynamodb_client, capture_items, "transact_write_items", params, response
+    )
+
+    assert span["name"] == "TransactWriteItems " + ENDPOINT
+    attributes = span["attributes"]
+    assert attributes[SPANDATA.AWS_DYNAMODB_TABLE_NAMES] == ["orders", "customers"]
+    assert SPANDATA.DB_COLLECTION_NAME not in attributes
+    assert attributes[SPANDATA.DB_OPERATION_BATCH_SIZE] == 3
+    assert attributes[SPANDATA.AWS_DYNAMODB_ITEM_COLLECTION_METRICS] == (
+        '{"orders":[{"ItemCollectionKey":{"id":{"S":"1"}},"SizeEstimateRangeGB":[0.0,1.0]}]}'
+    )
+
+
+def test_transact_get_items(dynamodb_client, capture_items):
+    params = {
+        "TransactItems": [
+            {"Get": {"TableName": "orders", "Key": {"id": {"S": "1"}}}},
+            {"Get": {"TableName": "orders", "Key": {"id": {"S": "2"}}}},
+        ]
+    }
+
+    span = _stubbed_span(
+        dynamodb_client, capture_items, "transact_get_items", params, {}
+    )
+
+    assert span["name"] == "TransactGetItems orders"
+    attributes = span["attributes"]
+    assert attributes[SPANDATA.AWS_DYNAMODB_TABLE_NAMES] == ["orders"]
+    assert attributes[SPANDATA.DB_OPERATION_BATCH_SIZE] == 2
+
+
+def test_item_collection_metrics_binary_key(dynamodb_client, capture_items):
+    params = {
+        "TableName": "orders",
+        "Item": {"id": {"B": b"\x00"}},
+        "ReturnItemCollectionMetrics": "SIZE",
+    }
+    response = {
+        "ItemCollectionMetrics": {
+            "ItemCollectionKey": {"id": {"B": b"\x00"}},
+            "SizeEstimateRangeGB": [0.0, 1.0],
+        }
+    }
+
+    span = _stubbed_span(dynamodb_client, capture_items, "put_item", params, response)
+
+    assert span["name"] == "PutItem orders"
+    assert SPANDATA.AWS_DYNAMODB_ITEM_COLLECTION_METRICS not in span["attributes"]
+
+
+def test_client_error(dynamodb_client, capture_items):
+    params = {"TableName": "orders", "Key": {"id": {"S": "1"}}}
+
+    with Stubber(dynamodb_client) as stubber:
+        stubber.add_client_error(
+            "get_item",
+            service_error_code="ResourceNotFoundException",
+            http_status_code=400,
+            expected_params=params,
+        )
+
+        def call():
+            with pytest.raises(ClientError):
+                dynamodb_client.get_item(**params)
+
+        spans = capture_spans_by_op(call, capture_items)
+
+    (span,) = spans[OP.DB]
+    assert span["name"] == "GetItem orders"
+    assert span["status"] == "error"
+    assert span["attributes"][SPANDATA.ERROR_TYPE] == "ResourceNotFoundException"
+    assert span["attributes"][SPANDATA.DB_COLLECTION_NAME] == "orders"
+
+
+@pytest.mark.parametrize(
+    "parameters,expected_parameters",
+    [
+        pytest.param(
+            [
+                {"S": "alex"},
+                {"N": "42"},
+                {"BOOL": False},
+                {"NULL": True},
+                {"SS": ["a", "b"]},
+                {"NS": ["1", "2"]},
+                {"L": [{"S": "a"}, {"N": "1"}]},
+                {"M": {"id": {"S": "1"}}},
+            ],
+            {
+                "0": "alex",
+                "1": "42",
+                "2": "false",
+                "3": "null",
+                "4": '["a","b"]',
+                "5": '["1","2"]',
+                "6": '{"L":[{"S":"a"},{"N":"1"}]}',
+                "7": '{"M":{"id":{"S":"1"}}}',
+            },
+            id="types",
+        ),
+        pytest.param(
+            [
+                {"B": b"\x00"},
+                {"BS": [b"\x00"]},
+                {"L": [{"S": "a"}, {"B": b"\x00"}]},
+                {"M": {"nested": {"M": {"id": {"B": b"\x00"}}}}},
+                {"S": "kept"},
+            ],
+            {"4": "kept"},
+            id="binary",
+        ),
+    ],
+)
+def test_execute_statement_parameters(
+    dynamodb_client, capture_items, parameters, expected_parameters
+):
+    require_botocore_model_fields(dynamodb_client, "execute_statement")
+    statement = 'SELECT * FROM "orders" WHERE customer = ? AND status = ?'
+    params = {"Statement": statement, "Parameters": parameters}
+
+    span = _stubbed_span(
+        dynamodb_client, capture_items, "execute_statement", params, {"Items": []}
+    )
+
+    assert span["name"] == "SELECT orders"
+    attributes = span["attributes"]
+    assert attributes[SPANDATA.DB_QUERY_SUMMARY] == "SELECT orders"
+    # parameterized statements are used as provided.
+    assert attributes[SPANDATA.DB_QUERY_TEXT] == statement
+    assert attributes[SPANDATA.DB_COLLECTION_NAME] == "orders"
+    assert attributes[SPANDATA.AWS_DYNAMODB_TABLE_NAMES] == ["orders"]
+    assert _query_parameters(attributes) == expected_parameters
+    assert SPANDATA.DB_OPERATION_BATCH_SIZE not in attributes
+
+
+@pytest.mark.parametrize(
+    "statement,expected_text,expected_summary,expected_table",
+    [
+        pytest.param(
+            "SELECT id FROM \"orders\".\"by-customer\" WHERE customer = 'it''s' AND total > 12.5e3",
+            'SELECT id FROM "orders"."by-customer" WHERE customer = ? AND total > ?',
+            "SELECT orders",
+            "orders",
+            id="select-index",
+        ),
+        pytest.param(
+            "insert into orders value {'id': '1', 'tags': <<'a', 'b'>>, 'items': [1, [2]]}",
+            "insert into orders value ?",
+            "INSERT orders",
+            "orders",
+            id="insert-tuple-bag-list",
+        ),
+        pytest.param(
+            'UPDATE "my-orders" SET tags[0] = `{a: 1}`, open = true '
+            "WHERE id IN ['1', '2'] AND closed IS NOT MISSING AND note IS NULL AND v = null",
+            'UPDATE "my-orders" SET tags[?] = ?, open = ? '
+            "WHERE id IN ? AND closed IS NOT MISSING AND note IS NULL AND v = ?",
+            "UPDATE my-orders",
+            "my-orders",
+            id="update-predicates",
+        ),
+        pytest.param(
+            "DELETE FROM orders WHERE id = '1'",
+            "DELETE FROM orders WHERE id = ?",
+            "DELETE orders",
+            "orders",
+            id="delete",
+        ),
+        pytest.param(
+            "SELECT * FROM orders WHERE id = 'unterminated",
+            None,
+            "SELECT orders",
+            "orders",
+            id="unterminated-string",
+        ),
+        pytest.param(
+            "SELECT * FROM orders WHERE id IN [1, 2",
+            None,
+            "SELECT orders",
+            "orders",
+            id="unterminated-list",
+        ),
+        pytest.param(
+            "REMOVE x",
+            "REMOVE x",
+            None,
+            None,
+            id="unrecognized",
+        ),
+    ],
+)
+def test_execute_statement_without_parameters(
+    dynamodb_client,
+    capture_items,
+    statement,
+    expected_text,
+    expected_summary,
+    expected_table,
+):
+    require_botocore_model_fields(dynamodb_client, "execute_statement")
+    params = {"Statement": statement}
+
+    span = _stubbed_span(
+        dynamodb_client, capture_items, "execute_statement", params, {"Items": []}
+    )
+
+    attributes = span["attributes"]
+    assert attributes.get(SPANDATA.DB_QUERY_TEXT) == expected_text
+    assert attributes.get(SPANDATA.DB_QUERY_SUMMARY) == expected_summary
+    assert attributes.get(SPANDATA.DB_COLLECTION_NAME) == expected_table
+    assert span["name"] == (expected_summary or "ExecuteStatement " + ENDPOINT)
+    assert _query_parameters(attributes) == {}
+
+
+@pytest.mark.parametrize(
+    "statements,expected",
+    [
+        pytest.param(
+            [
+                {
+                    "Statement": 'SELECT * FROM "orders" WHERE id = ?',
+                    "Parameters": [{"S": "1"}],
+                },
+                {
+                    "Statement": 'SELECT * FROM "orders" WHERE id = ?',
+                    "Parameters": [{"S": "2"}],
+                },
+            ],
+            {
+                "name": "SELECT orders",
+                SPANDATA.DB_QUERY_TEXT: 'SELECT * FROM "orders" WHERE id = ?',
+                SPANDATA.DB_QUERY_SUMMARY: "SELECT orders",
+                SPANDATA.DB_COLLECTION_NAME: "orders",
+                SPANDATA.AWS_DYNAMODB_TABLE_NAMES: ["orders"],
+                SPANDATA.DB_OPERATION_BATCH_SIZE: 2,
+            },
+            id="shared",
+        ),
+        pytest.param(
+            [
+                {"Statement": "SELECT * FROM orders WHERE id = '1'"},
+                {"Statement": "DELETE FROM orders WHERE id = '2'"},
+                {"Statement": "INSERT INTO customers VALUE {'id': '3'}"},
+            ],
+            {
+                "name": "BatchExecuteStatement " + ENDPOINT,
+                SPANDATA.DB_QUERY_TEXT: "SELECT * FROM orders WHERE id = ?; "
+                "DELETE FROM orders WHERE id = ?; INSERT INTO customers VALUE ?",
+                SPANDATA.AWS_DYNAMODB_TABLE_NAMES: ["orders", "customers"],
+                SPANDATA.DB_OPERATION_BATCH_SIZE: 3,
+            },
+            id="different",
+        ),
+        pytest.param(
+            [
+                {"Statement": "SELECT * FROM orders WHERE id = '1'"},
+                {"Statement": "SELECT * FROM orders WHERE id = 'unterminated"},
+            ],
+            {
+                "name": "SELECT orders",
+                SPANDATA.DB_QUERY_SUMMARY: "SELECT orders",
+                SPANDATA.DB_COLLECTION_NAME: "orders",
+                SPANDATA.AWS_DYNAMODB_TABLE_NAMES: ["orders"],
+                SPANDATA.DB_OPERATION_BATCH_SIZE: 2,
+            },
+            id="unsanitizable",
+        ),
+        pytest.param(
+            [
+                {
+                    "Statement": 'UPDATE "orders" SET total = ? WHERE id = ?',
+                    "Parameters": [{"N": "42"}, {"S": "1"}],
+                }
+            ],
+            {
+                "name": "UPDATE orders",
+                SPANDATA.DB_QUERY_TEXT: 'UPDATE "orders" SET total = ? WHERE id = ?',
+                SPANDATA.DB_QUERY_SUMMARY: "UPDATE orders",
+                SPANDATA.DB_COLLECTION_NAME: "orders",
+                SPANDATA.AWS_DYNAMODB_TABLE_NAMES: ["orders"],
+                SPANDATA.DB_QUERY_PARAMETER + ".0": "42",
+                SPANDATA.DB_QUERY_PARAMETER + ".1": "1",
+            },
+            id="single",
+        ),
+    ],
+)
+def test_batch_execute_statement(dynamodb_client, capture_items, statements, expected):
+    require_botocore_model_fields(dynamodb_client, "batch_execute_statement")
+    params = {"Statements": statements}
+
+    span = _stubbed_span(
+        dynamodb_client,
+        capture_items,
+        "batch_execute_statement",
+        params,
+        {"Responses": []},
+    )
+
+    expected = dict(expected)
+    assert span["name"] == expected.pop("name")
+    attributes = span["attributes"]
+    for key in (
+        SPANDATA.DB_QUERY_TEXT,
+        SPANDATA.DB_QUERY_SUMMARY,
+        SPANDATA.DB_COLLECTION_NAME,
+        SPANDATA.AWS_DYNAMODB_TABLE_NAMES,
+        SPANDATA.DB_OPERATION_BATCH_SIZE,
+    ):
+        assert attributes.get(key) == expected.get(key)
+    assert {
+        key: value
+        for key, value in attributes.items()
+        if key.startswith(SPANDATA.DB_QUERY_PARAMETER)
+    } == {
+        key: value
+        for key, value in expected.items()
+        if key.startswith(SPANDATA.DB_QUERY_PARAMETER)
+    }
+
+
+def test_execute_transaction(dynamodb_client, capture_items):
+    require_botocore_model_fields(dynamodb_client, "execute_transaction")
+    params = {
+        "TransactStatements": [
+            {
+                "Statement": "EXISTS(SELECT * FROM \"customers\" WHERE id = '1')",
+            },
+            {
+                "Statement": "INSERT INTO \"orders\" VALUE {'id': ?}",
+                "Parameters": [{"S": "2"}],
+            },
+        ]
+    }
+
+    span = _stubbed_span(
+        dynamodb_client, capture_items, "execute_transaction", params, {}
+    )
+
+    assert span["name"] == "ExecuteTransaction " + ENDPOINT
+    attributes = span["attributes"]
+    assert attributes[SPANDATA.DB_QUERY_TEXT] == (
+        'EXISTS(SELECT * FROM "customers" WHERE id = ?); INSERT INTO "orders" VALUE {\'id\': ?}'
+    )
+    assert attributes[SPANDATA.AWS_DYNAMODB_TABLE_NAMES] == ["customers", "orders"]
+    assert attributes[SPANDATA.DB_OPERATION_BATCH_SIZE] == 2
+    assert SPANDATA.DB_QUERY_SUMMARY not in attributes
+    assert SPANDATA.DB_COLLECTION_NAME not in attributes
+    assert _query_parameters(attributes) == {}
+
+
+def test_database_query_data_disabled(dynamodb_client, sentry_init, capture_items):
+    sentry_init(
+        traces_sample_rate=1.0,
+        integrations=[Boto3Integration()],
+        data_collection={"database_query_data": False},
+    )
+    require_botocore_model_fields(dynamodb_client, "execute_statement")
+    statement = 'SELECT * FROM "orders" WHERE id = ?'
+
+    statement_span = _stubbed_span(
+        dynamodb_client,
+        capture_items,
+        "execute_statement",
+        {"Statement": statement, "Parameters": [{"S": "private-id"}]},
+        {"Items": []},
+    )
+    put_span = _stubbed_span(
+        dynamodb_client,
+        capture_items,
+        "put_item",
+        {
+            "TableName": "orders",
+            "Item": {"id": {"S": "private-id"}},
+            "ReturnItemCollectionMetrics": "SIZE",
+        },
+        {
+            "ItemCollectionMetrics": {
+                "ItemCollectionKey": {"id": {"S": "private-id"}},
+                "SizeEstimateRangeGB": [0.0, 1.0],
+            }
+        },
+    )
+
+    # the parameterized text and summary aren't database content.
+    assert statement_span["attributes"][SPANDATA.DB_QUERY_TEXT] == statement
+    assert statement_span["attributes"][SPANDATA.DB_QUERY_SUMMARY] == "SELECT orders"
+    assert _query_parameters(statement_span["attributes"]) == {}
+    assert SPANDATA.AWS_DYNAMODB_ITEM_COLLECTION_METRICS not in put_span["attributes"]
+    assert "private-id" not in json.dumps([statement_span, put_span])
