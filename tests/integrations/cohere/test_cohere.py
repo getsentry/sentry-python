@@ -866,3 +866,46 @@ def test_embed_data_collection(
         assert "hello" in str(attributes[SPANDATA.AI_INPUT_MESSAGES])
     else:
         assert SPANDATA.AI_INPUT_MESSAGES not in attributes
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_streaming_chat_iteration_error_propagates(
+    sentry_init, capture_events, capture_items, span_streaming
+):
+    """Mid-stream provider errors must reach the caller, not be swallowed.
+
+    Regression test for https://github.com/getsentry/sentry-python/issues/7889
+    """
+    from sentry_sdk.integrations.cohere import _wrap_chat
+
+    sentry_init(
+        integrations=[CohereIntegration()],
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
+    events = capture_events()
+    items = capture_items("span") if span_streaming else None
+
+    def failing_stream(*args, **kwargs):
+        yield object()
+        raise httpx.RemoteProtocolError("connection dropped", request=None)
+
+    wrapped = _wrap_chat(failing_stream, streaming=True)
+
+    with start_transaction(name="test"):
+        with pytest.raises(httpx.RemoteProtocolError):
+            list(wrapped(message="hello"))
+
+    sentry_sdk.flush()
+
+    # the error was recorded on Sentry instead of vanishing
+    errors = [e for e in events if e.get("level") == "error"]
+    assert len(errors) == 1
+
+    if span_streaming:
+        assert len(items) == 1
+        assert items[0].payload["status"] == "error"
+    else:
+        transactions = [e for e in events if e.get("type") == "transaction"]
+        assert len(transactions) == 1
+        assert transactions[0]["spans"][0]["status"] == "internal_error"

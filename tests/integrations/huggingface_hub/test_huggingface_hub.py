@@ -1,4 +1,5 @@
 import re
+from types import SimpleNamespace
 from typing import TYPE_CHECKING
 
 import pytest
@@ -2712,3 +2713,81 @@ def test_chat_completion_streaming_data_collection_tools(
         assert span_data[SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 183
         assert span_data[SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 14
         assert span_data[SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 197
+
+
+def test_text_generation_streaming_iteration_error_propagates(
+    sentry_init: "Any", capture_events: "Any"
+) -> None:
+    """Mid-stream provider errors must reach the caller, not be swallowed.
+
+    Regression test for https://github.com/getsentry/sentry-python/issues/7889
+    """
+    from sentry_sdk.integrations.huggingface_hub import _wrap_huggingface_task
+
+    sentry_init(
+        integrations=[HuggingfaceHubIntegration()],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    def failing_stream(*args: "Any", **kwargs: "Any") -> "Any":
+        yield SimpleNamespace(
+            token=SimpleNamespace(text="the mocked "),
+            details=SimpleNamespace(finish_reason=None, generated_tokens=None),
+        )
+        raise RuntimeError("mid-stream failure")
+
+    wrapped = _wrap_huggingface_task(failing_stream, "gen_ai.text_completion")
+
+    with sentry_sdk.start_transaction(name="test"):
+        with pytest.raises(RuntimeError, match="mid-stream failure"):
+            list(
+                wrapped(
+                    SimpleNamespace(model="test-model"),
+                    prompt="Hello",
+                    details=True,
+                )
+            )
+
+    sentry_sdk.flush()
+
+    # the error was recorded on Sentry instead of vanishing
+    errors = [e for e in events if e.get("level") == "error"]
+    assert len(errors) == 1
+
+
+def test_chat_completion_streaming_iteration_error_propagates(
+    sentry_init: "Any", capture_events: "Any"
+) -> None:
+    """Mid-stream provider errors must reach the caller, not be swallowed.
+
+    Regression test for https://github.com/getsentry/sentry-python/issues/7889
+    """
+    from sentry_sdk.integrations.huggingface_hub import _wrap_huggingface_task
+
+    sentry_init(
+        integrations=[HuggingfaceHubIntegration()],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    def failing_stream(*args: "Any", **kwargs: "Any") -> "Any":
+        yield SimpleNamespace(model="test-model", usage=None, choices=None)
+        raise RuntimeError("mid-stream failure")
+
+    wrapped = _wrap_huggingface_task(failing_stream, "gen_ai.chat_completions")
+
+    with sentry_sdk.start_transaction(name="test"):
+        with pytest.raises(RuntimeError, match="mid-stream failure"):
+            list(
+                wrapped(
+                    SimpleNamespace(model="test-model"),
+                    messages=[{"role": "user", "content": "Hello"}],
+                )
+            )
+
+    sentry_sdk.flush()
+
+    # the error was recorded on Sentry instead of vanishing
+    errors = [e for e in events if e.get("level") == "error"]
+    assert len(errors) == 1
