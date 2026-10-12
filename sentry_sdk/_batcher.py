@@ -124,13 +124,16 @@ class Batcher(Generic[T]):
                 return None
 
             with self._lock:
-                if len(self._buffer) >= self.MAX_BEFORE_DROP:
-                    self._record_lost(item)
-                    return None
+                dropped = len(self._buffer) >= self.MAX_BEFORE_DROP
+                if not dropped:
+                    self._buffer.append(item)
+                    if len(self._buffer) >= self.MAX_BEFORE_FLUSH:
+                        self._flush_event.set()
 
-                self._buffer.append(item)
-                if len(self._buffer) >= self.MAX_BEFORE_FLUSH:
-                    self._flush_event.set()
+            # Record the loss outside of the lock, since this might involve
+            # serializing the item to report lost bytes
+            if dropped:
+                self._record_lost(item)
         finally:
             self._active.flag = False
 
