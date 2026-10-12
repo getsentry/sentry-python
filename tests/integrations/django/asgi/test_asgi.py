@@ -11,7 +11,7 @@ from channels.testing import HttpCommunicator
 
 import sentry_sdk
 from sentry_sdk import capture_message
-from sentry_sdk.consts import SPANDATA
+from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.django import DjangoIntegration
 from sentry_sdk.integrations.django.asgi import _asgi_middleware_mixin_factory
 from tests.integrations.django.myapp.asgi import channels_application
@@ -271,7 +271,7 @@ async def test_async_middleware_spans(
 
     # Filter out signal-receiver spans — their ordering depends on Django
     # module import order and is not what this middleware test verifies.
-    spans = [s for s in spans if s["attributes"].get("sentry.op") != "event.django"]
+    spans = [s for s in spans if s["attributes"].get("sentry.op") != OP.FUNCTION]
 
     assert (
         render_span_tree(spans)
