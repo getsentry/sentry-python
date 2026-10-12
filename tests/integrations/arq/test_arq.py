@@ -11,7 +11,7 @@ from fakeredis.aioredis import FakeRedis
 
 import sentry_sdk
 from sentry_sdk import get_client
-from sentry_sdk.consts import SPANDATA
+from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.arq import ArqIntegration
 from tests.integrations.utils import DATA_COLLECTION_QUEUES_CASES
 
@@ -247,7 +247,7 @@ async def test_job_retry(
     # (queue.publish) span is created for it; only the consumer segment
     # is emitted. The consumer segment is preceded by the redis spans for
     # the re-enqueue, so it lands at index 2.
-    assert spans[2]["attributes"]["sentry.op"] == "queue.process"
+    assert spans[2]["attributes"]["sentry.op"] == OP.QUEUE_PROCESS
     assert spans[2]["status"] == "ok"
     assert spans[2]["name"] == "retry_job"
 
@@ -256,7 +256,7 @@ async def test_job_retry(
     sentry_sdk.flush()
     spans = [item.payload for item in items]
 
-    assert spans[5]["attributes"]["sentry.op"] == "queue.process"
+    assert spans[5]["attributes"]["sentry.op"] == OP.QUEUE_PROCESS
     assert spans[5]["status"] == "ok"
     assert spans[5]["name"] == "retry_job"
 
@@ -327,7 +327,9 @@ async def test_worker_jobs(
     spans = [item.payload for item in items if item.type == "span"]
 
     task_spans = [
-        span for span in spans if span["attributes"].get("sentry.op") == "queue.process"
+        span
+        for span in spans
+        if span["attributes"].get("sentry.op") == OP.QUEUE_PROCESS
     ]
 
     division_span = next(span for span in task_spans if span["name"] == "division")
@@ -411,7 +413,7 @@ async def test_enqueue_job(
     assert spans[2]["trace_id"] == span.trace_id
     assert spans[2]["span_id"] == span.span_id
 
-    assert spans[1]["attributes"]["sentry.op"] == "queue.publish"
+    assert spans[1]["attributes"]["sentry.op"] == OP.QUEUE_PUBLISH
     assert spans[1]["name"] == "dummy_job"
 
 
@@ -498,7 +500,7 @@ async def test_span_origin_consumer(
     # No producer (queue.publish) span is created for the re-enqueue
     # triggered by the retry, since it happens without an active span, so
     # the consumer segment lands at index 2.
-    assert spans[2]["attributes"]["sentry.op"] == "queue.process"
+    assert spans[2]["attributes"]["sentry.op"] == OP.QUEUE_PROCESS
     assert spans[2]["attributes"]["sentry.origin"] == "auto.queue.arq"
     assert spans[1]["attributes"]["sentry.origin"] == "auto.db.redis"
     assert spans[0]["attributes"]["sentry.origin"] == "auto.db.redis"

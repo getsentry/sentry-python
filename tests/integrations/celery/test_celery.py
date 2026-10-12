@@ -9,6 +9,7 @@ from celery.bin import worker
 from celery.exceptions import Ignore, Reject, Retry
 
 import sentry_sdk
+from sentry_sdk.consts import OP
 from sentry_sdk.integrations.celery import (
     CeleryIntegration,
     _wrap_task_run,
@@ -297,14 +298,14 @@ def test_transaction_events(
 
     assert process_span["name"] == "dummy_task"
     assert process_span["trace_id"] == span.trace_id
-    assert process_span["attributes"]["sentry.op"] == "queue.process"
+    assert process_span["attributes"]["sentry.op"] == OP.QUEUE_PROCESS
     assert process_span["parent_span_id"] == execution_span["span_id"]
 
     assert submission_span["name"] == "submission"
     assert submission_span["is_segment"] is True
 
     assert submit_span["name"] == "dummy_task"
-    assert submit_span["attributes"]["sentry.op"] == "queue.publish"
+    assert submit_span["attributes"]["sentry.op"] == OP.QUEUE_PUBLISH
     assert submit_span["attributes"]["sentry.origin"] == "auto.queue.celery"
     assert submit_span["parent_span_id"] == submission_span["span_id"] == span.span_id
     assert submit_span["trace_id"] == span.trace_id
@@ -434,7 +435,7 @@ def test_control_flow_exceptions_not_errors(init_celery, capture_items, exceptio
     assert not [item for item in items if item.type == "event"]
 
     process_span, execution_span = [item.payload for item in items]
-    assert process_span["attributes"]["sentry.op"] == "queue.process"
+    assert process_span["attributes"]["sentry.op"] == OP.QUEUE_PROCESS
     assert process_span["status"] == "ok"
     assert execution_span["is_segment"] is True
     assert execution_span["status"] == "ok"
@@ -809,7 +810,7 @@ def test_producer_span_data(system, monkeypatch, sentry_init, capture_items):
 
     span_items = [item.payload for item in items]
     publish_span = next(
-        s for s in span_items if s["attributes"].get("sentry.op") == "queue.publish"
+        s for s in span_items if s["attributes"].get("sentry.op") == OP.QUEUE_PUBLISH
     )
 
     assert publish_span["attributes"]["messaging.system"] == system
@@ -941,7 +942,7 @@ def test_send_task_wrapped(
     assert outer["is_segment"] is True
 
     assert submit_span["name"] == "very_creative_task_name"
-    assert submit_span["attributes"]["sentry.op"] == "queue.publish"
+    assert submit_span["attributes"]["sentry.op"] == OP.QUEUE_PUBLISH
     assert submit_span["trace_id"] == outer_span.trace_id
     assert submit_span["trace_id"] == kwargs["headers"]["sentry-trace"].split("-")[0]
 
