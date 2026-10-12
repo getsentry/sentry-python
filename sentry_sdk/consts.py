@@ -357,6 +357,140 @@ class SPANDATA:
     Example: ["Token limit exceeded"]
     """
 
+    AWS_DYNAMODB_ATTRIBUTE_DEFINITIONS = "aws.dynamodb.attribute_definitions"
+    """
+    The JSON-serialized value of each item in the `AttributeDefinitions` request field.
+    Example: ["{\"AttributeName\":\"id\",\"AttributeType\":\"S\"}"]
+    """
+
+    AWS_DYNAMODB_ATTRIBUTES_TO_GET = "aws.dynamodb.attributes_to_get"
+    """
+    The value of the `AttributesToGet` request parameter.
+    Example: ["lives", "id"]
+    """
+
+    AWS_DYNAMODB_CONSISTENT_READ = "aws.dynamodb.consistent_read"
+    """
+    The value of the `ConsistentRead` request parameter.
+    Example: true
+    """
+
+    AWS_DYNAMODB_CONSUMED_CAPACITY = "aws.dynamodb.consumed_capacity"
+    """
+    The JSON-serialized value of each item in the `ConsumedCapacity` response field.
+    Example: ["{\"CapacityUnits\":1.0,\"TableName\":\"orders\"}"]
+    """
+
+    AWS_DYNAMODB_COUNT = "aws.dynamodb.count"
+    """
+    The value of the `Count` response parameter.
+    Example: 10
+    """
+
+    AWS_DYNAMODB_EXCLUSIVE_START_TABLE = "aws.dynamodb.exclusive_start_table"
+    """
+    The value of the `ExclusiveStartTableName` request parameter.
+    Example: "Users"
+    """
+
+    AWS_DYNAMODB_GLOBAL_SECONDARY_INDEX_UPDATES = (
+        "aws.dynamodb.global_secondary_index_updates"
+    )
+    """
+    The JSON-serialized value of each item in the `GlobalSecondaryIndexUpdates` request field.
+    Example: ["{\"Delete\":{\"IndexName\":\"by-customer\"}}"]
+    """
+
+    AWS_DYNAMODB_GLOBAL_SECONDARY_INDEXES = "aws.dynamodb.global_secondary_indexes"
+    """
+    The JSON-serialized value of each item of the `GlobalSecondaryIndexes` request field.
+    Example: ["{\"IndexName\":\"by-customer\",\"KeySchema\":[{\"AttributeName\":\"customer\",\"KeyType\":\"HASH\"}],\"Projection\":{\"ProjectionType\":\"ALL\"}}"]
+    """
+
+    AWS_DYNAMODB_INDEX_NAME = "aws.dynamodb.index_name"
+    """
+    The value of the `IndexName` request parameter.
+    Example: "name_to_group"
+    """
+
+    AWS_DYNAMODB_ITEM_COLLECTION_METRICS = "aws.dynamodb.item_collection_metrics"
+    """
+    The JSON-serialized value of the `ItemCollectionMetrics` response field.
+    Example: "{\"ItemCollectionKey\":{\"id\":{\"S\":\"1\"}},\"SizeEstimateRangeGB\":[0.0,1.0]}"
+    """
+
+    AWS_DYNAMODB_LIMIT = "aws.dynamodb.limit"
+    """
+    The value of the `Limit` request parameter.
+    Example: 10
+    """
+
+    AWS_DYNAMODB_LOCAL_SECONDARY_INDEXES = "aws.dynamodb.local_secondary_indexes"
+    """
+    The JSON-serialized value of each item of the `LocalSecondaryIndexes` request field.
+    Example: ["{\"IndexName\":\"by-date\",\"KeySchema\":[{\"AttributeName\":\"id\",\"KeyType\":\"HASH\"}],\"Projection\":{\"ProjectionType\":\"KEYS_ONLY\"}}"]
+    """
+
+    AWS_DYNAMODB_PROJECTION = "aws.dynamodb.projection"
+    """
+    The value of the `ProjectionExpression` request parameter.
+    Example: "Title, Price, Color"
+    """
+
+    AWS_DYNAMODB_PROVISIONED_READ_CAPACITY = "aws.dynamodb.provisioned_read_capacity"
+    """
+    The value of the `ProvisionedThroughput.ReadCapacityUnits` request parameter.
+    Example: 1.0
+    """
+
+    AWS_DYNAMODB_PROVISIONED_WRITE_CAPACITY = "aws.dynamodb.provisioned_write_capacity"
+    """
+    The value of the `ProvisionedThroughput.WriteCapacityUnits` request parameter.
+    Example: 2.0
+    """
+
+    AWS_DYNAMODB_SCAN_FORWARD = "aws.dynamodb.scan_forward"
+    """
+    The value of the `ScanIndexForward` request parameter.
+    Example: true
+    """
+
+    AWS_DYNAMODB_SCANNED_COUNT = "aws.dynamodb.scanned_count"
+    """
+    The value of the `ScannedCount` response parameter.
+    Example: 50
+    """
+
+    AWS_DYNAMODB_SEGMENT = "aws.dynamodb.segment"
+    """
+    The value of the `Segment` request parameter.
+    Example: 10
+    """
+
+    AWS_DYNAMODB_SELECT = "aws.dynamodb.select"
+    """
+    The value of the `Select` request parameter.
+    Example: "ALL_ATTRIBUTES"
+    """
+
+    AWS_DYNAMODB_TABLE_COUNT = "aws.dynamodb.table_count"
+    """
+    The number of items in the `TableNames` response parameter.
+    Example: 20
+    """
+
+    AWS_DYNAMODB_TABLE_NAMES = "aws.dynamodb.table_names"
+    """
+    The names of the tables the request refers to.
+    Example: ["Users", "Cats"]
+    """
+
+    AWS_DYNAMODB_TOTAL_SEGMENTS = "aws.dynamodb.total_segments"
+    """
+    The value of the `TotalSegments` request parameter.
+    Example: 100
+    """
+
     AWS_EXTENDED_REQUEST_ID = "aws.extended_request_id"
     """
     The AWS extended request ID as returned in the response headers.
@@ -508,6 +642,12 @@ class SPANDATA:
     Example: "http.handler"
     """
 
+    DB_COLLECTION_NAME = "db.collection.name"
+    """
+    The name of a collection (table, container) within the database.
+    Example: "users"
+    """
+
     DB_MONGODB_COLLECTION = "db.mongodb.collection"
     """
     The MongoDB collection being accessed within the database.
@@ -546,6 +686,12 @@ class SPANDATA:
     Example: findAndModify, HMSET, SELECT
     """
 
+    DB_OPERATION_BATCH_SIZE = "db.operation.batch.size"
+    """
+    The number of queries included in a batch operation. Operations are only considered batches when they contain two or more operations.
+    Example: 3
+    """
+
     DB_OPERATION_NAME = "db.operation.name"
     """
     The name of the operation being executed.
@@ -560,6 +706,19 @@ class SPANDATA:
     An identifier for the database management system (DBMS) product being used.
     See: https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/semantic_conventions/database.md
     Example: postgresql
+    """
+
+    DB_QUERY_PARAMETER = "db.query.parameter"
+    """
+    Prefix for query parameter attributes. The parameter name or index is
+    appended to form the full attribute key.
+    Example: "db.query.parameter.0"
+    """
+
+    DB_QUERY_SUMMARY = "db.query.summary"
+    """
+    A shortened, low-cardinality representation of the operation(s) in the full query.
+    Example: "SELECT users"
     """
 
     DB_QUERY_TEXT = "db.query.text"
