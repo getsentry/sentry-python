@@ -2850,7 +2850,7 @@ def test_ai_client_span_responses_api_no_sensitive_data(
         "gen_ai.usage.output_tokens": 10,
         SPANDATA.GEN_AI_USAGE_REASONING_OUTPUT_TOKENS: 8,
         "gen_ai.usage.total_tokens": 30,
-        "sentry.op": "gen_ai.responses",
+        "sentry.op": OP.GEN_AI_CHAT,
         "sentry.origin": "auto.ai.openai",
     }
 
@@ -3134,7 +3134,7 @@ def test_ai_client_span_responses_api(
         "gen_ai.request.messages": safe_serialize(expected_request_messages),
         "gen_ai.request.model": "gpt-4o",
         "gen_ai.response.text": "the model response",
-        "sentry.op": "gen_ai.responses",
+        "sentry.op": OP.GEN_AI_CHAT,
         "sentry.origin": "auto.ai.openai",
     }
 
@@ -3265,7 +3265,7 @@ def test_error_in_responses_api(
     # make sure the span where the error occurred is captured
     sentry_sdk.flush()
     spans = [item.payload for item in items if item.type == "span"]
-    assert spans[0]["attributes"]["sentry.op"] == "gen_ai.responses"
+    assert spans[0]["attributes"]["sentry.op"] == "gen_ai.chat"
 
     (error_event,) = (item.payload for item in items if item.type == "event")
 
@@ -3476,7 +3476,7 @@ async def test_ai_client_span_responses_async_api(
         SPANDATA.GEN_AI_USAGE_REASONING_OUTPUT_TOKENS: 8,
         "gen_ai.usage.total_tokens": 30,
         "gen_ai.response.text": "the model response",
-        "sentry.op": "gen_ai.responses",
+        "sentry.op": OP.GEN_AI_CHAT,
         "sentry.origin": "auto.ai.openai",
     }
 
@@ -3684,9 +3684,7 @@ async def test_ai_client_span_streaming_responses_async_api(
     sentry_sdk.flush()
     spans = [item.payload for item in items]
     spans = [
-        span
-        for span in spans
-        if span["attributes"].get("sentry.op") == OP.GEN_AI_RESPONSES
+        span for span in spans if span["attributes"].get("sentry.op") == OP.GEN_AI_CHAT
     ]
 
     assert len(spans) == 1
@@ -3710,7 +3708,7 @@ async def test_ai_client_span_streaming_responses_async_api(
         "gen_ai.request.model": "gpt-4o",
         "gen_ai.response.text": "hello world",
         "sentry.environment": "production",
-        "sentry.op": "gen_ai.responses",
+        "sentry.op": OP.GEN_AI_CHAT,
         "sentry.origin": "auto.ai.openai",
     }
 
@@ -3757,7 +3755,7 @@ async def test_error_in_responses_async_api(
     # make sure the span where the error occurred is captured
     sentry_sdk.flush()
     spans = [item.payload for item in items if item.type == "span"]
-    assert spans[0]["attributes"]["sentry.op"] == "gen_ai.responses"
+    assert spans[0]["attributes"]["sentry.op"] == "gen_ai.chat"
 
     (error_event,) = (item.payload for item in items if item.type == "event")
 
@@ -3892,7 +3890,7 @@ def test_streaming_responses_api(
 
     sentry_sdk.flush()
     (span,) = (item.payload for item in items)
-    assert span["attributes"]["sentry.op"] == "gen_ai.responses"
+    assert span["attributes"]["sentry.op"] == "gen_ai.chat"
     assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "openai"
     assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
     assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
@@ -3960,7 +3958,7 @@ def test_streaming_responses_api_no_sensitive_data(
 
     sentry_sdk.flush()
     (span,) = (item.payload for item in items)
-    assert span["attributes"]["sentry.op"] == "gen_ai.responses"
+    assert span["attributes"]["sentry.op"] == "gen_ai.chat"
     assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "openai"
     assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
     assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
@@ -4028,7 +4026,7 @@ async def test_streaming_responses_api_async(
 
     sentry_sdk.flush()
     (span,) = (item.payload for item in items)
-    assert span["attributes"]["sentry.op"] == "gen_ai.responses"
+    assert span["attributes"]["sentry.op"] == "gen_ai.chat"
     assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "openai"
     assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
     assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
@@ -4096,7 +4094,7 @@ async def test_streaming_responses_api_async_no_sensitive_data(
 
     sentry_sdk.flush()
     (span,) = (item.payload for item in items)
-    assert span["attributes"]["sentry.op"] == "gen_ai.responses"
+    assert span["attributes"]["sentry.op"] == "gen_ai.chat"
     assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "openai"
     assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
     assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
@@ -4441,7 +4439,7 @@ def test_streaming_responses_api_ttft(
 
     sentry_sdk.flush()
     span = next(item.payload for item in items)
-    assert span["attributes"]["sentry.op"] == "gen_ai.responses"
+    assert span["attributes"]["sentry.op"] == "gen_ai.chat"
 
     # Verify TTFT is captured
     assert SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_CHUNK in span["attributes"]
@@ -4492,7 +4490,7 @@ async def test_streaming_responses_api_ttft_async(
 
     sentry_sdk.flush()
     span = next(item.payload for item in items)
-    assert span["attributes"]["sentry.op"] == "gen_ai.responses"
+    assert span["attributes"]["sentry.op"] == "gen_ai.chat"
 
     # Verify TTFT is captured
     assert SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_CHUNK in span["attributes"]
