@@ -20,6 +20,7 @@ class Batcher(Generic[T]):
     FLUSH_WAIT_TIME = 5.0
 
     TYPE = ""
+    CLIENT_REPORT_TYPE = ""
     CONTENT_TYPE = ""
 
     def __init__(
@@ -189,7 +190,7 @@ class Batcher(Generic[T]):
 
         self._record_lost_func(
             reason="queue_overflow",
-            data_category=self.TYPE,
+            data_category=self.CLIENT_REPORT_TYPE,
             item=envelope_item,
             quantity=1,
         )

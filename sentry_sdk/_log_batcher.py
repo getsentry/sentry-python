@@ -15,6 +15,7 @@ class LogBatcher(Batcher["Log"]):
     FLUSH_WAIT_TIME = 5.0
 
     TYPE = "log"
+    CLIENT_REPORT_TYPE = "log_item"
     CONTENT_TYPE = "application/vnd.sentry.items.log+json"
 
     @staticmethod
