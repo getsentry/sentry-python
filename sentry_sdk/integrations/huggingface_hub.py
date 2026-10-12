@@ -320,10 +320,9 @@ def _wrap_huggingface_task(f: "Callable[..., Any]", op: str) -> "Callable[..., A
                                     tokens_used = chunk.details.generated_tokens
 
                             yield chunk
-                    except Exception as e:
+                    except Exception:
                         exc_info = sys.exc_info()
                         with capture_internal_exceptions():
-                            _capture_exception(e)
                             span.__exit__(*exc_info)
                         reraise(*exc_info)
 
@@ -409,10 +408,9 @@ def _wrap_huggingface_task(f: "Callable[..., Any]", op: str) -> "Callable[..., A
                                             tool_calls = choice.delta.tool_calls
 
                             yield chunk
-                    except Exception as e:
+                    except Exception:
                         exc_info = sys.exc_info()
                         with capture_internal_exceptions():
-                            _capture_exception(e)
                             span.__exit__(*exc_info)
                         reraise(*exc_info)
 

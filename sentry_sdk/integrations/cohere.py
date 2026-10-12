@@ -267,10 +267,9 @@ def _wrap_chat(f: "Callable[..., Any]", streaming: bool) -> "Callable[..., Any]"
                                         ),
                                     )
                             yield x
-                    except Exception as e:
+                    except Exception:
                         exc_info = sys.exc_info()
                         with capture_internal_exceptions():
-                            _capture_exception(e)
                             span.__exit__(*exc_info)
                         reraise(*exc_info)
 
