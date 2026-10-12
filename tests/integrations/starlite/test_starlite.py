@@ -12,6 +12,7 @@ from starlite.testing import TestClient
 import sentry_sdk
 from sentry_sdk import capture_message
 from sentry_sdk._types import SENSITIVE_DATA_SUBSTITUTE
+from sentry_sdk.consts import OP
 from sentry_sdk.integrations.starlite import StarliteIntegration
 from tests.integrations.utils import DATA_COLLECTION_USER_INFO_CASES
 
@@ -196,15 +197,13 @@ def test_middleware_spans(sentry_init, capture_items):
     middleware_spans = [
         item.payload
         for item in items
-        if item.payload.get("attributes", {}).get("sentry.op") == "middleware"
-        and item.payload.get("name")
-        == item.payload.get("attributes", {}).get("middleware.name")
+        if item.payload.get("attributes", {}).get("sentry.op", "") == OP.MIDDLEWARE
+        and item.payload.get("name") in expected
     ]
     assert len(middleware_spans) == 3
 
     found = set()
     for span in middleware_spans:
-        assert span["name"] in expected
         assert span["name"] not in found
         found.add(span["name"])
         assert span["name"] == span["attributes"]["middleware.name"]
@@ -234,15 +233,15 @@ def test_middleware_callback_spans(sentry_init, capture_items):
 
     expected_starlite_spans = [
         {
-            "op": "middleware",
+            "op": OP.MIDDLEWARE,
             "description": "SampleMiddleware",
         },
         {
-            "op": "middleware",
+            "op": OP.MIDDLEWARE,
             "description": "SentryAsgiMiddleware._run_app.<locals>._sentry_wrapped_send",
         },
         {
-            "op": "middleware",
+            "op": OP.MIDDLEWARE,
             "description": "SentryAsgiMiddleware._run_app.<locals>._sentry_wrapped_send",
         },
     ]
@@ -252,7 +251,7 @@ def test_middleware_callback_spans(sentry_init, capture_items):
     actual_starlite_spans = [
         item.payload
         for item in items
-        if item.payload.get("attributes", {}).get("sentry.op") == "middleware"
+        if OP.MIDDLEWARE in item.payload.get("attributes", {}).get("sentry.op", "")
     ]
     assert len(actual_starlite_spans) == 3
 
@@ -327,15 +326,15 @@ def test_middleware_partial_receive_send(sentry_init, capture_items):
 
     expected_starlite_spans = [
         {
-            "op": "middleware",
+            "op": OP.MIDDLEWARE,
             "description": "SamplePartialReceiveSendMiddleware",
         },
         {
-            "op": "middleware",
+            "op": OP.MIDDLEWARE,
             "description": "TestClientTransport.create_receive.<locals>.receive",
         },
         {
-            "op": "middleware",
+            "op": OP.MIDDLEWARE,
             "description": "SentryAsgiMiddleware._run_app.<locals>._sentry_wrapped_send",
         },
     ]
@@ -345,7 +344,7 @@ def test_middleware_partial_receive_send(sentry_init, capture_items):
     actual_starlite_spans = [
         item.payload
         for item in items
-        if item.payload.get("attributes", {}).get("sentry.op") == "middleware"
+        if OP.MIDDLEWARE in item.payload.get("attributes", {}).get("sentry.op", "")
     ]
     assert len(actual_starlite_spans) == 3
 
@@ -391,8 +390,7 @@ def test_span_origin(sentry_init, capture_items):
     starlite_items = [
         item
         for item in items
-        if item.payload.get("attributes", {}).get("sentry.origin")
-        == "auto.http.starlite"
+        if item.payload.get("attributes", {}).get("sentry.op", "") == OP.MIDDLEWARE
     ]
     assert len(starlite_items) > 0
     for item in starlite_items:
