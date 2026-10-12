@@ -557,9 +557,8 @@ def test_response_trace(
     sentry_sdk.flush()
     spans = [item.payload for item in items]
 
-    assert (
-        '- sentry.op="view.response.render": name="serialize response"'
-        in render_span_tree(spans)
+    assert '- sentry.op="view.render": name="serialize response"' in render_span_tree(
+        spans
     )
 
 

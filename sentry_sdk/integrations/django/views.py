@@ -27,7 +27,7 @@ def patch_views() -> None:
         with sentry_sdk.start_span(
             name="serialize response",
             attributes={
-                "sentry.op": OP.VIEW_RESPONSE_RENDER,
+                "sentry.op": OP.VIEW_RENDER,
                 "sentry.origin": DjangoIntegration.origin,
             },
         ):
