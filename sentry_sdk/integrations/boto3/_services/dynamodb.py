@@ -94,6 +94,11 @@ _PARTIQL_LITERAL_KEYWORDS = ("true", "false", "null", "missing")
 
 _JSON_SEPARATORS = (",", ":")
 
+# https://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_AttributeValue.html
+_ATTRIBUTE_VALUE_TYPES = frozenset(
+    ("S", "N", "B", "SS", "NS", "BS", "M", "L", "NULL", "BOOL")
+)
+
 
 def _get_table_name(table: str) -> str:
     # `TableName` and the `RequestItems` keys accept a table name or a table ARN
@@ -367,18 +372,32 @@ def _get_parameter_value(parameter: "Dict[str, Any]") -> "Optional[str]":
     return json.dumps(parameter, separators=_JSON_SEPARATORS)
 
 
-def _to_attribute_value(value: "Any") -> "Dict[str, Any]":
-    """Return a value as a typed `AttributeValue`, e.g. {"S": "1"}."""
-    if isinstance(value, dict):
-        # the low-level client keeps the data type.
-        return value
-    # the resource api (`boto3.resource("dynamodb")`) parses typed values to python
-    # values in an `after-call` handler, e.g. {"N": "10"} to `Decimal("10")`; key
-    # attributes are only strings, numbers or binary.
+def _is_attribute_value(value: "Any") -> bool:
+    return (
+        isinstance(value, dict)
+        and len(value) == 1
+        and next(iter(value)) in _ATTRIBUTE_VALUE_TYPES
+    )
+
+
+def _serialize_attribute_value(value: "Any") -> "Dict[str, Any]":
+    """Return a python value as a typed `AttributeValue`, like the resource api sends it."""
+    # the resource api (`boto3.resource("dynamodb")` and its `meta.client`) takes and
+    # returns python values, and converts them from and to typed values in botocore
+    # event handlers, i.e. after the span starts and before the response is returned.
     # https://boto3.amazonaws.com/v1/documentation/api/latest/reference/customizations/dynamodb.html
     from boto3.dynamodb.types import TypeSerializer  # type: ignore[import-not-found]
 
     return TypeSerializer().serialize(value)
+
+
+def _to_attribute_value(value: "Any") -> "Dict[str, Any]":
+    """Return a key value as a typed `AttributeValue`, e.g. {"S": "1"}."""
+    # the low-level client keeps the data type; the resource api parses it, e.g.
+    # {"N": "10"} to `Decimal("10")`. key attributes are only strings, numbers or binary.
+    if isinstance(value, dict):
+        return value
+    return _serialize_attribute_value(value)
 
 
 def _get_typed_item_collection_metrics(metrics: "Any") -> "Any":
@@ -448,10 +467,19 @@ def _get_partiql_attributes(statements: "List[Dict[str, Any]]") -> "Attributes":
         len(statements) == 1
         and sentry_sdk.get_client().options["data_collection"]["database_query_data"]
     ):
-        for index, parameter in enumerate(statements[0].get("Parameters", ())):
-            value = _get_parameter_value(parameter)
-            if value is not None:
-                attributes[f"{SPANDATA.DB_QUERY_PARAMETER}.{index}"] = value
+        parameters = statements[0].get("Parameters") or ()
+        # the resource api's client takes python values (`["alex", 42]`). a python map
+        # that looks like a typed value, e.g. {"S": "x"}, is only taken as one when
+        # every parameter does.
+        typed = all(_is_attribute_value(parameter) for parameter in parameters)
+        for index, parameter in enumerate(parameters):
+            # a parameter that can't be read is skipped without affecting the others.
+            with capture_internal_exceptions():
+                value = _get_parameter_value(
+                    parameter if typed else _serialize_attribute_value(parameter)
+                )
+                if value is not None:
+                    attributes[f"{SPANDATA.DB_QUERY_PARAMETER}.{index}"] = value
 
     return attributes
 

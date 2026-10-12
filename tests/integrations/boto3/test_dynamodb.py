@@ -522,6 +522,37 @@ def test_item_collection_metrics_resource_batch(dynamodb_resource, capture_items
     )
 
 
+def test_execute_statement_resource_client(dynamodb_resource, capture_items):
+    client = dynamodb_resource.meta.client
+    require_botocore_model_fields(client, "execute_statement")
+    statement = 'SELECT * FROM "orders"."by-customer" WHERE customer = ? AND total > ?'
+    # the resource api's client takes python values instead of typed values.
+    parameters = ["alex", 42, True, None, {"city": "Ghent"}, b"\x00", {"gift"}]
+
+    span = _stubbed_resource_span(
+        dynamodb_resource,
+        capture_items,
+        "execute_statement",
+        lambda: client.execute_statement(Statement=statement, Parameters=parameters),
+        {"Items": []},
+    )
+
+    assert span["name"] == "SELECT orders"
+    attributes = span["attributes"]
+    assert attributes[SPANDATA.DB_QUERY_TEXT] == statement
+    assert attributes[SPANDATA.DB_COLLECTION_NAME] == "orders"
+    assert attributes[SPANDATA.AWS_DYNAMODB_INDEX_NAME] == "by-customer"
+    # values as the typed parameters the call sends; the binary one is omitted.
+    assert _query_parameters(attributes) == {
+        "0": "alex",
+        "1": "42",
+        "2": "true",
+        "3": "null",
+        "4": '{"M":{"city":{"S":"Ghent"}}}',
+        "6": '["gift"]',
+    }
+
+
 def test_client_error(dynamodb_client, capture_items):
     params = {"TableName": "orders", "Key": {"id": {"S": "1"}}}
 
