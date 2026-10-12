@@ -183,14 +183,14 @@ class Batcher(Generic[T]):
         return envelope
 
     def _record_lost(self, item: "T") -> None:
-        item = None
+        envelope_item = None
         with capture_internal_exceptions():
-            item = self._to_envelope_item([item])
+            envelope_item = self._to_envelope_item([item])
 
         self._record_lost_func(
             reason="queue_overflow",
             data_category=self.TYPE,
-            item=item,
+            item=envelope_item,
             quantity=1,
         )
 
