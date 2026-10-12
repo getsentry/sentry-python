@@ -5,7 +5,7 @@ from fakeredis import FakeRedis
 
 import sentry_sdk
 from sentry_sdk import capture_message
-from sentry_sdk.consts import SPANDATA
+from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.redis import RedisIntegration
 
 MOCK_CONNECTION_POOL = mock.MagicMock()
@@ -70,7 +70,7 @@ def test_pii_data_redacted(
     assert parent["name"] == "custom parent"
     assert set1["name"] == "SET 'somekey1' [Filtered]"
     assert set1["attributes"][SPANDATA.DB_QUERY_TEXT] == "SET 'somekey1' [Filtered]"
-    assert set1["attributes"]["sentry.op"] == "db.redis"
+    assert set1["attributes"]["sentry.op"] == OP.DB_QUERY
     assert set2["name"] == "SET 'somekey2' [Filtered]"
     assert set2["attributes"][SPANDATA.DB_QUERY_TEXT] == "SET 'somekey2' [Filtered]"
     assert get["name"] == "GET 'somekey2'"
@@ -117,7 +117,7 @@ def test_data_collection_database_query_data(
     assert parent["name"] == "custom parent"
     assert set_span["name"] == expected_description
     assert set_span["attributes"][SPANDATA.DB_QUERY_TEXT] == expected_description
-    assert set_span["attributes"]["sentry.op"] == "db.redis"
+    assert set_span["attributes"]["sentry.op"] == OP.DB_QUERY
 
 
 def test_no_data_truncation_by_default(sentry_init, capture_items):
@@ -147,7 +147,7 @@ def test_no_data_truncation_by_default(sentry_init, capture_items):
     assert (
         set1["attributes"][SPANDATA.DB_QUERY_TEXT] == f"SET 'somekey1' '{long_string}'"
     )
-    assert set1["attributes"]["sentry.op"] == "db.redis"
+    assert set1["attributes"]["sentry.op"] == OP.DB_QUERY
     assert set2["name"] == f"SET 'somekey2' '{short_string}'"
     assert (
         set2["attributes"][SPANDATA.DB_QUERY_TEXT] == f"SET 'somekey2' '{short_string}'"
@@ -219,7 +219,7 @@ def test_db_connection_attributes_client(sentry_init, capture_items):
     assert parent_span["name"] == "custom parent"
     assert redis_span["name"] == "GET 'foobar'"
     attrs = redis_span["attributes"]
-    assert attrs["sentry.op"] == "db.redis"
+    assert attrs["sentry.op"] == OP.DB_QUERY
     assert attrs[SPANDATA.DB_QUERY_TEXT] == "GET 'foobar'"
     assert attrs[SPANDATA.DB_SYSTEM_NAME] == "redis"
     assert attrs[SPANDATA.DB_DRIVER_NAME] == "redis-py"
@@ -252,7 +252,7 @@ def test_db_connection_attributes_pipeline(sentry_init, capture_items):
     assert parent_span["name"] == "custom parent"
     assert pipeline_span["name"] == "redis.pipeline.execute"
     attrs = pipeline_span["attributes"]
-    assert attrs["sentry.op"] == "db.redis"
+    assert attrs["sentry.op"] == OP.DB_QUERY
     assert attrs[SPANDATA.DB_SYSTEM_NAME] == "redis"
     assert attrs[SPANDATA.DB_DRIVER_NAME] == "redis-py"
     assert attrs[SPANDATA.DB_NAMESPACE] == "1"

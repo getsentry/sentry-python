@@ -1334,6 +1334,7 @@ class OP:
     DB = "db"
     DB_CURSOR_ITERATOR = "db.cursor.iter"
     DB_CURSOR_FETCH = "db.cursor.fetch"
+    DB_QUERY = "db.query"
     DB_REDIS = "db.redis"
     EVENT_DJANGO = "event.django"
     FUNCTION = "function"

@@ -5,7 +5,7 @@ import redis
 
 import sentry_sdk
 from sentry_sdk import capture_message
-from sentry_sdk.consts import SPANDATA
+from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.redis import RedisIntegration
 
 
@@ -94,7 +94,7 @@ def test_rediscluster_basic(
     span = redis_spans[-1]
     assert span["name"] == description
     attrs = span["attributes"]
-    assert attrs["sentry.op"] == "db.redis"
+    assert attrs["sentry.op"] == OP.DB_QUERY
     assert attrs[SPANDATA.DB_SYSTEM_NAME] == "redis"
     assert attrs[SPANDATA.DB_DRIVER_NAME] == "redis-py"
     # ClusterNode converts localhost to 127.0.0.1
@@ -132,7 +132,7 @@ def test_rediscluster_pipeline(sentry_init, capture_items):
     pipeline_span = redis_spans[-1]
     assert pipeline_span["name"] == "redis.pipeline.execute"
     attrs = pipeline_span["attributes"]
-    assert attrs["sentry.op"] == "db.redis"
+    assert attrs["sentry.op"] == OP.DB_QUERY
     assert attrs[SPANDATA.DB_SYSTEM_NAME] == "redis"
     assert attrs[SPANDATA.DB_DRIVER_NAME] == "redis-py"
     # ClusterNode converts localhost to 127.0.0.1

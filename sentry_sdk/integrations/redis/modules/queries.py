@@ -23,7 +23,7 @@ def _compile_db_span_properties(
     description = _get_db_span_description(integration, redis_command, args)
 
     properties = {
-        "op": OP.DB_REDIS,
+        "op": OP.DB_QUERY,
         "description": description,
     }
 
