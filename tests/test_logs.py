@@ -889,12 +889,12 @@ def test_reentrant_add_does_not_deadlock(sentry_init, capture_envelopes):
     reentrant_add_called = False
     original_add_to_envelope = batcher._add_to_envelope
 
-    def add_to_envelope_with_reentrant_add(envelope):
+    def add_to_envelope_with_reentrant_add(envelope, items):
         nonlocal reentrant_add_called
         # Simulate a GC warning routing back into add() during flush
         batcher.add({"fake": "log"})
         reentrant_add_called = True
-        original_add_to_envelope(envelope)
+        original_add_to_envelope(envelope, items)
 
     batcher._add_to_envelope = add_to_envelope_with_reentrant_add
 
@@ -904,6 +904,29 @@ def test_reentrant_add_does_not_deadlock(sentry_init, capture_envelopes):
     assert reentrant_add_called
     # If the re-entrancy guard didn't work, this test would hang and it'd
     # eventually be timed out by pytest-timeout
+
+
+def test_flush_serializes_outside_the_lock(sentry_init, capture_envelopes):
+    """Regression for https://github.com/getsentry/sentry-python/issues/7775."""
+    sentry_init()
+    capture_envelopes()
+
+    client = sentry_sdk.get_client()
+    batcher = client.log_batcher
+
+    lock_held_while_serializing = []
+    original_to_transport_format = batcher._to_transport_format
+
+    def record_lock_state(item):
+        lock_held_while_serializing.append(batcher._lock.locked())
+        return original_to_transport_format(item)
+
+    batcher._to_transport_format = record_lock_state
+
+    sentry_sdk.logger.warning("test log")
+    client.flush()
+
+    assert lock_held_while_serializing == [False]
 
 
 @pytest.mark.skipif(
