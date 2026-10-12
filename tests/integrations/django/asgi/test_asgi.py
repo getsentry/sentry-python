@@ -271,7 +271,7 @@ async def test_async_middleware_spans(
 
     # Filter out signal-receiver spans — their ordering depends on Django
     # module import order and is not what this middleware test verifies.
-    spans = [s for s in spans if s["attributes"].get("sentry.op") != "event.django"]
+    spans = [s for s in spans if s["attributes"].get("sentry.op") != "function"]
 
     assert (
         render_span_tree(spans)

@@ -1572,15 +1572,15 @@ def test_signals_spans(
         render_span_tree(spans)
         == """\
 - sentry.op="http.server": name="/message"
-  - sentry.op="event.django": name="django.db.reset_queries"
-  - sentry.op="event.django": name="django.db.close_old_connections"\
+  - sentry.op="function": name="django.db.reset_queries"
+  - sentry.op="function": name="django.db.close_old_connections"\
 """
     )
 
-    assert spans[0]["attributes"]["sentry.op"] == "event.django"
+    assert spans[0]["attributes"]["sentry.op"] == "function"
     assert spans[0]["name"] == "django.db.reset_queries"
 
-    assert spans[1]["attributes"]["sentry.op"] == "event.django"
+    assert spans[1]["attributes"]["sentry.op"] == "function"
     assert spans[1]["name"] == "django.db.close_old_connections"
 
 
@@ -1636,19 +1636,19 @@ def test_signals_spans_filtering(
         render_span_tree(spans)
         == """\
 - sentry.op="http.server": name="/send-myapp-custom-signal"
-  - sentry.op="event.django": name="django.db.reset_queries"
-  - sentry.op="event.django": name="django.db.close_old_connections"
-  - sentry.op="event.django": name="tests.integrations.django.myapp.signals.signal_handler"\
+  - sentry.op="function": name="django.db.reset_queries"
+  - sentry.op="function": name="django.db.close_old_connections"
+  - sentry.op="function": name="tests.integrations.django.myapp.signals.signal_handler"\
 """
     )
 
-    assert spans[0]["attributes"]["sentry.op"] == "event.django"
+    assert spans[0]["attributes"]["sentry.op"] == "function"
     assert spans[0]["name"] == "django.db.reset_queries"
 
-    assert spans[1]["attributes"]["sentry.op"] == "event.django"
+    assert spans[1]["attributes"]["sentry.op"] == "function"
     assert spans[1]["name"] == "django.db.close_old_connections"
 
-    assert spans[2]["attributes"]["sentry.op"] == "event.django"
+    assert spans[2]["attributes"]["sentry.op"] == "function"
     assert spans[2]["name"] == "tests.integrations.django.myapp.signals.signal_handler"
 
 
@@ -1794,7 +1794,7 @@ def test_span_origin(
 
     for span in spans:
         assert span["attributes"]["sentry.origin"] == "auto.http.django"
-        if span["attributes"]["sentry.op"] == "event.django":
+        if span["attributes"]["sentry.op"] == "function":
             signal_span_found = True
 
     assert signal_span_found
