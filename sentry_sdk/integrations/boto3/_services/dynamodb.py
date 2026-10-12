@@ -52,24 +52,33 @@ _RESPONSE_ATTRIBUTES: "Sequence[_AttributeSpec]" = (
     ("ScannedCount", SPANDATA.AWS_DYNAMODB_SCANNED_COUNT),
 )
 
-# a partiql statement addresses one table, optionally double-quoted and followed by
-# an index (`"orders"."by-customer"`), which is not part of the match.
+# a partiql statement addresses one table, optionally double-quoted. a select can
+# read from an index of that table (`"orders"."by-customer"`).
 # https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/ql-reference.select.html
 _PARTIQL_TABLE = r'(?:"(?P<quoted>[^"]+)"|(?P<bare>[A-Za-z_][A-Za-z0-9_]*))'
+_PARTIQL_INDEX = (
+    r'(?:\s*\.\s*(?:"(?P<quoted_index>[^"]+)"|(?P<bare_index>[A-Za-z_][A-Za-z0-9_]*)))?'
+)
 
 # maps the query summary operation to the statement forms that name their table.
 # `EXISTS` only occurs in `ExecuteTransaction`.
 # https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/ql-reference.statements.html
 # https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/ql-functions.exists.html
 _PARTIQL_STATEMENTS = (
-    ("SELECT", re.compile(r"\s*SELECT\b.*?\bFROM\s+" + _PARTIQL_TABLE, re.I | re.S)),
+    (
+        "SELECT",
+        re.compile(
+            r"\s*SELECT\b.*?\bFROM\s+" + _PARTIQL_TABLE + _PARTIQL_INDEX, re.I | re.S
+        ),
+    ),
     ("INSERT", re.compile(r"\s*INSERT\s+INTO\s+" + _PARTIQL_TABLE, re.I)),
     ("UPDATE", re.compile(r"\s*UPDATE\s+" + _PARTIQL_TABLE, re.I)),
     ("DELETE", re.compile(r"\s*DELETE\s+FROM\s+" + _PARTIQL_TABLE, re.I)),
     (
         "EXISTS",
         re.compile(
-            r"\s*EXISTS\s*\(\s*SELECT\b.*?\bFROM\s+" + _PARTIQL_TABLE, re.I | re.S
+            r"\s*EXISTS\s*\(\s*SELECT\b.*?\bFROM\s+" + _PARTIQL_TABLE + _PARTIQL_INDEX,
+            re.I | re.S,
         ),
     ),
 )
@@ -155,13 +164,20 @@ def _get_partiql_statements(
     return None
 
 
-def _parse_partiql_statement(statement: str) -> "Optional[Tuple[str, str]]":
-    """Return the query summary operation and table of a statement, or `None` if not recognized."""
+def _parse_partiql_statement(
+    statement: str,
+) -> "Optional[Tuple[str, str, Optional[str]]]":
+    """Return the query summary operation, table and index of a statement, or `None` if not recognized."""
     statement = _strip_partiql_comments(statement)
     for operation, pattern in _PARTIQL_STATEMENTS:
         match = pattern.match(statement)
         if match is not None:
-            return operation, match.group("quoted") or match.group("bare")
+            groups = match.groupdict()
+            return (
+                operation,
+                groups["quoted"] or groups["bare"],
+                groups.get("quoted_index") or groups.get("bare_index"),
+            )
     return None
 
 
@@ -368,13 +384,23 @@ def _get_partiql_attributes(statements: "List[Dict[str, Any]]") -> "Attributes":
     recognized_statements = [
         parsed for parsed in parsed_statements if parsed is not None
     ]
+    all_recognized = len(recognized_statements) == len(statements)
     # a batch only has a summary when every statement shares the same one.
-    summaries = {f"{operation} {table}" for operation, table in recognized_statements}
-    if len(recognized_statements) == len(statements) and len(summaries) == 1:
+    summaries = {
+        f"{operation} {table}" for operation, table, _ in recognized_statements
+    }
+    if all_recognized and len(summaries) == 1:
         attributes[SPANDATA.DB_QUERY_SUMMARY] = summaries.pop()
 
+    # like `IndexName` of `Query` and `Scan`, when every statement reads the same index.
+    indexes = {(table, index) for _, table, index in recognized_statements}
+    if all_recognized and len(indexes) == 1:
+        ((_, index),) = indexes
+        if index is not None:
+            attributes[SPANDATA.AWS_DYNAMODB_INDEX_NAME] = index
+
     attributes.update(
-        _get_table_attributes(table for _, table in recognized_statements)
+        _get_table_attributes(table for _, table, _ in recognized_statements)
     )
 
     # parameters are database content, and only set for a single statement.

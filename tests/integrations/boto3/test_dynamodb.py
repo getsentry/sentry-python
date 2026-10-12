@@ -513,6 +513,62 @@ def test_execute_statement_parameters(
     assert SPANDATA.DB_OPERATION_BATCH_SIZE not in attributes
 
 
+@pytest.mark.parametrize(
+    "method,params,expected_index",
+    [
+        pytest.param(
+            "execute_statement",
+            {"Statement": 'SELECT * FROM "orders"."by-customer" WHERE customer = ?'},
+            "by-customer",
+            id="quoted",
+        ),
+        pytest.param(
+            "execute_statement",
+            {"Statement": "select * from orders . by_status where status = ?"},
+            "by_status",
+            id="bare",
+        ),
+        pytest.param(
+            "execute_statement",
+            {"Statement": 'SELECT * FROM "orders" WHERE "orders".id = ?'},
+            None,
+            id="table",
+        ),
+        pytest.param(
+            "batch_execute_statement",
+            {
+                "Statements": [
+                    {"Statement": 'SELECT * FROM "orders"."by-status" WHERE s = ?'},
+                    {"Statement": 'SELECT * FROM "orders"."by-status" WHERE s = ?'},
+                ]
+            },
+            "by-status",
+            id="batch-same-index",
+        ),
+        pytest.param(
+            "batch_execute_statement",
+            {
+                "Statements": [
+                    {"Statement": 'SELECT * FROM "orders"."by-status" WHERE s = ?'},
+                    {"Statement": 'SELECT * FROM "orders" WHERE id = ?'},
+                ]
+            },
+            None,
+            id="batch-different-index",
+        ),
+    ],
+)
+def test_partiql_index(dynamodb_client, capture_items, method, params, expected_index):
+    require_botocore_model_fields(dynamodb_client, method)
+    response = {"Items": []} if method == "execute_statement" else {"Responses": []}
+
+    span = _stubbed_span(dynamodb_client, capture_items, method, params, response)
+
+    attributes = span["attributes"]
+    assert attributes.get(SPANDATA.AWS_DYNAMODB_INDEX_NAME) == expected_index
+    assert attributes[SPANDATA.DB_COLLECTION_NAME] == "orders"
+
+
 def test_execute_statement_parameters_with_comment(dynamodb_client, capture_items):
     require_botocore_model_fields(dynamodb_client, "execute_statement")
     statement = '/* order lookup */ SELECT * FROM "orders" WHERE id = ? -- don\'t cache'
