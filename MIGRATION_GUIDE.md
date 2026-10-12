@@ -37,6 +37,12 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 - We now don't suppress chained exceptions in the ASGI and asyncio integrations by default. The related `suppress_asgi_chained_exceptions` experimental option was removed.
 - In the AWS Lambda and GCP integrations, the text of the message of the warning the SDK optionally emits if a function is about to time out has changed.
 
+#### Span operation consolidation
+
+Span ops are now a smaller, framework-neutral set.
+
+- The Cohere integration now emits `gen_ai.chat` instead of `ai.chat_completions.create.cohere`, and `gen_ai.embeddings` instead of `ai.embeddings.create.cohere`.
+
 #### Django
 
 - The Django integration now creates spans for cache operations by default. Pass `DjangoIntegration(cache_spans=False)` to `sentry_sdk.init()` to turn them off.
