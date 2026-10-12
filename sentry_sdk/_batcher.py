@@ -191,12 +191,13 @@ class Batcher(Generic[T]):
         with capture_internal_exceptions():
             envelope_item = self._to_envelope_item([item])
 
-        self._record_lost_func(
-            reason="queue_overflow",
-            data_category=self.CLIENT_REPORT_TYPE,
-            item=envelope_item,
-            quantity=1,
-        )
+        if envelope_item:
+            self._record_lost_func(
+                reason="queue_overflow",
+                data_category=self.CLIENT_REPORT_TYPE,
+                item=envelope_item,
+                quantity=1,
+            )
 
     @staticmethod
     def _to_transport_format(item: "T") -> "Any":
