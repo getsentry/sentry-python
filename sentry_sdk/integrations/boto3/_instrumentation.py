@@ -14,6 +14,7 @@ from sentry_sdk.integrations.boto3.consts import (
 from sentry_sdk.traces import BAGGAGE_HEADER_NAME, NoOpSpan, Span
 from sentry_sdk.tracing_utils import (
     add_http_breadcrumb,
+    add_query_source,
     add_sentry_baggage_to_headers,
     get_url_attributes,
     should_propagate_trace,
@@ -39,6 +40,12 @@ except ImportError:
 
 
 def _finish_span(span: "Span", error: "Optional[BaseException]" = None) -> None:
+    # like the sql integrations, add the calling code location to slow `db` spans
+    # (`db_query_source_threshold_ms`).
+    with capture_internal_exceptions():
+        if span.get_attributes().get(SPANDATA.SENTRY_OP) == OP.DB:
+            add_query_source(span)
+
     with capture_internal_exceptions():
         if error is None:
             span.end()

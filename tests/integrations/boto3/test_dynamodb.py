@@ -730,6 +730,41 @@ def test_execute_transaction(dynamodb_client, capture_items):
     assert _query_parameters(attributes) == {}
 
 
+@pytest.mark.parametrize(
+    "options,expected",
+    [
+        pytest.param({"db_query_source_threshold_ms": 0}, True, id="enabled"),
+        pytest.param(
+            {"db_query_source_threshold_ms": 0, "enable_db_query_source": False},
+            False,
+            id="disabled",
+        ),
+        pytest.param({"db_query_source_threshold_ms": 60_000}, False, id="fast-call"),
+    ],
+)
+def test_query_source(dynamodb_client, sentry_init, capture_items, options, expected):
+    sentry_init(traces_sample_rate=1.0, integrations=[Boto3Integration()], **options)
+
+    span = _stubbed_span(
+        dynamodb_client,
+        capture_items,
+        "get_item",
+        {"TableName": "orders", "Key": {"id": {"S": "1"}}},
+        {},
+    )
+
+    attributes = span["attributes"]
+    if expected:
+        # the first in-app frame: the lambda in `_stubbed_span()` that calls the client.
+        assert attributes[SPANDATA.CODE_FILE_PATH].endswith("test_dynamodb.py")
+        assert attributes[SPANDATA.CODE_FUNCTION] == "<lambda>"
+        assert SPANDATA.CODE_LINE_NUMBER in attributes
+        assert SPANDATA.CODE_NAMESPACE in attributes
+    else:
+        assert SPANDATA.CODE_FILE_PATH not in attributes
+        assert SPANDATA.CODE_FUNCTION not in attributes
+
+
 def test_database_query_data_disabled(dynamodb_client, sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
