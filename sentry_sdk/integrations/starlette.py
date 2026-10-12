@@ -173,11 +173,11 @@ def _enable_span_for_middleware(
                 },
             )
 
-        with _start_middleware_span(op=OP.MIDDLEWARE_STARLETTE, name=middleware_name):
+        with _start_middleware_span(op=OP.MIDDLEWARE, name=middleware_name):
             # Creating spans for the "receive" callback
             async def _sentry_receive(*args: "Any", **kwargs: "Any") -> "Any":
                 with _start_middleware_span(
-                    op=OP.MIDDLEWARE_STARLETTE_RECEIVE,
+                    op=OP.MIDDLEWARE,
                     name=getattr(receive, "__qualname__", str(receive)),
                 ):
                     return await receive(*args, **kwargs)
@@ -189,7 +189,7 @@ def _enable_span_for_middleware(
             # Creating spans for the "send" callback
             async def _sentry_send(*args: "Any", **kwargs: "Any") -> "Any":
                 with _start_middleware_span(
-                    op=OP.MIDDLEWARE_STARLETTE_SEND,
+                    op=OP.MIDDLEWARE,
                     name=getattr(send, "__qualname__", str(send)),
                 ):
                     return await send(*args, **kwargs)

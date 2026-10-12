@@ -25,7 +25,7 @@ except ImportError:
 import sentry_sdk
 from sentry_sdk import capture_exception, capture_message
 from sentry_sdk._compat import PY310
-from sentry_sdk.consts import SPANDATA
+from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.django import (
     DjangoIntegration,
     DjangoRequestExtractor,
@@ -557,9 +557,8 @@ def test_response_trace(
     sentry_sdk.flush()
     spans = [item.payload for item in items]
 
-    assert (
-        '- sentry.op="view.response.render": name="serialize response"'
-        in render_span_tree(spans)
+    assert '- sentry.op="view.render": name="serialize response"' in render_span_tree(
+        spans
     )
 
 
@@ -1260,7 +1259,7 @@ def test_rest_framework_authentication_span(
         render_span_tree(spans)
         == """\
 - sentry.op="http.server": name="/rest-authenticated-hello"
-  - sentry.op="view.authenticate": name="authenticate"\
+  - sentry.op="view": name="authenticate"\
 """
     )
 
@@ -1499,25 +1498,25 @@ def test_middleware_spans(
     if DJANGO_VERSION >= (1, 10):
         EXPECTED_MIDDLEWARE_SPANS = """\
 - sentry.op="http.server": name="/message"
-  - sentry.op="middleware.django": name="django.contrib.sessions.middleware.SessionMiddleware.__call__"
-    - sentry.op="middleware.django": name="django.contrib.auth.middleware.AuthenticationMiddleware.__call__"
-      - sentry.op="middleware.django": name="django.middleware.csrf.CsrfViewMiddleware.__call__"
-        - sentry.op="middleware.django": name="tests.integrations.django.myapp.settings.TestMiddleware.__call__"
-          - sentry.op="middleware.django": name="tests.integrations.django.myapp.settings.TestFunctionMiddleware.__call__"
-            - sentry.op="middleware.django": name="django.middleware.csrf.CsrfViewMiddleware.process_view"
+  - sentry.op="middleware": name="django.contrib.sessions.middleware.SessionMiddleware.__call__"
+    - sentry.op="middleware": name="django.contrib.auth.middleware.AuthenticationMiddleware.__call__"
+      - sentry.op="middleware": name="django.middleware.csrf.CsrfViewMiddleware.__call__"
+        - sentry.op="middleware": name="tests.integrations.django.myapp.settings.TestMiddleware.__call__"
+          - sentry.op="middleware": name="tests.integrations.django.myapp.settings.TestFunctionMiddleware.__call__"
+            - sentry.op="middleware": name="django.middleware.csrf.CsrfViewMiddleware.process_view"
             - sentry.op="view.render": name="message"\
 """
     else:
         EXPECTED_MIDDLEWARE_SPANS = """\
 - sentry.op="http.server": name="/message"
-  - sentry.op="middleware.django": name="django.contrib.sessions.middleware.SessionMiddleware.process_request"
-  - sentry.op="middleware.django": name="django.contrib.auth.middleware.AuthenticationMiddleware.process_request"
-  - sentry.op="middleware.django": name="tests.integrations.django.myapp.settings.TestMiddleware.process_request"
-  - sentry.op="middleware.django": name="django.middleware.csrf.CsrfViewMiddleware.process_view"
+  - sentry.op="middleware": name="django.contrib.sessions.middleware.SessionMiddleware.process_request"
+  - sentry.op="middleware": name="django.contrib.auth.middleware.AuthenticationMiddleware.process_request"
+  - sentry.op="middleware": name="tests.integrations.django.myapp.settings.TestMiddleware.process_request"
+  - sentry.op="middleware": name="django.middleware.csrf.CsrfViewMiddleware.process_view"
   - sentry.op="view.render": name="message"
-  - sentry.op="middleware.django": name="tests.integrations.django.myapp.settings.TestMiddleware.process_response"
-  - sentry.op="middleware.django": name="django.middleware.csrf.CsrfViewMiddleware.process_response"
-  - sentry.op="middleware.django": name="django.contrib.sessions.middleware.SessionMiddleware.process_response"\
+  - sentry.op="middleware": name="tests.integrations.django.myapp.settings.TestMiddleware.process_response"
+  - sentry.op="middleware": name="django.middleware.csrf.CsrfViewMiddleware.process_response"
+  - sentry.op="middleware": name="django.contrib.sessions.middleware.SessionMiddleware.process_response"\
 """
     assert render_span_tree(spans) == EXPECTED_MIDDLEWARE_SPANS
 
@@ -1572,15 +1571,15 @@ def test_signals_spans(
         render_span_tree(spans)
         == """\
 - sentry.op="http.server": name="/message"
-  - sentry.op="event.django": name="django.db.reset_queries"
-  - sentry.op="event.django": name="django.db.close_old_connections"\
+  - sentry.op="function": name="django.db.reset_queries"
+  - sentry.op="function": name="django.db.close_old_connections"\
 """
     )
 
-    assert spans[0]["attributes"]["sentry.op"] == "event.django"
+    assert spans[0]["attributes"]["sentry.op"] == OP.FUNCTION
     assert spans[0]["name"] == "django.db.reset_queries"
 
-    assert spans[1]["attributes"]["sentry.op"] == "event.django"
+    assert spans[1]["attributes"]["sentry.op"] == OP.FUNCTION
     assert spans[1]["name"] == "django.db.close_old_connections"
 
 
@@ -1636,19 +1635,19 @@ def test_signals_spans_filtering(
         render_span_tree(spans)
         == """\
 - sentry.op="http.server": name="/send-myapp-custom-signal"
-  - sentry.op="event.django": name="django.db.reset_queries"
-  - sentry.op="event.django": name="django.db.close_old_connections"
-  - sentry.op="event.django": name="tests.integrations.django.myapp.signals.signal_handler"\
+  - sentry.op="function": name="django.db.reset_queries"
+  - sentry.op="function": name="django.db.close_old_connections"
+  - sentry.op="function": name="tests.integrations.django.myapp.signals.signal_handler"\
 """
     )
 
-    assert spans[0]["attributes"]["sentry.op"] == "event.django"
+    assert spans[0]["attributes"]["sentry.op"] == OP.FUNCTION
     assert spans[0]["name"] == "django.db.reset_queries"
 
-    assert spans[1]["attributes"]["sentry.op"] == "event.django"
+    assert spans[1]["attributes"]["sentry.op"] == OP.FUNCTION
     assert spans[1]["name"] == "django.db.close_old_connections"
 
-    assert spans[2]["attributes"]["sentry.op"] == "event.django"
+    assert spans[2]["attributes"]["sentry.op"] == OP.FUNCTION
     assert spans[2]["name"] == "tests.integrations.django.myapp.signals.signal_handler"
 
 
@@ -1794,7 +1793,7 @@ def test_span_origin(
 
     for span in spans:
         assert span["attributes"]["sentry.origin"] == "auto.http.django"
-        if span["attributes"]["sentry.op"] == "event.django":
+        if span["attributes"]["sentry.op"] == OP.FUNCTION:
             signal_span_found = True
 
     assert signal_span_found

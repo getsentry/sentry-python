@@ -7,7 +7,7 @@ from sentry_sdk.integrations import Integration
 
 if MYPY:
     from socket import AddressFamily, SocketKind
-    from typing import List, Optional, Tuple, Union
+    from typing import List, Literal, Optional, Tuple, Union
 
 __all__ = ["SocketIntegration"]
 
@@ -86,7 +86,7 @@ def _patch_getaddrinfo() -> None:
         type: int = 0,
         proto: int = 0,
         flags: int = 0,
-    ) -> "List[Tuple[AddressFamily, SocketKind, int, str, Union[Tuple[str, int], Tuple[str, int, int, int], Tuple[int, bytes]]]]":
+    ) -> "List[Tuple[Literal[AddressFamily.AF_INET], SocketKind, int, str, Tuple[str, int]] | Tuple[Literal[AddressFamily.AF_INET6], SocketKind, int, str, Union[Tuple[str, int, int, int], Tuple[int, bytes]]]]":
         client = sentry_sdk.get_client()
         integration = client.get_integration(SocketIntegration)
         if integration is None:
