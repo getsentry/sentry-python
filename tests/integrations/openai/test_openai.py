@@ -1,4 +1,5 @@
 import json
+import warnings
 
 import pytest
 
@@ -45,6 +46,11 @@ try:
     from openai.types.shared_params import FunctionDefinition
 except ImportError:
     pass
+
+try:
+    from pydantic.warnings import PydanticDeprecatedSince20
+except ImportError:
+    PydanticDeprecatedSince20 = None
 
 SKIP_RESPONSES_TESTS = False
 
@@ -6246,6 +6252,74 @@ def test_responses_api_data_collection_outputs_shapes(
         assert "get_current_weather" in span_data[SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS]
     else:
         assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in span_data
+
+
+@pytest.mark.parametrize(
+    "data_collection,send_default_pii",
+    [
+        pytest.param({"gen_ai": {"outputs": True}}, False, id="data-collection"),
+        pytest.param(None, True, id="send-default-pii"),
+    ],
+)
+@pytest.mark.skipif(SKIP_RESPONSES_TESTS, reason="Responses API not available")
+@pytest.mark.skipif(
+    PydanticDeprecatedSince20 is None,
+    reason="Pydantic v1 does not deprecate `dict()`",
+)
+def test_responses_api_output_serialization_emits_no_pydantic_deprecation_warning(
+    sentry_init,
+    capture_events,
+    capture_items,
+    data_collection,
+    send_default_pii,
+):
+    init_kwargs = {
+        "integrations": [OpenAIIntegration()],
+        "disabled_integrations": [StdlibIntegration],
+        "traces_sample_rate": 1.0,
+        "send_default_pii": send_default_pii,
+        "stream_gen_ai_spans": False,
+    }
+    if data_collection is not None:
+        init_kwargs["data_collection"] = data_collection
+
+    sentry_init(**init_kwargs)
+
+    client = OpenAI(api_key="z")
+    client.responses._post = mock.Mock(
+        return_value=_make_responses_api_response(
+            output=[
+                _make_responses_api_output_message(
+                    content=[
+                        ResponseOutputRefusal(
+                            refusal="I cannot help with that.",
+                            type="refusal",
+                        ),
+                    ]
+                ),
+                _make_responses_api_function_call(),
+            ]
+        )
+    )
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        span_data = _collect_responses_span_data(
+            capture_events,
+            capture_items,
+            False,
+            False,
+            lambda: client.responses.create(model="gpt-4o", input="hello"),
+        )
+
+    assert not [
+        warning
+        for warning in caught
+        if issubclass(warning.category, PydanticDeprecatedSince20)
+    ]
+
+    assert "I cannot help with that." in span_data[SPANDATA.GEN_AI_RESPONSE_TEXT]
+    assert "get_current_weather" in span_data[SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS]
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
