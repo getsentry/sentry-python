@@ -610,3 +610,56 @@ def test_normalize_data_with_pydantic_class():
     # Test with dict containing class
     result = _normalize_data({"schema": TestClass, "count": 5})
     assert result == {"schema": "<ClassType: TestClass>", "count": 5}
+
+
+def test_safe_repr_truncates_pathological_repr():
+    """Regression for #6649 — safe_repr must not spend seconds / megabytes
+    materialising a huge repr. A hostile __repr__ returning 10 MiB of
+    characters must be bounded by SAFE_REPR_MAX_CHARS.
+    """
+    from sentry_sdk.utils import SAFE_REPR_MAX_CHARS
+
+    class _Pathological:
+        """Mimics FastAPI _IncludedRouter: a repr that materialises a huge
+        string (~10 MiB). The real-world value was ~117 MiB per router per
+        frame, with 8 nested frames per request — ~15-20s event-loop stall.
+        """
+
+        def __repr__(self):
+            return "x" * (10 * 1024 * 1024)  # 10 MiB
+
+    result = safe_repr(_Pathological())
+    assert len(result) <= SAFE_REPR_MAX_CHARS + len("...<truncated repr>")
+    assert result.endswith("...<truncated repr>")
+
+
+def test_safe_repr_small_repr_unchanged():
+    """Values whose repr fits comfortably within the cap must be returned
+    exactly as before (no truncation marker, no behaviour change)."""
+    assert safe_repr(123) == "123"
+    assert safe_repr("hello") == "'hello'"
+    assert safe_repr([1, 2, 3]) == "[1, 2, 3]"
+
+
+def test_safe_repr_opt_in_unbounded():
+    """Callers that explicitly want the historical unbounded behaviour
+    (eg. tests, or callers that supply their own downstream cap) can pass
+    max_chars=None to disable the guard."""
+    from sentry_sdk.utils import SAFE_REPR_MAX_CHARS
+
+    big = "y" * (SAFE_REPR_MAX_CHARS + 1000)
+    result = safe_repr(big, max_chars=None)
+    # repr adds surrounding quotes, so len is >= original length
+    assert len(result) >= len(big)
+    assert "<truncated repr>" not in result
+
+
+def test_safe_repr_broken_still_graceful():
+    """A __repr__ that raises must still return the historical sentinel
+    rather than propagating."""
+
+    class _Broken:
+        def __repr__(self):
+            raise RuntimeError("boom")
+
+    assert safe_repr(_Broken()) == "<broken repr>"

@@ -553,11 +553,47 @@ def safe_str(value: "Any") -> str:
         return safe_repr(value)
 
 
-def safe_repr(value: "Any") -> str:
+#: Hard upper bound on the number of characters we will materialize from a
+#: single object's repr before truncating. This exists so that an object whose
+#: ``__repr__`` happens to walk a large graph (eg. a FastAPI ``_IncludedRouter``
+#: traversing nested routers, or any domain object with an expensive repr)
+#: cannot pin an event loop for seconds while we build a string we will
+#: immediately truncate anyway (issue #6649).
+#:
+#: The downstream serializer still truncates to ``max_value_length`` (default
+#: 1024 chars), so values larger than that bound are already discarded; the
+#: issue is just the CPU + memory cost of building them. Keeping this cap
+#: comfortably above the default ``max_value_length`` means normal values are
+#: unaffected, and only the pathological "repr materialises hundreds of MiB"
+#: case is cut short.
+SAFE_REPR_MAX_CHARS = 100_000
+
+
+def safe_repr(value: "Any", max_chars: "Optional[int]" = SAFE_REPR_MAX_CHARS) -> str:
+    """Return ``repr(value)``, with belt-and-braces guards so a hostile
+    ``__repr__`` cannot:
+
+    1. Raise through us (returns ``"<broken repr>"`` instead).
+    2. Burn seconds / gigabytes materialising a huge string that the serializer
+       is about to truncate anyway. If ``max_chars`` is not ``None`` and the
+       repr grows past it, we stop pulling characters as soon as the cap is
+       exceeded and append a truncation marker. Passing ``max_chars=None``
+       preserves the original unbounded behaviour.
+
+    See :data:`SAFE_REPR_MAX_CHARS` for the rationale.
+    """
+    if max_chars is None:
+        try:
+            return repr(value)
+        except Exception:
+            return "<broken repr>"
     try:
-        return repr(value)
+        full = repr(value)
     except Exception:
         return "<broken repr>"
+    if len(full) <= max_chars:
+        return full
+    return full[:max_chars] + "...<truncated repr>"
 
 
 def filename_for_module(
