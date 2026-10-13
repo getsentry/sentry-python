@@ -63,7 +63,7 @@ if IS_MCP_V2:
         TextResourceContents,
     )
 else:
-    from mcp.types import GetPromptResult, PromptMessage, TextContent
+    from mcp.types import CallToolResult, GetPromptResult, PromptMessage, TextContent
 
 from mcp.server.sse import SseServerTransport
 from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
@@ -786,6 +786,51 @@ async def test_tool_handler_with_error(
 
         assert span["status"] == "internal_error"
         assert span["tags"]["status"] == "internal_error"
+
+
+@pytest.mark.asyncio
+async def test_tool_is_error_result_sets_error_type(sentry_init, capture_events, stdio):
+    sentry_init(
+        integrations=[MCPIntegration()],
+        default_integrations=False,
+        traces_sample_rate=1.0,
+        trace_lifecycle="static",
+    )
+
+    if IS_MCP_V2:
+        from mcp.server import MCPServer
+
+        mcp_server = MCPServer("test-server")
+
+        @mcp_server.tool()
+        def bad_tool() -> str:
+            raise ValueError("bad input")
+
+        server = mcp_server._lowlevel_server
+    else:
+        server = Server("test-server")
+
+        @server.call_tool()
+        def bad_tool(tool_name, arguments):
+            return CallToolResult(
+                content=[TextContent(type="text", text="bad input")],
+                isError=True,
+            )
+
+    events = capture_events()
+    with start_transaction(name="mcp tx"):
+        result = await stdio(
+            server,
+            method="tools/call",
+            params={"name": "bad_tool", "arguments": {}},
+            request_id="req-is-error",
+        )
+
+    assert _get_response(result).result["isError"] is True
+    (tx,) = events
+    (span,) = tx["spans"]
+    assert span["data"][SPANDATA.ERROR_TYPE] == "tool_error"
+    assert "status" not in span
 
 
 @pytest.mark.asyncio

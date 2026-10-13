@@ -270,6 +270,19 @@ def _extract_text_from_content_blocks(content_blocks: "Any") -> "Any":
     return " ".join(texts) if texts else content_blocks
 
 
+def _tool_result_is_error(result: "Any") -> bool:
+    """
+    Return whether a tools/call result reports a tool error.
+
+    A dict uses the wire key ``isError`` (what mcp 2.x middleware observes).
+    A result object uses the ``isError`` attribute (``CallToolResult`` on mcp
+    1.x, and a non-dict result the v2 middleware can see).
+    """
+    if isinstance(result, dict):
+        return result.get("isError") is True
+    return getattr(result, "isError", None) is True
+
+
 async def _tool_handler_wrapper(
     func: "Callable[..., Awaitable[Union[CallToolResult, InputRequiredResult]]]",
     original_args: "tuple[Any, ...]",
@@ -363,6 +376,9 @@ async def _tool_handler_wrapper(
                 with capture_internal_exceptions():
                     _capture_exception(e)
                 raise
+
+            if _tool_result_is_error(result):
+                _set_span_data_attribute(span, SPANDATA.ERROR_TYPE, "tool_error")
 
             if result is None:
                 return result
@@ -460,6 +476,9 @@ async def _instrument_v2_tool_call(
                 with capture_internal_exceptions():
                     _capture_exception(e)
                 raise
+
+            if _tool_result_is_error(result):
+                _set_span_data_attribute(span, SPANDATA.ERROR_TYPE, "tool_error")
 
             if not isinstance(result, dict):
                 return result
