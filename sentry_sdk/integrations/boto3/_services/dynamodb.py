@@ -108,7 +108,10 @@ def _get_table_name(table: str) -> str:
 
 
 def _get_table_attributes(tables: "Iterable[str]") -> "Attributes":
-    table_names = list(dict.fromkeys(_get_table_name(table) for table in tables))
+    # sorted, so the values and the span description sentry derives from them
+    # (`DynamoDB.BatchGetItem customers, orders`) don't depend on the request order.
+    # https://github.com/getsentry/sentry-conventions/blob/main/model/description/db.json
+    table_names = sorted(set(_get_table_name(table) for table in tables))
     attributes: "Attributes" = {}
     if table_names:
         attributes[SPANDATA.AWS_DYNAMODB_TABLE_NAMES] = table_names

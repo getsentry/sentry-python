@@ -338,12 +338,9 @@ def test_batch_get_item(
     assert span["name"] == expected_name
     assert span["status"] == "ok"
     attributes = span["attributes"]
-    assert (
-        attributes[SPANDATA.AWS_DYNAMODB_TABLE_NAMES]
-        == [
-            "orders",
-            "invoices",
-        ][: len(request_items)]
+    # sorted, independent of the request order.
+    assert attributes[SPANDATA.AWS_DYNAMODB_TABLE_NAMES] == sorted(
+        ["orders", "invoices"][: len(request_items)]
     )
     assert attributes.get(SPANDATA.DB_COLLECTION_NAME) == expected_collection
     assert attributes.get(SPANDATA.DB_OPERATION_BATCH_SIZE) == expected_batch_size
@@ -386,7 +383,7 @@ def test_batch_write_item_multiple_tables(dynamodb_client, capture_items):
     assert span["name"] == "BatchWriteItem Orders audit-log"
     attributes = span["attributes"]
     assert attributes[SPANDATA.DB_COLLECTION_NAME] == ",Orders,audit-log,"
-    assert attributes[SPANDATA.AWS_DYNAMODB_TABLE_NAMES] == ["audit-log", "Orders"]
+    assert attributes[SPANDATA.AWS_DYNAMODB_TABLE_NAMES] == ["Orders", "audit-log"]
 
 
 def test_transact_write_items(dynamodb_client, capture_items):
@@ -421,7 +418,7 @@ def test_transact_write_items(dynamodb_client, capture_items):
 
     assert span["name"] == "TransactWriteItems customers orders"
     attributes = span["attributes"]
-    assert attributes[SPANDATA.AWS_DYNAMODB_TABLE_NAMES] == ["orders", "customers"]
+    assert attributes[SPANDATA.AWS_DYNAMODB_TABLE_NAMES] == ["customers", "orders"]
     assert attributes[SPANDATA.DB_COLLECTION_NAME] == ",customers,orders,"
     assert attributes[SPANDATA.DB_OPERATION_BATCH_SIZE] == 3
     assert attributes[SPANDATA.AWS_DYNAMODB_ITEM_COLLECTION_METRICS] == (
@@ -974,7 +971,7 @@ def test_execute_statement_without_parameters(
                 SPANDATA.DB_QUERY_TEXT: "SELECT * FROM orders WHERE id = ?; "
                 "DELETE FROM orders WHERE id = ?; INSERT INTO customers VALUE ?",
                 SPANDATA.DB_COLLECTION_NAME: ",customers,orders,",
-                SPANDATA.AWS_DYNAMODB_TABLE_NAMES: ["orders", "customers"],
+                SPANDATA.AWS_DYNAMODB_TABLE_NAMES: ["customers", "orders"],
                 SPANDATA.DB_OPERATION_BATCH_SIZE: 3,
             },
             id="different",
@@ -997,7 +994,7 @@ def test_execute_statement_without_parameters(
                 SPANDATA.DB_QUERY_TEXT: 'UPDATE "orders" SET s = ? WHERE id = ?; '
                 "SELECT * FROM customers WHERE id = ?",
                 SPANDATA.DB_COLLECTION_NAME: ",customers,orders,",
-                SPANDATA.AWS_DYNAMODB_TABLE_NAMES: ["orders", "customers"],
+                SPANDATA.AWS_DYNAMODB_TABLE_NAMES: ["customers", "orders"],
                 SPANDATA.DB_OPERATION_BATCH_SIZE: 5,
             },
             id="repeated",
