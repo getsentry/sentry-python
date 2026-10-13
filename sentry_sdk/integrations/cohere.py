@@ -253,17 +253,26 @@ def _wrap_chat(f: "Callable[..., Any]", streaming: bool) -> "Callable[..., Any]"
                 old_iterator = res
 
                 def new_iterator() -> "Iterator[StreamedChatResponse]":
-                    with capture_internal_exceptions():
+                    try:
                         for x in old_iterator:
-                            if isinstance(x, ChatStreamEndEvent) or isinstance(
-                                x, StreamEndStreamedChatResponse
-                            ):
-                                collect_chat_response_fields(
-                                    span,
-                                    x.response,
-                                    include_pii=_should_record(integration, "outputs"),
-                                )
+                            with capture_internal_exceptions():
+                                if isinstance(x, ChatStreamEndEvent) or isinstance(
+                                    x, StreamEndStreamedChatResponse
+                                ):
+                                    collect_chat_response_fields(
+                                        span,
+                                        x.response,
+                                        include_pii=_should_record(
+                                            integration, "outputs"
+                                        ),
+                                    )
                             yield x
+                    except Exception:
+                        exc_info = sys.exc_info()
+                        with capture_internal_exceptions():
+                            span.__exit__(*exc_info)
+                        reraise(*exc_info)
+
                     _end_span(span)
 
                 return new_iterator()
