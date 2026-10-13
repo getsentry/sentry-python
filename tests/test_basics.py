@@ -734,7 +734,7 @@ def test_event_processor_exception_drops_event_and_records_client_report(
     capture_message("should be dropped")
 
     assert len(events) == 0
-    assert ("event_processor", "error", None, 1) in record_lost_event_calls
+    assert record_lost_event_calls == [("callback_error", "error", None, 1)]
 
 
 @pytest.mark.tests_internal_exceptions
@@ -757,7 +757,7 @@ def test_error_processor_exception_drops_event(
         capture_exception()
 
     assert len(events) == 0
-    assert ("event_processor", "error", None, 1) in record_lost_event_calls
+    assert record_lost_event_calls == [("callback_error", "error", None, 1)]
 
 
 @pytest.mark.tests_internal_exceptions
