@@ -102,9 +102,11 @@ _ATTRIBUTE_VALUE_TYPES = frozenset(
 
 def _get_table_name(table: str) -> str:
     # `TableName` and the `RequestItems` keys accept a table name or a table ARN
-    # (`arn:aws:dynamodb:<region>:<account>:table/<name>`); table names can't contain ":".
+    # (`arn:aws:dynamodb:<region>:<account>:table/<name>`). backup, export, import and
+    # stream ARNs continue after the name (`table/<name>/backup/<id>`); table names
+    # can't contain ":" or "/".
     # https://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_GetItem.html#DDB-GetItem-request-TableName
-    return table.rsplit(":table/", 1)[-1]
+    return table.rsplit(":table/", 1)[-1].split("/", 1)[0]
 
 
 def _get_table_attributes(tables: "Iterable[str]") -> "Attributes":
@@ -129,10 +131,36 @@ def _get_table_attributes(tables: "Iterable[str]") -> "Attributes":
     return attributes
 
 
+# request parameters that hold a table name, or a table ARN.
+_TABLE_NAME_PARAMS = (
+    "TableName",
+    "GlobalTableName",
+    "SourceTableName",
+    "TargetTableName",
+)
+
+# request parameters that hold an ARN of a table or of a resource that belongs to one
+# (`ResourceArn` is a table or stream ARN for tags and resource policies).
+_TABLE_ARN_PARAMS = (
+    "TableArn",
+    "SourceTableArn",
+    "ResourceArn",
+    "BackupArn",
+    "ExportArn",
+    "ImportArn",
+)
+
+
 def _get_request_tables(params: "Dict[str, Any]") -> "List[str]":
-    tables = []
-    if "TableName" in params:
-        tables.append(params["TableName"])
+    tables = [params[param] for param in _TABLE_NAME_PARAMS if param in params]
+    tables.extend(
+        params[param]
+        for param in _TABLE_ARN_PARAMS
+        if ":table/" in params.get(param, "")
+    )
+    if "TableCreationParameters" in params:
+        # `ImportTable` creates the table it imports into.
+        tables.append(params["TableCreationParameters"]["TableName"])
     if "RequestItems" in params:
         tables.extend(params["RequestItems"])
     if "TransactItems" in params:

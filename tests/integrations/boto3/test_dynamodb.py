@@ -218,6 +218,107 @@ def test_list_tables(dynamodb_client, capture_items):
     assert attributes[SPANDATA.SENTRY_NORMALIZED_DB_QUERY] == "ListTables"
 
 
+@pytest.mark.parametrize(
+    "method,params,expected_name",
+    [
+        pytest.param(
+            "export_table_to_point_in_time",
+            {"TableArn": TABLE_ARN, "S3Bucket": "exports"},
+            "ExportTableToPointInTime orders",
+            id="table-arn",
+        ),
+        pytest.param(
+            "tag_resource",
+            {"ResourceArn": TABLE_ARN, "Tags": [{"Key": "team", "Value": "x"}]},
+            "TagResource orders",
+            id="resource-arn",
+        ),
+        pytest.param(
+            "put_resource_policy",
+            {
+                "ResourceArn": TABLE_ARN + "/stream/2024-01-01T00:00:00.000",
+                "Policy": "{}",
+            },
+            "PutResourcePolicy orders",
+            id="stream-arn",
+        ),
+        pytest.param(
+            "describe_backup",
+            {"BackupArn": TABLE_ARN + "/backup/01700000000000-abcdef12"},
+            "DescribeBackup orders",
+            id="backup-arn",
+        ),
+        pytest.param(
+            "describe_export",
+            {"ExportArn": TABLE_ARN + "/export/01700000000000-abcdef12"},
+            "DescribeExport orders",
+            id="export-arn",
+        ),
+        pytest.param(
+            "create_global_table",
+            {
+                "GlobalTableName": "orders",
+                "ReplicationGroup": [{"RegionName": "eu-north-1"}],
+            },
+            "CreateGlobalTable orders",
+            id="global-table-name",
+        ),
+        pytest.param(
+            "restore_table_to_point_in_time",
+            {"SourceTableName": "orders", "TargetTableName": "orders-restored"},
+            "RestoreTableToPointInTime orders orders-restored",
+            id="source-and-target",
+        ),
+        pytest.param(
+            "restore_table_from_backup",
+            {
+                "TargetTableName": "orders-restored",
+                "BackupArn": TABLE_ARN + "/backup/01700000000000-abcdef12",
+            },
+            "RestoreTableFromBackup orders orders-restored",
+            id="target-and-backup",
+        ),
+        pytest.param(
+            "import_table",
+            {
+                "S3BucketSource": {"S3Bucket": "imports"},
+                "InputFormat": "CSV",
+                "TableCreationParameters": {
+                    "TableName": "orders",
+                    "AttributeDefinitions": [
+                        {"AttributeName": "id", "AttributeType": "S"}
+                    ],
+                    "KeySchema": [{"AttributeName": "id", "KeyType": "HASH"}],
+                    "BillingMode": "PAY_PER_REQUEST",
+                },
+            },
+            "ImportTable orders",
+            id="table-creation-parameters",
+        ),
+        pytest.param(
+            "list_exports",
+            {
+                "TableArn": "arn:aws:dynamodb:eu-north-1:123456789012:global-table/orders"
+            },
+            "ListExports",
+            id="non-table-arn",
+        ),
+    ],
+)
+def test_table_from_other_parameters(
+    dynamodb_client, capture_items, method, params, expected_name
+):
+    require_botocore_model_fields(dynamodb_client, method)
+
+    # the only one of these responses with a required field.
+    response = {"ImportTableDescription": {}} if method == "import_table" else {}
+    span = _stubbed_span(dynamodb_client, capture_items, method, params, response)
+
+    # tables named by other parameters and ARNs are summarized like `TableName`.
+    assert span["name"] == expected_name
+    assert span["attributes"][SPANDATA.DB_QUERY_SUMMARY] == expected_name
+
+
 def test_create_table(dynamodb_client, capture_items):
     key_schema = [{"AttributeName": "id", "KeyType": "HASH"}]
     params = {
