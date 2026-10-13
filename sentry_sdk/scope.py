@@ -1458,18 +1458,6 @@ class Scope:
             ):
                 attributes[attribute_name] = self._user[user_attribute]
 
-    def _drop(
-        self, cause: "Any", ty: str, exception_raised: bool = False
-    ) -> "Optional[Any]":
-        logger.info("%s (%s) dropped event", ty, cause)
-        transport = sentry_sdk.get_client().transport
-        if transport:
-            transport.record_lost_event(
-                "callback_error" if exception_raised else "event_processor",
-                data_category="error",
-            )
-        return None
-
     def run_error_processors(self, event: "Event", hint: "Hint") -> "Optional[Event]":
         """
         Runs the error processors on the event and returns the modified event.
@@ -1492,9 +1480,14 @@ class Scope:
                         exception_raised = True
                         raise
                 if new_event is None:
-                    return self._drop(
-                        error_processor, "error processor", exception_raised
-                    )
+                    logger.info("%s (error processor) dropped event", error_processor)
+                    transport = sentry_sdk.get_client().transport
+                    if transport:
+                        transport.record_lost_event(
+                            "callback_error" if exception_raised else "event_processor",
+                            data_category="error",
+                        )
+                    return None
 
                 event = new_event
 
@@ -1529,9 +1522,17 @@ class Scope:
                         exception_raised = True
                         raise
                 if new_event is None:
-                    return self._drop(
-                        event_processor, "event processor", exception_raised
+                    logger.info(
+                        "%s (event processor processor) dropped event", event_processor
                     )
+                    transport = sentry_sdk.get_client().transport
+                    if transport:
+                        transport.record_lost_event(
+                            "callback_error" if exception_raised else "event_processor",
+                            data_category="error",
+                        )
+                    return None
+
                 event = new_event
 
         return event
