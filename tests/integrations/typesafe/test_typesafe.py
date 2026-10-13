@@ -105,12 +105,12 @@ def test_system_one(sentry_init, capture_items, typesafe_response):
     (span,) = (
         span
         for span in spans
-        if span["attributes"].get("sentry.op") == OP.GEN_AI_EVALUATE
+        if span["attributes"].get("sentry.op") == OP.GEN_AI_DECIDE
     )
-    assert span["name"] == "evaluate jev-latest"
+    assert span["name"] == "decide jev-latest"
 
     assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "typesafe"
-    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "evaluate"
+    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "decide"
     assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "jev-latest"
 
     assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "jev-latest"
@@ -258,12 +258,12 @@ async def test_system_one_async(sentry_init, capture_items, typesafe_response):
     (span,) = (
         span
         for span in spans
-        if span["attributes"].get("sentry.op") == OP.GEN_AI_EVALUATE
+        if span["attributes"].get("sentry.op") == OP.GEN_AI_DECIDE
     )
-    assert span["name"] == "evaluate jev-latest"
+    assert span["name"] == "decide jev-latest"
 
     assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "typesafe"
-    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "evaluate"
+    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "decide"
     assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "jev-latest"
 
     assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "jev-latest"
