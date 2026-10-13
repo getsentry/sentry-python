@@ -438,9 +438,9 @@ def _get_partiql_attributes(statements: "List[Dict[str, Any]]") -> "Attributes":
         parsed for parsed in parsed_statements if parsed is not None
     ]
     all_recognized = len(recognized_statements) == len(statements)
-    # a batch only has a summary when every statement shares the same one, prefixed with
-    # `BATCH ` so it's named apart from a single statement. otel uses `BATCH` alone for
-    # differing statements; they keep no summary, so they're named after their tables.
+    # a batch only has a parsed summary when every statement shares the same one, prefixed
+    # with `BATCH ` so it's named apart from a single statement. otel uses `BATCH` alone for
+    # differing statements; they get the operation-and-tables summary instead.
     # https://opentelemetry.io/docs/specs/semconv/registry/attributes/db/#db-query-summary
     summaries = {
         f"{operation} {table}" for operation, table, _ in recognized_statements
@@ -485,20 +485,25 @@ def _get_partiql_attributes(statements: "List[Dict[str, Any]]") -> "Attributes":
     return attributes
 
 
-def _get_table_label(attributes: "Attributes") -> "Optional[str]":
-    """Return the table names sorted and joined with ", ", or `None` for a call without a table."""
+def _get_operation_summary(ctx: "AwsCallContext", attributes: "Attributes") -> str:
+    """
+    Return the operation followed by its tables, sorted and separated by spaces
+    (`GetItem orders`, `BatchGetItem customers orders`), or the operation alone for a call
+    without a table (`ListTables`).
+    """
+    # otel's summary format separates targets with spaces; table names can't contain any.
     # sorted, so it doesn't depend on the request order.
+    # https://opentelemetry.io/docs/specs/semconv/db/database-spans/#generating-a-summary-of-the-query
     table_names = attributes.get(SPANDATA.AWS_DYNAMODB_TABLE_NAMES)
     if isinstance(table_names, list) and table_names:
-        return ", ".join(sorted(str(table) for table in table_names))
-    return None
+        return " ".join([ctx.operation_name, *sorted(str(t) for t in table_names)])
+    return ctx.operation_name
 
 
 def _get_normalized_query(ctx: "AwsCallContext", attributes: "Attributes") -> str:
     """
     Return the value of `sentry.normalized_db_query`: the partiql statements with every
-    literal and parameter replaced by `%s`, otherwise the operation and its tables
-    (`GetItem orders`).
+    literal and parameter replaced by `%s`, otherwise the query summary (`GetItem orders`).
     """
     statements = _get_partiql_statements(ctx)
     if statements:
@@ -522,10 +527,10 @@ def _get_normalized_query(ctx: "AwsCallContext", attributes: "Attributes") -> st
                 return f"BATCH {normalized_query}"
             return normalized_query
 
-    table_label = _get_table_label(attributes)
-    if table_label is None:
-        return ctx.operation_name
-    return f"{ctx.operation_name} {table_label}"
+    return str(
+        attributes.get(SPANDATA.DB_QUERY_SUMMARY)
+        or _get_operation_summary(ctx, attributes)
+    )
 
 
 class _DynamoDBExtension(_ServiceExtension):
@@ -537,26 +542,13 @@ class _DynamoDBExtension(_ServiceExtension):
     def get_span_name(
         self, ctx: "AwsCallContext", attributes: "Attributes"
     ) -> "Optional[str]":
-        # sentry's ordered db name templates; dynamodb always sets `db.operation.name`
-        # and never `db.stored_procedure.name` or `db.namespace`.
+        # every dynamodb span has a query summary, which is the first of sentry's db name
+        # templates, so the name matches the one relay would derive from the attributes.
         # https://github.com/getsentry/sentry-conventions/blob/main/model/name/db.json
-        if SPANDATA.DB_QUERY_SUMMARY in attributes:
-            return str(attributes[SPANDATA.DB_QUERY_SUMMARY])
-
-        # a multi-table call is named after its tables rather than its comma-wrapped
-        # `db.collection.name`.
-        table_label = _get_table_label(attributes)
-        if table_label is not None:
-            return f"{ctx.operation_name} {table_label}"
-
-        # calls without a table. `server.address` is still the configured endpoint here;
-        # botocore may resolve an account-based one (`<account>.ddb.<region>.amazonaws.com`)
-        # later, which keeps the name stable and free of account ids.
-        server_address = attributes.get(SPANDATA.SERVER_ADDRESS)
-        server_port = attributes.get(SPANDATA.SERVER_PORT)
-        if server_address is None or server_port is None:
+        summary = attributes.get(SPANDATA.DB_QUERY_SUMMARY)
+        if summary is None:
             return None
-        return f"{ctx.operation_name} {server_address}:{server_port}"
+        return str(summary)
 
     def get_request_attributes(self, ctx: "AwsCallContext") -> "Attributes":
         attributes: "Attributes" = {
@@ -602,6 +594,19 @@ class _DynamoDBExtension(_ServiceExtension):
                 )
             else:
                 attributes.update(_get_partiql_attributes(statements))
+
+        # calls without a parsed partiql summary are summarized by their operation and tables
+        # (`GetItem orders`, `BatchGetItem customers orders`, `ListTables`). otel allows a
+        # summary that doesn't come from parsing a query. it names the span and can describe
+        # it, rather than the comma-wrapped `db.collection.name` of a multi-table call or the
+        # endpoint of a call without a table, which botocore may resolve to one with the
+        # account id.
+        # https://opentelemetry.io/docs/specs/semconv/registry/attributes/db/#db-query-summary
+        with capture_internal_exceptions():
+            if SPANDATA.DB_QUERY_SUMMARY not in attributes:
+                attributes[SPANDATA.DB_QUERY_SUMMARY] = _get_operation_summary(
+                    ctx, attributes
+                )
 
         # the queries insight only lists `db` spans with a normalized query. relay derives
         # it from `db.query.text`, which most dynamodb calls don't have, and normalizes

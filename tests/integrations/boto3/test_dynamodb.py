@@ -18,7 +18,6 @@ from tests.integrations.boto3.helpers import (
 )
 from tests.integrations.boto3.helpers import client_factory as client_factory
 
-ENDPOINT = "dynamodb.eu-north-1.amazonaws.com:443"
 TABLE_ARN = "arn:aws:dynamodb:eu-north-1:123456789012:table/orders"
 
 
@@ -150,7 +149,8 @@ def test_get_item(dynamodb_client, capture_items, table_name):
     ]
     assert SPANDATA.DB_OPERATION_BATCH_SIZE not in attributes
     assert SPANDATA.DB_QUERY_TEXT not in attributes
-    # a call without query text is normalized to its operation and table.
+    # a call without query text is summarized and normalized to its operation and table.
+    assert attributes[SPANDATA.DB_QUERY_SUMMARY] == "GetItem orders"
     assert attributes[SPANDATA.SENTRY_NORMALIZED_DB_QUERY] == "GetItem orders"
     assert "private-key" not in json.dumps(span)
 
@@ -206,14 +206,15 @@ def test_list_tables(dynamodb_client, capture_items):
         {"TableNames": ["invoices", "orders"]},
     )
 
-    assert span["name"] == "ListTables " + ENDPOINT
+    # without the endpoint, which botocore may resolve to one with the account id.
+    assert span["name"] == "ListTables"
     attributes = span["attributes"]
     assert attributes[SPANDATA.AWS_DYNAMODB_EXCLUSIVE_START_TABLE] == "customers"
     assert attributes[SPANDATA.AWS_DYNAMODB_LIMIT] == 2
     assert attributes[SPANDATA.AWS_DYNAMODB_TABLE_COUNT] == 2
     assert SPANDATA.DB_COLLECTION_NAME not in attributes
     assert SPANDATA.AWS_DYNAMODB_TABLE_NAMES not in attributes
-    # without the endpoint, unlike the name.
+    assert attributes[SPANDATA.DB_QUERY_SUMMARY] == "ListTables"
     assert attributes[SPANDATA.SENTRY_NORMALIZED_DB_QUERY] == "ListTables"
 
 
@@ -291,7 +292,7 @@ def test_update_table(dynamodb_client, capture_items):
                 "orders": {"Keys": [{"id": {"S": "1"}}, {"id": {"S": "2"}}]},
                 TABLE_ARN.replace("orders", "invoices"): {"Keys": [{"id": {"S": "3"}}]},
             },
-            "BatchGetItem invoices, orders",
+            "BatchGetItem invoices orders",
             ",invoices,orders,",
             3,
             id="two-tables",
@@ -347,6 +348,7 @@ def test_batch_get_item(
     assert attributes.get(SPANDATA.DB_COLLECTION_NAME) == expected_collection
     assert attributes.get(SPANDATA.DB_OPERATION_BATCH_SIZE) == expected_batch_size
     # the operation and its sorted tables, like the name.
+    assert attributes[SPANDATA.DB_QUERY_SUMMARY] == expected_name
     assert attributes[SPANDATA.SENTRY_NORMALIZED_DB_QUERY] == expected_name
     assert attributes[SPANDATA.AWS_DYNAMODB_CONSUMED_CAPACITY] == [
         '{"TableName":"orders","CapacityUnits":1.0}',
@@ -381,7 +383,7 @@ def test_batch_write_item_multiple_tables(dynamodb_client, capture_items):
     span = _stubbed_span(dynamodb_client, capture_items, "batch_write_item", params, {})
 
     # sorted and case-preserving, independent of the request order.
-    assert span["name"] == "BatchWriteItem Orders, audit-log"
+    assert span["name"] == "BatchWriteItem Orders audit-log"
     attributes = span["attributes"]
     assert attributes[SPANDATA.DB_COLLECTION_NAME] == ",Orders,audit-log,"
     assert attributes[SPANDATA.AWS_DYNAMODB_TABLE_NAMES] == ["audit-log", "Orders"]
@@ -417,7 +419,7 @@ def test_transact_write_items(dynamodb_client, capture_items):
         dynamodb_client, capture_items, "transact_write_items", params, response
     )
 
-    assert span["name"] == "TransactWriteItems customers, orders"
+    assert span["name"] == "TransactWriteItems customers orders"
     attributes = span["attributes"]
     assert attributes[SPANDATA.AWS_DYNAMODB_TABLE_NAMES] == ["orders", "customers"]
     assert attributes[SPANDATA.DB_COLLECTION_NAME] == ",customers,orders,"
@@ -622,7 +624,7 @@ def test_execute_statement_resource_client(dynamodb_resource, capture_items):
             "execute_statement",
             {"Statement": "SELECT * FROM orders WHERE id = 'unterminated"},
             {"Items": []},
-            "ExecuteStatement orders",
+            "SELECT orders",
             id="unsanitizable",
         ),
     ],
@@ -885,7 +887,7 @@ def test_execute_statement_parameters_with_comment(dynamodb_client, capture_item
         pytest.param(
             "REMOVE x",
             "REMOVE x",
-            None,
+            "ExecuteStatement",
             None,
             id="unrecognized",
         ),
@@ -932,7 +934,7 @@ def test_execute_statement_without_parameters(
     assert attributes.get(SPANDATA.DB_QUERY_TEXT) == expected_text
     assert attributes.get(SPANDATA.DB_QUERY_SUMMARY) == expected_summary
     assert attributes.get(SPANDATA.DB_COLLECTION_NAME) == expected_table
-    assert span["name"] == (expected_summary or "ExecuteStatement " + ENDPOINT)
+    assert span["name"] == expected_summary
     assert _query_parameters(attributes) == {}
 
 
@@ -967,7 +969,8 @@ def test_execute_statement_without_parameters(
                 {"Statement": "INSERT INTO customers VALUE {'id': '3'}"},
             ],
             {
-                "name": "BatchExecuteStatement customers, orders",
+                "name": "BatchExecuteStatement customers orders",
+                SPANDATA.DB_QUERY_SUMMARY: "BatchExecuteStatement customers orders",
                 SPANDATA.DB_QUERY_TEXT: "SELECT * FROM orders WHERE id = ?; "
                 "DELETE FROM orders WHERE id = ?; INSERT INTO customers VALUE ?",
                 SPANDATA.DB_COLLECTION_NAME: ",customers,orders,",
@@ -989,7 +992,8 @@ def test_execute_statement_without_parameters(
                 {"Statement": "SELECT * FROM customers WHERE id = '5'"},
             ],
             {
-                "name": "BatchExecuteStatement customers, orders",
+                "name": "BatchExecuteStatement customers orders",
+                SPANDATA.DB_QUERY_SUMMARY: "BatchExecuteStatement customers orders",
                 SPANDATA.DB_QUERY_TEXT: 'UPDATE "orders" SET s = ? WHERE id = ?; '
                 "SELECT * FROM customers WHERE id = ?",
                 SPANDATA.DB_COLLECTION_NAME: ",customers,orders,",
@@ -1132,14 +1136,16 @@ def test_execute_transaction(dynamodb_client, capture_items):
         dynamodb_client, capture_items, "execute_transaction", params, {}
     )
 
-    assert span["name"] == "ExecuteTransaction customers, orders"
+    assert span["name"] == "ExecuteTransaction customers orders"
     attributes = span["attributes"]
     assert attributes[SPANDATA.DB_QUERY_TEXT] == (
         'EXISTS(SELECT * FROM "customers" WHERE id = ?); INSERT INTO "orders" VALUE {\'id\': ?}'
     )
     assert attributes[SPANDATA.AWS_DYNAMODB_TABLE_NAMES] == ["customers", "orders"]
     assert attributes[SPANDATA.DB_OPERATION_BATCH_SIZE] == 2
-    assert SPANDATA.DB_QUERY_SUMMARY not in attributes
+    assert (
+        attributes[SPANDATA.DB_QUERY_SUMMARY] == "ExecuteTransaction customers orders"
+    )
     assert attributes[SPANDATA.DB_COLLECTION_NAME] == ",customers,orders,"
     assert _query_parameters(attributes) == {}
 
