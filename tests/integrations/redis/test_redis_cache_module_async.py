@@ -15,7 +15,7 @@ if FakeRedisAsync is None:
     )
 
 import sentry_sdk
-from sentry_sdk.consts import SPANDATA
+from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.redis import RedisIntegration
 from sentry_sdk.utils import parse_version
 
@@ -41,7 +41,7 @@ async def test_no_cache_basic(sentry_init, capture_items):
     assert len(items) == 2
     db_span, parent_span = items[0].payload, items[1].payload
     assert parent_span["name"] == "custom parent"
-    assert db_span["attributes"]["sentry.op"] == "db.redis"
+    assert db_span["attributes"]["sentry.op"] == OP.DB_QUERY
 
 
 @pytest.mark.asyncio
@@ -65,7 +65,7 @@ async def test_cache_basic(sentry_init, capture_items):
     assert len(items) == 3
     db_span, cache_span, parent_span = [item.payload for item in items]
     assert parent_span["name"] == "custom parent"
-    assert db_span["attributes"]["sentry.op"] == "db.redis"
+    assert db_span["attributes"]["sentry.op"] == OP.DB_QUERY
     assert cache_span["attributes"]["sentry.op"] == "cache.get"
     assert cache_span["attributes"][SPANDATA.CACHE_KEY] == ["myasynccachekey"]
 
@@ -95,25 +95,25 @@ async def test_cache_keys(sentry_init, capture_items):
     payloads = [item.payload for item in items]
 
     # asomethingelse: db only
-    assert payloads[0]["attributes"]["sentry.op"] == "db.redis"
+    assert payloads[0]["attributes"]["sentry.op"] == OP.DB_QUERY
     assert payloads[0]["name"] == "GET 'asomethingelse'"
 
     # ablub: db then cache.get
-    assert payloads[1]["attributes"]["sentry.op"] == "db.redis"
+    assert payloads[1]["attributes"]["sentry.op"] == OP.DB_QUERY
     assert payloads[1]["name"] == "GET 'ablub'"
     assert payloads[2]["attributes"]["sentry.op"] == "cache.get"
     assert payloads[2]["name"] == "ablub"
     assert payloads[2]["attributes"][SPANDATA.CACHE_KEY] == ["ablub"]
 
     # ablubkeything: db then cache.get
-    assert payloads[3]["attributes"]["sentry.op"] == "db.redis"
+    assert payloads[3]["attributes"]["sentry.op"] == OP.DB_QUERY
     assert payloads[3]["name"] == "GET 'ablubkeything'"
     assert payloads[4]["attributes"]["sentry.op"] == "cache.get"
     assert payloads[4]["name"] == "ablubkeything"
     assert payloads[4]["attributes"][SPANDATA.CACHE_KEY] == ["ablubkeything"]
 
     # abl: db only (no prefix match)
-    assert payloads[5]["attributes"]["sentry.op"] == "db.redis"
+    assert payloads[5]["attributes"]["sentry.op"] == OP.DB_QUERY
     assert payloads[5]["name"] == "GET 'abl'"
 
     assert payloads[6]["name"] == "custom parent"
@@ -146,7 +146,7 @@ async def test_cache_data(sentry_init, capture_items):
     payloads = [item.payload for item in items]
 
     # First get (miss)
-    assert payloads[0]["attributes"]["sentry.op"] == "db.redis"
+    assert payloads[0]["attributes"]["sentry.op"] == OP.DB_QUERY
     cache_get_miss = payloads[1]
     assert cache_get_miss["attributes"]["sentry.op"] == "cache.get"
     assert cache_get_miss["name"] == "myasynccachekey"
@@ -163,7 +163,7 @@ async def test_cache_data(sentry_init, capture_items):
         assert cache_get_miss["attributes"]["network.peer.address"] == host
 
     # Set
-    assert payloads[2]["attributes"]["sentry.op"] == "db.redis"
+    assert payloads[2]["attributes"]["sentry.op"] == OP.DB_QUERY
     cache_put = payloads[3]
     assert cache_put["attributes"]["sentry.op"] == "cache.put"
     assert cache_put["name"] == "myasynccachekey"
@@ -180,7 +180,7 @@ async def test_cache_data(sentry_init, capture_items):
         assert cache_put["attributes"]["network.peer.address"] == host
 
     # Second get (hit)
-    assert payloads[4]["attributes"]["sentry.op"] == "db.redis"
+    assert payloads[4]["attributes"]["sentry.op"] == OP.DB_QUERY
     cache_get_hit = payloads[5]
     assert cache_get_hit["attributes"]["sentry.op"] == "cache.get"
     assert cache_get_hit["attributes"]["cache.key"] == ["myasynccachekey"]

@@ -43,6 +43,7 @@ Span ops are now a smaller, framework-neutral set.
 
 - The OpenAI integration now emits `gen_ai.chat` instead of `gen_ai.responses`.
 - The Cohere integration now emits `gen_ai.chat` instead of `ai.chat_completions.create.cohere`, and `gen_ai.embeddings` instead of `ai.embeddings.create.cohere`.
+- The Redis integration now emits `db.query` instead of `db.redis`.
 - The Django integration now emits `view.render` instead of `view.response.render`, `view` instead of `view.authenticate`, and `function` instead of `event.django`.
 - The Django, Starlette, Starlite, and Litestar integrations now emit `middleware` instead of `middleware.django`, `middleware.starlette`, `middleware.starlette.receive`, `middleware.starlette.send`, `middleware.starlite`, `middleware.starlite.receive`, `middleware.starlite.send`, `middleware.litestar`, `middleware.litestar.receive`, and `middleware.litestar.send`.
 - The ARQ, Celery, Django, Dramatiq, Huey, RQ, and Ray integrations now emit `queue.publish` and `queue.process` instead of `queue.submit.arq`, `queue.task.arq`, `queue.submit.celery`, `queue.task.celery`, `queue.submit.django`, `queue.task.dramatiq`, `queue.submit.huey`, `queue.task.huey`, `queue.task.rq`, `queue.submit.ray`, and `queue.task.ray`.
