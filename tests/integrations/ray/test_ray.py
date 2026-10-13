@@ -8,6 +8,7 @@ import pytest
 import ray
 
 import sentry_sdk
+from sentry_sdk.consts import OP
 from sentry_sdk.envelope import Envelope
 from sentry_sdk.integrations.ray import RayIntegration
 from sentry_sdk.integrations.stdlib import StdlibIntegration
@@ -222,7 +223,7 @@ def test_tracing_in_ray_tasks(
     )
 
     span = client_spans[0]
-    assert span["attributes"]["sentry.op"]["value"] == "queue.submit.ray"
+    assert span["attributes"]["sentry.op"]["value"] == OP.QUEUE_PUBLISH
     assert span["attributes"]["sentry.origin"]["value"] == "auto.queue.ray"
     assert span["name"] == f"tests.integrations.ray.test_ray.{task.__name__}"
     assert span["parent_span_id"] == client_spans[1]["span_id"]

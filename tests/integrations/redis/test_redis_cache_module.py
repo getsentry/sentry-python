@@ -5,7 +5,7 @@ import pytest
 from fakeredis import FakeRedis
 
 import sentry_sdk
-from sentry_sdk.consts import SPANDATA
+from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.redis import RedisIntegration
 from sentry_sdk.integrations.redis.utils import _get_safe_key, _key_as_string
 from sentry_sdk.utils import parse_version
@@ -33,7 +33,7 @@ def test_no_cache_basic(sentry_init, capture_items):
     assert len(items) == 2
     db_span, parent_span = items[0].payload, items[1].payload
     assert parent_span["name"] == "custom parent"
-    assert db_span["attributes"]["sentry.op"] == "db.redis"
+    assert db_span["attributes"]["sentry.op"] == OP.DB_QUERY
 
 
 def test_cache_basic(sentry_init, capture_items):
@@ -65,17 +65,17 @@ def test_cache_basic(sentry_init, capture_items):
     payloads = [item.payload for item in items]
 
     # hget: db only (HGET is not a cache command)
-    assert payloads[0]["attributes"]["sentry.op"] == "db.redis"
+    assert payloads[0]["attributes"]["sentry.op"] == OP.DB_QUERY
     assert payloads[0]["attributes"][SPANDATA.DB_OPERATION_NAME] == "HGET"
 
     # get: db then cache.get
-    assert payloads[1]["attributes"]["sentry.op"] == "db.redis"
+    assert payloads[1]["attributes"]["sentry.op"] == OP.DB_QUERY
     assert payloads[1]["attributes"][SPANDATA.DB_OPERATION_NAME] == "GET"
     assert payloads[2]["attributes"]["sentry.op"] == "cache.get"
     assert payloads[2]["attributes"][SPANDATA.DB_QUERY_TEXT] == "GET 'mycachekey'"
 
     # set: db then cache.put
-    assert payloads[3]["attributes"]["sentry.op"] == "db.redis"
+    assert payloads[3]["attributes"]["sentry.op"] == OP.DB_QUERY
     assert payloads[3]["attributes"][SPANDATA.DB_OPERATION_NAME] == "SET"
     assert payloads[4]["attributes"]["sentry.op"] == "cache.put"
     assert (
@@ -83,7 +83,7 @@ def test_cache_basic(sentry_init, capture_items):
     )
 
     # setex: db then cache.put
-    assert payloads[5]["attributes"]["sentry.op"] == "db.redis"
+    assert payloads[5]["attributes"]["sentry.op"] == OP.DB_QUERY
     assert payloads[5]["attributes"][SPANDATA.DB_OPERATION_NAME] == "SETEX"
     assert payloads[6]["attributes"]["sentry.op"] == "cache.put"
     assert (
@@ -92,7 +92,7 @@ def test_cache_basic(sentry_init, capture_items):
     )
 
     # mget: db then cache.get
-    assert payloads[7]["attributes"]["sentry.op"] == "db.redis"
+    assert payloads[7]["attributes"]["sentry.op"] == OP.DB_QUERY
     assert payloads[7]["attributes"][SPANDATA.DB_OPERATION_NAME] == "MGET"
     assert payloads[8]["attributes"]["sentry.op"] == "cache.get"
     assert (
@@ -129,25 +129,25 @@ def test_cache_keys(sentry_init, capture_items):
     payloads = [item.payload for item in items]
 
     # somethingelse: db only
-    assert payloads[0]["attributes"]["sentry.op"] == "db.redis"
+    assert payloads[0]["attributes"]["sentry.op"] == OP.DB_QUERY
     assert payloads[0]["name"] == "GET 'somethingelse'"
 
     # blub: db then cache.get
-    assert payloads[1]["attributes"]["sentry.op"] == "db.redis"
+    assert payloads[1]["attributes"]["sentry.op"] == OP.DB_QUERY
     assert payloads[1]["name"] == "GET 'blub'"
     assert payloads[2]["attributes"]["sentry.op"] == "cache.get"
     assert payloads[2]["name"] == "blub"
     assert payloads[2]["attributes"][SPANDATA.DB_QUERY_TEXT] == "GET 'blub'"
 
     # blubkeything: db then cache.get
-    assert payloads[3]["attributes"]["sentry.op"] == "db.redis"
+    assert payloads[3]["attributes"]["sentry.op"] == OP.DB_QUERY
     assert payloads[3]["name"] == "GET 'blubkeything'"
     assert payloads[4]["attributes"]["sentry.op"] == "cache.get"
     assert payloads[4]["name"] == "blubkeything"
     assert payloads[4]["attributes"][SPANDATA.DB_QUERY_TEXT] == "GET 'blubkeything'"
 
     # bl: db only (no prefix match)
-    assert payloads[5]["attributes"]["sentry.op"] == "db.redis"
+    assert payloads[5]["attributes"]["sentry.op"] == OP.DB_QUERY
     assert payloads[5]["name"] == "GET 'bl'"
 
     assert payloads[6]["name"] == "custom parent"
@@ -182,7 +182,7 @@ def test_cache_data(sentry_init, capture_items):
     payloads = [item.payload for item in items]
 
     # First get (miss)
-    assert payloads[0]["attributes"]["sentry.op"] == "db.redis"
+    assert payloads[0]["attributes"]["sentry.op"] == OP.DB_QUERY
     cache_get_miss = payloads[1]
     assert cache_get_miss["attributes"]["sentry.op"] == "cache.get"
     assert cache_get_miss["name"] == "mycachekey"
@@ -199,7 +199,7 @@ def test_cache_data(sentry_init, capture_items):
         assert cache_get_miss["attributes"]["network.peer.address"] == host
 
     # Set
-    assert payloads[2]["attributes"]["sentry.op"] == "db.redis"
+    assert payloads[2]["attributes"]["sentry.op"] == OP.DB_QUERY
     cache_put = payloads[3]
     assert cache_put["attributes"]["sentry.op"] == "cache.put"
     assert cache_put["name"] == "mycachekey"
@@ -216,7 +216,7 @@ def test_cache_data(sentry_init, capture_items):
         assert cache_put["attributes"]["network.peer.address"] == host
 
     # Second get (hit)
-    assert payloads[4]["attributes"]["sentry.op"] == "db.redis"
+    assert payloads[4]["attributes"]["sentry.op"] == OP.DB_QUERY
     cache_get_hit = payloads[5]
     assert cache_get_hit["attributes"]["sentry.op"] == "cache.get"
     assert cache_get_hit["attributes"]["cache.key"] == ["mycachekey"]

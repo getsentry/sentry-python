@@ -38,7 +38,7 @@ def patch_tasks() -> None:
         with sentry_sdk.start_span(
             name=name,
             attributes={
-                "sentry.op": OP.QUEUE_SUBMIT_DJANGO,
+                "sentry.op": OP.QUEUE_PUBLISH,
                 "sentry.origin": DjangoIntegration.origin,
             },
         ):

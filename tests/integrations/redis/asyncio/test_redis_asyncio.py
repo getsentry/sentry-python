@@ -3,7 +3,7 @@ from fakeredis.aioredis import FakeRedis
 
 import sentry_sdk
 from sentry_sdk import capture_message
-from sentry_sdk.consts import SPANDATA
+from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.redis import RedisIntegration
 
 
@@ -60,7 +60,7 @@ async def test_async_redis_pipeline(sentry_init, capture_items):
     assert parent_span["name"] == "custom parent"
     assert pipeline_span["name"] == "redis.pipeline.execute"
     attrs = pipeline_span["attributes"]
-    assert attrs["sentry.op"] == "db.redis"
+    assert attrs["sentry.op"] == OP.DB_QUERY
     assert attrs[SPANDATA.DB_SYSTEM_NAME] == "redis"
     assert attrs[SPANDATA.DB_DRIVER_NAME] == "redis-py"
     assert attrs[SPANDATA.DB_NAMESPACE] == "0"

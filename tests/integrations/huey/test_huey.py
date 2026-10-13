@@ -90,13 +90,13 @@ def test_task_segment(capture_items, init_huey, task_fails):
 
     payloads = [i.payload for i in items]
     # The task is enqueued without a wrapping span, so in streaming mode no
-    # producer (queue.submit.huey) span is created (see the early return in
+    # producer (queue.publish) span is created (see the early return in
     # patch_enqueue). Only the consumer segment is emitted.
     assert len(payloads) == 1
     (execute_span,) = payloads
 
     assert execute_span["is_segment"]
-    assert execute_span["attributes"]["sentry.op"] == OP.QUEUE_TASK_HUEY
+    assert execute_span["attributes"]["sentry.op"] == OP.QUEUE_PROCESS
     assert execute_span["attributes"][SPANDATA.MESSAGING_DESTINATION_NAME] == huey.name
     assert execute_span["name"] == "division"
     assert execute_span["status"] == (SpanStatus.ERROR if task_fails else SpanStatus.OK)
@@ -125,10 +125,10 @@ def test_task_retry(capture_items, init_huey):
 
     re_enqueue_span, execute_span = payloads
 
-    assert re_enqueue_span["attributes"]["sentry.op"] == OP.QUEUE_SUBMIT_HUEY
+    assert re_enqueue_span["attributes"]["sentry.op"] == OP.QUEUE_PUBLISH
     assert not re_enqueue_span["is_segment"]
 
-    assert execute_span["attributes"]["sentry.op"] == OP.QUEUE_TASK_HUEY
+    assert execute_span["attributes"]["sentry.op"] == OP.QUEUE_PROCESS
     assert execute_span["is_segment"]
     assert execute_span["name"] == "retry_task"
     assert execute_span["status"] == SpanStatus.OK
@@ -167,7 +167,7 @@ def test_task_cancel_does_not_override_status(capture_items, init_huey):
     assert len(payloads) == 1
     (execute_span,) = payloads
 
-    assert execute_span["attributes"]["sentry.op"] == OP.QUEUE_TASK_HUEY
+    assert execute_span["attributes"]["sentry.op"] == OP.QUEUE_PROCESS
     assert execute_span["is_segment"]
     assert execute_span["name"] == "cancel_task"
     assert execute_span["status"] == SpanStatus.OK
@@ -198,7 +198,7 @@ def test_task_lock(capture_items, init_huey, lock_name):
     assert len(payloads) == 1
     (execute_span,) = payloads
 
-    assert execute_span["attributes"]["sentry.op"] == OP.QUEUE_TASK_HUEY
+    assert execute_span["attributes"]["sentry.op"] == OP.QUEUE_PROCESS
 
     assert execute_span["is_segment"]
     assert execute_span["name"] == "maybe_locked_task"
@@ -260,14 +260,14 @@ def test_huey_enqueue(init_huey, capture_items):
     enqueue_span = next(
         p
         for p in payloads
-        if p.get("attributes", {}).get("sentry.op") == OP.QUEUE_SUBMIT_HUEY
+        if p.get("attributes", {}).get("sentry.op") == OP.QUEUE_PUBLISH
     )
     segment_span = next(p for p in payloads if p.get("is_segment"))
 
     assert enqueue_span["trace_id"] == segment_span["trace_id"]
     assert enqueue_span["parent_span_id"] == segment_span["span_id"]
     assert enqueue_span["name"] == "different_task_name"
-    assert enqueue_span["attributes"]["sentry.op"] == OP.QUEUE_SUBMIT_HUEY
+    assert enqueue_span["attributes"]["sentry.op"] == OP.QUEUE_PUBLISH
     assert enqueue_span["attributes"][SPANDATA.MESSAGING_DESTINATION_NAME] == huey.name
 
 
@@ -291,7 +291,7 @@ def test_huey_propagate_trace(init_huey, capture_items):
     execute_span = next(
         p
         for p in payloads
-        if p.get("attributes", {}).get("sentry.op") == OP.QUEUE_TASK_HUEY
+        if p.get("attributes", {}).get("sentry.op") == OP.QUEUE_PROCESS
     )
 
     assert execute_span["name"] == "propagated_trace_task"
@@ -317,7 +317,7 @@ def test_span_origin_producer(init_huey, capture_items):
     enqueue_span = next(
         p
         for p in payloads
-        if p.get("attributes", {}).get("sentry.op") == OP.QUEUE_SUBMIT_HUEY
+        if p.get("attributes", {}).get("sentry.op") == OP.QUEUE_PUBLISH
     )
 
     assert enqueue_span["attributes"]["sentry.origin"] == "auto.queue.huey"
@@ -341,7 +341,7 @@ def test_span_origin_consumer(init_huey, capture_items):
     execute_span = next(
         p
         for p in payloads
-        if p.get("attributes", {}).get("sentry.op") == OP.QUEUE_TASK_HUEY
+        if p.get("attributes", {}).get("sentry.op") == OP.QUEUE_PROCESS
     )
 
     assert execute_span["attributes"]["sentry.origin"] == "auto.queue.huey"
@@ -393,28 +393,28 @@ def test_huey_enqueue_group(init_huey, capture_items):
     assert group_span["parent_span_id"] == submission_span["span_id"]
     assert group_span["name"] == "Huey Task Group"
     assert group_span["status"] == "ok"
-    assert group_span["attributes"]["sentry.op"] == "queue.submit.huey"
+    assert group_span["attributes"]["sentry.op"] == OP.QUEUE_PUBLISH
     assert group_span["attributes"]["sentry.origin"] == "auto.queue.huey"
 
     assert task1_enqueue_span["name"] == "task1"
     assert task1_enqueue_span["status"] == "ok"
     assert task1_enqueue_span["parent_span_id"] == group_span["span_id"]
     assert task1_enqueue_span["attributes"]["sentry.segment.name"] == "submission"
-    assert task1_enqueue_span["attributes"]["sentry.op"] == "queue.submit.huey"
+    assert task1_enqueue_span["attributes"]["sentry.op"] == OP.QUEUE_PUBLISH
     assert task1_enqueue_span["attributes"]["sentry.origin"] == "auto.queue.huey"
 
     assert task2_enqueue_span["name"] == "task2"
     assert task2_enqueue_span["status"] == "ok"
     assert task2_enqueue_span["parent_span_id"] == group_span["span_id"]
     assert task2_enqueue_span["attributes"]["sentry.segment.name"] == "submission"
-    assert task2_enqueue_span["attributes"]["sentry.op"] == "queue.submit.huey"
+    assert task2_enqueue_span["attributes"]["sentry.op"] == OP.QUEUE_PUBLISH
     assert task2_enqueue_span["attributes"]["sentry.origin"] == "auto.queue.huey"
 
     assert task1_execute_span["name"] == "task1"
     assert task1_execute_span["status"] == "ok"
     assert task1_execute_span["attributes"]["messaging.message.system"] == "huey"
     assert task1_execute_span["parent_span_id"] == task1_enqueue_span["span_id"]
-    assert task1_execute_span["attributes"]["sentry.op"] == "queue.task.huey"
+    assert task1_execute_span["attributes"]["sentry.op"] == OP.QUEUE_PROCESS
     assert task1_execute_span["attributes"]["sentry.origin"] == "auto.queue.huey"
     assert (
         task1_execute_span["attributes"]["sentry.segment.name.source"]
@@ -427,7 +427,7 @@ def test_huey_enqueue_group(init_huey, capture_items):
     assert task2_execute_span["status"] == "ok"
     assert task2_execute_span["parent_span_id"] == task2_enqueue_span["span_id"]
     assert task2_execute_span["attributes"]["messaging.message.system"] == "huey"
-    assert task2_execute_span["attributes"]["sentry.op"] == "queue.task.huey"
+    assert task2_execute_span["attributes"]["sentry.op"] == OP.QUEUE_PROCESS
     assert task2_execute_span["attributes"]["sentry.origin"] == "auto.queue.huey"
     assert (
         task2_execute_span["attributes"]["sentry.segment.name.source"]
@@ -480,21 +480,21 @@ def test_huey_enqueue_chord(init_huey, capture_items):
     assert chord_span["parent_span_id"] == submission_span["span_id"]
     assert chord_span["name"] == "Huey Chord"
     assert chord_span["status"] == "ok"
-    assert chord_span["attributes"]["sentry.op"] == "queue.submit.huey"
+    assert chord_span["attributes"]["sentry.op"] == OP.QUEUE_PUBLISH
     assert chord_span["attributes"]["sentry.origin"] == "auto.queue.huey"
 
     assert task1_enqueue_span["name"] == "task1"
     assert task1_enqueue_span["status"] == "ok"
     assert task1_enqueue_span["parent_span_id"] == chord_span["span_id"]
     assert task1_enqueue_span["attributes"]["sentry.segment.name"] == "submission"
-    assert task1_enqueue_span["attributes"]["sentry.op"] == "queue.submit.huey"
+    assert task1_enqueue_span["attributes"]["sentry.op"] == OP.QUEUE_PUBLISH
     assert task1_enqueue_span["attributes"]["sentry.origin"] == "auto.queue.huey"
 
     assert task1_execute_span["name"] == "task1"
     assert task1_execute_span["status"] == "ok"
     assert task1_execute_span["attributes"]["messaging.message.system"] == "huey"
     assert task1_execute_span["parent_span_id"] == task1_enqueue_span["span_id"]
-    assert task1_execute_span["attributes"]["sentry.op"] == "queue.task.huey"
+    assert task1_execute_span["attributes"]["sentry.op"] == OP.QUEUE_PROCESS
     assert task1_execute_span["attributes"]["sentry.origin"] == "auto.queue.huey"
     assert (
         task1_execute_span["attributes"]["sentry.segment.name.source"]
@@ -505,14 +505,14 @@ def test_huey_enqueue_chord(init_huey, capture_items):
     assert task2_enqueue_span["status"] == "ok"
     assert task2_enqueue_span["parent_span_id"] == task1_execute_span["span_id"]
     assert task2_enqueue_span["attributes"]["sentry.segment.name"] == "task1"
-    assert task2_enqueue_span["attributes"]["sentry.op"] == "queue.submit.huey"
+    assert task2_enqueue_span["attributes"]["sentry.op"] == OP.QUEUE_PUBLISH
     assert task2_enqueue_span["attributes"]["sentry.origin"] == "auto.queue.huey"
 
     assert task2_execute_span["name"] == "task2"
     assert task2_execute_span["status"] == "ok"
     assert task2_execute_span["parent_span_id"] == task2_enqueue_span["span_id"]
     assert task2_execute_span["attributes"]["messaging.message.system"] == "huey"
-    assert task2_execute_span["attributes"]["sentry.op"] == "queue.task.huey"
+    assert task2_execute_span["attributes"]["sentry.op"] == OP.QUEUE_PROCESS
     assert task2_execute_span["attributes"]["sentry.origin"] == "auto.queue.huey"
     assert (
         task2_execute_span["attributes"]["sentry.segment.name.source"]

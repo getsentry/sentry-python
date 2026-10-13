@@ -15,6 +15,7 @@ if TYPE_CHECKING:
     from sentry_sdk._types import (
         Breadcrumb,
         BreadcrumbHint,
+        DataCollectionUserOptions,
         Event,
         EventDataCategory,
         Hint,
@@ -31,6 +32,7 @@ else:
     # guards. The types in this module are only intended to be used for type hints.
     Breadcrumb = Any
     BreadcrumbHint = Any
+    DataCollectionUserOptions = Any
     Event = Any
     EventDataCategory = Any
     Hint = Any
@@ -44,6 +46,7 @@ else:
 __all__ = (
     "Breadcrumb",
     "BreadcrumbHint",
+    "DataCollectionUserOptions",
     "Event",
     "EventDataCategory",
     "Hint",

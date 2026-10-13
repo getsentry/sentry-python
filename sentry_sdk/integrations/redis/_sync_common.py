@@ -56,7 +56,7 @@ def patch_redis_pipeline(
             name="redis.pipeline.execute",
             attributes={
                 "sentry.origin": SPAN_ORIGIN,
-                "sentry.op": OP.DB_REDIS,
+                "sentry.op": OP.DB_QUERY,
             },
         )
 
