@@ -297,29 +297,36 @@ def _wrap_huggingface_task(f: "Callable[..., Any]", op: str) -> "Callable[..., A
                     response_text_buffer: "list[str]" = []
                     tokens_used = 0
 
-                    with capture_internal_exceptions():
+                    try:
                         for chunk in res:
-                            if (
-                                hasattr(chunk, "token")
-                                and hasattr(chunk.token, "text")
-                                and chunk.token.text is not None
-                            ):
-                                response_text_buffer.append(chunk.token.text)
+                            with capture_internal_exceptions():
+                                if (
+                                    hasattr(chunk, "token")
+                                    and hasattr(chunk.token, "text")
+                                    and chunk.token.text is not None
+                                ):
+                                    response_text_buffer.append(chunk.token.text)
 
-                            if hasattr(chunk, "details") and hasattr(
-                                chunk.details, "finish_reason"
-                            ):
-                                finish_reason = chunk.details.finish_reason
+                                if hasattr(chunk, "details") and hasattr(
+                                    chunk.details, "finish_reason"
+                                ):
+                                    finish_reason = chunk.details.finish_reason
 
-                            if (
-                                hasattr(chunk, "details")
-                                and hasattr(chunk.details, "generated_tokens")
-                                and chunk.details.generated_tokens is not None
-                            ):
-                                tokens_used = chunk.details.generated_tokens
+                                if (
+                                    hasattr(chunk, "details")
+                                    and hasattr(chunk.details, "generated_tokens")
+                                    and chunk.details.generated_tokens is not None
+                                ):
+                                    tokens_used = chunk.details.generated_tokens
 
                             yield chunk
+                    except Exception:
+                        exc_info = sys.exc_info()
+                        with capture_internal_exceptions():
+                            span.__exit__(*exc_info)
+                        reraise(*exc_info)
 
+                    with capture_internal_exceptions():
                         if finish_reason is not None:
                             set_data_normalized(
                                 span,
@@ -360,44 +367,54 @@ def _wrap_huggingface_task(f: "Callable[..., Any]", op: str) -> "Callable[..., A
                     tool_calls = None
                     usage = None
 
-                    with capture_internal_exceptions():
+                    try:
                         for chunk in cast("Iterable[ChatCompletionStreamOutput]", res):
-                            if hasattr(chunk, "model") and chunk.model is not None:
-                                response_model = chunk.model
+                            with capture_internal_exceptions():
+                                if hasattr(chunk, "model") and chunk.model is not None:
+                                    response_model = chunk.model
 
-                            if hasattr(chunk, "usage") and chunk.usage is not None:
-                                usage = chunk.usage
+                                if hasattr(chunk, "usage") and chunk.usage is not None:
+                                    usage = chunk.usage
 
-                            if isinstance(chunk, str):
-                                if chunk is not None:
-                                    response_text_buffer.append(chunk)
+                                if isinstance(chunk, str):
+                                    if chunk is not None:
+                                        response_text_buffer.append(chunk)
 
-                            if hasattr(chunk, "choices") and chunk.choices is not None:
-                                for choice in chunk.choices:
-                                    if (
-                                        hasattr(choice, "delta")
-                                        and hasattr(choice.delta, "content")
-                                        and choice.delta.content is not None
-                                    ):
-                                        response_text_buffer.append(
-                                            choice.delta.content
-                                        )
+                                if (
+                                    hasattr(chunk, "choices")
+                                    and chunk.choices is not None
+                                ):
+                                    for choice in chunk.choices:
+                                        if (
+                                            hasattr(choice, "delta")
+                                            and hasattr(choice.delta, "content")
+                                            and choice.delta.content is not None
+                                        ):
+                                            response_text_buffer.append(
+                                                choice.delta.content
+                                            )
 
-                                    if (
-                                        hasattr(choice, "finish_reason")
-                                        and choice.finish_reason is not None
-                                    ):
-                                        finish_reason = choice.finish_reason
+                                        if (
+                                            hasattr(choice, "finish_reason")
+                                            and choice.finish_reason is not None
+                                        ):
+                                            finish_reason = choice.finish_reason
 
-                                    if (
-                                        hasattr(choice, "delta")
-                                        and hasattr(choice.delta, "tool_calls")
-                                        and choice.delta.tool_calls is not None
-                                    ):
-                                        tool_calls = choice.delta.tool_calls
+                                        if (
+                                            hasattr(choice, "delta")
+                                            and hasattr(choice.delta, "tool_calls")
+                                            and choice.delta.tool_calls is not None
+                                        ):
+                                            tool_calls = choice.delta.tool_calls
 
                             yield chunk
+                    except Exception:
+                        exc_info = sys.exc_info()
+                        with capture_internal_exceptions():
+                            span.__exit__(*exc_info)
+                        reraise(*exc_info)
 
+                    with capture_internal_exceptions():
                         if response_model is not None:
                             _set_span_data_attribute(
                                 span, SPANDATA.GEN_AI_RESPONSE_MODEL, response_model
