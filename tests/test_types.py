@@ -1,8 +1,15 @@
 import sys
+from typing import Optional
 
 import pytest
 
 from sentry_sdk.types import Event, Hint
+
+
+def test_attributes_optional_runtime():
+    from sentry_sdk.types import Attributes
+
+    Optional[Attributes]
 
 
 @pytest.mark.skipif(
