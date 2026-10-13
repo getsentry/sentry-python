@@ -95,7 +95,7 @@ def _patch_ray_remote() -> None:
                 with sentry_sdk.start_span(
                     name="unknown Ray task" if function_name is None else function_name,
                     attributes={
-                        "sentry.op": OP.QUEUE_TASK_RAY,
+                        "sentry.op": OP.QUEUE_PROCESS,
                         "sentry.origin": RayIntegration.origin,
                         "sentry.segment.name.source": SegmentNameSource.TASK,
                     },
@@ -145,7 +145,7 @@ def _patch_ray_remote() -> None:
                 with sentry_sdk.start_span(
                     name="unknown Ray task" if function_name is None else function_name,
                     attributes={
-                        "sentry.op": OP.QUEUE_SUBMIT_RAY,
+                        "sentry.op": OP.QUEUE_PUBLISH,
                         "sentry.origin": RayIntegration.origin,
                     },
                 ):

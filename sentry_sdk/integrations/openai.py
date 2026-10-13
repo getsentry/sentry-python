@@ -1321,7 +1321,7 @@ def _new_sync_responses_create(
     span = sentry_sdk.start_span(
         name=f"responses {model}",
         attributes={
-            "sentry.op": consts.OP.GEN_AI_RESPONSES,
+            "sentry.op": consts.OP.GEN_AI_CHAT,
             "sentry.origin": OpenAIIntegration.origin,
             SPANDATA.GEN_AI_PROVIDER_NAME: "openai",
             SPANDATA.GEN_AI_RESPONSE_STREAMING: is_streaming_response,
@@ -1389,7 +1389,7 @@ async def _new_async_responses_create(
     span = sentry_sdk.start_span(
         name=f"responses {model}",
         attributes={
-            "sentry.op": consts.OP.GEN_AI_RESPONSES,
+            "sentry.op": consts.OP.GEN_AI_CHAT,
             "sentry.origin": OpenAIIntegration.origin,
             SPANDATA.GEN_AI_PROVIDER_NAME: "openai",
             SPANDATA.GEN_AI_RESPONSE_STREAMING: is_streaming_response,

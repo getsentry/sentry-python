@@ -5,7 +5,7 @@ import rq
 from fakeredis import FakeRedis
 
 import sentry_sdk
-from sentry_sdk.consts import SPANDATA
+from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.rq import RqIntegration
 from sentry_sdk.utils import parse_version
 from tests.integrations.utils import DATA_COLLECTION_QUEUES_CASES
@@ -159,7 +159,7 @@ def test_worker_span_with_error(
     (error_event,) = (item.payload for item in items if item.type == "event")
 
     assert error_event["transaction"] == "tests.integrations.rq.test_rq.chew_up_shoes"
-    assert error_event["contexts"]["trace"]["op"] == "queue.task.rq"
+    assert error_event["contexts"]["trace"]["op"] == OP.QUEUE_PROCESS
     assert error_event["exception"]["values"][0]["type"] == "Exception"
     assert (
         error_event["exception"]["values"][0]["value"]
@@ -169,7 +169,9 @@ def test_worker_span_with_error(
     sentry_sdk.flush()
     spans = [item.payload for item in items if item.type == "span"]
     (span,) = (
-        span for span in spans if span["attributes"].get("sentry.op") == "queue.task.rq"
+        span
+        for span in spans
+        if span["attributes"].get("sentry.op") == OP.QUEUE_PROCESS
     )
 
     assert span["trace_id"] == error_event["contexts"]["trace"]["trace_id"]
@@ -234,7 +236,9 @@ def test_tracing_enabled(
     sentry_sdk.flush()
     spans = [item.payload for item in items if item.type == "span"]
     (span,) = (
-        span for span in spans if span["attributes"].get("sentry.op") == "queue.task.rq"
+        span
+        for span in spans
+        if span["attributes"].get("sentry.op") == OP.QUEUE_PROCESS
     )
 
     assert span["trace_id"] == error_event["contexts"]["trace"]["trace_id"]
@@ -285,10 +289,12 @@ def test_worker_span_no_error(
     sentry_sdk.flush()
     spans = [item.payload for item in items]
     (span,) = (
-        span for span in spans if span["attributes"].get("sentry.op") == "queue.task.rq"
+        span
+        for span in spans
+        if span["attributes"].get("sentry.op") == OP.QUEUE_PROCESS
     )
 
-    assert span["attributes"]["sentry.op"] == "queue.task.rq"
+    assert span["attributes"]["sentry.op"] == OP.QUEUE_PROCESS
     assert span["name"] == "tests.integrations.rq.test_rq.do_trick"
     assert span["attributes"][SPANDATA.MESSAGING_DESTINATION_NAME] == queue.name
 
@@ -369,7 +375,9 @@ def test_span_origin(
     sentry_sdk.flush()
     spans = [item.payload for item in items]
     (span,) = (
-        span for span in spans if span["attributes"].get("sentry.op") == "queue.task.rq"
+        span
+        for span in spans
+        if span["attributes"].get("sentry.op") == OP.QUEUE_PROCESS
     )
 
     assert span["attributes"]["sentry.origin"] == "auto.queue.rq"

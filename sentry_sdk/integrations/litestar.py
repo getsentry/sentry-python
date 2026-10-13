@@ -170,7 +170,7 @@ def enable_span_for_middleware(middleware: "Middleware") -> "Middleware":
         with sentry_sdk.start_span(
             name=middleware_name,
             attributes={
-                "sentry.op": OP.MIDDLEWARE_LITESTAR,
+                "sentry.op": OP.MIDDLEWARE,
                 "sentry.origin": LitestarIntegration.origin,
             },
         ) as middleware_span:
@@ -187,7 +187,7 @@ def enable_span_for_middleware(middleware: "Middleware") -> "Middleware":
                 with sentry_sdk.start_span(
                     name=getattr(receive, "__qualname__", str(receive)),
                     attributes={
-                        "sentry.op": OP.MIDDLEWARE_LITESTAR_RECEIVE,
+                        "sentry.op": OP.MIDDLEWARE,
                         "sentry.origin": LitestarIntegration.origin,
                     },
                 ) as span:
@@ -207,7 +207,7 @@ def enable_span_for_middleware(middleware: "Middleware") -> "Middleware":
                 with sentry_sdk.start_span(
                     name=getattr(send, "__qualname__", str(send)),
                     attributes={
-                        "sentry.op": OP.MIDDLEWARE_LITESTAR_SEND,
+                        "sentry.op": OP.MIDDLEWARE,
                         "sentry.origin": LitestarIntegration.origin,
                     },
                 ) as span:

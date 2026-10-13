@@ -1361,6 +1361,7 @@ class OP:
     HTTP_CLIENT = "http.client"
     HTTP_CLIENT_STREAM = "http.client.stream"
     HTTP_SERVER = "http.server"
+    MIDDLEWARE = "middleware"
     MIDDLEWARE_DJANGO = "middleware.django"
     MIDDLEWARE_LITESTAR = "middleware.litestar"
     MIDDLEWARE_LITESTAR_RECEIVE = "middleware.litestar.receive"
@@ -1391,6 +1392,7 @@ class OP:
     SUBPROCESS_WAIT = "subprocess.wait"
     SUBPROCESS_COMMUNICATE = "subprocess.communicate"
     TEMPLATE_RENDER = "template.render"
+    VIEW = "view"
     VIEW_AUTHENTICATE = "view.authenticate"
     VIEW_RENDER = "view.render"
     VIEW_RESPONSE_RENDER = "view.response.render"
@@ -1874,4 +1876,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "2.71.0"
+VERSION = "2.72.0"
