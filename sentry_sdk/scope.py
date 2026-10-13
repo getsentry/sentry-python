@@ -1458,10 +1458,6 @@ class Scope:
             ):
                 attributes[attribute_name] = self._user[user_attribute]
 
-    def _drop(self, cause: "Any", ty: str) -> "Optional[Any]":
-        logger.info("%s (%s) dropped event", ty, cause)
-        return None
-
     def run_error_processors(self, event: "Event", hint: "Hint") -> "Optional[Event]":
         """
         Runs the error processors on the event and returns the modified event.
@@ -1476,10 +1472,22 @@ class Scope:
 
             for error_processor in error_processors:
                 new_event = None
+                exception_raised = False
                 with capture_internal_exceptions():
-                    new_event = error_processor(event, exc_info)
+                    try:
+                        new_event = error_processor(event, exc_info)
+                    except Exception:
+                        exception_raised = True
+                        raise
                 if new_event is None:
-                    return self._drop(error_processor, "error processor")
+                    logger.info("%s (error processor) dropped event", error_processor)
+                    transport = sentry_sdk.get_client().transport
+                    if transport:
+                        transport.record_lost_event(
+                            "callback_error" if exception_raised else "event_processor",
+                            data_category="error",
+                        )
+                    return None
 
                 event = new_event
 
@@ -1506,10 +1514,23 @@ class Scope:
 
             for event_processor in event_processors:
                 new_event = None
+                exception_raised = False
                 with capture_internal_exceptions():
-                    new_event = event_processor(event, hint)
+                    try:
+                        new_event = event_processor(event, hint)
+                    except Exception:
+                        exception_raised = True
+                        raise
                 if new_event is None:
-                    return self._drop(event_processor, "event processor")
+                    logger.info("%s (event processor) dropped event", event_processor)
+                    transport = sentry_sdk.get_client().transport
+                    if transport:
+                        transport.record_lost_event(
+                            "callback_error" if exception_raised else "event_processor",
+                            data_category="error",
+                        )
+                    return None
+
                 event = new_event
 
         return event
