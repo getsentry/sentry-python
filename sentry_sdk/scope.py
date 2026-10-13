@@ -1522,9 +1522,7 @@ class Scope:
                         exception_raised = True
                         raise
                 if new_event is None:
-                    logger.info(
-                        "%s (event processor processor) dropped event", event_processor
-                    )
+                    logger.info("%s (event processor) dropped event", event_processor)
                     transport = sentry_sdk.get_client().transport
                     if transport:
                         transport.record_lost_event(
