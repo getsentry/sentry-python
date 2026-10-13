@@ -321,7 +321,42 @@ def test_capture_checkin_sdk_not_initialized():
         status=None,
         duration=None,
     )
-    assert check_in_id == "112233"
+    assert check_in_id is None
+
+
+def test_capture_checkin_dropped_by_before_send(sentry_init, capture_envelopes):
+    sentry_init(before_send=lambda event, hint: None)
+    envelopes = capture_envelopes()
+
+    check_in_id = capture_checkin(monitor_slug="abc123", status="in_progress")
+
+    assert check_in_id is None
+    assert envelopes == []
+
+
+def test_context_monitor_exit_successfully_sends_checkin_when_enter_checkin_dropped(
+    sentry_init, capture_envelopes
+):
+    sentry_init(
+        before_send=lambda event, hint: (
+            None if event.get("status") == "in_progress" else event
+        )
+    )
+    envelopes = capture_envelopes()
+
+    monitor = sentry_sdk.monitor(monitor_slug="abc123")
+    with monitor:
+        # Confirms that the check in was dropped in the `__enter__`
+        assert monitor.check_in_id is None
+
+    (envelope,) = envelopes
+    check_in = envelope.items[0].payload.json
+
+    # Confirms that the second check in in `__exit__` works correctly
+    assert check_in["monitor_slug"] == "abc123"
+    assert check_in["check_in_id"]
+    assert check_in["status"] == "ok"
+    assert check_in["duration"] > 0
 
 
 def test_scope_data_in_checkin(sentry_init, capture_envelopes):

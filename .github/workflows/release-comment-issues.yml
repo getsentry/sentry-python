@@ -17,7 +17,7 @@ permissions:
 
 jobs:
   release-comment-issues:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     name: Notify issues
     steps:
       - name: Get version

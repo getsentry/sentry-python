@@ -42,7 +42,7 @@ def capture_checkin(
     status: "Optional[str]" = None,
     duration: "Optional[float]" = None,
     monitor_config: "Optional[MonitorConfig]" = None,
-) -> str:
+) -> "Optional[str]":
     check_in_event = _create_check_in_event(
         monitor_slug=monitor_slug,
         check_in_id=check_in_id,
@@ -51,7 +51,8 @@ def capture_checkin(
         monitor_config=monitor_config,
     )
 
-    sentry_sdk.capture_event(check_in_event)
+    if sentry_sdk.capture_event(check_in_event) is None:
+        return None
 
     logger.debug(
         f"[Crons] Captured check-in ({check_in_event.get('check_in_id')}): {check_in_event.get('monitor_slug')} -> {check_in_event.get('status')}"

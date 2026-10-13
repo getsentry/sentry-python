@@ -425,6 +425,7 @@ if TYPE_CHECKING:
         "log_item",
         "log_byte",
         "trace_metric",
+        "trace_metric_byte",
     ]
     SessionStatus = Literal["ok", "exited", "crashed", "abnormal"]
 

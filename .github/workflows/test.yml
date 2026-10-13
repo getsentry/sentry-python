@@ -100,10 +100,10 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install uv
-        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
       - name: Download coverage data
         # Artifacts from the reusable test workflows live in this same run.
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: coverage-*
           merge-multiple: true
@@ -115,7 +115,7 @@ jobs:
           uv run coverage combine .coverage-sentry-*
           uv run coverage xml
       - name: Report coverage and test results
-        uses: getsentry/coverage-action@5f3f449cf9e909fd63513a48f27c57f090a5f321 # v0.4.0
+        uses: getsentry/coverage-action@88418cdae07a8bac2beaec1550bcafff9ec55c8b # 0.4.3
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           files: coverage.xml

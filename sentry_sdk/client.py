@@ -56,6 +56,7 @@ from sentry_sdk.utils import (
     capture_internal_exceptions,
     current_stacktrace,
     datetime_from_isoformat,
+    deprecation_warning,
     env_to_bool,
     format_timestamp,
     get_before_send_log,
@@ -349,6 +350,13 @@ def _get_options(*args: "Optional[str]", **kwargs: "Any") -> "Dict[str, Any]":
 
     if rv["enable_tracing"] is True and rv["traces_sample_rate"] is None:
         rv["traces_sample_rate"] = 1.0
+
+    if rv["send_default_pii"] is not None:
+        deprecation_warning(
+            "The send_default_pii option is deprecated. Use data_collection "
+            "instead. "
+            "See https://docs.sentry.io/platforms/python/data-management/data-collected/"
+        )
 
     rv["data_collection"] = _resolve_data_collection(rv)
 
@@ -1260,6 +1268,27 @@ class _Client(BaseClient):
 
         return return_value
 
+    def _record_lost_telemetry(
+        self, reason: str, ty: str, telemetry: "Union[Log, Metric]"
+    ) -> None:
+        if self.transport is None:
+            return
+
+        batcher_cls: "Union[type[LogBatcher], type[MetricsBatcher]]"
+        if ty == "log":
+            data_category: "EventDataCategory" = "log_item"
+            batcher_cls = LogBatcher
+        else:
+            data_category = "trace_metric"
+            batcher_cls = MetricsBatcher
+
+        # Construct envelope item without sending it to report lost bytes
+        item = None
+        with capture_internal_exceptions():
+            item = batcher_cls._to_envelope_item([telemetry])  # type: ignore[list-item]
+
+        self.transport.record_lost_event(reason, data_category=data_category, item=item)
+
     def _capture_telemetry(
         self,
         telemetry: "Optional[Union[Log, Metric, StreamedSpan]]",
@@ -1300,32 +1329,12 @@ class _Client(BaseClient):
                     exception_raised_in_before_send_func = True
                     raise
 
-            if ty == "log":
+            if ty in ("log", "metric"):
                 if exception_raised_in_before_send_func:
-                    if self.transport:
-                        self.transport.record_lost_event(
-                            "callback_error", data_category="log_item"
-                        )
+                    self._record_lost_telemetry("callback_error", ty, telemetry)  # type: ignore[arg-type]
                     return
                 if serialized is None:
-                    if self.transport:
-                        self.transport.record_lost_event(
-                            "before_send", data_category="log_item"
-                        )
-                    return
-
-            elif ty == "metric":
-                if exception_raised_in_before_send_func:
-                    if self.transport:
-                        self.transport.record_lost_event(
-                            "callback_error", data_category="trace_metric"
-                        )
-                    return
-                if serialized is None:
-                    if self.transport:
-                        self.transport.record_lost_event(
-                            "before_send", data_category="trace_metric"
-                        )
+                    self._record_lost_telemetry("before_send", ty, telemetry)  # type: ignore[arg-type]
                     return
 
             elif ty == "span" and isinstance(telemetry, StreamedSpan):
