@@ -442,9 +442,6 @@ def test_service_extension_customizes_client_span(
         def get_span_op(self, ctx):
             return "aws.test"
 
-        def get_span_origin(self, ctx):
-            return "auto.aws.test"
-
         def get_request_attributes(self, ctx):
             return {
                 "aws.test.request": ctx.params["Key"],
@@ -476,7 +473,6 @@ def test_service_extension_customizes_client_span(
         spans_by_op = _capture_boto3_spans_by_op(
             lambda: client.head_object(**api_params),
             capture_items,
-            expected_origin="auto.aws.test",
         )
 
     spans = spans_by_op.get("aws.test", [])
@@ -486,7 +482,7 @@ def test_service_extension_customizes_client_span(
     assert span["name"] == "S3.HeadObject"
     assert span.get("end_timestamp") is not None
     assert attributes[SPANDATA.SENTRY_OP] == "aws.test"
-    assert attributes[SPANDATA.SENTRY_ORIGIN] == "auto.aws.test"
+    assert attributes[SPANDATA.SENTRY_ORIGIN] == "auto.aws.boto3"
     assert attributes[SPANDATA.SENTRY_KIND] == "producer"
     assert attributes[SPANDATA.CLOUD_PROVIDER] == CLOUD_PROVIDER
     assert attributes[SPANDATA.RPC_SYSTEM_NAME] == AWS_RPC_SYSTEM_NAME
