@@ -1,3 +1,4 @@
+import inspect
 import json
 import sys
 import time
@@ -836,6 +837,140 @@ def _set_common_output_data(
             span.__exit__(None, None, None)
 
 
+def _finish_span_once(span: "Any") -> "Callable[[], None]":
+    state = {"finished": False}
+
+    def finish() -> None:
+        if state["finished"]:
+            return
+        state["finished"] = True
+        with capture_internal_exceptions():
+            span.__exit__(None, None, None)
+
+    return finish
+
+
+def _finish_raw_response(
+    span: "Any", response: "Any", kwargs: "Any", integration: "Any"
+) -> "Any":
+    """
+    `.with_raw_response` and `.with_streaming_response` hand back the response
+    wrapper instead of a `ChatCompletion`, so the span would end without any
+    output.
+
+    A body that is already read is parsed here; `parse()` caches its result, so
+    the caller pays nothing for it. A body the caller asked to stream must not be
+    read here, so the span is filled when the caller parses and closed when the
+    caller closes the response.
+    """
+    finish = _finish_span_once(span)
+
+    def record(parsed: "Any") -> None:
+        with capture_internal_exceptions():
+            _set_completions_api_output_data(
+                span, parsed, kwargs, integration, finish_span=False
+            )
+
+    if not hasattr(response, "parse"):
+        finish()
+        return response
+
+    if getattr(response.http_response, "is_stream_consumed", False):
+        record(response.parse())
+        finish()
+        return response
+
+    original_parse = response.parse
+
+    def parse(*args: "Any", **kwargs_: "Any") -> "Any":
+        parsed = original_parse(*args, **kwargs_)
+        record(parsed)
+        finish()
+        return parsed
+
+    response.parse = parse
+
+    original_close = getattr(response, "close", None)
+
+    if original_close is not None:
+
+        def close() -> None:
+            finish()
+            original_close()
+
+        response.close = close
+    return response
+
+
+async def _finish_raw_response_async(
+    span: "Any", response: "Any", kwargs: "Any", integration: "Any"
+) -> "Any":
+    """
+    The async twin of `_finish_raw_response`.
+
+    `parse()` and `close()` are coroutines on some SDK versions and plain
+    functions on others, so each wrapper keeps the shape of the method it
+    replaces and only awaits when the method it calls is awaitable.
+    """
+    finish = _finish_span_once(span)
+
+    def record(parsed: "Any") -> None:
+        with capture_internal_exceptions():
+            _set_completions_api_output_data(
+                span, parsed, kwargs, integration, finish_span=False
+            )
+
+    if not hasattr(response, "parse"):
+        finish()
+        return response
+
+    if getattr(response.http_response, "is_stream_consumed", False):
+        parsed = response.parse()
+        if inspect.isawaitable(parsed):
+            parsed = await parsed
+        record(parsed)
+        finish()
+        return response
+
+    original_parse = response.parse
+
+    if inspect.iscoroutinefunction(original_parse):
+
+        async def parse(*args: "Any", **kwargs_: "Any") -> "Any":
+            parsed = await original_parse(*args, **kwargs_)
+            record(parsed)
+            finish()
+            return parsed
+
+    else:
+
+        def parse(*args: "Any", **kwargs_: "Any") -> "Any":  # type: ignore[misc]
+            parsed = original_parse(*args, **kwargs_)
+            record(parsed)
+            finish()
+            return parsed
+
+    response.parse = parse
+
+    original_close = getattr(response, "close", None)
+
+    if original_close is not None:
+        if inspect.iscoroutinefunction(original_close):
+
+            async def close() -> None:
+                finish()
+                await original_close()
+
+        else:
+
+            def close() -> None:  # type: ignore[misc]
+                finish()
+                original_close()
+
+        response.close = close
+    return response
+
+
 def _new_sync_chat_completion(
     f: "Callable[..., Union[ChatCompletion, Stream[ChatCompletionChunk]]]",
     *args: "Any",
@@ -914,6 +1049,9 @@ def _new_sync_chat_completion(
             old_iterator=response._iterator,
             finish_span=True,
         )
+
+    elif hasattr(response, "http_response"):
+        _finish_raw_response(span, response, kwargs, integration)
 
     else:
         _set_completions_api_output_data(
@@ -998,6 +1136,8 @@ async def _new_async_chat_completion(
             old_iterator=response._iterator,
             finish_span=True,
         )
+    elif hasattr(response, "http_response"):
+        await _finish_raw_response_async(span, response, kwargs, integration)
     else:
         _set_completions_api_output_data(
             span, response, kwargs, integration, finish_span=True
