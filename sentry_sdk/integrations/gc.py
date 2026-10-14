@@ -50,15 +50,12 @@ class GcIntegration(Integration):
 
     @staticmethod
     def setup_once() -> None:
-        # gc.callbacks is the interpreter's official hook into garbage
-        # collection. The callback is invoked right before ("start") and right
-        # after ("stop") every collection.
         gc.callbacks.append(_gc_callback)
 
 
 def _gc_callback(phase: str, info: "Dict[str, Any]") -> None:
     # This runs in the middle of arbitrary user (or SDK) code, so it must never
-    # raise. An exception here would be reported as unraisable on stderr.
+    # raise.
     with capture_internal_exceptions():
         if phase == "start":
             _start_gc_span(info)
@@ -67,8 +64,6 @@ def _gc_callback(phase: str, info: "Dict[str, Any]") -> None:
 
 
 def _start_gc_span(info: "Dict[str, Any]") -> None:
-    # This runs on every collection, including the very frequent young
-    # generation ones, so bail out as cheaply as possible.
     client = sentry_sdk.get_client()
     integration = client.get_integration(GcIntegration)
     if integration is None:
@@ -78,11 +73,6 @@ def _start_gc_span(info: "Dict[str, Any]") -> None:
     if _GC_IS_GENERATIONAL and generation < integration.min_generation:
         return
 
-    # The span is started without making it the active span: finalizers
-    # (__del__, weakref callbacks) run during the collection and might create
-    # spans of their own, which shouldn't end up as children of the gc span.
-    # We also only ever attach the gc span to an existing span, never start a
-    # new trace for it.
     span: "Union[Span, StreamedSpan]"
     if has_span_streaming_enabled(client.options):
         parent = sentry_sdk.traces.get_current_span()
@@ -99,11 +89,7 @@ def _start_gc_span(info: "Dict[str, Any]") -> None:
             active=False,
         )
     else:
-        legacy_parent = sentry_sdk.get_current_span()
-        if legacy_parent is None:
-            return
-
-        span = legacy_parent.start_child(
+        span = sentry_sdk.start_span(
             op=OP.GC,
             name="garbage collection",
             origin=GcIntegration.origin,
