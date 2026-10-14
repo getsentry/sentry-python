@@ -1,4 +1,5 @@
 import gc
+import sysconfig
 import threading
 from typing import TYPE_CHECKING
 
@@ -17,6 +18,12 @@ if TYPE_CHECKING:
 
 ORIGIN = "auto.gc"
 
+# The garbage collector of free-threaded builds isn't generational: every
+# collection scans all objects, regardless of the generation it reports. This
+# is a property of the build, so it also applies if the GIL was re-enabled at
+# runtime.
+_GC_IS_GENERATIONAL = not sysconfig.get_config_var("Py_GIL_DISABLED")
+
 # The span of the garbage collection run that is currently in progress on this
 # thread. A collection runs synchronously from start to stop in the thread that
 # triggered it, and collections can't nest, so there's at most one at a time.
@@ -31,7 +38,8 @@ class GcIntegration(Integration):
     :param min_generation: Only collections of this generation or higher are
         recorded. Collections of the younger generations are very frequent and
         usually take well under a millisecond, so by default only full
-        collections (generation 2) are recorded.
+        collections (generation 2) are recorded. Ignored on free-threaded
+        builds, where every collection is a full collection.
     """
 
     identifier = "gc"
@@ -67,7 +75,7 @@ def _start_gc_span(info: "Dict[str, Any]") -> None:
         return
 
     generation = info["generation"]
-    if generation < integration.min_generation:
+    if _GC_IS_GENERATIONAL and generation < integration.min_generation:
         return
 
     # The span is started without making it the active span: finalizers

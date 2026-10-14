@@ -1,10 +1,20 @@
 import gc
+import sysconfig
 
 import pytest
 
 import sentry_sdk
 from sentry_sdk import start_transaction
 from sentry_sdk.integrations.gc import GcIntegration
+
+FREE_THREADED_BUILD = bool(sysconfig.get_config_var("Py_GIL_DISABLED"))
+
+requires_generational_gc = pytest.mark.skipif(
+    FREE_THREADED_BUILD, reason="The free-threaded GC isn't generational"
+)
+requires_free_threaded_build = pytest.mark.skipif(
+    not FREE_THREADED_BUILD, reason="Requires a free-threaded build"
+)
 
 
 class Node:
@@ -98,6 +108,7 @@ def test_gc_span(sentry_init, capture_events, capture_items, span_streaming):
     assert data["cpython.gc.uncollectable_objects"] == 0
 
 
+@requires_generational_gc
 @pytest.mark.parametrize("span_streaming", [True, False])
 def test_young_generations_skipped_by_default(
     sentry_init, capture_events, capture_items, span_streaming
@@ -119,6 +130,7 @@ def test_young_generations_skipped_by_default(
     assert gc_spans == []
 
 
+@requires_generational_gc
 @pytest.mark.parametrize("span_streaming", [True, False])
 def test_min_generation(sentry_init, capture_events, capture_items, span_streaming):
     sentry_init(
@@ -137,6 +149,71 @@ def test_min_generation(sentry_init, capture_events, capture_items, span_streami
     )
 
     assert [span[4]["cpython.gc.generation"] for span in gc_spans] == [1, 2]
+
+
+@requires_free_threaded_build
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_min_generation_ignored_on_free_threaded_build(
+    sentry_init, capture_events, capture_items, span_streaming
+):
+    sentry_init(
+        integrations=[GcIntegration(min_generation=2)],
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
+
+    def collect():
+        gc.collect(0)
+        gc.collect(1)
+        gc.collect(2)
+
+    _, gc_spans = collect_in_parent_span(
+        span_streaming, capture_events, capture_items, collect
+    )
+
+    assert [span[4]["cpython.gc.generation"] for span in gc_spans] == [0, 1, 2]
+
+
+@requires_free_threaded_build
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_automatic_collection_on_free_threaded_build(
+    sentry_init, capture_events, capture_items, span_streaming
+):
+    # Automatic collections on free-threaded builds always report generation 0,
+    # but they're full collections and must not be filtered out.
+    sentry_init(
+        integrations=[GcIntegration()],
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
+
+    collections = []
+
+    def on_collection(phase, info):
+        if phase == "stop":
+            collections.append(info)
+
+    def collect():
+        # When exactly an automatic collection happens depends on the
+        # interpreter's heuristics, so allocate until one does.
+        gc.callbacks.append(on_collection)
+        gc.enable()
+        try:
+            for _ in range(1000):
+                create_garbage_cycles(1000)
+                if collections:
+                    break
+        finally:
+            gc.disable()
+            gc.callbacks.remove(on_collection)
+
+    _, gc_spans = collect_in_parent_span(
+        span_streaming, capture_events, capture_items, collect
+    )
+
+    assert collections
+    assert len(gc_spans) == len(collections)
+    assert all(span[4]["cpython.gc.generation"] == 0 for span in gc_spans)
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
