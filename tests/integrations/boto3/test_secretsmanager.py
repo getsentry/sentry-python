@@ -92,7 +92,7 @@ def test_client_error(secretsmanager_client, capture_items):
 
         spans = capture_spans_by_op(call, capture_items)
 
-    (span,) = spans[OP.HTTP_CLIENT]
+    (span,) = spans[OP.RPC]
     attributes = span["attributes"]
     assert span["status"] == "error"
     assert attributes[SPANDATA.ERROR_TYPE] == "ResourceNotFoundException"
