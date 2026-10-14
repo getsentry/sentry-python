@@ -80,7 +80,7 @@ def _start_gc_span(info: "Dict[str, Any]") -> None:
             return
 
         span = sentry_sdk.traces.start_span(
-            name="garbage collection",
+            name="Garbage collection",
             attributes={
                 "sentry.op": OP.GC,
                 "sentry.origin": GcIntegration.origin,
@@ -91,7 +91,7 @@ def _start_gc_span(info: "Dict[str, Any]") -> None:
     else:
         span = sentry_sdk.start_span(
             op=OP.GC,
-            name="garbage collection",
+            name="Garbage collection",
             origin=GcIntegration.origin,
         )
         span.set_data(SPANDATA.CPYTHON_GC_GENERATION, generation)

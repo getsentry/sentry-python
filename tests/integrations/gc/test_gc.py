@@ -99,7 +99,7 @@ def test_gc_span(sentry_init, capture_events, capture_items, span_streaming):
 
     (span,) = gc_spans
     name, op, origin, span_parent_id, data = span
-    assert name == "garbage collection"
+    assert name == "Garbage collection"
     assert op == "gc"
     assert origin == "auto.gc"
     assert span_parent_id == parent_span_id
