@@ -287,6 +287,15 @@ TEST_SUITE_CONFIG = {
         "package": "litellm",
         "deps": {
             "*": ["anthropic", "google-genai", "pytest-asyncio", "httpx"],
+            # filelock 3.30.0-4.0.2 registers a Python audit hook on import. On
+            # CPython < 3.12, sys.settrace() is guarded by a process-wide flag
+            # that stays set while audit hooks run, so with coverage enabled a
+            # new thread can die in Thread._bootstrap with "Cannot install a
+            # trace function while another trace function is being installed"
+            # (python/cpython#98257). LiteLLM finishes spans in thread pool
+            # callbacks, so the span is lost. filelock 4.0.3 skips the hook on
+            # affected interpreters.
+            "py3.10,py3.11": ["filelock>=4.0.3"],
         },
         "include": "<=1.96",  # https://github.com/BerriAI/litellm/issues/36384
     },
