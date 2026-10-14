@@ -53,11 +53,16 @@ class SpanBatcher(Batcher["SpanJSON"]):
         self._record_lost_func = record_lost_func
         self._running = True
         self._lock = threading.Lock()
+        # Serializes whole flushes (taking buckets and capturing their
+        # envelopes), see _flush().
+        self._flush_lock = threading.RLock()
         self._active: "threading.local" = threading.local()
 
         self._last_full_flush: float = time.monotonic()  # drives time-based flushes
         self._flush_event = threading.Event()
-        self._pending_flush: set[str] = set()  # buckets to be flushed
+        # Buckets to be flushed, in the order they were marked. This is a dict
+        # rather than a set so traces go out in the order their segments ended.
+        self._pending_flush: dict[str, None] = {}
 
         self._flusher: "Optional[threading.Thread]" = None
         self._flusher_pid: "Optional[int]" = None
@@ -79,11 +84,12 @@ class SpanBatcher(Batcher["SpanJSON"]):
         self._running = True
 
         self._lock = threading.Lock()
+        self._flush_lock = threading.RLock()
         self._active = threading.local()
 
         self._last_full_flush = time.monotonic()
         self._flush_event = threading.Event()
-        self._pending_flush = set()
+        self._pending_flush = {}
 
         self._flusher = None
         self._flusher_pid = None
@@ -143,7 +149,7 @@ class SpanBatcher(Batcher["SpanJSON"]):
                     or self._running_size[span["trace_id"]]
                     >= self.MAX_BYTES_BEFORE_FLUSH
                 ):
-                    self._pending_flush.add(span["trace_id"])
+                    self._pending_flush[span["trace_id"]] = None
                     notify = True
                 else:
                     notify = False
@@ -183,6 +189,14 @@ class SpanBatcher(Batcher["SpanJSON"]):
         return res
 
     def _flush(self, only_pending: bool = False) -> None:
+        # The flusher thread and flush() can run concurrently. Holding
+        # _flush_lock until the envelopes have been captured keeps a later
+        # flush from capturing its buckets before an earlier one has, so
+        # envelopes are captured in the order their buckets were taken.
+        with self._flush_lock:
+            self._flush_buckets(only_pending)
+
+    def _flush_buckets(self, only_pending: bool) -> None:
         with self._lock:
             if only_pending:
                 buckets = list(self._pending_flush)

@@ -1,6 +1,8 @@
 import os
 import sys
+import threading
 import time
+import uuid
 from unittest import mock
 
 import pytest
@@ -572,3 +574,83 @@ def test_flush_loop_swallows_flush_exception():
     batcher._flush_loop()
 
     assert calls == [1]
+
+
+def _bare_batcher(capture_func):
+    """A SpanBatcher without a flusher thread, so tests drive flushes directly."""
+    batcher = SpanBatcher(
+        capture_func=capture_func, record_lost_func=lambda *a, **k: None
+    )
+    batcher._ensure_thread = lambda: True
+    batcher._flusher = mock.Mock()
+    return batcher
+
+
+def _segment_span_json(trace_id):
+    segment = mock.Mock()
+    segment._dynamic_sampling_context.return_value = {"trace_id": trace_id}
+    return {
+        "trace_id": trace_id,
+        "span_id": uuid.uuid4().hex[16:],
+        "name": "segment",
+        "is_segment": True,
+        "attributes": {},
+        "_segment_span": segment,
+    }
+
+
+def test_pending_buckets_flushed_in_segment_end_order():
+    """Traces whose segments ended before a flush are sent in that order.
+
+    Regression test for #8027: the pending buckets were kept in a set, so when
+    the flusher woke up after several segments had ended, traces were sent in
+    hash order of their trace IDs.
+    """
+    captured = []
+    batcher = _bare_batcher(
+        lambda envelope: captured.append(envelope.headers["trace"]["trace_id"])
+    )
+
+    trace_ids = [uuid.uuid4().hex for _ in range(20)]
+    for trace_id in trace_ids:
+        batcher.add(_segment_span_json(trace_id))
+
+    batcher._flush(only_pending=True)
+
+    assert captured == trace_ids
+
+
+def test_concurrent_flushes_capture_in_order():
+    """A flush must not capture its envelopes before an earlier, still-running
+    flush has captured its own, e.g. the flusher thread and sentry_sdk.flush().
+    """
+    trace_a, trace_b = uuid.uuid4().hex, uuid.uuid4().hex
+    captured = []
+    first_capture_started = threading.Event()
+    release_first_capture = threading.Event()
+
+    def capture(envelope):
+        trace_id = envelope.headers["trace"]["trace_id"]
+        if trace_id == trace_a:
+            first_capture_started.set()
+            assert release_first_capture.wait(timeout=5)
+        captured.append(trace_id)
+
+    batcher = _bare_batcher(capture)
+
+    batcher.add(_segment_span_json(trace_a))
+    first = threading.Thread(target=batcher._flush, kwargs={"only_pending": True})
+    first.start()
+    assert first_capture_started.wait(timeout=5)
+
+    # trace_a has been taken from the buffer but not captured yet.
+    batcher.add(_segment_span_json(trace_b))
+    second = threading.Thread(target=batcher.flush)
+    second.start()
+    second.join(timeout=0.2)
+
+    release_first_capture.set()
+    first.join(timeout=5)
+    second.join(timeout=5)
+
+    assert captured == [trace_a, trace_b]
