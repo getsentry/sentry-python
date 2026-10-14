@@ -169,7 +169,7 @@ def _start_client_span(
 
     # `sentry.op` and `sentry.origin` are set to generic defaults;
     # a service extension can override them with `get_span_op()` and `get_span_origin()`.
-    span_op = OP.HTTP_CLIENT
+    span_op = OP.RPC
     span_origin = ORIGIN
 
     if service_ext is not None:

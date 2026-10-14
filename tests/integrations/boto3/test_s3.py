@@ -26,12 +26,12 @@ def _stubbed_span(client, capture_items, method, params, response):
             lambda: getattr(client, method)(**params), capture_items
         )
         stubber.assert_no_pending_responses()
-    (span,) = spans[OP.HTTP_CLIENT]
+    (span,) = spans[OP.RPC]
     operation = client.meta.method_to_api_mapping[method]
     assert span["name"] == "S3.%s" % operation
     assert span.get("end_timestamp") is not None
     attributes = span.get("attributes", {})
-    assert attributes[SPANDATA.SENTRY_OP] == OP.HTTP_CLIENT
+    assert attributes[SPANDATA.SENTRY_OP] == OP.RPC
     assert attributes[SPANDATA.SENTRY_ORIGIN] == ORIGIN
     assert attributes[SPANDATA.SENTRY_KIND] == "client"
     assert attributes[SPANDATA.CLOUD_PROVIDER] == "aws"

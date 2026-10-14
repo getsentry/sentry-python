@@ -36,7 +36,7 @@ def test_request_attributes(
             lambda: getattr(client, method)(**params), capture_items
         )
 
-    (span,) = spans[OP.HTTP_CLIENT]
+    (span,) = spans[OP.RPC]
     attributes = span["attributes"]
     if expected_resource_id is None:
         assert SPANDATA.CLOUD_ACCOUNT_ID not in attributes
