@@ -22,7 +22,7 @@ jobs:
     steps:
     - name: Get auth token
       id: token
-      uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+      uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
       with:
         app-id: ${{ vars.SENTRY_RELEASE_BOT_CLIENT_ID }}
         private-key: ${{ secrets.SENTRY_RELEASE_BOT_PRIVATE_KEY }}
@@ -31,7 +31,7 @@ jobs:
         token: ${{ steps.token.outputs.token }}
         fetch-depth: 0
     - name: Prepare release
-      uses: getsentry/craft@cd1e8294061fd970b40d98b77aaa109cb1e00e78 # 2.30.1
+      uses: getsentry/craft@3f2abdc5703191d12ef2cc013f792f1bd220f44d # 2.34.1
       env:
         GITHUB_TOKEN: ${{ steps.token.outputs.token }}
       with:
