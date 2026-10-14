@@ -911,6 +911,7 @@ def test_completions_api_data_collection_outputs(
         span_data = span["data"]
 
     assert span_data[SPANDATA.GEN_AI_RESPONSE_MODEL] == "gpt-3.5-turbo"
+    assert span_data[SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["stop"]
 
     if expect_output:
         assert "the model response" in span_data[SPANDATA.GEN_AI_RESPONSE_TEXT]
@@ -1027,6 +1028,7 @@ async def test_completions_api_data_collection_outputs_async(
         span_data = span["data"]
 
     assert span_data[SPANDATA.GEN_AI_RESPONSE_MODEL] == "gpt-3.5-turbo"
+    assert span_data[SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["stop"]
 
     if expect_output:
         assert "the model response" in span_data[SPANDATA.GEN_AI_RESPONSE_TEXT]
@@ -1790,6 +1792,7 @@ def test_streaming_chat_completion_no_prompts(
         assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
 
         assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "model-id"
+        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["stop"]
 
         assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["attributes"]
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
@@ -1844,6 +1847,7 @@ def test_streaming_chat_completion_no_prompts(
         assert span["data"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
 
         assert span["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "model-id"
+        assert span["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["stop"]
 
         assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["data"]
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
@@ -2702,6 +2706,7 @@ async def test_streaming_chat_completion_async_no_prompts(
         assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
 
         assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "model-id"
+        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["stop"]
 
         assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["attributes"]
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
@@ -2758,6 +2763,7 @@ async def test_streaming_chat_completion_async_no_prompts(
         assert span["data"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
 
         assert span["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "model-id"
+        assert span["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["stop"]
 
         assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["data"]
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
@@ -5017,6 +5023,11 @@ def test_completions_token_usage_manual_output_counting_choices(
         sentry_sdk.flush()
         (span,) = (item.payload for item in items)
 
+        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == [
+            "stop",
+            "stop",
+            "stop",
+        ]
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 20
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 20
         if tiktoken_encoding_if_installed():
