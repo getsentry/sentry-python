@@ -169,7 +169,7 @@ def _start_client_span(
 
     # `sentry.op` is set to a generic default, which a service extension can override
     # with `get_span_op()`.
-    span_op = OP.HTTP_CLIENT
+    span_op = OP.RPC
 
     if service_ext is not None:
         with capture_internal_exceptions():
