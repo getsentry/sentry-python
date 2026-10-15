@@ -2665,6 +2665,8 @@ def test_response_without_usage(
             kwargs = {
                 "model": "gpt-3.5-turbo",
                 "messages": messages,
+                "response_cost": 0.123,
+                "standard_logging_object": {"response_cost": 0.001},
             }
 
             _input_callback(kwargs)
@@ -2681,6 +2683,7 @@ def test_response_without_usage(
         # Span should still be created even without usage info
         assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
         assert span["name"] == "chat gpt-3.5-turbo"
+        assert span["attributes"][SPANDATA.GEN_AI_COST_TOTAL_TOKENS] == 0.123
     else:
         events = capture_events()
 
@@ -2688,6 +2691,8 @@ def test_response_without_usage(
             kwargs = {
                 "model": "gpt-3.5-turbo",
                 "messages": messages,
+                "response_cost": 0.123,
+                "standard_logging_object": {"response_cost": 0.001},
             }
 
             _input_callback(kwargs)
@@ -2704,6 +2709,7 @@ def test_response_without_usage(
         # Span should still be created even without usage info
         assert span["op"] == OP.GEN_AI_CHAT
         assert span["description"] == "chat gpt-3.5-turbo"
+        assert span["data"][SPANDATA.GEN_AI_COST_TOTAL_TOKENS] == 0.123
 
 
 def test_integration_setup(sentry_init):
