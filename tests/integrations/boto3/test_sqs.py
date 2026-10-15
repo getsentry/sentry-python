@@ -33,7 +33,7 @@ def test_request_attributes(client_factory, capture_items, source):
             lambda: getattr(client, method)(**params), capture_items
         )
 
-    (span,) = spans[OP.HTTP_CLIENT]
+    (span,) = spans[OP.RPC]
     attributes = span["attributes"]
     assert attributes[SPANDATA.CLOUD_ACCOUNT_ID] == "123456789012"
     if resource_id is None:

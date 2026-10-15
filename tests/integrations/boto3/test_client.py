@@ -146,7 +146,7 @@ def test_streaming_span_order_and_scope(
         if span["name"] == "S3.GetObject"
         and (
             span.get("attributes", {}).get(SPANDATA.SENTRY_ORIGIN) == ORIGIN
-            and span.get("attributes", {}).get(SPANDATA.SENTRY_OP) == OP.HTTP_CLIENT
+            and span.get("attributes", {}).get(SPANDATA.SENTRY_OP) == OP.RPC
         )
     ]
     http_spans = [
@@ -231,7 +231,7 @@ def test_non_body_stream_delays_client_span(
         assert sentry_sdk.get_current_span() is parent
 
     spans_by_op = _capture_boto3_spans_by_op(invoke, capture_items)
-    (client_span,) = spans_by_op[OP.HTTP_CLIENT]
+    (client_span,) = spans_by_op[OP.RPC]
     (stream_span,) = spans_by_op[OP.HTTP_CLIENT_STREAM]
     assert stream_span.get("parent_span_id") == client_span["span_id"]
 
@@ -251,7 +251,7 @@ def test_omit_url_data_if_parsing_fails(capture_items, client_factory):
             )
 
     parse_url.assert_called()
-    (span,) = spans_by_op[OP.HTTP_CLIENT]
+    (span,) = spans_by_op[OP.RPC]
     attributes = span.get("attributes", {})
     assert SPANDATA.URL_FULL not in attributes
     assert SPANDATA.URL_FRAGMENT not in attributes
@@ -326,7 +326,7 @@ def test_url_query_data_collection(
     (span,) = [
         item.payload
         for item in items
-        if item.payload.get("attributes", {}).get(SPANDATA.SENTRY_OP) == OP.HTTP_CLIENT
+        if item.payload.get("attributes", {}).get(SPANDATA.SENTRY_OP) == OP.RPC
     ]
     attributes = span.get("attributes", {})
 
@@ -428,7 +428,7 @@ def _capture_stubbed_client_span(
         )
         stubber.assert_no_pending_responses()
 
-    client_spans = spans_by_op.get(OP.HTTP_CLIENT, [])
+    client_spans = spans_by_op.get(OP.RPC, [])
     assert len(client_spans) == 1
     return client_spans[0]
 
@@ -580,7 +580,7 @@ def test_client_call_has_common_attributes(
 
     assert span["name"] == span_name
     assert span.get("end_timestamp") is not None
-    assert attributes[SPANDATA.SENTRY_OP] == OP.HTTP_CLIENT
+    assert attributes[SPANDATA.SENTRY_OP] == OP.RPC
     assert attributes[SPANDATA.SENTRY_ORIGIN] == ORIGIN
     assert attributes[SPANDATA.SENTRY_KIND] == "client"
     assert attributes[SPANDATA.CLOUD_PROVIDER] == CLOUD_PROVIDER
@@ -651,7 +651,7 @@ def test_client_call_has_response_header_attributes(
             capture_items,
         )
 
-    spans = spans_by_op[OP.HTTP_CLIENT]
+    spans = spans_by_op[OP.RPC]
     assert len(spans) == 1
     attributes = spans[0].get("attributes", {})
     assert attributes[SPANDATA.HTTP_STATUS_CODE] == 200
@@ -670,7 +670,7 @@ def test_retry_attempts_share_one_client_span(
     spans_by_op = _capture_boto3_spans_by_op(
         lambda: client.head_object(Bucket="bucket", Key="foo"), capture_items
     )
-    client_spans = spans_by_op.get(OP.HTTP_CLIENT, [])
+    client_spans = spans_by_op.get(OP.RPC, [])
 
     assert len(request_span_ids) == attempt_count
     # all `AWSRequest` instances created during retries reference the same client span.
@@ -693,7 +693,7 @@ def test_retries_exhausted_has_one_failed_client_span(
     spans_by_op = _capture_boto3_spans_by_op(
         attempt_failed_head_object_call, capture_items
     )
-    client_spans = spans_by_op.get(OP.HTTP_CLIENT, [])
+    client_spans = spans_by_op.get(OP.RPC, [])
 
     assert len(request_span_ids) == 2
     assert len(set(request_span_ids)) == 1
@@ -749,14 +749,14 @@ def test_client_error_has_response_attributes_and_is_unchanged(
     spans_by_op = _capture_boto3_spans_by_op(
         invoke_failing_client_method, capture_items
     )
-    client_spans = spans_by_op.get(OP.HTTP_CLIENT, [])
+    client_spans = spans_by_op.get(OP.RPC, [])
     _assert_one_failed_span(client_spans)
     attributes = client_spans[0].get("attributes", {})
 
     span = client_spans[0]
     assert span["name"] == "S3.HeadObject"
     assert span.get("end_timestamp") is not None
-    assert attributes[SPANDATA.SENTRY_OP] == OP.HTTP_CLIENT
+    assert attributes[SPANDATA.SENTRY_OP] == OP.RPC
     assert attributes[SPANDATA.SENTRY_ORIGIN] == ORIGIN
     assert attributes[SPANDATA.SENTRY_KIND] == "client"
     assert attributes[SPANDATA.CLOUD_PROVIDER] == CLOUD_PROVIDER
@@ -810,7 +810,7 @@ def test_client_call_exception_is_unchanged_and_finishes_span(
     spans_by_op = _capture_boto3_spans_by_op(
         invoke_failing_client_method, capture_items
     )
-    client_spans = spans_by_op.get(OP.HTTP_CLIENT, [])
+    client_spans = spans_by_op.get(OP.RPC, [])
     _assert_one_failed_span(client_spans)
 
     expected_error_type = (
@@ -856,7 +856,7 @@ def test_instrumentation_failure_does_not_change_response(
         stubber.add_response("head_object", original_response, api_params)
         spans_by_op = _capture_boto3_spans_by_op(invoke_client_method, capture_items)
 
-    client_spans = spans_by_op.get(OP.HTTP_CLIENT, [])
+    client_spans = spans_by_op.get(OP.RPC, [])
     assert returned_responses == [original_response]
     assert returned_responses[0] is original_response
     if failing_instrumentation == "_get_response_attributes":
@@ -893,7 +893,7 @@ def test_error_attribute_extraction_failure_does_not_replace_original_exception(
     spans_by_op = _capture_boto3_spans_by_op(
         invoke_failing_client_method, capture_items
     )
-    client_spans = spans_by_op.get(OP.HTTP_CLIENT, [])
+    client_spans = spans_by_op.get(OP.RPC, [])
 
     assert len(client_spans) == 1
     assert client_spans[0]["status"] == "error"
@@ -926,7 +926,7 @@ def test_streaming_response_attributes_belong_to_client_span(
     spans_by_op = _capture_boto3_spans_by_op(
         invoke_client_method_and_read_body, capture_items
     )
-    client_spans = spans_by_op.get(OP.HTTP_CLIENT, [])
+    client_spans = spans_by_op.get(OP.RPC, [])
     stream_spans = spans_by_op.get(OP.HTTP_CLIENT_STREAM, [])
 
     assert len(client_spans) == 1
@@ -975,7 +975,7 @@ def test_streaming_body_read_failure_finishes_stream_span(
     spans_by_op = _capture_boto3_spans_by_op(
         invoke_client_method_and_read_body, capture_items
     )
-    client_spans = spans_by_op.get(OP.HTTP_CLIENT, [])
+    client_spans = spans_by_op.get(OP.RPC, [])
     stream_spans = spans_by_op.get(OP.HTTP_CLIENT_STREAM, [])
 
     assert len(client_spans) == 1
