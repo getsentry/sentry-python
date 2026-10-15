@@ -39,6 +39,7 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 - In the AWS Lambda and GCP integrations, the text of the message of the warning the SDK optionally emits if a function is about to time out has changed.
 - The `http.request.header.<name>` span attributes set by server integrations are now lists of strings instead of strings.
 - The HTTP breadcrumbs created by the stdlib (`http.client`) and boto3 integrations now use different keys: `http.method` is now `http.request.method`, `url` (or `aws.request.url` for boto3) is now `url.full`, `http.query` is now `url.query`, and `http.fragment` is now `url.fragment`. The stdlib breadcrumb no longer contains `reason`. The query string is filtered according to `data_collection`'s `url_query_params` setting.
+
 - The `url` field of HTTP breadcrumbs created by the HTTPX, httpx2, pyreqwest, and AIOHTTP client integrations now contains the full URL, including the query string and fragment. The query string is filtered according to `data_collection`'s `url_query_params` setting.
 - The breadcrumbs created by the PyMongo integration now use different keys: `db.name` is now `db.namespace`, `db.system` is now `db.system.name`, `db.operation` is now `db.operation.name`, `db.mongodb.collection` is now `db.collection.name`, and `net.peer.name` and `net.peer.port` are now `server.address` and `server.port`.
 - The connection breadcrumbs created by the asyncpg and aiomysql integrations now use `db.system.name` instead of `db.system` and `db.namespace` instead of `db.name`.
@@ -63,6 +64,7 @@ Span ops are now a smaller, framework-neutral set.
 - The Django integration now emits `view.render` instead of `view.response.render`, `view` instead of `view.authenticate`, and `function` instead of `event.django`.
 - The Django, Starlette, Starlite, and Litestar integrations now emit `middleware` instead of `middleware.django`, `middleware.starlette`, `middleware.starlette.receive`, `middleware.starlette.send`, `middleware.starlite`, `middleware.starlite.receive`, `middleware.starlite.send`, `middleware.litestar`, `middleware.litestar.receive`, and `middleware.litestar.send`.
 - The ARQ, Celery, Django, Dramatiq, Huey, RQ, and Ray integrations now emit `queue.publish` and `queue.process` instead of `queue.submit.arq`, `queue.task.arq`, `queue.submit.celery`, `queue.task.celery`, `queue.submit.django`, `queue.task.dramatiq`, `queue.submit.huey`, `queue.task.huey`, `queue.task.rq`, `queue.submit.ray`, and `queue.task.ray`.
+- The Boto3 integration now emits `rpc` instead of `http.client` for AWS API calls.
 
 #### GenAI span attributes
 
