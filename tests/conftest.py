@@ -5,13 +5,10 @@ import json
 import os
 import socket
 import threading
-import warnings
 from collections import namedtuple
-from contextlib import contextmanager
 from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from threading import Thread
-from unittest import mock
 from urllib.parse import parse_qs, urlparse
 
 try:
@@ -44,16 +41,6 @@ try:
 except (ImportError, RuntimeError):
     TestClient = None
 
-try:
-    import gevent
-except ImportError:
-    gevent = None
-
-try:
-    import eventlet
-except ImportError:
-    eventlet = None
-
 import sentry_sdk
 import sentry_sdk.utils
 from sentry_sdk.envelope import Envelope, parse_json
@@ -62,7 +49,6 @@ from sentry_sdk.integrations import (  # noqa: F401
     _installed_integrations,
     _processed_integrations,
 )
-from sentry_sdk.profiler import teardown_profiler
 from sentry_sdk.profiler.continuous_profiler import teardown_continuous_profiler
 from sentry_sdk.transport import Transport
 from sentry_sdk.utils import package_version, reraise
@@ -91,7 +77,7 @@ from tests import _warning_recorder, _warning_recorder_mgr
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
-    from typing import Any, Callable, MutableMapping, Optional
+    from typing import Any, Callable, MutableMapping
 
 try:
     from httpx import (
@@ -273,12 +259,7 @@ def reset_integrations():
     but this also means some other stuff will be monkeypatched twice.
     """
     global _DEFAULT_INTEGRATIONS, _processed_integrations
-    try:
-        _DEFAULT_INTEGRATIONS.remove(
-            "sentry_sdk.integrations.opentelemetry.integration.OpenTelemetryIntegration"
-        )
-    except ValueError:
-        pass
+
     _processed_integrations.clear()
     _installed_integrations.clear()
 
@@ -410,7 +391,7 @@ def capture_events(monkeypatch):
 
         def append_event(envelope):
             for item in envelope:
-                if item.headers.get("type") in ("event", "transaction"):
+                if item.headers.get("type") == "event":
                     events.append(item.payload.json)
             return old_capture_envelope(envelope)
 
@@ -503,37 +484,6 @@ def capture_record_lost_event_calls(monkeypatch):
 
 
 @pytest.fixture
-def capture_events_forksafe(monkeypatch, capture_events, request):
-    def inner():
-        capture_events()
-
-        events_r, events_w = os.pipe()
-        events_r = os.fdopen(events_r, "rb", 0)
-        events_w = os.fdopen(events_w, "wb", 0)
-
-        test_client = sentry_sdk.get_client()
-
-        old_capture_envelope = test_client.transport.capture_envelope
-
-        def append(envelope):
-            event = envelope.get_event() or envelope.get_transaction_event()
-            if event is not None:
-                events_w.write(json.dumps(event).encode("utf-8"))
-                events_w.write(b"\n")
-            return old_capture_envelope(envelope)
-
-        def flush(timeout=None, callback=None):
-            events_w.write(b"flush\n")
-
-        monkeypatch.setattr(test_client.transport, "capture_envelope", append)
-        monkeypatch.setattr(test_client, "flush", flush)
-
-        return EventStreamReader(events_r, events_w)
-
-    return inner
-
-
-@pytest.fixture
 def capture_items_forksafe(monkeypatch, capture_items, request):
     def inner(*types):
         capture_items(*types)
@@ -591,48 +541,9 @@ class EventStreamReader:
         assert self.read_file.readline() == b"flush\n"
 
 
-# scope=session ensures that fixture is run earlier
-@pytest.fixture(
-    scope="session",
-    params=[None, "eventlet", "gevent"],
-    ids=("threads", "eventlet", "greenlet"),
-)
-def maybe_monkeypatched_threading(request):
-    if request.param == "eventlet":
-        if eventlet is None:
-            pytest.skip("no eventlet installed")
-
-        try:
-            eventlet.monkey_patch()
-        except AttributeError as e:
-            if "'thread.RLock' object has no attribute" in str(e):
-                # https://bitbucket.org/pypy/pypy/issues/2962/gevent-cannot-patch-rlock-under-pypy-27-7
-                pytest.skip("https://github.com/eventlet/eventlet/issues/546")
-            else:
-                raise
-    elif request.param == "gevent":
-        if gevent is None:
-            pytest.skip("no gevent installed")
-        try:
-            gevent.monkey.patch_all()
-        except Exception as e:
-            if "_RLock__owner" in str(e):
-                pytest.skip("https://github.com/gevent/gevent/issues/1380")
-            else:
-                raise
-    else:
-        assert request.param is None
-
-    return request.param
-
-
 @pytest.fixture
 def render_span_tree():
-    def inner(spans, root_span=None):
-        streamed_spans = False
-        if root_span is None:
-            streamed_spans = True
-
+    def inner(spans):
         by_parent = {}
         for span in spans:
             if "parent_span_id" not in span:
@@ -642,15 +553,10 @@ def render_span_tree():
             by_parent.setdefault(span["parent_span_id"], []).append(span)
 
         def render_span(span):
-            if streamed_spans:
-                yield "- sentry.op={}: name={}".format(
-                    json.dumps(span["attributes"].get("sentry.op")),
-                    json.dumps(span["name"]),
-                )
-            else:
-                yield "- op={}: description={}".format(
-                    json.dumps(span.get("op")), json.dumps(span.get("description"))
-                )
+            yield "- sentry.op={}: name={}".format(
+                json.dumps(span["attributes"].get("sentry.op")),
+                json.dumps(span["name"]),
+            )
 
             for subspan in by_parent.get(span["span_id"]) or ():
                 for line in render_span(subspan):
@@ -841,25 +747,12 @@ def object_described_by_matcher():
 @pytest.fixture
 def teardown_profiling():
     # Make sure that a previous test didn't leave the profiler running
-    teardown_profiler()
     teardown_continuous_profiler()
 
     yield
 
-    # Make sure that to shut down the profiler after the test
-    teardown_profiler()
+    # Make sure to shut down the profiler after the test
     teardown_continuous_profiler()
-
-
-@pytest.fixture()
-def suppress_deprecation_warnings():
-    """
-    Use this fixture to suppress deprecation warnings in a test.
-    Useful for testing deprecated SDK features.
-    """
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore", DeprecationWarning)
-        yield
 
 
 def _make_session_message(jsonrpc_msg):
@@ -1020,35 +913,6 @@ def json_rpc():
             )
 
             return session_id, response
-
-    return inner
-
-
-@pytest.fixture()
-def select_mcp_transactions():
-    def inner(events):
-        return [
-            event
-            for event in events
-            if event["type"] == "transaction"
-            and event["contexts"]["trace"]["op"] == "mcp.server"
-        ]
-
-    return inner
-
-
-@pytest.fixture()
-def select_transactions_with_mcp_spans():
-    def inner(events, method_name):
-        return [
-            transaction
-            for transaction in events
-            if transaction.get("type") == "transaction"
-            and any(
-                span["data"].get("mcp.method.name") == method_name
-                for span in transaction.get("spans", [])
-            )
-        ]
 
     return inner
 
@@ -1736,24 +1600,6 @@ def werkzeug_set_cookie(client, servername, key, value):
         client.set_cookie(servername, key, value)
     except TypeError:
         client.set_cookie(key, value)
-
-
-@contextmanager
-def patch_start_tracing_child(
-    fake_transaction_is_none: bool = False,
-) -> "Iterator[Optional[mock.MagicMock]]":
-    if not fake_transaction_is_none:
-        fake_transaction = mock.MagicMock()
-        fake_start_child = mock.MagicMock()
-        fake_transaction.start_child = fake_start_child
-    else:
-        fake_transaction = None
-        fake_start_child = None
-
-    with mock.patch(
-        "sentry_sdk.tracing_utils.get_current_span", return_value=fake_transaction
-    ):
-        yield fake_start_child
 
 
 class ApproxDict(dict):

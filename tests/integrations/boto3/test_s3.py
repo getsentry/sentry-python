@@ -1,606 +1,281 @@
-from unittest import mock
+import json
+from copy import deepcopy
+from datetime import datetime, timezone
 
-import boto3
 import pytest
+from botocore.stub import Stubber
 
-import sentry_sdk
-from sentry_sdk import capture_message
-from sentry_sdk.consts import SPANDATA
-from sentry_sdk.integrations.boto3 import Boto3Integration
-from sentry_sdk.integrations.boto3.consts import ORIGIN
-from tests.conftest import ApproxDict
-from tests.integrations.boto3 import read_fixture
-from tests.integrations.boto3.aws_mock import MockResponse
-
-session = boto3.Session(
-    aws_access_key_id="-",
-    aws_secret_access_key="-",
+from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.integrations.boto3.consts import AWS_RPC_SYSTEM_NAME, ORIGIN
+from tests.integrations.boto3.helpers import (
+    capture_spans_by_op,
+    require_botocore_model_fields,
+)
+from tests.integrations.boto3.helpers import (
+    client_factory as client_factory,
+)
+from tests.integrations.boto3.helpers import (
+    s3_client as s3_client,
 )
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
-def test_basic(
-    sentry_init,
-    capture_events,
-    capture_items,
-    span_streaming,
-):
-    sentry_init(
-        traces_sample_rate=1.0,
-        integrations=[Boto3Integration()],
-        # disabled because session.resource() or s3.Bucket() result in a subprocess span for a
-        # shell that runs "uname -p 2> /dev/null" on Python 3.7 with boto3 version 1.12.49.
-        default_integrations=False,
-        trace_lifecycle="stream" if span_streaming else "static",
-    )
-
-    s3 = session.resource("s3")
-    bucket = s3.Bucket("bucket")
-
-    if span_streaming:
-        items = capture_items("span")
-
-        with sentry_sdk.traces.start_span(name="custom parent") as span, MockResponse(
-            s3.meta.client, 200, {}, read_fixture("s3_list.xml")
-        ):
-            objects = [obj for obj in bucket.objects.all()]
-            assert len(objects) == 2
-            assert objects[0].key == "foo.txt"
-            assert objects[1].key == "bar.txt"
-            span.end()
-
-        sentry_sdk.flush()
-        spans = [item.payload for item in items]
-        assert len(spans) == 2
-        span = spans[0]
-        assert span["attributes"]["sentry.op"] == "http.client"
-        assert span["name"] == "aws.s3.ListObjects"
-    else:
-        events = capture_events()
-
-        with sentry_sdk.start_transaction() as transaction, MockResponse(
-            s3.meta.client, 200, {}, read_fixture("s3_list.xml")
-        ):
-            items = [obj for obj in bucket.objects.all()]
-            assert len(items) == 2
-            assert items[0].key == "foo.txt"
-            assert items[1].key == "bar.txt"
-            transaction.finish()
-
-        (event,) = events
-        assert event["type"] == "transaction"
-        assert len(event["spans"]) == 1
-        (span,) = event["spans"]
-        assert span["op"] == "http.client"
-        assert span["description"] == "aws.s3.ListObjects"
+def _stubbed_span(client, capture_items, method, params, response):
+    with Stubber(client) as stubber:
+        stubber.add_response(method, response, expected_params=params)
+        spans = capture_spans_by_op(
+            lambda: getattr(client, method)(**params), capture_items
+        )
+        stubber.assert_no_pending_responses()
+    (span,) = spans[OP.HTTP_CLIENT]
+    operation = client.meta.method_to_api_mapping[method]
+    assert span["name"] == "S3.%s" % operation
+    assert span.get("end_timestamp") is not None
+    attributes = span.get("attributes", {})
+    assert attributes[SPANDATA.SENTRY_OP] == OP.HTTP_CLIENT
+    assert attributes[SPANDATA.SENTRY_ORIGIN] == ORIGIN
+    assert attributes[SPANDATA.SENTRY_KIND] == "client"
+    assert attributes[SPANDATA.CLOUD_PROVIDER] == "aws"
+    assert attributes[SPANDATA.RPC_SYSTEM_NAME] == AWS_RPC_SYSTEM_NAME
+    assert attributes[SPANDATA.RPC_SERVICE] == "S3"
+    assert attributes[SPANDATA.RPC_METHOD] == operation
+    assert attributes[SPANDATA.CLOUD_REGION] == "eu-north-1"
+    assert attributes[SPANDATA.SERVER_ADDRESS] == "s3.eu-north-1.amazonaws.com"
+    assert attributes[SPANDATA.SERVER_PORT] == 443
+    return span
 
 
-@pytest.mark.parametrize("send_default_pii", [True, False])
-@pytest.mark.parametrize("span_streaming", [True, False])
-def test_streaming(
-    sentry_init,
-    capture_events,
-    capture_items,
-    span_streaming,
-    send_default_pii,
-):
-    sentry_init(
-        traces_sample_rate=1.0,
-        integrations=[Boto3Integration()],
-        send_default_pii=send_default_pii,
-        trace_lifecycle="stream" if span_streaming else "static",
-    )
+def test_request_attributes(s3_client, capture_items):
+    bucket_arn = "arn:aws:s3:eu-north-1:123456789012:accesspoint/orders"
+    params = {
+        "Bucket": bucket_arn,
+        "Key": "file.txt",
+        "UploadId": "upload-id",
+        "PartNumber": 1,
+        "Body": b"private-content",
+    }
+    original = deepcopy(params)
 
-    s3 = session.resource("s3")
-    obj = s3.Bucket("bucket").Object("foo.pdf")
+    span = _stubbed_span(s3_client, capture_items, "upload_part", params, {})
 
-    if span_streaming:
-        items = capture_items("span")
+    attributes = span.get("attributes", {})
+    assert attributes[SPANDATA.CLOUD_ACCOUNT_ID] == "123456789012"
+    assert attributes[SPANDATA.CLOUD_RESOURCE_ID] == bucket_arn
+    assert attributes[SPANDATA.AWS_S3_BUCKET] == bucket_arn
+    assert attributes[SPANDATA.AWS_S3_KEY] == "file.txt"
+    assert attributes[SPANDATA.AWS_S3_UPLOAD_ID] == "upload-id"
+    assert attributes[SPANDATA.AWS_S3_PART_NUMBER] == 1
+    assert SPANDATA.AWS_S3_COPY_SOURCE not in attributes
+    assert SPANDATA.AWS_S3_DELETE not in attributes
+    assert SPANDATA.FILE_SIZE not in attributes
+    assert SPANDATA.HTTP_BODY_SIZE not in attributes
+    assert params == original
+    assert "private-content" not in json.dumps(span)
 
-        with sentry_sdk.traces.start_span(name="custom parent") as span, MockResponse(
-            s3.meta.client, 200, {}, b"hello"
-        ):
-            body = obj.get()["Body"]
-            assert body.read(1) == b"h"
-            assert body.read(2) == b"el"
-            assert body.read(3) == b"lo"
-            assert body.read(1) == b""
-            span.end()
 
-        sentry_sdk.flush()
-        spans = [item.payload for item in items]
-        assert len(spans) == 3
-
-        stream_span, client_span, parent_span = spans
-        assert stream_span["attributes"]["sentry.op"] == "http.client.stream"
-        assert stream_span["name"] == "aws.s3.GetObject"
-        assert stream_span["parent_span_id"] == client_span["span_id"]
-
-        assert client_span["attributes"]["sentry.op"] == "http.client"
-        assert client_span["name"] == "aws.s3.GetObject"
-        assert client_span["parent_span_id"] == parent_span["span_id"]
-
-        assert parent_span["name"] == "custom parent"
-        assert parent_span["start_timestamp"] <= client_span["start_timestamp"]
-        assert client_span["start_timestamp"] <= stream_span["start_timestamp"]
-        assert stream_span["end_timestamp"] <= client_span["end_timestamp"]
-
-        expected_attrs = {
-            "http.request.method": "GET",
-            "rpc.method": "GetObject",
-            "rpc.service": "S3",
-            "sentry.environment": "production",
-            "sentry.op": "http.client",
-            "sentry.origin": ORIGIN,
-            "sentry.release": mock.ANY,
-            "sentry.sdk.name": "sentry.python",
-            "sentry.sdk.version": mock.ANY,
-            "sentry.segment.id": mock.ANY,
-            "sentry.segment.name": "custom parent",
-            "server.address": mock.ANY,
-            "thread.id": mock.ANY,
-            "thread.name": mock.ANY,
-        }
-        if send_default_pii:
-            expected_attrs["url.full"] = "https://bucket.s3.amazonaws.com/foo.pdf"
-        assert client_span["attributes"] == ApproxDict(expected_attrs)
-
-        assert "url.fragment" not in client_span["attributes"]
-        assert "url.query" not in client_span["attributes"]
-        if not send_default_pii:
-            assert "url.full" not in client_span["attributes"]
-    else:
-        events = capture_events()
-
-        with sentry_sdk.start_transaction() as transaction, MockResponse(
-            s3.meta.client, 200, {}, b"hello"
-        ):
-            body = obj.get()["Body"]
-            assert body.read(1) == b"h"
-            assert body.read(2) == b"el"
-            assert body.read(3) == b"lo"
-            assert body.read(1) == b""
-            transaction.finish()
-
-        (event,) = events
-        assert event["type"] == "transaction"
-        assert len(event["spans"]) == 2
-
-        span1 = event["spans"][0]
-        assert span1["op"] == "http.client"
-        assert span1["description"] == "aws.s3.GetObject"
-        assert span1["data"] == ApproxDict(
-            {
-                "http.method": "GET",
-                "aws.request.url": "https://bucket.s3.amazonaws.com/foo.pdf",
-                "http.fragment": "",
-                "http.query": "",
-            }
+@pytest.mark.parametrize(
+    "method,copy_source,expected",
+    [
+        pytest.param(
+            "copy_object",
+            "source/path/file.txt",
+            "source/path/file.txt",
+            id="string",
+        ),
+        pytest.param(
+            "copy_object",
+            {"Bucket": "source", "Key": "path/file.txt"},
+            "source/path/file.txt",
+            id="dictionary",
+        ),
+        pytest.param(
+            "upload_part_copy",
+            {"Bucket": "source", "Key": "path/file.txt", "VersionId": "version-1"},
+            "source/path/file.txt?versionId=version-1",
+            id="versioned-dictionary",
+        ),
+    ],
+)
+def test_copy_source(s3_client, capture_items, method, copy_source, expected):
+    source = deepcopy(copy_source)
+    params = {"Bucket": "bucket", "Key": "file.txt", "CopySource": source}
+    expected_attributes = {
+        SPANDATA.AWS_S3_BUCKET: "bucket",
+        SPANDATA.AWS_S3_KEY: "file.txt",
+        SPANDATA.AWS_S3_COPY_SOURCE: expected,
+    }
+    if method == "upload_part_copy":
+        params.update(UploadId="upload-id", PartNumber=1)
+        expected_attributes.update(
+            {SPANDATA.AWS_S3_UPLOAD_ID: "upload-id", SPANDATA.AWS_S3_PART_NUMBER: 1}
         )
 
-        span2 = event["spans"][1]
-        assert span2["op"] == "http.client.stream"
-        assert span2["description"] == "aws.s3.GetObject"
-        assert span2["parent_span_id"] == span1["span_id"]
+    span = _stubbed_span(s3_client, capture_items, method, params, {})
+
+    attributes = span.get("attributes", {})
+    for key, value in expected_attributes.items():
+        assert attributes[key] == value
+    for key in (
+        SPANDATA.AWS_S3_UPLOAD_ID,
+        SPANDATA.AWS_S3_PART_NUMBER,
+        SPANDATA.AWS_S3_DELETE,
+        SPANDATA.FILE_SIZE,
+        SPANDATA.HTTP_BODY_SIZE,
+    ):
+        if key not in expected_attributes:
+            assert key not in attributes
+    assert params["CopySource"] is source
+    assert source == copy_source
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
-def test_streaming_close(
-    sentry_init,
-    capture_events,
-    capture_items,
-    span_streaming,
-):
-    sentry_init(
-        traces_sample_rate=1.0,
-        integrations=[Boto3Integration()],
-        trace_lifecycle="stream" if span_streaming else "static",
-    )
-
-    s3 = session.resource("s3")
-    obj = s3.Bucket("bucket").Object("foo.pdf")
-
-    if span_streaming:
-        items = capture_items("span")
-
-        with sentry_sdk.traces.start_span(name="custom parent") as span, MockResponse(
-            s3.meta.client, 200, {}, b"hello"
-        ):
-            body = obj.get()["Body"]
-            assert body.read(1) == b"h"
-            body.close()  # close partially-read stream
-            span.end()
-
-        sentry_sdk.flush()
-        spans = [item.payload for item in items]
-        assert len(spans) == 3
-
-        stream_span, client_span, parent_span = spans
-        assert stream_span["attributes"]["sentry.op"] == "http.client.stream"
-        assert stream_span["name"] == "aws.s3.GetObject"
-        assert stream_span["parent_span_id"] == client_span["span_id"]
-
-        assert client_span["attributes"]["sentry.op"] == "http.client"
-        assert client_span["name"] == "aws.s3.GetObject"
-        assert client_span["parent_span_id"] == parent_span["span_id"]
-
-        assert parent_span["name"] == "custom parent"
-        assert parent_span["start_timestamp"] <= client_span["start_timestamp"]
-        assert client_span["start_timestamp"] <= stream_span["start_timestamp"]
-        assert stream_span["end_timestamp"] <= client_span["end_timestamp"]
-    else:
-        events = capture_events()
-
-        with sentry_sdk.start_transaction() as transaction, MockResponse(
-            s3.meta.client, 200, {}, b"hello"
-        ):
-            body = obj.get()["Body"]
-            assert body.read(1) == b"h"
-            body.close()  # close partially-read stream
-            transaction.finish()
-
-        (event,) = events
-        assert event["type"] == "transaction"
-        assert len(event["spans"]) == 2
-        span1 = event["spans"][0]
-        assert span1["op"] == "http.client"
-        span2 = event["spans"][1]
-        assert span2["op"] == "http.client.stream"
-
-
-@pytest.mark.tests_internal_exceptions
-@pytest.mark.parametrize("span_streaming", [True, False])
-def test_omit_url_data_if_parsing_fails(
-    sentry_init,
-    capture_events,
-    capture_items,
-    span_streaming,
-):
-    sentry_init(
-        traces_sample_rate=1.0,
-        integrations=[Boto3Integration()],
-        send_default_pii=True,
-        trace_lifecycle="stream" if span_streaming else "static",
-    )
-
-    s3 = session.resource("s3")
-    bucket = s3.Bucket("bucket")
-
-    if span_streaming:
-        items = capture_items("span")
-
-        with mock.patch(
-            "sentry_sdk.integrations.boto3._instrumentation.parse_url",
-            side_effect=ValueError,
-        ):
-            with sentry_sdk.traces.start_span(
-                name="custom parent"
-            ) as span, MockResponse(
-                s3.meta.client, 200, {}, read_fixture("s3_list.xml")
-            ):
-                objects = [obj for obj in bucket.objects.all()]
-                assert len(objects) == 2
-                assert objects[0].key == "foo.txt"
-                assert objects[1].key == "bar.txt"
-                span.end()
-
-                sentry_sdk.flush()
-                spans = [item.payload for item in items]
-                assert spans[0]["attributes"] == ApproxDict(
+@pytest.mark.parametrize(
+    "delete, input_fields, expected_serialized_delete",
+    [
+        pytest.param(
+            {"Quiet": True, "Objects": [{"VersionId": "version-1", "Key": "file.txt"}]},
+            (),
+            '{"Objects":[{"Key":"file.txt","VersionId":"version-1"}],"Quiet":true}',
+            id="basic",
+        ),
+        pytest.param(
+            {
+                "Objects": [
                     {
-                        "http.request.method": "GET",
-                        "rpc.method": "ListObjects",
-                        "rpc.service": "S3",
-                        "sentry.environment": "production",
-                        "sentry.op": "http.client",
-                        "sentry.origin": ORIGIN,
-                        "sentry.release": mock.ANY,
-                        "sentry.sdk.name": "sentry.python",
-                        "sentry.sdk.version": mock.ANY,
-                        "sentry.segment.id": mock.ANY,
-                        "sentry.segment.name": "custom parent",
-                        "server.address": mock.ANY,
-                        "thread.id": mock.ANY,
-                        "thread.name": mock.ANY,
+                        "Key": "file.txt",
+                        "VersionId": "version-1",
+                        "ETag": "etag",
+                        "LastModifiedTime": datetime(
+                            2026, 10, 8, 12, 34, 56, tzinfo=timezone.utc
+                        ),
+                        "Size": 123,
                     }
-                )
-
-        assert "url.full" not in spans[0]["attributes"]
-        assert "url.fragment" not in spans[0]["attributes"]
-        assert "url.query" not in spans[0]["attributes"]
-    else:
-        events = capture_events()
-
-        with mock.patch(
-            "sentry_sdk.integrations.boto3._instrumentation.parse_url",
-            side_effect=ValueError,
-        ):
-            with sentry_sdk.start_transaction() as transaction, MockResponse(
-                s3.meta.client, 200, {}, read_fixture("s3_list.xml")
-            ):
-                items = [obj for obj in bucket.objects.all()]
-                assert len(items) == 2
-                assert items[0].key == "foo.txt"
-                assert items[1].key == "bar.txt"
-                transaction.finish()
-
-                (event,) = events
-                assert event["spans"][0]["data"] == ApproxDict(
-                    {
-                        "http.method": "GET",
-                        # no url data
-                    }
-                )
-
-        assert "aws.request.url" not in event["spans"][0]["data"]
-        assert "http.fragment" not in event["spans"][0]["data"]
-        assert "http.query" not in event["spans"][0]["data"]
-
-
-@pytest.mark.parametrize("span_streaming", [True, False])
-def test_span_origin(
-    sentry_init,
-    capture_events,
-    capture_items,
-    span_streaming,
+                ]
+            },
+            ("Delete.Objects.LastModifiedTime",),
+            '{"Objects":[{"ETag":"etag","Key":"file.txt","LastModifiedTime":"2026-10-08T12:34:56+00:00","Size":123,"VersionId":"version-1"}]}',
+            id="last-modified-time",
+        ),
+    ],
+)
+def test_delete_serialization(
+    s3_client, capture_items, delete, input_fields, expected_serialized_delete
 ):
-    sentry_init(
-        traces_sample_rate=1.0,
-        integrations=[Boto3Integration()],
-        trace_lifecycle="stream" if span_streaming else "static",
+    require_botocore_model_fields(
+        s3_client,
+        "delete_objects",
+        input_fields=input_fields,
     )
 
-    s3 = session.resource("s3")
-    bucket = s3.Bucket("bucket")
+    params = {"Bucket": "bucket", "Delete": deepcopy(delete)}
+    original = deepcopy(params)
+    caller_delete = params["Delete"]
+    caller_objects = caller_delete["Objects"]
 
-    if span_streaming:
-        items = capture_items("span")
+    span = _stubbed_span(s3_client, capture_items, "delete_objects", params, {})
 
-        with sentry_sdk.traces.start_span(name="custom parent"), MockResponse(
-            s3.meta.client, 200, {}, read_fixture("s3_list.xml")
-        ):
-            _ = [obj for obj in bucket.objects.all()]
-
-        sentry_sdk.flush()
-        spans = [item.payload for item in items]
-
-        assert spans[1]["attributes"]["sentry.origin"] == "manual"
-        assert spans[0]["attributes"]["sentry.origin"] == ORIGIN
-    else:
-        events = capture_events()
-
-        with sentry_sdk.start_transaction(), MockResponse(
-            s3.meta.client, 200, {}, read_fixture("s3_list.xml")
-        ):
-            _ = [obj for obj in bucket.objects.all()]
-
-        (event,) = events
-
-        assert event["contexts"]["trace"]["origin"] == "manual"
-        assert event["spans"][0]["origin"] == ORIGIN
+    attributes = span.get("attributes", {})
+    assert attributes[SPANDATA.AWS_S3_BUCKET] == "bucket"
+    assert attributes[SPANDATA.AWS_S3_DELETE] == expected_serialized_delete
+    assert SPANDATA.AWS_S3_KEY not in attributes
+    assert SPANDATA.AWS_S3_UPLOAD_ID not in attributes
+    assert SPANDATA.AWS_S3_COPY_SOURCE not in attributes
+    assert SPANDATA.AWS_S3_PART_NUMBER not in attributes
+    assert SPANDATA.FILE_SIZE not in attributes
+    assert SPANDATA.HTTP_BODY_SIZE not in attributes
+    assert params == original
+    assert params["Delete"] is caller_delete
+    assert caller_delete["Objects"] is caller_objects
 
 
-def test_breadcrumb(sentry_init, capture_events):
-    sentry_init(
-        integrations=[Boto3Integration()],
-        default_integrations=False,
-    )
-
-    s3 = session.resource("s3")
-    bucket = s3.Bucket("bucket")
-
-    events = capture_events()
-
-    with MockResponse(s3.meta.client, 200, {}, read_fixture("s3_list.xml")):
-        _ = [obj for obj in bucket.objects.all()]
-
-    capture_message("Testing!")
-
-    (event,) = events
-    (crumb,) = event["breadcrumbs"]["values"]
-    assert crumb["type"] == "http"
-    assert crumb["category"] == "httplib"
-    assert crumb["data"] == ApproxDict(
-        {
-            "aws.request.url": mock.ANY,
-            SPANDATA.HTTP_METHOD: "GET",
-            SPANDATA.HTTP_QUERY: mock.ANY,
-            SPANDATA.HTTP_FRAGMENT: "",
-        }
-    )
-
-
-@pytest.mark.parametrize("send_default_pii", [True, False])
-def test_breadcrumb_span_streaming(sentry_init, capture_events, send_default_pii):
-    sentry_init(
-        integrations=[Boto3Integration()],
-        default_integrations=False,
-        trace_lifecycle="stream",
-        send_default_pii=send_default_pii,
-    )
-
-    s3 = session.resource("s3")
-    bucket = s3.Bucket("bucket")
-
-    events = capture_events()
-
-    with sentry_sdk.traces.start_span(name="custom parent"), MockResponse(
-        s3.meta.client, 200, {}, read_fixture("s3_list.xml")
-    ):
-        _ = [obj for obj in bucket.objects.all()]
-
-    capture_message("Testing!")
-
-    (event,) = events
-    (crumb,) = event["breadcrumbs"]["values"]
-    assert crumb["type"] == "http"
-    assert crumb["category"] == "httplib"
-
-    if send_default_pii:
-        assert crumb["data"] == ApproxDict(
-            {
-                SPANDATA.URL_FULL: mock.ANY,
-                SPANDATA.HTTP_REQUEST_METHOD: "GET",
-                SPANDATA.URL_QUERY: mock.ANY,
-            }
-        )
-        assert SPANDATA.URL_FRAGMENT not in crumb["data"]
-    else:
-        assert crumb["data"] == ApproxDict(
-            {
-                SPANDATA.HTTP_REQUEST_METHOD: "GET",
-            }
-        )
-        assert SPANDATA.URL_FULL not in crumb["data"]
-        assert SPANDATA.URL_QUERY not in crumb["data"]
-        assert SPANDATA.URL_FRAGMENT not in crumb["data"]
-
-
-BUCKET_URL = "https://bucket.s3.amazonaws.com/"
-
-# ``expected_query`` of ``None`` means no URL data is recorded at all; ``""``
-# means the URL is recorded without a query string.
-# Structure of the parameters is "init_kwargs, expected_query"
-URL_QUERY_PARAMS = [
-    pytest.param(
-        {"send_default_pii": True},
-        "list-type=2&prefix=foo&continuation-token=abc&encoding-type=url",
-        id="send_default_pii_true",
-    ),
-    pytest.param(
-        {"send_default_pii": False},
-        None,
-        id="send_default_pii_false",
-    ),
-    pytest.param(
-        {},
-        None,
-        id="defaults",
-    ),
-    pytest.param(
-        {"data_collection": {}},
-        "list-type=2&prefix=foo&continuation-token=%5BFiltered%5D&encoding-type=url",
-        id="data_collection_denylist_default",
-    ),
-    pytest.param(
-        {
-            "data_collection": {
-                "url_query_params": {"mode": "denylist", "terms": ["prefix"]}
-            }
-        },
-        "list-type=2&prefix=%5BFiltered%5D&continuation-token=%5BFiltered%5D&encoding-type=url",
-        id="data_collection_denylist_custom_terms",
-    ),
-    pytest.param(
-        {
-            "data_collection": {
-                "url_query_params": {"mode": "allowlist", "terms": ["prefix"]}
-            }
-        },
-        "list-type=%5BFiltered%5D&prefix=foo&continuation-token=%5BFiltered%5D&encoding-type=%5BFiltered%5D",
-        id="data_collection_allowlist",
-    ),
-    pytest.param(
-        {
-            "data_collection": {
-                "url_query_params": {
-                    "mode": "allowlist",
-                    "terms": ["continuation-token"],
-                }
-            }
-        },
-        "list-type=%5BFiltered%5D&prefix=%5BFiltered%5D&continuation-token=%5BFiltered%5D&encoding-type=%5BFiltered%5D",
-        id="data_collection_allowlist_sensitive_term",
-    ),
-    pytest.param(
-        {"data_collection": {"url_query_params": {"mode": "off"}}},
-        "",
-        id="data_collection_off",
-    ),
-    pytest.param(
-        {
-            "send_default_pii": True,
-            "data_collection": {"url_query_params": {"mode": "off"}},
-        },
-        "",
-        id="data_collection_wins_over_send_default_pii",
-    ),
-]
-
-
-@pytest.mark.parametrize("init_kwargs, expected_query", URL_QUERY_PARAMS)
-def test_url_query_data_collection_span_streaming(
-    sentry_init, capture_items, init_kwargs, expected_query
+@pytest.mark.parametrize(
+    "method,extra_params,response,expected",
+    [
+        pytest.param(
+            "head_object",
+            {},
+            {"ContentLength": 1024},
+            {SPANDATA.FILE_SIZE: 1024},
+            id="head-whole-object",
+        ),
+        pytest.param(
+            "head_object",
+            {},
+            {"ContentLength": 0},
+            {SPANDATA.FILE_SIZE: 0},
+            id="head-empty-object",
+        ),
+        pytest.param(
+            "head_object",
+            {"Range": "bytes=0-3"},
+            {"ContentLength": 4},
+            {},
+            id="head-range",
+        ),
+        pytest.param(
+            "head_object", {"PartNumber": 1}, {"ContentLength": 4}, {}, id="head-part"
+        ),
+        pytest.param(
+            "get_object",
+            {"Range": "bytes=0-3"},
+            {"ContentLength": 4},
+            {SPANDATA.HTTP_BODY_SIZE: 4},
+            id="get-range",
+        ),
+        pytest.param(
+            "get_object_attributes",
+            {"ObjectAttributes": ["ObjectSize"]},
+            {"ObjectSize": 1024},
+            {SPANDATA.FILE_SIZE: 1024},
+            id="object-attributes-size",
+        ),
+        pytest.param(
+            "put_object",
+            {"Body": b"data", "WriteOffsetBytes": 1020},
+            {"Size": 1024},
+            {SPANDATA.FILE_SIZE: 1024},
+            id="put-append-size",
+        ),
+        pytest.param("put_object", {"Body": b"data"}, {}, {}, id="put-missing-size"),
+        pytest.param(
+            "complete_multipart_upload",
+            {"UploadId": "upload-id", "MpuObjectSize": 1024},
+            {},
+            {SPANDATA.FILE_SIZE: 1024, SPANDATA.AWS_S3_UPLOAD_ID: "upload-id"},
+            id="multipart-request-size",
+        ),
+    ],
+)
+def test_size_attributes(
+    s3_client, capture_items, method, extra_params, response, expected
 ):
-    sentry_init(
-        traces_sample_rate=1.0,
-        integrations=[Boto3Integration()],
-        default_integrations=False,
-        trace_lifecycle="stream",
-        **init_kwargs,
+    require_botocore_model_fields(
+        s3_client,
+        method,
+        input_fields=tuple(
+            field
+            for field in ("MpuObjectSize", "WriteOffsetBytes")
+            if field in extra_params
+        ),
+        output_fields=tuple(response),
     )
+    params = {"Bucket": "bucket", "Key": "file.txt", **deepcopy(extra_params)}
 
-    client = session.client("s3")
+    span = _stubbed_span(s3_client, capture_items, method, params, response)
 
-    items = capture_items("span")
-
-    with sentry_sdk.traces.start_span(name="custom parent"), MockResponse(
-        client, 200, {}, read_fixture("s3_list.xml")
+    attributes = span.get("attributes", {})
+    expected_attributes = {
+        SPANDATA.AWS_S3_BUCKET: "bucket",
+        SPANDATA.AWS_S3_KEY: "file.txt",
+        **expected,
+    }
+    for key, value in expected_attributes.items():
+        assert attributes[key] == value
+    for key in (
+        SPANDATA.AWS_S3_UPLOAD_ID,
+        SPANDATA.AWS_S3_COPY_SOURCE,
+        SPANDATA.AWS_S3_PART_NUMBER,
+        SPANDATA.AWS_S3_DELETE,
+        SPANDATA.FILE_SIZE,
+        SPANDATA.HTTP_BODY_SIZE,
     ):
-        client.list_objects_v2(Bucket="bucket", Prefix="foo", ContinuationToken="abc")
-
-    sentry_sdk.flush()
-
-    (span,) = [
-        item.payload
-        for item in items
-        if item.payload["attributes"].get("sentry.op") == "http.client"
-    ]
-
-    if expected_query is None:
-        assert SPANDATA.URL_QUERY not in span["attributes"]
-        assert SPANDATA.URL_FULL not in span["attributes"]
-    elif expected_query == "":
-        assert SPANDATA.URL_QUERY not in span["attributes"]
-        assert span["attributes"][SPANDATA.URL_FULL] == BUCKET_URL
-    else:
-        assert span["attributes"][SPANDATA.URL_QUERY] == expected_query
-        assert (
-            span["attributes"][SPANDATA.URL_FULL] == BUCKET_URL + "?" + expected_query
-        )
-
-
-@pytest.mark.parametrize("init_kwargs, expected_query", URL_QUERY_PARAMS)
-def test_url_query_data_collection_breadcrumb(
-    sentry_init, capture_events, init_kwargs, expected_query
-):
-    sentry_init(
-        integrations=[Boto3Integration()],
-        default_integrations=False,
-        trace_lifecycle="stream",
-        **init_kwargs,
-    )
-
-    client = session.client("s3")
-
-    events = capture_events()
-
-    with sentry_sdk.traces.start_span(name="custom parent"), MockResponse(
-        client, 200, {}, read_fixture("s3_list.xml")
-    ):
-        client.list_objects_v2(Bucket="bucket", Prefix="foo", ContinuationToken="abc")
-
-    capture_message("Testing!")
-
-    (event,) = events
-    (crumb,) = event["breadcrumbs"]["values"]
-
-    if expected_query is None:
-        assert SPANDATA.URL_QUERY not in crumb["data"]
-        assert SPANDATA.URL_FULL not in crumb["data"]
-    elif expected_query == "":
-        assert SPANDATA.URL_QUERY not in crumb["data"]
-        assert crumb["data"][SPANDATA.URL_FULL] == BUCKET_URL
-    else:
-        assert crumb["data"][SPANDATA.URL_QUERY] == expected_query
-        assert crumb["data"][SPANDATA.URL_FULL] == BUCKET_URL + "?" + expected_query
+        if key not in expected_attributes:
+            assert key not in attributes
