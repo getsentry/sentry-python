@@ -393,3 +393,28 @@ def test_query_string_list_of_mappings_scrubbed():
     EventScrubber().scrub_event(event)
     assert event["request"]["query_string"][0]["token"].value == "[Filtered]"
     assert event["request"]["query_string"][1]["safe"] == "keep-me"
+
+
+
+def test_query_string_mapping_filtered_before_send(sentry_init, capture_events):
+    sentry_init()
+    events = capture_events()
+
+    capture_event(
+        {
+            "message": "test query parameters",
+            "request": {
+                "url": "https://example.test/resource",
+                "query_string": {"token": "do-not-send", "safe": "keep-me"},
+            },
+        }
+    )
+
+    (event,) = events
+    assert event["request"]["query_string"] == {
+        "token": "[Filtered]",
+        "safe": "keep-me",
+    }
+    assert event["_meta"]["request"]["query_string"]["token"] == {
+        "": {"rem": [["!config", "s"]]}
+    }
