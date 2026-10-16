@@ -56,9 +56,8 @@ class _SecretsManagerExtension(_ServiceExtension):
     def get_response_attributes(
         self, ctx: "AwsCallContext", response: "Any"
     ) -> "Attributes":
-        # when returned, the full `ARN` and exact `Name` replace the `SecretId` values.
-        # failed calls, tagging and `ValidateResourcePolicy` return neither, the
-        # replication apis no `Name`; there the request's values remain.
+        # the response's full `ARN` and exact `Name` override the request's values,
+        # which stay when the response has neither, e.g. failed calls.
         return _extract_attributes(
             response,
             (

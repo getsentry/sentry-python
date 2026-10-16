@@ -44,6 +44,7 @@ def secretsmanager_client(client_factory):
         pytest.param(
             "tag_resource",
             {"SecretId": SECRET_ARN, "Tags": [{"Key": "team", "Value": "billing"}]},
+            # doesn't return `ARN` or `Name`, so comes from request's `SecretId`.
             {},
             SECRET_ARN,
             "db-password",
@@ -72,6 +73,7 @@ def test_secret_attributes(
     attributes = span["attributes"]
     assert attributes[SPANDATA.AWS_SECRETSMANAGER_SECRET_ARN] == expected_arn
     assert attributes[SPANDATA.AWS_SECRETSMANAGER_SECRET_NAME] == expected_name
+    # secret value is never recorded.
     assert "hunter2" not in str(span)
 
 
@@ -98,5 +100,6 @@ def test_client_error(secretsmanager_client, capture_items):
     assert attributes[SPANDATA.ERROR_TYPE] == "ResourceNotFoundException"
     assert attributes[SPANDATA.CLOUD_ACCOUNT_ID] == "123456789012"
     assert attributes[SPANDATA.CLOUD_RESOURCE_ID] == SECRET_ARN
+    # both from the request's `SecretId`.
     assert attributes[SPANDATA.AWS_SECRETSMANAGER_SECRET_ARN] == SECRET_ARN
     assert attributes[SPANDATA.AWS_SECRETSMANAGER_SECRET_NAME] == "db-password"
