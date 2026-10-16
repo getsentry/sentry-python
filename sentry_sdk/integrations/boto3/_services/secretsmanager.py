@@ -21,22 +21,24 @@ _ARN_SUFFIX = re.compile(r"-[A-Za-z0-9]{6}$")
 
 
 def _get_name_from_arn(arn: str) -> str:
-    # names can't contain ":"; a partial arn has no suffix (`…:secret:db-backup` → `db`).
-    # https://docs.aws.amazon.com/secretsmanager/latest/apireference/API_CreateSecret.html#SecretsManager-CreateSecret-request-Name
+    # `…:secret:db-backup` => `db`
     return _ARN_SUFFIX.sub("", arn.rsplit(":", 1)[1])
 
 
 class _SecretsManagerExtension(_ServiceExtension):
     def get_request_attributes(self, ctx: "AwsCallContext") -> "Attributes":
         attributes: "Attributes" = {}
-        with capture_internal_exceptions():
-            # only `CreateSecret` takes a `Name`; every other operations acts on
-            # a secret by name or full/partial arn.
-            if "Name" in ctx.params:
-                attributes[SPANDATA.AWS_SECRETSMANAGER_SECRET_NAME] = ctx.params["Name"]
 
-            if "SecretId" in ctx.params:
-                secret_id = ctx.params["SecretId"]
+        # only `CreateSecret` takes a `Name`; every other operations acts on
+        # a secret by name or full/partial arn.
+        if "Name" in ctx.params:
+            attributes[SPANDATA.AWS_SECRETSMANAGER_SECRET_NAME] = ctx.params["Name"]
+
+        if "SecretId" in ctx.params:
+            secret_id = ctx.params["SecretId"]
+            # `SecretId` isn't validated yet. `get_request_attributes()` runs before
+            # botocore validates the params; a malformed one mustn't drop the other attributes.
+            with capture_internal_exceptions():
                 arn_attributes = _get_aws_arn_attributes(
                     (secret_id,), ("secretsmanager",)
                 )
@@ -48,6 +50,7 @@ class _SecretsManagerExtension(_ServiceExtension):
                     )
                 else:
                     attributes[SPANDATA.AWS_SECRETSMANAGER_SECRET_NAME] = secret_id
+
         return attributes
 
     def get_response_attributes(
