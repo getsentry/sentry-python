@@ -479,40 +479,45 @@ def _get_partiql_attributes(statements: "List[Dict[str, Any]]") -> "Attributes":
     """
     attributes: "Attributes" = {}
 
-    query_text = _get_query_text(statements)
-    if query_text is not None:
-        attributes[SPANDATA.DB_QUERY_TEXT] = query_text
+    # the query text, the parsed attributes and the parameters are read separately, so
+    # a statement one of them can't handle doesn't drop the others.
+    with capture_internal_exceptions():
+        query_text = _get_query_text(statements)
+        if query_text is not None:
+            attributes[SPANDATA.DB_QUERY_TEXT] = query_text
 
-    parsed_statements = [
-        _parse_partiql_statement(statement["Statement"]) for statement in statements
-    ]
-    recognized_statements = [
-        parsed for parsed in parsed_statements if parsed is not None
-    ]
-    all_recognized = len(recognized_statements) == len(statements)
-    # a batch only has a parsed summary when every statement shares the same one, prefixed
-    # with `BATCH ` so it's named apart from a single statement. otel uses `BATCH` alone for
-    # differing statements; they get the operation-and-tables summary instead.
-    # https://opentelemetry.io/docs/specs/semconv/registry/attributes/db/#db-query-summary
-    summaries = {
-        f"{operation} {table}" for operation, table, _ in recognized_statements
-    }
-    if all_recognized and len(summaries) == 1:
-        summary = summaries.pop()
-        attributes[SPANDATA.DB_QUERY_SUMMARY] = (
-            f"BATCH {summary}" if len(statements) > 1 else summary
+    with capture_internal_exceptions():
+        parsed_statements = [
+            _parse_partiql_statement(statement["Statement"]) for statement in statements
+        ]
+        recognized_statements = [
+            parsed for parsed in parsed_statements if parsed is not None
+        ]
+        all_recognized = len(recognized_statements) == len(statements)
+        # a batch only has a parsed summary when every statement shares the same one,
+        # prefixed with `BATCH ` so it's named apart from a single statement. otel uses
+        # `BATCH` alone for differing statements; they get the operation-and-tables
+        # summary instead.
+        # https://opentelemetry.io/docs/specs/semconv/registry/attributes/db/#db-query-summary
+        summaries = {
+            f"{operation} {table}" for operation, table, _ in recognized_statements
+        }
+        if all_recognized and len(summaries) == 1:
+            summary = summaries.pop()
+            attributes[SPANDATA.DB_QUERY_SUMMARY] = (
+                f"BATCH {summary}" if len(statements) > 1 else summary
+            )
+
+        # like `IndexName` of `Query` and `Scan`, when every statement reads the same index.
+        indexes = {(table, index) for _, table, index in recognized_statements}
+        if all_recognized and len(indexes) == 1:
+            ((_, index),) = indexes
+            if index is not None:
+                attributes[SPANDATA.AWS_DYNAMODB_INDEX_NAME] = index
+
+        attributes.update(
+            _get_table_attributes(table for _, table, _ in recognized_statements)
         )
-
-    # like `IndexName` of `Query` and `Scan`, when every statement reads the same index.
-    indexes = {(table, index) for _, table, index in recognized_statements}
-    if all_recognized and len(indexes) == 1:
-        ((_, index),) = indexes
-        if index is not None:
-            attributes[SPANDATA.AWS_DYNAMODB_INDEX_NAME] = index
-
-    attributes.update(
-        _get_table_attributes(table for _, table, _ in recognized_statements)
-    )
 
     # parameters are database content, and only set for a single statement.
     # https://opentelemetry.io/docs/specs/semconv/db/database-spans/#common-attributes
@@ -520,19 +525,20 @@ def _get_partiql_attributes(statements: "List[Dict[str, Any]]") -> "Attributes":
         len(statements) == 1
         and sentry_sdk.get_client().options["data_collection"]["database_query_data"]
     ):
-        parameters = statements[0].get("Parameters") or ()
-        # the resource api's client takes python values (`["alex", 42]`). a python map
-        # that looks like a typed value, e.g. {"S": "x"}, is only taken as one when
-        # every parameter does.
-        typed = all(_is_attribute_value(parameter) for parameter in parameters)
-        for index, parameter in enumerate(parameters):
-            # a parameter that can't be read is skipped without affecting the others.
-            with capture_internal_exceptions():
-                value = _get_parameter_value(
-                    parameter if typed else _serialize_attribute_value(parameter)
-                )
-                if value is not None:
-                    attributes[f"{SPANDATA.DB_QUERY_PARAMETER}.{index}"] = value
+        with capture_internal_exceptions():
+            parameters = statements[0].get("Parameters") or ()
+            # the resource api's client takes python values (`["alex", 42]`). a python
+            # map that looks like a typed value, e.g. {"S": "x"}, is only taken as one
+            # when every parameter does.
+            typed = all(_is_attribute_value(parameter) for parameter in parameters)
+            for index, parameter in enumerate(parameters):
+                # a parameter that can't be read is skipped without affecting the others.
+                with capture_internal_exceptions():
+                    value = _get_parameter_value(
+                        parameter if typed else _serialize_attribute_value(parameter)
+                    )
+                    if value is not None:
+                        attributes[f"{SPANDATA.DB_QUERY_PARAMETER}.{index}"] = value
 
     return attributes
 
@@ -620,23 +626,27 @@ class _DynamoDBExtension(_ServiceExtension):
                 )
             )
 
+        # the params aren't validated yet. every extraction below that reads into them can
+        # fail on a malformed one, and mustn't drop the other attributes.
         for param, attribute in _REQUEST_JSON_LIST_ATTRIBUTES:
             if param in ctx.params:
-                attributes[attribute] = [
-                    json.dumps(entry, separators=_JSON_SEPARATORS)
-                    for entry in ctx.params[param]
-                ]
+                with capture_internal_exceptions():
+                    attributes[attribute] = [
+                        json.dumps(entry, separators=_JSON_SEPARATORS)
+                        for entry in ctx.params[param]
+                    ]
 
         if "ProvisionedThroughput" in ctx.params:
             # capacity units are integers in the request, but defined as doubles.
             # https://opentelemetry.io/docs/specs/semconv/registry/attributes/aws/#aws-dynamodb-provisioned-read-capacity
-            throughput = ctx.params["ProvisionedThroughput"]
-            attributes[SPANDATA.AWS_DYNAMODB_PROVISIONED_READ_CAPACITY] = float(
-                throughput["ReadCapacityUnits"]
-            )
-            attributes[SPANDATA.AWS_DYNAMODB_PROVISIONED_WRITE_CAPACITY] = float(
-                throughput["WriteCapacityUnits"]
-            )
+            with capture_internal_exceptions():
+                throughput = ctx.params["ProvisionedThroughput"]
+                attributes[SPANDATA.AWS_DYNAMODB_PROVISIONED_READ_CAPACITY] = float(
+                    throughput["ReadCapacityUnits"]
+                )
+                attributes[SPANDATA.AWS_DYNAMODB_PROVISIONED_WRITE_CAPACITY] = float(
+                    throughput["WriteCapacityUnits"]
+                )
 
         with capture_internal_exceptions():
             statements = _get_partiql_statements(ctx)
@@ -675,9 +685,10 @@ class _DynamoDBExtension(_ServiceExtension):
 
         # a single operation is not a batch.
         # https://opentelemetry.io/docs/specs/semconv/registry/attributes/db/#db-operation-batch-size
-        batch_size = _get_batch_size(ctx)
-        if batch_size is not None and batch_size >= 2:
-            attributes[SPANDATA.DB_OPERATION_BATCH_SIZE] = batch_size
+        with capture_internal_exceptions():
+            batch_size = _get_batch_size(ctx)
+            if batch_size is not None and batch_size >= 2:
+                attributes[SPANDATA.DB_OPERATION_BATCH_SIZE] = batch_size
 
         return attributes
 
@@ -723,16 +734,21 @@ class _DynamoDBExtension(_ServiceExtension):
         ):
             # `ItemCollectionKey` holds partition key values, i.e. database content.
             # https://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_ItemCollectionMetrics.html
-            try:
-                attributes[SPANDATA.AWS_DYNAMODB_ITEM_COLLECTION_METRICS] = json.dumps(
-                    _get_typed_item_collection_metrics(
-                        response["ItemCollectionMetrics"]
-                    ),
-                    separators=_JSON_SEPARATORS,
-                )
-            except TypeError:
-                # binary partition keys are parsed to `bytes`, which aren't json serializable;
-                # omit them like binary query parameters.
-                pass
+            # boto3's serializer of resource api values can raise, e.g. on a decimal that
+            # doesn't fit dynamodb's number context, which mustn't drop `error.type`.
+            with capture_internal_exceptions():
+                try:
+                    attributes[SPANDATA.AWS_DYNAMODB_ITEM_COLLECTION_METRICS] = (
+                        json.dumps(
+                            _get_typed_item_collection_metrics(
+                                response["ItemCollectionMetrics"]
+                            ),
+                            separators=_JSON_SEPARATORS,
+                        )
+                    )
+                except TypeError:
+                    # binary partition keys are parsed to `bytes`, which aren't json
+                    # serializable; omit them like binary query parameters.
+                    pass
 
         return attributes
