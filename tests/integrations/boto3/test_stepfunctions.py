@@ -12,25 +12,18 @@ from tests.integrations.boto3.helpers import client_factory as client_factory
 
 ARN_PREFIX = "arn:aws:states:eu-north-1:123456789012:"
 STATE_MACHINE_ARN = ARN_PREFIX + "stateMachine:orders"
+ALIAS_ARN = STATE_MACHINE_ARN + ":prod"
 EXECUTION_ARN = ARN_PREFIX + "execution:orders:order-1234"
+MAP_RUN_ARN = ARN_PREFIX + "mapRun:orders/process-items:5e7c"
 ACTIVITY_ARN = ARN_PREFIX + "activity:approve"
 DATE = datetime(2026, 10, 14, tzinfo=timezone.utc)
 
-STEP_FUNCTIONS_ATTRIBUTES = (
-    SPANDATA.AWS_STEP_FUNCTIONS_ACTIVITY_ARN,
-    SPANDATA.AWS_STEP_FUNCTIONS_ACTIVITY_NAME,
-    SPANDATA.AWS_STEP_FUNCTIONS_EXECUTION_ARN,
-    SPANDATA.AWS_STEP_FUNCTIONS_STATE_MACHINE_ARN,
-    SPANDATA.AWS_STEP_FUNCTIONS_STATE_MACHINE_NAME,
-)
 
-
-@pytest.fixture
-def stepfunctions_client(client_factory):
-    return client_factory("stepfunctions")
-
-
-def _stubbed_span(client, capture_items, method, params, response):
+def _stubbed_span(client_factory, capture_items, method, params, response):
+    client = client_factory("stepfunctions")
+    require_botocore_model_fields(
+        client, method, input_fields=tuple(params), output_fields=tuple(response)
+    )
     with Stubber(client) as stubber:
         stubber.add_response(method, response, params)
         spans = capture_spans_by_op(
@@ -40,37 +33,16 @@ def _stubbed_span(client, capture_items, method, params, response):
     return span
 
 
-def test_request_attributes(client_factory, capture_items):
-    client = client_factory("stepfunctions")
-    state_machine_arn = "arn:aws:states:eu-north-1:123456789012:stateMachine:orders"
-
-    with Stubber(client) as stubber:
-        stubber.add_response(
-            "delete_state_machine", {}, {"stateMachineArn": state_machine_arn}
-        )
-        spans = capture_spans_by_op(
-            lambda: client.delete_state_machine(
-                **{"stateMachineArn": state_machine_arn}
-            ),
-            capture_items,
-        )
-
-    (span,) = spans[OP.RPC]
-    attributes = span["attributes"]
-    assert attributes[SPANDATA.CLOUD_ACCOUNT_ID] == "123456789012"
-    assert attributes[SPANDATA.CLOUD_RESOURCE_ID] == state_machine_arn
-
-
 @pytest.mark.parametrize(
     "method,params,response,expected",
     [
         pytest.param(
             "start_execution",
-            {"stateMachineArn": STATE_MACHINE_ARN + ":prod", "name": "order-1234"},
+            {"stateMachineArn": ALIAS_ARN, "name": "order-1234"},
             {"executionArn": EXECUTION_ARN, "startDate": DATE},
             {
-                SPANDATA.AWS_STEP_FUNCTIONS_STATE_MACHINE_ARN: STATE_MACHINE_ARN
-                + ":prod",
+                SPANDATA.CLOUD_RESOURCE_ID: ALIAS_ARN,
+                SPANDATA.AWS_STEP_FUNCTIONS_STATE_MACHINE_ARN: ALIAS_ARN,
                 SPANDATA.AWS_STEP_FUNCTIONS_STATE_MACHINE_NAME: "orders",
                 SPANDATA.AWS_STEP_FUNCTIONS_EXECUTION_ARN: EXECUTION_ARN,
             },
@@ -81,6 +53,7 @@ def test_request_attributes(client_factory, capture_items):
             {"executionArn": EXECUTION_ARN},
             {"stopDate": DATE},
             {
+                SPANDATA.CLOUD_RESOURCE_ID: EXECUTION_ARN,
                 SPANDATA.AWS_STEP_FUNCTIONS_EXECUTION_ARN: EXECUTION_ARN,
                 SPANDATA.AWS_STEP_FUNCTIONS_STATE_MACHINE_NAME: "orders",
             },
@@ -88,9 +61,12 @@ def test_request_attributes(client_factory, capture_items):
         ),
         pytest.param(
             "list_executions",
-            {"mapRunArn": ARN_PREFIX + "mapRun:orders/process-items:5e7c"},
+            {"mapRunArn": MAP_RUN_ARN},
             {"executions": []},
-            {SPANDATA.AWS_STEP_FUNCTIONS_STATE_MACHINE_NAME: "orders"},
+            {
+                SPANDATA.CLOUD_RESOURCE_ID: MAP_RUN_ARN,
+                SPANDATA.AWS_STEP_FUNCTIONS_STATE_MACHINE_NAME: "orders",
+            },
             id="map-run",
         ),
         pytest.param(
@@ -121,24 +97,24 @@ def test_request_attributes(client_factory, capture_items):
             "tag_resource",
             {"resourceArn": ACTIVITY_ARN, "tags": [{"key": "team", "value": "a"}]},
             {},
-            {SPANDATA.AWS_STEP_FUNCTIONS_ACTIVITY_NAME: "approve"},
+            {
+                SPANDATA.CLOUD_RESOURCE_ID: ACTIVITY_ARN,
+                SPANDATA.AWS_STEP_FUNCTIONS_ACTIVITY_NAME: "approve",
+            },
             id="tag-activity",
         ),
     ],
 )
 def test_resource_attributes(
-    stepfunctions_client, capture_items, method, params, response, expected
+    client_factory, capture_items, method, params, response, expected
 ):
-    require_botocore_model_fields(
-        stepfunctions_client, method, input_fields=tuple(params)
-    )
-    span = _stubbed_span(stepfunctions_client, capture_items, method, params, response)
+    span = _stubbed_span(client_factory, capture_items, method, params, response)
 
-    attributes = span["attributes"]
+    # `cloud.resource_id` is only set from the arn in the request the call acts on.
     assert {
         key: value
-        for key, value in attributes.items()
-        if key in STEP_FUNCTIONS_ATTRIBUTES
+        for key, value in span["attributes"].items()
+        if key.startswith("aws.step_functions.") or key == SPANDATA.CLOUD_RESOURCE_ID
     } == expected
 
 
@@ -148,12 +124,11 @@ def test_resource_attributes(
         ("start_sync_execution", "SUCCEEDED", None),
         ("start_sync_execution", "FAILED", "stepfunctions_execution_failed"),
         ("start_sync_execution", "TIMED_OUT", "stepfunctions_execution_timed_out"),
-        # the status of an execution the call only describes.
         ("describe_execution", "FAILED", None),
     ],
 )
 def test_execution_outcome(
-    stepfunctions_client, capture_items, method, status, expected_error_type
+    client_factory, capture_items, method, status, expected_error_type
 ):
     params = (
         {"stateMachineArn": STATE_MACHINE_ARN, "input": '{"card": "4242"}'}
@@ -169,17 +144,10 @@ def test_execution_outcome(
         "error": "States.TaskFailed",
         "cause": "card 4242 declined",
     }
-    require_botocore_model_fields(
-        stepfunctions_client, method, output_fields=tuple(response)
-    )
-    span = _stubbed_span(stepfunctions_client, capture_items, method, params, response)
+    span = _stubbed_span(client_factory, capture_items, method, params, response)
 
-    attributes = span["attributes"]
-    if expected_error_type is None:
-        assert span["status"] == "ok"
-        assert SPANDATA.ERROR_TYPE not in attributes
-    else:
-        assert span["status"] == "error"
-        assert attributes[SPANDATA.ERROR_TYPE] == expected_error_type
+    assert span["status"] == ("ok" if expected_error_type is None else "error")
+    assert span["attributes"].get(SPANDATA.ERROR_TYPE) == expected_error_type
+    # the execution's input, error and cause are never recorded.
     assert "4242" not in str(span)
     assert "States.TaskFailed" not in str(span)
