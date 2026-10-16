@@ -187,12 +187,6 @@ def _wrap_handler(handler: "F") -> "F":
                     }
                 )
 
-            if "AWS_LAMBDA_METADATA_API" in environ:
-                with capture_internal_exceptions():
-                    availability_zone = _get_availability_zone()
-                    if availability_zone is not None:
-                        attributes[SPANDATA.CLOUD_AVAILABILITY_ZONE] = availability_zone
-
             sentry_sdk.continue_trace(headers)
             Scope.set_custom_sampling_context(sampling_context)
             with sentry_sdk.start_span(

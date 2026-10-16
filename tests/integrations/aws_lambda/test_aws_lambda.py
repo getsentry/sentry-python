@@ -941,26 +941,6 @@ def test_url_query_params_with_data_collection(lambda_client, test_environment):
         _get_span_attr(attrs, SPANDATA.URL_QUERY)
         == "page=2&tracking=%5BFiltered%5D&token=%5BFiltered%5D"
     )
-    assert _get_span_attr(attrs, SPANDATA.CLOUD_AVAILABILITY_ZONE) == "use1-az1"
-    # The container may already be warm (and the metadata cached) from an earlier
-    # test invoking the same function, so only assert that the second invocation
-    # is served from the cache.
-    metadata_requests = server.lambda_metadata_requests
-    assert metadata_requests >= 1
-
-    server.clear_envelopes()
-    lambda_client.invoke(
-        FunctionName="BasicOkSpanStreamingDataCollection",
-        Payload=json.dumps(payload),
-    )
-    segment_spans = [s for s in server.span_items if s["is_segment"]]
-
-    assert len(segment_spans) == 1
-    assert (
-        _get_span_attr(segment_spans[0]["attributes"], SPANDATA.CLOUD_AVAILABILITY_ZONE)
-        == "use1-az1"
-    )
-    assert server.lambda_metadata_requests == metadata_requests
 
 
 def test_user_info_with_data_collection_user_info_off(lambda_client, test_environment):

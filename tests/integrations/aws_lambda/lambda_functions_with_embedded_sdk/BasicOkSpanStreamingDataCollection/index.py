@@ -3,13 +3,6 @@ import os
 import sentry_sdk
 from sentry_sdk.integrations.aws_lambda import AwsLambdaIntegration
 
-# otherwise SAM will call its built-in metadata endpoint/token.
-os.environ["AWS_LAMBDA_METADATA_API"] = os.environ[
-    "SENTRY_TEST_AWS_LAMBDA_METADATA_API"
-]
-os.environ["AWS_LAMBDA_METADATA_TOKEN"] = os.environ[
-    "SENTRY_TEST_AWS_LAMBDA_METADATA_TOKEN"
-]
 # the alias is only in the name to get a qualified invoked ARN.
 os.environ["AWS_LAMBDA_FUNCTION_NAME"] = os.environ["AWS_LAMBDA_FUNCTION_NAME"].split(
     ":"
