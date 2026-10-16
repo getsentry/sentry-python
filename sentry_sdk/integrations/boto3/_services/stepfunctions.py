@@ -67,18 +67,24 @@ def _get_name_attribute(arn: str) -> "Tuple[str, str]":
 class _StepFunctionsExtension(_ServiceExtension):
     def get_request_attributes(self, ctx: "AwsCallContext") -> "Attributes":
         attributes: "Attributes" = _extract_attributes(ctx.params, _ARN_ATTRIBUTES)
-        with capture_internal_exceptions():
-            name_attribute = _CREATED_NAME_ATTRIBUTES.get(ctx.operation_name)
-            if name_attribute is not None:
-                attributes[name_attribute] = ctx.params["name"]
 
-            for param in _TARGET_ARN_PARAMS:
-                if param in ctx.params:
-                    arn = ctx.params[param]
-                    attributes.update(_get_aws_arn_attributes((arn,), ("states",)))
-                    name_attribute, name = _get_name_attribute(arn)
-                    attributes[name_attribute] = name
-                    break
+        name_attribute = _CREATED_NAME_ATTRIBUTES.get(ctx.operation_name)
+        if name_attribute is not None and "name" in ctx.params:
+            attributes[name_attribute] = ctx.params["name"]
+
+        for param in _TARGET_ARN_PARAMS:
+            if param in ctx.params:
+                arn = ctx.params[param]
+                # `get_request_attributes()` runs before botocore validates the params;
+                # a malformed arn mustn't drop the other attributes.
+                with capture_internal_exceptions():
+                    arn_attributes = _get_aws_arn_attributes((arn,), ("states",))
+                    attributes.update(arn_attributes)
+                    if arn_attributes:
+                        name_attribute, name = _get_name_attribute(arn)
+                        attributes[name_attribute] = name
+                break
+
         return attributes
 
     def get_response_attributes(
