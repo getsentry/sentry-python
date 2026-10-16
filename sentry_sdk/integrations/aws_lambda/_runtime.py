@@ -41,8 +41,31 @@ def _wrap_init_error(init_error: "F") -> "F":
                 error_info = args[1]
                 if isinstance(error_info, str):
                     error_info = json.loads(error_info)
-                sentry_event = _event_from_error_json(error_info)
-                sentry_sdk.capture_event(sentry_event)
+                # convert error JSON into Sentry error event; not full fletched
+                # but better than nothing. Example of where AWS creates the error JSON:
+                # https://github.com/aws/aws-lambda-python-runtime-interface-client/blob/2.2.1/awslambdaric/bootstrap.py#L479
+                sentry_error_event: "Event" = {
+                    "level": "error",
+                    "exception": {
+                        "values": [
+                            {
+                                "type": error_info.get("errorType"),
+                                "value": error_info.get("errorMessage"),
+                                "stacktrace": {
+                                    "frames": _parse_formatted_traceback(
+                                        error_info.get("stackTrace", [])
+                                    ),
+                                },
+                                "mechanism": {
+                                    "type": "aws_lambda",
+                                    "handled": False,
+                                },
+                            }
+                        ],
+                    },
+                }
+
+                sentry_sdk.capture_event(sentry_error_event)
 
         return init_error(*args, **kwargs)
 
@@ -163,35 +186,3 @@ def _parse_formatted_traceback(formatted_tb: "list[str]") -> "list[dict[str, Any
                 }
             )
     return frames
-
-
-def _event_from_error_json(error_json: "dict[str, Any]") -> "Event":
-    """
-    Converts the error JSON from AWS Lambda into a Sentry error event.
-    This is not a full fletched event, but better than nothing.
-
-    This is an example of where AWS creates the error JSON:
-    https://github.com/aws/aws-lambda-python-runtime-interface-client/blob/2.2.1/awslambdaric/bootstrap.py#L479
-    """
-    event: "Event" = {
-        "level": "error",
-        "exception": {
-            "values": [
-                {
-                    "type": error_json.get("errorType"),
-                    "value": error_json.get("errorMessage"),
-                    "stacktrace": {
-                        "frames": _parse_formatted_traceback(
-                            error_json.get("stackTrace", [])
-                        ),
-                    },
-                    "mechanism": {
-                        "type": "aws_lambda",
-                        "handled": False,
-                    },
-                }
-            ],
-        },
-    }
-
-    return event
