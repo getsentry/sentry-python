@@ -254,6 +254,8 @@ class StreamedSpan:
         "_status",
         "_scope",
         "_previous_span_on_scope",
+        "_previous_transaction_on_scope",
+        "_previous_transaction_info_on_scope",
         "_baggage",
         "_sample_rand",
         "_sample_rate",
@@ -364,6 +366,11 @@ class StreamedSpan:
     def _start(self) -> None:
         if self._active:
             old_span = self._scope.streamed_span
+            if self._is_segment():
+                self._previous_transaction_on_scope = self._scope._transaction
+                self._previous_transaction_info_on_scope = (
+                    self._scope._transaction_info.copy()
+                )
             self._scope.streamed_span = self
             self._previous_span_on_scope = old_span
 
@@ -383,6 +390,13 @@ class StreamedSpan:
                 old_span = self._previous_span_on_scope
                 del self._previous_span_on_scope
                 self._scope.streamed_span = old_span
+                if self._is_segment():
+                    self._scope._transaction = self._previous_transaction_on_scope
+                    del self._previous_transaction_on_scope
+                    self._scope._transaction_info = (
+                        self._previous_transaction_info_on_scope
+                    )
+                    del self._previous_transaction_info_on_scope
 
         # Set attributes from the segment. These are set on span end on purpose
         # so that we have the best chance to capture the segment's final name
@@ -691,6 +705,11 @@ class NoOpStreamedSpan(StreamedSpan):
             return
 
         old_span = self._scope.streamed_span
+        if self._is_segment():
+            self._previous_transaction_on_scope = self._scope._transaction
+            self._previous_transaction_info_on_scope = (
+                self._scope._transaction_info.copy()
+            )
         self._scope.streamed_span = self
         self._previous_span_on_scope = old_span
 
@@ -715,6 +734,13 @@ class NoOpStreamedSpan(StreamedSpan):
                 old_span = self._previous_span_on_scope
                 del self._previous_span_on_scope
                 self._scope.streamed_span = old_span
+                if self._is_segment():
+                    self._scope._transaction = self._previous_transaction_on_scope
+                    del self._previous_transaction_on_scope
+                    self._scope._transaction_info = (
+                        self._previous_transaction_info_on_scope
+                    )
+                    del self._previous_transaction_info_on_scope
 
         self._finished = True
 

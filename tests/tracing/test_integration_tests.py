@@ -110,6 +110,69 @@ def test_error_event_linked_without_performance_span_streaming(
     assert event["transaction_info"] == {"source": "custom segment source"}
 
 
+@pytest.mark.parametrize("sample_rate", [0.0, 1.0])
+def test_span_streaming_clears_transaction_name(
+    sentry_init, capture_events, sample_rate
+):
+    sentry_init(traces_sample_rate=sample_rate, trace_lifecycle="stream")
+    events = capture_events()
+    scope = sentry_sdk.get_current_scope()
+
+    with sentry_sdk.traces.start_span(
+        name="streamed segment",
+        attributes={"sentry.segment.name.source": "component"},
+    ):
+        assert scope._transaction == "streamed segment"
+        assert scope._transaction_info == {"source": "component"}
+
+    assert scope._transaction is None
+    assert scope._transaction_info == {}
+
+    sentry_sdk.capture_message("after streamed segment")
+
+    (event,) = events
+    assert "transaction" not in event
+
+
+@pytest.mark.parametrize("sample_rate", [0.0, 1.0])
+def test_span_streaming_restores_transaction_name(
+    sentry_init, capture_events, sample_rate
+):
+    sentry_init(traces_sample_rate=sample_rate, trace_lifecycle="stream")
+    events = capture_events()
+    scope = sentry_sdk.get_current_scope()
+    scope.set_transaction_name("previous transaction", source="route")
+
+    with sentry_sdk.traces.start_span(name="streamed segment"):
+        assert scope._transaction == "streamed segment"
+        assert scope._transaction_info == ({"source": "custom"} if sample_rate else {})
+
+    assert scope._transaction == "previous transaction"
+    assert scope._transaction_info == {"source": "route"}
+
+    sentry_sdk.capture_message("after streamed segment")
+
+    (event,) = events
+    assert event["transaction"] == "previous transaction"
+    assert event["transaction_info"] == {"source": "route"}
+
+
+@pytest.mark.parametrize("sample_rate", [0.0, 1.0])
+def test_span_streaming_keeps_name_changed_during_child_span(sentry_init, sample_rate):
+    sentry_init(traces_sample_rate=sample_rate, trace_lifecycle="stream")
+    scope = sentry_sdk.get_current_scope()
+
+    with sentry_sdk.traces.start_span(name="streamed segment"):
+        with sentry_sdk.traces.start_span(name="child"):
+            scope.set_transaction_name("renamed segment", source="component")
+
+        assert scope._transaction == "renamed segment"
+        assert scope._transaction_info == {"source": "component"}
+
+    assert scope._transaction is None
+    assert scope._transaction_info == {}
+
+
 @pytest.mark.parametrize("parent_sampled", [True, False, None])
 @pytest.mark.parametrize("sample_rate", [0.0, 1.0])
 def test_continue_trace(sentry_init, capture_envelopes, parent_sampled, sample_rate):
