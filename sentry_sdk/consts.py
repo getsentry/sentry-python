@@ -577,6 +577,12 @@ class SPANDATA:
     Example: "conv_abc123"
     """
 
+    GEN_AI_COST_TOTAL_TOKENS = "gen_ai.cost.total_tokens"
+    """
+    The total cost of the AI model call.
+    Example: 0.0015
+    """
+
     GEN_AI_CHOICE = "gen_ai.choice"
     """
     The model's response message.
