@@ -2,7 +2,7 @@ import json
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sentry_sdk.consts import SPANDATA
+from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.boto3._services.base import _ServiceExtension
 from sentry_sdk.integrations.boto3._utils import (
     _extract_attributes,
@@ -11,13 +11,35 @@ from sentry_sdk.integrations.boto3._utils import (
 from sentry_sdk.utils import capture_internal_exceptions
 
 if TYPE_CHECKING:
-    from typing import Any, Sequence
+    from typing import Any, Dict, Optional, Sequence
 
     from sentry_sdk._types import Attributes
     from sentry_sdk.integrations.boto3._context import AwsCallContext
     from sentry_sdk.integrations.boto3._utils import (
         _AttributeSpec,
     )
+
+# s3 object apis get `object.*` ops, every other s3 api, e.g. `ListBuckets`, keeps the default `rpc`.
+# https://github.com/getsentry/sentry-conventions/blob/main/model/op/object.json
+_OBJECT_OPS: "Dict[str, str]" = {
+    "GetObject": OP.OBJECT_GET,
+    "HeadObject": OP.OBJECT_HEAD,
+    # `GetObjectAttributes` combines `HeadObject` and `ListParts`.
+    # https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetObjectAttributes.html
+    "GetObjectAttributes": OP.OBJECT_HEAD,
+    "PutObject": OP.OBJECT_PUT,
+    "CopyObject": OP.OBJECT_COPY,
+    "DeleteObject": OP.OBJECT_DELETE,
+    "DeleteObjects": OP.OBJECT_DELETE,
+    "ListObjects": OP.OBJECT_LIST,
+    "ListObjectsV2": OP.OBJECT_LIST,
+    "ListObjectVersions": OP.OBJECT_LIST,
+    "UploadPart": OP.OBJECT_UPLOAD_PART,
+    "UploadPartCopy": OP.OBJECT_UPLOAD_PART,
+    "CreateMultipartUpload": OP.OBJECT_MULTIPART_UPLOAD_CREATE,
+    "CompleteMultipartUpload": OP.OBJECT_MULTIPART_UPLOAD_COMPLETE,
+    "AbortMultipartUpload": OP.OBJECT_MULTIPART_UPLOAD_ABORT,
+}
 
 # maps s3 operations to the response field that contains the complete file size.
 _RESPONSE_FILE_SIZE_FIELDS = {
@@ -35,6 +57,9 @@ _REQUEST_ATTRIBUTES: "Sequence[_AttributeSpec]" = (
 
 class _S3Extension(_ServiceExtension):
     __slots__ = ()
+
+    def get_span_op(self, ctx: "AwsCallContext") -> "Optional[str]":
+        return _OBJECT_OPS.get(ctx.operation_name)
 
     def get_request_attributes(self, ctx: "AwsCallContext") -> "Attributes":
         attributes: "Attributes" = _extract_attributes(ctx.params, _REQUEST_ATTRIBUTES)

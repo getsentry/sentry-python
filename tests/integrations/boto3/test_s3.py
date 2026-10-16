@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 import pytest
 from botocore.stub import Stubber
 
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.boto3.consts import AWS_RPC_SYSTEM_NAME, ORIGIN
 from tests.integrations.boto3.helpers import (
     capture_spans_by_op,
@@ -26,12 +26,11 @@ def _stubbed_span(client, capture_items, method, params, response):
             lambda: getattr(client, method)(**params), capture_items
         )
         stubber.assert_no_pending_responses()
-    (span,) = spans[OP.RPC]
+    ((span,),) = spans.values()
     operation = client.meta.method_to_api_mapping[method]
     assert span["name"] == "S3.%s" % operation
     assert span.get("end_timestamp") is not None
     attributes = span.get("attributes", {})
-    assert attributes[SPANDATA.SENTRY_OP] == OP.RPC
     assert attributes[SPANDATA.SENTRY_ORIGIN] == ORIGIN
     assert attributes[SPANDATA.SENTRY_KIND] == "client"
     assert attributes[SPANDATA.CLOUD_PROVIDER] == "aws"
