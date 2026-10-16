@@ -363,6 +363,12 @@ class SPANDATA:
     Example: "wzHcyEWfmOGDIE5QOhTAqFDoDWP3y8IUvpNINCwL9N4TEHbUw0/gZJ+VZTmCNCWR7fezEN3eCiQ="
     """
 
+    AWS_KINESIS_STREAM_NAME = "aws.kinesis.stream_name"
+    """
+    The name of the AWS Kinesis stream the request refers to.
+    Example: "orders"
+    """
+
     AWS_LAMBDA_INVOKED_ARN = "aws.lambda.invoked_arn"
     """
     The full ARN of the Lambda function that was invoked.
