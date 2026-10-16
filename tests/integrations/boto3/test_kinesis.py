@@ -115,6 +115,6 @@ def test_put_records_outcome(
     if error_codes:
         response["FailedRecordCount"] = len(error_codes)  # type: ignore
     span = _stubbed_span(client_factory, capture_items, "put_records", params, response)
-    
+
     assert span["status"] == ("ok" if expected_error_type is None else "error")
     assert span["attributes"].get(SPANDATA.ERROR_TYPE) == expected_error_type
