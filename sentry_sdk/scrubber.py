@@ -132,6 +132,15 @@ class EventScrubber:
                     self.scrub_dict(data)  # no-op unless data is a dict
                     self.scrub_list(data)  # no-op unless data is a list
 
+                # Some integrations (such as AWS Lambda) supply query parameters
+                # as a mapping instead of a raw query string. Apply the same
+                # configured scrubbing as for request bodies and headers.
+                # Leave raw strings unchanged for backwards compatibility.
+                if "query_string" in event["request"]:
+                    query_string = event["request"]["query_string"]
+                    self.scrub_dict(query_string)
+                    self.scrub_list(query_string)
+
     def scrub_extra(self, event: "Event") -> None:
         with capture_internal_exceptions():
             if "extra" in event:

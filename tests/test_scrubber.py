@@ -336,3 +336,85 @@ def test_recursive_scrubber_does_not_override_original(sentry_init, capture_even
     (frame,) = frames
     assert data["csrf"] == "secret"
     assert frame["vars"]["data"]["csrf"] == "[Filtered]"
+
+
+
+def test_query_string_mapping_scrubbing():
+    # AWS Lambda provides queryStringParameters as a mapping; legacy
+    # request scrubbing must not leave secrets in its query_string.
+    event = {
+        "request": {
+            "query_string": {
+                "token": "do-not-send-token",
+                "AUTH": "do-not-send-auth",
+                "password": ["do-not-send-password"],
+                "safe": "keep-me",
+            }
+        }
+    }
+
+    EventScrubber().scrub_event(event)
+
+    query_string = event["request"]["query_string"]
+    for key in ("token", "AUTH", "password"):
+        assert query_string[key].value == "[Filtered]"
+        assert query_string[key].metadata == {"rem": [["!config", "s"]]}
+    assert query_string["safe"] == "keep-me"
+
+
+def test_query_string_mapping_respects_custom_denylist():
+    event = {
+        "request": {
+            "query_string": {
+                "color": "sensitive-value",
+                "safe": "keep-me",
+            }
+        }
+    }
+    EventScrubber(denylist=["color"]).scrub_event(event)
+    assert event["request"]["query_string"]["color"].value == "[Filtered]"
+    assert event["request"]["query_string"]["safe"] == "keep-me"
+
+
+def test_query_string_string_remains_unchanged():
+    # The mapping-only improvement deliberately does not rewrite text
+    # query strings, which are handled by other SDK configuration paths.
+    event = {"request": {"query_string": "token=a&safe=b"}}
+    EventScrubber().scrub_event(event)
+    assert event["request"]["query_string"] == "token=a&safe=b"
+
+
+def test_query_string_list_of_mappings_scrubbed():
+    event = {
+        "request": {
+            "query_string": [{"token": "secret"}, {"safe": "keep-me"}],
+        }
+    }
+    EventScrubber().scrub_event(event)
+    assert event["request"]["query_string"][0]["token"].value == "[Filtered]"
+    assert event["request"]["query_string"][1]["safe"] == "keep-me"
+
+
+
+def test_query_string_mapping_filtered_before_send(sentry_init, capture_events):
+    sentry_init()
+    events = capture_events()
+
+    capture_event(
+        {
+            "message": "test query parameters",
+            "request": {
+                "url": "https://example.test/resource",
+                "query_string": {"token": "do-not-send", "safe": "keep-me"},
+            },
+        }
+    )
+
+    (event,) = events
+    assert event["request"]["query_string"] == {
+        "token": "[Filtered]",
+        "safe": "keep-me",
+    }
+    assert event["_meta"]["request"]["query_string"]["token"] == {
+        "": {"rem": [["!config", "s"]]}
+    }
