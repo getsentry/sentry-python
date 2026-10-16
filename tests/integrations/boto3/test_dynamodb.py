@@ -215,7 +215,7 @@ def test_list_tables(dynamodb_client, capture_items):
     assert SPANDATA.DB_COLLECTION_NAME not in attributes
     assert SPANDATA.AWS_DYNAMODB_TABLE_NAMES not in attributes
     assert attributes[SPANDATA.DB_QUERY_SUMMARY] == "ListTables"
-    assert attributes[SPANDATA.SENTRY_NORMALIZED_DB_QUERY] == "ListTables"
+    assert SPANDATA.SENTRY_NORMALIZED_DB_QUERY not in attributes
 
 
 @pytest.mark.parametrize(
@@ -735,7 +735,7 @@ def test_partiql_normalized_db_query(
     span = _stubbed_span(dynamodb_client, capture_items, method, params, response)
 
     # set by the sdk, so relay doesn't normalize partiql as sql; calls without query
-    # text are covered by `test_get_item`, `test_batch_get_item` and `test_list_tables`.
+    # text are covered by `test_get_item` and `test_batch_get_item`.
     assert span["attributes"][SPANDATA.SENTRY_NORMALIZED_DB_QUERY] == expected
 
 

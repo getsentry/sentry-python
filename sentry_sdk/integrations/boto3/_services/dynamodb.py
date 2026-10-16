@@ -22,6 +22,27 @@ if TYPE_CHECKING:
 # https://opentelemetry.io/docs/specs/semconv/db/dynamodb/
 _DB_SYSTEM_NAME = "aws.dynamodb"
 
+# the operations on items: the data plane and transaction operations. the others manage
+# tables and their dependent resources (`CreateTable`, `ListTables`, backups, tags, ...).
+# https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/HowItWorks.API.html
+_ITEM_OPERATIONS = frozenset(
+    (
+        "BatchExecuteStatement",
+        "BatchGetItem",
+        "BatchWriteItem",
+        "DeleteItem",
+        "ExecuteStatement",
+        "ExecuteTransaction",
+        "GetItem",
+        "PutItem",
+        "Query",
+        "Scan",
+        "TransactGetItems",
+        "TransactWriteItems",
+        "UpdateItem",
+    )
+)
+
 # dynamodb request attributes that are extracted when present, regardless of operation.
 # https://opentelemetry.io/docs/specs/semconv/db/dynamodb/
 _REQUEST_ATTRIBUTES: "Sequence[_AttributeSpec]" = (
@@ -643,12 +664,14 @@ class _DynamoDBExtension(_ServiceExtension):
         # it from `db.query.text`, which most dynamodb calls don't have, and normalizes
         # partiql as sql (`FROM "orders"."by-status"` becomes `FROM by-status`); it keeps
         # a normalized query that is already set. it holds no values, so it isn't gated
-        # by `database_query_data`.
+        # by `database_query_data`. only operations on items are queries; the others
+        # manage tables and would crowd them out of the insight.
         # https://github.com/getsentry/relay/blob/master/relay-event-normalization/src/eap/mod.rs
         with capture_internal_exceptions():
-            attributes[SPANDATA.SENTRY_NORMALIZED_DB_QUERY] = _get_normalized_query(
-                ctx, attributes
-            )
+            if ctx.operation_name in _ITEM_OPERATIONS:
+                attributes[SPANDATA.SENTRY_NORMALIZED_DB_QUERY] = _get_normalized_query(
+                    ctx, attributes
+                )
 
         # a single operation is not a batch.
         # https://opentelemetry.io/docs/specs/semconv/registry/attributes/db/#db-operation-batch-size
