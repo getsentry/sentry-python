@@ -4,13 +4,11 @@ import sys
 from typing import TYPE_CHECKING
 
 import sentry_sdk
-from sentry_sdk.integrations.aws_lambda import AwsLambdaIntegration
-from sentry_sdk.integrations.aws_lambda._handler import _wrap_handler
+from sentry_sdk.integrations.aws_lambda.consts import IDENTIFIER
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
     event_from_exception,
-    logger,
 )
 
 if TYPE_CHECKING:
@@ -22,6 +20,8 @@ if TYPE_CHECKING:
 
 
 def _wrap_init_error(init_error: "F") -> "F":
+    from sentry_sdk.integrations.aws_lambda import AwsLambdaIntegration
+
     @ensure_integration_enabled(AwsLambdaIntegration, init_error)
     def sentry_init_error(*args: "Any", **kwargs: "Any") -> "Any":
 
@@ -75,61 +75,11 @@ def _wrap_init_error(init_error: "F") -> "F":
 def _drain_queue() -> None:
     with capture_internal_exceptions():
         client = sentry_sdk.get_client()
-        integration = client.get_integration(AwsLambdaIntegration)
+        integration = client.get_integration(IDENTIFIER)
         if integration is not None:
             # Flush out the event queue before AWS kills the
             # process.
             client.flush()
-
-
-def _setup_once() -> None:
-    lambda_bootstrap = get_lambda_bootstrap()
-    if not lambda_bootstrap:
-        logger.warning(
-            "Not running in AWS Lambda environment, "
-            "AwsLambdaIntegration disabled (could not find bootstrap module)"
-        )
-        return
-
-    if not hasattr(lambda_bootstrap, "handle_event_request"):
-        logger.warning(
-            "Not running in AWS Lambda environment, "
-            "AwsLambdaIntegration disabled (could not find handle_event_request)"
-        )
-        return
-
-    lambda_bootstrap.LambdaRuntimeClient.post_init_error = _wrap_init_error(
-        lambda_bootstrap.LambdaRuntimeClient.post_init_error
-    )
-
-    old_handle_event_request = lambda_bootstrap.handle_event_request
-
-    def sentry_handle_event_request(  # type: ignore
-        lambda_runtime_client, request_handler, *args, **kwargs
-    ):
-        request_handler = _wrap_handler(request_handler)
-        return old_handle_event_request(
-            lambda_runtime_client, request_handler, *args, **kwargs
-        )
-
-    lambda_bootstrap.handle_event_request = sentry_handle_event_request
-
-    # Patch the runtime client to drain the queue. This should work
-    # even when the SDK is initialized inside of the handler
-
-    def _wrap_post_function(f: "F") -> "F":
-        def inner(*args: "Any", **kwargs: "Any") -> "Any":
-            _drain_queue()
-            return f(*args, **kwargs)
-
-        return inner  # type: ignore
-
-    lambda_bootstrap.LambdaRuntimeClient.post_invocation_result = _wrap_post_function(
-        lambda_bootstrap.LambdaRuntimeClient.post_invocation_result
-    )
-    lambda_bootstrap.LambdaRuntimeClient.post_invocation_error = _wrap_post_function(
-        lambda_bootstrap.LambdaRuntimeClient.post_invocation_error
-    )
 
 
 def get_lambda_bootstrap() -> "Optional[Any]":

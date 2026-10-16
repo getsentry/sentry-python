@@ -7,13 +7,13 @@ import sentry_sdk
 from sentry_sdk.consts import OP
 from sentry_sdk.data_collection import _apply_key_value_collection_filtering
 from sentry_sdk.integrations._wsgi_common import _filter_headers
-from sentry_sdk.integrations.aws_lambda import AwsLambdaIntegration
 from sentry_sdk.integrations.aws_lambda._request import (
     _get_user_from_event,
     _make_request_event_processor,
 )
 from sentry_sdk.integrations.aws_lambda.consts import (
     MILLIS_TO_SECONDS,
+    ORIGIN,
     TIMEOUT_WARNING_BUFFER,
 )
 from sentry_sdk.integrations.cloud_resource_context import (
@@ -36,6 +36,8 @@ if TYPE_CHECKING:
 
 
 def _wrap_handler(handler: "F") -> "F":
+    from sentry_sdk.integrations.aws_lambda import AwsLambdaIntegration
+
     @functools.wraps(handler)
     def sentry_handler(
         aws_event: "Any", aws_context: "Any", *args: "Any", **kwargs: "Any"
@@ -150,7 +152,7 @@ def _wrap_handler(handler: "F") -> "F":
                 parent_span=None,
                 attributes={
                     "sentry.op": OP.FUNCTION_AWS,
-                    "sentry.origin": AwsLambdaIntegration.origin,
+                    "sentry.origin": ORIGIN,
                     "sentry.segment.name.source": SegmentNameSource.COMPONENT,
                     "cloud.region": aws_region,
                     "cloud.resource_id": aws_context.invoked_function_arn,
