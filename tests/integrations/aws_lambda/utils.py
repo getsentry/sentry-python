@@ -30,6 +30,13 @@ LAMBDA_FUNCTION_TIMEOUT = 10
 LAMBDA_METADATA_TOKEN = "test-token"
 SAM_PORT = 3001
 
+# functions invoked through a published version or an alias instead of `$LATEST`:
+# function name -> (qualifier of the invoked ARN, version the qualifier resolves to)
+QUALIFIED_FUNCTIONS = {
+    "RaiseErrorSpanStreaming": ("5", "5"),
+    "BasicOkSpanStreamingDataCollection": ("prod", "5"),
+}
+
 PYTHON_VERSION = f"python{sys.version_info.major}.{sys.version_info.minor}"
 
 # Match the host CPU architecture so local runs on ARM machines (e.g. macOS)
@@ -181,6 +188,16 @@ class LocalLambdaStack(Stack):
                         "SENTRY_TEST_AWS_LAMBDA_METADATA_TOKEN": (
                             LAMBDA_METADATA_TOKEN
                         ),
+                    }
+                )
+            if lambda_dir in QUALIFIED_FUNCTIONS:
+                qualifier, function_version = QUALIFIED_FUNCTIONS[lambda_dir]
+                # SAM builds the invoked ARN from `AWS_LAMBDA_FUNCTION_NAME`,
+                # so the qualifier is appended there; the function's `index.py` strips it again.
+                environment.update(
+                    {
+                        "AWS_LAMBDA_FUNCTION_NAME": f"{lambda_dir}:{qualifier}",
+                        "AWS_LAMBDA_FUNCTION_VERSION": function_version,
                     }
                 )
 

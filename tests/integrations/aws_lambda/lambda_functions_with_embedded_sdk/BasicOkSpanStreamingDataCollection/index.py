@@ -10,6 +10,10 @@ os.environ["AWS_LAMBDA_METADATA_API"] = os.environ[
 os.environ["AWS_LAMBDA_METADATA_TOKEN"] = os.environ[
     "SENTRY_TEST_AWS_LAMBDA_METADATA_TOKEN"
 ]
+# the alias is only in the name to get a qualified invoked ARN.
+os.environ["AWS_LAMBDA_FUNCTION_NAME"] = os.environ["AWS_LAMBDA_FUNCTION_NAME"].split(
+    ":"
+)[0]
 
 sentry_sdk.init(
     dsn=os.environ.get("SENTRY_DSN"),
