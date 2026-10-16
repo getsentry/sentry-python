@@ -933,6 +933,8 @@ class Scope:
                 self._transaction_info["source"] = str(
                     span._attributes["sentry.segment.name.source"]
                 )
+            else:
+                self._transaction_info.pop("source", None)
             return
 
         if type(span) is NoOpStreamedSpan:
@@ -942,6 +944,8 @@ class Scope:
                 self._transaction_info["source"] = str(
                     span._attributes["sentry.segment.name.source"]
                 )
+            else:
+                self._transaction_info.pop("source", None)
 
     @property
     def profile(self) -> "Optional[Profile]":
