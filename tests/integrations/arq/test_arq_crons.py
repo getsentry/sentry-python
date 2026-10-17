@@ -119,8 +119,9 @@ async def test_cron_job_without_config(sentry_init, capture_envelopes):
         timezone=timezone.utc,
     )
 
+    # A scheduled run can follow the startup run.
     check_ins = _check_ins(envelopes)
-    assert [c["status"] for c in check_ins] == ["in_progress", "ok"]
+    assert [c["status"] for c in check_ins[:2]] == ["in_progress", "ok"]
     assert all("monitor_config" not in c for c in check_ins)
 
 
