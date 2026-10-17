@@ -324,7 +324,7 @@ def _monitor_cron_job(
     # Each create_worker call wraps the coroutine again.
     if getattr(cron_job, "_sentry_monitored", False):
         return
-    cron_job._sentry_monitored = True  # type: ignore[attr-defined]
+    cron_job._sentry_monitored = True
 
     # arq names cron jobs "cron:<function name>" by default.
     monitor_slug = cron_job.name
