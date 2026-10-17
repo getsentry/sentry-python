@@ -1,9 +1,12 @@
 import functools
+import re
+import time
 import weakref
 
 import sentry_sdk
 from sentry_sdk.api import continue_trace
 from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.crons import MonitorStatus, capture_checkin
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.scope import Scope, should_send_default_pii
@@ -16,6 +19,9 @@ from sentry_sdk.utils import (
     event_from_exception,
     format_timestamp,
     has_data_collection_enabled,
+    logger,
+    match_regex_list,
+    now,
     parse_version,
 )
 
@@ -39,17 +45,30 @@ except ImportError:
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any, Callable
+    from typing import Any, Callable, List, Optional, Tuple
 
     from rq.job import Job
 
-    from sentry_sdk._types import Event, EventProcessor
+    from sentry_sdk._types import (
+        Event,
+        EventProcessor,
+        MonitorConfig,
+        MonitorConfigScheduleUnit,
+    )
     from sentry_sdk.utils import ExcInfo
 
 
 class RqIntegration(Integration):
     identifier = "rq"
     origin = f"auto.queue.{identifier}"
+
+    def __init__(
+        self,
+        monitor_cron_jobs: bool = False,
+        exclude_cron_jobs: "Optional[List[str]]" = None,
+    ) -> None:
+        self.monitor_cron_jobs = monitor_cron_jobs
+        self.exclude_cron_jobs = exclude_cron_jobs
 
     @staticmethod
     def setup_once() -> None:
@@ -69,8 +88,13 @@ class RqIntegration(Integration):
             self: "Any", job: "Job", queue: "Queue", *args: "Any", **kwargs: "Any"
         ) -> bool:
             client = sentry_sdk.get_client()
-            if client.get_integration(RqIntegration) is None:
+            integration = client.get_integration(RqIntegration)
+            if integration is None:
                 return old_perform_job(self, job, queue, *args, **kwargs)
+
+            check_in = None
+            with capture_internal_exceptions():
+                check_in = _start_check_in(integration, job)
 
             with sentry_sdk.new_scope() as scope:
                 scope.clear_breadcrumbs()
@@ -121,6 +145,10 @@ class RqIntegration(Integration):
                         span.set_data(SPANDATA.MESSAGING_DESTINATION_NAME, queue.name)
 
                         rv = old_perform_job(self, job, queue, *args, **kwargs)
+
+            if check_in is not None:
+                with capture_internal_exceptions():
+                    _finish_check_in(check_in, rv)
 
             if self.is_horse:
                 # We're inside of a forked process and RQ is
@@ -229,3 +257,101 @@ def _capture_exception(exc_info: "ExcInfo", **kwargs: "Any") -> None:
     )
 
     sentry_sdk.capture_event(event, hint=hint)
+
+
+# rq generates `str(uuid4())` job ids.
+_GENERATED_JOB_ID = re.compile(
+    r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+)
+_CRONTAB_FIELD = re.compile(r"[0-9*,/-]+")
+_INTERVAL_UNITS: "Tuple[Tuple[MonitorConfigScheduleUnit, int], ...]" = (
+    ("day", 60 * 60 * 24),
+    ("hour", 60 * 60),
+    ("minute", 60),
+)
+
+
+def _get_crontab_config(cron_string: str) -> "Optional[MonitorConfig]":
+    fields = cron_string.split()
+    if len(fields) != 5 or not all(_CRONTAB_FIELD.fullmatch(f) for f in fields):
+        return None
+    # Day of month and day of week are matched differently by different
+    # cron parsers when both are set.
+    if fields[2] != "*" and fields[4] != "*":
+        return None
+    # rq-scheduler evaluates crontabs in the system's local time.
+    if time.timezone != 0 or (time.daylight and time.altzone != 0):
+        return None
+    return {
+        "schedule": {"type": "crontab", "value": " ".join(fields)},
+        "timezone": "UTC",
+    }
+
+
+def _get_monitor_config(job: "Job") -> "Optional[MonitorConfig]":
+    # Jobs with `repeat` stop after a number of runs.
+    if job.meta.get("repeat") is not None:
+        return None
+
+    cron_string = job.meta.get("cron_string")
+    if isinstance(cron_string, str):
+        return _get_crontab_config(cron_string)
+
+    interval = job.meta.get("interval")
+    if isinstance(interval, int):
+        for unit, seconds in _INTERVAL_UNITS:
+            if interval >= seconds and interval % seconds == 0:
+                return {
+                    "schedule": {
+                        "type": "interval",
+                        "value": interval // seconds,
+                        "unit": unit,
+                    }
+                }
+    return None
+
+
+def _start_check_in(
+    integration: "RqIntegration", job: "Job"
+) -> "Optional[Tuple[str, Optional[MonitorConfig], str, float]]":
+    """
+    Send an `in_progress` check-in for jobs that rq-scheduler's `cron()` and
+    `schedule(interval=...)` re-enqueue. It stores their schedule in the meta.
+    """
+    if not integration.monitor_cron_jobs:
+        return None
+    if "cron_string" not in job.meta and "interval" not in job.meta:
+        return None
+
+    # Without an explicit `id`, every scheduled job gets a random one.
+    monitor_slug = job.func_name if _GENERATED_JOB_ID.fullmatch(job.id) else job.id
+    if match_regex_list(monitor_slug, integration.exclude_cron_jobs):
+        return None
+
+    monitor_config = _get_monitor_config(job)
+    if monitor_config is None:
+        logger.debug(
+            "Schedule of RQ job %r can't be expressed as a Sentry Crons "
+            "schedule. Sending check-ins without a monitor config.",
+            monitor_slug,
+        )
+
+    check_in_id = capture_checkin(
+        monitor_slug=monitor_slug,
+        monitor_config=monitor_config,
+        status=MonitorStatus.IN_PROGRESS,
+    )
+    return monitor_slug, monitor_config, check_in_id, now()
+
+
+def _finish_check_in(
+    check_in: "Tuple[str, Optional[MonitorConfig], str, float]", ok: bool
+) -> None:
+    monitor_slug, monitor_config, check_in_id, start = check_in
+    capture_checkin(
+        monitor_slug=monitor_slug,
+        monitor_config=monitor_config,
+        check_in_id=check_in_id,
+        duration=now() - start,
+        status=MonitorStatus.OK if ok else MonitorStatus.ERROR,
+    )
