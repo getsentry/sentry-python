@@ -153,6 +153,20 @@ async def test_exclude_cron_jobs(sentry_init, capture_envelopes):
     assert {c["monitor_slug"] for c in _check_ins(envelopes)} == {"other"}
 
 
+@pytest.mark.asyncio
+async def test_cron_job_monitored_once(sentry_init, capture_envelopes):
+    sentry_init(integrations=[ArqIntegration(monitor_cron_jobs=True)])
+    envelopes = capture_envelopes()
+
+    cron_job = cron(ok_job, run_at_startup=True)
+    await _run_cron_jobs(cron_job, timezone=timezone.utc)
+    cron_job.next_run = None
+    await _run_cron_jobs(cron_job, timezone=timezone.utc)
+
+    statuses = [c["status"] for c in _check_ins(envelopes)]
+    assert statuses[:4] == ["in_progress", "ok", "in_progress", "ok"]
+
+
 class _Worker:
     def __init__(self, timezone):
         self.timezone = timezone

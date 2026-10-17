@@ -321,8 +321,10 @@ def _get_arq_cron_job(cron_job: "CronJob") -> "CronJob":
 def _monitor_cron_job(
     integration: "ArqIntegration", cron_job: "CronJob", worker: "Worker"
 ) -> None:
-    if getattr(cron_job.coroutine, "_sentry_monitored", False):
+    # Each create_worker call wraps the coroutine again.
+    if getattr(cron_job, "_sentry_monitored", False):
         return
+    cron_job._sentry_monitored = True  # type: ignore[attr-defined]
 
     # arq names cron jobs "cron:<function name>" by default.
     monitor_slug = cron_job.name
@@ -347,7 +349,6 @@ def _monitor_cron_job(
         with monitor(monitor_slug=monitor_slug, monitor_config=monitor_config):
             return await coroutine(ctx, *args, **kwargs)
 
-    _sentry_cron_coroutine._sentry_monitored = True  # type: ignore[attr-defined]
     cron_job.coroutine = _sentry_cron_coroutine
 
 
