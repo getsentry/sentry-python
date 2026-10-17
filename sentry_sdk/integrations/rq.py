@@ -313,7 +313,7 @@ def _get_monitor_config(job: "Job") -> "Optional[MonitorConfig]":
 
 def _start_check_in(
     integration: "RqIntegration", job: "Job"
-) -> "Optional[Tuple[str, Optional[MonitorConfig], str, float]]":
+) -> "Optional[Tuple[str, Optional[MonitorConfig], Optional[str], float]]":
     """
     Send an `in_progress` check-in for jobs that rq-scheduler's `cron()` and
     `schedule(interval=...)` re-enqueue. It stores their schedule in the meta.
@@ -345,7 +345,7 @@ def _start_check_in(
 
 
 def _finish_check_in(
-    check_in: "Tuple[str, Optional[MonitorConfig], str, float]", ok: bool
+    check_in: "Tuple[str, Optional[MonitorConfig], Optional[str], float]", ok: bool
 ) -> None:
     monitor_slug, monitor_config, check_in_id, start = check_in
     capture_checkin(
