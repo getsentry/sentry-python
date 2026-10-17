@@ -45,7 +45,7 @@ except ImportError:
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, List, Optional, Tuple
+    from typing import Any, Callable, List, Optional, Set, Tuple
 
     from rq.job import Job
 
@@ -263,6 +263,7 @@ def _capture_exception(exc_info: "ExcInfo", **kwargs: "Any") -> None:
 _GENERATED_JOB_ID = re.compile(
     r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
 )
+_warned_func_names: "Set[str]" = set()
 _CRONTAB_FIELD = re.compile(r"[0-9*,/-]+")
 _INTERVAL_UNITS: "Tuple[Tuple[MonitorConfigScheduleUnit, int], ...]" = (
     ("day", 60 * 60 * 24),
@@ -324,7 +325,18 @@ def _start_check_in(
         return None
 
     # Without an explicit `id`, every scheduled job gets a random one.
-    monitor_slug = job.func_name if _GENERATED_JOB_ID.fullmatch(job.id) else job.id
+    if _GENERATED_JOB_ID.fullmatch(job.id):
+        monitor_slug = job.func_name
+        if monitor_slug not in _warned_func_names:
+            _warned_func_names.add(monitor_slug)
+            logger.warning(
+                "RQ scheduled job %r has no explicit `id`, so its function name "
+                "is used as its monitor slug, and jobs for the same function "
+                "share a monitor. Pass `id` to give it its own monitor.",
+                monitor_slug,
+            )
+    else:
+        monitor_slug = job.id
     if match_regex_list(monitor_slug, integration.exclude_cron_jobs):
         return None
 
