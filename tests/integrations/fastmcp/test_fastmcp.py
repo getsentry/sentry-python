@@ -13,7 +13,7 @@ Tests focus on verifying Sentry integration behavior:
 - Error capture and instrumentation
 - PII and include_prompts flag behavior
 - Request context data extraction
-- Transport detection (stdio, http, sse)
+- Transport metadata (in-memory, HTTP, SSE)
 
 All tests invoke tools/prompts/resources through the MCP Server's low-level
 request handlers (via CallToolRequest, GetPromptRequest, ReadResourceRequest)
@@ -334,7 +334,7 @@ async def test_fastmcp_tool_sync(
         assert span["name"] == "tools/call add_numbers"
         assert span["attributes"][SPANDATA.MCP_TOOL_NAME] == "add_numbers"
         assert span["attributes"][SPANDATA.MCP_METHOD_NAME] == "tools/call"
-        assert span["attributes"][SPANDATA.MCP_TRANSPORT] == "stdio"
+        assert SPANDATA.MCP_TRANSPORT not in span["attributes"]
         assert span["attributes"][SPANDATA.MCP_REQUEST_ID] == "req-123"
 
         # Check PII-sensitive data
@@ -367,7 +367,7 @@ async def test_fastmcp_tool_sync(
         assert span["description"] == "tools/call add_numbers"
         assert span["data"][SPANDATA.MCP_TOOL_NAME] == "add_numbers"
         assert span["data"][SPANDATA.MCP_METHOD_NAME] == "tools/call"
-        assert span["data"][SPANDATA.MCP_TRANSPORT] == "stdio"
+        assert SPANDATA.MCP_TRANSPORT not in span["data"]
         assert span["data"][SPANDATA.MCP_REQUEST_ID] == "req-123"
 
         # Check PII-sensitive data
@@ -455,7 +455,10 @@ async def test_fastmcp_tool_async(
         assert span["name"] == "tools/call multiply_numbers"
         assert span["attributes"][SPANDATA.MCP_TOOL_NAME] == "multiply_numbers"
         assert span["attributes"][SPANDATA.MCP_METHOD_NAME] == "tools/call"
-        assert span["attributes"][SPANDATA.MCP_TRANSPORT] == "http"
+        assert (
+            span["attributes"][SPANDATA.MCP_TRANSPORT]
+            == "StreamableHTTPServerTransport"
+        )
         assert span["attributes"][SPANDATA.MCP_REQUEST_ID] == "req-456"
         assert span["attributes"][SPANDATA.MCP_SESSION_ID] == session_id
 
@@ -495,7 +498,7 @@ async def test_fastmcp_tool_async(
         assert span["description"] == "tools/call multiply_numbers"
         assert span["data"][SPANDATA.MCP_TOOL_NAME] == "multiply_numbers"
         assert span["data"][SPANDATA.MCP_METHOD_NAME] == "tools/call"
-        assert span["data"][SPANDATA.MCP_TRANSPORT] == "http"
+        assert span["data"][SPANDATA.MCP_TRANSPORT] == "StreamableHTTPServerTransport"
         assert span["data"][SPANDATA.MCP_REQUEST_ID] == "req-456"
         assert span["data"][SPANDATA.MCP_SESSION_ID] == session_id
 
@@ -1319,7 +1322,10 @@ async def test_fastmcp_sse_transport(
         assert len(mcp_spans) >= 1
         span = mcp_spans[0]
         # Check that SSE transport is detected
-        assert span["attributes"].get(SPANDATA.MCP_TRANSPORT) == "sse"
+        assert span["attributes"][SPANDATA.MCP_TRANSPORT] == "SseServerTransport"
+        assert span["attributes"][SPANDATA.NETWORK_PROTOCOL_NAME] == "http"
+        assert span["attributes"][SPANDATA.NETWORK_PROTOCOL_VERSION] == "1.1"
+        assert SPANDATA.NETWORK_TRANSPORT not in span["attributes"]
     else:
         events = capture_events()
 
@@ -1355,7 +1361,10 @@ async def test_fastmcp_sse_transport(
         assert len(mcp_spans) >= 1
         span = mcp_spans[0]
         # Check that SSE transport is detected
-        assert span["data"].get(SPANDATA.MCP_TRANSPORT) == "sse"
+        assert span["data"][SPANDATA.MCP_TRANSPORT] == "SseServerTransport"
+        assert span["data"][SPANDATA.NETWORK_PROTOCOL_NAME] == "http"
+        assert span["data"][SPANDATA.NETWORK_PROTOCOL_VERSION] == "1.1"
+        assert SPANDATA.NETWORK_TRANSPORT not in span["data"]
 
 
 @pytest.mark.parametrize("FastMCP", fastmcp_implementations, ids=fastmcp_ids)
@@ -1423,7 +1432,13 @@ def test_fastmcp_http_transport(
         span = spans[0]
 
         # Check that HTTP transport is detected
-        assert span["attributes"].get(SPANDATA.MCP_TRANSPORT) == "http"
+        assert (
+            span["attributes"][SPANDATA.MCP_TRANSPORT]
+            == "StreamableHTTPServerTransport"
+        )
+        assert span["attributes"][SPANDATA.NETWORK_PROTOCOL_NAME] == "http"
+        assert span["attributes"][SPANDATA.NETWORK_PROTOCOL_VERSION] == "1.1"
+        assert SPANDATA.NETWORK_TRANSPORT not in span["attributes"]
     else:
         events = capture_events()
 
@@ -1450,13 +1465,16 @@ def test_fastmcp_http_transport(
         span = tx["spans"][0]
 
         # Check that HTTP transport is detected
-        assert span["data"].get(SPANDATA.MCP_TRANSPORT) == "http"
+        assert span["data"][SPANDATA.MCP_TRANSPORT] == "StreamableHTTPServerTransport"
+        assert span["data"][SPANDATA.NETWORK_PROTOCOL_NAME] == "http"
+        assert span["data"][SPANDATA.NETWORK_PROTOCOL_VERSION] == "1.1"
+        assert SPANDATA.NETWORK_TRANSPORT not in span["data"]
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("FastMCP", fastmcp_implementations, ids=fastmcp_ids)
 @pytest.mark.parametrize("span_streaming", [True, False])
-async def test_fastmcp_stdio_transport(
+async def test_fastmcp_in_memory_transport(
     sentry_init,
     capture_events,
     capture_items,
@@ -1464,7 +1482,7 @@ async def test_fastmcp_stdio_transport(
     stdio,
     span_streaming,
 ):
-    """Test that FastMCP correctly detects stdio transport"""
+    """In-memory streams do not identify the MCP or network transport."""
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
@@ -1500,9 +1518,10 @@ async def test_fastmcp_stdio_transport(
 
         assert len(mcp_spans) >= 1
         span = mcp_spans[0]
-        # Check that stdio transport is detected
-
-        assert span["attributes"].get(SPANDATA.MCP_TRANSPORT) == "stdio"
+        assert SPANDATA.MCP_TRANSPORT not in span["attributes"]
+        assert SPANDATA.NETWORK_TRANSPORT not in span["attributes"]
+        assert SPANDATA.NETWORK_PROTOCOL_NAME not in span["attributes"]
+        assert SPANDATA.NETWORK_PROTOCOL_VERSION not in span["attributes"]
     else:
         events = capture_events()
         with start_transaction(name="fastmcp tx"):
@@ -1523,9 +1542,10 @@ async def test_fastmcp_stdio_transport(
 
         assert len(mcp_spans) >= 1
         span = mcp_spans[0]
-        # Check that stdio transport is detected
-
-        assert span["data"].get(SPANDATA.MCP_TRANSPORT) == "stdio"
+        assert SPANDATA.MCP_TRANSPORT not in span["data"]
+        assert SPANDATA.NETWORK_TRANSPORT not in span["data"]
+        assert SPANDATA.NETWORK_PROTOCOL_NAME not in span["data"]
+        assert SPANDATA.NETWORK_PROTOCOL_VERSION not in span["data"]
 
 
 @pytest.mark.asyncio
