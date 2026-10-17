@@ -385,6 +385,130 @@ def test_get_monitor_config_timezone_in_celery_schedule():
     assert monitor_config["timezone"] == str(panama_tz)
 
 
+def test_get_monitor_config_with_overrides():
+    app = MagicMock()
+    app.timezone = "Europe/Vienna"
+
+    celery_schedule = crontab(day_of_month="3", hour="12", minute="*/10")
+
+    monitor_config = _get_monitor_config(
+        celery_schedule,
+        app,
+        "foo",
+        {"max_runtime": 120, "checkin_margin": 5, "owner": "team:6"},
+    )
+
+    assert monitor_config == {
+        "schedule": {
+            "type": "crontab",
+            "value": "*/10 12 3 * *",
+        },
+        "timezone": "UTC",
+        "max_runtime": 120,
+        "checkin_margin": 5,
+        "owner": "team:6",
+    }
+
+
+def test_get_monitor_config_overrides_can_replace_schedule():
+    app = MagicMock()
+    app.timezone = "Europe/Vienna"
+
+    celery_schedule = crontab(day_of_month="3", hour="12", minute="*/10")
+    override_schedule = {"type": "crontab", "value": "0 5 * * *"}
+
+    monitor_config = _get_monitor_config(
+        celery_schedule, app, "foo", {"schedule": override_schedule}
+    )
+
+    assert monitor_config["schedule"] == override_schedule
+
+
+def test_beat_task_monitor_config_option():
+    """``beat_task_monitor_config`` is merged into the derived monitor config."""
+    fake_apply_entry = MagicMock()
+
+    fake_scheduler = MagicMock()
+    fake_scheduler.apply_entry = fake_apply_entry
+
+    fake_integration = MagicMock()
+    fake_integration.monitor_beat_tasks = True
+    fake_integration.exclude_beat_tasks = None
+    fake_integration.beat_task_monitor_config = {
+        "some_task_name": {"max_runtime": 120, "checkin_margin": 10}
+    }
+
+    fake_client = MagicMock()
+    fake_client.get_integration.return_value = fake_integration
+
+    fake_schedule_entry = MagicMock()
+    fake_schedule_entry.name = "some_task_name"
+    fake_schedule_entry.schedule = crontab(day_of_month="3", hour="12", minute="*/10")
+    fake_schedule_entry.options = {}
+
+    with mock.patch(
+        "sentry_sdk.integrations.celery.beat.Scheduler", fake_scheduler
+    ) as Scheduler:  # noqa: N806
+        with mock.patch(
+            "sentry_sdk.integrations.celery.sentry_sdk.get_client",
+            return_value=fake_client,
+        ):
+            with mock.patch(
+                "sentry_sdk.integrations.celery.beat.capture_checkin",
+                return_value="check-in-id",
+            ) as mock_capture_checkin:
+                # Mimic CeleryIntegration patching of Scheduler.apply_entry()
+                _patch_beat_apply_entry()
+                # Mimic Celery Beat calling a task from the Beat schedule
+                Scheduler.apply_entry(fake_scheduler, fake_schedule_entry)
+
+    assert fake_apply_entry.call_count == 1
+    monitor_config = mock_capture_checkin.call_args.kwargs["monitor_config"]
+    assert monitor_config["schedule"] == {
+        "type": "crontab",
+        "value": "*/10 12 3 * *",
+    }
+    assert monitor_config["max_runtime"] == 120
+    assert monitor_config["checkin_margin"] == 10
+
+
+def test_beat_task_monitor_config_option_only_applies_to_matching_task():
+    fake_apply_entry = MagicMock()
+
+    fake_scheduler = MagicMock()
+    fake_scheduler.apply_entry = fake_apply_entry
+
+    fake_integration = MagicMock()
+    fake_integration.monitor_beat_tasks = True
+    fake_integration.exclude_beat_tasks = None
+    fake_integration.beat_task_monitor_config = {"some_task_name": {"max_runtime": 120}}
+
+    fake_client = MagicMock()
+    fake_client.get_integration.return_value = fake_integration
+
+    fake_schedule_entry = MagicMock()
+    fake_schedule_entry.name = "another_task_name"
+    fake_schedule_entry.schedule = crontab(day_of_month="3", hour="12", minute="*/10")
+    fake_schedule_entry.options = {}
+
+    with mock.patch(
+        "sentry_sdk.integrations.celery.beat.Scheduler", fake_scheduler
+    ) as Scheduler:  # noqa: N806
+        with mock.patch(
+            "sentry_sdk.integrations.celery.sentry_sdk.get_client",
+            return_value=fake_client,
+        ):
+            with mock.patch(
+                "sentry_sdk.integrations.celery.beat.capture_checkin",
+                return_value="check-in-id",
+            ) as mock_capture_checkin:
+                _patch_beat_apply_entry()
+                Scheduler.apply_entry(fake_scheduler, fake_schedule_entry)
+
+    monitor_config = mock_capture_checkin.call_args.kwargs["monitor_config"]
+    assert "max_runtime" not in monitor_config
+
+
 @pytest.mark.parametrize(
     "task_name,exclude_beat_tasks,task_in_excluded_beat_tasks",
     [

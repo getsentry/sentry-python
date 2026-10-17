@@ -57,7 +57,10 @@ def _get_headers(task: "Task") -> "dict[str, Any]":
 
 
 def _get_monitor_config(
-    celery_schedule: "Any", app: "Celery", monitor_name: str
+    celery_schedule: "Any",
+    app: "Celery",
+    monitor_name: str,
+    monitor_config_overrides: "Optional[MonitorConfig]" = None,
 ) -> "MonitorConfig":
     monitor_config: "MonitorConfig" = {}
     schedule_type: "Optional[MonitorConfigScheduleType]" = None
@@ -111,6 +114,9 @@ def _get_monitor_config(
         or "UTC"
     )
 
+    if monitor_config_overrides is not None:
+        monitor_config.update(monitor_config_overrides)
+
     return monitor_config
 
 
@@ -136,7 +142,12 @@ def _apply_crons_data_to_schedule_entry(
     celery_schedule = schedule_entry.schedule
     app = scheduler.app
 
-    monitor_config = _get_monitor_config(celery_schedule, app, monitor_name)
+    monitor_config = _get_monitor_config(
+        celery_schedule,
+        app,
+        monitor_name,
+        (integration.beat_task_monitor_config or {}).get(monitor_name),
+    )
 
     is_supported_schedule = bool(monitor_config)
     if not is_supported_schedule:

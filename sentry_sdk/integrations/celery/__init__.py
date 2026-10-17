@@ -29,9 +29,15 @@ from sentry_sdk.utils import (
 )
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, List, Optional, TypeVar, Union
+    from typing import Any, Callable, Dict, List, Optional, TypeVar, Union
 
-    from sentry_sdk._types import Event, EventProcessor, ExcInfo, Hint
+    from sentry_sdk._types import (
+        Event,
+        EventProcessor,
+        ExcInfo,
+        Hint,
+        MonitorConfig,
+    )
 
     F = TypeVar("F", bound=Callable[..., Any])
 
@@ -63,10 +69,15 @@ class CeleryIntegration(Integration):
         propagate_traces: bool = True,
         monitor_beat_tasks: bool = False,
         exclude_beat_tasks: "Optional[List[str]]" = None,
+        beat_task_monitor_config: "Optional[Dict[str, MonitorConfig]]" = None,
     ) -> None:
         self.propagate_traces = propagate_traces
         self.monitor_beat_tasks = monitor_beat_tasks
         self.exclude_beat_tasks = exclude_beat_tasks
+        # Extra monitor config (e.g. ``max_runtime``, ``checkin_margin``) keyed
+        # by the name of the task in the Celery Beat schedule. The values are
+        # merged into the config the SDK derives from the schedule.
+        self.beat_task_monitor_config = beat_task_monitor_config
 
         _patch_beat_apply_entry()
         _patch_redbeat_apply_async()
