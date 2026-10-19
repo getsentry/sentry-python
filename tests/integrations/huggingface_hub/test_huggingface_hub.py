@@ -2802,17 +2802,20 @@ def test_chat_completion_request_parameters(
         else capture_events()
     )
 
+    kwargs = {
+        "messages": [{"role": "user", "content": "Hello"}],
+        "max_tokens": 200,
+        "seed": 123,
+        "temperature": 0.8,
+        "top_p": 0.95,
+        "frequency_penalty": 0.2,
+        "presence_penalty": 0.3,
+    }
+    if HF_VERSION and HF_VERSION >= (0, 29, 0):
+        kwargs["extra_body"] = {"top_k": 40}
+
     with sentry_sdk.start_transaction(name="test"):
-        client.chat_completion(
-            messages=[{"role": "user", "content": "Hello"}],
-            max_tokens=200,
-            seed=123,
-            temperature=0.8,
-            top_p=0.95,
-            frequency_penalty=0.2,
-            presence_penalty=0.3,
-            extra_body={"top_k": 40},
-        )
+        client.chat_completion(**kwargs)
 
     if span_streaming or stream_gen_ai_spans:
         sentry_sdk.flush()
@@ -2832,7 +2835,8 @@ def test_chat_completion_request_parameters(
     assert span_data[SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.95
     assert span_data[SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
     assert span_data[SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.3
-    assert span_data[SPANDATA.GEN_AI_REQUEST_TOP_K] == 40
+    if HF_VERSION and HF_VERSION >= (0, 29, 0):
+        assert span_data[SPANDATA.GEN_AI_REQUEST_TOP_K] == 40
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
@@ -2862,16 +2866,19 @@ def test_chat_completion_request_parameters_zero_values(
         else capture_events()
     )
 
+    kwargs = {
+        "messages": [{"role": "user", "content": "Hello"}],
+        "seed": 0,
+        "temperature": 0.0,
+        "frequency_penalty": 0.0,
+        "presence_penalty": 0.0,
+        "top_p": 0.0,
+    }
+    if HF_VERSION and HF_VERSION >= (0, 29, 0):
+        kwargs["extra_body"] = {"top_k": 0}
+
     with sentry_sdk.start_transaction(name="test"):
-        client.chat_completion(
-            messages=[{"role": "user", "content": "Hello"}],
-            seed=0,
-            temperature=0.0,
-            frequency_penalty=0.0,
-            presence_penalty=0.0,
-            top_p=0.0,
-            extra_body={"top_k": 0},
-        )
+        client.chat_completion(**kwargs)
 
     if span_streaming or stream_gen_ai_spans:
         sentry_sdk.flush()
@@ -2890,7 +2897,8 @@ def test_chat_completion_request_parameters_zero_values(
     assert span_data[SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.0
     assert span_data[SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.0
     assert span_data[SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.0
-    assert span_data[SPANDATA.GEN_AI_REQUEST_TOP_K] == 0
+    if HF_VERSION and HF_VERSION >= (0, 29, 0):
+        assert span_data[SPANDATA.GEN_AI_REQUEST_TOP_K] == 0
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
