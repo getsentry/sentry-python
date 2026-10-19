@@ -458,7 +458,7 @@ class SPANDATA:
     The name of the AWS Step Functions state machine the request refers to, without a version or alias qualifier.
     Example: "orders"
     """
-    
+
     AWS_SECRETSMANAGER_SECRET_ARN = "aws.secretsmanager.secret.arn"
     """
     The ARN of the Secrets Manager secret the request refers to.
