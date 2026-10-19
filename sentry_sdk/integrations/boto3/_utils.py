@@ -1,11 +1,15 @@
 from typing import TYPE_CHECKING
 
+import sentry_sdk
 from sentry_sdk.consts import SPANDATA
+from sentry_sdk.tracing_utils import should_propagate_trace
 
 if TYPE_CHECKING:
     from typing import Any, Dict, Iterable, Optional, Sequence, Tuple
 
     from sentry_sdk._types import Attributes
+    from sentry_sdk.integrations.boto3._context import AwsCallContext
+    from sentry_sdk.traces import Span
 
     # tuple of (request param name, span attribute name).
     _AttributeSpec = Tuple[str, str]
@@ -38,3 +42,20 @@ def _get_aws_arn_attributes(
         return attributes
 
     return {}
+
+
+def _get_propagation_headers(
+    ctx: "AwsCallContext", span: "Optional[Span]"
+) -> "Dict[str, str]":
+    """
+    Return the `sentry-trace` and `baggage` (and `traceparent`, if enabled) a call
+    propagates to its consumer, from its span or else the scope, like the HTTP headers.
+    Empty when `trace_propagation_targets` excludes the endpoint.
+    """
+    if ctx.endpoint_url is None or not should_propagate_trace(
+        sentry_sdk.get_client(), ctx.endpoint_url
+    ):
+        return {}
+    return dict(
+        sentry_sdk.get_current_scope().iter_trace_propagation_headers(span=span)
+    )

@@ -96,6 +96,9 @@ def _patch_botocore_client() -> None:
                 ctx.add_metadata(self)
             service_ext = _resolve_service(ctx.service_name)
             span = _start_client_span(ctx, service_ext)
+            if service_ext is not None:
+                with capture_internal_exceptions():
+                    api_params = service_ext.get_request_params(ctx, span) or api_params
 
         if span is None:
             return orig_make_api_call(self, operation_name, api_params)
@@ -136,7 +139,8 @@ def _patch_botocore_client() -> None:
 
         streaming_body_instrumented = False
         with capture_internal_exceptions():
-            streaming_body_instrumented = _instrument_streaming_body(span, parsed)
+            if service_ext is None or service_ext.has_streaming_response(ctx):
+                streaming_body_instrumented = _instrument_streaming_body(span, parsed)
 
         # `StreamingBody`s finish their span when consumed or closed.
         if not streaming_body_instrumented:

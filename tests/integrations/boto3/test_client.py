@@ -181,11 +181,11 @@ def test_streaming_span_order_and_scope(
     "service_name,method_name,api_params,payload_field",
     [
         pytest.param(
-            "lambda",
-            "invoke",
-            {"FunctionName": "function"},
-            "Payload",
-            id="payload",
+            "polly",
+            "synthesize_speech",
+            {"Text": "hi", "OutputFormat": "mp3", "VoiceId": "Joanna"},
+            "AudioStream",
+            id="audio-stream",
         ),
         pytest.param(
             "s3",
