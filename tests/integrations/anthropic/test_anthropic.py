@@ -5637,19 +5637,59 @@ async def test_stream_message_with_input_json_delta_async(
     reason="Versions <0.27.0 do not include InputJSONDelta, which was introduced in >=0.27.0 along with a new message delta type for tool calling.",
 )
 @pytest.mark.parametrize("api", ["create", "stream"])
+@pytest.mark.parametrize(
+    "data_collection,send_default_pii,include_prompts,outputs_collected",
+    [
+        pytest.param(
+            {"gen_ai": {"outputs": True}},
+            False,
+            False,
+            True,
+            id="gen-ai-outputs-enabled-overrides-pii-and-include-prompts",
+        ),
+        pytest.param(
+            {"gen_ai": {"outputs": False}},
+            True,
+            True,
+            False,
+            id="gen-ai-outputs-disabled-overrides-pii-and-include-prompts",
+        ),
+        pytest.param(
+            None,
+            True,
+            True,
+            True,
+            id="legacy-pii-and-include-prompts-enabled",
+        ),
+        pytest.param(
+            None,
+            False,
+            True,
+            False,
+            id="legacy-pii-disabled",
+        ),
+    ],
+)
 def test_streaming_text_and_tool_use_output(
     sentry_init,
     capture_items,
     get_model_response,
     server_side_event_chunks,
     api,
+    data_collection,
+    send_default_pii,
+    include_prompts,
+    outputs_collected,
 ):
-    sentry_init(
-        integrations=[AnthropicIntegration(include_prompts=True)],
+    sentry_init_kwargs = dict(
+        integrations=[AnthropicIntegration(include_prompts=include_prompts)],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        send_default_pii=True,
+        send_default_pii=send_default_pii,
     )
+    if data_collection is not None:
+        sentry_init_kwargs["data_collection"] = data_collection
+    sentry_init(**sentry_init_kwargs)
     items = capture_items("span")
 
     client = Anthropic(api_key="z")
@@ -5740,15 +5780,21 @@ def test_streaming_text_and_tool_use_output(
     sentry_sdk.flush()
     (span,) = (item.payload for item in items)
 
-    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Checking the weather."
-    assert json.loads(span["attributes"][SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS]) == [
-        {
-            "id": "toolu_1",
-            "input": {"city": "Paris"},
-            "name": "get_weather",
-            "type": "tool_use",
-        }
-    ]
+    if outputs_collected:
+        assert (
+            span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Checking the weather."
+        )
+        assert json.loads(span["attributes"][SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS]) == [
+            {
+                "id": "toolu_1",
+                "input": {"city": "Paris"},
+                "name": "get_weather",
+                "type": "tool_use",
+            }
+        ]
+    else:
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
+        assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in span["attributes"]
 
 
 @pytest.mark.asyncio
@@ -5757,6 +5803,39 @@ def test_streaming_text_and_tool_use_output(
     reason="Versions <0.27.0 do not include InputJSONDelta, which was introduced in >=0.27.0 along with a new message delta type for tool calling.",
 )
 @pytest.mark.parametrize("api", ["create", "stream"])
+@pytest.mark.parametrize(
+    "data_collection,send_default_pii,include_prompts,outputs_collected",
+    [
+        pytest.param(
+            {"gen_ai": {"outputs": True}},
+            False,
+            False,
+            True,
+            id="gen-ai-outputs-enabled-overrides-pii-and-include-prompts",
+        ),
+        pytest.param(
+            {"gen_ai": {"outputs": False}},
+            True,
+            True,
+            False,
+            id="gen-ai-outputs-disabled-overrides-pii-and-include-prompts",
+        ),
+        pytest.param(
+            None,
+            True,
+            True,
+            True,
+            id="legacy-pii-and-include-prompts-enabled",
+        ),
+        pytest.param(
+            None,
+            False,
+            True,
+            False,
+            id="legacy-pii-disabled",
+        ),
+    ],
+)
 async def test_streaming_text_and_tool_use_output_async(
     sentry_init,
     capture_items,
@@ -5764,13 +5843,20 @@ async def test_streaming_text_and_tool_use_output_async(
     async_iterator,
     server_side_event_chunks,
     api,
+    data_collection,
+    send_default_pii,
+    include_prompts,
+    outputs_collected,
 ):
-    sentry_init(
-        integrations=[AnthropicIntegration(include_prompts=True)],
+    sentry_init_kwargs = dict(
+        integrations=[AnthropicIntegration(include_prompts=include_prompts)],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        send_default_pii=True,
+        send_default_pii=send_default_pii,
     )
+    if data_collection is not None:
+        sentry_init_kwargs["data_collection"] = data_collection
+    sentry_init(**sentry_init_kwargs)
     items = capture_items("span")
 
     client = AsyncAnthropic(api_key="z")
@@ -5866,15 +5952,21 @@ async def test_streaming_text_and_tool_use_output_async(
     sentry_sdk.flush()
     (span,) = (item.payload for item in items)
 
-    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Checking the weather."
-    assert json.loads(span["attributes"][SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS]) == [
-        {
-            "id": "toolu_1",
-            "input": {"city": "Paris"},
-            "name": "get_weather",
-            "type": "tool_use",
-        }
-    ]
+    if outputs_collected:
+        assert (
+            span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Checking the weather."
+        )
+        assert json.loads(span["attributes"][SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS]) == [
+            {
+                "id": "toolu_1",
+                "input": {"city": "Paris"},
+                "name": "get_weather",
+                "type": "tool_use",
+            }
+        ]
+    else:
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
+        assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in span["attributes"]
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
