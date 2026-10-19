@@ -6,9 +6,7 @@ from typing import TYPE_CHECKING
 import sentry_sdk
 from sentry_sdk.data_collection import _apply_key_value_collection_filtering
 from sentry_sdk.integrations._wsgi_common import _filter_headers
-from sentry_sdk.utils import (
-    AnnotatedValue,
-)
+from sentry_sdk.utils import AnnotatedValue
 
 if TYPE_CHECKING:
     from typing import Any, Optional
@@ -119,8 +117,8 @@ def _get_url(aws_event: "Any", aws_context: "Any") -> str:
     host = headers.get("Host", None)
     proto = headers.get("X-Forwarded-Proto", None)
     if proto and host and path:
-        return "{}://{}{}".format(proto, host, path)
-    return "awslambda:///{}".format(aws_context.function_name)
+        return f"{proto}://{host}{path}"
+    return f"awslambda:///{aws_context.function_name}"
 
 
 def _get_cloudwatch_logs_url(aws_context: "Any", start_time: "datetime") -> str:

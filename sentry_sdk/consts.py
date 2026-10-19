@@ -453,12 +453,6 @@ class SPANDATA:
     Example: "123456789012"
     """
 
-    CLOUD_AVAILABILITY_ZONE = "cloud.availability_zone"
-    """
-    Cloud regions often have multiple, isolated locations known as zones to increase availability
-    Example: "us-east-1c"
-    """
-
     CLOUD_PLATFORM = "cloud.platform"
     """
     The cloud platform in use.
