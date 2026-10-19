@@ -103,6 +103,7 @@ try:
             ChatCompletionChunk,
             ChatCompletionMessageParam,
         )
+        from openai.types.chat.chat_completion_chunk import ChoiceDelta
 except ImportError:
     raise DidNotEnable("OpenAI not installed")
 
@@ -1030,6 +1031,25 @@ def _set_completions_api_output_data(
     )
 
 
+def _accumulate_tool_call_deltas(
+    tool_calls: "dict[tuple[int, int], dict[str, Any]]",
+    choice_index: int,
+    delta: "ChoiceDelta",
+) -> None:
+    for tool_call in getattr(delta, "tool_calls", None) or []:
+        call = tool_calls.setdefault(
+            (choice_index, tool_call.index),
+            {"id": None, "type": "function", "function": {"name": "", "arguments": ""}},
+        )
+        if tool_call.id is not None:
+            call["id"] = tool_call.id
+        if tool_call.type is not None:
+            call["type"] = tool_call.type
+        if tool_call.function is not None:
+            call["function"]["name"] += tool_call.function.name or ""
+            call["function"]["arguments"] += tool_call.function.arguments or ""
+
+
 def _wrap_synchronous_completions_chunk_iterator(
     span: "Union[Span, StreamedSpan]",
     integration: "OpenAIIntegration",
@@ -1046,6 +1066,7 @@ def _wrap_synchronous_completions_chunk_iterator(
     """
     ttft = None
     data_buf: "list[list[str]]" = []  # one for each choice
+    tool_calls: "dict[tuple[int, int], dict[str, Any]]" = {}
     streaming_message_total_token_usage = None
     client = sentry_sdk.get_client()
 
@@ -1066,6 +1087,10 @@ def _wrap_synchronous_completions_chunk_iterator(
                         if len(data_buf) <= choice_index:
                             data_buf.append([])
                         data_buf[choice_index].append(content or "")
+                    if hasattr(choice, "delta"):
+                        _accumulate_tool_call_deltas(
+                            tool_calls, choice_index, choice.delta
+                        )
                     choice_index += 1
             if hasattr(x, "usage"):
                 streaming_message_total_token_usage = x.usage
@@ -1077,9 +1102,26 @@ def _wrap_synchronous_completions_chunk_iterator(
             set_data_normalized(
                 span, SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN, ttft
             )
+        if len(tool_calls) > 0:
+            if has_data_collection_enabled(client.options):
+                if client.options["data_collection"]["gen_ai"]["outputs"]:
+                    set_data_normalized(
+                        span,
+                        SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
+                        list(tool_calls.values()),
+                        unpack=False,
+                    )
+            elif should_send_default_pii() and integration.include_prompts:
+                set_data_normalized(
+                    span,
+                    SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
+                    list(tool_calls.values()),
+                    unpack=False,
+                )
         all_responses = None
         if len(data_buf) > 0:
             all_responses = ["".join(chunk) for chunk in data_buf]
+        if all_responses is not None and any(all_responses):
             if has_data_collection_enabled(client.options):
                 if client.options["data_collection"]["gen_ai"]["outputs"]:
                     set_data_normalized(
@@ -1117,6 +1159,7 @@ async def _wrap_asynchronous_completions_chunk_iterator(
     """
     ttft = None
     data_buf: "list[list[str]]" = []  # one for each choice
+    tool_calls: "dict[tuple[int, int], dict[str, Any]]" = {}
     streaming_message_total_token_usage = None
     client = sentry_sdk.get_client()
 
@@ -1137,6 +1180,10 @@ async def _wrap_asynchronous_completions_chunk_iterator(
                         if len(data_buf) <= choice_index:
                             data_buf.append([])
                         data_buf[choice_index].append(content or "")
+                    if hasattr(choice, "delta"):
+                        _accumulate_tool_call_deltas(
+                            tool_calls, choice_index, choice.delta
+                        )
                     choice_index += 1
             if hasattr(x, "usage"):
                 streaming_message_total_token_usage = x.usage
@@ -1148,9 +1195,26 @@ async def _wrap_asynchronous_completions_chunk_iterator(
             set_data_normalized(
                 span, SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN, ttft
             )
+        if len(tool_calls) > 0:
+            if has_data_collection_enabled(client.options):
+                if client.options["data_collection"]["gen_ai"]["outputs"]:
+                    set_data_normalized(
+                        span,
+                        SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
+                        list(tool_calls.values()),
+                        unpack=False,
+                    )
+            elif should_send_default_pii() and integration.include_prompts:
+                set_data_normalized(
+                    span,
+                    SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
+                    list(tool_calls.values()),
+                    unpack=False,
+                )
         all_responses = None
         if len(data_buf) > 0:
             all_responses = ["".join(chunk) for chunk in data_buf]
+        if all_responses is not None and any(all_responses):
             if has_data_collection_enabled(client.options):
                 if client.options["data_collection"]["gen_ai"]["outputs"]:
                     set_data_normalized(

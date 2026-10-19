@@ -28,6 +28,15 @@ from openai.types.chat.chat_completion_chunk import ChoiceDelta
 from openai.types.create_embedding_response import Usage as EmbeddingTokenUsage
 
 try:
+    from openai.types.chat.chat_completion_chunk import (
+        ChoiceDeltaToolCall,
+        ChoiceDeltaToolCallFunction,
+    )
+except ImportError:
+    ChoiceDeltaToolCall = None
+    ChoiceDeltaToolCallFunction = None
+
+try:
     from openai.types.completion_usage import (
         CompletionTokensDetails,
         PromptTokensDetails,
@@ -2168,6 +2177,308 @@ async def test_streaming_chat_completion_empty_content_preserves_token_usage_asy
         assert span["data"]["gen_ai.usage.input_tokens"] == 20
         assert "gen_ai.usage.output_tokens" not in span["data"]
         assert span["data"]["gen_ai.usage.total_tokens"] == 20
+
+
+def _make_chat_completion_tool_call_stream(content):
+    def chunk(delta, finish_reason=None):
+        return ChatCompletionChunk(
+            id="chatcmpl-1",
+            choices=[
+                DeltaChoice(index=0, delta=delta, finish_reason=finish_reason),
+            ],
+            created=100000,
+            model="model-id",
+            object="chat.completion.chunk",
+        )
+
+    return [
+        chunk(ChoiceDelta(role="assistant", content=content)),
+        chunk(
+            ChoiceDelta(
+                tool_calls=[
+                    ChoiceDeltaToolCall(
+                        index=0,
+                        id="call_1",
+                        type="function",
+                        function=ChoiceDeltaToolCallFunction(
+                            name="get_weather", arguments=""
+                        ),
+                    )
+                ]
+            )
+        ),
+        chunk(
+            ChoiceDelta(
+                tool_calls=[
+                    ChoiceDeltaToolCall(
+                        index=0,
+                        function=ChoiceDeltaToolCallFunction(arguments='{"city": '),
+                    )
+                ]
+            )
+        ),
+        chunk(
+            ChoiceDelta(
+                tool_calls=[
+                    ChoiceDeltaToolCall(
+                        index=0,
+                        function=ChoiceDeltaToolCallFunction(arguments='"Paris"}'),
+                    )
+                ]
+            )
+        ),
+        chunk(ChoiceDelta(), finish_reason="tool_calls"),
+    ]
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+@pytest.mark.parametrize(
+    "content",
+    [
+        pytest.param("Checking the weather.", id="with-content"),
+        pytest.param(None, id="tool-call-only"),
+    ],
+)
+@pytest.mark.parametrize(
+    "data_collection,send_default_pii,expect_output",
+    [
+        pytest.param(
+            {"gen_ai": {"outputs": True}},
+            False,
+            True,
+            id="gen-ai-outputs-enabled-overrides-pii-disabled",
+        ),
+        pytest.param(
+            {"gen_ai": {"outputs": False}},
+            True,
+            False,
+            id="gen-ai-outputs-disabled-overrides-pii-enabled",
+        ),
+        pytest.param(
+            None,
+            False,
+            False,
+            id="no-gen-ai-data-collection-falls-back-to-send-default-pii",
+        ),
+        pytest.param(
+            None,
+            True,
+            True,
+            id="no-gen-ai-data-collection-pii-enabled-collects",
+        ),
+    ],
+)
+@pytest.mark.skipif(
+    ChoiceDeltaToolCall is None,
+    reason="OpenAI version does not support streamed tool call deltas.",
+)
+def test_streaming_chat_completion_tool_calls(
+    sentry_init,
+    capture_events,
+    capture_items,
+    data_collection,
+    send_default_pii,
+    expect_output,
+    content,
+    get_model_response,
+    server_side_event_chunks,
+    stream_gen_ai_spans,
+    span_streaming,
+):
+    init_kwargs = {
+        "integrations": [OpenAIIntegration()],
+        "disabled_integrations": [StdlibIntegration],
+        "traces_sample_rate": 1.0,
+        "send_default_pii": send_default_pii,
+        "stream_gen_ai_spans": stream_gen_ai_spans,
+        "trace_lifecycle": "stream" if span_streaming else "static",
+    }
+    if data_collection is not None:
+        init_kwargs["data_collection"] = data_collection
+
+    sentry_init(**init_kwargs)
+
+    client = OpenAI(api_key="z")
+    returned_stream = get_model_response(
+        server_side_event_chunks(
+            _make_chat_completion_tool_call_stream(content),
+            include_event_type=False,
+        )
+    )
+
+    def create():
+        with mock.patch.object(
+            client.chat._client._client,
+            "send",
+            return_value=returned_stream,
+        ), start_transaction(name="openai tx"):
+            response_stream = client.chat.completions.create(
+                model="some-model",
+                messages=[{"role": "user", "content": "Weather in Paris?"}],
+                stream=True,
+            )
+            for _ in response_stream:
+                pass
+
+    if span_streaming or stream_gen_ai_spans:
+        items = capture_items("span")
+        create()
+        sentry_sdk.flush()
+        (span,) = (item.payload for item in items)
+        span_data = span["attributes"]
+    else:
+        events = capture_events()
+        create()
+        (transaction,) = events
+        (span,) = transaction["spans"]
+        span_data = span["data"]
+
+    if expect_output:
+        if content is None:
+            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span_data
+        else:
+            assert span_data[SPANDATA.GEN_AI_RESPONSE_TEXT] == content
+        assert json.loads(span_data[SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS]) == [
+            {
+                "id": "call_1",
+                "type": "function",
+                "function": {
+                    "name": "get_weather",
+                    "arguments": '{"city": "Paris"}',
+                },
+            }
+        ]
+    else:
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span_data
+        assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in span_data
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "content",
+    [
+        pytest.param("Checking the weather.", id="with-content"),
+        pytest.param(None, id="tool-call-only"),
+    ],
+)
+@pytest.mark.parametrize(
+    "data_collection,send_default_pii,expect_output",
+    [
+        pytest.param(
+            {"gen_ai": {"outputs": True}},
+            False,
+            True,
+            id="gen-ai-outputs-enabled-overrides-pii-disabled",
+        ),
+        pytest.param(
+            {"gen_ai": {"outputs": False}},
+            True,
+            False,
+            id="gen-ai-outputs-disabled-overrides-pii-enabled",
+        ),
+        pytest.param(
+            None,
+            False,
+            False,
+            id="no-gen-ai-data-collection-falls-back-to-send-default-pii",
+        ),
+        pytest.param(
+            None,
+            True,
+            True,
+            id="no-gen-ai-data-collection-pii-enabled-collects",
+        ),
+    ],
+)
+@pytest.mark.skipif(
+    ChoiceDeltaToolCall is None,
+    reason="OpenAI version does not support streamed tool call deltas.",
+)
+async def test_streaming_chat_completion_tool_calls_async(
+    sentry_init,
+    capture_events,
+    capture_items,
+    data_collection,
+    send_default_pii,
+    expect_output,
+    content,
+    get_model_response,
+    async_iterator,
+    server_side_event_chunks,
+    stream_gen_ai_spans,
+    span_streaming,
+):
+    init_kwargs = {
+        "integrations": [OpenAIIntegration()],
+        "disabled_integrations": [StdlibIntegration],
+        "traces_sample_rate": 1.0,
+        "send_default_pii": send_default_pii,
+        "stream_gen_ai_spans": stream_gen_ai_spans,
+        "trace_lifecycle": "stream" if span_streaming else "static",
+    }
+    if data_collection is not None:
+        init_kwargs["data_collection"] = data_collection
+
+    sentry_init(**init_kwargs)
+
+    client = AsyncOpenAI(api_key="z")
+    returned_stream = get_model_response(
+        async_iterator(
+            server_side_event_chunks(
+                _make_chat_completion_tool_call_stream(content),
+                include_event_type=False,
+            )
+        )
+    )
+
+    async def create():
+        with mock.patch.object(
+            client.chat._client._client,
+            "send",
+            return_value=returned_stream,
+        ), start_transaction(name="openai tx"):
+            response_stream = await client.chat.completions.create(
+                model="some-model",
+                messages=[{"role": "user", "content": "Weather in Paris?"}],
+                stream=True,
+            )
+            async for _ in response_stream:
+                pass
+
+    if span_streaming or stream_gen_ai_spans:
+        items = capture_items("span")
+        await create()
+        sentry_sdk.flush()
+        (span,) = (item.payload for item in items)
+        span_data = span["attributes"]
+    else:
+        events = capture_events()
+        await create()
+        (transaction,) = events
+        (span,) = transaction["spans"]
+        span_data = span["data"]
+
+    if expect_output:
+        if content is None:
+            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span_data
+        else:
+            assert span_data[SPANDATA.GEN_AI_RESPONSE_TEXT] == content
+        assert json.loads(span_data[SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS]) == [
+            {
+                "id": "call_1",
+                "type": "function",
+                "function": {
+                    "name": "get_weather",
+                    "arguments": '{"city": "Paris"}',
+                },
+            }
+        ]
+    else:
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span_data
+        assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in span_data
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
