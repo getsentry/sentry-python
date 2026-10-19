@@ -429,6 +429,48 @@ class SPANDATA:
     Example: "dfRtDYWFbkRONycy.Yxwh66Yjlx.cph0gtNBtJ"
     """
 
+    AWS_STEP_FUNCTIONS_ACTIVITY_ARN = "aws.step_functions.activity.arn"
+    """
+    The ARN of the AWS Step Functions activity the request refers to.
+    Example: "arn:aws:states:us-east-1:123456789012:activity:approve-order"
+    """
+
+    AWS_STEP_FUNCTIONS_ACTIVITY_NAME = "aws.step_functions.activity.name"
+    """
+    The name of the AWS Step Functions activity the request refers to.
+    Example: "approve-order"
+    """
+
+    AWS_STEP_FUNCTIONS_EXECUTION_ARN = "aws.step_functions.execution.arn"
+    """
+    The ARN of the AWS Step Functions execution the request refers to.
+    Example: "arn:aws:states:us-east-1:123456789012:execution:orders:4f9b1c2e"
+    """
+
+    AWS_STEP_FUNCTIONS_STATE_MACHINE_ARN = "aws.step_functions.state_machine.arn"
+    """
+    The ARN of the AWS Step Functions state machine the request refers to.
+    Example: "arn:aws:states:us-east-1:123456789012:stateMachine:orders"
+    """
+
+    AWS_STEP_FUNCTIONS_STATE_MACHINE_NAME = "aws.step_functions.state_machine.name"
+    """
+    The name of the AWS Step Functions state machine the request refers to, without a version or alias qualifier.
+    Example: "orders"
+    """
+    
+    AWS_SECRETSMANAGER_SECRET_ARN = "aws.secretsmanager.secret.arn"
+    """
+    The ARN of the Secrets Manager secret the request refers to.
+    Example: "arn:aws:secretsmanager:us-east-1:123456789012:secret:db-password-AbCdEf"
+    """
+
+    AWS_SECRETSMANAGER_SECRET_NAME = "aws.secretsmanager.secret.name"
+    """
+    The name of the Secrets Manager secret the request refers to.
+    Example: "db-password"
+    """
+
     CACHE_HIT = "cache.hit"
     """
     A boolean indicating whether the requested data was found in the cache.
@@ -457,12 +499,6 @@ class SPANDATA:
     """
     The cloud account ID the resource is assigned to.
     Example: "123456789012"
-    """
-
-    CLOUD_AVAILABILITY_ZONE = "cloud.availability_zone"
-    """
-    Cloud regions often have multiple, isolated locations known as zones to increase availability
-    Example: "us-east-1c"
     """
 
     CLOUD_PLATFORM = "cloud.platform"

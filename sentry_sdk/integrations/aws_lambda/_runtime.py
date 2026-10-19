@@ -32,7 +32,7 @@ def _wrap_init_error(init_error: "F") -> "F":
             if exc_info and all(exc_info):
                 sentry_event, hint = event_from_exception(
                     exc_info,
-                    mechanism={"type": "aws_lambda", "handled": False},
+                    mechanism={"type": IDENTIFIER, "handled": False},
                 )
                 sentry_sdk.capture_event(sentry_event, hint=hint)
 
