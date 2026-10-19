@@ -1735,7 +1735,7 @@ def test_streaming_chat_completion_no_prompts(
                     id="1",
                     choices=[
                         DeltaChoice(
-                            index=1,
+                            index=0,
                             delta=ChoiceDelta(content="lo "),
                             finish_reason=None,
                         )
@@ -1748,7 +1748,7 @@ def test_streaming_chat_completion_no_prompts(
                     id="1",
                     choices=[
                         DeltaChoice(
-                            index=2,
+                            index=0,
                             delta=ChoiceDelta(content="world"),
                             finish_reason="stop",
                         )
@@ -2179,60 +2179,141 @@ async def test_streaming_chat_completion_empty_content_preserves_token_usage_asy
         assert span["data"]["gen_ai.usage.total_tokens"] == 20
 
 
-def _make_chat_completion_tool_call_stream(content):
-    def chunk(delta, finish_reason=None):
-        return ChatCompletionChunk(
+def _make_chat_completion_tool_call_stream(content, cities, choices_per_chunk):
+    def choice(choice_index, delta, finish_reason=None):
+        return DeltaChoice(index=choice_index, delta=delta, finish_reason=finish_reason)
+
+    def tool_call_delta(**kwargs):
+        return ChoiceDelta(tool_calls=[ChoiceDeltaToolCall(index=0, **kwargs)])
+
+    choice_indices = range(len(cities))
+    # Later steps deliver the last choice first, so the tool call order
+    # can't rely on the order choices are first seen.
+    steps = [
+        [
+            choice(i, ChoiceDelta(role="assistant", content=content))
+            for i in choice_indices
+        ],
+        [
+            choice(
+                i,
+                tool_call_delta(
+                    id=f"call_{i + 1}",
+                    type="function",
+                    function=ChoiceDeltaToolCallFunction(
+                        name="get_weather", arguments=""
+                    ),
+                ),
+            )
+            for i in reversed(choice_indices)
+        ],
+        [
+            choice(
+                i,
+                tool_call_delta(
+                    function=ChoiceDeltaToolCallFunction(arguments='{"city": '),
+                ),
+            )
+            for i in reversed(choice_indices)
+        ],
+        [
+            choice(
+                i,
+                tool_call_delta(
+                    function=ChoiceDeltaToolCallFunction(arguments=f'"{cities[i]}"}}'),
+                ),
+            )
+            for i in reversed(choice_indices)
+        ],
+        [
+            choice(i, ChoiceDelta(), finish_reason="tool_calls")
+            for i in reversed(choice_indices)
+        ],
+    ]
+
+    if choices_per_chunk == 1:
+        steps = [[c] for step in steps for c in step]
+
+    return [
+        ChatCompletionChunk(
             id="chatcmpl-1",
-            choices=[
-                DeltaChoice(index=0, delta=delta, finish_reason=finish_reason),
-            ],
+            choices=step,
             created=100000,
             model="model-id",
             object="chat.completion.chunk",
         )
-
-    return [
-        chunk(ChoiceDelta(role="assistant", content=content)),
-        chunk(
-            ChoiceDelta(
-                tool_calls=[
-                    ChoiceDeltaToolCall(
-                        index=0,
-                        id="call_1",
-                        type="function",
-                        function=ChoiceDeltaToolCallFunction(
-                            name="get_weather", arguments=""
-                        ),
-                    )
-                ]
-            )
-        ),
-        chunk(
-            ChoiceDelta(
-                tool_calls=[
-                    ChoiceDeltaToolCall(
-                        index=0,
-                        function=ChoiceDeltaToolCallFunction(arguments='{"city": '),
-                    )
-                ]
-            )
-        ),
-        chunk(
-            ChoiceDelta(
-                tool_calls=[
-                    ChoiceDeltaToolCall(
-                        index=0,
-                        function=ChoiceDeltaToolCallFunction(arguments='"Paris"}'),
-                    )
-                ]
-            )
-        ),
-        chunk(ChoiceDelta(), finish_reason="tool_calls"),
+        for step in steps
     ]
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+@pytest.mark.parametrize(
+    "cities,choices_per_chunk,expected_tool_calls",
+    [
+        pytest.param(
+            ["Paris"],
+            1,
+            [
+                {
+                    "id": "call_1",
+                    "type": "function",
+                    "function": {
+                        "name": "get_weather",
+                        "arguments": '{"city": "Paris"}',
+                    },
+                }
+            ],
+            id="single-choice",
+        ),
+        pytest.param(
+            ["Paris", "Rome"],
+            1,
+            [
+                {
+                    "id": "call_1",
+                    "type": "function",
+                    "function": {
+                        "name": "get_weather",
+                        "arguments": '{"city": "Paris"}',
+                    },
+                },
+                {
+                    "id": "call_2",
+                    "type": "function",
+                    "function": {
+                        "name": "get_weather",
+                        "arguments": '{"city": "Rome"}',
+                    },
+                },
+            ],
+            id="two-choices-one-per-chunk",
+        ),
+        pytest.param(
+            ["Paris", "Rome"],
+            2,
+            [
+                {
+                    "id": "call_1",
+                    "type": "function",
+                    "function": {
+                        "name": "get_weather",
+                        "arguments": '{"city": "Paris"}',
+                    },
+                },
+                {
+                    "id": "call_2",
+                    "type": "function",
+                    "function": {
+                        "name": "get_weather",
+                        "arguments": '{"city": "Rome"}',
+                    },
+                },
+            ],
+            id="two-choices-in-one-chunk",
+        ),
+    ],
+)
 @pytest.mark.parametrize(
     "content",
     [
@@ -2281,6 +2362,9 @@ def test_streaming_chat_completion_tool_calls(
     send_default_pii,
     expect_output,
     content,
+    cities,
+    choices_per_chunk,
+    expected_tool_calls,
     get_model_response,
     server_side_event_chunks,
     stream_gen_ai_spans,
@@ -2302,7 +2386,7 @@ def test_streaming_chat_completion_tool_calls(
     client = OpenAI(api_key="z")
     returned_stream = get_model_response(
         server_side_event_chunks(
-            _make_chat_completion_tool_call_stream(content),
+            _make_chat_completion_tool_call_stream(content, cities, choices_per_chunk),
             include_event_type=False,
         )
     )
@@ -2337,18 +2421,16 @@ def test_streaming_chat_completion_tool_calls(
     if expect_output:
         if content is None:
             assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span_data
-        else:
+        elif len(cities) == 1:
             assert span_data[SPANDATA.GEN_AI_RESPONSE_TEXT] == content
-        assert json.loads(span_data[SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS]) == [
-            {
-                "id": "call_1",
-                "type": "function",
-                "function": {
-                    "name": "get_weather",
-                    "arguments": '{"city": "Paris"}',
-                },
-            }
-        ]
+        else:
+            assert json.loads(span_data[SPANDATA.GEN_AI_RESPONSE_TEXT]) == [
+                content
+            ] * len(cities)
+        assert (
+            json.loads(span_data[SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS])
+            == expected_tool_calls
+        )
     else:
         assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span_data
         assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in span_data
@@ -2357,6 +2439,72 @@ def test_streaming_chat_completion_tool_calls(
 @pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "cities,choices_per_chunk,expected_tool_calls",
+    [
+        pytest.param(
+            ["Paris"],
+            1,
+            [
+                {
+                    "id": "call_1",
+                    "type": "function",
+                    "function": {
+                        "name": "get_weather",
+                        "arguments": '{"city": "Paris"}',
+                    },
+                }
+            ],
+            id="single-choice",
+        ),
+        pytest.param(
+            ["Paris", "Rome"],
+            1,
+            [
+                {
+                    "id": "call_1",
+                    "type": "function",
+                    "function": {
+                        "name": "get_weather",
+                        "arguments": '{"city": "Paris"}',
+                    },
+                },
+                {
+                    "id": "call_2",
+                    "type": "function",
+                    "function": {
+                        "name": "get_weather",
+                        "arguments": '{"city": "Rome"}',
+                    },
+                },
+            ],
+            id="two-choices-one-per-chunk",
+        ),
+        pytest.param(
+            ["Paris", "Rome"],
+            2,
+            [
+                {
+                    "id": "call_1",
+                    "type": "function",
+                    "function": {
+                        "name": "get_weather",
+                        "arguments": '{"city": "Paris"}',
+                    },
+                },
+                {
+                    "id": "call_2",
+                    "type": "function",
+                    "function": {
+                        "name": "get_weather",
+                        "arguments": '{"city": "Rome"}',
+                    },
+                },
+            ],
+            id="two-choices-in-one-chunk",
+        ),
+    ],
+)
 @pytest.mark.parametrize(
     "content",
     [
@@ -2405,6 +2553,9 @@ async def test_streaming_chat_completion_tool_calls_async(
     send_default_pii,
     expect_output,
     content,
+    cities,
+    choices_per_chunk,
+    expected_tool_calls,
     get_model_response,
     async_iterator,
     server_side_event_chunks,
@@ -2428,7 +2579,9 @@ async def test_streaming_chat_completion_tool_calls_async(
     returned_stream = get_model_response(
         async_iterator(
             server_side_event_chunks(
-                _make_chat_completion_tool_call_stream(content),
+                _make_chat_completion_tool_call_stream(
+                    content, cities, choices_per_chunk
+                ),
                 include_event_type=False,
             )
         )
@@ -2464,18 +2617,16 @@ async def test_streaming_chat_completion_tool_calls_async(
     if expect_output:
         if content is None:
             assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span_data
-        else:
+        elif len(cities) == 1:
             assert span_data[SPANDATA.GEN_AI_RESPONSE_TEXT] == content
-        assert json.loads(span_data[SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS]) == [
-            {
-                "id": "call_1",
-                "type": "function",
-                "function": {
-                    "name": "get_weather",
-                    "arguments": '{"city": "Paris"}',
-                },
-            }
-        ]
+        else:
+            assert json.loads(span_data[SPANDATA.GEN_AI_RESPONSE_TEXT]) == [
+                content
+            ] * len(cities)
+        assert (
+            json.loads(span_data[SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS])
+            == expected_tool_calls
+        )
     else:
         assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span_data
         assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in span_data
@@ -2734,7 +2885,7 @@ def test_streaming_chat_completion(
                     id="1",
                     choices=[
                         DeltaChoice(
-                            index=1,
+                            index=0,
                             delta=ChoiceDelta(content="lo "),
                             finish_reason=None,
                         )
@@ -2747,7 +2898,7 @@ def test_streaming_chat_completion(
                     id="1",
                     choices=[
                         DeltaChoice(
-                            index=2,
+                            index=0,
                             delta=ChoiceDelta(content="world"),
                             finish_reason="stop",
                         )
@@ -2947,7 +3098,7 @@ async def test_streaming_chat_completion_async_no_prompts(
                         id="1",
                         choices=[
                             DeltaChoice(
-                                index=1,
+                                index=0,
                                 delta=ChoiceDelta(content="lo "),
                                 finish_reason=None,
                             )
@@ -2960,7 +3111,7 @@ async def test_streaming_chat_completion_async_no_prompts(
                         id="1",
                         choices=[
                             DeltaChoice(
-                                index=2,
+                                index=0,
                                 delta=ChoiceDelta(content="world"),
                                 finish_reason="stop",
                             )
@@ -3227,7 +3378,7 @@ async def test_streaming_chat_completion_async(
                         id="1",
                         choices=[
                             DeltaChoice(
-                                index=1,
+                                index=0,
                                 delta=ChoiceDelta(content="lo "),
                                 finish_reason=None,
                             )
@@ -3240,7 +3391,7 @@ async def test_streaming_chat_completion_async(
                         id="1",
                         choices=[
                             DeltaChoice(
-                                index=2,
+                                index=0,
                                 delta=ChoiceDelta(content="world"),
                                 finish_reason="stop",
                             )
@@ -4674,7 +4825,7 @@ def test_span_origin_streaming_chat(
             id="1",
             choices=[
                 DeltaChoice(
-                    index=1, delta=ChoiceDelta(content="lo "), finish_reason=None
+                    index=0, delta=ChoiceDelta(content="lo "), finish_reason=None
                 )
             ],
             created=100000,
@@ -4685,7 +4836,7 @@ def test_span_origin_streaming_chat(
             id="1",
             choices=[
                 DeltaChoice(
-                    index=2, delta=ChoiceDelta(content="world"), finish_reason="stop"
+                    index=0, delta=ChoiceDelta(content="world"), finish_reason="stop"
                 )
             ],
             created=100000,
@@ -4781,7 +4932,7 @@ async def test_span_origin_streaming_chat_async(
                 id="1",
                 choices=[
                     DeltaChoice(
-                        index=1, delta=ChoiceDelta(content="lo "), finish_reason=None
+                        index=0, delta=ChoiceDelta(content="lo "), finish_reason=None
                     )
                 ],
                 created=100000,
@@ -4792,7 +4943,7 @@ async def test_span_origin_streaming_chat_async(
                 id="1",
                 choices=[
                     DeltaChoice(
-                        index=2,
+                        index=0,
                         delta=ChoiceDelta(content="world"),
                         finish_reason="stop",
                     )

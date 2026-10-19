@@ -1078,20 +1078,19 @@ def _wrap_synchronous_completions_chunk_iterator(
 
         with capture_internal_exceptions():
             if hasattr(x, "choices") and x.choices is not None:
-                choice_index = 0
-                for choice in x.choices:
+                for position, choice in enumerate(x.choices):
+                    choice_index = getattr(choice, "index", position)
                     if hasattr(choice, "delta") and hasattr(choice.delta, "content"):
                         if start_time is not None and ttft is None:
                             ttft = time.perf_counter() - start_time
                         content = choice.delta.content
-                        if len(data_buf) <= choice_index:
+                        while len(data_buf) <= choice_index:
                             data_buf.append([])
                         data_buf[choice_index].append(content or "")
                     if hasattr(choice, "delta"):
                         _accumulate_tool_call_deltas(
                             tool_calls, choice_index, choice.delta
                         )
-                    choice_index += 1
             if hasattr(x, "usage"):
                 streaming_message_total_token_usage = x.usage
 
@@ -1108,14 +1107,14 @@ def _wrap_synchronous_completions_chunk_iterator(
                     set_data_normalized(
                         span,
                         SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
-                        list(tool_calls.values()),
+                        [tool_calls[k] for k in sorted(tool_calls)],
                         unpack=False,
                     )
             elif should_send_default_pii() and integration.include_prompts:
                 set_data_normalized(
                     span,
                     SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
-                    list(tool_calls.values()),
+                    [tool_calls[k] for k in sorted(tool_calls)],
                     unpack=False,
                 )
         all_responses = None
@@ -1171,20 +1170,19 @@ async def _wrap_asynchronous_completions_chunk_iterator(
 
         with capture_internal_exceptions():
             if hasattr(x, "choices") and x.choices is not None:
-                choice_index = 0
-                for choice in x.choices:
+                for position, choice in enumerate(x.choices):
+                    choice_index = getattr(choice, "index", position)
                     if hasattr(choice, "delta") and hasattr(choice.delta, "content"):
                         if start_time is not None and ttft is None:
                             ttft = time.perf_counter() - start_time
                         content = choice.delta.content
-                        if len(data_buf) <= choice_index:
+                        while len(data_buf) <= choice_index:
                             data_buf.append([])
                         data_buf[choice_index].append(content or "")
                     if hasattr(choice, "delta"):
                         _accumulate_tool_call_deltas(
                             tool_calls, choice_index, choice.delta
                         )
-                    choice_index += 1
             if hasattr(x, "usage"):
                 streaming_message_total_token_usage = x.usage
 
@@ -1201,14 +1199,14 @@ async def _wrap_asynchronous_completions_chunk_iterator(
                     set_data_normalized(
                         span,
                         SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
-                        list(tool_calls.values()),
+                        [tool_calls[k] for k in sorted(tool_calls)],
                         unpack=False,
                     )
             elif should_send_default_pii() and integration.include_prompts:
                 set_data_normalized(
                     span,
                     SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
-                    list(tool_calls.values()),
+                    [tool_calls[k] for k in sorted(tool_calls)],
                     unpack=False,
                 )
         all_responses = None
