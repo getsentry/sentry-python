@@ -482,20 +482,18 @@ def get_lines_from_file(
     if has_data_collection_enabled(client_options):
         context_lines = client_options["data_collection"]["frame_context_lines"]
 
-    source = None
-    if loader is not None and hasattr(loader, "get_source"):
+    try:
+        source = linecache.getlines(filename)
+    except (OSError, IOError):
+        source = []
+
+    if not source and loader is not None and hasattr(loader, "get_source"):
         try:
             source_str: "Optional[str]" = loader.get_source(module)
         except (ImportError, IOError):
             source_str = None
         if source_str is not None:
             source = source_str.splitlines()
-
-    if source is None:
-        try:
-            source = linecache.getlines(filename)
-        except (OSError, IOError):
-            return [], None, []
 
     if not source:
         return [], None, []
