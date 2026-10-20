@@ -99,81 +99,79 @@ class RqIntegration(Integration):
             with capture_internal_exceptions():
                 check_in = _start_check_in(integration, job)
 
+            status = MonitorStatus.ERROR
             try:
-                rv = _perform_job(self, job, queue, *args, **kwargs)
-            except BaseException:
+                with sentry_sdk.new_scope() as scope:
+                    scope.clear_breadcrumbs()
+                    scope.add_event_processor(_make_event_processor(weakref.ref(job)))
+
+                    if has_span_streaming_enabled(client.options):
+                        sentry_sdk.traces.continue_trace(
+                            job.meta.get("_sentry_trace_headers") or {}
+                        )
+
+                        Scope.set_custom_sampling_context({"rq_job": job})
+
+                        func_name = None
+                        with capture_internal_exceptions():
+                            func_name = job.func_name
+
+                        with sentry_sdk.traces.start_span(
+                            name="unknown RQ task" if func_name is None else func_name,
+                            attributes={
+                                "sentry.op": OP.QUEUE_TASK_RQ,
+                                "sentry.origin": RqIntegration.origin,
+                                "sentry.segment.name.source": SegmentNameSource.TASK,
+                                SPANDATA.MESSAGING_MESSAGE_ID: job.id,
+                                SPANDATA.MESSAGING_DESTINATION_NAME: queue.name,
+                            },
+                            parent_span=None,
+                        ) as span:
+                            if func_name is not None:
+                                span.set_attribute(
+                                    SPANDATA.CODE_FUNCTION_NAME, func_name
+                                )
+
+                            rv = old_perform_job(self, job, queue, *args, **kwargs)
+                    else:
+                        transaction = continue_trace(
+                            job.meta.get("_sentry_trace_headers") or {},
+                            op=OP.QUEUE_TASK_RQ,
+                            name="unknown RQ task",
+                            source=TransactionSource.TASK,
+                            origin=RqIntegration.origin,
+                        )
+
+                        with capture_internal_exceptions():
+                            transaction.name = job.func_name
+
+                        with sentry_sdk.start_transaction(
+                            transaction,
+                            custom_sampling_context={"rq_job": job},
+                        ) as span:
+                            span.set_data(
+                                SPANDATA.MESSAGING_DESTINATION_NAME, queue.name
+                            )
+
+                            rv = old_perform_job(self, job, queue, *args, **kwargs)
+                status = MonitorStatus.OK if rv else MonitorStatus.ERROR
+            finally:
                 if check_in is not None:
-                    _finish_check_in(check_in, MonitorStatus.ERROR)
-                    if self.is_horse:
-                        sentry_sdk.get_client().flush()
-                raise
-
-            if check_in is not None:
-                _finish_check_in(
-                    check_in, MonitorStatus.OK if rv else MonitorStatus.ERROR
-                )
-
-            if self.is_horse:
-                # We're inside of a forked process and RQ is
-                # about to call `os._exit`. Make sure that our
-                # events get sent out.
-                sentry_sdk.get_client().flush()
-
-            return rv
-
-        def _perform_job(
-            self: "Any", job: "Job", queue: "Queue", *args: "Any", **kwargs: "Any"
-        ) -> bool:
-            client = sentry_sdk.get_client()
-            with sentry_sdk.new_scope() as scope:
-                scope.clear_breadcrumbs()
-                scope.add_event_processor(_make_event_processor(weakref.ref(job)))
-
-                if has_span_streaming_enabled(client.options):
-                    sentry_sdk.traces.continue_trace(
-                        job.meta.get("_sentry_trace_headers") or {}
-                    )
-
-                    Scope.set_custom_sampling_context({"rq_job": job})
-
-                    func_name = None
                     with capture_internal_exceptions():
-                        func_name = job.func_name
+                        monitor_slug, monitor_config, check_in_id, start = check_in
+                        capture_checkin(
+                            monitor_slug=monitor_slug,
+                            monitor_config=monitor_config,
+                            check_in_id=check_in_id,
+                            duration=now() - start,
+                            status=status,
+                        )
 
-                    with sentry_sdk.traces.start_span(
-                        name="unknown RQ task" if func_name is None else func_name,
-                        attributes={
-                            "sentry.op": OP.QUEUE_TASK_RQ,
-                            "sentry.origin": RqIntegration.origin,
-                            "sentry.segment.name.source": SegmentNameSource.TASK,
-                            SPANDATA.MESSAGING_MESSAGE_ID: job.id,
-                            SPANDATA.MESSAGING_DESTINATION_NAME: queue.name,
-                        },
-                        parent_span=None,
-                    ) as span:
-                        if func_name is not None:
-                            span.set_attribute(SPANDATA.CODE_FUNCTION_NAME, func_name)
-
-                        rv = old_perform_job(self, job, queue, *args, **kwargs)
-                else:
-                    transaction = continue_trace(
-                        job.meta.get("_sentry_trace_headers") or {},
-                        op=OP.QUEUE_TASK_RQ,
-                        name="unknown RQ task",
-                        source=TransactionSource.TASK,
-                        origin=RqIntegration.origin,
-                    )
-
-                    with capture_internal_exceptions():
-                        transaction.name = job.func_name
-
-                    with sentry_sdk.start_transaction(
-                        transaction,
-                        custom_sampling_context={"rq_job": job},
-                    ) as span:
-                        span.set_data(SPANDATA.MESSAGING_DESTINATION_NAME, queue.name)
-
-                        rv = old_perform_job(self, job, queue, *args, **kwargs)
+                if self.is_horse:
+                    # We're inside of a forked process and RQ is
+                    # about to call `os._exit`. Make sure that our
+                    # events get sent out.
+                    sentry_sdk.get_client().flush()
 
             return rv
 
@@ -326,20 +324,6 @@ def _get_monitor_config(job: "Job") -> "Optional[MonitorConfig]":
         if schedule is not None:
             return {"schedule": schedule}
     return None
-
-
-def _finish_check_in(
-    check_in: "Tuple[str, MonitorConfig, Optional[str], float]", status: str
-) -> None:
-    with capture_internal_exceptions():
-        monitor_slug, monitor_config, check_in_id, start = check_in
-        capture_checkin(
-            monitor_slug=monitor_slug,
-            monitor_config=monitor_config,
-            check_in_id=check_in_id,
-            duration=now() - start,
-            status=status,
-        )
 
 
 def _start_check_in(
