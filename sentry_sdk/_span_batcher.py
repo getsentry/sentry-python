@@ -159,7 +159,12 @@ class SpanBatcher(Batcher["SpanJSON"]):
         # 210 is the rough size of the payload without attributes, and then we
         # estimate the attributes separately.
         estimate = 210
-        for value in (item.get("attributes") or {}).values():
+        attribute_values = list((item.get("attributes") or {}).values())
+        for link in item.get("links") or ():
+            estimate += 100
+            attribute_values.extend((link.get("attributes") or {}).values())
+
+        for value in attribute_values:
             estimate += 50
 
             if isinstance(value, str):
@@ -179,6 +184,20 @@ class SpanBatcher(Batcher["SpanJSON"]):
             }
         else:
             del res["attributes"]
+
+        if item.get("links"):
+            res["links"] = [
+                {
+                    **link,
+                    "attributes": {
+                        k: serialize_attribute(v)
+                        for (k, v) in link["attributes"].items()
+                    },
+                }
+                if "attributes" in link
+                else link
+                for link in item["links"]
+            ]
 
         return res
 
