@@ -295,12 +295,7 @@ def _monitor_periodic_task(
     @wraps(execute)
     def _sentry_monitored_execute(*args: "Any", **kwargs: "Any") -> "Any":
         with monitor(monitor_slug=task.name, monitor_config=monitor_config):
-            try:
-                return execute(*args, **kwargs)
-            except HUEY_CONTROL_FLOW_EXCEPTIONS as exc:
-                # Retried, locked or cancelled runs aren't failures.
-                control_flow_exc = exc
-        raise control_flow_exc
+            return execute(*args, **kwargs)
 
     return _sentry_monitored_execute
 

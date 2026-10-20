@@ -89,7 +89,7 @@ def test_periodic_task_control_flow(sentry_init, capture_envelopes, exception):
     _run_periodic_tasks(huey)
 
     statuses = [c["status"] for c in _check_ins(envelopes)]
-    assert statuses[:2] == ["in_progress", "ok"]
+    assert statuses[:2] == ["in_progress", "error"]
 
 
 def test_regular_tasks_not_monitored(sentry_init, capture_envelopes):
