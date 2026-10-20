@@ -236,7 +236,6 @@ def test_user_attributes(sentry_init, capture_items):
 def test_unserializable_attributes(sentry_init, capture_items, bad_value, expected):
     sentry_init(
         traces_sample_rate=1.0,
-        send_default_pii=True,
         trace_lifecycle="stream",
     )
 
