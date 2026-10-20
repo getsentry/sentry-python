@@ -3,6 +3,7 @@ from datetime import datetime
 import pytest
 from huey import crontab
 from huey.api import MemoryHuey
+from huey.exceptions import CancelExecution, RetryTask, TaskLockedException
 
 from sentry_sdk.integrations.huey import HueyIntegration, _get_monitor_config
 
@@ -69,6 +70,26 @@ def test_periodic_task_error(sentry_init, capture_envelopes):
     events = [envelope.get_event() for envelope in envelopes]
     (error,) = [e for e in events if e is not None and e.get("exception")]
     assert error["exception"]["values"][0]["type"] == "ValueError"
+
+
+@pytest.mark.parametrize("exception", [CancelExecution, RetryTask, TaskLockedException])
+def test_periodic_task_control_flow(sentry_init, capture_envelopes, exception):
+    sentry_init(integrations=[HueyIntegration(monitor_periodic_tasks=True)])
+    envelopes = capture_envelopes()
+    huey = MemoryHuey()
+
+    calls = []
+
+    @huey.periodic_task(crontab())
+    def cleanup():
+        if not calls:
+            calls.append(1)
+            raise exception()
+
+    _run_periodic_tasks(huey)
+
+    statuses = [c["status"] for c in _check_ins(envelopes)]
+    assert statuses[:2] == ["in_progress", "ok"]
 
 
 def test_regular_tasks_not_monitored(sentry_init, capture_envelopes):

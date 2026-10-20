@@ -1,5 +1,6 @@
 import sys
 from datetime import datetime
+from functools import wraps
 from typing import TYPE_CHECKING
 
 import sentry_sdk
@@ -290,7 +291,17 @@ def _monitor_periodic_task(
             task.name,
         )
 
-    return monitor(monitor_slug=task.name, monitor_config=monitor_config)(execute)
+    @wraps(execute)
+    def _sentry_monitored_execute(*args: "Any", **kwargs: "Any") -> "Any":
+        with monitor(monitor_slug=task.name, monitor_config=monitor_config):
+            try:
+                return execute(*args, **kwargs)
+            except HUEY_CONTROL_FLOW_EXCEPTIONS as exc:
+                # Retried, locked or cancelled runs aren't failures.
+                control_flow_exc = exc
+        raise control_flow_exc
+
+    return _sentry_monitored_execute
 
 
 _CRONTAB_CODE = crontab().__code__
