@@ -103,8 +103,6 @@ def test_cron_job_generated_id(sentry_init, capture_envelopes):
         (300, {"type": "interval", "value": 5, "unit": "minute"}),
         (7200, {"type": "interval", "value": 2, "unit": "hour"}),
         (86400, {"type": "interval", "value": 1, "unit": "day"}),
-        (30, None),
-        (90, None),
     ],
 )
 def test_interval_job(sentry_init, capture_envelopes, interval, schedule):
@@ -121,20 +119,75 @@ def test_interval_job(sentry_init, capture_envelopes, interval, schedule):
     assert [c["status"] for c in check_ins] == ["in_progress", "ok"]
     assert {c["monitor_slug"] for c in check_ins} == {"poll"}
     for check_in in check_ins:
-        assert check_in.get("monitor_config") == (
-            None if schedule is None else {"schedule": schedule}
+        assert check_in["monitor_config"] == {"schedule": schedule}
+
+
+@pytest.mark.parametrize("interval", [30, 90])
+def test_unsupported_interval_not_monitored(sentry_init, capture_envelopes, interval):
+    sentry_init(integrations=[RqIntegration(monitor_cron_jobs=True)])
+    envelopes = capture_envelopes()
+
+    _run(
+        lambda s: s.schedule(
+            datetime.now(timezone.utc), ok_job, interval=interval, id="poll"
         )
+    )
+
+    assert _check_ins(envelopes) == []
 
 
-def test_repeat_job_without_config(sentry_init, capture_envelopes):
+def test_unsupported_cron_string_not_monitored(sentry_init, capture_envelopes):
+    sentry_init(integrations=[RqIntegration(monitor_cron_jobs=True)])
+    envelopes = capture_envelopes()
+
+    _run(lambda s: s.cron("0 0 1 * 1", func=ok_job, id="first-or-monday"))
+
+    assert _check_ins(envelopes) == []
+
+
+def test_local_time_cron_not_monitored(monkeypatch, sentry_init, capture_envelopes):
+    _set_local_timezone(monkeypatch, "America/New_York")
+    sentry_init(integrations=[RqIntegration(monitor_cron_jobs=True)])
+    envelopes = capture_envelopes()
+
+    _run(lambda s: s.cron("0 * * * *", func=ok_job, id="hourly"))
+
+    assert _check_ins(envelopes) == []
+
+
+def test_repeat_job_not_monitored(sentry_init, capture_envelopes):
     sentry_init(integrations=[RqIntegration(monitor_cron_jobs=True)])
     envelopes = capture_envelopes()
 
     _run(lambda s: s.cron("0 * * * *", func=ok_job, id="limited", repeat=3))
 
-    check_ins = _check_ins(envelopes)
-    assert [c["status"] for c in check_ins] == ["in_progress", "ok"]
-    assert all("monitor_config" not in c for c in check_ins)
+    assert _check_ins(envelopes) == []
+
+
+def test_perform_job_raises(monkeypatch, sentry_init, capture_envelopes):
+    sentry_init(integrations=[RqIntegration(monitor_cron_jobs=True)])
+    envelopes = capture_envelopes()
+
+    def handle_execution_ended(*args, **kwargs):
+        raise ConnectionError("redis down")
+
+    connection = FakeStrictRedis()
+    queue = rq.Queue(connection=connection)
+    scheduler = rq_scheduler.Scheduler(queue=queue, connection=connection)
+    job = scheduler.cron("0 * * * *", func=ok_job, id="hourly")
+    scheduler.enqueue_job(job)
+    worker = rq.SimpleWorker([queue], connection=connection)
+    # Raises from rq's own exception handler too.
+    monkeypatch.setattr(worker, "handle_execution_ended", handle_execution_ended)
+
+    with pytest.raises(ConnectionError):
+        worker.perform_job(job, queue)
+
+    in_progress, error = _check_ins(envelopes)
+    assert in_progress["status"] == "in_progress"
+    assert error["status"] == "error"
+    assert error["check_in_id"] == in_progress["check_in_id"]
+    assert error["monitor_config"] == in_progress["monitor_config"]
 
 
 def test_one_off_jobs_not_monitored(sentry_init, capture_envelopes):

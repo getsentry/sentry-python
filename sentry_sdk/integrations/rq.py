@@ -99,6 +99,32 @@ class RqIntegration(Integration):
             with capture_internal_exceptions():
                 check_in = _start_check_in(integration, job)
 
+            try:
+                rv = _perform_job(self, job, queue, *args, **kwargs)
+            except BaseException:
+                if check_in is not None:
+                    _finish_check_in(check_in, MonitorStatus.ERROR)
+                    if self.is_horse:
+                        sentry_sdk.get_client().flush()
+                raise
+
+            if check_in is not None:
+                _finish_check_in(
+                    check_in, MonitorStatus.OK if rv else MonitorStatus.ERROR
+                )
+
+            if self.is_horse:
+                # We're inside of a forked process and RQ is
+                # about to call `os._exit`. Make sure that our
+                # events get sent out.
+                sentry_sdk.get_client().flush()
+
+            return rv
+
+        def _perform_job(
+            self: "Any", job: "Job", queue: "Queue", *args: "Any", **kwargs: "Any"
+        ) -> bool:
+            client = sentry_sdk.get_client()
             with sentry_sdk.new_scope() as scope:
                 scope.clear_breadcrumbs()
                 scope.add_event_processor(_make_event_processor(weakref.ref(job)))
@@ -148,23 +174,6 @@ class RqIntegration(Integration):
                         span.set_data(SPANDATA.MESSAGING_DESTINATION_NAME, queue.name)
 
                         rv = old_perform_job(self, job, queue, *args, **kwargs)
-
-            if check_in is not None:
-                with capture_internal_exceptions():
-                    monitor_slug, monitor_config, check_in_id, start = check_in
-                    capture_checkin(
-                        monitor_slug=monitor_slug,
-                        monitor_config=monitor_config,
-                        check_in_id=check_in_id,
-                        duration=now() - start,
-                        status=MonitorStatus.OK if rv else MonitorStatus.ERROR,
-                    )
-
-            if self.is_horse:
-                # We're inside of a forked process and RQ is
-                # about to call `os._exit`. Make sure that our
-                # events get sent out.
-                sentry_sdk.get_client().flush()
 
             return rv
 
@@ -319,9 +328,23 @@ def _get_monitor_config(job: "Job") -> "Optional[MonitorConfig]":
     return None
 
 
+def _finish_check_in(
+    check_in: "Tuple[str, MonitorConfig, Optional[str], float]", status: str
+) -> None:
+    with capture_internal_exceptions():
+        monitor_slug, monitor_config, check_in_id, start = check_in
+        capture_checkin(
+            monitor_slug=monitor_slug,
+            monitor_config=monitor_config,
+            check_in_id=check_in_id,
+            duration=now() - start,
+            status=status,
+        )
+
+
 def _start_check_in(
     integration: "RqIntegration", job: "Job"
-) -> "Optional[Tuple[str, Optional[MonitorConfig], Optional[str], float]]":
+) -> "Optional[Tuple[str, MonitorConfig, Optional[str], float]]":
     """
     Send an `in_progress` check-in for jobs that rq-scheduler's `cron()` and
     `schedule(interval=...)` re-enqueue. It stores their schedule in the meta.
@@ -342,10 +365,11 @@ def _start_check_in(
     monitor_config = _get_monitor_config(job)
     if monitor_config is None:
         logger.debug(
-            "Schedule of RQ job %r can't be expressed as a Sentry Crons "
-            "schedule. Sending check-ins without a monitor config.",
+            "Not monitoring RQ job %r: its schedule can't be expressed as a "
+            "Sentry Crons schedule.",
             monitor_slug,
         )
+        return None
 
     check_in_id = capture_checkin(
         monitor_slug=monitor_slug,
