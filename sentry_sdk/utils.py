@@ -2168,6 +2168,9 @@ def format_attribute(val: "Any") -> "AttributeValue":
     https://develop.sentry.dev/sdk/telemetry/attributes/
     """
     if isinstance(val, (bool, int, float, str)):
+        if isinstance(val, float) and (math.isinf(val) or math.isnan(val)):
+            return str(val)
+
         return val
 
     if isinstance(val, (list, tuple)) and not val:
