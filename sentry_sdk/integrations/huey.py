@@ -286,10 +286,11 @@ def _monitor_periodic_task(
     monitor_config = _get_monitor_config(huey, task)
     if monitor_config is None:
         logger.debug(
-            "Huey periodic task %r can't be expressed as a Sentry Crons "
-            "schedule. Sending check-ins without a monitor config.",
+            "Not monitoring Huey periodic task %r: its schedule can't be "
+            "expressed as a Sentry Crons schedule.",
             task.name,
         )
+        return execute
 
     @wraps(execute)
     def _sentry_monitored_execute(*args: "Any", **kwargs: "Any") -> "Any":

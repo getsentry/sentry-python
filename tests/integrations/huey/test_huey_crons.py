@@ -145,23 +145,34 @@ def test_exclude_periodic_tasks(sentry_init, capture_envelopes):
     assert {c["monitor_slug"] for c in _check_ins(envelopes)} == {"report"}
 
 
-def test_periodic_task_without_config(sentry_init, capture_envelopes):
+def _every_minute(timestamp):
+    return True
+
+
+@pytest.mark.parametrize(
+    "utc, validate_datetime",
+    [
+        (True, _every_minute),
+        (True, crontab(minute="0", hour="0", day="1", day_of_week="1")),
+        (False, crontab()),
+    ],
+)
+def test_unsupported_schedule_not_monitored(
+    sentry_init, capture_envelopes, utc, validate_datetime
+):
     sentry_init(integrations=[HueyIntegration(monitor_periodic_tasks=True)])
     envelopes = capture_envelopes()
-    huey = MemoryHuey()
+    huey = MemoryHuey(utc=utc)
+    calls = []
 
-    def every_minute(timestamp):
-        return True
-
-    @huey.periodic_task(every_minute)
+    @huey.periodic_task(validate_datetime)
     def cleanup():
-        pass
+        calls.append(1)
 
-    _run_periodic_tasks(huey)
+    _run_periodic_tasks(huey, timestamp=datetime(2026, 6, 1))
 
-    check_ins = _check_ins(envelopes)
-    assert [c["status"] for c in check_ins] == ["in_progress", "ok"]
-    assert all("monitor_config" not in c for c in check_ins)
+    assert calls == [1]
+    assert _check_ins(envelopes) == []
 
 
 def _config(huey, validate_datetime):
