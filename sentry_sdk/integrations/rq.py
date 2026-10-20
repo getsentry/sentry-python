@@ -7,6 +7,7 @@ import sentry_sdk
 from sentry_sdk.api import continue_trace
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.crons import MonitorStatus, capture_checkin
+from sentry_sdk.crons.utils import _get_interval_schedule
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.scope import Scope, should_send_default_pii
@@ -45,17 +46,19 @@ except ImportError:
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, List, Optional, Set, Tuple
+    from typing import Any, Callable, List, Optional, Tuple
 
     from rq.job import Job
 
-    from sentry_sdk._types import (
-        Event,
-        EventProcessor,
-        MonitorConfig,
-        MonitorConfigScheduleUnit,
-    )
+    from sentry_sdk._types import Event, EventProcessor, MonitorConfig
     from sentry_sdk.utils import ExcInfo
+
+# rq generates `str(uuid4())` job ids.
+_GENERATED_JOB_ID = re.compile(
+    r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+)
+# `*`, `*/n`, `n`, `n/n`, `n-n` and `n-n/n`.
+_CRONTAB_ITEM = re.compile(r"\*(?:/\d+)?|(\d+)(?:-(\d+)(?:/\d+)?|/\d+)?")
 
 
 class RqIntegration(Integration):
@@ -148,7 +151,14 @@ class RqIntegration(Integration):
 
             if check_in is not None:
                 with capture_internal_exceptions():
-                    _finish_check_in(check_in, rv)
+                    monitor_slug, monitor_config, check_in_id, start = check_in
+                    capture_checkin(
+                        monitor_slug=monitor_slug,
+                        monitor_config=monitor_config,
+                        check_in_id=check_in_id,
+                        duration=now() - start,
+                        status=MonitorStatus.OK if rv else MonitorStatus.ERROR,
+                    )
 
             if self.is_horse:
                 # We're inside of a forked process and RQ is
@@ -259,22 +269,25 @@ def _capture_exception(exc_info: "ExcInfo", **kwargs: "Any") -> None:
     sentry_sdk.capture_event(event, hint=hint)
 
 
-# rq generates `str(uuid4())` job ids.
-_GENERATED_JOB_ID = re.compile(
-    r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
-)
-_warned_func_names: "Set[str]" = set()
-_CRONTAB_FIELD = re.compile(r"[0-9*,/-]+")
-_INTERVAL_UNITS: "Tuple[Tuple[MonitorConfigScheduleUnit, int], ...]" = (
-    ("day", 60 * 60 * 24),
-    ("hour", 60 * 60),
-    ("minute", 60),
-)
+def _is_portable_crontab_field(field: str, is_weekday: bool) -> bool:
+    for item in field.split(","):
+        match = _CRONTAB_ITEM.fullmatch(item)
+        if match is None:
+            return False
+        first, last = match.groups()
+        # rq-scheduler's crontab parser and Sentry read these differently.
+        if last is not None and int(last) <= int(first):
+            return False
+        if is_weekday and first is not None and last is None and "/" in item:
+            return False
+    return True
 
 
 def _get_crontab_config(cron_string: str) -> "Optional[MonitorConfig]":
     fields = cron_string.split()
-    if len(fields) != 5 or not all(_CRONTAB_FIELD.fullmatch(f) for f in fields):
+    if len(fields) != 5 or not all(
+        _is_portable_crontab_field(field, i == 4) for i, field in enumerate(fields)
+    ):
         return None
     # Day of month and day of week are matched differently by different
     # cron parsers when both are set.
@@ -300,15 +313,9 @@ def _get_monitor_config(job: "Job") -> "Optional[MonitorConfig]":
 
     interval = job.meta.get("interval")
     if isinstance(interval, int):
-        for unit, seconds in _INTERVAL_UNITS:
-            if interval >= seconds and interval % seconds == 0:
-                return {
-                    "schedule": {
-                        "type": "interval",
-                        "value": interval // seconds,
-                        "unit": unit,
-                    }
-                }
+        schedule = _get_interval_schedule(interval)
+        if schedule is not None:
+            return {"schedule": schedule}
     return None
 
 
@@ -327,14 +334,6 @@ def _start_check_in(
     # Without an explicit `id`, every scheduled job gets a random one.
     if _GENERATED_JOB_ID.fullmatch(job.id):
         monitor_slug = job.func_name
-        if monitor_slug not in _warned_func_names:
-            _warned_func_names.add(monitor_slug)
-            logger.warning(
-                "RQ scheduled job %r has no explicit `id`, so its function name "
-                "is used as its monitor slug, and jobs for the same function "
-                "share a monitor. Pass `id` to give it its own monitor.",
-                monitor_slug,
-            )
     else:
         monitor_slug = job.id
     if match_regex_list(monitor_slug, integration.exclude_cron_jobs):
@@ -354,16 +353,3 @@ def _start_check_in(
         status=MonitorStatus.IN_PROGRESS,
     )
     return monitor_slug, monitor_config, check_in_id, now()
-
-
-def _finish_check_in(
-    check_in: "Tuple[str, Optional[MonitorConfig], Optional[str], float]", ok: bool
-) -> None:
-    monitor_slug, monitor_config, check_in_id, start = check_in
-    capture_checkin(
-        monitor_slug=monitor_slug,
-        monitor_config=monitor_config,
-        check_in_id=check_in_id,
-        duration=now() - start,
-        status=MonitorStatus.OK if ok else MonitorStatus.ERROR,
-    )

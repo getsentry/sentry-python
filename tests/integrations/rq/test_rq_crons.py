@@ -179,7 +179,15 @@ def test_exclude_cron_jobs(sentry_init, capture_envelopes):
 
 @pytest.mark.parametrize(
     "cron_string",
-    ["* * * * *", "*/5 * * * *", "0 9-17 * * 1-5", "30 2 1,15 * *", "0 0 * 1/3 *"],
+    [
+        "* * * * *",
+        "*/5 * * * *",
+        "0 9-17 * * 1-5",
+        "30 2 1,15 * *",
+        "0 0 * 1/3 *",
+        "5-55/10 * * * *",
+        "0 0 * * 5-7",
+    ],
 )
 def test_get_crontab_config(cron_string):
     assert _get_crontab_config(cron_string) == {
@@ -198,6 +206,11 @@ def test_get_crontab_config(cron_string):
         "0 0 * * MON",
         # day of month and day of week
         "0 0 1 * 1",
+        # read differently by rq-scheduler and Sentry
+        "0 0 * * 1/2",
+        "0 0 * * 0-0",
+        "0 0 * * 5-1",
+        "10-10/5 * * * *",
     ],
 )
 def test_get_crontab_config_not_representable(cron_string):
