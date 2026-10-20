@@ -382,7 +382,7 @@ class Span:
             pass
 
     def add_link(self, link: "SpanLink") -> None:
-        stored: "SpanLink" = {"trace_id": link["trace_id"], "span_id": link["span_id"]}  # type: ignore[assignment]
+        stored: "SpanLink" = {"trace_id": link["trace_id"], "span_id": link["span_id"]}
         if "sampled" in link:
             stored["sampled"] = link["sampled"]
         if link.get("attributes"):
