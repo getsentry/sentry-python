@@ -471,6 +471,7 @@ TEST_SUITE_CONFIG = {
             # The default "addr" value was removed in https://github.com/cunla/fakeredis-py/commit/0441288fb22c8c191fc716b561e0001cf512abe5.
             # from fakeredis.
             ">=1.1.14": ["fakeredis<2.36.0"],
+            ">=2.0": ["rq-scheduler"],
             "<0.9": ["fakeredis<1.0", "redis<3.2.2"],
             ">=0.9,<0.14": ["fakeredis>=1.0,<1.7.4"],
             "py3.6,py3.7": ["fakeredis!=2.26.0"],
