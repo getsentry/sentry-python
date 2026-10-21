@@ -1,5 +1,20 @@
 # Changelog
 
+## 3.0.0b1
+
+This is a pre-release of the next Python SDK major, to be released in November 2026.
+
+Want to give it a spin? Be our guest and [let us know](https://github.com/getsentry/sentry-python/discussions) how it went!
+
+## ✨ Notable Changes
+- Say goodbye to transactions: span streaming is now the default tracing model
+- The fine-grained `data_collection` supersedes the flat `send_default_pii`
+
+## 🗞️ Resources
+- [2.x to 3.x migration guide](https://docs.sentry.io/platforms/python/migration/2.x-to-3.x)
+- [detailed changelog](https://github.com/getsentry/sentry-python/blob/major/3.0/MIGRATION_GUIDE.md)
+
+
 ## 2.72.0
 
 ### New Features ✨
