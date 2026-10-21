@@ -92,4 +92,9 @@ When integrating with a package:
 
 ## Test Guidelines
 
-- Use end-to-end tests, not mocks.
+- Don't use mocks unless it can't be avoided.
+- Use end-to-end tests, not unit tests.
+- Avoid testing integration helpers or private methods directly.
+- Avoid testing things that can't realistically break.
+- Avoid duplicating tests (extend an existing one or use parametrize).
+- Assert on what Sentry captures with `capture_events`/`capture_items`.
