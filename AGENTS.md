@@ -96,5 +96,5 @@ When integrating with a package:
 - Use end-to-end tests, not unit tests.
 - Avoid testing integration helpers or private methods directly.
 - Avoid testing things that can't realistically break.
-- Avoid duplicating tests (extend an existing one or use parametrize).
+- Avoid duplicating tests (extend an existing one or use `parametrize`).
 - Assert on what Sentry captures with `capture_events`/`capture_items`.
