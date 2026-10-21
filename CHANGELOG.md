@@ -1,5 +1,26 @@
 # Changelog
 
+## 3.0.0b1
+
+### New Features ✨
+
+- (types) Export Attributes from the public types module by @sansynx in [#8019](https://github.com/getsentry/sentry-python/pull/8019)
+
+### Bug Fixes 🐛
+
+- (cohere) Stop swallowing exceptions during stream iteration by @intertermux-code in [#8017](https://github.com/getsentry/sentry-python/pull/8017)
+- (huggingface_hub) Stop swallowing exceptions during stream iteration by @intertermux-code in [#8018](https://github.com/getsentry/sentry-python/pull/8018)
+
+### Internal Changes 🔧
+
+- (deps) Update github workflows by @renovate in [#7276](https://github.com/getsentry/sentry-python/pull/7276)
+- (litellm) Require filelock>=4.0.3 on Python 3.10/3.11 by @sentry-junior in [#8026](https://github.com/getsentry/sentry-python/pull/8026)
+- 🤖 Update test matrix with new releases (10/12) by @github-actions in [#7944](https://github.com/getsentry/sentry-python/pull/7944)
+
+### Other
+
+- Next Python SDK major by @sentrivana in [#5005](https://github.com/getsentry/sentry-python/pull/5005)
+
 ## 2.72.0
 
 ### New Features ✨
