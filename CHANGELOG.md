@@ -1,5 +1,38 @@
 # Changelog
 
+## 2.73.0
+
+### New Features ✨
+
+- (arq) Add an option to monitor arq cron jobs by @wedamija in [#8051](https://github.com/getsentry/sentry-python/pull/8051)
+- (huey) Add an option to monitor Huey periodic tasks by @wedamija in [#8052](https://github.com/getsentry/sentry-python/pull/8052)
+- (rq) Add an option to monitor rq-scheduler jobs by @wedamija in [#8053](https://github.com/getsentry/sentry-python/pull/8053)
+- (types) Export Attributes from the public types module by @sansynx in [#8019](https://github.com/getsentry/sentry-python/pull/8019)
+
+### Bug Fixes 🐛
+
+- (arq) Don't monitor cron jobs with unsupported schedules by @wedamija in [#8098](https://github.com/getsentry/sentry-python/pull/8098)
+- (attributes) Handle special float values correctly by @sentrivana in [#8067](https://github.com/getsentry/sentry-python/pull/8067)
+- (celery) Don't round down beat schedule intervals by @wedamija in [#7842](https://github.com/getsentry/sentry-python/pull/7842)
+- (cohere) Stop swallowing exceptions during stream iteration by @intertermux-code in [#8017](https://github.com/getsentry/sentry-python/pull/8017)
+- (huggingface_hub) Stop swallowing exceptions during stream iteration by @intertermux-code in [#8018](https://github.com/getsentry/sentry-python/pull/8018)
+- Exclude litellm==1.107.0 from extras by @jonny-norwine in [#8104](https://github.com/getsentry/sentry-python/pull/8104)
+
+### Internal Changes 🔧
+
+#### Deps
+
+- Update github workflows by @renovate in [#8045](https://github.com/getsentry/sentry-python/pull/8045)
+- Update github workflows by @renovate in [#8036](https://github.com/getsentry/sentry-python/pull/8036)
+- Update github workflows by @renovate in [#7276](https://github.com/getsentry/sentry-python/pull/7276)
+
+#### Other
+
+- (litellm) Require filelock>=4.0.3 on Python 3.10/3.11 by @sentry-junior in [#8026](https://github.com/getsentry/sentry-python/pull/8026)
+- (monitor) Stop background health checks in tests that drive the monitor by @sentry-junior in [#8032](https://github.com/getsentry/sentry-python/pull/8032)
+- Update `AGENTS.md` by @sentrivana in [#8077](https://github.com/getsentry/sentry-python/pull/8077)
+- 🤖 Update test matrix with new releases (10/12) by @github-actions in [#7944](https://github.com/getsentry/sentry-python/pull/7944)
+
 ## 2.72.0
 
 ### New Features ✨
