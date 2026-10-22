@@ -22,6 +22,7 @@ from anthropic.types.content_block_stop_event import ContentBlockStopEvent
 from anthropic.types.message import Message
 from anthropic.types.message_delta_event import MessageDeltaEvent
 from anthropic.types.message_start_event import MessageStartEvent
+from anthropic.types.message_stop_event import MessageStopEvent
 
 try:
     from anthropic import APIStatusError
@@ -4657,13 +4658,21 @@ def test_streaming_create_message_with_input_json_delta(
                 span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
                 == '[{"role": "user", "content": "What is the weather like in San Francisco?"}]'
             )
-            assert (
-                span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
-                == '{"location": "San Francisco, CA"}'
-            )
+            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
+            assert json.loads(
+                span["attributes"][SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS]
+            ) == [
+                {
+                    "id": "toolu_0",
+                    "input": {"location": "San Francisco, CA"},
+                    "name": "get_weather",
+                    "type": "tool_use",
+                }
+            ]
         else:
             assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
             assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
+            assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in span["attributes"]
 
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 366
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 41
@@ -4704,13 +4713,21 @@ def test_streaming_create_message_with_input_json_delta(
                 span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
                 == '[{"role": "user", "content": "What is the weather like in San Francisco?"}]'
             )
-            assert (
-                span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
-                == '{"location": "San Francisco, CA"}'
-            )
+            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
+            assert json.loads(
+                span["attributes"][SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS]
+            ) == [
+                {
+                    "id": "toolu_0",
+                    "input": {"location": "San Francisco, CA"},
+                    "name": "get_weather",
+                    "type": "tool_use",
+                }
+            ]
         else:
             assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
             assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
+            assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in span["attributes"]
 
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 366
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 41
@@ -4752,13 +4769,19 @@ def test_streaming_create_message_with_input_json_delta(
                 span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
                 == '[{"role": "user", "content": "What is the weather like in San Francisco?"}]'
             )
-            assert (
-                span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
-                == '{"location": "San Francisco, CA"}'
-            )
+            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
+            assert json.loads(span["data"][SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS]) == [
+                {
+                    "id": "toolu_0",
+                    "input": {"location": "San Francisco, CA"},
+                    "name": "get_weather",
+                    "type": "tool_use",
+                }
+            ]
         else:
             assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
             assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
+            assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in span["data"]
 
         assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 366
         assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 41
@@ -4910,13 +4933,21 @@ def test_stream_messages_with_input_json_delta(
                 span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
                 == '[{"role": "user", "content": "What is the weather like in San Francisco?"}]'
             )
-            assert (
-                span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
-                == '{"location": "San Francisco, CA"}'
-            )
+            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
+            assert json.loads(
+                span["attributes"][SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS]
+            ) == [
+                {
+                    "id": "toolu_0",
+                    "input": {"location": "San Francisco, CA"},
+                    "name": "get_weather",
+                    "type": "tool_use",
+                }
+            ]
         else:
             assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
             assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
+            assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in span["attributes"]
 
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 366
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 41
@@ -4957,13 +4988,21 @@ def test_stream_messages_with_input_json_delta(
                 span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
                 == '[{"role": "user", "content": "What is the weather like in San Francisco?"}]'
             )
-            assert (
-                span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
-                == '{"location": "San Francisco, CA"}'
-            )
+            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
+            assert json.loads(
+                span["attributes"][SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS]
+            ) == [
+                {
+                    "id": "toolu_0",
+                    "input": {"location": "San Francisco, CA"},
+                    "name": "get_weather",
+                    "type": "tool_use",
+                }
+            ]
         else:
             assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
             assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
+            assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in span["attributes"]
 
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 366
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 41
@@ -5004,13 +5043,19 @@ def test_stream_messages_with_input_json_delta(
                 span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
                 == '[{"role": "user", "content": "What is the weather like in San Francisco?"}]'
             )
-            assert (
-                span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
-                == '{"location": "San Francisco, CA"}'
-            )
+            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
+            assert json.loads(span["data"][SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS]) == [
+                {
+                    "id": "toolu_0",
+                    "input": {"location": "San Francisco, CA"},
+                    "name": "get_weather",
+                    "type": "tool_use",
+                }
+            ]
         else:
             assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
             assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
+            assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in span["data"]
 
         assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 366
         assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 41
@@ -5169,14 +5214,22 @@ async def test_streaming_create_message_with_input_json_delta_async(
                 span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
                 == '[{"role": "user", "content": "What is the weather like in San Francisco?"}]'
             )
-            assert (
-                span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
-                == '{"location": "San Francisco, CA"}'
-            )
+            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
+            assert json.loads(
+                span["attributes"][SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS]
+            ) == [
+                {
+                    "id": "toolu_0",
+                    "input": {"location": "San Francisco, CA"},
+                    "name": "get_weather",
+                    "type": "tool_use",
+                }
+            ]
 
         else:
             assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
             assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
+            assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in span["attributes"]
 
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 366
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 41
@@ -5217,14 +5270,22 @@ async def test_streaming_create_message_with_input_json_delta_async(
                 span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
                 == '[{"role": "user", "content": "What is the weather like in San Francisco?"}]'
             )
-            assert (
-                span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
-                == '{"location": "San Francisco, CA"}'
-            )
+            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
+            assert json.loads(
+                span["attributes"][SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS]
+            ) == [
+                {
+                    "id": "toolu_0",
+                    "input": {"location": "San Francisco, CA"},
+                    "name": "get_weather",
+                    "type": "tool_use",
+                }
+            ]
 
         else:
             assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
             assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
+            assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in span["attributes"]
 
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 366
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 41
@@ -5265,14 +5326,20 @@ async def test_streaming_create_message_with_input_json_delta_async(
                 span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
                 == '[{"role": "user", "content": "What is the weather like in San Francisco?"}]'
             )
-            assert (
-                span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
-                == '{"location": "San Francisco, CA"}'
-            )
+            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
+            assert json.loads(span["data"][SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS]) == [
+                {
+                    "id": "toolu_0",
+                    "input": {"location": "San Francisco, CA"},
+                    "name": "get_weather",
+                    "type": "tool_use",
+                }
+            ]
 
         else:
             assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
             assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
+            assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in span["data"]
 
         assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 366
         assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 41
@@ -5432,13 +5499,21 @@ async def test_stream_message_with_input_json_delta_async(
                 span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
                 == '[{"role": "user", "content": "What is the weather like in San Francisco?"}]'
             )
-            assert (
-                span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
-                == '{"location": "San Francisco, CA"}'
-            )
+            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
+            assert json.loads(
+                span["attributes"][SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS]
+            ) == [
+                {
+                    "id": "toolu_0",
+                    "input": {"location": "San Francisco, CA"},
+                    "name": "get_weather",
+                    "type": "tool_use",
+                }
+            ]
         else:
             assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
             assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
+            assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in span["attributes"]
 
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 366
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 41
@@ -5480,13 +5555,21 @@ async def test_stream_message_with_input_json_delta_async(
                 span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
                 == '[{"role": "user", "content": "What is the weather like in San Francisco?"}]'
             )
-            assert (
-                span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
-                == '{"location": "San Francisco, CA"}'
-            )
+            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
+            assert json.loads(
+                span["attributes"][SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS]
+            ) == [
+                {
+                    "id": "toolu_0",
+                    "input": {"location": "San Francisco, CA"},
+                    "name": "get_weather",
+                    "type": "tool_use",
+                }
+            ]
         else:
             assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
             assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
+            assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in span["attributes"]
 
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 366
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 41
@@ -5528,19 +5611,362 @@ async def test_stream_message_with_input_json_delta_async(
                 span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
                 == '[{"role": "user", "content": "What is the weather like in San Francisco?"}]'
             )
-            assert (
-                span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
-                == '{"location": "San Francisco, CA"}'
-            )
+            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
+            assert json.loads(span["data"][SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS]) == [
+                {
+                    "id": "toolu_0",
+                    "input": {"location": "San Francisco, CA"},
+                    "name": "get_weather",
+                    "type": "tool_use",
+                }
+            ]
 
         else:
             assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
             assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
+            assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in span["data"]
 
         assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 366
         assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 41
         assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 407
         assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+
+
+@pytest.mark.skipif(
+    ANTHROPIC_VERSION < (0, 27),
+    reason="Versions <0.27.0 do not include InputJSONDelta, which was introduced in >=0.27.0 along with a new message delta type for tool calling.",
+)
+@pytest.mark.parametrize("api", ["create", "stream"])
+@pytest.mark.parametrize(
+    "data_collection,send_default_pii,include_prompts,outputs_collected",
+    [
+        pytest.param(
+            {"gen_ai": {"outputs": True}},
+            False,
+            False,
+            True,
+            id="gen-ai-outputs-enabled-overrides-pii-and-include-prompts",
+        ),
+        pytest.param(
+            {"gen_ai": {"outputs": False}},
+            True,
+            True,
+            False,
+            id="gen-ai-outputs-disabled-overrides-pii-and-include-prompts",
+        ),
+        pytest.param(
+            None,
+            True,
+            True,
+            True,
+            id="legacy-pii-and-include-prompts-enabled",
+        ),
+        pytest.param(
+            None,
+            False,
+            True,
+            False,
+            id="legacy-pii-disabled",
+        ),
+    ],
+)
+def test_streaming_text_and_tool_use_output(
+    sentry_init,
+    capture_items,
+    get_model_response,
+    server_side_event_chunks,
+    api,
+    data_collection,
+    send_default_pii,
+    include_prompts,
+    outputs_collected,
+):
+    sentry_init_kwargs = dict(
+        integrations=[AnthropicIntegration(include_prompts=include_prompts)],
+        disabled_integrations=[StdlibIntegration],
+        traces_sample_rate=1.0,
+        send_default_pii=send_default_pii,
+    )
+    if data_collection is not None:
+        sentry_init_kwargs["data_collection"] = data_collection
+    sentry_init(**sentry_init_kwargs)
+    items = capture_items("span")
+
+    client = Anthropic(api_key="z")
+
+    response = get_model_response(
+        server_side_event_chunks(
+            [
+                MessageStartEvent(
+                    message=Message(
+                        id="msg_1",
+                        content=[],
+                        model="claude-sonnet-4-5",
+                        role="assistant",
+                        stop_reason=None,
+                        stop_sequence=None,
+                        type="message",
+                        usage=Usage(input_tokens=20, output_tokens=1),
+                    ),
+                    type="message_start",
+                ),
+                ContentBlockStartEvent(
+                    type="content_block_start",
+                    index=0,
+                    content_block=TextBlock(type="text", text=""),
+                ),
+                ContentBlockDeltaEvent(
+                    delta=TextDelta(text="Checking ", type="text_delta"),
+                    index=0,
+                    type="content_block_delta",
+                ),
+                ContentBlockDeltaEvent(
+                    delta=TextDelta(text="the weather.", type="text_delta"),
+                    index=0,
+                    type="content_block_delta",
+                ),
+                ContentBlockStopEvent(type="content_block_stop", index=0),
+                ContentBlockStartEvent(
+                    type="content_block_start",
+                    index=1,
+                    content_block=ToolUseBlock(
+                        id="toolu_1", input={}, name="get_weather", type="tool_use"
+                    ),
+                ),
+                ContentBlockDeltaEvent(
+                    delta=InputJSONDelta(
+                        partial_json='{"city"', type="input_json_delta"
+                    ),
+                    index=1,
+                    type="content_block_delta",
+                ),
+                ContentBlockDeltaEvent(
+                    delta=InputJSONDelta(
+                        partial_json=': "Paris"}', type="input_json_delta"
+                    ),
+                    index=1,
+                    type="content_block_delta",
+                ),
+                ContentBlockStopEvent(type="content_block_stop", index=1),
+                MessageDeltaEvent(
+                    delta=Delta(stop_reason="tool_use", stop_sequence=None),
+                    usage=MessageDeltaUsage(output_tokens=30),
+                    type="message_delta",
+                ),
+                MessageStopEvent(type="message_stop"),
+            ]
+        )
+    )
+
+    messages = [{"role": "user", "content": "What is the weather in Paris?"}]
+
+    with mock.patch.object(
+        client._client,
+        "send",
+        return_value=response,
+    ), start_transaction(name="anthropic"):
+        if api == "create":
+            for _ in client.messages.create(
+                max_tokens=1024, messages=messages, model="model", stream=True
+            ):
+                pass
+        else:
+            with client.messages.stream(
+                max_tokens=1024, messages=messages, model="model"
+            ) as stream:
+                for _ in stream:
+                    pass
+
+    sentry_sdk.flush()
+    (span,) = (item.payload for item in items)
+
+    if outputs_collected:
+        assert (
+            span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Checking the weather."
+        )
+        assert json.loads(span["attributes"][SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS]) == [
+            {
+                "id": "toolu_1",
+                "input": {"city": "Paris"},
+                "name": "get_weather",
+                "type": "tool_use",
+            }
+        ]
+    else:
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
+        assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in span["attributes"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif(
+    ANTHROPIC_VERSION < (0, 27),
+    reason="Versions <0.27.0 do not include InputJSONDelta, which was introduced in >=0.27.0 along with a new message delta type for tool calling.",
+)
+@pytest.mark.parametrize("api", ["create", "stream"])
+@pytest.mark.parametrize(
+    "data_collection,send_default_pii,include_prompts,outputs_collected",
+    [
+        pytest.param(
+            {"gen_ai": {"outputs": True}},
+            False,
+            False,
+            True,
+            id="gen-ai-outputs-enabled-overrides-pii-and-include-prompts",
+        ),
+        pytest.param(
+            {"gen_ai": {"outputs": False}},
+            True,
+            True,
+            False,
+            id="gen-ai-outputs-disabled-overrides-pii-and-include-prompts",
+        ),
+        pytest.param(
+            None,
+            True,
+            True,
+            True,
+            id="legacy-pii-and-include-prompts-enabled",
+        ),
+        pytest.param(
+            None,
+            False,
+            True,
+            False,
+            id="legacy-pii-disabled",
+        ),
+    ],
+)
+async def test_streaming_text_and_tool_use_output_async(
+    sentry_init,
+    capture_items,
+    get_model_response,
+    async_iterator,
+    server_side_event_chunks,
+    api,
+    data_collection,
+    send_default_pii,
+    include_prompts,
+    outputs_collected,
+):
+    sentry_init_kwargs = dict(
+        integrations=[AnthropicIntegration(include_prompts=include_prompts)],
+        disabled_integrations=[StdlibIntegration],
+        traces_sample_rate=1.0,
+        send_default_pii=send_default_pii,
+    )
+    if data_collection is not None:
+        sentry_init_kwargs["data_collection"] = data_collection
+    sentry_init(**sentry_init_kwargs)
+    items = capture_items("span")
+
+    client = AsyncAnthropic(api_key="z")
+
+    response = get_model_response(
+        async_iterator(
+            server_side_event_chunks(
+                [
+                    MessageStartEvent(
+                        message=Message(
+                            id="msg_1",
+                            content=[],
+                            model="claude-sonnet-4-5",
+                            role="assistant",
+                            stop_reason=None,
+                            stop_sequence=None,
+                            type="message",
+                            usage=Usage(input_tokens=20, output_tokens=1),
+                        ),
+                        type="message_start",
+                    ),
+                    ContentBlockStartEvent(
+                        type="content_block_start",
+                        index=0,
+                        content_block=TextBlock(type="text", text=""),
+                    ),
+                    ContentBlockDeltaEvent(
+                        delta=TextDelta(text="Checking ", type="text_delta"),
+                        index=0,
+                        type="content_block_delta",
+                    ),
+                    ContentBlockDeltaEvent(
+                        delta=TextDelta(text="the weather.", type="text_delta"),
+                        index=0,
+                        type="content_block_delta",
+                    ),
+                    ContentBlockStopEvent(type="content_block_stop", index=0),
+                    ContentBlockStartEvent(
+                        type="content_block_start",
+                        index=1,
+                        content_block=ToolUseBlock(
+                            id="toolu_1",
+                            input={},
+                            name="get_weather",
+                            type="tool_use",
+                        ),
+                    ),
+                    ContentBlockDeltaEvent(
+                        delta=InputJSONDelta(
+                            partial_json='{"city"', type="input_json_delta"
+                        ),
+                        index=1,
+                        type="content_block_delta",
+                    ),
+                    ContentBlockDeltaEvent(
+                        delta=InputJSONDelta(
+                            partial_json=': "Paris"}', type="input_json_delta"
+                        ),
+                        index=1,
+                        type="content_block_delta",
+                    ),
+                    ContentBlockStopEvent(type="content_block_stop", index=1),
+                    MessageDeltaEvent(
+                        delta=Delta(stop_reason="tool_use", stop_sequence=None),
+                        usage=MessageDeltaUsage(output_tokens=30),
+                        type="message_delta",
+                    ),
+                    MessageStopEvent(type="message_stop"),
+                ]
+            )
+        )
+    )
+
+    messages = [{"role": "user", "content": "What is the weather in Paris?"}]
+
+    with mock.patch.object(
+        client._client,
+        "send",
+        return_value=response,
+    ), start_transaction(name="anthropic"):
+        if api == "create":
+            async for _ in await client.messages.create(
+                max_tokens=1024, messages=messages, model="model", stream=True
+            ):
+                pass
+        else:
+            async with client.messages.stream(
+                max_tokens=1024, messages=messages, model="model"
+            ) as stream:
+                async for _ in stream:
+                    pass
+
+    sentry_sdk.flush()
+    (span,) = (item.payload for item in items)
+
+    if outputs_collected:
+        assert (
+            span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Checking the weather."
+        )
+        assert json.loads(span["attributes"][SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS]) == [
+            {
+                "id": "toolu_1",
+                "input": {"city": "Paris"},
+                "name": "get_weather",
+                "type": "tool_use",
+            }
+        ]
+    else:
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
+        assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in span["attributes"]
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
@@ -6004,26 +6430,39 @@ async def test_span_origin_async(
 )
 @pytest.mark.parametrize("span_streaming", [True, False])
 def test_collect_ai_data_with_input_json_delta(span_streaming):
-    event = ContentBlockDeltaEvent(
-        delta=InputJSONDelta(partial_json="test", type="input_json_delta"),
-        index=0,
-        type="content_block_delta",
-    )
     model = None
 
     usage = _RecordedUsage()
     usage.output_tokens = 20
     usage.input_tokens = 10
 
-    content_blocks = []
+    content_blocks = {}
 
-    model, new_usage, new_content_blocks, response_id, finish_reason = _collect_ai_data(
-        event, model, usage, content_blocks
-    )
+    for event in [
+        ContentBlockStartEvent(
+            type="content_block_start",
+            index=0,
+            content_block=ToolUseBlock(
+                id="toolu_0", input={}, name="get_weather", type="tool_use"
+            ),
+        ),
+        ContentBlockDeltaEvent(
+            delta=InputJSONDelta(partial_json="test", type="input_json_delta"),
+            index=0,
+            type="content_block_delta",
+        ),
+        ContentBlockStopEvent(type="content_block_stop", index=0),
+    ]:
+        model, new_usage, content_blocks, response_id, finish_reason = _collect_ai_data(
+            event, model, usage, content_blocks
+        )
+
     assert model is None
     assert new_usage.input_tokens == usage.input_tokens
     assert new_usage.output_tokens == usage.output_tokens
-    assert new_content_blocks == ["test"]
+    assert content_blocks == {
+        0: {"type": "tool_use", "id": "toolu_0", "name": "get_weather", "input": "test"}
+    }
     assert response_id is None
     assert finish_reason is None
 
