@@ -3,7 +3,12 @@ from array import array
 
 import pytest
 
-from sentry_sdk.serializer import MAX_DATABAG_BREADTH, MAX_DATABAG_DEPTH, serialize
+from sentry_sdk.serializer import (
+    MAX_DATABAG_BREADTH,
+    MAX_DATABAG_DEPTH,
+    Memo,
+    serialize,
+)
 
 try:
     import hypothesis.strategies as st
@@ -113,6 +118,44 @@ def test_custom_mapping_doesnt_mess_with_mock(extra_normalizer):
     m = mock.Mock()
     extra_normalizer(m)
     assert len(m.mock_calls) == 0
+
+
+def test_atomic_values_serialization_output():
+    result = serialize(
+        {
+            "nested": {
+                "values": [
+                    "string",
+                    42,
+                    3.14,
+                    True,
+                    False,
+                    None,
+                    float("inf"),
+                    float("nan"),
+                ]
+            }
+        }
+    )
+
+    assert result == {
+        "nested": {"values": ["string", 42, 3.14, True, False, None, "inf", "nan"]}
+    }
+
+
+def test_atomic_values_are_not_memoized(monkeypatch):
+    memoized_objects = []
+    original_memoize = Memo.memoize
+
+    def counting_memoize(self, obj):
+        memoized_objects.append(obj)
+        return original_memoize(self, obj)
+
+    monkeypatch.setattr(Memo, "memoize", counting_memoize)
+    event = {"one": "1", "two": "2", "three": "3"}
+
+    assert serialize(event) == event
+    assert memoized_objects == [event]
 
 
 def test_custom_repr(extra_normalizer):
