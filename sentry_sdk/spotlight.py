@@ -205,7 +205,7 @@ try:
         def process_exception(
             self: "Self", _request: "HttpRequest", exception: Exception
         ) -> "Optional[HttpResponseServerError]":
-            if not settings.DEBUG or not self._spotlight_url:
+            if settings is None or not settings.DEBUG or not self._spotlight_url:
                 return None
 
             try:

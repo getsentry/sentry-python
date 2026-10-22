@@ -1,5 +1,6 @@
 import sentry_sdk
 from sentry_sdk.integrations import DidNotEnable, Integration
+from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
 from sentry_sdk.utils import ensure_integration_enabled, event_from_exception
 
@@ -16,11 +17,10 @@ class TrytondWSGIIntegration(Integration):
     identifier = "trytond_wsgi"
     origin = f"auto.http.{identifier}"
 
-    def __init__(self) -> None:
-        pass
-
     @staticmethod
     def setup_once() -> None:
+        ignore_logger("trytond.wsgi")
+
         app.wsgi_app = SentryWsgiMiddleware(
             app.wsgi_app,
             span_origin=TrytondWSGIIntegration.origin,

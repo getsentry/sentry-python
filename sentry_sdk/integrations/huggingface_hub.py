@@ -4,7 +4,6 @@ from functools import wraps
 from typing import TYPE_CHECKING, cast
 
 import sentry_sdk
-from sentry_sdk.ai.monitoring import record_token_usage
 from sentry_sdk.ai.utils import (
     _set_span_data_attribute,
     get_start_span_function,
@@ -13,7 +12,6 @@ from sentry_sdk.ai.utils import (
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
     capture_internal_exceptions,
@@ -23,13 +21,12 @@ from sentry_sdk.utils import (
 )
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Iterable, Union
+    from typing import Any, Callable, Iterable
 
     from huggingface_hub import (
         ChatCompletionStreamOutput,
     )
 
-    from sentry_sdk.tracing import Span
 
 try:
     import huggingface_hub.inference._client
@@ -97,7 +94,6 @@ def _wrap_huggingface_task(f: "Callable[..., Any]", op: str) -> "Callable[..., A
         model = hf_client.model or kwargs.get("model") or ""
         operation_name = op.split(".")[-1]
 
-        span: "Union[Span, StreamedSpan]"
         if has_span_streaming_enabled(client.options):
             span = sentry_sdk.traces.start_span(
                 name=f"{operation_name} {model}",
@@ -106,12 +102,16 @@ def _wrap_huggingface_task(f: "Callable[..., Any]", op: str) -> "Callable[..., A
                     "sentry.origin": HuggingfaceHubIntegration.origin,
                 },
             )
+
+            set_on_span = span.set_attribute
         else:
             span = get_start_span_function()(
                 op=op,
                 name=f"{operation_name} {model}",
                 origin=HuggingfaceHubIntegration.origin,
             )
+
+            set_on_span = span.set_data
         span.__enter__()
 
         _set_span_data_attribute(span, SPANDATA.GEN_AI_OPERATION_NAME, operation_name)
@@ -258,16 +258,30 @@ def _wrap_huggingface_task(f: "Callable[..., Any]", op: str) -> "Callable[..., A
                         )
 
             if usage is not None:
-                record_token_usage(
-                    span,
-                    input_tokens=usage.prompt_tokens,
-                    output_tokens=usage.completion_tokens,
-                    total_tokens=usage.total_tokens,
-                )
+                if usage is not None and usage.prompt_tokens is not None:
+                    set_on_span(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, usage.prompt_tokens)
+
+                if usage is not None and usage.completion_tokens is not None:
+                    set_on_span(
+                        SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS, usage.completion_tokens
+                    )
+
+                if usage is not None and usage.total_tokens is not None:
+                    set_on_span(SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, usage.total_tokens)
+
+                elif (
+                    usage is not None
+                    and usage.prompt_tokens is not None
+                    and usage.completion_tokens is not None
+                ):
+                    set_on_span(
+                        SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS,
+                        usage.prompt_tokens + usage.completion_tokens,
+                    )
             elif tokens_used > 0:
-                record_token_usage(
-                    span,
-                    total_tokens=tokens_used,
+                set_on_span(
+                    SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS,
+                    tokens_used,
                 )
 
             # If the response is not a generator (meaning a streaming response)
@@ -283,29 +297,36 @@ def _wrap_huggingface_task(f: "Callable[..., Any]", op: str) -> "Callable[..., A
                     response_text_buffer: "list[str]" = []
                     tokens_used = 0
 
-                    with capture_internal_exceptions():
+                    try:
                         for chunk in res:
-                            if (
-                                hasattr(chunk, "token")
-                                and hasattr(chunk.token, "text")
-                                and chunk.token.text is not None
-                            ):
-                                response_text_buffer.append(chunk.token.text)
+                            with capture_internal_exceptions():
+                                if (
+                                    hasattr(chunk, "token")
+                                    and hasattr(chunk.token, "text")
+                                    and chunk.token.text is not None
+                                ):
+                                    response_text_buffer.append(chunk.token.text)
 
-                            if hasattr(chunk, "details") and hasattr(
-                                chunk.details, "finish_reason"
-                            ):
-                                finish_reason = chunk.details.finish_reason
+                                if hasattr(chunk, "details") and hasattr(
+                                    chunk.details, "finish_reason"
+                                ):
+                                    finish_reason = chunk.details.finish_reason
 
-                            if (
-                                hasattr(chunk, "details")
-                                and hasattr(chunk.details, "generated_tokens")
-                                and chunk.details.generated_tokens is not None
-                            ):
-                                tokens_used = chunk.details.generated_tokens
+                                if (
+                                    hasattr(chunk, "details")
+                                    and hasattr(chunk.details, "generated_tokens")
+                                    and chunk.details.generated_tokens is not None
+                                ):
+                                    tokens_used = chunk.details.generated_tokens
 
                             yield chunk
+                    except Exception:
+                        exc_info = sys.exc_info()
+                        with capture_internal_exceptions():
+                            span.__exit__(*exc_info)
+                        reraise(*exc_info)
 
+                    with capture_internal_exceptions():
                         if finish_reason is not None:
                             set_data_normalized(
                                 span,
@@ -331,10 +352,7 @@ def _wrap_huggingface_task(f: "Callable[..., Any]", op: str) -> "Callable[..., A
                                     )
 
                         if tokens_used > 0:
-                            record_token_usage(
-                                span,
-                                total_tokens=tokens_used,
-                            )
+                            set_on_span(SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, tokens_used)
 
                     span.__exit__(None, None, None)
 
@@ -349,44 +367,54 @@ def _wrap_huggingface_task(f: "Callable[..., Any]", op: str) -> "Callable[..., A
                     tool_calls = None
                     usage = None
 
-                    with capture_internal_exceptions():
+                    try:
                         for chunk in cast("Iterable[ChatCompletionStreamOutput]", res):
-                            if hasattr(chunk, "model") and chunk.model is not None:
-                                response_model = chunk.model
+                            with capture_internal_exceptions():
+                                if hasattr(chunk, "model") and chunk.model is not None:
+                                    response_model = chunk.model
 
-                            if hasattr(chunk, "usage") and chunk.usage is not None:
-                                usage = chunk.usage
+                                if hasattr(chunk, "usage") and chunk.usage is not None:
+                                    usage = chunk.usage
 
-                            if isinstance(chunk, str):
-                                if chunk is not None:
-                                    response_text_buffer.append(chunk)
+                                if isinstance(chunk, str):
+                                    if chunk is not None:
+                                        response_text_buffer.append(chunk)
 
-                            if hasattr(chunk, "choices") and chunk.choices is not None:
-                                for choice in chunk.choices:
-                                    if (
-                                        hasattr(choice, "delta")
-                                        and hasattr(choice.delta, "content")
-                                        and choice.delta.content is not None
-                                    ):
-                                        response_text_buffer.append(
-                                            choice.delta.content
-                                        )
+                                if (
+                                    hasattr(chunk, "choices")
+                                    and chunk.choices is not None
+                                ):
+                                    for choice in chunk.choices:
+                                        if (
+                                            hasattr(choice, "delta")
+                                            and hasattr(choice.delta, "content")
+                                            and choice.delta.content is not None
+                                        ):
+                                            response_text_buffer.append(
+                                                choice.delta.content
+                                            )
 
-                                    if (
-                                        hasattr(choice, "finish_reason")
-                                        and choice.finish_reason is not None
-                                    ):
-                                        finish_reason = choice.finish_reason
+                                        if (
+                                            hasattr(choice, "finish_reason")
+                                            and choice.finish_reason is not None
+                                        ):
+                                            finish_reason = choice.finish_reason
 
-                                    if (
-                                        hasattr(choice, "delta")
-                                        and hasattr(choice.delta, "tool_calls")
-                                        and choice.delta.tool_calls is not None
-                                    ):
-                                        tool_calls = choice.delta.tool_calls
+                                        if (
+                                            hasattr(choice, "delta")
+                                            and hasattr(choice.delta, "tool_calls")
+                                            and choice.delta.tool_calls is not None
+                                        ):
+                                            tool_calls = choice.delta.tool_calls
 
                             yield chunk
+                    except Exception:
+                        exc_info = sys.exc_info()
+                        with capture_internal_exceptions():
+                            span.__exit__(*exc_info)
+                        reraise(*exc_info)
 
+                    with capture_internal_exceptions():
                         if response_model is not None:
                             _set_span_data_attribute(
                                 span, SPANDATA.GEN_AI_RESPONSE_MODEL, response_model
@@ -443,12 +471,32 @@ def _wrap_huggingface_task(f: "Callable[..., Any]", op: str) -> "Callable[..., A
                                         text_response,
                                     )
 
-                        if usage is not None:
-                            record_token_usage(
-                                span,
-                                input_tokens=usage.prompt_tokens,
-                                output_tokens=usage.completion_tokens,
-                                total_tokens=usage.total_tokens,
+                        if usage is None:
+                            span.__exit__(None, None, None)
+                            return
+
+                        if usage.prompt_tokens is not None:
+                            set_on_span(
+                                SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, usage.prompt_tokens
+                            )
+
+                        if usage.completion_tokens is not None:
+                            set_on_span(
+                                SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS,
+                                usage.completion_tokens,
+                            )
+
+                        if usage.total_tokens is not None:
+                            set_on_span(
+                                SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, usage.total_tokens
+                            )
+                        elif (
+                            usage.prompt_tokens is not None
+                            and usage.completion_tokens is not None
+                        ):
+                            set_on_span(
+                                SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS,
+                                usage.prompt_tokens + usage.completion_tokens,
                             )
 
                         span.__exit__(None, None, None)
