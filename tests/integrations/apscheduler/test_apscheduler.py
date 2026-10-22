@@ -310,6 +310,42 @@ def test_interval_trigger_not_whole_minutes(
     assert check_ins == []
 
 
+@pytest.mark.parametrize(
+    "trigger_cls,trigger_kwargs",
+    [(CronTrigger, {"minute": "*/5"}), (IntervalTrigger, {"minutes": 5})],
+)
+@pytest.mark.parametrize("jitter, checkin_margin", [(1, 2), (60, 2), (61, 3), (300, 6)])
+def test_trigger_jitter_adds_checkin_margin(
+    sentry_init, capture_envelopes, trigger_cls, trigger_kwargs, jitter, checkin_margin
+):
+    try:
+        trigger = trigger_cls(timezone="UTC", jitter=jitter, **trigger_kwargs)
+    except TypeError:
+        pytest.skip("APScheduler < 3.5 has no jitter.")
+
+    sentry_init(integrations=[APSchedulerIntegration(monitor_jobs=True)])
+    envelopes = capture_envelopes()
+
+    check_ins = _run_once(envelopes, trigger)
+
+    assert check_ins[0]["monitor_config"]["checkin_margin"] == checkin_margin
+
+
+@pytest.mark.parametrize(
+    "trigger_cls,trigger_kwargs",
+    [(CronTrigger, {"minute": "*/5"}), (IntervalTrigger, {"minutes": 5})],
+)
+def test_trigger_without_jitter_has_no_checkin_margin(
+    sentry_init, capture_envelopes, trigger_cls, trigger_kwargs
+):
+    sentry_init(integrations=[APSchedulerIntegration(monitor_jobs=True)])
+    envelopes = capture_envelopes()
+
+    check_ins = _run_once(envelopes, trigger_cls(timezone="UTC", **trigger_kwargs))
+
+    assert "checkin_margin" not in check_ins[0]["monitor_config"]
+
+
 def test_date_trigger_is_not_monitored(sentry_init, capture_envelopes):
     sentry_init(integrations=[APSchedulerIntegration(monitor_jobs=True)])
     envelopes = capture_envelopes()

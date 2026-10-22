@@ -1,3 +1,4 @@
+import math
 import re
 import threading
 import weakref
@@ -254,6 +255,7 @@ def _get_monitor_config(trigger: "Any") -> "Optional[MonitorConfig]":
     if getattr(trigger, "end_date", None) is not None:
         return None
 
+    monitor_config: "MonitorConfig"
     if isinstance(trigger, CronTrigger):
         crontab = _get_crontab(trigger)
         if crontab is None:
@@ -262,19 +264,26 @@ def _get_monitor_config(trigger: "Any") -> "Optional[MonitorConfig]":
         timezone = _get_timezone_name(trigger.timezone)
         if timezone is None:
             return None
-        return {
+        monitor_config = {
             "schedule": {"type": "crontab", "value": crontab},
             "timezone": timezone,
         }
-
-    if isinstance(trigger, IntervalTrigger):
+    elif isinstance(trigger, IntervalTrigger):
         schedule = _get_interval_schedule(trigger.interval.total_seconds())
         if schedule is None:
             return None
-        return {"schedule": schedule}
+        monitor_config = {"schedule": schedule}
+    else:
+        # DateTrigger (one-off) and combining triggers have no schedule to monitor.
+        return None
 
-    # DateTrigger (one-off) and combining triggers have no schedule to monitor.
-    return None
+    # Jitter delays runs by up to that many seconds; add it to Sentry's
+    # default 1 minute margin.
+    jitter = getattr(trigger, "jitter", None)
+    if jitter:
+        monitor_config["checkin_margin"] = 1 + math.ceil(jitter / 60)
+
+    return monitor_config
 
 
 def _begin_check_ins(
