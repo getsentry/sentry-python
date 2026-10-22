@@ -112,6 +112,9 @@ try:
     from openai.resources.responses import AsyncResponses, Responses
     from openai.types.responses import Response, ResponseTextDeltaEvent
     from openai.types.responses.response_completed_event import ResponseCompletedEvent
+    from openai.types.responses.response_output_item_done_event import (
+        ResponseOutputItemDoneEvent,
+    )
 except ImportError:
     RESPONSES_API_ENABLED = False
 
@@ -1185,6 +1188,7 @@ def _wrap_synchronous_responses_event_iterator(
     """
     ttft = None
     data_buf: "list[list[str]]" = []  # one for each choice
+    tool_calls: "list[Any]" = []
     client = sentry_sdk.get_client()
 
     count_tokens_manually = True
@@ -1196,6 +1200,10 @@ def _wrap_synchronous_responses_event_iterator(
                 if len(data_buf) == 0:
                     data_buf.append([])
                 data_buf[0].append(x.delta or "")
+
+            elif isinstance(x, ResponseOutputItemDoneEvent):
+                if x.item.type == "function_call":
+                    tool_calls.append(x.item.model_dump())
 
             elif isinstance(x, ResponseCompletedEvent):
                 if isinstance(span, StreamedSpan):
@@ -1219,6 +1227,22 @@ def _wrap_synchronous_responses_event_iterator(
             set_data_normalized(
                 span, SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN, ttft
             )
+        if len(tool_calls) > 0:
+            if has_data_collection_enabled(client.options):
+                if client.options["data_collection"]["gen_ai"]["outputs"]:
+                    set_data_normalized(
+                        span,
+                        SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
+                        tool_calls,
+                        unpack=False,
+                    )
+            elif should_send_default_pii() and integration.include_prompts:
+                set_data_normalized(
+                    span,
+                    SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
+                    tool_calls,
+                    unpack=False,
+                )
         if len(data_buf) > 0:
             all_responses = ["".join(chunk) for chunk in data_buf]
             if has_data_collection_enabled(client.options):
@@ -1258,6 +1282,7 @@ async def _wrap_asynchronous_responses_event_iterator(
     """
     ttft: "Optional[float]" = None
     data_buf: "list[list[str]]" = []  # one for each choice
+    tool_calls: "list[Any]" = []
     client = sentry_sdk.get_client()
 
     count_tokens_manually = True
@@ -1269,6 +1294,10 @@ async def _wrap_asynchronous_responses_event_iterator(
                 if len(data_buf) == 0:
                     data_buf.append([])
                 data_buf[0].append(x.delta or "")
+
+            elif isinstance(x, ResponseOutputItemDoneEvent):
+                if x.item.type == "function_call":
+                    tool_calls.append(x.item.model_dump())
 
             elif isinstance(x, ResponseCompletedEvent):
                 if isinstance(span, StreamedSpan):
@@ -1292,6 +1321,22 @@ async def _wrap_asynchronous_responses_event_iterator(
             set_data_normalized(
                 span, SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN, ttft
             )
+        if len(tool_calls) > 0:
+            if has_data_collection_enabled(client.options):
+                if client.options["data_collection"]["gen_ai"]["outputs"]:
+                    set_data_normalized(
+                        span,
+                        SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
+                        tool_calls,
+                        unpack=False,
+                    )
+            elif should_send_default_pii() and integration.include_prompts:
+                set_data_normalized(
+                    span,
+                    SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
+                    tool_calls,
+                    unpack=False,
+                )
         if len(data_buf) > 0:
             all_responses = ["".join(chunk) for chunk in data_buf]
 
