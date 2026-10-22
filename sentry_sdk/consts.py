@@ -1477,6 +1477,16 @@ class OP:
     HUGGINGFACE_HUB_CHAT_COMPLETIONS_CREATE = (
         "ai.chat_completions.create.huggingface_hub"
     )
+    OBJECT_COPY = "object.copy"
+    OBJECT_DELETE = "object.delete"
+    OBJECT_GET = "object.get"
+    OBJECT_HEAD = "object.head"
+    OBJECT_LIST = "object.list"
+    OBJECT_MULTIPART_UPLOAD_ABORT = "object.multipart_upload.abort"
+    OBJECT_MULTIPART_UPLOAD_COMPLETE = "object.multipart_upload.complete"
+    OBJECT_MULTIPART_UPLOAD_CREATE = "object.multipart_upload.create"
+    OBJECT_PUT = "object.put"
+    OBJECT_UPLOAD_PART = "object.upload_part"
     QUEUE_PROCESS = "queue.process"
     QUEUE_PUBLISH = "queue.publish"
     QUEUE_SUBMIT_ARQ = "queue.submit.arq"
