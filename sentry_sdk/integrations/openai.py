@@ -715,24 +715,31 @@ def _set_common_output_data(
     # Chat Completions API
     if hasattr(response, "choices") and response.choices is not None:
         if has_data_collection_enabled(client.options):
-            if client.options["data_collection"]["gen_ai"]["outputs"]:
-                response_text = [
-                    choice.message.model_dump()
-                    for choice in response.choices
-                    if choice.message is not None
-                ]
-                if len(response_text) > 0:
-                    set_data_normalized(
-                        span, SPANDATA.GEN_AI_RESPONSE_TEXT, response_text
-                    )
-        elif should_send_default_pii() and integration.include_prompts:
-            response_text = [
-                choice.message.model_dump()
+            record_outputs = client.options["data_collection"]["gen_ai"]["outputs"]
+        else:
+            record_outputs = should_send_default_pii() and integration.include_prompts
+
+        if record_outputs:
+            messages = [
+                choice.message
                 for choice in response.choices
                 if choice.message is not None
             ]
-            if len(response_text) > 0:
+            response_text = [message.content or "" for message in messages]
+            tool_calls = [
+                tool_call.model_dump()
+                for message in messages
+                for tool_call in getattr(message, "tool_calls", None) or []
+            ]
+            if any(response_text):
                 set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, response_text)
+            if len(tool_calls) > 0:
+                set_data_normalized(
+                    span,
+                    SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
+                    tool_calls,
+                    unpack=False,
+                )
 
         _calculate_completions_token_usage(
             messages=input,
