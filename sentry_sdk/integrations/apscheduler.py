@@ -279,6 +279,10 @@ def _get_crontab(trigger: "CronTrigger") -> "Optional[str]":
 
 
 def _get_monitor_config(trigger: "Any") -> "Optional[MonitorConfig]":
+    # Sentry schedules have no end, so finite triggers would alert as missed.
+    if getattr(trigger, "end_date", None) is not None:
+        return None
+
     if isinstance(trigger, CronTrigger):
         crontab = _get_crontab(trigger)
         if crontab is None:

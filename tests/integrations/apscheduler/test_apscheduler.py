@@ -309,6 +309,24 @@ def test_date_trigger_is_not_monitored(sentry_init, capture_envelopes):
     assert check_ins == []
 
 
+@pytest.mark.parametrize(
+    "trigger_cls,trigger_kwargs",
+    [(CronTrigger, {"minute": "*/5"}), (IntervalTrigger, {"minutes": 5})],
+)
+def test_trigger_with_end_date_is_not_monitored(
+    sentry_init, capture_envelopes, trigger_cls, trigger_kwargs
+):
+    sentry_init(integrations=[APSchedulerIntegration(monitor_jobs=True)])
+    envelopes = capture_envelopes()
+
+    trigger = trigger_cls(
+        timezone="UTC", end_date=_utcnow() + timedelta(days=1), **trigger_kwargs
+    )
+    check_ins = _run_once(envelopes, trigger)
+
+    assert check_ins == []
+
+
 def test_thread_pool_executor(sentry_init, capture_envelopes):
     sentry_init(integrations=[APSchedulerIntegration(monitor_jobs=True)])
     envelopes = capture_envelopes()
