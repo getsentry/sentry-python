@@ -336,10 +336,11 @@ def _monitor_cron_job(
     monitor_config = _get_monitor_config(cron_job, worker)
     if monitor_config is None:
         logger.debug(
-            "arq cron job %r can't be expressed as a Sentry Crons schedule. "
-            "Sending check-ins without a monitor config.",
+            "Not monitoring arq cron job %r: its schedule can't be expressed "
+            "as a Sentry Crons schedule.",
             cron_job.name,
         )
+        return
 
     coroutine = cron_job.coroutine
 

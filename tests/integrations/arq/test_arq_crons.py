@@ -30,6 +30,13 @@ def patch_fakeredis_info_command():
         FakeSocket.info = info
 
 
+@pytest.fixture(autouse=True)
+def utc_local_time(monkeypatch):
+    # arq < 0.25 runs cron jobs in local time.
+    monkeypatch.setattr(time, "timezone", 0)
+    monkeypatch.setattr(time, "daylight", 0)
+
+
 def _check_ins(envelopes):
     return [
         item.payload.json
@@ -65,10 +72,7 @@ async def _run_cron_jobs(*cron_jobs, **settings):
 
 
 @pytest.mark.asyncio
-async def test_cron_job_ok(sentry_init, capture_envelopes, monkeypatch):
-    # arq < 0.25 runs cron jobs in local time.
-    monkeypatch.setattr(time, "timezone", 0)
-    monkeypatch.setattr(time, "daylight", 0)
+async def test_cron_job_ok(sentry_init, capture_envelopes):
     sentry_init(integrations=[ArqIntegration(monitor_cron_jobs=True)])
     envelopes = capture_envelopes()
 
@@ -109,20 +113,32 @@ async def test_cron_job_error(sentry_init, capture_envelopes):
 
 
 @pytest.mark.asyncio
-async def test_cron_job_without_config(sentry_init, capture_envelopes):
+@pytest.mark.parametrize(
+    "kwargs, tz",
+    [
+        # Every 10 seconds can't be expressed as a crontab.
+        ({"second": {0, 10, 20, 30, 40, 50}}, timezone.utc),
+        ({"day": 1, "weekday": "mon"}, timezone.utc),
+        ({"minute": 0}, timezone(timedelta(hours=5, minutes=30))),
+    ],
+)
+async def test_unsupported_schedule_not_monitored(
+    sentry_init, capture_envelopes, monkeypatch, kwargs, tz
+):
+    monkeypatch.setattr(time, "timezone", -tz.utcoffset(None).total_seconds())
     sentry_init(integrations=[ArqIntegration(monitor_cron_jobs=True)])
     envelopes = capture_envelopes()
+    calls = []
 
-    # Every 10 seconds can't be expressed as a crontab.
+    async def job(ctx):
+        calls.append(1)
+
     await _run_cron_jobs(
-        cron(ok_job, second={0, 10, 20, 30, 40, 50}, run_at_startup=True),
-        timezone=timezone.utc,
+        cron(job, name="job", run_at_startup=True, **kwargs), timezone=tz
     )
 
-    # A scheduled run can follow the startup run.
-    check_ins = _check_ins(envelopes)
-    assert [c["status"] for c in check_ins[:2]] == ["in_progress", "ok"]
-    assert all("monitor_config" not in c for c in check_ins)
+    assert calls
+    assert _check_ins(envelopes) == []
 
 
 @pytest.mark.asyncio
