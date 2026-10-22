@@ -1,3 +1,4 @@
+import inspect
 import json
 import sys
 from collections.abc import Iterable
@@ -732,6 +733,175 @@ def _set_output_data(
         set_on_span(SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, input_tokens + output_tokens)
 
 
+def _set_message_output_data(
+    span: "Any", integration: "AnthropicIntegration", message: "Any"
+) -> None:
+    if hasattr(message, "content"):
+        (
+            input_tokens,
+            output_tokens,
+            cache_read_input_tokens,
+            cache_write_input_tokens,
+        ) = _get_token_usage(message)
+
+        content_blocks = []
+        for content_block in message.content:
+            if hasattr(content_block, "to_dict"):
+                content_blocks.append(content_block.to_dict())
+            elif hasattr(content_block, "model_dump"):
+                content_blocks.append(content_block.model_dump())
+            elif hasattr(content_block, "text"):
+                content_blocks.append({"type": "text", "text": content_block.text})
+
+        _set_output_data(
+            span=span,
+            integration=integration,
+            model=getattr(message, "model", None),
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            cache_read_input_tokens=cache_read_input_tokens,
+            cache_write_input_tokens=cache_write_input_tokens,
+            content_blocks=content_blocks,
+            response_id=getattr(message, "id", None),
+            finish_reason=getattr(message, "stop_reason", None),
+        )
+    elif isinstance(span, Span):
+        span.set_data("unknown_response", True)
+
+
+def _finish_span_once(span: "Any") -> "Callable[[], None]":
+    state = {"finished": False}
+
+    def finish() -> None:
+        if state["finished"]:
+            return
+        state["finished"] = True
+        with capture_internal_exceptions():
+            span.__exit__(None, None, None)
+
+    return finish
+
+
+def _finish_raw_response(
+    span: "Any", integration: "AnthropicIntegration", response: "Any"
+) -> "Any":
+    """
+    `.with_raw_response` and `.with_streaming_response` hand back the response
+    wrapper instead of a `Message`, so the span would end without any output.
+
+    A body that is already read is parsed here, the way `create` parses it;
+    `parse()` caches its result, so the caller pays nothing for it. A body the
+    caller asked to stream must not be read here, so the span is filled when the
+    caller parses and closed when the caller closes the response.
+    """
+    finish = _finish_span_once(span)
+
+    if not hasattr(response, "parse"):
+        with capture_internal_exceptions():
+            if isinstance(span, Span):
+                span.set_data("unknown_response", True)
+        finish()
+        return response
+
+    if getattr(response.http_response, "is_stream_consumed", False):
+        with capture_internal_exceptions():
+            _set_message_output_data(span, integration, response.parse())
+        finish()
+        return response
+
+    original_parse = response.parse
+
+    def parse(*args: "Any", **kwargs: "Any") -> "Any":
+        parsed = original_parse(*args, **kwargs)
+        with capture_internal_exceptions():
+            _set_message_output_data(span, integration, parsed)
+        finish()
+        return parsed
+
+    response.parse = parse
+
+    original_close = getattr(response, "close", None)
+
+    if original_close is not None:
+
+        def close() -> None:
+            finish()
+            original_close()
+
+        response.close = close
+    return response
+
+
+async def _finish_raw_response_async(
+    span: "Any", integration: "AnthropicIntegration", response: "Any"
+) -> "Any":
+    """
+    The async twin of `_finish_raw_response`.
+
+    `parse()` and `close()` are coroutines on some SDK versions and plain
+    functions on others, so each wrapper keeps the shape of the method it
+    replaces and only awaits when the method it calls is awaitable.
+    """
+    finish = _finish_span_once(span)
+
+    if not hasattr(response, "parse"):
+        with capture_internal_exceptions():
+            if isinstance(span, Span):
+                span.set_data("unknown_response", True)
+        finish()
+        return response
+
+    def record(parsed: "Any") -> None:
+        with capture_internal_exceptions():
+            _set_message_output_data(span, integration, parsed)
+        finish()
+
+    if getattr(response.http_response, "is_stream_consumed", False):
+        with capture_internal_exceptions():
+            parsed = response.parse()
+            if inspect.isawaitable(parsed):
+                parsed = await parsed
+            _set_message_output_data(span, integration, parsed)
+        finish()
+        return response
+
+    original_parse = response.parse
+
+    if inspect.iscoroutinefunction(original_parse):
+
+        async def parse(*args: "Any", **kwargs: "Any") -> "Any":
+            parsed = await original_parse(*args, **kwargs)
+            record(parsed)
+            return parsed
+
+    else:
+
+        def parse(*args: "Any", **kwargs: "Any") -> "Any":  # type: ignore[misc]
+            parsed = original_parse(*args, **kwargs)
+            record(parsed)
+            return parsed
+
+    response.parse = parse
+
+    original_close = getattr(response, "close", None)
+
+    if original_close is not None:
+        if inspect.iscoroutinefunction(original_close):
+
+            async def close() -> None:
+                finish()
+                await original_close()
+
+        else:
+
+            def close() -> None:  # type: ignore[misc]
+                finish()
+                original_close()
+
+        response.close = close
+    return response
+
+
 def _sentry_patched_create_sync(f: "Any", *args: "Any", **kwargs: "Any") -> "Any":
     """
     Creates and manages an AI Client Span for both non-streaming and streaming calls.
@@ -790,39 +960,11 @@ def _sentry_patched_create_sync(f: "Any", *args: "Any", **kwargs: "Any") -> "Any
 
         return result
 
+    if hasattr(result, "http_response"):
+        return _finish_raw_response(span, integration, result)
+
     with capture_internal_exceptions():
-        if hasattr(result, "content"):
-            (
-                input_tokens,
-                output_tokens,
-                cache_read_input_tokens,
-                cache_write_input_tokens,
-            ) = _get_token_usage(result)
-
-            content_blocks = []
-            for content_block in result.content:
-                if hasattr(content_block, "to_dict"):
-                    content_blocks.append(content_block.to_dict())
-                elif hasattr(content_block, "model_dump"):
-                    content_blocks.append(content_block.model_dump())
-                elif hasattr(content_block, "text"):
-                    content_blocks.append({"type": "text", "text": content_block.text})
-
-            _set_output_data(
-                span=span,
-                integration=integration,
-                model=getattr(result, "model", None),
-                input_tokens=input_tokens,
-                output_tokens=output_tokens,
-                cache_read_input_tokens=cache_read_input_tokens,
-                cache_write_input_tokens=cache_write_input_tokens,
-                content_blocks=content_blocks,
-                response_id=getattr(result, "id", None),
-                finish_reason=getattr(result, "stop_reason", None),
-            )
-        elif isinstance(span, Span):
-            span.set_data("unknown_response", True)
-
+        _set_message_output_data(span, integration, result)
         span.__exit__(None, None, None)
 
     return result
@@ -888,39 +1030,11 @@ async def _sentry_patched_create_async(
 
         return result
 
+    if hasattr(result, "http_response"):
+        return await _finish_raw_response_async(span, integration, result)
+
     with capture_internal_exceptions():
-        if hasattr(result, "content"):
-            (
-                input_tokens,
-                output_tokens,
-                cache_read_input_tokens,
-                cache_write_input_tokens,
-            ) = _get_token_usage(result)
-
-            content_blocks = []
-            for content_block in result.content:
-                if hasattr(content_block, "to_dict"):
-                    content_blocks.append(content_block.to_dict())
-                elif hasattr(content_block, "model_dump"):
-                    content_blocks.append(content_block.model_dump())
-                elif hasattr(content_block, "text"):
-                    content_blocks.append({"type": "text", "text": content_block.text})
-
-            _set_output_data(
-                span=span,
-                integration=integration,
-                model=getattr(result, "model", None),
-                input_tokens=input_tokens,
-                output_tokens=output_tokens,
-                cache_read_input_tokens=cache_read_input_tokens,
-                cache_write_input_tokens=cache_write_input_tokens,
-                content_blocks=content_blocks,
-                response_id=getattr(result, "id", None),
-                finish_reason=getattr(result, "stop_reason", None),
-            )
-        elif isinstance(span, Span):
-            span.set_data("unknown_response", True)
-
+        _set_message_output_data(span, integration, result)
         span.__exit__(None, None, None)
 
     return result
