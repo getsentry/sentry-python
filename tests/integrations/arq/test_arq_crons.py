@@ -1,5 +1,5 @@
 import time
-from datetime import timedelta, timezone
+from datetime import datetime, timedelta, timezone
 
 import arq.worker
 import pytest
@@ -35,6 +35,13 @@ def utc_local_time(monkeypatch):
     # arq < 0.25 runs cron jobs in local time.
     monkeypatch.setattr(time, "timezone", 0)
     monkeypatch.setattr(time, "daylight", 0)
+
+
+def _minute_far_from_now():
+    # arq enqueues a cron job if its next run is about a second away. Schedule
+    # it half an hour from now so that it doesn't run again right after the
+    # startup run.
+    return (datetime.now(timezone.utc).minute + 30) % 60
 
 
 def _check_ins(envelopes):
@@ -76,15 +83,16 @@ async def test_cron_job_ok(sentry_init, capture_envelopes):
     sentry_init(integrations=[ArqIntegration(monitor_cron_jobs=True)])
     envelopes = capture_envelopes()
 
+    minute = _minute_far_from_now()
     await _run_cron_jobs(
-        cron(ok_job, minute={0, 30}, run_at_startup=True), timezone=timezone.utc
+        cron(ok_job, minute=minute, run_at_startup=True), timezone=timezone.utc
     )
 
     in_progress, ok = _check_ins(envelopes)
     assert in_progress["monitor_slug"] == "ok_job"
     assert in_progress["status"] == "in_progress"
     assert in_progress["monitor_config"] == {
-        "schedule": {"type": "crontab", "value": "0,30 * * * *"},
+        "schedule": {"type": "crontab", "value": f"{minute} * * * *"},
         "timezone": "UTC",
     }
     assert ok["monitor_slug"] == "ok_job"
@@ -99,7 +107,13 @@ async def test_cron_job_error(sentry_init, capture_envelopes):
     envelopes = capture_envelopes()
 
     await _run_cron_jobs(
-        cron(failing_job, name="nightly", hour=3, minute=0, run_at_startup=True),
+        cron(
+            failing_job,
+            name="nightly",
+            hour=3,
+            minute=_minute_far_from_now(),
+            run_at_startup=True,
+        ),
         timezone=timezone.utc,
     )
 
