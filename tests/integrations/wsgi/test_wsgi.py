@@ -903,11 +903,11 @@ def test_request_headers_legacy_no_pii_redacts_sensitive(
 
     for header in (
         "X-Forwarded-For",
-        "X-Real-IP",
-        "CF-Connecting-IP",
-        "True-Client-IP",
+        "X-Real-Ip",
+        "Cf-Connecting-Ip",
+        "True-Client-Ip",
         "Forwarded",
-        "X-Client-IP",
+        "X-Client-Ip",
     ):
         assert event["request"]["headers"][header] == ""
         assert event["_meta"]["request"]["headers"][header] == {
