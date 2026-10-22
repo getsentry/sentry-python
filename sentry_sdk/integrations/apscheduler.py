@@ -1,12 +1,12 @@
 import re
 import threading
 import weakref
-from functools import lru_cache, wraps
+from functools import wraps
 from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk.crons import MonitorStatus, capture_checkin
-from sentry_sdk.crons.utils import _get_interval_schedule
+from sentry_sdk.crons.utils import _get_interval_schedule, _get_timezone_name
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.utils import (
     capture_internal_exceptions,
@@ -17,7 +17,7 @@ from sentry_sdk.utils import (
 )
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, FrozenSet, List, Optional, Set, Tuple
+    from typing import Any, Dict, List, Optional, Set, Tuple
 
     from sentry_sdk._types import MonitorConfig
 
@@ -186,35 +186,6 @@ def _warn_generated_id(job: "Any") -> None:
         "to `add_job` to give it its own monitor.",
         job.name,
     )
-
-
-@lru_cache(maxsize=None)
-def _get_known_timezones() -> "FrozenSet[str]":
-    try:
-        from zoneinfo import available_timezones
-    except ImportError:
-        try:
-            from backports.zoneinfo import available_timezones  # type: ignore
-        except ImportError:
-            try:
-                import pytz  # type: ignore
-            except ImportError:
-                return frozenset(("UTC",))
-            # A lazy list that frozenset() alone would read as empty.
-            return frozenset(name for name in pytz.all_timezones)
-    return frozenset(available_timezones())
-
-
-def _get_timezone_name(timezone: "Any") -> "Optional[str]":
-    """
-    Return the IANA name of the timezone, or None if it has none, e.g.
-    `datetime.timezone(timedelta(hours=2))` ("UTC+02:00"), `pytz.FixedOffset`
-    or tzlocal's "local".
-    """
-    name = str(timezone)
-    if name in _get_known_timezones():
-        return name
-    return None
 
 
 def _get_crontab_day_of_week(field: "Any") -> "Optional[str]":

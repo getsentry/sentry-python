@@ -228,39 +228,49 @@ def test_cron_trigger_timezone(sentry_init, capture_envelopes):
     assert check_ins[0]["monitor_config"]["timezone"] == "Europe/Vienna"
 
 
-def _fixed_offset_cron_trigger():
+@pytest.mark.parametrize(
+    "offset, expected",
+    [
+        (timedelta(hours=2), "Etc/GMT-2"),
+        (timedelta(hours=-7), "Etc/GMT+7"),
+        (timedelta(0), "UTC"),
+    ],
+)
+def test_cron_trigger_fixed_offset_timezone(
+    sentry_init, capture_envelopes, offset, expected
+):
     try:
-        return CronTrigger(hour=9, timezone=timezone(timedelta(hours=2)))
+        trigger = CronTrigger(hour=9, timezone=timezone(offset))
+    except TypeError:
+        pytest.skip("APScheduler < 3.7 only takes pytz timezones.")
+
+    sentry_init(integrations=[APSchedulerIntegration(monitor_jobs=True)])
+    envelopes = capture_envelopes()
+
+    check_ins = _run_once(envelopes, trigger)
+
+    assert check_ins[0]["monitor_config"]["timezone"] == expected
+
+
+def _non_whole_hour_cron_trigger():
+    try:
+        return CronTrigger(hour=9, timezone=timezone(timedelta(hours=5, minutes=30)))
     except TypeError:
         # APScheduler < 3.7 only takes pytz timezones.
         import pytz
 
-        return CronTrigger(hour=9, timezone=pytz.FixedOffset(120))
+        return CronTrigger(hour=9, timezone=pytz.FixedOffset(330))
 
 
 def test_cron_trigger_without_iana_timezone(sentry_init, capture_envelopes):
     sentry_init(integrations=[APSchedulerIntegration(monitor_jobs=True)])
     envelopes = capture_envelopes()
 
-    # Sentry rejects timezones like "UTC+02:00", and without one it would
+    # Sentry rejects timezones like "UTC+05:30", and without one it would
     # read the crontab as UTC.
-    check_ins = _run_once(envelopes, _fixed_offset_cron_trigger())
+    check_ins = _run_once(envelopes, _non_whole_hour_cron_trigger())
 
     assert check_ins == []
-
-
-@pytest.mark.parametrize(
-    "tz, expected",
-    [
-        ("UTC", "UTC"),
-        ("Europe/Vienna", "Europe/Vienna"),
-        (timezone.utc, "UTC"),
-        (timezone(timedelta(hours=2)), None),
-        ("local", None),
-    ],
-)
-def test_get_timezone_name(tz, expected):
-    assert apscheduler_integration._get_timezone_name(tz) == expected
 
 
 @pytest.mark.parametrize(
