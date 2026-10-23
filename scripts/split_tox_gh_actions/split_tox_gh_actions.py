@@ -136,6 +136,7 @@ GROUPS = {
         "requests",
     ],
     "Tasks": [
+        "apscheduler",
         "arq",
         "beam",
         "celery",
