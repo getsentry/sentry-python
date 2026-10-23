@@ -107,7 +107,7 @@ def _make_erroneous_query(capture_events, execute_query):
     (exception,) = event["exception"]["values"]
 
     assert exception["type"] == "TransportQueryError", (
-        "%s was captured, but we expected a TransportQueryError" % exception(type)
+        "%s was captured, but we expected a TransportQueryError" % exception["type"]
     )
 
     assert "request" in event
@@ -144,41 +144,9 @@ def test_real_gql_request_no_error(sentry_init, capture_events, execute_query):
 
 
 @pytest.mark.parametrize("execute_query", _execute_query_funcs)
-def test_real_gql_request_with_error_no_pii(sentry_init, capture_events, execute_query):
-    """
-    Integration test verifying that the GQLIntegration works as expected with query resulting
-    in a GraphQL error, and that PII is not sent.
-    """
-    sentry_init(integrations=[GQLIntegration()])
-
-    event = _make_erroneous_query(capture_events, execute_query)
-
-    assert "data" not in event["request"]
-    assert "response" not in event["contexts"]
-
-
-@pytest.mark.parametrize("execute_query", _execute_query_funcs)
-def test_real_gql_request_with_error_with_pii(
-    sentry_init, capture_events, execute_query
-):
-    """
-    Integration test verifying that the GQLIntegration works as expected with query resulting
-    in a GraphQL error, and that PII is not sent.
-    """
-    sentry_init(integrations=[GQLIntegration()], send_default_pii=True)
-
-    event = _make_erroneous_query(capture_events, execute_query)
-
-    assert "data" in event["request"]
-    assert "response" in event["contexts"]
-
-
-@pytest.mark.parametrize("execute_query", _execute_query_funcs)
 @pytest.mark.parametrize(
     "init_kwargs,expect_data",
     [
-        pytest.param({}, False, id="no_pii_no_data_collection"),
-        pytest.param({"send_default_pii": True}, True, id="legacy_pii_on"),
         pytest.param(
             {"data_collection": {}},
             True,
@@ -193,22 +161,6 @@ def test_real_gql_request_with_error_with_pii(
             {"data_collection": {"graphql": {"document": False}}},
             False,
             id="data_collection_document_off",
-        ),
-        pytest.param(
-            {
-                "send_default_pii": True,
-                "data_collection": {"graphql": {"document": False}},
-            },
-            False,
-            id="data_collection_takes_precedence_over_send_default_pii_on",
-        ),
-        pytest.param(
-            {
-                "send_default_pii": False,
-                "data_collection": {"graphql": {"document": True}},
-            },
-            True,
-            id="data_collection_takes_precedence_over_send_default_pii_off",
         ),
     ],
 )
@@ -236,7 +188,6 @@ def test_real_gql_request_with_error_data_collection(
 @pytest.mark.parametrize(
     "init_kwargs,expect_variables",
     [
-        pytest.param({"send_default_pii": True}, True, id="legacy_pii_on"),
         pytest.param(
             {"data_collection": {}},
             True,

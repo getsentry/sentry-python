@@ -1,5 +1,19 @@
 # Changelog
 
+## 3.0.0b1
+
+This is a pre-release of the next Python SDK major, to be released in November 2026.
+
+Want to give it a spin? Be our guest and [let us know](https://github.com/getsentry/sentry-python/discussions) how it went!
+
+## ✨ Notable Changes
+- Say goodbye to transactions: span streaming is now the default tracing model
+- The fine-grained `data_collection` supersedes the flat `send_default_pii`
+
+## 🗞️ Resources
+- [2.x to 3.x migration guide](https://docs.sentry.io/platforms/python/migration/2.x-to-3.x)
+- [detailed changelog](https://github.com/getsentry/sentry-python/blob/major/3.0/MIGRATION_GUIDE.md)
+
 ## 2.73.0
 
 ### New Features ✨
@@ -180,7 +194,7 @@ sentry_sdk.init(
   Offers much more flexibility than `send_default_pii`, allowing you to specify what
   data should be collected. If `data_collection` is defined, it takes precedence over
   `send_default_pii`.
-  
+
   See https://docs.sentry.io/platforms/python/configuration/options/#data_collection
   for the available configuration options.
 
@@ -785,7 +799,7 @@ Self-hosted Sentry users should opt out with `stream_gen_ai_spans=False`, since 
 ### New Features ✨
 
 - Add integration for `aiomysql` by @tonal in [#4703](https://github.com/getsentry/sentry-python/pull/4703)
-  
+
   We're adding support for the `aiomysql` package. To enable the integration, add it to your `integrations` list:
 
   ```python
@@ -808,7 +822,7 @@ Self-hosted Sentry users should opt out with `stream_gen_ai_spans=False`, since 
   import sentry_sdk
 
   sentry_sdk.init(...)
-  
+
   with sentry_sdk.start_transaction(name="testing_sentry"):
       httpx2.get("https://sentry.io/")
   ```
@@ -864,7 +878,7 @@ Self-hosted Sentry users should opt out with `stream_gen_ai_spans=False`, since 
 
   Following a previous significant increase of the string truncation limit, we've now completely removed the limit by default.
   In case you have large strings in your events, you should now be able to see them.
-  
+
   In rare cases, if you have really long strings (or a lot of them), you might see envelopes being dropped because of their size.
   If that happens, you can set the `max_value_length` `init` option to the previous value of `100_000`:
 
@@ -1337,17 +1351,17 @@ We've put additional data that might contain sensitive information, like GraphQL
 
   ```python
   import sentry_sdk
-  
+
   sentry_sdk.init(...)
-  
+
   sentry_sdk.set_attribute("my.attribute", "my value")
-  
+
   # This metric will have "my.attribute" set
   sentry_sdk.metrics.count("counter", 1)
-  
+
   # Remove the attribute
   sentry_sdk.remove_attribute("my.attribute")
-  
+
   # This log will not have "my.attribute" set
   sentry_sdk.logger.info("An info log")
   ```

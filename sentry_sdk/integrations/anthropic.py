@@ -7,26 +7,17 @@ from typing import TYPE_CHECKING, cast
 import sentry_sdk
 from sentry_sdk.ai.utils import (
     GEN_AI_ALLOWED_MESSAGE_ROLES,
-    get_start_span_function,
     normalize_message_roles,
     set_data_normalized,
     transform_anthropic_content_part,
-    truncate_and_annotate_messages,
 )
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
-from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.traces import StreamedSpan
-from sentry_sdk.tracing import Span
-from sentry_sdk.tracing_utils import (
-    has_span_streaming_enabled,
-    should_truncate_gen_ai_input,
-)
+from sentry_sdk.traces import Span
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
-    has_data_collection_enabled,
-    package_version,
+    parse_version,
     reraise,
     safe_serialize,
 )
@@ -43,6 +34,7 @@ try:
         Omit = None  # type: ignore[misc,assignment]
 
     from anthropic import AsyncStream, Stream
+    from anthropic import __version__ as ANTHROPIC_VERSION
     from anthropic.lib.streaming import (
         AsyncMessageStream,
         AsyncMessageStreamManager,
@@ -62,7 +54,7 @@ try:
     if TYPE_CHECKING:
         from anthropic.types import MessageStreamEvent, TextBlockParam
 except ImportError:
-    raise DidNotEnable("Anthropic not installed")
+    raise DidNotEnable("Anthropic not installed or incompatible")
 
 if TYPE_CHECKING:
     from typing import (
@@ -88,7 +80,7 @@ if TYPE_CHECKING:
     from sentry_sdk._types import TextPart
 
     class _PatchedRawMessageStream(Stream[RawMessageStreamEvent]):
-        _span: Union[Span, StreamedSpan]
+        _span: Span
         _integration: "AnthropicIntegration"
 
         _model: Optional[ModelParam]
@@ -98,7 +90,7 @@ if TYPE_CHECKING:
         _finish_reason: Optional[str]
 
     class _PatchedMessageStream(MessageStream):
-        _span: Union[Span, StreamedSpan]
+        _span: Span
         _integration: "AnthropicIntegration"
 
         _model: Optional[ModelParam]
@@ -108,7 +100,7 @@ if TYPE_CHECKING:
         _finish_reason: Optional[str]
 
     class _PatchedRawAsyncMessageStream(AsyncStream[RawMessageStreamEvent]):
-        _span: Union[Span, StreamedSpan]
+        _span: Span
         _integration: "AnthropicIntegration"
 
         _model: Optional[ModelParam]
@@ -118,7 +110,7 @@ if TYPE_CHECKING:
         _finish_reason: Optional[str]
 
     class _PatchedAsyncMessageStream(AsyncMessageStream):
-        _span: Union[Span, StreamedSpan]
+        _span: Span
         _integration: "AnthropicIntegration"
 
         _model: Optional[ModelParam]
@@ -128,7 +120,7 @@ if TYPE_CHECKING:
         _finish_reason: Optional[str]
 
     class _PatchedMessageStreamManager(MessageStreamManager):
-        _span: Union[Span, StreamedSpan]
+        _span: Span
         _integration: "AnthropicIntegration"
 
         _max_tokens: int
@@ -141,7 +133,7 @@ if TYPE_CHECKING:
         _tools: Optional[Iterable[ToolUnionParam]]
 
     class _PatchedAsyncMessageStreamManager(AsyncMessageStreamManager[Any]):
-        _span: Union[Span, StreamedSpan]
+        _span: Span
         _integration: "AnthropicIntegration"
 
         _max_tokens: int
@@ -221,12 +213,9 @@ class AnthropicIntegration(Integration):
     identifier = "anthropic"
     origin = f"auto.ai.{identifier}"
 
-    def __init__(self: "AnthropicIntegration", include_prompts: bool = True) -> None:
-        self.include_prompts = include_prompts
-
     @staticmethod
     def setup_once() -> None:
-        version = package_version("anthropic")
+        version = parse_version(ANTHROPIC_VERSION)
         _check_minimum_version(AnthropicIntegration, version)
 
         """
@@ -276,7 +265,6 @@ class AnthropicIntegration(Integration):
 def _capture_exception(exc: "Any") -> None:
     event, hint = event_from_exception(
         exc,
-        client_options=sentry_sdk.get_client().options,
         mechanism={"type": "anthropic", "handled": False},
     )
     sentry_sdk.capture_event(event, hint=hint)
@@ -446,7 +434,7 @@ def _transform_system_instructions(
 
 
 def _set_common_input_data(
-    span: "Union[Span, StreamedSpan]",
+    span: "Span",
     integration: "AnthropicIntegration",
     max_tokens: "int",
     messages: "Iterable[MessageParam]",
@@ -460,50 +448,31 @@ def _set_common_input_data(
     """
     Set input data for the span based on the provided keyword arguments for the anthropic message creation.
     """
-    set_on_span = (
-        span.set_attribute if isinstance(span, StreamedSpan) else span.set_data
-    )
-    set_on_span(SPANDATA.GEN_AI_SYSTEM, "anthropic")
-    set_on_span(SPANDATA.GEN_AI_OPERATION_NAME, "chat")
+    span.set_attribute(SPANDATA.GEN_AI_PROVIDER_NAME, "anthropic")
+    span.set_attribute(SPANDATA.GEN_AI_OPERATION_NAME, "chat")
 
     if max_tokens is not None and _is_given(max_tokens):
-        set_on_span(SPANDATA.GEN_AI_REQUEST_MAX_TOKENS, max_tokens)
+        span.set_attribute(SPANDATA.GEN_AI_REQUEST_MAX_TOKENS, max_tokens)
     if model is not None and _is_given(model):
-        set_on_span(SPANDATA.GEN_AI_REQUEST_MODEL, model)
+        span.set_attribute(SPANDATA.GEN_AI_REQUEST_MODEL, model)
     if temperature is not None and _is_given(temperature):
-        set_on_span(SPANDATA.GEN_AI_REQUEST_TEMPERATURE, temperature)
+        span.set_attribute(SPANDATA.GEN_AI_REQUEST_TEMPERATURE, temperature)
     if top_k is not None and _is_given(top_k):
-        set_on_span(SPANDATA.GEN_AI_REQUEST_TOP_K, top_k)
+        span.set_attribute(SPANDATA.GEN_AI_REQUEST_TOP_K, top_k)
     if top_p is not None and _is_given(top_p):
-        set_on_span(SPANDATA.GEN_AI_REQUEST_TOP_P, top_p)
+        span.set_attribute(SPANDATA.GEN_AI_REQUEST_TOP_P, top_p)
 
-    client = sentry_sdk.get_client()
-
-    if has_data_collection_enabled(client.options):
-        if client.options["data_collection"]["gen_ai"]["inputs"]:
-            if tools is not None and _is_given(tools) and len(tools) > 0:  # type: ignore
-                set_on_span(
-                    SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS, safe_serialize(tools)
-                )
-    else:
-        # Tools were unconditionally added pre-data collection configuration.
-        # This can be removed once data collection is fully rolled out
+    if sentry_sdk.get_client().options["data_collection"]["gen_ai"]["inputs"]:
         if tools is not None and _is_given(tools) and len(tools) > 0:  # type: ignore
-            set_on_span(SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS, safe_serialize(tools))
+            span.set_attribute(
+                SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS, safe_serialize(tools)
+            )
 
-    if messages is None or len(messages) == 0:  # type: ignore
-        return
+        if messages is None or len(messages) == 0:  # type: ignore
+            return
 
-    record_inputs = False
-    if has_data_collection_enabled(client.options):
-        if client.options["data_collection"]["gen_ai"]["inputs"]:
-            record_inputs = True
-    elif should_send_default_pii() and integration.include_prompts:
-        record_inputs = True
-
-    if record_inputs:
         if isinstance(system, str) or isinstance(system, Iterable):
-            set_on_span(
+            span.set_attribute(
                 SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
                 json.dumps(_transform_system_instructions(system)),
             )
@@ -553,35 +522,23 @@ def _set_common_input_data(
 
         role_normalized_messages = normalize_message_roles(normalized_messages)
 
-        scope = sentry_sdk.get_current_scope()
-        messages_data = (
-            truncate_and_annotate_messages(role_normalized_messages, span, scope)
-            if should_truncate_gen_ai_input(client.options)
-            else role_normalized_messages
+        set_data_normalized(
+            span,
+            SPANDATA.GEN_AI_REQUEST_MESSAGES,
+            role_normalized_messages,
+            unpack=False,
         )
-        if messages_data is not None:
-            set_data_normalized(
-                span,
-                SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                messages_data,
-                unpack=False,
-            )
 
 
 def _set_create_input_data(
-    span: "Union[Span, StreamedSpan]",
+    span: "Span",
     kwargs: "dict[str, Any]",
     integration: "AnthropicIntegration",
 ) -> None:
     """
     Set input data for the span based on the provided keyword arguments for the anthropic message creation.
     """
-    if isinstance(span, StreamedSpan):
-        span.set_attribute(
-            SPANDATA.GEN_AI_RESPONSE_STREAMING, kwargs.get("stream", False)
-        )
-    else:
-        span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, kwargs.get("stream", False))
+    span.set_attribute(SPANDATA.GEN_AI_RESPONSE_STREAMING, kwargs.get("stream", False))
 
     _set_common_input_data(
         span=span,
@@ -658,7 +615,7 @@ async def _wrap_asynchronous_message_iterator(
 
 
 def _set_output_data(
-    span: "Union[Span, StreamedSpan]",
+    span: "Span",
     integration: "AnthropicIntegration",
     model: "str | None",
     input_tokens: "int | None",
@@ -671,24 +628,14 @@ def _set_output_data(
 ) -> None:
     """
     Set output data for the span based on the AI response."""
-    set_on_span = (
-        span.set_attribute if isinstance(span, StreamedSpan) else span.set_data
-    )
     if model is not None:
-        set_on_span(SPANDATA.GEN_AI_RESPONSE_MODEL, model)
+        span.set_attribute(SPANDATA.GEN_AI_RESPONSE_MODEL, model)
     if response_id is not None:
-        set_on_span(SPANDATA.GEN_AI_RESPONSE_ID, response_id)
+        span.set_attribute(SPANDATA.GEN_AI_RESPONSE_ID, response_id)
     if finish_reason is not None:
-        set_on_span(SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS, [finish_reason])
+        span.set_attribute(SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS, [finish_reason])
 
-    client = sentry_sdk.get_client()
-    record_outputs = False
-    if has_data_collection_enabled(client.options):
-        record_outputs = client.options["data_collection"]["gen_ai"]["outputs"]
-    elif should_send_default_pii() and integration.include_prompts:
-        record_outputs = True
-
-    if record_outputs:
+    if sentry_sdk.get_client().options["data_collection"]["gen_ai"]["outputs"]:
         output_messages: "dict[str, list[Any]]" = {
             "response": [],
             "tool": [],
@@ -714,22 +661,26 @@ def _set_output_data(
             )
 
     if input_tokens is not None:
-        set_on_span(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, input_tokens)
+        span.set_attribute(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, input_tokens)
 
     if cache_read_input_tokens is not None:
-        set_on_span(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED, cache_read_input_tokens)
+        span.set_attribute(
+            SPANDATA.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS, cache_read_input_tokens
+        )
 
     if cache_write_input_tokens is not None:
-        set_on_span(
-            SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE,
+        span.set_attribute(
+            SPANDATA.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS,
             cache_write_input_tokens,
         )
 
     if output_tokens is not None:
-        set_on_span(SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS, output_tokens)
+        span.set_attribute(SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS, output_tokens)
 
     if input_tokens is not None and output_tokens is not None:
-        set_on_span(SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, input_tokens + output_tokens)
+        span.set_attribute(
+            SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, input_tokens + output_tokens
+        )
 
 
 def _sentry_patched_create_sync(f: "Any", *args: "Any", **kwargs: "Any") -> "Any":
@@ -738,6 +689,9 @@ def _sentry_patched_create_sync(f: "Any", *args: "Any", **kwargs: "Any") -> "Any
     """
     integration = kwargs.pop("integration")
     if integration is None:
+        return f(*args, **kwargs)
+
+    if sentry_sdk.get_current_scope()._agent_framework_chat_generation_entered:
         return f(*args, **kwargs)
 
     if "messages" not in kwargs:
@@ -750,22 +704,13 @@ def _sentry_patched_create_sync(f: "Any", *args: "Any", **kwargs: "Any") -> "Any
 
     model = kwargs.get("model", "")
 
-    span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
-    if span_streaming:
-        span = sentry_sdk.traces.start_span(
-            name=f"chat {model}".strip(),
-            attributes={
-                "sentry.op": OP.GEN_AI_CHAT,
-                "sentry.origin": AnthropicIntegration.origin,
-            },
-        )
-    else:
-        span = get_start_span_function()(
-            op=OP.GEN_AI_CHAT,
-            name=f"chat {model}".strip(),
-            origin=AnthropicIntegration.origin,
-        )
-        span.__enter__()
+    span = sentry_sdk.start_span(
+        name=f"chat {model}".strip(),
+        attributes={
+            "sentry.op": OP.GEN_AI_CHAT,
+            "sentry.origin": AnthropicIntegration.origin,
+        },
+    )
 
     _set_create_input_data(span, kwargs, integration)
 
@@ -820,8 +765,6 @@ def _sentry_patched_create_sync(f: "Any", *args: "Any", **kwargs: "Any") -> "Any
                 response_id=getattr(result, "id", None),
                 finish_reason=getattr(result, "stop_reason", None),
             )
-        elif isinstance(span, Span):
-            span.set_data("unknown_response", True)
 
         span.__exit__(None, None, None)
 
@@ -838,6 +781,9 @@ async def _sentry_patched_create_async(
     if integration is None:
         return await f(*args, **kwargs)
 
+    if sentry_sdk.get_current_scope()._agent_framework_chat_generation_entered:
+        return await f(*args, **kwargs)
+
     if "messages" not in kwargs:
         return await f(*args, **kwargs)
 
@@ -848,22 +794,13 @@ async def _sentry_patched_create_async(
 
     model = kwargs.get("model", "")
 
-    span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
-    if span_streaming:
-        span = sentry_sdk.traces.start_span(
-            name=f"chat {model}".strip(),
-            attributes={
-                "sentry.op": OP.GEN_AI_CHAT,
-                "sentry.origin": AnthropicIntegration.origin,
-            },
-        )
-    else:
-        span = get_start_span_function()(
-            op=OP.GEN_AI_CHAT,
-            name=f"chat {model}".strip(),
-            origin=AnthropicIntegration.origin,
-        )
-        span.__enter__()
+    span = sentry_sdk.start_span(
+        name=f"chat {model}".strip(),
+        attributes={
+            "sentry.op": OP.GEN_AI_CHAT,
+            "sentry.origin": AnthropicIntegration.origin,
+        },
+    )
 
     _set_create_input_data(span, kwargs, integration)
 
@@ -918,8 +855,6 @@ async def _sentry_patched_create_async(
                 response_id=getattr(result, "id", None),
                 finish_reason=getattr(result, "stop_reason", None),
             )
-        elif isinstance(span, Span):
-            span.set_data("unknown_response", True)
 
         span.__exit__(None, None, None)
 
@@ -975,7 +910,7 @@ def _accumulate_event_data(
 
 
 def _set_streaming_output_data(
-    span: "Union[Span, StreamedSpan]",
+    span: "Span",
     integration: "AnthropicIntegration",
     model: "Optional[str]",
     usage: "_RecordedUsage",
@@ -1055,6 +990,9 @@ def _wrap_message_stream(f: "Any") -> "Any":
 
     @wraps(f)
     def _sentry_patched_stream(*args: "Any", **kwargs: "Any") -> "MessageStreamManager":
+        if sentry_sdk.get_current_scope()._agent_framework_chat_generation_entered:
+            return f(*args, **kwargs)
+
         stream_manager = f(*args, **kwargs)
 
         stream_manager._max_tokens = kwargs.get("max_tokens")
@@ -1097,28 +1035,16 @@ def _wrap_message_stream_manager_enter(f: "Any") -> "Any":
         except TypeError:
             return f(self)
 
-        if has_span_streaming_enabled(client.options):
-            span = sentry_sdk.traces.start_span(
-                name="chat"
-                if patched_self._model is None
-                else f"chat {patched_self._model}".strip(),
-                attributes={
-                    "sentry.op": OP.GEN_AI_CHAT,
-                    "sentry.origin": AnthropicIntegration.origin,
-                    SPANDATA.GEN_AI_RESPONSE_STREAMING: True,
-                },
-            )
-        else:
-            span = get_start_span_function()(
-                op=OP.GEN_AI_CHAT,
-                name="chat"
-                if patched_self._model is None
-                else f"chat {patched_self._model}".strip(),
-                origin=AnthropicIntegration.origin,
-            )
-            span.__enter__()
-
-            span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, True)
+        span = sentry_sdk.start_span(
+            name="chat"
+            if patched_self._model is None
+            else f"chat {patched_self._model}".strip(),
+            attributes={
+                "sentry.op": OP.GEN_AI_CHAT,
+                "sentry.origin": AnthropicIntegration.origin,
+                SPANDATA.GEN_AI_RESPONSE_STREAMING: True,
+            },
+        )
 
         _set_common_input_data(
             span=span,
@@ -1166,6 +1092,9 @@ def _wrap_async_message_stream(f: "Any") -> "Any":
     def _sentry_patched_stream(
         *args: "Any", **kwargs: "Any"
     ) -> "AsyncMessageStreamManager":
+        if sentry_sdk.get_current_scope()._agent_framework_chat_generation_entered:
+            return f(*args, **kwargs)
+
         stream_manager = f(*args, **kwargs)
 
         stream_manager._max_tokens = kwargs.get("max_tokens")
@@ -1210,28 +1139,16 @@ def _wrap_async_message_stream_manager_aenter(f: "Any") -> "Any":
         except TypeError:
             return await f(self)
 
-        if has_span_streaming_enabled(client.options):
-            span = sentry_sdk.traces.start_span(
-                name="chat"
-                if patched_self._model is None
-                else f"chat {patched_self._model}".strip(),
-                attributes={
-                    "sentry.op": OP.GEN_AI_CHAT,
-                    "sentry.origin": AnthropicIntegration.origin,
-                    SPANDATA.GEN_AI_RESPONSE_STREAMING: True,
-                },
-            )
-        else:
-            span = get_start_span_function()(
-                op=OP.GEN_AI_CHAT,
-                name="chat"
-                if patched_self._model is None
-                else f"chat {patched_self._model}".strip(),
-                origin=AnthropicIntegration.origin,
-            )
-            span.__enter__()
-
-            span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, True)
+        span = sentry_sdk.start_span(
+            name="chat"
+            if patched_self._model is None
+            else f"chat {patched_self._model}".strip(),
+            attributes={
+                "sentry.op": OP.GEN_AI_CHAT,
+                "sentry.origin": AnthropicIntegration.origin,
+                SPANDATA.GEN_AI_RESPONSE_STREAMING: True,
+            },
+        )
 
         _set_common_input_data(
             span=span,

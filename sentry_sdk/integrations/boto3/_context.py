@@ -38,8 +38,8 @@ class AwsCallContext:
             # botocore's internal identifier, e.g. `apigateway`.
             self.service_name = service_model.service_name
             service_id = service_model.service_id
-            # modeled AWS service identity used in span names, e.g. `API Gateway`.
-            self.service_id = str(service_id)
+            # modeled AWS service identity used in span names with whitespace stripped, e.g. `API Gateway` => `APIGateway`.
+            self.service_id = "".join(str(service_id).split())
             self.service_id_hyphenized = service_id.hyphenize()
 
         with capture_internal_exceptions():

@@ -40,7 +40,6 @@ def _make_unraisable(
                         unraisable.exc_value,
                         unraisable.exc_traceback,
                     ),
-                    client_options=sentry_sdk.get_client().options,
                     mechanism={"type": "unraisablehook", "handled": False},
                 )
                 sentry_sdk.capture_event(event, hint=hint)

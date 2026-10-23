@@ -18,7 +18,8 @@ minimum_python_311 = pytest.mark.skipif(
 
 
 @minimum_python_311
-def test_exceptiongroup():
+def test_exceptiongroup(sentry_init):
+    sentry_init()
     exception_group = None
 
     try:
@@ -44,11 +45,6 @@ def test_exceptiongroup():
 
     (event, _) = event_from_exception(
         exception_group,
-        client_options={
-            "include_local_variables": True,
-            "include_source_context": True,
-            "max_value_length": 1024,
-        },
         mechanism={"type": "test_suite", "handled": False},
     )
 
@@ -145,7 +141,8 @@ def test_exceptiongroup():
 
 
 @minimum_python_311
-def test_exceptiongroup_simple():
+def test_exceptiongroup_simple(sentry_init):
+    sentry_init()
     exception_group = None
 
     try:
@@ -160,11 +157,6 @@ def test_exceptiongroup_simple():
 
     (event, _) = event_from_exception(
         exception_group,
-        client_options={
-            "include_local_variables": True,
-            "include_source_context": True,
-            "max_value_length": 1024,
-        },
         mechanism={"type": "test_suite", "handled": False},
     )
 
@@ -205,11 +197,6 @@ def test_exception_chain_cause():
 
     (event, _) = event_from_exception(
         exception_chain_cause,
-        client_options={
-            "include_local_variables": True,
-            "include_source_context": True,
-            "max_value_length": 1024,
-        },
         mechanism={"type": "test_suite", "handled": False},
     )
 
@@ -217,7 +204,10 @@ def test_exception_chain_cause():
         {
             "mechanism": {
                 "handled": False,
-                "type": "test_suite",
+                "type": "chained",
+                "exception_id": 1,
+                "parent_id": 0,
+                "source": "__cause__",
             },
             "module": None,
             "type": "TypeError",
@@ -227,6 +217,7 @@ def test_exception_chain_cause():
             "mechanism": {
                 "handled": False,
                 "type": "test_suite",
+                "exception_id": 0,
             },
             "module": None,
             "type": "ValueError",
@@ -245,11 +236,6 @@ def test_exception_chain_context():
 
     (event, _) = event_from_exception(
         exception_chain_context,
-        client_options={
-            "include_local_variables": True,
-            "include_source_context": True,
-            "max_value_length": 1024,
-        },
         mechanism={"type": "test_suite", "handled": False},
     )
 
@@ -257,7 +243,10 @@ def test_exception_chain_context():
         {
             "mechanism": {
                 "handled": False,
-                "type": "test_suite",
+                "type": "chained",
+                "exception_id": 1,
+                "parent_id": 0,
+                "source": "__context__",
             },
             "module": None,
             "type": "TypeError",
@@ -267,6 +256,7 @@ def test_exception_chain_context():
             "mechanism": {
                 "handled": False,
                 "type": "test_suite",
+                "exception_id": 0,
             },
             "module": None,
             "type": "ValueError",
@@ -284,11 +274,6 @@ def test_simple_exception():
 
     (event, _) = event_from_exception(
         simple_excpetion,
-        client_options={
-            "include_local_variables": True,
-            "include_source_context": True,
-            "max_value_length": 1024,
-        },
         mechanism={"type": "test_suite", "handled": False},
     )
 
@@ -297,6 +282,7 @@ def test_simple_exception():
             "mechanism": {
                 "handled": False,
                 "type": "test_suite",
+                "exception_id": 0,
             },
             "module": None,
             "type": "ValueError",
@@ -309,7 +295,87 @@ def test_simple_exception():
 
 
 @minimum_python_311
-def test_exceptiongroup_starlette_collapse():
+def test_exception_group_chained_with_context(sentry_init):
+    sentry_init()
+    try:
+        try:
+            raise ExceptionGroup(
+                "group",
+                [
+                    ValueError("child1"),
+                    ExceptionGroup(
+                        "child2",
+                        [
+                            RuntimeError("grandchild1"),
+                            RuntimeError("grandchild2"),
+                        ],
+                    ),
+                ],
+            )
+        finally:
+            raise TypeError("bar")
+    except BaseException as e:
+        exc = e
+
+    (event, _) = event_from_exception(
+        exc,
+        mechanism={"type": "test_suite", "handled": False},
+    )
+
+    exception_values = event["exception"]["values"]
+
+    # innermost (oldest) to outermost (newest)
+    assert [(e["type"], e["value"]) for e in exception_values] == [
+        ("RuntimeError", "grandchild2"),
+        ("RuntimeError", "grandchild1"),
+        ("ExceptionGroup", "child2"),
+        ("ValueError", "child1"),
+        ("ExceptionGroup", "group"),
+        ("TypeError", "bar"),
+    ]
+
+    # TypeError("bar") is the outermost exception (exception_id=0)
+    type_error = exception_values[-1]
+    assert type_error["mechanism"]["type"] == "test_suite"
+    assert type_error["mechanism"]["exception_id"] == 0
+
+    # ExceptionGroup("group") is the __context__ of TypeError
+    group = exception_values[-2]
+    assert group["mechanism"]["type"] == "chained"
+    assert group["mechanism"]["source"] == "__context__"
+    assert group["mechanism"]["parent_id"] == 0
+    assert group["mechanism"]["is_exception_group"] is True
+
+    group_id = group["mechanism"]["exception_id"]
+
+    # ValueError("child1") and ExceptionGroup("child2") are children of "group"
+    child1 = exception_values[-3]
+    assert child1["type"] == "ValueError"
+    assert child1["mechanism"]["source"] == "exceptions[0]"
+    assert child1["mechanism"]["parent_id"] == group_id
+
+    child2 = exception_values[-4]
+    assert child2["type"] == "ExceptionGroup"
+    assert child2["mechanism"]["source"] == "exceptions[1]"
+    assert child2["mechanism"]["parent_id"] == group_id
+    assert child2["mechanism"]["is_exception_group"] is True
+
+    child2_id = child2["mechanism"]["exception_id"]
+
+    # RuntimeError("grandchild1") and RuntimeError("grandchild2") are children of "child2"
+    rt1 = exception_values[-5]
+    assert rt1["value"] == "grandchild1"
+    assert rt1["mechanism"]["source"] == "exceptions[0]"
+    assert rt1["mechanism"]["parent_id"] == child2_id
+
+    rt2 = exception_values[-6]
+    assert rt2["value"] == "grandchild2"
+    assert rt2["mechanism"]["source"] == "exceptions[1]"
+    assert rt2["mechanism"]["parent_id"] == child2_id
+
+
+@minimum_python_311
+def test_exceptiongroup_starlette_collapse(sentry_init):
     """
     Simulates the Starlette collapse_excgroups() pattern where a single-exception
     ExceptionGroup is caught and the inner exception is unwrapped and re-raised.
@@ -329,6 +395,7 @@ def test_exceptiongroup_starlette_collapse():
     Without cycle detection in exceptions_from_error(), this causes infinite
     recursion and a silent RecursionError that drops the event.
     """
+    sentry_init()
     exception_group = None
 
     try:
@@ -351,11 +418,6 @@ def test_exceptiongroup_starlette_collapse():
 
     (event, _) = event_from_exception(
         exception_group,
-        client_options={
-            "include_local_variables": True,
-            "include_source_context": True,
-            "max_value_length": 1024,
-        },
         mechanism={"type": "test_suite", "handled": False},
     )
 
@@ -422,11 +484,6 @@ def test_cyclic_exception_group_cause():
     # is called directly (not walk_exception_chain which has cycle detection).
     (event, _) = event_from_exception(
         group,
-        client_options={
-            "include_local_variables": True,
-            "include_source_context": True,
-            "max_value_length": 1024,
-        },
         mechanism={"type": "test_suite", "handled": False},
     )
 
@@ -460,11 +517,6 @@ def test_deeply_nested_cyclic_exception_group():
 
     (event, _) = event_from_exception(
         outer_group,
-        client_options={
-            "include_local_variables": True,
-            "include_source_context": True,
-            "max_value_length": 1024,
-        },
         mechanism={"type": "test_suite", "handled": False},
     )
 

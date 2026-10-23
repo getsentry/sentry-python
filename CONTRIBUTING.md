@@ -100,7 +100,7 @@ uv run ruff format tests sentry_sdk
 We use `mypy` for typing our codebase. Use the following command to typecheck the source:
 
 ```
-uv run --group typing mypy sentry_sdk 
+uv run --group typing mypy sentry_sdk
 ```
 
 ##### Install Coding Style Pre-commit Hooks
@@ -167,7 +167,7 @@ TESTPATH=tests/integrations/logging/test_logging.py uv run tox -e py3.12-common
 To select specific tests, you can forward arguments to `pytest` like so
 
 ```bash
-uv run tox -e py3.12-celery-v5.5.3 -- -k test_transaction_events
+uv run tox -e py3.12-celery-v5.5.3 -- -k test_simple_with_performance
 ```
 
 In general, you use
