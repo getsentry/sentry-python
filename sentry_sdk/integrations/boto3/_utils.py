@@ -2,6 +2,7 @@ from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk.consts import SPANDATA
+from sentry_sdk.traces import NoOpSpan
 from sentry_sdk.tracing_utils import should_propagate_trace
 
 if TYPE_CHECKING:
@@ -56,6 +57,10 @@ def _get_propagation_headers(
         sentry_sdk.get_client(), ctx.endpoint_url
     ):
         return {}
+    # `NoOpSpan` is never sent, use scope's span instead.
+    # which should be the parent normally.
+    if isinstance(span, NoOpSpan):
+        span = None
     return dict(
         sentry_sdk.get_current_scope().iter_trace_propagation_headers(span=span)
     )
