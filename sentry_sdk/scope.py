@@ -76,6 +76,7 @@ if TYPE_CHECKING:
         Log,
         LogLevelStr,
         Metric,
+        SpanLink,
         Type,
     )
 
@@ -937,6 +938,7 @@ class Scope:
         attributes: "Optional[Attributes]",
         parent_span: "Optional[Span]",
         active: bool,
+        links: "Optional[list[SpanLink]]" = None,
     ) -> "Span":
         """
         Start a span.
@@ -986,6 +988,11 @@ class Scope:
             you want to create a span that shouldn't have any children (unless
             provided explicitly via the `parent_span` argument), set this to `False`.
         :type active: bool
+
+        :param links: Spans to link the span to, without making them its parent,
+            e.g. in other traces. More can be added with `span.add_link()` or
+            `span.add_links()`.
+        :type links: "Optional[list[SpanLink]]"
 
         :return: The span that has been started.
         :rtype: Span
@@ -1055,6 +1062,7 @@ class Scope:
                 baggage=propagation_context.baggage,
                 sample_rand=sample_rand,
                 sample_rate=sample_rate,
+                links=links,
             )
 
         # This is a child span; take propagation context from the parent span
@@ -1090,6 +1098,7 @@ class Scope:
                 trace_id=parent_span.trace_id,
                 parent_span_id=parent_span.span_id,
                 parent_sampled=parent_span.sampled,
+                links=links,
             )
 
     def _update_sample_rate(self, sample_rate: float) -> None:

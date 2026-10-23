@@ -13,7 +13,7 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 - If a `before_breadcrumb` callback, an event processor, or an error processor raises an exception, the breadcrumb or event is now dropped. Previously, the SDK would log the exception and continue processing the unmodified breadcrumb or event.
 - The top-level manual tracing API is now wired to span streaming tracing:
   - `sentry_sdk.start_transaction` doesn't exist anymore. Use `sentry_sdk.start_span` instead.
-  - `sentry_sdk.start_span` accepts four arguments now: `name` (mandatory), `attributes`, `parent_span` (default: current active span), `active` (default: `True`).
+  - `sentry_sdk.start_span` accepts five arguments now: `name` (mandatory), `attributes`, `parent_span` (default: current active span), `active` (default: `True`), `links` (spans to link to without making them the parent; more can be added with `span.add_link()` / `span.add_links()`).
   - The `@trace` decorator accepts three optional arguments: `name`, `attributes`, `active` (default: `True`).
   - `sentry_sdk.continue_trace` accepts a single dictionary with the incoming headers or environment data. It is no longer a context manager and it does not return a span/transaction anymore. A span needs to be started manually afterwards.
   - `sentry_sdk.new_trace` resets the trace.
