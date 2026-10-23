@@ -349,6 +349,12 @@ class _Client(BaseClient):
 
         try:
             _client_init_debug.set(self.options["debug"])
+
+            if self.options["trace_lifecycle"] not in (None, "stream"):
+                logger.warning(
+                    "Span streaming is the only tracing mode. Ignoring unknown trace_lifecycle value."
+                )
+
             self.transport = make_transport(self.options)
 
             self.monitor = None
