@@ -5,6 +5,7 @@ import pytest
 
 import sentry_sdk
 from sentry_sdk.crons import capture_checkin
+from sentry_sdk.crons.utils import _get_interval_schedule
 
 
 @sentry_sdk.monitor(monitor_slug="abc123")
@@ -517,3 +518,29 @@ async def test_contextmanager_error_async(sentry_init):
         assert fake_capture_checkin.call_args[1]["status"] == "error"
         assert fake_capture_checkin.call_args[1]["duration"]
         assert fake_capture_checkin.call_args[1]["check_in_id"]
+
+
+@pytest.mark.parametrize(
+    "seconds, expected",
+    [
+        (60, (1, "minute")),
+        (90 * 60, (90, "minute")),
+        (2 * 60 * 60, (2, "hour")),
+        (36 * 60 * 60, (36, "hour")),
+        (24 * 60 * 60, (1, "day")),
+        (7 * 24 * 60 * 60, (7, "day")),
+        (300.0, (5, "minute")),
+    ],
+)
+def test_get_interval_schedule(seconds, expected):
+    value, unit = expected
+    assert _get_interval_schedule(seconds) == {
+        "type": "interval",
+        "value": value,
+        "unit": unit,
+    }
+
+
+@pytest.mark.parametrize("seconds", [0, 0.5, 30, 59, 90, 61.5, 3601])
+def test_get_interval_schedule_not_whole_minutes(seconds):
+    assert _get_interval_schedule(seconds) is None
