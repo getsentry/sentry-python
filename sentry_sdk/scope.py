@@ -54,7 +54,6 @@ if TYPE_CHECKING:
         Deque,
         Dict,
         Generator,
-        Iterable,
         List,
         Optional,
         ParamSpec,
@@ -939,7 +938,7 @@ class Scope:
         attributes: "Optional[Attributes]",
         parent_span: "Optional[Span]",
         active: bool,
-        links: "Optional[Iterable[SpanLink]]" = None,
+        links: "Optional[list[SpanLink]]" = None,
     ) -> "Span":
         """
         Start a span.
@@ -993,7 +992,7 @@ class Scope:
         :param links: Spans to link the span to, without making them its parent,
             e.g. in other traces. More can be added with `span.add_link()` or
             `span.add_links()`.
-        :type links: "Optional[Iterable[SpanLink]]"
+        :type links: "Optional[list[SpanLink]]"
 
         :return: The span that has been started.
         :rtype: Span

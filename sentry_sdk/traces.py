@@ -26,7 +26,6 @@ if TYPE_CHECKING:
     from typing import (
         Any,
         Callable,
-        Iterable,
         Iterator,
         Optional,
         ParamSpec,
@@ -134,7 +133,7 @@ def start_span(
     attributes: "Optional[Attributes]" = None,
     parent_span: "Optional[Span]" = _DEFAULT_PARENT_SPAN,  # type: ignore[assignment]
     active: bool = True,
-    links: "Optional[Iterable[SpanLink]]" = None,
+    links: "Optional[list[SpanLink]]" = None,
 ) -> "Span":
 
     return sentry_sdk.get_current_scope().start_span(
@@ -207,7 +206,7 @@ class Span:
         baggage: "Optional[Baggage]" = None,
         sample_rate: "Optional[float]" = None,
         sample_rand: "Optional[float]" = None,
-        links: "Optional[Iterable[SpanLink]]" = None,
+        links: "Optional[list[SpanLink]]" = None,
     ):
         self._name: str = name
         self._active: bool = active
@@ -392,7 +391,7 @@ class Span:
             }
         self._links.append(stored)
 
-    def add_links(self, links: "Iterable[SpanLink]") -> None:
+    def add_links(self, links: "list[SpanLink]") -> None:
         for link in links:
             self.add_link(link)
 
@@ -704,7 +703,7 @@ class NoOpSpan(Span):
     def add_link(self, link: "SpanLink") -> None:
         pass
 
-    def add_links(self, links: "Iterable[SpanLink]") -> None:
+    def add_links(self, links: "list[SpanLink]") -> None:
         pass
 
     @property

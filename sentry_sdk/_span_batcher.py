@@ -186,18 +186,20 @@ class SpanBatcher(Batcher["SpanJSON"]):
             del res["attributes"]
 
         if item.get("links"):
-            res["links"] = [
-                {
-                    **link,
-                    "attributes": {
-                        k: serialize_attribute(v)
-                        for (k, v) in link["attributes"].items()
-                    },
-                }
-                if "attributes" in link
-                else link
-                for link in item["links"]
-            ]
+            res["links"] = []
+            for link in item["links"]:
+                if "attributes" in link:
+                    res["links"].append(  # type: ignore[attr-defined]
+                        {
+                            **link,
+                            "attributes": {
+                                k: serialize_attribute(v)
+                                for (k, v) in link["attributes"].items()
+                            },
+                        }
+                    )
+                else:
+                    res["links"].append(link)  # type: ignore[attr-defined]
 
         return res
 
