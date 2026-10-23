@@ -14,6 +14,38 @@ Want to give it a spin? Be our guest and [let us know](https://github.com/getsen
 - [2.x to 3.x migration guide](https://docs.sentry.io/platforms/python/migration/2.x-to-3.x)
 - [detailed changelog](https://github.com/getsentry/sentry-python/blob/major/3.0/MIGRATION_GUIDE.md)
 
+## 2.73.0
+
+### New Features ✨
+
+- (arq) Add an option to monitor arq cron jobs by @wedamija in [#8051](https://github.com/getsentry/sentry-python/pull/8051)
+- (huey) Add an option to monitor Huey periodic tasks by @wedamija in [#8052](https://github.com/getsentry/sentry-python/pull/8052)
+- (rq) Add an option to monitor rq-scheduler jobs by @wedamija in [#8053](https://github.com/getsentry/sentry-python/pull/8053)
+- (types) Export Attributes from the public types module by @sansynx in [#8019](https://github.com/getsentry/sentry-python/pull/8019)
+
+### Bug Fixes 🐛
+
+- (arq) Don't monitor cron jobs with unsupported schedules by @wedamija in [#8098](https://github.com/getsentry/sentry-python/pull/8098)
+- (attributes) Handle special float values correctly by @sentrivana in [#8067](https://github.com/getsentry/sentry-python/pull/8067)
+- (celery) Don't round down beat schedule intervals by @wedamija in [#7842](https://github.com/getsentry/sentry-python/pull/7842)
+- (cohere) Stop swallowing exceptions during stream iteration by @intertermux-code in [#8017](https://github.com/getsentry/sentry-python/pull/8017)
+- (huggingface_hub) Stop swallowing exceptions during stream iteration by @intertermux-code in [#8018](https://github.com/getsentry/sentry-python/pull/8018)
+- Exclude litellm==1.107.0 from extras by @jonny-norwine in [#8104](https://github.com/getsentry/sentry-python/pull/8104)
+
+### Internal Changes 🔧
+
+#### Deps
+
+- Update github workflows by @renovate in [#8045](https://github.com/getsentry/sentry-python/pull/8045)
+- Update github workflows by @renovate in [#8036](https://github.com/getsentry/sentry-python/pull/8036)
+- Update github workflows by @renovate in [#7276](https://github.com/getsentry/sentry-python/pull/7276)
+
+#### Other
+
+- (litellm) Require filelock>=4.0.3 on Python 3.10/3.11 by @sentry-junior in [#8026](https://github.com/getsentry/sentry-python/pull/8026)
+- (monitor) Stop background health checks in tests that drive the monitor by @sentry-junior in [#8032](https://github.com/getsentry/sentry-python/pull/8032)
+- Update `AGENTS.md` by @sentrivana in [#8077](https://github.com/getsentry/sentry-python/pull/8077)
+- 🤖 Update test matrix with new releases (10/12) by @github-actions in [#7944](https://github.com/getsentry/sentry-python/pull/7944)
 
 ## 2.72.0
 
@@ -162,7 +194,7 @@ sentry_sdk.init(
   Offers much more flexibility than `send_default_pii`, allowing you to specify what
   data should be collected. If `data_collection` is defined, it takes precedence over
   `send_default_pii`.
-  
+
   See https://docs.sentry.io/platforms/python/configuration/options/#data_collection
   for the available configuration options.
 
@@ -767,7 +799,7 @@ Self-hosted Sentry users should opt out with `stream_gen_ai_spans=False`, since 
 ### New Features ✨
 
 - Add integration for `aiomysql` by @tonal in [#4703](https://github.com/getsentry/sentry-python/pull/4703)
-  
+
   We're adding support for the `aiomysql` package. To enable the integration, add it to your `integrations` list:
 
   ```python
@@ -790,7 +822,7 @@ Self-hosted Sentry users should opt out with `stream_gen_ai_spans=False`, since 
   import sentry_sdk
 
   sentry_sdk.init(...)
-  
+
   with sentry_sdk.start_transaction(name="testing_sentry"):
       httpx2.get("https://sentry.io/")
   ```
@@ -846,7 +878,7 @@ Self-hosted Sentry users should opt out with `stream_gen_ai_spans=False`, since 
 
   Following a previous significant increase of the string truncation limit, we've now completely removed the limit by default.
   In case you have large strings in your events, you should now be able to see them.
-  
+
   In rare cases, if you have really long strings (or a lot of them), you might see envelopes being dropped because of their size.
   If that happens, you can set the `max_value_length` `init` option to the previous value of `100_000`:
 
@@ -1319,17 +1351,17 @@ We've put additional data that might contain sensitive information, like GraphQL
 
   ```python
   import sentry_sdk
-  
+
   sentry_sdk.init(...)
-  
+
   sentry_sdk.set_attribute("my.attribute", "my value")
-  
+
   # This metric will have "my.attribute" set
   sentry_sdk.metrics.count("counter", 1)
-  
+
   # Remove the attribute
   sentry_sdk.remove_attribute("my.attribute")
-  
+
   # This log will not have "my.attribute" set
   sentry_sdk.logger.info("An info log")
   ```

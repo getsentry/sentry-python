@@ -9,8 +9,9 @@ import sentry_sdk
 from sentry_sdk.consts import _SENTRY_HEADER_NAMES, OP, SPANDATA
 from sentry_sdk.integrations import Integration
 from sentry_sdk.scope import add_global_event_processor
-from sentry_sdk.traces import SENTRY_TRACE_HEADER_NAME, Span
+from sentry_sdk.traces import BAGGAGE_HEADER_NAME, SENTRY_TRACE_HEADER_NAME, Span
 from sentry_sdk.tracing_utils import (
+    Baggage,
     EnvironHeaders,
     add_http_breadcrumb,
     add_http_request_source,
@@ -98,6 +99,19 @@ def _get_wrapped_putheader(
         # existing `sentry-trace`: skip so it is not duplicated.
         if normalized_header == SENTRY_TRACE_HEADER_NAME:
             headers_to_skip.add(normalized_header)
+
+        # `baggage` with Sentry members (e.g. merged by the boto3 integration
+        # before signing): skip so Sentry members are not duplicated.
+        if normalized_header == BAGGAGE_HEADER_NAME and values:
+            with capture_internal_exceptions():
+                baggage = values[0]
+                if isinstance(baggage, bytes):
+                    baggage = baggage.decode("latin-1")
+                if any(
+                    Baggage.SENTRY_PREFIX_REGEX.match(item.strip())
+                    for item in baggage.split(",")
+                ):
+                    headers_to_skip.add(normalized_header)
 
         if normalized_header == "authorization" and values:
             with capture_internal_exceptions():
