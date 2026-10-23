@@ -48,19 +48,16 @@ def _get_aws_arn_attributes(
 def _get_propagation_headers(
     ctx: "AwsCallContext", span: "Optional[Span]"
 ) -> "Dict[str, str]":
-    """
-    Return the `sentry-trace` and `baggage` (and `traceparent`, if enabled) a call
-    propagates to its consumer, from its span or else the scope, like the HTTP headers.
-    Empty when `trace_propagation_targets` excludes the endpoint.
-    """
+    """Return the `sentry-trace` and `baggage` headers a call propagates to its consumer."""
     if ctx.endpoint_url is None or not should_propagate_trace(
         sentry_sdk.get_client(), ctx.endpoint_url
     ):
         return {}
+
     # `NoOpSpan` is never sent, use scope's span instead.
-    # which should be the parent normally.
     if isinstance(span, NoOpSpan):
         span = None
+
     return dict(
         sentry_sdk.get_current_scope().iter_trace_propagation_headers(span=span)
     )
