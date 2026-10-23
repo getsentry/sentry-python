@@ -468,6 +468,8 @@ def patch_asgi_app(root_path_in_path: "_RootPathInPath") -> None:
     Instrument Starlette ASGI app using the SentryAsgiMiddleware.
     """
     old_app = Starlette.__call__
+    if "_sentry_patched_asgi_app" in str(old_app):
+        return
 
     async def _sentry_patched_asgi_app(
         self: "Starlette", scope: "StarletteScope", receive: "Receive", send: "Send"
@@ -663,6 +665,8 @@ def _wrap_sync_handler(handler: "Callable[..., Any]") -> "Callable[..., Any]":
 
 def patch_request_response() -> None:
     old_request_response = starlette.routing.request_response
+    if "_sentry_request_response" in str(old_request_response):
+        return
 
     def _sentry_request_response(func: "Callable[[Any], Any]") -> "ASGIApp":
         old_func = func
