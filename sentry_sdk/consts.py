@@ -965,6 +965,12 @@ class SPANDATA:
     Example: "http", "https"
     """
 
+    NETWORK_PROTOCOL_VERSION = "network.protocol.version"
+    """
+    The version of the application layer protocol used for the network connection.
+    Example: "1.1", "2", "3"
+    """
+
     NETWORK_PEER_ADDRESS = "network.peer.address"
     """
     Peer address of the network connection - IP address or Unix domain socket name.
@@ -1184,8 +1190,8 @@ class SPANDATA:
 
     MCP_TRANSPORT = "mcp.transport"
     """
-    The transport method used for MCP communication.
-    Example: "http", "sse", "stdio"
+    The MCP transport implementation name, separate from the network transport.
+    Example: "StreamableHTTPServerTransport", "CustomHTTPTransport"
     """
 
     MCP_SESSION_ID = "mcp.session.id"
