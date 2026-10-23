@@ -148,7 +148,7 @@ def _get_error_attributes(exception: "BaseException") -> "Attributes":
 
 def _start_client_span(
     ctx: "AwsCallContext",
-    service_ext: "Optional[_ServiceExtension]" = None,
+    service_ext: "_ServiceExtension",
 ) -> "Optional[Span]":
     if sentry_sdk.get_current_span() is None:
         return None
@@ -171,14 +171,13 @@ def _start_client_span(
     # with `get_span_op()`.
     span_op = OP.RPC
 
-    if service_ext is not None:
-        with capture_internal_exceptions():
-            service_op = service_ext.get_span_op(ctx)
-            if service_op is not None:
-                span_op = service_op
+    with capture_internal_exceptions():
+        service_op = service_ext.get_span_op(ctx)
+        if service_op is not None:
+            span_op = service_op
 
-        with capture_internal_exceptions():
-            attributes.update(service_ext.get_request_attributes(ctx))
+    with capture_internal_exceptions():
+        attributes.update(service_ext.get_request_attributes(ctx))
 
     # `start_span()` evaluates `ignore_spans` against the initial attributes.
     # https://opentelemetry.io/docs/specs/semconv/rpc/rpc-spans/#rpc-client-span
