@@ -252,7 +252,7 @@ Additionally, the OpenAI integration now sets `gen_ai.operation.name` to `chat` 
 - The `update_current_span` API was removed.
 - The `sentry_sdk.tracing` module was removed, including the `Span`, `Transaction`, `NoOpSpan`, and `TransactionSource` classes. Import tracing primitives from `sentry_sdk.traces` instead. `TransactionSource` was replaced by `sentry_sdk.traces.SegmentNameSource`, which has the same values. The span classes from 2.x's span streaming mode, `sentry_sdk.traces.StreamedSpan` and `NoOpStreamedSpan`, are now called `Span` and `NoOpSpan`; the old names remain available as aliases.
 - The `stream_gen_ai_spans` option was removed. All spans are streamed now. If you previously set `stream_gen_ai_spans=False`, note that GenAI integrations no longer truncate messages (previously, only the last message was kept and truncated), and the OpenAI, Anthropic, LangChain, LiteLLM, and OpenAI Agents integrations no longer replace binary content in messages (for example, base64-encoded images) with `[Filtered]`. To prevent prompts and responses from being sent, set `data_collection`'s `gen_ai` `inputs` and/or `outputs` to `False`.
-- The `trace_lifecycle` option (both top-level and experimental) was removed. Span streaming is now the only tracing mode.
+- Span streaming is now the only tracing mode. The experimental `trace_lifecycle` option was removed. The top-level `trace_lifecycle` option is still accepted, but any value other than `"stream"` is ignored and logs a warning.
 
 ### Integrations
 

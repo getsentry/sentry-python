@@ -1539,6 +1539,7 @@ class ClientConstructor:
         attach_stacktrace: bool = True,
         ca_certs: "Optional[str]" = None,
         traces_sample_rate: "Optional[float]" = None,
+        trace_lifecycle: "Optional[str]" = None,
         traces_sampler: "Optional[TracesSampler]" = None,
         profiler_mode: "Optional[ContinuousProfilerMode]" = None,
         profile_lifecycle: 'Literal["manual", "trace"]' = "manual",
@@ -1852,6 +1853,10 @@ class ClientConstructor:
 
             If you want to disable all tracing you need to set `traces_sample_rate=None`. In this case, no new traces
             will be started and no incoming traces will be continued.
+
+        :param trace_lifecycle: Controls how traces are sent. Span streaming is the only supported tracing mode,
+            so the only accepted value is `"stream"`. Other values are ignored and a warning is logged.
+            This option only exists for backwards compatibility with 2.x and has no effect.
 
         :param traces_sampler: A function responsible for determining the percentage chance a given service span will be
             sent to Sentry.
