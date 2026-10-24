@@ -323,24 +323,139 @@ def _collect_ai_data(
     event: "MessageStreamEvent",
     model: "str | None",
     usage: "_RecordedUsage",
-    content_blocks: "list[str]",
+    content_blocks: "list[Any]",
     response_id: "str | None" = None,
     finish_reason: "str | None" = None,
-) -> "tuple[str | None, _RecordedUsage, list[str], str | None, str | None]":
+) -> "tuple[str | None, _RecordedUsage, list[Any], str | None, str | None]":
     """
     Collect model information, token usage, and collect content blocks from the AI streaming response.
     """
     with capture_internal_exceptions():
         if hasattr(event, "type"):
             if event.type == "content_block_start":
-                pass
+                index = getattr(event, "index", len(content_blocks))
+                if index is None:
+                    index = len(content_blocks)
+                while len(content_blocks) <= index:
+                    content_blocks.append({})
+
+                block: dict[str, Any] = {}
+                if hasattr(event, "content_block"):
+                    cb = event.content_block
+                    block_type = getattr(cb, "type", None)
+                    if isinstance(cb, dict):
+                        block_type = cb.get("type", block_type)
+
+                    if block_type == "tool_use":
+                        block = {
+                            "type": "tool_use",
+                            "id": (
+                                getattr(cb, "id", None)
+                                if not isinstance(cb, dict)
+                                else cb.get("id")
+                            ),
+                            "name": (
+                                getattr(cb, "name", None)
+                                if not isinstance(cb, dict)
+                                else cb.get("name")
+                            ),
+                            "input": (
+                                (
+                                    getattr(cb, "input", {})
+                                    if not isinstance(cb, dict)
+                                    else cb.get("input", {})
+                                )
+                                or {}
+                            ),
+                            "_partial_json": "",
+                        }
+                    elif block_type == "text":
+                        block = {
+                            "type": "text",
+                            "text": (
+                                getattr(cb, "text", "")
+                                if not isinstance(cb, dict)
+                                else cb.get("text", "")
+                            ),
+                        }
+                    elif hasattr(cb, "to_dict"):
+                        block = cb.to_dict()
+                    elif hasattr(cb, "model_dump"):
+                        block = cb.model_dump()
+                    elif isinstance(cb, dict):
+                        block = dict(cb)
+                    else:
+                        block = {"type": getattr(cb, "type", "text")}
+                        if hasattr(cb, "id"):
+                            block["id"] = cb.id
+                        if hasattr(cb, "name"):
+                            block["name"] = cb.name
+                        if hasattr(cb, "input"):
+                            block["input"] = cb.input
+                        if hasattr(cb, "text"):
+                            block["text"] = cb.text
+
+                if block.get("type") == "tool_use":
+                    block.setdefault("input", {})
+                    block["_partial_json"] = ""
+                elif block.get("type") == "text":
+                    block.setdefault("text", "")
+
+                content_blocks[index] = block
+
             elif event.type == "content_block_delta":
-                if hasattr(event.delta, "text"):
-                    content_blocks.append(event.delta.text)
-                elif hasattr(event.delta, "partial_json"):
-                    content_blocks.append(event.delta.partial_json)
+                index = getattr(event, "index", 0)
+                if index is None:
+                    index = 0
+                while len(content_blocks) <= index:
+                    content_blocks.append({})
+
+                block = content_blocks[index]
+                if isinstance(block, str):
+                    block = {"type": "text", "text": block}
+                    content_blocks[index] = block
+                elif not isinstance(block, dict):
+                    block = {}
+                    content_blocks[index] = block
+
+                if hasattr(event.delta, "partial_json"):
+                    if not block:
+                        block.update(
+                            {
+                                "type": "tool_use",
+                                "id": None,
+                                "name": None,
+                                "input": {},
+                                "_partial_json": "",
+                            }
+                        )
+                    elif "_partial_json" not in block:
+                        block["_partial_json"] = ""
+                    block["_partial_json"] += event.delta.partial_json
+
+                elif hasattr(event.delta, "text"):
+                    if not block:
+                        block.update(
+                            {
+                                "type": "text",
+                                "text": "",
+                            }
+                        )
+                    elif "text" not in block:
+                        block["text"] = ""
+                    block["text"] += event.delta.text
+
             elif event.type == "content_block_stop":
-                pass
+                index = getattr(event, "index", None)
+                if index is not None and 0 <= index < len(content_blocks):
+                    block = content_blocks[index]
+                    if isinstance(block, dict) and "_partial_json" in block:
+                        raw_json = block.pop("_partial_json")
+                        if raw_json:
+                            try:
+                                block["input"] = json.loads(raw_json)
+                            except Exception:
+                                block["input"] = raw_json
 
             # Token counting logic mirrors anthropic SDK, which also extracts already accumulated tokens.
             # https://github.com/anthropics/anthropic-sdk-python/blob/9c485f6966e10ae0ea9eabb3a921d2ea8145a25b/src/anthropic/lib/streaming/_messages.py#L433-L518
@@ -979,7 +1094,7 @@ def _set_streaming_output_data(
     integration: "AnthropicIntegration",
     model: "Optional[str]",
     usage: "_RecordedUsage",
-    content_blocks: "list[str]",
+    content_blocks: "list[Any]",
     response_id: "Optional[str]",
     finish_reason: "Optional[str]",
 ) -> None:
@@ -994,6 +1109,31 @@ def _set_streaming_output_data(
         + (usage.cache_write_input_tokens or 0)
     )
 
+    normalized_blocks: list[dict[str, Any]] = []
+    text_chunks: list[str] = []
+
+    def flush_text_chunks() -> None:
+        if text_chunks:
+            normalized_blocks.append({"type": "text", "text": "".join(text_chunks)})
+            text_chunks.clear()
+
+    for block in content_blocks:
+        if isinstance(block, dict) and "type" in block:
+            flush_text_chunks()
+            block_copy = dict(block)
+            if "_partial_json" in block_copy:
+                raw_json = block_copy.pop("_partial_json")
+                if raw_json:
+                    try:
+                        block_copy["input"] = json.loads(raw_json)
+                    except Exception:
+                        block_copy["input"] = raw_json
+            normalized_blocks.append(block_copy)
+        elif isinstance(block, str):
+            text_chunks.append(block)
+
+    flush_text_chunks()
+
     _set_output_data(
         span=span,
         integration=integration,
@@ -1002,7 +1142,7 @@ def _set_streaming_output_data(
         output_tokens=usage.output_tokens,
         cache_read_input_tokens=usage.cache_read_input_tokens,
         cache_write_input_tokens=usage.cache_write_input_tokens,
-        content_blocks=[{"text": "".join(content_blocks), "type": "text"}],
+        content_blocks=normalized_blocks,
         response_id=response_id,
         finish_reason=finish_reason,
     )
