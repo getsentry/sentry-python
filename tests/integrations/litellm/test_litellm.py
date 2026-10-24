@@ -2273,6 +2273,8 @@ def test_additional_parameters(
                 top_p=0.9,
                 frequency_penalty=0.5,
                 presence_penalty=0.5,
+                seed=42,
+                top_k=50,
             )
 
             litellm_utils.executor.shutdown(wait=True)
@@ -2293,6 +2295,8 @@ def test_additional_parameters(
         assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
         assert span["attributes"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.5
         assert span["attributes"][SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.5
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_SEED] == 42
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TOP_K] == 50
     else:
         events = capture_events()
 
@@ -2310,6 +2314,8 @@ def test_additional_parameters(
                 top_p=0.9,
                 frequency_penalty=0.5,
                 presence_penalty=0.5,
+                seed=42,
+                top_k=50,
             )
 
             litellm_utils.executor.shutdown(wait=True)
@@ -2328,6 +2334,8 @@ def test_additional_parameters(
         assert span["data"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
         assert span["data"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.5
         assert span["data"][SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.5
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_SEED] == 42
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_TOP_K] == 50
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
@@ -2387,6 +2395,8 @@ async def test_async_additional_parameters(
                 top_p=0.9,
                 frequency_penalty=0.5,
                 presence_penalty=0.5,
+                seed=42,
+                top_k=50,
             )
 
             await GLOBAL_LOGGING_WORKER.flush()
@@ -2408,6 +2418,8 @@ async def test_async_additional_parameters(
         assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
         assert span["attributes"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.5
         assert span["attributes"][SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.5
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_SEED] == 42
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TOP_K] == 50
     else:
         events = capture_events()
 
@@ -2425,6 +2437,8 @@ async def test_async_additional_parameters(
                 top_p=0.9,
                 frequency_penalty=0.5,
                 presence_penalty=0.5,
+                seed=42,
+                top_k=50,
             )
 
             await GLOBAL_LOGGING_WORKER.flush()
@@ -2444,6 +2458,178 @@ async def test_async_additional_parameters(
         assert span["data"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
         assert span["data"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.5
         assert span["data"][SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.5
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_SEED] == 42
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_TOP_K] == 50
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+def test_additional_parameters_zero_values(
+    reset_litellm_executor,
+    sentry_init,
+    capture_events,
+    capture_items,
+    get_model_response,
+    nonstreaming_chat_completions_model_response,
+    stream_gen_ai_spans,
+    span_streaming,
+):
+    """Test that zero values for additional parameters are correctly recorded."""
+    sentry_init(
+        integrations=[LiteLLMIntegration()],
+        disabled_integrations=[StdlibIntegration],
+        traces_sample_rate=1.0,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
+
+    messages = [{"role": "user", "content": "Hello!"}]
+    client = OpenAI(api_key="test-key")
+
+    model_response = get_model_response(
+        nonstreaming_chat_completions_model_response(
+            response_id="chatcmpl-test",
+            response_model="gpt-3.5-turbo",
+            message_content="Test response",
+            created=1234567890,
+            usage=CompletionUsage(
+                prompt_tokens=10,
+                completion_tokens=20,
+                total_tokens=30,
+            ),
+        ),
+        serialize_pydantic=True,
+        request_headers={"X-Stainless-Raw-Response": "true"},
+    )
+
+    if span_streaming or stream_gen_ai_spans:
+        items = capture_items("span")
+
+        with mock.patch.object(
+            client.completions._client._client,
+            "send",
+            return_value=model_response,
+        ), start_transaction(name="litellm test"):
+            litellm.completion(
+                model="gpt-3.5-turbo",
+                messages=messages,
+                client=client,
+                temperature=0.0,
+                max_tokens=100,
+                top_p=0.0,
+                frequency_penalty=0.0,
+                presence_penalty=0.0,
+                seed=0,
+                top_k=0,
+            )
+
+            litellm_utils.executor.shutdown(wait=True)
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items]
+        chat_spans = list(
+            x
+            for x in spans
+            if x["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+            and x["attributes"]["sentry.origin"] == "auto.ai.litellm"
+        )
+        assert len(chat_spans) == 1
+        span = chat_spans[0]
+
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.0
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.0
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.0
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.0
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_SEED] == 0
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TOP_K] == 0
+    else:
+        events = capture_events()
+
+        with mock.patch.object(
+            client.completions._client._client,
+            "send",
+            return_value=model_response,
+        ), start_transaction(name="litellm test"):
+            litellm.completion(
+                model="gpt-3.5-turbo",
+                messages=messages,
+                client=client,
+                temperature=0.0,
+                max_tokens=100,
+                top_p=0.0,
+                frequency_penalty=0.0,
+                presence_penalty=0.0,
+                seed=0,
+                top_k=0,
+            )
+
+            litellm_utils.executor.shutdown(wait=True)
+
+        (event,) = events
+        chat_spans = list(
+            x
+            for x in event["spans"]
+            if x["op"] == OP.GEN_AI_CHAT and x["origin"] == "auto.ai.litellm"
+        )
+        assert len(chat_spans) == 1
+        span = chat_spans[0]
+
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.0
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.0
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.0
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.0
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_SEED] == 0
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_TOP_K] == 0
+
+
+def test_input_callback_fallback_extra_body(sentry_init):
+    """Test that seed and top_k are extracted from optional_params and extra_body."""
+    sentry_init(
+        integrations=[LiteLLMIntegration()],
+        traces_sample_rate=1.0,
+    )
+
+    kwargs = {
+        "model": "gpt-3.5-turbo",
+        "messages": [{"role": "user", "content": "hi"}],
+        "optional_params": {
+            "seed": 999,
+            "extra_body": {"top_k": 25},
+        },
+    }
+
+    with start_transaction(name="litellm test"):
+        _input_callback(kwargs)
+        span = kwargs.pop("_sentry_span", None)
+        assert span is not None
+        data = getattr(span, "attributes", None) or getattr(span, "_data", {})
+        assert data[SPANDATA.GEN_AI_REQUEST_SEED] == 999
+        assert data[SPANDATA.GEN_AI_REQUEST_TOP_K] == 25
+        span.__exit__(None, None, None)
+
+
+def test_input_callback_omitted_parameters(sentry_init):
+    """Test that seed and top_k are omitted when not provided."""
+    sentry_init(
+        integrations=[LiteLLMIntegration()],
+        traces_sample_rate=1.0,
+    )
+
+    kwargs = {
+        "model": "gpt-3.5-turbo",
+        "messages": [{"role": "user", "content": "hi"}],
+    }
+
+    with start_transaction(name="litellm test"):
+        _input_callback(kwargs)
+        span = kwargs.pop("_sentry_span", None)
+        assert span is not None
+        data = getattr(span, "attributes", None) or getattr(span, "_data", {})
+        assert SPANDATA.GEN_AI_REQUEST_SEED not in data
+        assert SPANDATA.GEN_AI_REQUEST_TOP_K not in data
+        span.__exit__(None, None, None)
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])

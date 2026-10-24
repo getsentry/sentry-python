@@ -187,9 +187,19 @@ def _input_callback(kwargs: "Dict[str, Any]") -> None:
         "frequency_penalty": SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY,
         "temperature": SPANDATA.GEN_AI_REQUEST_TEMPERATURE,
         "top_p": SPANDATA.GEN_AI_REQUEST_TOP_P,
+        "seed": SPANDATA.GEN_AI_REQUEST_SEED,
+        "top_k": SPANDATA.GEN_AI_REQUEST_TOP_K,
     }
     for key, attribute in params.items():
         value = kwargs.get(key)
+        if value is None and isinstance(kwargs.get("optional_params"), dict):
+            value = kwargs["optional_params"].get(key)
+            if value is None and isinstance(
+                kwargs["optional_params"].get("extra_body"), dict
+            ):
+                value = kwargs["optional_params"]["extra_body"].get(key)
+        if value is None and isinstance(kwargs.get("extra_body"), dict):
+            value = kwargs["extra_body"].get(key)
         if value is not None:
             set_data_normalized(span, attribute, value)
 
