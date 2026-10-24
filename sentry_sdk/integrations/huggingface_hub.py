@@ -123,6 +123,7 @@ def _wrap_huggingface_task(f: "Callable[..., Any]", op: str) -> "Callable[..., A
             "frequency_penalty": SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY,
             "max_tokens": SPANDATA.GEN_AI_REQUEST_MAX_TOKENS,
             "presence_penalty": SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY,
+            "seed": SPANDATA.GEN_AI_REQUEST_SEED,
             "temperature": SPANDATA.GEN_AI_REQUEST_TEMPERATURE,
             "top_p": SPANDATA.GEN_AI_REQUEST_TOP_P,
             "top_k": SPANDATA.GEN_AI_REQUEST_TOP_K,
@@ -147,8 +148,16 @@ def _wrap_huggingface_task(f: "Callable[..., Any]", op: str) -> "Callable[..., A
                 span, SPANDATA.GEN_AI_REQUEST_MESSAGES, prompt, unpack=False
             )
 
+        extra_body = kwargs.get("extra_body")
         for attribute, span_attribute in attribute_mapping.items():
             value = kwargs.get(attribute, None)
+            if value is None and isinstance(extra_body, dict):
+                value = extra_body.get(attribute, None)
+            if value is None and attribute == "max_tokens":
+                value = kwargs.get("max_new_tokens", None)
+                if value is None and isinstance(extra_body, dict):
+                    value = extra_body.get("max_new_tokens", None)
+
             if value is not None:
                 if isinstance(value, (int, float, bool, str)):
                     _set_span_data_attribute(span, span_attribute, value)

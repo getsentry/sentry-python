@@ -2712,3 +2712,249 @@ def test_chat_completion_streaming_data_collection_tools(
         assert span_data[SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 183
         assert span_data[SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 14
         assert span_data[SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 197
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+@pytest.mark.httpx_mock(assert_all_requests_were_expected=False)
+@pytest.mark.httpx2_mock(assert_all_requests_were_expected=False)
+def test_text_generation_request_parameters(
+    sentry_init: "Any",
+    capture_events: "Any",
+    capture_items: "Any",
+    mock_hf_text_generation_api: "Any",
+    stream_gen_ai_spans: "Any",
+    span_streaming: "Any",
+) -> None:
+    sentry_init(
+        traces_sample_rate=1.0,
+        integrations=[HuggingfaceHubIntegration()],
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
+
+    client = InferenceClient(model="test-model")
+
+    captured = (
+        capture_items("transaction", "span")
+        if span_streaming or stream_gen_ai_spans
+        else capture_events()
+    )
+
+    with sentry_sdk.start_transaction(name="test"):
+        client.text_generation(
+            "Hello",
+            stream=False,
+            details=True,
+            max_new_tokens=150,
+            seed=42,
+            temperature=0.7,
+            top_p=0.9,
+            top_k=50,
+            frequency_penalty=0.5,
+        )
+
+    if span_streaming or stream_gen_ai_spans:
+        sentry_sdk.flush()
+        spans = [item.payload for item in captured if item.type == "span"]
+        (span,) = [
+            sp for sp in spans if sp["attributes"]["sentry.op"].startswith("gen_ai")
+        ]
+        span_data = span["attributes"]
+    else:
+        (transaction,) = captured
+        (span,) = [sp for sp in transaction["spans"] if sp["op"].startswith("gen_ai")]
+        span_data = span["data"]
+
+    assert span_data[SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 150
+    assert span_data[SPANDATA.GEN_AI_REQUEST_SEED] == 42
+    assert span_data[SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
+    assert span_data[SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
+    assert span_data[SPANDATA.GEN_AI_REQUEST_TOP_K] == 50
+    assert span_data[SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.5
+    assert SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY not in span_data
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+@pytest.mark.httpx_mock(assert_all_requests_were_expected=False)
+@pytest.mark.httpx2_mock(assert_all_requests_were_expected=False)
+def test_chat_completion_request_parameters(
+    sentry_init: "Any",
+    capture_events: "Any",
+    capture_items: "Any",
+    mock_hf_chat_completion_api: "Any",
+    stream_gen_ai_spans: "Any",
+    span_streaming: "Any",
+) -> None:
+    sentry_init(
+        traces_sample_rate=1.0,
+        integrations=[HuggingfaceHubIntegration()],
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
+
+    client = get_hf_provider_inference_client()
+
+    captured = (
+        capture_items("transaction", "span")
+        if span_streaming or stream_gen_ai_spans
+        else capture_events()
+    )
+
+    kwargs = {
+        "messages": [{"role": "user", "content": "Hello"}],
+        "max_tokens": 200,
+        "seed": 123,
+        "temperature": 0.8,
+        "top_p": 0.95,
+        "frequency_penalty": 0.2,
+        "presence_penalty": 0.3,
+    }
+    if HF_VERSION and HF_VERSION >= (0, 29, 0):
+        kwargs["extra_body"] = {"top_k": 40}
+
+    with sentry_sdk.start_transaction(name="test"):
+        client.chat_completion(**kwargs)
+
+    if span_streaming or stream_gen_ai_spans:
+        sentry_sdk.flush()
+        spans = [item.payload for item in captured if item.type == "span"]
+        (span,) = [
+            sp for sp in spans if sp["attributes"]["sentry.op"].startswith("gen_ai")
+        ]
+        span_data = span["attributes"]
+    else:
+        (transaction,) = captured
+        (span,) = [sp for sp in transaction["spans"] if sp["op"].startswith("gen_ai")]
+        span_data = span["data"]
+
+    assert span_data[SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 200
+    assert span_data[SPANDATA.GEN_AI_REQUEST_SEED] == 123
+    assert span_data[SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.8
+    assert span_data[SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.95
+    assert span_data[SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
+    assert span_data[SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.3
+    if HF_VERSION and HF_VERSION >= (0, 29, 0):
+        assert span_data[SPANDATA.GEN_AI_REQUEST_TOP_K] == 40
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+@pytest.mark.httpx_mock(assert_all_requests_were_expected=False)
+@pytest.mark.httpx2_mock(assert_all_requests_were_expected=False)
+def test_chat_completion_request_parameters_zero_values(
+    sentry_init: "Any",
+    capture_events: "Any",
+    capture_items: "Any",
+    mock_hf_chat_completion_api: "Any",
+    stream_gen_ai_spans: "Any",
+    span_streaming: "Any",
+) -> None:
+    sentry_init(
+        traces_sample_rate=1.0,
+        integrations=[HuggingfaceHubIntegration()],
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
+
+    client = get_hf_provider_inference_client()
+
+    captured = (
+        capture_items("transaction", "span")
+        if span_streaming or stream_gen_ai_spans
+        else capture_events()
+    )
+
+    kwargs = {
+        "messages": [{"role": "user", "content": "Hello"}],
+        "seed": 0,
+        "temperature": 0.0,
+        "frequency_penalty": 0.0,
+        "presence_penalty": 0.0,
+        "top_p": 0.0,
+    }
+    if HF_VERSION and HF_VERSION >= (0, 29, 0):
+        kwargs["extra_body"] = {"top_k": 0}
+
+    with sentry_sdk.start_transaction(name="test"):
+        client.chat_completion(**kwargs)
+
+    if span_streaming or stream_gen_ai_spans:
+        sentry_sdk.flush()
+        spans = [item.payload for item in captured if item.type == "span"]
+        (span,) = [
+            sp for sp in spans if sp["attributes"]["sentry.op"].startswith("gen_ai")
+        ]
+        span_data = span["attributes"]
+    else:
+        (transaction,) = captured
+        (span,) = [sp for sp in transaction["spans"] if sp["op"].startswith("gen_ai")]
+        span_data = span["data"]
+
+    assert span_data[SPANDATA.GEN_AI_REQUEST_SEED] == 0
+    assert span_data[SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.0
+    assert span_data[SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.0
+    assert span_data[SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.0
+    assert span_data[SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.0
+    if HF_VERSION and HF_VERSION >= (0, 29, 0):
+        assert span_data[SPANDATA.GEN_AI_REQUEST_TOP_K] == 0
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+@pytest.mark.httpx_mock(assert_all_requests_were_expected=False)
+@pytest.mark.httpx2_mock(assert_all_requests_were_expected=False)
+def test_chat_completion_request_parameters_omitted_when_none(
+    sentry_init: "Any",
+    capture_events: "Any",
+    capture_items: "Any",
+    mock_hf_chat_completion_api: "Any",
+    stream_gen_ai_spans: "Any",
+    span_streaming: "Any",
+) -> None:
+    sentry_init(
+        traces_sample_rate=1.0,
+        integrations=[HuggingfaceHubIntegration()],
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
+
+    client = get_hf_provider_inference_client()
+
+    captured = (
+        capture_items("transaction", "span")
+        if span_streaming or stream_gen_ai_spans
+        else capture_events()
+    )
+
+    with sentry_sdk.start_transaction(name="test"):
+        client.chat_completion(
+            messages=[{"role": "user", "content": "Hello"}],
+            seed=None,
+            temperature=None,
+            frequency_penalty=None,
+            presence_penalty=None,
+            top_p=None,
+            max_tokens=None,
+        )
+
+    if span_streaming or stream_gen_ai_spans:
+        sentry_sdk.flush()
+        spans = [item.payload for item in captured if item.type == "span"]
+        (span,) = [
+            sp for sp in spans if sp["attributes"]["sentry.op"].startswith("gen_ai")
+        ]
+        span_data = span["attributes"]
+    else:
+        (transaction,) = captured
+        (span,) = [sp for sp in transaction["spans"] if sp["op"].startswith("gen_ai")]
+        span_data = span["data"]
+
+    assert SPANDATA.GEN_AI_REQUEST_SEED not in span_data
+    assert SPANDATA.GEN_AI_REQUEST_TEMPERATURE not in span_data
+    assert SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY not in span_data
+    assert SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY not in span_data
+    assert SPANDATA.GEN_AI_REQUEST_TOP_P not in span_data
+    assert SPANDATA.GEN_AI_REQUEST_TOP_K not in span_data
+    assert SPANDATA.GEN_AI_REQUEST_MAX_TOKENS not in span_data
