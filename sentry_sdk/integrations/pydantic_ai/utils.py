@@ -183,21 +183,32 @@ def _set_model_data(
             "top_p": SPANDATA.GEN_AI_REQUEST_TOP_P,
             "frequency_penalty": SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY,
             "presence_penalty": SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY,
+            "seed": SPANDATA.GEN_AI_REQUEST_SEED,
+            "top_k": SPANDATA.GEN_AI_REQUEST_TOP_K,
         }
 
         # ModelSettings is a TypedDict (dict at runtime), so use dict access
         if isinstance(settings, dict):
+            extra_body = settings.get("extra_body")
             for setting_name, spandata_key in settings_map.items():
                 value = settings.get(setting_name)
+                if value is None and isinstance(extra_body, dict):
+                    value = extra_body.get(setting_name)
                 if value is not None:
                     set_on_span(spandata_key, value)
         else:
             # Fallback for object-style settings
+            extra_body = getattr(settings, "extra_body", None)
             for setting_name, spandata_key in settings_map.items():
-                if hasattr(settings, setting_name):
-                    value = getattr(settings, setting_name)
-                    if value is not None:
-                        set_on_span(spandata_key, value)
+                value = (
+                    getattr(settings, setting_name)
+                    if hasattr(settings, setting_name)
+                    else None
+                )
+                if value is None and isinstance(extra_body, dict):
+                    value = extra_body.get(setting_name)
+                if value is not None:
+                    set_on_span(spandata_key, value)
 
 
 def _set_available_tools(

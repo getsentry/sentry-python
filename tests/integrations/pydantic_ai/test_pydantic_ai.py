@@ -58,6 +58,10 @@ def get_test_agent_with_settings():
                 temperature=0.7,
                 max_tokens=100,
                 top_p=0.9,
+                frequency_penalty=0.5,
+                presence_penalty=0.5,
+                seed=42,
+                top_k=50,
             ),
         )
 
@@ -1192,6 +1196,10 @@ async def test_model_settings(
         assert chat_span["attributes"].get("gen_ai.request.temperature") == 0.7
         assert chat_span["attributes"].get("gen_ai.request.max_tokens") == 100
         assert chat_span["attributes"].get("gen_ai.request.top_p") == 0.9
+        assert chat_span["attributes"].get("gen_ai.request.frequency_penalty") == 0.5
+        assert chat_span["attributes"].get("gen_ai.request.presence_penalty") == 0.5
+        assert chat_span["attributes"].get("gen_ai.request.seed") == 42
+        assert chat_span["attributes"].get("gen_ai.request.top_k") == 50
     else:
         events = capture_events()
 
@@ -1209,6 +1217,205 @@ async def test_model_settings(
         assert chat_span["data"].get("gen_ai.request.temperature") == 0.7
         assert chat_span["data"].get("gen_ai.request.max_tokens") == 100
         assert chat_span["data"].get("gen_ai.request.top_p") == 0.9
+        assert chat_span["data"].get("gen_ai.request.frequency_penalty") == 0.5
+        assert chat_span["data"].get("gen_ai.request.presence_penalty") == 0.5
+        assert chat_span["data"].get("gen_ai.request.seed") == 42
+        assert chat_span["data"].get("gen_ai.request.top_k") == 50
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+@pytest.mark.asyncio
+async def test_model_settings_zero_values(
+    sentry_init,
+    capture_events,
+    capture_items,
+    stream_gen_ai_spans,
+    span_streaming,
+):
+    """
+    Test that zero values for model settings are correctly captured.
+    """
+    from pydantic_ai import ModelSettings
+
+    agent = Agent(
+        "test",
+        name="test_agent_zero_settings",
+        model_settings=ModelSettings(
+            temperature=0.0,
+            max_tokens=100,
+            top_p=0.0,
+            frequency_penalty=0.0,
+            presence_penalty=0.0,
+            seed=0,
+            top_k=0,
+        ),
+    )
+
+    sentry_init(
+        integrations=[PydanticAIIntegration()],
+        traces_sample_rate=1.0,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
+
+    if span_streaming or stream_gen_ai_spans:
+        items = capture_items("span")
+
+        await agent.run("Test input")
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items]
+        chat_spans = [
+            s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
+        ]
+        assert len(chat_spans) == 1
+        chat_span = chat_spans[0]
+
+        assert chat_span["attributes"].get("gen_ai.request.temperature") == 0.0
+        assert chat_span["attributes"].get("gen_ai.request.max_tokens") == 100
+        assert chat_span["attributes"].get("gen_ai.request.top_p") == 0.0
+        assert chat_span["attributes"].get("gen_ai.request.frequency_penalty") == 0.0
+        assert chat_span["attributes"].get("gen_ai.request.presence_penalty") == 0.0
+        assert chat_span["attributes"].get("gen_ai.request.seed") == 0
+        assert chat_span["attributes"].get("gen_ai.request.top_k") == 0
+    else:
+        events = capture_events()
+
+        await agent.run("Test input")
+
+        (transaction,) = events
+        spans = transaction["spans"]
+        chat_spans = [s for s in spans if s["op"] == "gen_ai.chat"]
+        assert len(chat_spans) == 1
+        chat_span = chat_spans[0]
+
+        assert chat_span["data"].get("gen_ai.request.temperature") == 0.0
+        assert chat_span["data"].get("gen_ai.request.max_tokens") == 100
+        assert chat_span["data"].get("gen_ai.request.top_p") == 0.0
+        assert chat_span["data"].get("gen_ai.request.frequency_penalty") == 0.0
+        assert chat_span["data"].get("gen_ai.request.presence_penalty") == 0.0
+        assert chat_span["data"].get("gen_ai.request.seed") == 0
+        assert chat_span["data"].get("gen_ai.request.top_k") == 0
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+@pytest.mark.asyncio
+async def test_model_settings_fallback_extra_body(
+    sentry_init,
+    capture_events,
+    capture_items,
+    stream_gen_ai_spans,
+    span_streaming,
+):
+    """
+    Test that parameters in extra_body are resolved as fallbacks.
+    """
+    agent = Agent(
+        "test",
+        name="test_agent_extra_body",
+        model_settings={
+            "temperature": 0.7,
+            "extra_body": {
+                "seed": 999,
+                "top_k": 25,
+            },
+        },
+    )
+
+    sentry_init(
+        integrations=[PydanticAIIntegration()],
+        traces_sample_rate=1.0,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
+
+    if span_streaming or stream_gen_ai_spans:
+        items = capture_items("span")
+
+        await agent.run("Test input")
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items]
+        chat_spans = [
+            s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
+        ]
+        assert len(chat_spans) == 1
+        chat_span = chat_spans[0]
+
+        assert chat_span["attributes"].get("gen_ai.request.temperature") == 0.7
+        assert chat_span["attributes"].get("gen_ai.request.seed") == 999
+        assert chat_span["attributes"].get("gen_ai.request.top_k") == 25
+    else:
+        events = capture_events()
+
+        await agent.run("Test input")
+
+        (transaction,) = events
+        spans = transaction["spans"]
+        chat_spans = [s for s in spans if s["op"] == "gen_ai.chat"]
+        assert len(chat_spans) == 1
+        chat_span = chat_spans[0]
+
+        assert chat_span["data"].get("gen_ai.request.temperature") == 0.7
+        assert chat_span["data"].get("gen_ai.request.seed") == 999
+        assert chat_span["data"].get("gen_ai.request.top_k") == 25
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+@pytest.mark.asyncio
+async def test_model_settings_omitted(
+    sentry_init,
+    capture_events,
+    capture_items,
+    stream_gen_ai_spans,
+    span_streaming,
+):
+    """
+    Test that omitted model settings are not set on the span.
+    """
+    agent = Agent(
+        "test",
+        name="test_agent_omitted",
+    )
+
+    sentry_init(
+        integrations=[PydanticAIIntegration()],
+        traces_sample_rate=1.0,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
+
+    if span_streaming or stream_gen_ai_spans:
+        items = capture_items("span")
+
+        await agent.run("Test input")
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items]
+        chat_spans = [
+            s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
+        ]
+        assert len(chat_spans) == 1
+        chat_span = chat_spans[0]
+
+        assert "gen_ai.request.seed" not in chat_span["attributes"]
+        assert "gen_ai.request.top_k" not in chat_span["attributes"]
+    else:
+        events = capture_events()
+
+        await agent.run("Test input")
+
+        (transaction,) = events
+        spans = transaction["spans"]
+        chat_spans = [s for s in spans if s["op"] == "gen_ai.chat"]
+        assert len(chat_spans) == 1
+        chat_span = chat_spans[0]
+
+        assert "gen_ai.request.seed" not in chat_span["data"]
+        assert "gen_ai.request.top_k" not in chat_span["data"]
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
