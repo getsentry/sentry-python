@@ -67,6 +67,30 @@ def test_mixed_baggage():
     )
 
 
+def test_serialize_no_trailing_comma_without_third_party_items():
+    # With Sentry items but no third-party items, include_third_party=True must not
+    # append an empty segment, which would leave a trailing comma in the header.
+    header = (
+        "sentry-trace_id=771a43a4192642f0b136d5159a501700,"
+        "sentry-public_key=49d0f7386ad645858ae85020e393bef3,"
+        "sentry-sample_rate=0.01337"
+    )
+    baggage = Baggage.from_incoming_header(header)
+
+    assert baggage.third_party_items == ""
+
+    serialized = baggage.serialize(include_third_party=True)
+
+    assert not serialized.endswith(",")
+    # with no third-party items, include_third_party should change nothing
+    assert serialized == baggage.serialize()
+    assert serialized == (
+        "sentry-trace_id=771a43a4192642f0b136d5159a501700,"
+        "sentry-public_key=49d0f7386ad645858ae85020e393bef3,"
+        "sentry-sample_rate=0.01337"
+    )
+
+
 def test_malformed_baggage():
     header = ","
 
