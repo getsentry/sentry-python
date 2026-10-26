@@ -169,6 +169,10 @@ module = "pyramid.*"
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
+module = "aiobotocore.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
 module = "aiohttp.*"
 ignore_missing_imports = true
 

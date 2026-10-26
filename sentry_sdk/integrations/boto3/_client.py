@@ -65,7 +65,7 @@ def _activate_client_span(
 
 
 def _register_request_hooks(client: "BaseClient") -> None:
-    # aiobotocore clients also run botocore's `__init__`; `unique_id` registers each hook once.
+    # boto3 and aiobotocore both register them on aiobotocore clients; `unique_id` keeps one.
     client.meta.events.register(
         "request-created", _sentry_request_created, unique_id="sentry-request-created"
     )

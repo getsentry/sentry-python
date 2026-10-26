@@ -9,6 +9,7 @@ TEST_SUITE_CONFIG = {
         "package": "aiobotocore",
         "deps": {
             "*": ["pytest-asyncio", "pytest-aiohttp"],
+            ">=3.8": ["httpx"],
         },
     },
     "aiohttp": {

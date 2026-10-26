@@ -1,3 +1,5 @@
+import inspect
+
 import pytest
 import pytest_asyncio
 from aiobotocore import __version__ as AIOBOTOCORE_VERSION
@@ -25,6 +27,12 @@ OBJECT_BODY = b"hello world"
 
 # aiobotocore's bodies are botocore `StreamingBody`s since 3.8.
 STREAMING_BODY_INSTRUMENTED = parse_version(AIOBOTOCORE_VERSION) >= (3, 8)
+
+HTTP_SESSIONS = [pytest.param({}, id="aiohttp")]
+if STREAMING_BODY_INSTRUMENTED:
+    from aiobotocore.httpxsession import HttpxSession
+
+    HTTP_SESSIONS.append(pytest.param({"http_session_cls": HttpxSession}, id="httpx"))
 
 
 @pytest_asyncio.fixture
@@ -55,15 +63,14 @@ async def s3_server(aiohttp_server):
     return server
 
 
-def _s3_client(s3_server):
-    # created after `sentry_init()`, so the client's `__init__` registers the request hooks.
+def _s3_client(s3_server, **config):
     return get_session().create_client(
         "s3",
         region_name="eu-north-1",
         endpoint_url=str(s3_server.make_url("/")),
         aws_access_key_id="-",
         aws_secret_access_key="-",
-        config=AioConfig(s3={"addressing_style": "path"}),
+        config=AioConfig(s3={"addressing_style": "path"}, **config),
     )
 
 
@@ -146,7 +153,10 @@ async def _read(body):
 
 
 async def _close(body):
-    body.close()
+    closed = body.close()
+    # the httpx body's `close()` is a coroutine.
+    if inspect.isawaitable(closed):
+        await closed
 
 
 async def _exit_context(body):
@@ -155,12 +165,15 @@ async def _exit_context(body):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("http_session", HTTP_SESSIONS)
 @pytest.mark.parametrize("consume", [_read, _close, _exit_context])
-async def test_streaming_body(sentry_init, capture_items, s3_server, consume):
+async def test_streaming_body(
+    sentry_init, capture_items, s3_server, http_session, consume
+):
     sentry_init(traces_sample_rate=1.0, integrations=[AioBotocoreIntegration()])
     items = capture_items("span")
 
-    async with _s3_client(s3_server) as client:
+    async with _s3_client(s3_server, **http_session) as client:
         with sentry_sdk.start_span(name="test"):
             response = await client.get_object(Bucket="bucket", Key="key")
             sentry_sdk.flush()

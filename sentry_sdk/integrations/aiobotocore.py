@@ -22,7 +22,7 @@ from sentry_sdk.traces import NoOpSpan
 from sentry_sdk.utils import capture_internal_exceptions, parse_version
 
 if TYPE_CHECKING:
-    from typing import Any, Dict
+    from typing import Any, Awaitable, Callable, Dict
 
     from sentry_sdk.traces import Span
 
@@ -88,7 +88,8 @@ def _instrument_streaming_body(span: "Span", parsed: "Dict[str, Any]") -> bool:
         streaming_spans.finish()
 
     try:
-        orig_read = body.read
+        # aiobotocore's `read()` is a coroutine.
+        orig_read: "Callable[..., Awaitable[bytes]]" = body.read  # type: ignore[assignment]
         orig_close = body.close
         orig_aclose = body.aclose  # type: ignore[attr-defined]
 
@@ -104,15 +105,7 @@ def _instrument_streaming_body(span: "Span", parsed: "Dict[str, Any]") -> bool:
 
 
 def _patch_aiobotocore_client() -> None:
-    orig_init = AioBaseClient.__init__
     orig_make_api_call = AioBaseClient._make_api_call
-
-    def sentry_patched_init(
-        self: "AioBaseClient", *args: "Any", **kwargs: "Any"
-    ) -> None:
-        orig_init(self, *args, **kwargs)
-        with capture_internal_exceptions():
-            _register_request_hooks(self)
 
     async def sentry_patched_make_api_call(
         self: "AioBaseClient", operation_name: str, api_params: "Dict[str, Any]"
@@ -125,6 +118,11 @@ def _patch_aiobotocore_client() -> None:
         client = sentry_sdk.get_client()
         if client.get_integration(AioBotocoreIntegration) is None:
             return await orig_make_api_call(self, operation_name, api_params)
+
+        with capture_internal_exceptions():
+            # on every call instead of in `__init__`, which boto3 may have patched to
+            # register them as well, and to cover clients created before `init()`.
+            _register_request_hooks(self)
 
         api_call_span = None
         with capture_internal_exceptions():
@@ -158,5 +156,4 @@ def _patch_aiobotocore_client() -> None:
             _finish_span(span)
         return parsed
 
-    AioBaseClient.__init__ = sentry_patched_init  # type: ignore
-    AioBaseClient._make_api_call = sentry_patched_make_api_call  # type: ignore
+    AioBaseClient._make_api_call = sentry_patched_make_api_call
