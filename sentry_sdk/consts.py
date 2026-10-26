@@ -1554,6 +1554,7 @@ class OP:
     EVENT_DJANGO = "event.django"
     FUNCTION = "function"
     FUNCTION_AWS = "function.aws"
+    FUNCTION_AWS_IMPORT = "function.aws.import"
     FUNCTION_GCP = "function.gcp"
     GEN_AI_CHAT = "gen_ai.chat"
     GEN_AI_CREATE_AGENT = "gen_ai.create_agent"

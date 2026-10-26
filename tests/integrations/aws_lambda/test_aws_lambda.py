@@ -833,11 +833,26 @@ def test_cold_start(lambda_client, test_environment):
     for _ in range(2):
         lambda_client.invoke(FunctionName="ColdStart", Payload=json.dumps({}))
 
-    first, second = [
-        s["attributes"]
-        for s in test_environment["server"].span_items
-        if s["is_segment"]
+    span_items = test_environment["server"].span_items
+    first_segment, second_segment = [
+        s for s in span_items if s["is_segment"] and s["name"] == "ColdStart"
     ]
+    # the Sentry layer imports the function's module in the first invocation only.
+    (import_span,) = [
+        s
+        for s in span_items
+        if not s["is_segment"]
+        and s["trace_id"] in (first_segment["trace_id"], second_segment["trace_id"])
+    ]
+    assert import_span["name"] == "index"
+    assert import_span["parent_span_id"] == first_segment["span_id"]
+    assert (
+        _get_span_attr(import_span["attributes"], SPANDATA.SENTRY_OP)
+        == OP.FUNCTION_AWS_IMPORT
+    )
+    assert _get_span_attr(import_span["attributes"], SPANDATA.SENTRY_ORIGIN) == ORIGIN
+
+    first, second = first_segment["attributes"], second_segment["attributes"]
     assert _get_span_attr(first, SPANDATA.FAAS_COLDSTART) is True
     assert _get_span_attr(second, SPANDATA.FAAS_COLDSTART) is False
     # the first invocation started right after the environment was initialized.

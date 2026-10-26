@@ -12,10 +12,12 @@ import sys
 from typing import TYPE_CHECKING
 
 import sentry_sdk
+from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.aws_lambda import AwsLambdaIntegration
+from sentry_sdk.integrations.aws_lambda.consts import ORIGIN
 
 if TYPE_CHECKING:
-    from typing import Any
+    from typing import Any, Callable, Optional
 
 
 # Configure Sentry SDK
@@ -69,10 +71,29 @@ class AWSLambdaModuleLoader:
         return getattr(self.lambda_function_module, self.handler_name)
 
 
+_lambda_handler: "Optional[Callable[..., Any]]" = None
+
+
 def sentry_lambda_handler(event: "Any", context: "Any") -> None:
     """
     Handler function that invokes a lambda handler which path is defined in
     environment variables as "SENTRY_INITIAL_HANDLER"
     """
-    module_loader = AWSLambdaModuleLoader(os.environ["SENTRY_INITIAL_HANDLER"])
-    return module_loader.get_lambda_handler()(event, context)
+    global _lambda_handler
+    if _lambda_handler is None:
+        initial_handler = os.environ["SENTRY_INITIAL_HANDLER"]
+        # the function's module is imported in its first invocation, and only once:
+        # loading it from a path runs its module-level code again.
+        with sentry_sdk.start_span(
+            name=initial_handler.rsplit(".", 1)[0].rsplit("/", 1)[-1],
+            attributes={
+                SPANDATA.SENTRY_OP: OP.FUNCTION_AWS_IMPORT,
+                SPANDATA.SENTRY_ORIGIN: ORIGIN,
+                SPANDATA.SENTRY_KIND: "internal",
+            },
+        ):
+            _lambda_handler = AWSLambdaModuleLoader(
+                initial_handler
+            ).get_lambda_handler()
+
+    return _lambda_handler(event, context)
