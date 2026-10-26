@@ -1009,6 +1009,158 @@ def test_trigger(lambda_client, test_environment, aws_event, trigger, batch_coun
         )
 
 
+_PRODUCER_1 = ("471a43a4192642f0b136d5159a501701", "6e8f22c393e68f19")
+_PRODUCER_2 = ("0f4c2a5b8d9e4f1a2b3c4d5e6f7a8b9c", "1a2b3c4d5e6f7a8b")
+
+
+def _sqs_message(sentry_trace=None, queue="orders"):
+    record = {
+        "messageId": "059f36b4-87a3-44ab-83d2-661975830a7d",
+        "body": "{}",
+        "messageAttributes": {},
+        "eventSource": "aws:sqs",
+        "eventSourceARN": f"arn:aws:sqs:us-east-1:012345678912:{queue}",
+    }
+    if sentry_trace is not None:
+        record["messageAttributes"]["sentry-trace"] = {
+            "stringValue": sentry_trace,
+            "stringListValues": [],
+            "binaryListValues": [],
+            "dataType": "String",
+        }
+    return record
+
+
+def _sns_notification(sentry_trace):
+    return {
+        "Type": "Notification",
+        "MessageId": "95df01b4-ee98-5cb9-9903-4c221d41eb5e",
+        "TopicArn": "arn:aws:sns:us-east-1:012345678912:alerts",
+        "Message": "{}",
+        "MessageAttributes": {
+            "sentry-trace": {"Type": "String", "Value": sentry_trace}
+        },
+    }
+
+
+@pytest.mark.parametrize(
+    "aws_event,name,system,destination,links",
+    [
+        pytest.param(
+            {
+                "Records": [
+                    _sqs_message("%s-%s-1" % _PRODUCER_1),
+                    # the same send context: linked once.
+                    _sqs_message("%s-%s-1" % _PRODUCER_1),
+                    _sqs_message("%s-%s-0" % _PRODUCER_2),
+                    _sqs_message("not-a-trace"),
+                    _sqs_message(),
+                ]
+            },
+            "process orders",
+            "aws_sqs",
+            "orders",
+            [
+                {
+                    "trace_id": _PRODUCER_1[0],
+                    "span_id": _PRODUCER_1[1],
+                    "sampled": True,
+                },
+                {
+                    "trace_id": _PRODUCER_2[0],
+                    "span_id": _PRODUCER_2[1],
+                    "sampled": False,
+                },
+            ],
+            id="sqs",
+        ),
+        pytest.param(
+            {
+                "Records": [
+                    {
+                        "EventSource": "aws:sns",
+                        "Sns": _sns_notification("%s-%s-1" % _PRODUCER_1),
+                    }
+                ]
+            },
+            "process alerts",
+            "aws.sns",
+            "alerts",
+            [{"trace_id": _PRODUCER_1[0], "span_id": _PRODUCER_1[1], "sampled": True}],
+            id="sns",
+        ),
+        pytest.param(
+            {
+                "Records": [
+                    {
+                        **_sqs_message(),
+                        "body": json.dumps(_sns_notification("%s-%s-1" % _PRODUCER_1)),
+                    }
+                ]
+            },
+            "process orders",
+            "aws_sqs",
+            "orders",
+            [{"trace_id": _PRODUCER_1[0], "span_id": _PRODUCER_1[1], "sampled": True}],
+            id="sns-to-sqs",
+        ),
+        pytest.param(
+            {"Records": [_sqs_message(), _sqs_message(queue="refunds")]},
+            "process",
+            "aws_sqs",
+            None,
+            None,
+            id="several-queues",
+        ),
+    ],
+)
+def test_messaging_process_span(
+    lambda_client, test_environment, aws_event, name, system, destination, links
+):
+    lambda_client.invoke(
+        FunctionName="BasicOkSpanStreaming",
+        Payload=json.dumps(aws_event),
+    )
+
+    span_items = test_environment["server"].span_items
+    (segment_span,) = [s for s in span_items if s["is_segment"]]
+    (process_span,) = [
+        s
+        for s in span_items
+        if _get_span_attr(s["attributes"], SPANDATA.SENTRY_OP) == OP.QUEUE_PROCESS
+    ]
+    # messages are linked, never the parent of the invocation.
+    assert "parent_span_id" not in segment_span
+    assert process_span["parent_span_id"] == segment_span["span_id"]
+    assert process_span["trace_id"] == segment_span["trace_id"]
+    assert process_span["name"] == name
+    assert process_span.get("links") == links
+
+    attrs = process_span["attributes"]
+    assert _get_span_attr(attrs, SPANDATA.SENTRY_ORIGIN) == ORIGIN
+    assert _get_span_attr(attrs, SPANDATA.SENTRY_KIND) == "consumer"
+    assert _get_span_attr(attrs, SPANDATA.MESSAGING_SYSTEM) == system
+    assert _get_span_attr(attrs, SPANDATA.MESSAGING_OPERATION_TYPE) == "process"
+    assert _get_span_attr(attrs, SPANDATA.MESSAGING_OPERATION_NAME) == "process"
+    assert _get_span_attr(attrs, SPANDATA.MESSAGING_BATCH_MESSAGE_COUNT) == len(
+        aws_event["Records"]
+    )
+    if destination is None:
+        assert SPANDATA.MESSAGING_DESTINATION_NAME not in attrs
+    else:
+        assert _get_span_attr(attrs, SPANDATA.MESSAGING_DESTINATION_NAME) == destination
+
+
+def test_no_process_span_without_messages(lambda_client, test_environment):
+    lambda_client.invoke(
+        FunctionName="BasicOkSpanStreaming",
+        Payload=json.dumps({"Records": [{"eventSource": "aws:kinesis"}]}),
+    )
+
+    (span,) = test_environment["server"].span_items
+    assert span["is_segment"]
+
+
 def test_trace_continuation(lambda_client, test_environment):
     trace_id = "471a43a4192642f0b136d5159a501701"
     parent_span_id = "6e8f22c393e68f19"

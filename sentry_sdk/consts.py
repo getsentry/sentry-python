@@ -1186,6 +1186,18 @@ class SPANDATA:
     Number of retries/attempts to process a message.
     """
 
+    MESSAGING_OPERATION_NAME = "messaging.operation.name"
+    """
+    The system-specific name of the messaging operation.
+    Example: "publish"
+    """
+
+    MESSAGING_OPERATION_TYPE = "messaging.operation.type"
+    """
+    The type of the messaging operation: `create`, `send`, `receive`, `process` or `settle`.
+    Example: "send"
+    """
+
     MESSAGING_SYSTEM = "messaging.system"
     """
     The messaging system's name, e.g. `kafka`, `aws_sqs`

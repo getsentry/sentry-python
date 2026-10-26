@@ -1,6 +1,7 @@
 import functools
 import sys
 import time
+from contextlib import nullcontext
 from datetime import datetime, timezone
 from os import environ
 from typing import TYPE_CHECKING
@@ -16,6 +17,7 @@ from sentry_sdk.integrations.aws_lambda._request import (
 from sentry_sdk.integrations.aws_lambda._trigger import (
     _get_messaging_batch_size,
     _get_trigger,
+    _start_process_span,
 )
 from sentry_sdk.integrations.aws_lambda.consts import (
     CLOUD_PLATFORM,
@@ -34,7 +36,7 @@ from sentry_sdk.utils import (
 )
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, TypeVar
+    from typing import Any, Callable, ContextManager, TypeVar
 
     from sentry_sdk._types import Attributes
 
@@ -231,7 +233,11 @@ def _wrap_handler(handler: "F") -> "F":
                 start_time = datetime.now(timezone.utc)
                 start = time.monotonic()
                 try:
-                    response = handler(aws_event, aws_context, *args, **kwargs)
+                    process_span: "ContextManager[Any]" = nullcontext()
+                    with capture_internal_exceptions():
+                        process_span = _start_process_span(aws_event)
+                    with process_span:
+                        response = handler(aws_event, aws_context, *args, **kwargs)
                     with capture_internal_exceptions():
                         # the response an HTTP integration turns into the HTTP response.
                         if (
