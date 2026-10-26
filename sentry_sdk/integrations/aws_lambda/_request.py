@@ -1,17 +1,23 @@
+import base64
 from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 from os import environ
 from typing import TYPE_CHECKING
+from urllib.parse import urlencode
 
 import sentry_sdk
-from sentry_sdk.data_collection import _apply_key_value_collection_filtering
+from sentry_sdk.consts import SPANDATA
+from sentry_sdk.data_collection import (
+    _apply_data_collection_filtering_to_query_string,
+    _apply_key_value_collection_filtering,
+)
 from sentry_sdk.integrations._wsgi_common import _filter_headers
 from sentry_sdk.utils import AnnotatedValue
 
 if TYPE_CHECKING:
     from typing import Any, Optional
 
-    from sentry_sdk._types import Event, EventProcessor, Hint
+    from sentry_sdk._types import Attributes, Event, EventProcessor, Hint
 
 
 def _get_user_from_event(aws_event: "dict[str, Any]") -> "dict[str, Any]":
@@ -33,6 +39,109 @@ def _get_user_from_event(aws_event: "dict[str, Any]") -> "dict[str, Any]":
         user_info["ip_address"] = ip
 
     return user_info
+
+
+def _get_http_attributes(aws_event: "dict[str, Any]") -> "Attributes":
+    """
+    Span attributes of an API Gateway (REST or HTTP API), function URL or ALB request.
+    https://docs.aws.amazon.com/apigateway/latest/developerguide/set-up-lambda-proxy-integrations.html
+    https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-develop-integrations-lambda.html
+    https://docs.aws.amazon.com/elasticloadbalancing/latest/application/lambda-functions.html
+    """
+    data_collection = sentry_sdk.get_client().options["data_collection"]
+    attributes: "Attributes" = {}
+
+    headers = aws_event.get("headers")
+    # some AWS services (e.g. EventBridge) send `headers` as a list or `None`.
+    if not isinstance(headers, dict):
+        headers = {}
+
+    # REST APIs and ALB send every value of a repeated header in `multiValueHeaders`,
+    # HTTP APIs and function URLs send cookies in `cookies`.
+    header_values: "dict[str, Any]" = {name: [value] for name, value in headers.items()}
+    header_values.update(aws_event.get("multiValueHeaders") or {})
+    if aws_event.get("cookies"):
+        header_values["cookie"] = ["; ".join(aws_event["cookies"])]
+    for name, values in _filter_headers(header_values).items():
+        attributes[f"{SPANDATA.HTTP_REQUEST_HEADER}.{name.lower()}"] = (
+            values if isinstance(values, list) else [values]
+        )
+
+    request_context = aws_event.get("requestContext") or {}
+    # HTTP APIs and function URLs.
+    http = request_context.get("http") or {}
+
+    method = aws_event.get("httpMethod") or http.get("method")
+    if not method:
+        return attributes
+    attributes[SPANDATA.HTTP_REQUEST_METHOD] = method
+
+    # the matched route, never the path: its IDs would make every request different.
+    if aws_event.get("resource"):
+        attributes[SPANDATA.HTTP_ROUTE] = aws_event["resource"]
+    elif aws_event.get("routeKey") not in (None, "$default"):
+        attributes[SPANDATA.HTTP_ROUTE] = aws_event["routeKey"].split(" ", 1)[-1]
+
+    query = None
+    url_query_params = data_collection["url_query_params"]
+    if aws_event.get("rawQueryString"):
+        query = _apply_data_collection_filtering_to_query_string(
+            query_string=aws_event["rawQueryString"], behaviour=url_query_params
+        )
+    elif aws_event.get("multiValueQueryStringParameters"):
+        query = urlencode(
+            _apply_key_value_collection_filtering(
+                items=aws_event["multiValueQueryStringParameters"],
+                behaviour=url_query_params,
+            ),
+            doseq=True,
+        )
+    elif aws_event.get("queryStringParameters"):
+        query = urlencode(
+            _apply_key_value_collection_filtering(
+                items=aws_event["queryStringParameters"], behaviour=url_query_params
+            )
+        )
+    if query:
+        attributes[SPANDATA.URL_QUERY] = query
+
+    lowered_headers = {name.lower(): value for name, value in headers.items()}
+    scheme = lowered_headers.get("x-forwarded-proto", "https")
+    attributes[SPANDATA.URL_SCHEME] = scheme
+
+    host = lowered_headers.get("host") or request_context.get("domainName")
+    if host:
+        attributes[SPANDATA.SERVER_ADDRESS] = host
+
+    path = aws_event.get("rawPath") or aws_event.get("path")
+    if path:
+        attributes[SPANDATA.URL_PATH] = path
+        if host:
+            attributes[SPANDATA.URL_FULL] = f"{scheme}://{host}{path}" + (
+                f"?{query}" if query else ""
+            )
+
+    identity = request_context.get("identity") or {}
+    user_agent = lowered_headers.get("user-agent") or identity.get("userAgent")
+    if user_agent:
+        attributes[SPANDATA.USER_AGENT_ORIGINAL] = user_agent
+
+    client_address = identity.get("sourceIp") or http.get("sourceIp")
+    if client_address and data_collection["user_info"]:
+        attributes[SPANDATA.CLIENT_ADDRESS] = client_address
+
+    body = aws_event.get("body")
+    if body and "incoming_request" in data_collection["http_bodies"]:
+        if aws_event.get("isBase64Encoded"):
+            try:
+                body = base64.b64decode(body).decode("utf-8")
+            except ValueError:
+                # binary content.
+                body = None
+        if body:
+            attributes[SPANDATA.HTTP_REQUEST_BODY_DATA] = body
+
+    return attributes
 
 
 def _make_request_event_processor(

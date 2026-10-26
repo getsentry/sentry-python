@@ -1347,6 +1347,12 @@ class SPANDATA:
     Example: "foo=bar&bar=baz"
     """
 
+    URL_SCHEME = "url.scheme"
+    """
+    The URI scheme component identifying the used protocol.
+    Example: "https"
+    """
+
     MCP_TOOL_NAME = "mcp.tool.name"
     """
     .. deprecated::

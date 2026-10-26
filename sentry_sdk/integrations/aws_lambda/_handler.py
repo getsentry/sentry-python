@@ -4,14 +4,12 @@ import time
 from datetime import datetime, timezone
 from os import environ
 from typing import TYPE_CHECKING
-from urllib.parse import urlencode
 
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
-from sentry_sdk.data_collection import _apply_key_value_collection_filtering
-from sentry_sdk.integrations._wsgi_common import _filter_headers
 from sentry_sdk.integrations.aws_lambda._request import (
     _get_cloudwatch_logs_url,
+    _get_http_attributes,
     _get_user_from_event,
     _make_request_event_processor,
 )
@@ -36,7 +34,7 @@ from sentry_sdk.utils import (
 )
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Mapping, TypeVar
+    from typing import Any, Callable, TypeVar
 
     from sentry_sdk._types import Attributes
 
@@ -128,36 +126,11 @@ def _wrap_handler(handler: "F") -> "F":
             if not isinstance(headers, dict):
                 headers = {}
 
-            header_attributes: "dict[str, Any]" = {}
-            filtered_headers: "Mapping[str, Any]" = {}
+            http_attributes: "Attributes" = {}
             with capture_internal_exceptions():
-                filtered_headers = _filter_headers(headers)
-            for header, header_value in filtered_headers.items():
-                with capture_internal_exceptions():
-                    header_attributes[
-                        f"{SPANDATA.HTTP_REQUEST_HEADER}.{header.lower()}"
-                    ] = [header_value]
+                http_attributes = _get_http_attributes(request_data)
 
-            additional_attributes: "dict[str, Any]" = {}
-            if "httpMethod" in request_data:
-                additional_attributes[SPANDATA.HTTP_REQUEST_METHOD] = request_data[
-                    "httpMethod"
-                ]
-
-            data_collection = client.options["data_collection"]
-            if "queryStringParameters" in request_data:
-                qs = request_data["queryStringParameters"]
-                if qs:
-                    filtered_qs = _apply_key_value_collection_filtering(
-                        items=qs,
-                        behaviour=data_collection["url_query_params"],
-                    )
-                    if filtered_qs:
-                        additional_attributes[SPANDATA.URL_QUERY] = urlencode(
-                            filtered_qs
-                        )
-
-            if not scope._user and data_collection["user_info"]:
+            if not scope._user and client.options["data_collection"]["user_info"]:
                 user_info = _get_user_from_event(request_data)
                 if user_info:
                     scope.set_user(user_info)
@@ -176,8 +149,7 @@ def _wrap_handler(handler: "F") -> "F":
                 SPANDATA.SENTRY_SEGMENT_NAME_SOURCE: SegmentNameSource.COMPONENT,
                 SPANDATA.CLOUD_PROVIDER: CLOUD_PROVIDER,
                 SPANDATA.CLOUD_PLATFORM: CLOUD_PLATFORM,
-                **header_attributes,
-                **additional_attributes,
+                **http_attributes,
             }
 
             with capture_internal_exceptions():
@@ -259,7 +231,18 @@ def _wrap_handler(handler: "F") -> "F":
                 start_time = datetime.now(timezone.utc)
                 start = time.monotonic()
                 try:
-                    return handler(aws_event, aws_context, *args, **kwargs)
+                    response = handler(aws_event, aws_context, *args, **kwargs)
+                    with capture_internal_exceptions():
+                        # the response an HTTP integration turns into the HTTP response.
+                        if (
+                            SPANDATA.HTTP_REQUEST_METHOD in http_attributes
+                            and isinstance(response, dict)
+                            and "statusCode" in response
+                        ):
+                            status_code = int(response["statusCode"])
+                            span.status = "error" if status_code >= 400 else "ok"
+                            span.set_attribute(SPANDATA.HTTP_STATUS_CODE, status_code)
+                    return response
                 except Exception as exception:
                     exception_type = type(exception)
                     span.set_attribute(

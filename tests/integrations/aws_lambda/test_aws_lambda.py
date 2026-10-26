@@ -1141,6 +1141,219 @@ def test_request_attributes(lambda_client, test_environment):
     ]
 
 
+_API_HOST = "abc123.execute-api.us-east-1.amazonaws.com"
+
+
+@pytest.mark.parametrize(
+    "aws_event,expected,absent",
+    [
+        pytest.param(
+            {
+                "resource": "/orders/{id}",
+                "path": "/orders/42",
+                "httpMethod": "POST",
+                "headers": {
+                    "Host": _API_HOST,
+                    "User-Agent": "curl/8.7.1",
+                    "X-Forwarded-Proto": "https",
+                    "Accept": "application/json",
+                },
+                "multiValueHeaders": {
+                    "Host": [_API_HOST],
+                    "User-Agent": ["curl/8.7.1"],
+                    "X-Forwarded-Proto": ["https"],
+                    "Accept": ["text/html", "application/json"],
+                },
+                "queryStringParameters": {"tag": "b"},
+                "multiValueQueryStringParameters": {"tag": ["a", "b"]},
+                "requestContext": {
+                    "stage": "prod",
+                    "domainName": _API_HOST,
+                    "identity": {"sourceIp": "203.0.113.7", "userAgent": "curl/8.7.1"},
+                },
+                "body": '{"qty": 1}',
+                "isBase64Encoded": False,
+            },
+            {
+                SPANDATA.HTTP_REQUEST_METHOD: "POST",
+                SPANDATA.HTTP_ROUTE: "/orders/{id}",
+                SPANDATA.URL_PATH: "/orders/42",
+                SPANDATA.URL_QUERY: "tag=a&tag=b",
+                SPANDATA.URL_SCHEME: "https",
+                SPANDATA.SERVER_ADDRESS: _API_HOST,
+                SPANDATA.URL_FULL: f"https://{_API_HOST}/orders/42?tag=a&tag=b",
+                SPANDATA.USER_AGENT_ORIGINAL: "curl/8.7.1",
+                SPANDATA.CLIENT_ADDRESS: "203.0.113.7",
+                SPANDATA.HTTP_REQUEST_BODY_DATA: '{"qty": 1}',
+                f"{SPANDATA.HTTP_REQUEST_HEADER}.accept": [
+                    "text/html",
+                    "application/json",
+                ],
+            },
+            (),
+            id="api-gateway-rest",
+        ),
+        pytest.param(
+            {
+                "version": "2.0",
+                "routeKey": "GET /orders/{id}",
+                "rawPath": "/orders/42",
+                "rawQueryString": "tag=a&tag=b",
+                "cookies": ["session=abc", "theme=dark"],
+                "headers": {
+                    "host": _API_HOST,
+                    "user-agent": "curl/8.7.1",
+                    "x-forwarded-proto": "https",
+                },
+                "queryStringParameters": {"tag": "a,b"},
+                "requestContext": {
+                    "domainName": _API_HOST,
+                    "http": {
+                        "method": "GET",
+                        "path": "/orders/42",
+                        "sourceIp": "203.0.113.7",
+                        "userAgent": "curl/8.7.1",
+                    },
+                },
+                # base64 of `{"qty": 1}`.
+                "body": "eyJxdHkiOiAxfQ==",
+                "isBase64Encoded": True,
+            },
+            {
+                SPANDATA.HTTP_REQUEST_METHOD: "GET",
+                SPANDATA.HTTP_ROUTE: "/orders/{id}",
+                SPANDATA.URL_PATH: "/orders/42",
+                SPANDATA.URL_QUERY: "tag=a&tag=b",
+                SPANDATA.URL_FULL: f"https://{_API_HOST}/orders/42?tag=a&tag=b",
+                SPANDATA.CLIENT_ADDRESS: "203.0.113.7",
+                SPANDATA.HTTP_REQUEST_BODY_DATA: '{"qty": 1}',
+                f"{SPANDATA.HTTP_REQUEST_HEADER}.cookie": ["[Filtered]"],
+            },
+            (),
+            id="api-gateway-http",
+        ),
+        pytest.param(
+            {
+                "version": "2.0",
+                "routeKey": "$default",
+                "rawPath": "/orders/42",
+                "rawQueryString": "",
+                "headers": {"host": "abc123.lambda-url.us-east-1.on.aws"},
+                "requestContext": {"http": {"method": "GET", "path": "/orders/42"}},
+            },
+            {
+                SPANDATA.HTTP_REQUEST_METHOD: "GET",
+                SPANDATA.URL_FULL: "https://abc123.lambda-url.us-east-1.on.aws/orders/42",
+            },
+            (SPANDATA.HTTP_ROUTE, SPANDATA.URL_QUERY),
+            id="function-url",
+        ),
+        pytest.param(
+            {
+                "requestContext": {
+                    "elb": {
+                        "targetGroupArn": "arn:aws:elasticloadbalancing:us-east-1:012345678912:targetgroup/orders/73e2d6bc24d8a067"
+                    }
+                },
+                "httpMethod": "GET",
+                "path": "/health",
+                "queryStringParameters": {},
+                "headers": {
+                    "host": "orders-123.us-east-1.elb.amazonaws.com",
+                    "x-forwarded-proto": "http",
+                    "user-agent": "ELB-HealthChecker/2.0",
+                },
+                "body": "",
+                "isBase64Encoded": False,
+            },
+            {
+                SPANDATA.HTTP_REQUEST_METHOD: "GET",
+                SPANDATA.URL_SCHEME: "http",
+                SPANDATA.URL_FULL: "http://orders-123.us-east-1.elb.amazonaws.com/health",
+                SPANDATA.USER_AGENT_ORIGINAL: "ELB-HealthChecker/2.0",
+            },
+            (
+                SPANDATA.HTTP_ROUTE,
+                SPANDATA.CLIENT_ADDRESS,
+                SPANDATA.HTTP_REQUEST_BODY_DATA,
+            ),
+            id="alb",
+        ),
+    ],
+)
+def test_http_attributes(lambda_client, test_environment, aws_event, expected, absent):
+    lambda_client.invoke(
+        FunctionName="BasicOkSpanStreamingDataCollectionUserInfoOn",
+        Payload=json.dumps(aws_event),
+    )
+
+    (segment_span,) = [
+        s for s in test_environment["server"].span_items if s["is_segment"]
+    ]
+    attrs = segment_span["attributes"]
+    assert {key: _get_span_attr(attrs, key) for key in expected} == expected
+    for key in absent:
+        assert key not in attrs
+
+
+@pytest.mark.parametrize(
+    "aws_event,status_code,status",
+    [
+        pytest.param(
+            {
+                "httpMethod": "GET",
+                "queryStringParameters": {"status": "200"},
+                "requestContext": {},
+            },
+            200,
+            "ok",
+            id="ok",
+        ),
+        pytest.param(
+            {
+                "httpMethod": "GET",
+                "queryStringParameters": {"status": "404"},
+                "requestContext": {},
+            },
+            404,
+            "error",
+            id="client-error",
+        ),
+        pytest.param(
+            {
+                "httpMethod": "GET",
+                "queryStringParameters": {"status": "503"},
+                "requestContext": {},
+            },
+            503,
+            "error",
+            id="server-error",
+        ),
+        # a direct invocation's response is not an HTTP response.
+        pytest.param(
+            {"queryStringParameters": {"status": "503"}},
+            None,
+            "ok",
+            id="not-http",
+        ),
+    ],
+)
+def test_http_response_status(
+    lambda_client, test_environment, aws_event, status_code, status
+):
+    lambda_client.invoke(FunctionName="HttpResponse", Payload=json.dumps(aws_event))
+
+    (segment_span,) = [
+        s for s in test_environment["server"].span_items if s["is_segment"]
+    ]
+    assert segment_span["status"] == status
+    attrs = segment_span["attributes"]
+    if status_code is None:
+        assert SPANDATA.HTTP_STATUS_CODE not in attrs
+    else:
+        assert _get_span_attr(attrs, SPANDATA.HTTP_STATUS_CODE) == status_code
+
+
 def test_url_query_params_with_data_collection(lambda_client, test_environment):
     server = test_environment["server"]
     payload = {
