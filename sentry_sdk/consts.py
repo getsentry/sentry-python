@@ -476,6 +476,11 @@ class SPANDATA:
     The URL of the AWS SQS queue the request refers to.
     Example: "https://sqs.us-east-1.amazonaws.com/123456789012/orders"
     """
+    AWS_SNS_TOPIC_ARN = "aws.sns.topic.arn"
+    """
+    The ARN of the AWS SNS topic the request refers to.
+    Example: "arn:aws:sns:us-east-1:123456789012:alerts"
+    """
 
     CACHE_HIT = "cache.hit"
     """
