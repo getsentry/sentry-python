@@ -706,6 +706,12 @@ class SPANDATA:
     Example: "my_function"
     """
 
+    FAAS_TRIGGER = "faas.trigger"
+    """
+    The type of the trigger on which the function is executed.
+    Example: "pubsub"
+    """
+
     FAAS_VERSION = "faas.version"
     """
     The version of the function that was invoked.

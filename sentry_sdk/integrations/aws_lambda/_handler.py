@@ -12,6 +12,10 @@ from sentry_sdk.integrations.aws_lambda._request import (
     _get_user_from_event,
     _make_request_event_processor,
 )
+from sentry_sdk.integrations.aws_lambda._trigger import (
+    _get_messaging_batch_size,
+    _get_trigger,
+)
 from sentry_sdk.integrations.aws_lambda.consts import (
     CLOUD_PLATFORM,
     CLOUD_PROVIDER,
@@ -64,10 +68,8 @@ def _wrap_handler(handler: "F") -> "F":
 
         if isinstance(aws_event, list) and len(aws_event) >= 1:
             request_data = aws_event[0]
-            batch_size = len(aws_event)
         else:
             request_data = aws_event
-            batch_size = 1
 
         if not isinstance(request_data, dict):
             # If we're not dealing with a dictionary, we won't be able to get
@@ -160,10 +162,18 @@ def _wrap_handler(handler: "F") -> "F":
                 SPANDATA.SENTRY_SEGMENT_NAME_SOURCE: SegmentNameSource.COMPONENT,
                 SPANDATA.CLOUD_PROVIDER: CLOUD_PROVIDER,
                 SPANDATA.CLOUD_PLATFORM: CLOUD_PLATFORM,
-                SPANDATA.MESSAGING_BATCH_MESSAGE_COUNT: batch_size,
                 **header_attributes,
                 **additional_attributes,
             }
+
+            with capture_internal_exceptions():
+                attributes[SPANDATA.FAAS_TRIGGER] = _get_trigger(aws_event)
+                # HTTP and direct invocations aren't batches, even when the payload is a list.
+                messaging_batch_size = _get_messaging_batch_size(aws_event)
+                if messaging_batch_size is not None:
+                    attributes[SPANDATA.MESSAGING_BATCH_MESSAGE_COUNT] = (
+                        messaging_batch_size
+                    )
 
             with capture_internal_exceptions():
                 invoked_function_arn = aws_context.invoked_function_arn

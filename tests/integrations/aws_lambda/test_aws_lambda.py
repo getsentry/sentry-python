@@ -756,7 +756,8 @@ def test_no_error(lambda_client, test_environment):
     assert _get_span_attr(attrs, SPANDATA.AWS_LOG_STREAM_NAMES) == [
         LATEST_FUNCTION_VERSION
     ]
-    assert _get_span_attr(attrs, SPANDATA.MESSAGING_BATCH_MESSAGE_COUNT) == 1
+    assert _get_span_attr(attrs, SPANDATA.FAAS_TRIGGER) == "other"
+    assert SPANDATA.MESSAGING_BATCH_MESSAGE_COUNT not in attrs
 
 
 def test_error(lambda_client, test_environment):
@@ -810,7 +811,177 @@ def test_error(lambda_client, test_environment):
     assert _get_span_attr(attrs, SPANDATA.AWS_LOG_STREAM_NAMES) == [
         LATEST_FUNCTION_VERSION
     ]
-    assert _get_span_attr(attrs, SPANDATA.MESSAGING_BATCH_MESSAGE_COUNT) == 1
+    assert _get_span_attr(attrs, SPANDATA.FAAS_TRIGGER) == "other"
+    assert SPANDATA.MESSAGING_BATCH_MESSAGE_COUNT not in attrs
+
+
+def _sqs_record():
+    return {
+        "messageId": "059f36b4-87a3-44ab-83d2-661975830a7d",
+        "body": "{}",
+        "eventSource": "aws:sqs",
+        "eventSourceARN": "arn:aws:sqs:us-east-1:012345678912:orders",
+    }
+
+
+def _sns_record():
+    return {
+        "EventSource": "aws:sns",
+        "Sns": {"TopicArn": "arn:aws:sns:us-east-1:012345678912:alerts"},
+    }
+
+
+def _appsync_event():
+    return {
+        "arguments": {"id": "1"},
+        "info": {"fieldName": "getOrder", "parentTypeName": "Query"},
+    }
+
+
+def _eventbridge_event(source, detail_type):
+    return {
+        "version": "0",
+        "id": "53dc4d37-cffa-4f76-80c9-8b7d4a4d2eaa",
+        "detail-type": detail_type,
+        "source": source,
+        "account": "012345678912",
+        "time": "2026-10-26T12:00:00Z",
+        "region": "us-east-1",
+        "resources": [],
+        "detail": {},
+    }
+
+
+@pytest.mark.parametrize(
+    "aws_event,trigger,batch_count",
+    [
+        pytest.param(
+            {"httpMethod": "GET", "path": "/", "requestContext": {"stage": "prod"}},
+            "http",
+            None,
+            id="api-gateway-rest",
+        ),
+        pytest.param(
+            {
+                "version": "2.0",
+                "routeKey": "GET /",
+                "requestContext": {"http": {"method": "GET"}},
+            },
+            "http",
+            None,
+            id="api-gateway-http",
+        ),
+        pytest.param(
+            {"Records": [{"cf": {"request": {"uri": "/"}}}]},
+            "http",
+            None,
+            id="cloudfront",
+        ),
+        pytest.param(_appsync_event(), "http", None, id="appsync"),
+        pytest.param(
+            [_appsync_event(), _appsync_event()], "http", None, id="appsync-batch"
+        ),
+        pytest.param(
+            {"Records": [_sqs_record(), _sqs_record()]}, "pubsub", 2, id="sqs"
+        ),
+        pytest.param({"Records": [_sns_record()]}, "pubsub", 1, id="sns"),
+        pytest.param(
+            {"Records": [{"eventSource": "aws:kinesis"}]},
+            "pubsub",
+            None,
+            id="kinesis",
+        ),
+        pytest.param(
+            {
+                "eventSource": "aws:kafka",
+                "records": {
+                    "orders-0": [{"offset": 1}, {"offset": 2}],
+                    "orders-1": [{"offset": 1}],
+                },
+            },
+            "pubsub",
+            3,
+            id="msk",
+        ),
+        pytest.param(
+            {"eventSource": "SelfManagedKafka", "records": {"orders-0": [{}]}},
+            "pubsub",
+            1,
+            id="self-managed-kafka",
+        ),
+        pytest.param(
+            {"eventSource": "aws:mq", "messages": [{}, {}]},
+            "pubsub",
+            2,
+            id="activemq",
+        ),
+        pytest.param(
+            {
+                "eventSource": "aws:rmq",
+                "rmqMessagesByQueue": {"orders::/": [{}, {}], "alerts::/": [{}]},
+            },
+            "pubsub",
+            3,
+            id="rabbitmq",
+        ),
+        pytest.param(
+            _eventbridge_event("aws.s3", "Object Created"),
+            "pubsub",
+            None,
+            id="eventbridge",
+        ),
+        pytest.param(
+            _eventbridge_event("aws.events", "Scheduled Event"),
+            "timer",
+            None,
+            id="eventbridge-schedule",
+        ),
+        pytest.param(
+            {"Records": [{"eventSource": "aws:s3"}]}, "datasource", None, id="s3"
+        ),
+        pytest.param(
+            {"Records": [{"eventSource": "aws:dynamodb"}]},
+            "datasource",
+            None,
+            id="dynamodb-streams",
+        ),
+        pytest.param(
+            {"eventSource": "aws:docdb", "events": [{}]},
+            "datasource",
+            None,
+            id="documentdb",
+        ),
+        pytest.param(
+            {"Records": [_sqs_record(), _sns_record()]},
+            "other",
+            None,
+            id="mixed-sources",
+        ),
+        pytest.param(
+            [{"good dog": "Maisey"}, {"good dog": "Charlie"}],
+            "other",
+            None,
+            id="list",
+        ),
+    ],
+)
+def test_trigger(lambda_client, test_environment, aws_event, trigger, batch_count):
+    lambda_client.invoke(
+        FunctionName="BasicOkSpanStreaming",
+        Payload=json.dumps(aws_event),
+    )
+
+    (segment_span,) = [
+        s for s in test_environment["server"].span_items if s["is_segment"]
+    ]
+    attrs = segment_span["attributes"]
+    assert _get_span_attr(attrs, SPANDATA.FAAS_TRIGGER) == trigger
+    if batch_count is None:
+        assert SPANDATA.MESSAGING_BATCH_MESSAGE_COUNT not in attrs
+    else:
+        assert (
+            _get_span_attr(attrs, SPANDATA.MESSAGING_BATCH_MESSAGE_COUNT) == batch_count
+        )
 
 
 def test_trace_continuation(lambda_client, test_environment):
