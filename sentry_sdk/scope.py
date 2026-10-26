@@ -939,6 +939,7 @@ class Scope:
         parent_span: "Optional[Span]",
         active: bool,
         links: "Optional[list[SpanLink]]" = None,
+        start_timestamp: "Optional[datetime]" = None,
     ) -> "Span":
         """
         Start a span.
@@ -993,6 +994,9 @@ class Scope:
             e.g. in other traces. More can be added with `span.add_link()` or
             `span.add_links()`.
         :type links: "Optional[list[SpanLink]]"
+
+        :param start_timestamp: When the span started, if before it was created.
+        :type start_timestamp: "Optional[datetime]"
 
         :return: The span that has been started.
         :rtype: Span
@@ -1063,6 +1067,7 @@ class Scope:
                 sample_rand=sample_rand,
                 sample_rate=sample_rate,
                 links=links,
+                start_timestamp=start_timestamp,
             )
 
         # This is a child span; take propagation context from the parent span
@@ -1099,6 +1104,7 @@ class Scope:
                 parent_span_id=parent_span.span_id,
                 parent_sampled=parent_span.sampled,
                 links=links,
+                start_timestamp=start_timestamp,
             )
 
     def _update_sample_rate(self, sample_rate: float) -> None:

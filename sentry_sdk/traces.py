@@ -134,10 +134,11 @@ def start_span(
     parent_span: "Optional[Span]" = _DEFAULT_PARENT_SPAN,  # type: ignore[assignment]
     active: bool = True,
     links: "Optional[list[SpanLink]]" = None,
+    start_timestamp: "Optional[datetime]" = None,
 ) -> "Span":
 
     return sentry_sdk.get_current_scope().start_span(
-        name, attributes, parent_span, active, links
+        name, attributes, parent_span, active, links, start_timestamp
     )
 
 
@@ -207,6 +208,7 @@ class Span:
         sample_rate: "Optional[float]" = None,
         sample_rand: "Optional[float]" = None,
         links: "Optional[list[SpanLink]]" = None,
+        start_timestamp: "Optional[datetime]" = None,
     ):
         self._name: str = name
         self._active: bool = active
@@ -240,6 +242,15 @@ class Span:
         # profiling depends on this value and requires that
         # it is measured in nanoseconds
         self._start_timestamp_monotonic_ns = nanosecond_time()
+
+        # some work starts before the SDK can start a span for it, e.g. a Lambda cold start.
+        if start_timestamp is not None:
+            self._start_timestamp_monotonic_ns -= (
+                (self._start_timestamp - start_timestamp)
+                // timedelta(microseconds=1)
+                * 1000
+            )
+            self._start_timestamp = start_timestamp
 
         self._span_id: "Optional[str]" = None
 

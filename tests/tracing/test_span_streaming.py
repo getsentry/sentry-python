@@ -1,6 +1,7 @@
 import re
 import sys
 import time
+from datetime import datetime, timedelta, timezone
 from unittest import mock
 
 import pytest
@@ -93,6 +94,24 @@ def test_start_span_no_context_manager(sentry_init, capture_items):
 
     assert child["status"] == "ok"
     assert segment["status"] == "ok"
+
+
+def test_start_span_start_timestamp(sentry_init, capture_items):
+    sentry_init(
+        traces_sample_rate=1.0,
+    )
+
+    items = capture_items("span")
+
+    start_timestamp = datetime.now(timezone.utc) - timedelta(seconds=5)
+    sentry_sdk.start_span(name="segment", start_timestamp=start_timestamp).end()
+
+    sentry_sdk.flush()
+    (span,) = [item.payload for item in items]
+
+    assert span["start_timestamp"] == start_timestamp.timestamp()
+    # the duration is measured from the given start, not from when the span was created.
+    assert 5 <= span["end_timestamp"] - span["start_timestamp"] < 6
 
 
 def test_span_sampled_when_created(sentry_init, capture_items):
