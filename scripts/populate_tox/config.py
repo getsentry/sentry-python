@@ -5,6 +5,12 @@
 # See scripts/populate_tox/README.md for more info on the format and examples.
 
 TEST_SUITE_CONFIG = {
+    "aiobotocore": {
+        "package": "aiobotocore",
+        "deps": {
+            "*": ["pytest-asyncio", "pytest-aiohttp"],
+        },
+    },
     "aiohttp": {
         "package": "aiohttp",
         "deps": {

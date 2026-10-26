@@ -5,6 +5,7 @@ import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.integrations.boto3.consts import (
+    AIOBOTOCORE_IDENTIFIER,
     AWS_RPC_SYSTEM_NAME,
     CLOUD_PROVIDER,
     DEFAULT_PORTS,
@@ -36,6 +37,14 @@ try:
     from botocore.response import StreamingBody
 except ImportError:
     raise DidNotEnable("botocore not installed")
+
+
+def _is_enabled() -> bool:
+    client = sentry_sdk.get_client()
+    return (
+        client.get_integration(IDENTIFIER) is not None
+        or client.get_integration(AIOBOTOCORE_IDENTIFIER) is not None
+    )
 
 
 def _finish_span(span: "Span", error: "Optional[BaseException]" = None) -> None:
@@ -149,6 +158,7 @@ def _get_error_attributes(exception: "BaseException") -> "Attributes":
 def _start_client_span(
     ctx: "AwsCallContext",
     service_ext: "Optional[_ServiceExtension]" = None,
+    origin: str = ORIGIN,
 ) -> "Optional[Span]":
     if sentry_sdk.get_current_span() is None:
         return None
@@ -185,7 +195,7 @@ def _start_client_span(
     attributes.update(
         {
             SPANDATA.SENTRY_OP: span_op,
-            SPANDATA.SENTRY_ORIGIN: ORIGIN,
+            SPANDATA.SENTRY_ORIGIN: origin,
         }
     )
     return sentry_sdk.start_span(
@@ -197,57 +207,85 @@ def _start_client_span(
     )
 
 
-def _instrument_streaming_body(span: "Span", parsed: "Dict[str, Any]") -> bool:
-    if isinstance(span, NoOpSpan):
-        return False
-
+def _find_streaming_body(parsed: "Dict[str, Any]") -> "Optional[StreamingBody]":
     # botocore uses service-specific response key for streaming payload; e.g. `Payload`
     # for Lambda Invoke, `Body` for S3 GetObject. Find it by type so every streaming
     # response is handled.
-    body = next(
+    return next(
         (value for value in parsed.values() if isinstance(value, StreamingBody)),
         None,
     )
-    if not isinstance(body, StreamingBody):
-        return False
 
-    streaming_span = sentry_sdk.start_span(
-        name=span.name,
-        # keep stream span under the boto span after `_make_api_call()` returns.
-        parent_span=span,
-        # the body may outlive the api call, so keep it inactive. Otherwise it
-        # 1. could restore the already-finished client span when it ends; 2. make
-        # unrelated new spans attach to the stream span since it's the current span.
-        active=False,
-        attributes={
-            SPANDATA.SENTRY_OP: OP.HTTP_CLIENT_STREAM,
-            SPANDATA.SENTRY_ORIGIN: ORIGIN,
-        },
-    )
 
-    finished = False
-    read_in_progress = False
+class _StreamingBodySpans:
+    """
+    The `http.client.stream` span of a streaming response, ended together with its
+    client span when the body is read to its end, closed or fails.
+    """
 
-    def finish_span(error: "Optional[BaseException]" = None) -> None:
-        nonlocal finished
-        if finished:
+    __slots__ = ("_span", "_streaming_span", "_body", "_finished")
+
+    def __init__(self, span: "Span", body: "StreamingBody", origin: str) -> None:
+        self._span = span
+        self._body = body
+        self._finished = False
+        self._streaming_span = sentry_sdk.start_span(
+            name=span.name,
+            # keep stream span under the boto span after `_make_api_call()` returns.
+            parent_span=span,
+            # the body may outlive the api call, so keep it inactive. Otherwise it
+            # 1. could restore the already-finished client span when it ends; 2. make
+            # unrelated new spans attach to the stream span since it's the current span.
+            active=False,
+            attributes={
+                SPANDATA.SENTRY_OP: OP.HTTP_CLIENT_STREAM,
+                SPANDATA.SENTRY_ORIGIN: origin,
+            },
+        )
+
+    def finish(self, error: "Optional[BaseException]" = None) -> None:
+        if self._finished:
             return
 
-        finished = True
+        self._finished = True
         # finish the stream span before the client span, and only once across
         # read and close.
         if error is not None:
             with capture_internal_exceptions():
                 attributes = _get_error_attributes(error)
-                streaming_span.set_attributes(attributes)
-                span.set_attributes(attributes)
+                self._streaming_span.set_attributes(attributes)
+                self._span.set_attributes(attributes)
 
-        _finish_span(streaming_span, error)
-        _finish_span(span, error)
+        _finish_span(self._streaming_span, error)
+        _finish_span(self._span, error)
 
-    def content_length_reached() -> bool:
-        content_length = body._content_length  # type: ignore[attr-defined]
-        return content_length is not None and body._amount_read >= int(content_length)  # type: ignore[attr-defined]
+    def finish_if_read(
+        self, amount_of_bytes_requested: "Optional[int]", chunk: bytes
+    ) -> None:
+        content_length = self._body._content_length  # type: ignore[attr-defined]
+        # detect read-to-end, eof, or the known content length being consumed.
+        if (
+            amount_of_bytes_requested is None
+            or amount_of_bytes_requested < 0
+            or (amount_of_bytes_requested > 0 and not chunk)
+            or (
+                content_length is not None
+                and self._body._amount_read >= int(content_length)  # type: ignore[attr-defined]
+            )
+        ):
+            self.finish()
+
+
+def _instrument_streaming_body(span: "Span", parsed: "Dict[str, Any]") -> bool:
+    if isinstance(span, NoOpSpan):
+        return False
+
+    body = _find_streaming_body(parsed)
+    if body is None:
+        return False
+
+    streaming_spans = _StreamingBodySpans(span, body, ORIGIN)
+    read_in_progress = False
 
     def sentry_streaming_body_read(*args: "Any", **kwargs: "Any") -> bytes:
         nonlocal read_in_progress
@@ -255,18 +293,12 @@ def _instrument_streaming_body(span: "Span", parsed: "Dict[str, Any]") -> bool:
         try:
             read_return_value = orig_read(*args, **kwargs)
             with capture_internal_exceptions():
-                amount_of_bytes_requested = args[0] if args else kwargs.get("amt")
-                # detect read-to-end, eof, or the known content length being consumed.
-                if (
-                    amount_of_bytes_requested is None
-                    or amount_of_bytes_requested < 0
-                    or (amount_of_bytes_requested > 0 and not read_return_value)
-                    or content_length_reached()
-                ):
-                    finish_span()
+                streaming_spans.finish_if_read(
+                    args[0] if args else kwargs.get("amt"), read_return_value
+                )
             return read_return_value
         except BaseException as error:
-            finish_span(error)
+            streaming_spans.finish(error)
             raise
         finally:
             read_in_progress = False
@@ -274,18 +306,18 @@ def _instrument_streaming_body(span: "Span", parsed: "Dict[str, Any]") -> bool:
     def sentry_streaming_body_close(*args: "Any", **kwargs: "Any") -> None:
         try:
             orig_close(*args, **kwargs)
-            finish_span()
+            streaming_spans.finish()
         except BaseException as error:
-            finish_span(error)
+            streaming_spans.finish(error)
             raise
 
     def sentry_raw_stream_close(*args: "Any", **kwargs: "Any") -> None:
         try:
             orig_raw_close(*args, **kwargs)
             if not read_in_progress:
-                finish_span()
+                streaming_spans.finish()
         except BaseException as error:
-            finish_span(error)
+            streaming_spans.finish(error)
             raise
 
     try:
@@ -298,7 +330,7 @@ def _instrument_streaming_body(span: "Span", parsed: "Dict[str, Any]") -> bool:
         body.read = sentry_streaming_body_read  # type: ignore
         body.close = sentry_streaming_body_close  # type: ignore
     except Exception:
-        finish_span()
+        streaming_spans.finish()
         raise
 
     return True
@@ -342,8 +374,7 @@ def _sentry_request_created(
     https://github.com/boto/botocore/blob/f9195c79ea2bf46350dd320d2a0bf3db7da0b460/botocore/endpoint.py#L178-L202
     """
 
-    client = sentry_sdk.get_client()
-    if client.get_integration(IDENTIFIER) is None:
+    if not _is_enabled():
         return
 
     with capture_internal_exceptions():
@@ -365,10 +396,10 @@ def _sentry_request_created(
 def _sentry_before_sign(
     request: "AWSRequest", signature_version: "Any", **kwargs: "Any"
 ) -> None:
-    client = sentry_sdk.get_client()
-    if client.get_integration(IDENTIFIER) is None:
+    if not _is_enabled():
         return
 
+    client = sentry_sdk.get_client()
     with capture_internal_exceptions():
         # presigned requests are executed later by another caller. Adding propagation
         # headers here would make those headers part of the signature, requiring the caller to reproduce the same values.

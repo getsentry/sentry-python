@@ -98,6 +98,7 @@ GROUPS = {
         "typesafe",
     ],
     "Cloud": [
+        "aiobotocore",
         "aws_lambda",
         "boto3",
         "chalice",

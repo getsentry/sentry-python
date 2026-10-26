@@ -71,6 +71,7 @@ if sys.version_info >= (3, 8):
     )
 
 _AUTO_ENABLING_INTEGRATIONS = [
+    "sentry_sdk.integrations.aiobotocore.AioBotocoreIntegration",
     "sentry_sdk.integrations.aiohttp.AioHttpIntegration",
     "sentry_sdk.integrations.anthropic.AnthropicIntegration",
     "sentry_sdk.integrations.ariadne.AriadneIntegration",
@@ -121,6 +122,7 @@ del _generate_default_integrations_iterator
 
 
 _MIN_VERSIONS = {
+    "aiobotocore": (2, 0),
     "aiohttp": (3, 7),
     "aiomysql": (0, 3, 0),
     "anthropic": (0, 16),

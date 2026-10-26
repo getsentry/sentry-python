@@ -1,5 +1,8 @@
 IDENTIFIER = "boto3"
 ORIGIN = f"auto.aws.{IDENTIFIER}"
+# aiobotocore clients are botocore clients, instrumented by the same code.
+AIOBOTOCORE_IDENTIFIER = "aiobotocore"
+AIOBOTOCORE_ORIGIN = f"auto.aws.{AIOBOTOCORE_IDENTIFIER}"
 CLOUD_PROVIDER = "aws"
 
 # value is used by `rpc.system` (deprecated in OTel, but we still support it for now) and `rpc.system.name`

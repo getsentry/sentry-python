@@ -17,14 +17,15 @@ from sentry_sdk.integrations.boto3._instrumentation import (
 from sentry_sdk.integrations.boto3._services.registry import (
     _resolve_service,
 )
-from sentry_sdk.integrations.boto3.consts import IDENTIFIER
+from sentry_sdk.integrations.boto3.consts import IDENTIFIER, ORIGIN
 from sentry_sdk.traces import NoOpSpan, Span, SpanStatus
 from sentry_sdk.utils import capture_internal_exceptions
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, Iterator, Optional
+    from typing import Any, Dict, Iterator, Optional, Tuple
 
     from sentry_sdk._types import Attributes
+    from sentry_sdk.integrations.boto3._services.base import _ServiceExtension
 
 try:
     from botocore.client import BaseClient
@@ -63,6 +64,70 @@ def _activate_client_span(
         scope.span = previous_span
 
 
+def _register_request_hooks(client: "BaseClient") -> None:
+    # aiobotocore clients also run botocore's `__init__`; `unique_id` registers each hook once.
+    client.meta.events.register(
+        "request-created", _sentry_request_created, unique_id="sentry-request-created"
+    )
+    # run after other `before-sign` handlers so existing baggage is preserved.
+    client.meta.events.register_last(
+        "before-sign", _sentry_before_sign, unique_id="sentry-before-sign"
+    )
+
+
+def _start_api_call_span(
+    client: "BaseClient",
+    operation_name: str,
+    api_params: "Dict[str, Any]",
+    origin: str,
+) -> "Optional[Tuple[Span, AwsCallContext, Optional[_ServiceExtension]]]":
+    ctx = AwsCallContext(operation_name, api_params)
+    with capture_internal_exceptions():
+        # add optional metadata to the context, e.g. service-name, region-name, etc.
+        ctx.add_metadata(client)
+    service_ext = _resolve_service(ctx.service_name)
+    span = _start_client_span(ctx, service_ext, origin)
+    if span is None:
+        return None
+    return span, ctx, service_ext
+
+
+def _set_error_attributes(
+    span: "Span",
+    ctx: "AwsCallContext",
+    service_ext: "Optional[_ServiceExtension]",
+    error: "BaseException",
+) -> None:
+    attributes: "Attributes" = {}
+    if service_ext is not None and isinstance(error, ClientError):
+        with capture_internal_exceptions():
+            attributes.update(service_ext.get_response_attributes(ctx, error.response))
+    with capture_internal_exceptions():
+        attributes.update(_get_error_attributes(error))
+    with capture_internal_exceptions():
+        span.set_attributes(attributes)
+
+
+def _set_response_attributes(
+    span: "Span",
+    ctx: "AwsCallContext",
+    service_ext: "Optional[_ServiceExtension]",
+    parsed: "Dict[str, Any]",
+) -> None:
+    attributes: "Attributes" = {}
+    if service_ext is not None:
+        with capture_internal_exceptions():
+            attributes.update(service_ext.get_response_attributes(ctx, parsed))
+    with capture_internal_exceptions():
+        attributes.update(_get_response_attributes(parsed))
+    with capture_internal_exceptions():
+        span.set_attributes(attributes)
+        # a service extension reports a failure that didn't raise, i.e. one
+        # in a successful response, with `error.type`.
+        if SPANDATA.ERROR_TYPE in attributes:
+            span.status = SpanStatus.ERROR
+
+
 def _patch_botocore_client() -> None:
     orig_init = BaseClient.__init__
     orig_make_api_call = BaseClient._make_api_call  # type: ignore
@@ -70,9 +135,7 @@ def _patch_botocore_client() -> None:
     def sentry_patched_init(self: "BaseClient", *args: "Any", **kwargs: "Any") -> None:
         orig_init(self, *args, **kwargs)
         with capture_internal_exceptions():
-            self.meta.events.register("request-created", _sentry_request_created)
-            # run after other `before-sign` handlers so existing baggage is preserved.
-            self.meta.events.register_last("before-sign", _sentry_before_sign)
+            _register_request_hooks(self)
 
     def sentry_patched_make_api_call(
         self: "BaseClient", operation_name: str, api_params: "Dict[str, Any]"
@@ -88,48 +151,25 @@ def _patch_botocore_client() -> None:
         if client.get_integration(IDENTIFIER) is None:
             return orig_make_api_call(self, operation_name, api_params)
 
-        span: "Optional[Span]" = None
+        api_call_span = None
         with capture_internal_exceptions():
-            ctx = AwsCallContext(operation_name, api_params)
-            with capture_internal_exceptions():
-                # add optional metadata to the context, e.g. service-name, region-name, etc.
-                ctx.add_metadata(self)
-            service_ext = _resolve_service(ctx.service_name)
-            span = _start_client_span(ctx, service_ext)
+            api_call_span = _start_api_call_span(
+                self, operation_name, api_params, ORIGIN
+            )
 
-        if span is None:
+        if api_call_span is None:
             return orig_make_api_call(self, operation_name, api_params)
 
+        span, ctx, service_ext = api_call_span
         # activate without finishing; a streaming response may outlive the call.
-        attributes: "Attributes" = {}
         try:
             with _activate_client_span(span):
                 try:
                     parsed = orig_make_api_call(self, operation_name, api_params)
                 except BaseException as error:
-                    if service_ext is not None and isinstance(error, ClientError):
-                        with capture_internal_exceptions():
-                            attributes.update(
-                                service_ext.get_response_attributes(ctx, error.response)
-                            )
-                    with capture_internal_exceptions():
-                        attributes.update(_get_error_attributes(error))
-                    with capture_internal_exceptions():
-                        span.set_attributes(attributes)
+                    _set_error_attributes(span, ctx, service_ext, error)
                     raise
-                if service_ext is not None:
-                    with capture_internal_exceptions():
-                        attributes.update(
-                            service_ext.get_response_attributes(ctx, parsed)
-                        )
-                with capture_internal_exceptions():
-                    attributes.update(_get_response_attributes(parsed))
-                with capture_internal_exceptions():
-                    span.set_attributes(attributes)
-                    # a service extension reports a failure that didn't raise, i.e. one
-                    # in a successful response, with `error.type`.
-                    if SPANDATA.ERROR_TYPE in attributes:
-                        span.status = SpanStatus.ERROR
+                _set_response_attributes(span, ctx, service_ext, parsed)
         except BaseException as error:
             _finish_span(span, error)
             raise
