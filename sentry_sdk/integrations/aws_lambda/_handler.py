@@ -1,5 +1,7 @@
 import functools
 import sys
+import time
+from datetime import datetime, timezone
 from os import environ
 from typing import TYPE_CHECKING
 from urllib.parse import urlencode
@@ -9,6 +11,7 @@ from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.data_collection import _apply_key_value_collection_filtering
 from sentry_sdk.integrations._wsgi_common import _filter_headers
 from sentry_sdk.integrations.aws_lambda._request import (
+    _get_cloudwatch_logs_url,
     _get_user_from_event,
     _make_request_event_processor,
 )
@@ -41,6 +44,14 @@ if TYPE_CHECKING:
 
 TIMEOUT_WARNING_BUFFER = 1500
 MILLIS_TO_SECONDS = 1000.0
+BYTES_PER_MEBIBYTE = 1024 * 1024
+# a first invocation that starts this long after the SDK loaded found an environment
+# that Lambda initialized ahead of demand, so no request waited for it.
+# https://docs.aws.amazon.com/lambda/latest/dg/lambda-runtime-environment.html#runtimes-lifecycle-ib
+PROACTIVE_INITIALIZATION_THRESHOLD_SECONDS = 10
+
+_sdk_loaded_at = time.monotonic()
+_cold_start = True
 
 
 def _wrap_handler(handler: "F") -> "F":
@@ -65,6 +76,10 @@ def _wrap_handler(handler: "F") -> "F":
 
         if integration is None:
             return handler(aws_event, aws_context, *args, **kwargs)
+
+        global _cold_start
+        cold_start = _cold_start
+        _cold_start = False
 
         if isinstance(aws_event, list) and len(aws_event) >= 1:
             request_data = aws_event[0]
@@ -194,8 +209,41 @@ def _wrap_handler(handler: "F") -> "F":
                         SPANDATA.AWS_LAMBDA_INVOKED_ARN: invoked_function_arn,
                         SPANDATA.AWS_LOG_GROUP_NAMES: [aws_context.log_group_name],
                         SPANDATA.AWS_LOG_STREAM_NAMES: [aws_context.log_stream_name],
+                        SPANDATA.FAAS_INSTANCE: aws_context.log_stream_name,
+                        SPANDATA.FAAS_COLDSTART: cold_start,
                     }
                 )
+
+            # https://docs.aws.amazon.com/lambda/latest/dg/configuration-envvars.html#configuration-envvars-runtime
+            with capture_internal_exceptions():
+                if "AWS_LAMBDA_FUNCTION_MEMORY_SIZE" in environ:
+                    attributes[SPANDATA.FAAS_MAX_MEMORY] = (
+                        int(environ["AWS_LAMBDA_FUNCTION_MEMORY_SIZE"])
+                        * BYTES_PER_MEBIBYTE
+                    )
+
+                # the Sentry layer runs its own handler and keeps the function's in
+                # `SENTRY_INITIAL_HANDLER`.
+                entry_point = environ.get("SENTRY_INITIAL_HANDLER") or environ.get(
+                    "_HANDLER"
+                )
+                if entry_point:
+                    attributes[SPANDATA.FAAS_ENTRY_POINT] = entry_point
+
+                initialization_type = environ.get("AWS_LAMBDA_INITIALIZATION_TYPE")
+                if initialization_type:
+                    attributes[SPANDATA.AWS_LAMBDA_INITIALIZATION_TYPE] = (
+                        initialization_type
+                    )
+
+                # provisioned concurrency and SnapStart say so in the initialization type.
+                if (
+                    cold_start
+                    and initialization_type in (None, "on-demand")
+                    and time.monotonic() - _sdk_loaded_at
+                    > PROACTIVE_INITIALIZATION_THRESHOLD_SECONDS
+                ):
+                    attributes[SPANDATA.AWS_LAMBDA_PROACTIVE_INITIALIZATION] = True
 
             # a synchronous `Invoke` passes the invoking span in `ClientContext`; it wins over
             # event headers, which a forwarded HTTP event keeps from further upstream.
@@ -214,10 +262,20 @@ def _wrap_handler(handler: "F") -> "F":
                 name=function_name,
                 parent_span=None,
                 attributes=attributes,
-            ):
+            ) as span:
+                start_time = datetime.now(timezone.utc)
+                start = time.monotonic()
                 try:
                     return handler(aws_event, aws_context, *args, **kwargs)
-                except Exception:
+                except Exception as exception:
+                    exception_type = type(exception)
+                    span.set_attribute(
+                        SPANDATA.ERROR_TYPE,
+                        exception_type.__qualname__
+                        if exception_type.__module__ == "builtins"
+                        else f"{exception_type.__module__}.{exception_type.__qualname__}",
+                    )
+
                     exc_info = sys.exc_info()
                     sentry_event, hint = event_from_exception(
                         exc_info,
@@ -226,6 +284,19 @@ def _wrap_handler(handler: "F") -> "F":
                     sentry_sdk.capture_event(sentry_event, hint=hint)
                     reraise(*exc_info)
                 finally:
+                    with capture_internal_exceptions():
+                        duration = (time.monotonic() - start) * 1000
+                        span.set_attributes(
+                            {
+                                SPANDATA.AWS_LAMBDA_EXECUTION_DURATION_IN_MILLIS: duration,
+                                SPANDATA.FAAS_DURATION_IN_MS: int(duration),
+                                SPANDATA.AWS_LAMBDA_REMAINING_TIME_IN_MILLIS: aws_context.get_remaining_time_in_millis(),
+                                SPANDATA.AWS_CLOUDWATCH_LOGS_URL: _get_cloudwatch_logs_url(
+                                    aws_context, start_time
+                                ),
+                            }
+                        )
+
                     if timeout_thread:
                         timeout_thread.stop()
 

@@ -133,13 +133,19 @@ def _get_cloudwatch_logs_url(aws_context: "Any", start_time: "datetime") -> str:
     """
     formatstring = "%Y-%m-%dT%H:%M:%SZ"
     region = environ.get("AWS_REGION", "")
+    if region.startswith("cn-"):
+        domain = "amazonaws.cn"
+    elif region.startswith("us-gov-"):
+        domain = "amazonaws-us-gov.com"
+    else:
+        domain = "aws.amazon.com"
 
     url = (
         "https://console.{domain}/cloudwatch/home?region={region}"
         "#logEventViewer:group={log_group};stream={log_stream}"
         ";start={start_time};end={end_time}"
     ).format(
-        domain="amazonaws.cn" if region.startswith("cn-") else "aws.amazon.com",
+        domain=domain,
         region=region,
         log_group=aws_context.log_group_name,
         log_stream=aws_context.log_stream_name,

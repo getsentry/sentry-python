@@ -357,6 +357,12 @@ class SPANDATA:
     Example: ["Token limit exceeded"]
     """
 
+    AWS_CLOUDWATCH_LOGS_URL = "aws.cloudwatch.logs.url"
+    """
+    The AWS console URL of the CloudWatch logs of a Lambda invocation.
+    Example: "https://console.aws.amazon.com/cloudwatch/home?region=us-east-1#logEventViewer:group=/aws/lambda/my-function;stream=2026/10/26/[$LATEST]8f2c;start=2026-10-26T12:00:00Z;end=2026-10-26T12:00:03Z"
+    """
+
     AWS_EXTENDED_REQUEST_ID = "aws.extended_request_id"
     """
     The AWS extended request ID as returned in the response headers.
@@ -369,10 +375,34 @@ class SPANDATA:
     Example: "orders"
     """
 
+    AWS_LAMBDA_EXECUTION_DURATION_IN_MILLIS = "aws.lambda.execution_duration_in_millis"
+    """
+    How long the Lambda function handler ran, in milliseconds.
+    Example: 52.4
+    """
+
+    AWS_LAMBDA_INITIALIZATION_TYPE = "aws.lambda.initialization_type"
+    """
+    How Lambda initialized the execution environment.
+    Example: "on-demand"
+    """
+
     AWS_LAMBDA_INVOKED_ARN = "aws.lambda.invoked_arn"
     """
     The full ARN of the Lambda function that was invoked.
     Example: "arn:aws:lambda:us-east-1:123456789012:function:my-function"
+    """
+
+    AWS_LAMBDA_PROACTIVE_INITIALIZATION = "aws.lambda.proactive_initialization"
+    """
+    Whether Lambda initialized the execution environment of a first invocation ahead of demand.
+    Example: true
+    """
+
+    AWS_LAMBDA_REMAINING_TIME_IN_MILLIS = "aws.lambda.remaining_time_in_millis"
+    """
+    The milliseconds left before the Lambda invocation times out, when it ends.
+    Example: 2948
     """
 
     AWS_LAMBDA_RESOURCE_MAPPING_ID = "aws.lambda.resource_mapping.id"
@@ -676,6 +706,30 @@ class SPANDATA:
     File size in bytes.
     Example: 1024
     """
+    FAAS_COLDSTART = "faas.coldstart"
+    """
+    Whether this is the first invocation of the serverless function's execution environment.
+    Example: true
+    """
+
+    FAAS_DURATION_IN_MS = "faas.duration_in_ms"
+    """
+    How long the serverless function handler ran, in milliseconds.
+    Example: 52
+    """
+
+    FAAS_ENTRY_POINT = "faas.entry_point"
+    """
+    The handler the serverless function runs.
+    Example: "index.handler"
+    """
+
+    FAAS_INSTANCE = "faas.instance"
+    """
+    The execution environment of the serverless function.
+    Example: "2026/10/26/[$LATEST]8f2c64b9d3a24f6e9b1c0d7e5a3f2b1c"
+    """
+
     FAAS_INVOCATION_ID = "faas.invocation_id"
     """
     The invocation ID of the current function invocation.
@@ -698,6 +752,12 @@ class SPANDATA:
     """
     The cloud region of the invoked function.
     Example: "eu-north-1"
+    """
+
+    FAAS_MAX_MEMORY = "faas.max_memory"
+    """
+    The memory available to the serverless function, in bytes.
+    Example: 134217728
     """
 
     FAAS_NAME = "faas.name"

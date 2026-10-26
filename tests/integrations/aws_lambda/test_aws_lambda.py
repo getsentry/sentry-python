@@ -758,6 +758,18 @@ def test_no_error(lambda_client, test_environment):
     ]
     assert _get_span_attr(attrs, SPANDATA.FAAS_TRIGGER) == "other"
     assert SPANDATA.MESSAGING_BATCH_MESSAGE_COUNT not in attrs
+    assert _get_span_attr(attrs, SPANDATA.FAAS_INSTANCE) == LATEST_FUNCTION_VERSION
+    assert _get_span_attr(attrs, SPANDATA.FAAS_MAX_MEMORY) == 128 * 1024 * 1024
+    assert _get_span_attr(attrs, SPANDATA.FAAS_ENTRY_POINT) == "index.handler"
+    duration = _get_span_attr(attrs, SPANDATA.AWS_LAMBDA_EXECUTION_DURATION_IN_MILLIS)
+    assert duration >= 0
+    assert _get_span_attr(attrs, SPANDATA.FAAS_DURATION_IN_MS) == int(duration)
+    assert _get_span_attr(attrs, SPANDATA.AWS_LAMBDA_REMAINING_TIME_IN_MILLIS) > 0
+    assert _get_span_attr(attrs, SPANDATA.AWS_CLOUDWATCH_LOGS_URL).startswith(
+        "https://console.aws.amazon.com/cloudwatch/home?region=us-east-1"
+        "#logEventViewer:group=aws/lambda/BasicOkSpanStreaming;stream=$LATEST;start="
+    )
+    assert SPANDATA.ERROR_TYPE not in attrs
 
 
 def test_error(lambda_client, test_environment):
@@ -813,6 +825,24 @@ def test_error(lambda_client, test_environment):
     ]
     assert _get_span_attr(attrs, SPANDATA.FAAS_TRIGGER) == "other"
     assert SPANDATA.MESSAGING_BATCH_MESSAGE_COUNT not in attrs
+    assert _get_span_attr(attrs, SPANDATA.ERROR_TYPE) == "Exception"
+
+
+def test_cold_start(lambda_client, test_environment):
+    for _ in range(2):
+        lambda_client.invoke(FunctionName="ColdStart", Payload=json.dumps({}))
+
+    first, second = [
+        s["attributes"]
+        for s in test_environment["server"].span_items
+        if s["is_segment"]
+    ]
+    assert _get_span_attr(first, SPANDATA.FAAS_COLDSTART) is True
+    assert _get_span_attr(second, SPANDATA.FAAS_COLDSTART) is False
+    # the first invocation started right after the environment was initialized.
+    assert SPANDATA.AWS_LAMBDA_PROACTIVE_INITIALIZATION not in first
+    # the Sentry layer runs its own handler.
+    assert _get_span_attr(first, SPANDATA.FAAS_ENTRY_POINT) == "index.handler"
 
 
 def _sqs_record():
