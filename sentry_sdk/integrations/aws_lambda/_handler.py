@@ -20,7 +20,7 @@ from sentry_sdk.integrations.aws_lambda.consts import (
     ORIGIN,
 )
 from sentry_sdk.scope import Scope
-from sentry_sdk.traces import SegmentNameSource
+from sentry_sdk.traces import SENTRY_TRACE_HEADER_NAME, SegmentNameSource
 from sentry_sdk.utils import (
     TimeoutThread,
     capture_internal_exceptions,
@@ -187,7 +187,18 @@ def _wrap_handler(handler: "F") -> "F":
                     }
                 )
 
-            sentry_sdk.continue_trace(headers)
+            # a synchronous `Invoke` passes the invoking span in `ClientContext`; it wins over
+            # event headers, which a forwarded HTTP event keeps from further upstream.
+            # https://docs.aws.amazon.com/lambda/latest/dg/python-context.html
+            client_context = aws_context.client_context
+            if (
+                client_context is not None
+                and client_context.custom
+                and SENTRY_TRACE_HEADER_NAME in client_context.custom
+            ):
+                sentry_sdk.continue_trace(client_context.custom)
+            else:
+                sentry_sdk.continue_trace(headers)
             Scope.set_custom_sampling_context(sampling_context)
             with sentry_sdk.start_span(
                 name=function_name,
