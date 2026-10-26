@@ -2,8 +2,8 @@ import functools
 import sys
 import time
 from contextlib import nullcontext
-from datetime import datetime, timezone
-from os import environ
+from datetime import datetime, timedelta, timezone
+from os import environ, sysconf
 from typing import TYPE_CHECKING
 
 import sentry_sdk
@@ -51,6 +51,16 @@ PROACTIVE_INITIALIZATION_THRESHOLD_SECONDS = 10
 
 _sdk_loaded_at = time.monotonic()
 _cold_start = True
+
+
+def _get_process_start_time() -> "datetime":
+    # the process's age is the system uptime minus its start time since boot.
+    # https://man7.org/linux/man-pages/man5/proc_pid_stat.5.html
+    with open("/proc/uptime") as uptime_file, open("/proc/self/stat") as stat_file:
+        uptime = float(uptime_file.read().split()[0])
+        started = int(stat_file.read().rsplit(")", 1)[1].split()[19])
+    process_age = uptime - started / sysconf("SC_CLK_TCK")
+    return datetime.now(timezone.utc) - timedelta(seconds=process_age)
 
 
 def _wrap_handler(handler: "F") -> "F":
@@ -187,6 +197,7 @@ def _wrap_handler(handler: "F") -> "F":
                     }
                 )
 
+            waited_for_initialization = False
             # https://docs.aws.amazon.com/lambda/latest/dg/configuration-envvars.html#configuration-envvars-runtime
             with capture_internal_exceptions():
                 initialization_type = environ["AWS_LAMBDA_INITIALIZATION_TYPE"]
@@ -204,13 +215,14 @@ def _wrap_handler(handler: "F") -> "F":
                 )
 
                 # provisioned concurrency and SnapStart say so in the initialization type.
-                if (
-                    cold_start
-                    and initialization_type == "on-demand"
-                    and time.monotonic() - _sdk_loaded_at
-                    > PROACTIVE_INITIALIZATION_THRESHOLD_SECONDS
-                ):
-                    attributes[SPANDATA.AWS_LAMBDA_PROACTIVE_INITIALIZATION] = True
+                if cold_start and initialization_type == "on-demand":
+                    if (
+                        time.monotonic() - _sdk_loaded_at
+                        > PROACTIVE_INITIALIZATION_THRESHOLD_SECONDS
+                    ):
+                        attributes[SPANDATA.AWS_LAMBDA_PROACTIVE_INITIALIZATION] = True
+                    else:
+                        waited_for_initialization = True
 
             # a synchronous `Invoke` passes the invoking span in `ClientContext`; it wins over
             # event headers, which a forwarded HTTP event keeps from further upstream.
@@ -232,6 +244,19 @@ def _wrap_handler(handler: "F") -> "F":
             ) as span:
                 start_time = datetime.now(timezone.utc)
                 start = time.monotonic()
+                if waited_for_initialization:
+                    with capture_internal_exceptions():
+                        # the initialization this invocation waited for, from the process start.
+                        sentry_sdk.start_span(
+                            name=f"{function_name} init",
+                            attributes={
+                                SPANDATA.SENTRY_OP: OP.FUNCTION_AWS_INIT,
+                                SPANDATA.SENTRY_ORIGIN: ORIGIN,
+                                SPANDATA.SENTRY_KIND: "internal",
+                            },
+                            active=False,
+                            start_timestamp=_get_process_start_time(),
+                        ).end(end_timestamp=span.start_timestamp)
                 try:
                     process_span: "ContextManager[Any]" = nullcontext()
                     with capture_internal_exceptions():

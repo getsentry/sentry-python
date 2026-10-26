@@ -837,13 +837,33 @@ def test_cold_start(lambda_client, test_environment):
     first_segment, second_segment = [
         s for s in span_items if s["is_segment"] and s["name"] == "ColdStart"
     ]
-    # the Sentry layer imports the function's module in the first invocation only.
-    (import_span,) = [
-        s
-        for s in span_items
-        if not s["is_segment"]
-        and s["trace_id"] in (first_segment["trace_id"], second_segment["trace_id"])
-    ]
+    # the initialization and the Sentry layer's import of the function's module are
+    # only in the first invocation.
+    init_span, import_span = sorted(
+        (
+            s
+            for s in span_items
+            if not s["is_segment"]
+            and s["trace_id"] in (first_segment["trace_id"], second_segment["trace_id"])
+        ),
+        key=lambda s: s["start_timestamp"],
+    )
+    assert init_span["name"] == "ColdStart init"
+    assert init_span["parent_span_id"] == first_segment["span_id"]
+    assert (
+        _get_span_attr(init_span["attributes"], SPANDATA.SENTRY_OP)
+        == OP.FUNCTION_AWS_INIT
+    )
+    assert _get_span_attr(init_span["attributes"], SPANDATA.SENTRY_ORIGIN) == ORIGIN
+    # it starts when the process started, at most 10 s (Lambda's on-demand initialization limit)
+    # before the invocation, and ends when the invocation starts.
+    assert (
+        first_segment["start_timestamp"] - 10
+        < init_span["start_timestamp"]
+        < first_segment["start_timestamp"]
+    )
+    assert init_span["end_timestamp"] == first_segment["start_timestamp"]
+
     assert import_span["name"] == "index"
     assert import_span["parent_span_id"] == first_segment["span_id"]
     assert (
