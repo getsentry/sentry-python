@@ -855,6 +855,39 @@ def test_trace_continuation(lambda_client, test_environment):
     assert SPANDATA.FAAS_INVOCATION_ID in attrs
 
 
+@pytest.mark.parametrize(
+    "headers",
+    [
+        pytest.param({}, id="client-context"),
+        # `ClientContext` wins over event headers.
+        pytest.param(
+            {"sentry-trace": "0f4c2a5b8d9e4f1a2b3c4d5e6f7a8b9c-1a2b3c4d5e6f7a8b-1"},
+            id="client-context-and-event-headers",
+        ),
+    ],
+)
+def test_trace_continuation_from_client_context(
+    lambda_client, test_environment, headers
+):
+    payload = {
+        "headers": headers,
+        # `ClientContextTrace` passes it to the runtime as the invocation's `ClientContext`.
+        "client_context": {
+            "custom": {
+                "sentry-trace": "471a43a4192642f0b136d5159a501701-6e8f22c393e68f19-1"
+            }
+        },
+    }
+
+    lambda_client.invoke(FunctionName="ClientContextTrace", Payload=json.dumps(payload))
+
+    (segment_span,) = [
+        s for s in test_environment["server"].span_items if s["is_segment"]
+    ]
+    assert segment_span["trace_id"] == "471a43a4192642f0b136d5159a501701"
+    assert segment_span["parent_span_id"] == "6e8f22c393e68f19"
+
+
 def test_request_attributes(lambda_client, test_environment):
     payload = {
         "headers": {
