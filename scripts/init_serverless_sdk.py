@@ -69,10 +69,23 @@ class AWSLambdaModuleLoader:
         return getattr(self.lambda_function_module, self.handler_name)
 
 
-def sentry_lambda_handler(event: "Any", context: "Any") -> None:
+_entry_point: "Any" = None
+_module_loader: "AWSLambdaModuleLoader | None" = None
+
+
+def _reset_loader() -> None:
+    global _entry_point, _module_loader
+    _entry_point = None
+    _module_loader = None
+
+
+def sentry_lambda_handler(event: "Any", context: "Any") -> "Any":
     """
     Handler function that invokes a lambda handler which path is defined in
     environment variables as "SENTRY_INITIAL_HANDLER"
     """
-    module_loader = AWSLambdaModuleLoader(os.environ["SENTRY_INITIAL_HANDLER"])
-    return module_loader.get_lambda_handler()(event, context)
+    global _entry_point, _module_loader
+    if _entry_point is None:
+        _module_loader = AWSLambdaModuleLoader(os.environ["SENTRY_INITIAL_HANDLER"])
+        _entry_point = _module_loader.get_lambda_handler()
+    return _entry_point(event, context)
