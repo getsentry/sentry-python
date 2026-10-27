@@ -27,6 +27,9 @@ LAMBDA_FUNCTION_WITH_EMBEDDED_SDK_DIR = (
 LAMBDA_FUNCTION_TIMEOUT = 10
 SAM_PORT = 3001
 
+# functions whose handler is a path instead of `index.handler`.
+INITIAL_HANDLERS = {"PathHandler": "app/index.handler"}
+
 PYTHON_VERSION = f"python{sys.version_info.major}.{sys.version_info.minor}"
 
 # Match the host CPU architecture so local runs on ARM machines (e.g. macOS)
@@ -117,7 +120,9 @@ class LocalLambdaStack(Stack):
                     "Environment": {
                         "Variables": {
                             "SENTRY_DSN": dsn,
-                            "SENTRY_INITIAL_HANDLER": "index.handler",
+                            "SENTRY_INITIAL_HANDLER": INITIAL_HANDLERS.get(
+                                lambda_dir, "index.handler"
+                            ),
                             "SENTRY_TRACES_SAMPLE_RATE": "1.0",
                         }
                     },
