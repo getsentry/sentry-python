@@ -297,7 +297,6 @@ TEST_SUITE_CONFIG = {
             # affected interpreters.
             "py3.10,py3.11": ["filelock>=4.0.3"],
         },
-        "include": "<=1.96",  # https://github.com/BerriAI/litellm/issues/36384
     },
     "litestar": {
         "package": "litestar",
