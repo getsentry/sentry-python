@@ -364,6 +364,16 @@ if TYPE_CHECKING:
 
     MetricProcessor = Callable[[Metric, Hint], Optional[Metric]]
 
+    SpanLink = TypedDict(
+        "SpanLink",
+        {
+            "span_id": str,
+            "trace_id": str,
+            "sampled": NotRequired[bool],
+            "attributes": NotRequired[Attributes],
+        },
+    )
+
     SpanJSON = TypedDict(
         "SpanJSON",
         {
@@ -376,6 +386,7 @@ if TYPE_CHECKING:
             "start_timestamp": float,
             "end_timestamp": NotRequired[float],
             "attributes": NotRequired[Attributes],
+            "links": NotRequired[list[SpanLink]],
             "_segment_span": NotRequired["sentry_sdk.traces.Span"],
         },
     )

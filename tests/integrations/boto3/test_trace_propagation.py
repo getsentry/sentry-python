@@ -3,6 +3,7 @@ from threading import Thread
 from urllib.parse import parse_qs, urlparse
 
 import boto3
+from botocore.auth import SIGNED_HEADERS_BLACKLIST
 from botocore.config import Config
 
 import sentry_sdk
@@ -12,6 +13,9 @@ from sentry_sdk.utils import (
     _get_aws_sigv4_signed_headers_from_authorization_header,
     _get_aws_sigv4_signed_headers_from_url_query_string,
 )
+
+# botocore 1.43.115+ never signs `baggage`.
+BOTOCORE_SIGNS_BAGGAGE = "baggage" not in SIGNED_HEADERS_BLACKLIST
 
 
 class _AwsRequestHandler(BaseHTTPRequestHandler):
@@ -111,7 +115,8 @@ def test_botocore_merges_propagation_before_sigv4_signing(
         signed_headers = _get_aws_sigv4_signed_headers_from_authorization_header(
             headers.get("Authorization", "")
         )
-        assert signed_headers >= {"baggage", "sentry-trace"}
+        assert "sentry-trace" in signed_headers
+        assert ("baggage" in signed_headers) == BOTOCORE_SIGNS_BAGGAGE
     finally:
         server.shutdown()
         server.server_close()
@@ -153,15 +158,22 @@ def test_botocore_without_boto3_integration_preserves_signed_baggage(
 
         assert response["ResponseMetadata"]["HTTPStatusCode"] == 200
         headers = _AwsRequestHandler.requests[-1]
-        # signed `baggage`: leave as-is.
-        assert headers.get_all("baggage") == ["vendor=value"]
         # unsigned `sentry-trace`: add it.
         assert len(headers.get_all("sentry-trace")) == 1
         signed_headers = _get_aws_sigv4_signed_headers_from_authorization_header(
             headers.get("Authorization", "")
         )
-        assert "baggage" in signed_headers
         assert "sentry-trace" not in signed_headers
+        if BOTOCORE_SIGNS_BAGGAGE:
+            # signed `baggage`: leave as-is.
+            assert headers.get_all("baggage") == ["vendor=value"]
+            assert "baggage" in signed_headers
+        else:
+            # unsigned `baggage`: append Sentry members as a separate field.
+            vendor_baggage, sentry_baggage = headers.get_all("baggage")
+            assert vendor_baggage == "vendor=value"
+            assert sentry_baggage.startswith("sentry-trace_id=")
+            assert "baggage" not in signed_headers
     finally:
         server.shutdown()
         server.server_close()

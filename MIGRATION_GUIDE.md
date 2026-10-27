@@ -13,7 +13,7 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 - If a `before_breadcrumb` callback, an event processor, or an error processor raises an exception, the breadcrumb or event is now dropped. Previously, the SDK would log the exception and continue processing the unmodified breadcrumb or event.
 - The top-level manual tracing API is now wired to span streaming tracing:
   - `sentry_sdk.start_transaction` doesn't exist anymore. Use `sentry_sdk.start_span` instead.
-  - `sentry_sdk.start_span` accepts four arguments now: `name` (mandatory), `attributes`, `parent_span` (default: current active span), `active` (default: `True`).
+  - `sentry_sdk.start_span` accepts five arguments now: `name` (mandatory), `attributes`, `parent_span` (default: current active span), `active` (default: `True`), `links` (spans to link to without making them the parent; more can be added with `span.add_link()` / `span.add_links()`).
   - The `@trace` decorator accepts three optional arguments: `name`, `attributes`, `active` (default: `True`).
   - `sentry_sdk.continue_trace` accepts a single dictionary with the incoming headers or environment data. It is no longer a context manager and it does not return a span/transaction anymore. A span needs to be started manually afterwards.
   - `sentry_sdk.new_trace` resets the trace.
@@ -252,7 +252,7 @@ Additionally, the OpenAI integration now sets `gen_ai.operation.name` to `chat` 
 - The `update_current_span` API was removed.
 - The `sentry_sdk.tracing` module was removed, including the `Span`, `Transaction`, `NoOpSpan`, and `TransactionSource` classes. Import tracing primitives from `sentry_sdk.traces` instead. `TransactionSource` was replaced by `sentry_sdk.traces.SegmentNameSource`, which has the same values. The span classes from 2.x's span streaming mode, `sentry_sdk.traces.StreamedSpan` and `NoOpStreamedSpan`, are now called `Span` and `NoOpSpan`; the old names remain available as aliases.
 - The `stream_gen_ai_spans` option was removed. All spans are streamed now. If you previously set `stream_gen_ai_spans=False`, note that GenAI integrations no longer truncate messages (previously, only the last message was kept and truncated), and the OpenAI, Anthropic, LangChain, LiteLLM, and OpenAI Agents integrations no longer replace binary content in messages (for example, base64-encoded images) with `[Filtered]`. To prevent prompts and responses from being sent, set `data_collection`'s `gen_ai` `inputs` and/or `outputs` to `False`.
-- The `trace_lifecycle` option (both top-level and experimental) was removed. Span streaming is now the only tracing mode.
+- Span streaming is now the only tracing mode. The experimental `trace_lifecycle` option was removed. The top-level `trace_lifecycle` option is still accepted, but any value other than `"stream"` is ignored and logs a warning.
 
 ### Integrations
 

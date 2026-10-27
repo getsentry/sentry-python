@@ -15,6 +15,6 @@ permissions:
 
 jobs:
   changelog-preview:
-    uses: getsentry/craft/.github/workflows/changelog-preview.yml@3f2abdc5703191d12ef2cc013f792f1bd220f44d # v2
+    uses: getsentry/craft/.github/workflows/changelog-preview.yml@7a7857552e2cdc08b502de96e6076849c01fba32 # v2
     secrets:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

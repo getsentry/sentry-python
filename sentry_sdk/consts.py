@@ -363,6 +363,12 @@ class SPANDATA:
     Example: "wzHcyEWfmOGDIE5QOhTAqFDoDWP3y8IUvpNINCwL9N4TEHbUw0/gZJ+VZTmCNCWR7fezEN3eCiQ="
     """
 
+    AWS_KINESIS_STREAM_NAME = "aws.kinesis.stream_name"
+    """
+    The name of the AWS Kinesis stream the request refers to.
+    Example: "orders"
+    """
+
     AWS_LAMBDA_INVOKED_ARN = "aws.lambda.invoked_arn"
     """
     The full ARN of the Lambda function that was invoked.
@@ -423,6 +429,48 @@ class SPANDATA:
     Example: "dfRtDYWFbkRONycy.Yxwh66Yjlx.cph0gtNBtJ"
     """
 
+    AWS_STEP_FUNCTIONS_ACTIVITY_ARN = "aws.step_functions.activity.arn"
+    """
+    The ARN of the AWS Step Functions activity the request refers to.
+    Example: "arn:aws:states:us-east-1:123456789012:activity:approve-order"
+    """
+
+    AWS_STEP_FUNCTIONS_ACTIVITY_NAME = "aws.step_functions.activity.name"
+    """
+    The name of the AWS Step Functions activity the request refers to.
+    Example: "approve-order"
+    """
+
+    AWS_STEP_FUNCTIONS_EXECUTION_ARN = "aws.step_functions.execution.arn"
+    """
+    The ARN of the AWS Step Functions execution the request refers to.
+    Example: "arn:aws:states:us-east-1:123456789012:execution:orders:4f9b1c2e"
+    """
+
+    AWS_STEP_FUNCTIONS_STATE_MACHINE_ARN = "aws.step_functions.state_machine.arn"
+    """
+    The ARN of the AWS Step Functions state machine the request refers to.
+    Example: "arn:aws:states:us-east-1:123456789012:stateMachine:orders"
+    """
+
+    AWS_STEP_FUNCTIONS_STATE_MACHINE_NAME = "aws.step_functions.state_machine.name"
+    """
+    The name of the AWS Step Functions state machine the request refers to, without a version or alias qualifier.
+    Example: "orders"
+    """
+
+    AWS_SECRETSMANAGER_SECRET_ARN = "aws.secretsmanager.secret.arn"
+    """
+    The ARN of the Secrets Manager secret the request refers to.
+    Example: "arn:aws:secretsmanager:us-east-1:123456789012:secret:db-password-AbCdEf"
+    """
+
+    AWS_SECRETSMANAGER_SECRET_NAME = "aws.secretsmanager.secret.name"
+    """
+    The name of the Secrets Manager secret the request refers to.
+    Example: "db-password"
+    """
+
     CACHE_HIT = "cache.hit"
     """
     A boolean indicating whether the requested data was found in the cache.
@@ -451,12 +499,6 @@ class SPANDATA:
     """
     The cloud account ID the resource is assigned to.
     Example: "123456789012"
-    """
-
-    CLOUD_AVAILABILITY_ZONE = "cloud.availability_zone"
-    """
-    Cloud regions often have multiple, isolated locations known as zones to increase availability
-    Example: "us-east-1c"
     """
 
     CLOUD_PLATFORM = "cloud.platform"
@@ -1507,6 +1549,7 @@ class ClientConstructor:
         attach_stacktrace: bool = True,
         ca_certs: "Optional[str]" = None,
         traces_sample_rate: "Optional[float]" = None,
+        trace_lifecycle: "Optional[str]" = None,
         traces_sampler: "Optional[TracesSampler]" = None,
         profiler_mode: "Optional[ContinuousProfilerMode]" = None,
         profile_lifecycle: 'Literal["manual", "trace"]' = "manual",
@@ -1821,6 +1864,10 @@ class ClientConstructor:
             If you want to disable all tracing you need to set `traces_sample_rate=None`. In this case, no new traces
             will be started and no incoming traces will be continued.
 
+        :param trace_lifecycle: Controls how traces are sent. Span streaming is the only supported tracing mode,
+            so the only accepted value is `"stream"`. Other values are ignored and a warning is logged.
+            This option only exists for backwards compatibility with 2.x and has no effect.
+
         :param traces_sampler: A function responsible for determining the percentage chance a given service span will be
             sent to Sentry.
 
@@ -1947,4 +1994,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "2.72.0"
+VERSION = "3.0.0b2"
