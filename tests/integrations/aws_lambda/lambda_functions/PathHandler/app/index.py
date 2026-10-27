@@ -6,4 +6,4 @@ num_invocations = 0
 def handler(event, context):
     global num_invocations
     num_invocations += 1
-    return {"invocations": num_invocations}
+    return {"num_invocations": num_invocations}
