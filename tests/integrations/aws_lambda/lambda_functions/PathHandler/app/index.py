@@ -1,8 +1,9 @@
-# counts the invocations since this module was loaded.
-invocations = 0
+# counts the invocations since this module was loaded; gets reset on cold start or
+# when the module is reloaded.
+num_invocations = 0
 
 
 def handler(event, context):
-    global invocations
-    invocations += 1
-    return {"invocations": invocations}
+    global num_invocations
+    num_invocations += 1
+    return {"invocations": num_invocations}

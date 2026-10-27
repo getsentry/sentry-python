@@ -202,16 +202,17 @@ def test_init_error(lambda_client, test_environment):
 
 
 def test_path_handler_loaded_once(lambda_client, test_environment):
-    invocations = [
+    num_invocations = [
         json.loads(
             lambda_client.invoke(FunctionName="PathHandler", Payload=json.dumps({}))[
                 "Payload"
             ].read()
-        )["invocations"]
+        )["num_invocations"]
         for _ in range(2)
     ]
-    # the Sentry layer loads the function's module once, not on every invocation.
-    assert invocations == [1, 2]
+    # Sentry layer should load the function's module once (on cold start or whenever
+    # the module is reloaded), not on every warm invocation.
+    assert num_invocations == [1, 2]
 
 
 def test_timeout_error_scope_modified(lambda_client, test_environment):

@@ -40,7 +40,7 @@ class AWSLambdaModuleLoader:
         """
         # like the Lambda runtime: `dir/file` is the module `dir.file`, which `sys.modules`
         # keeps, so its code only runs on the first invocation.
-        # https://github.com/aws/aws-lambda-python-runtime-interface-client/blob/4.2.2/awslambdaric/bootstrap.py#L53
+        # https://github.com/aws/aws-lambda-python-runtime-interface-client/blob/fa2462d93d11da632aad8f8bfb07a3e060438150/awslambdaric/bootstrap.py#L53
         self.lambda_function_module = importlib.import_module(
             module_path.replace("/", ".")
         )
