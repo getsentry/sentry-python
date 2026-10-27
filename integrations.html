@@ -2,7 +2,7 @@
 <html lang="en" data-accent-color="violet" data-content_root="./">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Integrations - sentry-python 2.73.0 documentation</title><link rel="index" title="Index" href="genindex.html" /><link rel="search" title="Search" href="search.html" /><link rel="next" title="API Docs" href="apidocs.html" /><link rel="prev" title="Top Level API" href="api.html" /><script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Integrations - sentry-python 3.0.0b2 documentation</title><link rel="index" title="Index" href="genindex.html" /><link rel="search" title="Search" href="search.html" /><link rel="next" title="API Docs" href="apidocs.html" /><link rel="prev" title="Top Level API" href="api.html" /><script>
     function setColorMode(t){let e=document.documentElement;e.setAttribute("data-color-mode",t);let a=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches,s=t;"auto"===t&&(s=a?"dark":"light"),"light"===s?(e.classList.remove("dark"),e.classList.add("light")):(e.classList.remove("light"),e.classList.add("dark"))}
     setColorMode(localStorage._theme||"auto");
   </script><link rel="stylesheet" type="text/css" href="_static/pygments.css?v=e1a1ceaf" />
@@ -118,12 +118,8 @@ data-aria-dark="Switch to auto color mode">
 <dl class="py function">
 <dt class="sig sig-object py" id="sentry_sdk.integrations.logging.ignore_logger">
 <span class="sig-prename descclassname"><span class="pre">sentry_sdk.integrations.logging.</span></span><span class="sig-name descname"><span class="pre">ignore_logger</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/integrations/logging.html#ignore_logger"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.integrations.logging.ignore_logger" title="Link to this definition">#</a></dt>
-<dd><p>This disables recording (both in breadcrumbs and as events) calls to
-a logger of a specific name.  Among other uses, many of our integrations
-use this to prevent their actions being recorded as breadcrumbs. Exposed
-to users as a way to quiet spammy loggers.</p>
-<p>This does <strong>not</strong> affect Sentry Logs — use
-<code class="xref py py-func docutils literal notranslate"><span class="pre">ignore_logger_for_sentry_logs()</span></code> for that.</p>
+<dd><p>This disables recording as Sentry Logs calls to a logger of a
+specific name.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><p><strong>name</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a></span>) – The name of the logger to ignore (same string you would pass to <code class="docutils literal notranslate"><span class="pre">logging.getLogger</span></code>).</p>
@@ -137,15 +133,13 @@ to users as a way to quiet spammy loggers.</p>
 <dl class="py class">
 <dt class="sig sig-object py" id="sentry_sdk.integrations.logging.EventHandler">
 <em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">sentry_sdk.integrations.logging.</span></span><span class="sig-name descname"><span class="pre">EventHandler</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">level</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/integrations/logging.html#EventHandler"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.integrations.logging.EventHandler" title="Link to this definition">#</a></dt>
-<dd><p>A logging handler that emits Sentry events for each log record</p>
-<p>Note that you do not have to use this class if the logging integration is enabled, which it is by default.</p>
+<dd><p>A logging handler that emits Sentry events for each log record.</p>
 </dd></dl>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="sentry_sdk.integrations.logging.BreadcrumbHandler">
 <em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">sentry_sdk.integrations.logging.</span></span><span class="sig-name descname"><span class="pre">BreadcrumbHandler</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">level</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/integrations/logging.html#BreadcrumbHandler"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.integrations.logging.BreadcrumbHandler" title="Link to this definition">#</a></dt>
 <dd><p>A logging handler that records breadcrumbs for each log record.</p>
-<p>Note that you do not have to use this class if the logging integration is enabled, which it is by default.</p>
 </dd></dl>
 
 </section>
@@ -194,7 +188,7 @@ to users as a way to quiet spammy loggers.</p>
     </div>
   </div>
 </footer>
-      <script src="_static/documentation_options.js?v=9b795c81"></script>
+      <script src="_static/documentation_options.js?v=1ea26b0a"></script>
       <script src="_static/doctools.js?v=9bcbadda"></script>
       <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
       <script src="_static/shibuya.js?v=50760d75"></script></body>

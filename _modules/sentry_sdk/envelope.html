@@ -2,7 +2,7 @@
 <html lang="en" data-accent-color="violet" data-content_root="../../">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>sentry_sdk.envelope - sentry-python 2.73.0 documentation</title><link rel="index" title="Index" href="../../genindex.html" /><link rel="search" title="Search" href="../../search.html" /><script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>sentry_sdk.envelope - sentry-python 3.0.0b2 documentation</title><link rel="index" title="Index" href="../../genindex.html" /><link rel="search" title="Search" href="../../search.html" /><script>
     function setColorMode(t){let e=document.documentElement;e.setAttribute("data-color-mode",t);let a=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches,s=t;"auto"===t&&(s=a?"dark":"light"),"light"===s?(e.classList.remove("dark"),e.classList.add("light")):(e.classList.remove("light"),e.classList.add("dark"))}
     setColorMode(localStorage._theme||"auto");
   </script><link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=e1a1ceaf" />
@@ -134,7 +134,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="23"><span class="w">    </span><span class="sd">"""</span>
 </span><span data-line="24"><span class="sd">    Represents a Sentry Envelope. The calling code is responsible for adhering to the constraints</span>
 </span><span data-line="25"><span class="sd">    documented in the Sentry docs: https://develop.sentry.dev/sdk/envelopes/#data-model. In particular,</span>
-</span><span data-line="26"><span class="sd">    each envelope may have at most one Item with type "event" or "transaction" (but not both).</span>
+</span><span data-line="26"><span class="sd">    each envelope may have at most one Item with type "event".</span>
 </span><span data-line="27"><span class="sd">    """</span>
 </span><span data-line="28">
 </span><span data-line="29">    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
@@ -164,289 +164,261 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="53">    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 </span><span data-line="54">        <span class="bp">self</span><span class="o">.</span><span class="n">add_item</span><span class="p">(</span><span class="n">Item</span><span class="p">(</span><span class="n">payload</span><span class="o">=</span><span class="n">PayloadRef</span><span class="p">(</span><span class="n">json</span><span class="o">=</span><span class="n">event</span><span class="p">),</span> <span class="nb">type</span><span class="o">=</span><span class="s2">"event"</span><span class="p">))</span>
 </span><span data-line="55">
-</span><span data-line="56">    <span class="k">def</span><span class="w"> </span><span class="nf">add_transaction</span><span class="p">(</span>
+</span><span data-line="56">    <span class="k">def</span><span class="w"> </span><span class="nf">add_profile_chunk</span><span class="p">(</span>
 </span><span data-line="57">        <span class="bp">self</span><span class="p">,</span>
-</span><span data-line="58">        <span class="n">transaction</span><span class="p">:</span> <span class="s2">"Event"</span><span class="p">,</span>
+</span><span data-line="58">        <span class="n">profile_chunk</span><span class="p">:</span> <span class="s2">"Any"</span><span class="p">,</span>
 </span><span data-line="59">    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="60">        <span class="bp">self</span><span class="o">.</span><span class="n">add_item</span><span class="p">(</span><span class="n">Item</span><span class="p">(</span><span class="n">payload</span><span class="o">=</span><span class="n">PayloadRef</span><span class="p">(</span><span class="n">json</span><span class="o">=</span><span class="n">transaction</span><span class="p">),</span> <span class="nb">type</span><span class="o">=</span><span class="s2">"transaction"</span><span class="p">))</span>
-</span><span data-line="61">
-</span><span data-line="62">    <span class="k">def</span><span class="w"> </span><span class="nf">add_profile</span><span class="p">(</span>
-</span><span data-line="63">        <span class="bp">self</span><span class="p">,</span>
-</span><span data-line="64">        <span class="n">profile</span><span class="p">:</span> <span class="s2">"Any"</span><span class="p">,</span>
-</span><span data-line="65">    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="66">        <span class="bp">self</span><span class="o">.</span><span class="n">add_item</span><span class="p">(</span><span class="n">Item</span><span class="p">(</span><span class="n">payload</span><span class="o">=</span><span class="n">PayloadRef</span><span class="p">(</span><span class="n">json</span><span class="o">=</span><span class="n">profile</span><span class="p">),</span> <span class="nb">type</span><span class="o">=</span><span class="s2">"profile"</span><span class="p">))</span>
+</span><span data-line="60">        <span class="bp">self</span><span class="o">.</span><span class="n">add_item</span><span class="p">(</span>
+</span><span data-line="61">            <span class="n">Item</span><span class="p">(</span>
+</span><span data-line="62">                <span class="n">payload</span><span class="o">=</span><span class="n">PayloadRef</span><span class="p">(</span><span class="n">json</span><span class="o">=</span><span class="n">profile_chunk</span><span class="p">),</span>
+</span><span data-line="63">                <span class="nb">type</span><span class="o">=</span><span class="s2">"profile_chunk"</span><span class="p">,</span>
+</span><span data-line="64">                <span class="n">headers</span><span class="o">=</span><span class="p">{</span><span class="s2">"platform"</span><span class="p">:</span> <span class="n">profile_chunk</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"platform"</span><span class="p">,</span> <span class="s2">"python"</span><span class="p">)},</span>
+</span><span data-line="65">            <span class="p">)</span>
+</span><span data-line="66">        <span class="p">)</span>
 </span><span data-line="67">
-</span><span data-line="68">    <span class="k">def</span><span class="w"> </span><span class="nf">add_profile_chunk</span><span class="p">(</span>
+</span><span data-line="68">    <span class="k">def</span><span class="w"> </span><span class="nf">add_checkin</span><span class="p">(</span>
 </span><span data-line="69">        <span class="bp">self</span><span class="p">,</span>
-</span><span data-line="70">        <span class="n">profile_chunk</span><span class="p">:</span> <span class="s2">"Any"</span><span class="p">,</span>
+</span><span data-line="70">        <span class="n">checkin</span><span class="p">:</span> <span class="s2">"Any"</span><span class="p">,</span>
 </span><span data-line="71">    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="72">        <span class="bp">self</span><span class="o">.</span><span class="n">add_item</span><span class="p">(</span>
-</span><span data-line="73">            <span class="n">Item</span><span class="p">(</span>
-</span><span data-line="74">                <span class="n">payload</span><span class="o">=</span><span class="n">PayloadRef</span><span class="p">(</span><span class="n">json</span><span class="o">=</span><span class="n">profile_chunk</span><span class="p">),</span>
-</span><span data-line="75">                <span class="nb">type</span><span class="o">=</span><span class="s2">"profile_chunk"</span><span class="p">,</span>
-</span><span data-line="76">                <span class="n">headers</span><span class="o">=</span><span class="p">{</span><span class="s2">"platform"</span><span class="p">:</span> <span class="n">profile_chunk</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"platform"</span><span class="p">,</span> <span class="s2">"python"</span><span class="p">)},</span>
-</span><span data-line="77">            <span class="p">)</span>
-</span><span data-line="78">        <span class="p">)</span>
-</span><span data-line="79">
-</span><span data-line="80">    <span class="k">def</span><span class="w"> </span><span class="nf">add_checkin</span><span class="p">(</span>
-</span><span data-line="81">        <span class="bp">self</span><span class="p">,</span>
-</span><span data-line="82">        <span class="n">checkin</span><span class="p">:</span> <span class="s2">"Any"</span><span class="p">,</span>
-</span><span data-line="83">    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="84">        <span class="bp">self</span><span class="o">.</span><span class="n">add_item</span><span class="p">(</span><span class="n">Item</span><span class="p">(</span><span class="n">payload</span><span class="o">=</span><span class="n">PayloadRef</span><span class="p">(</span><span class="n">json</span><span class="o">=</span><span class="n">checkin</span><span class="p">),</span> <span class="nb">type</span><span class="o">=</span><span class="s2">"check_in"</span><span class="p">))</span>
-</span><span data-line="85">
-</span><span data-line="86">    <span class="k">def</span><span class="w"> </span><span class="nf">add_session</span><span class="p">(</span>
-</span><span data-line="87">        <span class="bp">self</span><span class="p">,</span>
-</span><span data-line="88">        <span class="n">session</span><span class="p">:</span> <span class="s2">"Union[Session, Any]"</span><span class="p">,</span>
-</span><span data-line="89">    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="90">        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">session</span><span class="p">,</span> <span class="n">Session</span><span class="p">):</span>
-</span><span data-line="91">            <span class="n">session</span> <span class="o">=</span> <span class="n">session</span><span class="o">.</span><span class="n">to_json</span><span class="p">()</span>
-</span><span data-line="92">        <span class="bp">self</span><span class="o">.</span><span class="n">add_item</span><span class="p">(</span><span class="n">Item</span><span class="p">(</span><span class="n">payload</span><span class="o">=</span><span class="n">PayloadRef</span><span class="p">(</span><span class="n">json</span><span class="o">=</span><span class="n">session</span><span class="p">),</span> <span class="nb">type</span><span class="o">=</span><span class="s2">"session"</span><span class="p">))</span>
+</span><span data-line="72">        <span class="bp">self</span><span class="o">.</span><span class="n">add_item</span><span class="p">(</span><span class="n">Item</span><span class="p">(</span><span class="n">payload</span><span class="o">=</span><span class="n">PayloadRef</span><span class="p">(</span><span class="n">json</span><span class="o">=</span><span class="n">checkin</span><span class="p">),</span> <span class="nb">type</span><span class="o">=</span><span class="s2">"check_in"</span><span class="p">))</span>
+</span><span data-line="73">
+</span><span data-line="74">    <span class="k">def</span><span class="w"> </span><span class="nf">add_session</span><span class="p">(</span>
+</span><span data-line="75">        <span class="bp">self</span><span class="p">,</span>
+</span><span data-line="76">        <span class="n">session</span><span class="p">:</span> <span class="s2">"Union[Session, Any]"</span><span class="p">,</span>
+</span><span data-line="77">    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="78">        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">session</span><span class="p">,</span> <span class="n">Session</span><span class="p">):</span>
+</span><span data-line="79">            <span class="n">session</span> <span class="o">=</span> <span class="n">session</span><span class="o">.</span><span class="n">to_json</span><span class="p">()</span>
+</span><span data-line="80">        <span class="bp">self</span><span class="o">.</span><span class="n">add_item</span><span class="p">(</span><span class="n">Item</span><span class="p">(</span><span class="n">payload</span><span class="o">=</span><span class="n">PayloadRef</span><span class="p">(</span><span class="n">json</span><span class="o">=</span><span class="n">session</span><span class="p">),</span> <span class="nb">type</span><span class="o">=</span><span class="s2">"session"</span><span class="p">))</span>
+</span><span data-line="81">
+</span><span data-line="82">    <span class="k">def</span><span class="w"> </span><span class="nf">add_sessions</span><span class="p">(</span>
+</span><span data-line="83">        <span class="bp">self</span><span class="p">,</span>
+</span><span data-line="84">        <span class="n">sessions</span><span class="p">:</span> <span class="s2">"Any"</span><span class="p">,</span>
+</span><span data-line="85">    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="86">        <span class="bp">self</span><span class="o">.</span><span class="n">add_item</span><span class="p">(</span><span class="n">Item</span><span class="p">(</span><span class="n">payload</span><span class="o">=</span><span class="n">PayloadRef</span><span class="p">(</span><span class="n">json</span><span class="o">=</span><span class="n">sessions</span><span class="p">),</span> <span class="nb">type</span><span class="o">=</span><span class="s2">"sessions"</span><span class="p">))</span>
+</span><span data-line="87">
+</span><span data-line="88">    <span class="k">def</span><span class="w"> </span><span class="nf">add_item</span><span class="p">(</span>
+</span><span data-line="89">        <span class="bp">self</span><span class="p">,</span>
+</span><span data-line="90">        <span class="n">item</span><span class="p">:</span> <span class="s2">"Item"</span><span class="p">,</span>
+</span><span data-line="91">    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="92">        <span class="bp">self</span><span class="o">.</span><span class="n">items</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">item</span><span class="p">)</span>
 </span><span data-line="93">
-</span><span data-line="94">    <span class="k">def</span><span class="w"> </span><span class="nf">add_sessions</span><span class="p">(</span>
-</span><span data-line="95">        <span class="bp">self</span><span class="p">,</span>
-</span><span data-line="96">        <span class="n">sessions</span><span class="p">:</span> <span class="s2">"Any"</span><span class="p">,</span>
-</span><span data-line="97">    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="98">        <span class="bp">self</span><span class="o">.</span><span class="n">add_item</span><span class="p">(</span><span class="n">Item</span><span class="p">(</span><span class="n">payload</span><span class="o">=</span><span class="n">PayloadRef</span><span class="p">(</span><span class="n">json</span><span class="o">=</span><span class="n">sessions</span><span class="p">),</span> <span class="nb">type</span><span class="o">=</span><span class="s2">"sessions"</span><span class="p">))</span>
-</span><span data-line="99">
-</span><span data-line="100">    <span class="k">def</span><span class="w"> </span><span class="nf">add_item</span><span class="p">(</span>
-</span><span data-line="101">        <span class="bp">self</span><span class="p">,</span>
-</span><span data-line="102">        <span class="n">item</span><span class="p">:</span> <span class="s2">"Item"</span><span class="p">,</span>
-</span><span data-line="103">    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="104">        <span class="bp">self</span><span class="o">.</span><span class="n">items</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">item</span><span class="p">)</span>
-</span><span data-line="105">
-</span><span data-line="106">    <span class="k">def</span><span class="w"> </span><span class="nf">get_event</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"Optional[Event]"</span><span class="p">:</span>
-</span><span data-line="107">        <span class="k">for</span> <span class="n">items</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">items</span><span class="p">:</span>
-</span><span data-line="108">            <span class="n">event</span> <span class="o">=</span> <span class="n">items</span><span class="o">.</span><span class="n">get_event</span><span class="p">()</span>
-</span><span data-line="109">            <span class="k">if</span> <span class="n">event</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="110">                <span class="k">return</span> <span class="n">event</span>
-</span><span data-line="111">        <span class="k">return</span> <span class="kc">None</span>
+</span><span data-line="94">    <span class="k">def</span><span class="w"> </span><span class="nf">get_event</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"Optional[Event]"</span><span class="p">:</span>
+</span><span data-line="95">        <span class="k">for</span> <span class="n">items</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">items</span><span class="p">:</span>
+</span><span data-line="96">            <span class="n">event</span> <span class="o">=</span> <span class="n">items</span><span class="o">.</span><span class="n">get_event</span><span class="p">()</span>
+</span><span data-line="97">            <span class="k">if</span> <span class="n">event</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="98">                <span class="k">return</span> <span class="n">event</span>
+</span><span data-line="99">        <span class="k">return</span> <span class="kc">None</span>
+</span><span data-line="100">
+</span><span data-line="101">    <span class="k">def</span><span class="w"> </span><span class="fm">__iter__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"Iterator[Item]"</span><span class="p">:</span>
+</span><span data-line="102">        <span class="k">return</span> <span class="nb">iter</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">items</span><span class="p">)</span>
+</span><span data-line="103">
+</span><span data-line="104">    <span class="k">def</span><span class="w"> </span><span class="nf">serialize_into</span><span class="p">(</span>
+</span><span data-line="105">        <span class="bp">self</span><span class="p">,</span>
+</span><span data-line="106">        <span class="n">f</span><span class="p">:</span> <span class="s2">"Any"</span><span class="p">,</span>
+</span><span data-line="107">    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="108">        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">json_dumps</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">headers</span><span class="p">))</span>
+</span><span data-line="109">        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="sa">b</span><span class="s2">"</span><span class="se">\n</span><span class="s2">"</span><span class="p">)</span>
+</span><span data-line="110">        <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">items</span><span class="p">:</span>
+</span><span data-line="111">            <span class="n">item</span><span class="o">.</span><span class="n">serialize_into</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
 </span><span data-line="112">
-</span><span data-line="113">    <span class="k">def</span><span class="w"> </span><span class="nf">get_transaction_event</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"Optional[Event]"</span><span class="p">:</span>
-</span><span data-line="114">        <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">items</span><span class="p">:</span>
-</span><span data-line="115">            <span class="n">event</span> <span class="o">=</span> <span class="n">item</span><span class="o">.</span><span class="n">get_transaction_event</span><span class="p">()</span>
-</span><span data-line="116">            <span class="k">if</span> <span class="n">event</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="117">                <span class="k">return</span> <span class="n">event</span>
-</span><span data-line="118">        <span class="k">return</span> <span class="kc">None</span>
-</span><span data-line="119">
-</span><span data-line="120">    <span class="k">def</span><span class="w"> </span><span class="fm">__iter__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"Iterator[Item]"</span><span class="p">:</span>
-</span><span data-line="121">        <span class="k">return</span> <span class="nb">iter</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">items</span><span class="p">)</span>
-</span><span data-line="122">
-</span><span data-line="123">    <span class="k">def</span><span class="w"> </span><span class="nf">serialize_into</span><span class="p">(</span>
-</span><span data-line="124">        <span class="bp">self</span><span class="p">,</span>
-</span><span data-line="125">        <span class="n">f</span><span class="p">:</span> <span class="s2">"Any"</span><span class="p">,</span>
-</span><span data-line="126">    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="127">        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">json_dumps</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">headers</span><span class="p">))</span>
-</span><span data-line="128">        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="sa">b</span><span class="s2">"</span><span class="se">\n</span><span class="s2">"</span><span class="p">)</span>
-</span><span data-line="129">        <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">items</span><span class="p">:</span>
-</span><span data-line="130">            <span class="n">item</span><span class="o">.</span><span class="n">serialize_into</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
+</span><span data-line="113">    <span class="k">def</span><span class="w"> </span><span class="nf">serialize</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bytes</span><span class="p">:</span>
+</span><span data-line="114">        <span class="n">out</span> <span class="o">=</span> <span class="n">io</span><span class="o">.</span><span class="n">BytesIO</span><span class="p">()</span>
+</span><span data-line="115">        <span class="bp">self</span><span class="o">.</span><span class="n">serialize_into</span><span class="p">(</span><span class="n">out</span><span class="p">)</span>
+</span><span data-line="116">        <span class="k">return</span> <span class="n">out</span><span class="o">.</span><span class="n">getvalue</span><span class="p">()</span>
+</span><span data-line="117">
+</span><span data-line="118">    <span class="nd">@classmethod</span>
+</span><span data-line="119">    <span class="k">def</span><span class="w"> </span><span class="nf">deserialize_from</span><span class="p">(</span>
+</span><span data-line="120">        <span class="bp">cls</span><span class="p">,</span>
+</span><span data-line="121">        <span class="n">f</span><span class="p">:</span> <span class="s2">"Any"</span><span class="p">,</span>
+</span><span data-line="122">    <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"Envelope"</span><span class="p">:</span>
+</span><span data-line="123">        <span class="n">headers</span> <span class="o">=</span> <span class="n">parse_json</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">readline</span><span class="p">())</span>
+</span><span data-line="124">        <span class="n">items</span> <span class="o">=</span> <span class="p">[]</span>
+</span><span data-line="125">        <span class="k">while</span> <span class="mi">1</span><span class="p">:</span>
+</span><span data-line="126">            <span class="n">item</span> <span class="o">=</span> <span class="n">Item</span><span class="o">.</span><span class="n">deserialize_from</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
+</span><span data-line="127">            <span class="k">if</span> <span class="n">item</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="128">                <span class="k">break</span>
+</span><span data-line="129">            <span class="n">items</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">item</span><span class="p">)</span>
+</span><span data-line="130">        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="n">headers</span><span class="o">=</span><span class="n">headers</span><span class="p">,</span> <span class="n">items</span><span class="o">=</span><span class="n">items</span><span class="p">)</span>
 </span><span data-line="131">
-</span><span data-line="132">    <span class="k">def</span><span class="w"> </span><span class="nf">serialize</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bytes</span><span class="p">:</span>
-</span><span data-line="133">        <span class="n">out</span> <span class="o">=</span> <span class="n">io</span><span class="o">.</span><span class="n">BytesIO</span><span class="p">()</span>
-</span><span data-line="134">        <span class="bp">self</span><span class="o">.</span><span class="n">serialize_into</span><span class="p">(</span><span class="n">out</span><span class="p">)</span>
-</span><span data-line="135">        <span class="k">return</span> <span class="n">out</span><span class="o">.</span><span class="n">getvalue</span><span class="p">()</span>
-</span><span data-line="136">
-</span><span data-line="137">    <span class="nd">@classmethod</span>
-</span><span data-line="138">    <span class="k">def</span><span class="w"> </span><span class="nf">deserialize_from</span><span class="p">(</span>
-</span><span data-line="139">        <span class="bp">cls</span><span class="p">,</span>
-</span><span data-line="140">        <span class="n">f</span><span class="p">:</span> <span class="s2">"Any"</span><span class="p">,</span>
-</span><span data-line="141">    <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"Envelope"</span><span class="p">:</span>
-</span><span data-line="142">        <span class="n">headers</span> <span class="o">=</span> <span class="n">parse_json</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">readline</span><span class="p">())</span>
-</span><span data-line="143">        <span class="n">items</span> <span class="o">=</span> <span class="p">[]</span>
-</span><span data-line="144">        <span class="k">while</span> <span class="mi">1</span><span class="p">:</span>
-</span><span data-line="145">            <span class="n">item</span> <span class="o">=</span> <span class="n">Item</span><span class="o">.</span><span class="n">deserialize_from</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
-</span><span data-line="146">            <span class="k">if</span> <span class="n">item</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="147">                <span class="k">break</span>
-</span><span data-line="148">            <span class="n">items</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">item</span><span class="p">)</span>
-</span><span data-line="149">        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="n">headers</span><span class="o">=</span><span class="n">headers</span><span class="p">,</span> <span class="n">items</span><span class="o">=</span><span class="n">items</span><span class="p">)</span>
-</span><span data-line="150">
-</span><span data-line="151">    <span class="nd">@classmethod</span>
-</span><span data-line="152">    <span class="k">def</span><span class="w"> </span><span class="nf">deserialize</span><span class="p">(</span>
-</span><span data-line="153">        <span class="bp">cls</span><span class="p">,</span>
-</span><span data-line="154">        <span class="nb">bytes</span><span class="p">:</span> <span class="nb">bytes</span><span class="p">,</span>
-</span><span data-line="155">    <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"Envelope"</span><span class="p">:</span>
-</span><span data-line="156">        <span class="k">return</span> <span class="bp">cls</span><span class="o">.</span><span class="n">deserialize_from</span><span class="p">(</span><span class="n">io</span><span class="o">.</span><span class="n">BytesIO</span><span class="p">(</span><span class="nb">bytes</span><span class="p">))</span>
-</span><span data-line="157">
-</span><span data-line="158">    <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-</span><span data-line="159">        <span class="k">return</span> <span class="s2">"&lt;Envelope headers=</span><span class="si">%r</span><span class="s2"> items=</span><span class="si">%r</span><span class="s2">&gt;"</span> <span class="o">%</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">headers</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">items</span><span class="p">)</span></div>
+</span><span data-line="132">    <span class="nd">@classmethod</span>
+</span><span data-line="133">    <span class="k">def</span><span class="w"> </span><span class="nf">deserialize</span><span class="p">(</span>
+</span><span data-line="134">        <span class="bp">cls</span><span class="p">,</span>
+</span><span data-line="135">        <span class="nb">bytes</span><span class="p">:</span> <span class="nb">bytes</span><span class="p">,</span>
+</span><span data-line="136">    <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"Envelope"</span><span class="p">:</span>
+</span><span data-line="137">        <span class="k">return</span> <span class="bp">cls</span><span class="o">.</span><span class="n">deserialize_from</span><span class="p">(</span><span class="n">io</span><span class="o">.</span><span class="n">BytesIO</span><span class="p">(</span><span class="nb">bytes</span><span class="p">))</span>
+</span><span data-line="138">
+</span><span data-line="139">    <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+</span><span data-line="140">        <span class="k">return</span> <span class="s2">"&lt;Envelope headers=</span><span class="si">%r</span><span class="s2"> items=</span><span class="si">%r</span><span class="s2">&gt;"</span> <span class="o">%</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">headers</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">items</span><span class="p">)</span></div>
 
-</span><span data-line="160">
-</span><span data-line="161">
-</span><span data-line="162"><span class="k">class</span><span class="w"> </span><span class="nc">PayloadRef</span><span class="p">:</span>
-</span><span data-line="163">    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
-</span><span data-line="164">        <span class="bp">self</span><span class="p">,</span>
-</span><span data-line="165">        <span class="nb">bytes</span><span class="p">:</span> <span class="s2">"Optional[bytes]"</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span data-line="166">        <span class="n">path</span><span class="p">:</span> <span class="s2">"Optional[Union[bytes, str]]"</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span data-line="167">        <span class="n">json</span><span class="p">:</span> <span class="s2">"Optional[Any]"</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span data-line="168">    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="169">        <span class="bp">self</span><span class="o">.</span><span class="n">json</span> <span class="o">=</span> <span class="n">json</span>
-</span><span data-line="170">        <span class="bp">self</span><span class="o">.</span><span class="n">bytes</span> <span class="o">=</span> <span class="nb">bytes</span>
-</span><span data-line="171">        <span class="bp">self</span><span class="o">.</span><span class="n">path</span> <span class="o">=</span> <span class="n">path</span>
-</span><span data-line="172">
-</span><span data-line="173">    <span class="k">def</span><span class="w"> </span><span class="nf">get_bytes</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bytes</span><span class="p">:</span>
-</span><span data-line="174">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">bytes</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="175">            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">path</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="176">                <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
-</span><span data-line="177">                    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">path</span><span class="p">,</span> <span class="s2">"rb"</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
-</span><span data-line="178">                        <span class="bp">self</span><span class="o">.</span><span class="n">bytes</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
-</span><span data-line="179">            <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">json</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="180">                <span class="bp">self</span><span class="o">.</span><span class="n">bytes</span> <span class="o">=</span> <span class="n">json_dumps</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">json</span><span class="p">)</span>
-</span><span data-line="181">        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">bytes</span> <span class="ow">or</span> <span class="sa">b</span><span class="s2">""</span>
-</span><span data-line="182">
-</span><span data-line="183">    <span class="nd">@property</span>
-</span><span data-line="184">    <span class="k">def</span><span class="w"> </span><span class="nf">inferred_content_type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-</span><span data-line="185">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">json</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="186">            <span class="k">return</span> <span class="s2">"application/json"</span>
-</span><span data-line="187">        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">path</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="188">            <span class="n">path</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">path</span>
-</span><span data-line="189">            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="nb">bytes</span><span class="p">):</span>
-</span><span data-line="190">                <span class="n">path</span> <span class="o">=</span> <span class="n">path</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s2">"utf-8"</span><span class="p">,</span> <span class="s2">"replace"</span><span class="p">)</span>
-</span><span data-line="191">            <span class="n">ty</span> <span class="o">=</span> <span class="n">mimetypes</span><span class="o">.</span><span class="n">guess_type</span><span class="p">(</span><span class="n">path</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
-</span><span data-line="192">            <span class="k">if</span> <span class="n">ty</span><span class="p">:</span>
-</span><span data-line="193">                <span class="k">return</span> <span class="n">ty</span>
-</span><span data-line="194">        <span class="k">return</span> <span class="s2">"application/octet-stream"</span>
-</span><span data-line="195">
-</span><span data-line="196">    <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-</span><span data-line="197">        <span class="k">return</span> <span class="s2">"&lt;Payload </span><span class="si">%r</span><span class="s2">&gt;"</span> <span class="o">%</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">inferred_content_type</span><span class="p">,)</span>
-</span><span data-line="198">
-</span><span data-line="199">
+</span><span data-line="141">
+</span><span data-line="142">
+</span><span data-line="143"><span class="k">class</span><span class="w"> </span><span class="nc">PayloadRef</span><span class="p">:</span>
+</span><span data-line="144">    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+</span><span data-line="145">        <span class="bp">self</span><span class="p">,</span>
+</span><span data-line="146">        <span class="nb">bytes</span><span class="p">:</span> <span class="s2">"Optional[bytes]"</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span data-line="147">        <span class="n">path</span><span class="p">:</span> <span class="s2">"Optional[Union[bytes, str]]"</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span data-line="148">        <span class="n">json</span><span class="p">:</span> <span class="s2">"Optional[Any]"</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span data-line="149">    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="150">        <span class="bp">self</span><span class="o">.</span><span class="n">json</span> <span class="o">=</span> <span class="n">json</span>
+</span><span data-line="151">        <span class="bp">self</span><span class="o">.</span><span class="n">bytes</span> <span class="o">=</span> <span class="nb">bytes</span>
+</span><span data-line="152">        <span class="bp">self</span><span class="o">.</span><span class="n">path</span> <span class="o">=</span> <span class="n">path</span>
+</span><span data-line="153">
+</span><span data-line="154">    <span class="k">def</span><span class="w"> </span><span class="nf">get_bytes</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bytes</span><span class="p">:</span>
+</span><span data-line="155">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">bytes</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="156">            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">path</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="157">                <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
+</span><span data-line="158">                    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">path</span><span class="p">,</span> <span class="s2">"rb"</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+</span><span data-line="159">                        <span class="bp">self</span><span class="o">.</span><span class="n">bytes</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
+</span><span data-line="160">            <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">json</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="161">                <span class="bp">self</span><span class="o">.</span><span class="n">bytes</span> <span class="o">=</span> <span class="n">json_dumps</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">json</span><span class="p">)</span>
+</span><span data-line="162">        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">bytes</span> <span class="ow">or</span> <span class="sa">b</span><span class="s2">""</span>
+</span><span data-line="163">
+</span><span data-line="164">    <span class="nd">@property</span>
+</span><span data-line="165">    <span class="k">def</span><span class="w"> </span><span class="nf">inferred_content_type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+</span><span data-line="166">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">json</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="167">            <span class="k">return</span> <span class="s2">"application/json"</span>
+</span><span data-line="168">        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">path</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="169">            <span class="n">path</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">path</span>
+</span><span data-line="170">            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="nb">bytes</span><span class="p">):</span>
+</span><span data-line="171">                <span class="n">path</span> <span class="o">=</span> <span class="n">path</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s2">"utf-8"</span><span class="p">,</span> <span class="s2">"replace"</span><span class="p">)</span>
+</span><span data-line="172">            <span class="n">ty</span> <span class="o">=</span> <span class="n">mimetypes</span><span class="o">.</span><span class="n">guess_type</span><span class="p">(</span><span class="n">path</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+</span><span data-line="173">            <span class="k">if</span> <span class="n">ty</span><span class="p">:</span>
+</span><span data-line="174">                <span class="k">return</span> <span class="n">ty</span>
+</span><span data-line="175">        <span class="k">return</span> <span class="s2">"application/octet-stream"</span>
+</span><span data-line="176">
+</span><span data-line="177">    <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+</span><span data-line="178">        <span class="k">return</span> <span class="s2">"&lt;Payload </span><span class="si">%r</span><span class="s2">&gt;"</span> <span class="o">%</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">inferred_content_type</span><span class="p">,)</span>
+</span><span data-line="179">
+</span><span data-line="180">
 <div class="viewcode-block" id="Item">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk.envelope.Item">[docs]</a>
-</span><span data-line="200"><span class="k">class</span><span class="w"> </span><span class="nc">Item</span><span class="p">:</span>
-</span><span data-line="201">    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
-</span><span data-line="202">        <span class="bp">self</span><span class="p">,</span>
-</span><span data-line="203">        <span class="n">payload</span><span class="p">:</span> <span class="s2">"Union[bytes, str, PayloadRef]"</span><span class="p">,</span>
-</span><span data-line="204">        <span class="n">headers</span><span class="p">:</span> <span class="s2">"Optional[Dict[str, Any]]"</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span data-line="205">        <span class="nb">type</span><span class="p">:</span> <span class="s2">"Optional[str]"</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span data-line="206">        <span class="n">content_type</span><span class="p">:</span> <span class="s2">"Optional[str]"</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span data-line="207">        <span class="n">filename</span><span class="p">:</span> <span class="s2">"Optional[str]"</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span data-line="208">    <span class="p">):</span>
-</span><span data-line="209">        <span class="k">if</span> <span class="n">headers</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="210">            <span class="n">headers</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">headers</span><span class="p">)</span>
-</span><span data-line="211">        <span class="k">elif</span> <span class="n">headers</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="212">            <span class="n">headers</span> <span class="o">=</span> <span class="p">{}</span>
-</span><span data-line="213">        <span class="bp">self</span><span class="o">.</span><span class="n">headers</span> <span class="o">=</span> <span class="n">headers</span>
-</span><span data-line="214">        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">payload</span><span class="p">,</span> <span class="nb">bytes</span><span class="p">):</span>
-</span><span data-line="215">            <span class="n">payload</span> <span class="o">=</span> <span class="n">PayloadRef</span><span class="p">(</span><span class="nb">bytes</span><span class="o">=</span><span class="n">payload</span><span class="p">)</span>
-</span><span data-line="216">        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">payload</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
-</span><span data-line="217">            <span class="n">payload</span> <span class="o">=</span> <span class="n">PayloadRef</span><span class="p">(</span><span class="nb">bytes</span><span class="o">=</span><span class="n">payload</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="s2">"utf-8"</span><span class="p">))</span>
-</span><span data-line="218">        <span class="k">else</span><span class="p">:</span>
-</span><span data-line="219">            <span class="n">payload</span> <span class="o">=</span> <span class="n">payload</span>
-</span><span data-line="220">
-</span><span data-line="221">        <span class="k">if</span> <span class="n">filename</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="222">            <span class="n">headers</span><span class="p">[</span><span class="s2">"filename"</span><span class="p">]</span> <span class="o">=</span> <span class="n">filename</span>
-</span><span data-line="223">        <span class="k">if</span> <span class="nb">type</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="224">            <span class="n">headers</span><span class="p">[</span><span class="s2">"type"</span><span class="p">]</span> <span class="o">=</span> <span class="nb">type</span>
-</span><span data-line="225">        <span class="k">if</span> <span class="n">content_type</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="226">            <span class="n">headers</span><span class="p">[</span><span class="s2">"content_type"</span><span class="p">]</span> <span class="o">=</span> <span class="n">content_type</span>
-</span><span data-line="227">        <span class="k">elif</span> <span class="s2">"content_type"</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">headers</span><span class="p">:</span>
-</span><span data-line="228">            <span class="n">headers</span><span class="p">[</span><span class="s2">"content_type"</span><span class="p">]</span> <span class="o">=</span> <span class="n">payload</span><span class="o">.</span><span class="n">inferred_content_type</span>
-</span><span data-line="229">
-</span><span data-line="230">        <span class="bp">self</span><span class="o">.</span><span class="n">payload</span> <span class="o">=</span> <span class="n">payload</span>
-</span><span data-line="231">
-</span><span data-line="232">    <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-</span><span data-line="233">        <span class="k">return</span> <span class="s2">"&lt;Item headers=</span><span class="si">%r</span><span class="s2"> payload=</span><span class="si">%r</span><span class="s2"> data_category=</span><span class="si">%r</span><span class="s2">&gt;"</span> <span class="o">%</span> <span class="p">(</span>
-</span><span data-line="234">            <span class="bp">self</span><span class="o">.</span><span class="n">headers</span><span class="p">,</span>
-</span><span data-line="235">            <span class="bp">self</span><span class="o">.</span><span class="n">payload</span><span class="p">,</span>
-</span><span data-line="236">            <span class="bp">self</span><span class="o">.</span><span class="n">data_category</span><span class="p">,</span>
-</span><span data-line="237">        <span class="p">)</span>
-</span><span data-line="238">
-</span><span data-line="239">    <span class="nd">@property</span>
-</span><span data-line="240">    <span class="k">def</span><span class="w"> </span><span class="nf">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"Optional[str]"</span><span class="p">:</span>
-</span><span data-line="241">        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">headers</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"type"</span><span class="p">)</span>
-</span><span data-line="242">
-</span><span data-line="243">    <span class="nd">@property</span>
-</span><span data-line="244">    <span class="k">def</span><span class="w"> </span><span class="nf">data_category</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"EventDataCategory"</span><span class="p">:</span>
-</span><span data-line="245">        <span class="n">ty</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">headers</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"type"</span><span class="p">)</span>
-</span><span data-line="246">        <span class="k">if</span> <span class="n">ty</span> <span class="o">==</span> <span class="s2">"session"</span> <span class="ow">or</span> <span class="n">ty</span> <span class="o">==</span> <span class="s2">"sessions"</span><span class="p">:</span>
-</span><span data-line="247">            <span class="k">return</span> <span class="s2">"session"</span>
-</span><span data-line="248">        <span class="k">elif</span> <span class="n">ty</span> <span class="o">==</span> <span class="s2">"attachment"</span><span class="p">:</span>
-</span><span data-line="249">            <span class="k">return</span> <span class="s2">"attachment"</span>
-</span><span data-line="250">        <span class="k">elif</span> <span class="n">ty</span> <span class="o">==</span> <span class="s2">"transaction"</span><span class="p">:</span>
-</span><span data-line="251">            <span class="k">return</span> <span class="s2">"transaction"</span>
-</span><span data-line="252">        <span class="k">elif</span> <span class="n">ty</span> <span class="o">==</span> <span class="s2">"span"</span><span class="p">:</span>
-</span><span data-line="253">            <span class="k">return</span> <span class="s2">"span"</span>
-</span><span data-line="254">        <span class="k">elif</span> <span class="n">ty</span> <span class="o">==</span> <span class="s2">"event"</span><span class="p">:</span>
-</span><span data-line="255">            <span class="k">return</span> <span class="s2">"error"</span>
-</span><span data-line="256">        <span class="k">elif</span> <span class="n">ty</span> <span class="o">==</span> <span class="s2">"log"</span><span class="p">:</span>
-</span><span data-line="257">            <span class="k">return</span> <span class="s2">"log_item"</span>
-</span><span data-line="258">        <span class="k">elif</span> <span class="n">ty</span> <span class="o">==</span> <span class="s2">"trace_metric"</span><span class="p">:</span>
-</span><span data-line="259">            <span class="k">return</span> <span class="s2">"trace_metric"</span>
-</span><span data-line="260">        <span class="k">elif</span> <span class="n">ty</span> <span class="o">==</span> <span class="s2">"client_report"</span><span class="p">:</span>
-</span><span data-line="261">            <span class="k">return</span> <span class="s2">"internal"</span>
-</span><span data-line="262">        <span class="k">elif</span> <span class="n">ty</span> <span class="o">==</span> <span class="s2">"profile"</span><span class="p">:</span>
-</span><span data-line="263">            <span class="k">return</span> <span class="s2">"profile"</span>
-</span><span data-line="264">        <span class="k">elif</span> <span class="n">ty</span> <span class="o">==</span> <span class="s2">"profile_chunk"</span><span class="p">:</span>
-</span><span data-line="265">            <span class="k">return</span> <span class="s2">"profile_chunk"</span>
-</span><span data-line="266">        <span class="k">elif</span> <span class="n">ty</span> <span class="o">==</span> <span class="s2">"check_in"</span><span class="p">:</span>
-</span><span data-line="267">            <span class="k">return</span> <span class="s2">"monitor"</span>
-</span><span data-line="268">        <span class="k">else</span><span class="p">:</span>
-</span><span data-line="269">            <span class="k">return</span> <span class="s2">"default"</span>
-</span><span data-line="270">
-</span><span data-line="271">    <span class="k">def</span><span class="w"> </span><span class="nf">get_bytes</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bytes</span><span class="p">:</span>
-</span><span data-line="272">        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">payload</span><span class="o">.</span><span class="n">get_bytes</span><span class="p">()</span>
-</span><span data-line="273">
+</span><span data-line="181"><span class="k">class</span><span class="w"> </span><span class="nc">Item</span><span class="p">:</span>
+</span><span data-line="182">    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+</span><span data-line="183">        <span class="bp">self</span><span class="p">,</span>
+</span><span data-line="184">        <span class="n">payload</span><span class="p">:</span> <span class="s2">"Union[bytes, str, PayloadRef]"</span><span class="p">,</span>
+</span><span data-line="185">        <span class="n">headers</span><span class="p">:</span> <span class="s2">"Optional[Dict[str, Any]]"</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span data-line="186">        <span class="nb">type</span><span class="p">:</span> <span class="s2">"Optional[str]"</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span data-line="187">        <span class="n">content_type</span><span class="p">:</span> <span class="s2">"Optional[str]"</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span data-line="188">        <span class="n">filename</span><span class="p">:</span> <span class="s2">"Optional[str]"</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span data-line="189">    <span class="p">):</span>
+</span><span data-line="190">        <span class="k">if</span> <span class="n">headers</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="191">            <span class="n">headers</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">headers</span><span class="p">)</span>
+</span><span data-line="192">        <span class="k">elif</span> <span class="n">headers</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="193">            <span class="n">headers</span> <span class="o">=</span> <span class="p">{}</span>
+</span><span data-line="194">        <span class="bp">self</span><span class="o">.</span><span class="n">headers</span> <span class="o">=</span> <span class="n">headers</span>
+</span><span data-line="195">        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">payload</span><span class="p">,</span> <span class="nb">bytes</span><span class="p">):</span>
+</span><span data-line="196">            <span class="n">payload</span> <span class="o">=</span> <span class="n">PayloadRef</span><span class="p">(</span><span class="nb">bytes</span><span class="o">=</span><span class="n">payload</span><span class="p">)</span>
+</span><span data-line="197">        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">payload</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+</span><span data-line="198">            <span class="n">payload</span> <span class="o">=</span> <span class="n">PayloadRef</span><span class="p">(</span><span class="nb">bytes</span><span class="o">=</span><span class="n">payload</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="s2">"utf-8"</span><span class="p">))</span>
+</span><span data-line="199">        <span class="k">else</span><span class="p">:</span>
+</span><span data-line="200">            <span class="n">payload</span> <span class="o">=</span> <span class="n">payload</span>
+</span><span data-line="201">
+</span><span data-line="202">        <span class="k">if</span> <span class="n">filename</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="203">            <span class="n">headers</span><span class="p">[</span><span class="s2">"filename"</span><span class="p">]</span> <span class="o">=</span> <span class="n">filename</span>
+</span><span data-line="204">        <span class="k">if</span> <span class="nb">type</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="205">            <span class="n">headers</span><span class="p">[</span><span class="s2">"type"</span><span class="p">]</span> <span class="o">=</span> <span class="nb">type</span>
+</span><span data-line="206">        <span class="k">if</span> <span class="n">content_type</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="207">            <span class="n">headers</span><span class="p">[</span><span class="s2">"content_type"</span><span class="p">]</span> <span class="o">=</span> <span class="n">content_type</span>
+</span><span data-line="208">        <span class="k">elif</span> <span class="s2">"content_type"</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">headers</span><span class="p">:</span>
+</span><span data-line="209">            <span class="n">headers</span><span class="p">[</span><span class="s2">"content_type"</span><span class="p">]</span> <span class="o">=</span> <span class="n">payload</span><span class="o">.</span><span class="n">inferred_content_type</span>
+</span><span data-line="210">
+</span><span data-line="211">        <span class="bp">self</span><span class="o">.</span><span class="n">payload</span> <span class="o">=</span> <span class="n">payload</span>
+</span><span data-line="212">
+</span><span data-line="213">    <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+</span><span data-line="214">        <span class="k">return</span> <span class="s2">"&lt;Item headers=</span><span class="si">%r</span><span class="s2"> payload=</span><span class="si">%r</span><span class="s2"> data_category=</span><span class="si">%r</span><span class="s2">&gt;"</span> <span class="o">%</span> <span class="p">(</span>
+</span><span data-line="215">            <span class="bp">self</span><span class="o">.</span><span class="n">headers</span><span class="p">,</span>
+</span><span data-line="216">            <span class="bp">self</span><span class="o">.</span><span class="n">payload</span><span class="p">,</span>
+</span><span data-line="217">            <span class="bp">self</span><span class="o">.</span><span class="n">data_category</span><span class="p">,</span>
+</span><span data-line="218">        <span class="p">)</span>
+</span><span data-line="219">
+</span><span data-line="220">    <span class="nd">@property</span>
+</span><span data-line="221">    <span class="k">def</span><span class="w"> </span><span class="nf">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"Optional[str]"</span><span class="p">:</span>
+</span><span data-line="222">        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">headers</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"type"</span><span class="p">)</span>
+</span><span data-line="223">
+</span><span data-line="224">    <span class="nd">@property</span>
+</span><span data-line="225">    <span class="k">def</span><span class="w"> </span><span class="nf">data_category</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"EventDataCategory"</span><span class="p">:</span>
+</span><span data-line="226">        <span class="n">ty</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">headers</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"type"</span><span class="p">)</span>
+</span><span data-line="227">        <span class="k">if</span> <span class="n">ty</span> <span class="o">==</span> <span class="s2">"session"</span> <span class="ow">or</span> <span class="n">ty</span> <span class="o">==</span> <span class="s2">"sessions"</span><span class="p">:</span>
+</span><span data-line="228">            <span class="k">return</span> <span class="s2">"session"</span>
+</span><span data-line="229">        <span class="k">elif</span> <span class="n">ty</span> <span class="o">==</span> <span class="s2">"attachment"</span><span class="p">:</span>
+</span><span data-line="230">            <span class="k">return</span> <span class="s2">"attachment"</span>
+</span><span data-line="231">        <span class="k">elif</span> <span class="n">ty</span> <span class="o">==</span> <span class="s2">"span"</span><span class="p">:</span>
+</span><span data-line="232">            <span class="k">return</span> <span class="s2">"span"</span>
+</span><span data-line="233">        <span class="k">elif</span> <span class="n">ty</span> <span class="o">==</span> <span class="s2">"event"</span><span class="p">:</span>
+</span><span data-line="234">            <span class="k">return</span> <span class="s2">"error"</span>
+</span><span data-line="235">        <span class="k">elif</span> <span class="n">ty</span> <span class="o">==</span> <span class="s2">"log"</span><span class="p">:</span>
+</span><span data-line="236">            <span class="k">return</span> <span class="s2">"log_item"</span>
+</span><span data-line="237">        <span class="k">elif</span> <span class="n">ty</span> <span class="o">==</span> <span class="s2">"trace_metric"</span><span class="p">:</span>
+</span><span data-line="238">            <span class="k">return</span> <span class="s2">"trace_metric"</span>
+</span><span data-line="239">        <span class="k">elif</span> <span class="n">ty</span> <span class="o">==</span> <span class="s2">"client_report"</span><span class="p">:</span>
+</span><span data-line="240">            <span class="k">return</span> <span class="s2">"internal"</span>
+</span><span data-line="241">        <span class="k">elif</span> <span class="n">ty</span> <span class="o">==</span> <span class="s2">"profile_chunk"</span><span class="p">:</span>
+</span><span data-line="242">            <span class="k">return</span> <span class="s2">"profile_chunk"</span>
+</span><span data-line="243">        <span class="k">elif</span> <span class="n">ty</span> <span class="o">==</span> <span class="s2">"check_in"</span><span class="p">:</span>
+</span><span data-line="244">            <span class="k">return</span> <span class="s2">"monitor"</span>
+</span><span data-line="245">        <span class="k">else</span><span class="p">:</span>
+</span><span data-line="246">            <span class="k">return</span> <span class="s2">"default"</span>
+</span><span data-line="247">
+</span><span data-line="248">    <span class="k">def</span><span class="w"> </span><span class="nf">get_bytes</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bytes</span><span class="p">:</span>
+</span><span data-line="249">        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">payload</span><span class="o">.</span><span class="n">get_bytes</span><span class="p">()</span>
+</span><span data-line="250">
 <div class="viewcode-block" id="Item.get_event">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk.envelope.Item.get_event">[docs]</a>
-</span><span data-line="274">    <span class="k">def</span><span class="w"> </span><span class="nf">get_event</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"Optional[Event]"</span><span class="p">:</span>
-</span><span data-line="275"><span class="w">        </span><span class="sd">"""</span>
-</span><span data-line="276"><span class="sd">        Returns an error event if there is one.</span>
-</span><span data-line="277"><span class="sd">        """</span>
-</span><span data-line="278">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="s2">"event"</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">payload</span><span class="o">.</span><span class="n">json</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="279">            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">payload</span><span class="o">.</span><span class="n">json</span>
-</span><span data-line="280">        <span class="k">return</span> <span class="kc">None</span></div>
+</span><span data-line="251">    <span class="k">def</span><span class="w"> </span><span class="nf">get_event</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"Optional[Event]"</span><span class="p">:</span>
+</span><span data-line="252"><span class="w">        </span><span class="sd">"""</span>
+</span><span data-line="253"><span class="sd">        Returns an error event if there is one.</span>
+</span><span data-line="254"><span class="sd">        """</span>
+</span><span data-line="255">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="s2">"event"</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">payload</span><span class="o">.</span><span class="n">json</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="256">            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">payload</span><span class="o">.</span><span class="n">json</span>
+</span><span data-line="257">        <span class="k">return</span> <span class="kc">None</span></div>
 
-</span><span data-line="281">
-</span><span data-line="282">    <span class="k">def</span><span class="w"> </span><span class="nf">get_transaction_event</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"Optional[Event]"</span><span class="p">:</span>
-</span><span data-line="283">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="s2">"transaction"</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">payload</span><span class="o">.</span><span class="n">json</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="284">            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">payload</span><span class="o">.</span><span class="n">json</span>
-</span><span data-line="285">        <span class="k">return</span> <span class="kc">None</span>
-</span><span data-line="286">
-</span><span data-line="287">    <span class="k">def</span><span class="w"> </span><span class="nf">serialize_into</span><span class="p">(</span>
-</span><span data-line="288">        <span class="bp">self</span><span class="p">,</span>
-</span><span data-line="289">        <span class="n">f</span><span class="p">:</span> <span class="s2">"Any"</span><span class="p">,</span>
-</span><span data-line="290">    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="291">        <span class="n">headers</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">headers</span><span class="p">)</span>
-</span><span data-line="292">        <span class="nb">bytes</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_bytes</span><span class="p">()</span>
-</span><span data-line="293">        <span class="n">headers</span><span class="p">[</span><span class="s2">"length"</span><span class="p">]</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="nb">bytes</span><span class="p">)</span>
-</span><span data-line="294">        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">json_dumps</span><span class="p">(</span><span class="n">headers</span><span class="p">))</span>
-</span><span data-line="295">        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="sa">b</span><span class="s2">"</span><span class="se">\n</span><span class="s2">"</span><span class="p">)</span>
-</span><span data-line="296">        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="nb">bytes</span><span class="p">)</span>
-</span><span data-line="297">        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="sa">b</span><span class="s2">"</span><span class="se">\n</span><span class="s2">"</span><span class="p">)</span>
+</span><span data-line="258">
+</span><span data-line="259">    <span class="k">def</span><span class="w"> </span><span class="nf">serialize_into</span><span class="p">(</span>
+</span><span data-line="260">        <span class="bp">self</span><span class="p">,</span>
+</span><span data-line="261">        <span class="n">f</span><span class="p">:</span> <span class="s2">"Any"</span><span class="p">,</span>
+</span><span data-line="262">    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="263">        <span class="n">headers</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">headers</span><span class="p">)</span>
+</span><span data-line="264">        <span class="nb">bytes</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_bytes</span><span class="p">()</span>
+</span><span data-line="265">        <span class="n">headers</span><span class="p">[</span><span class="s2">"length"</span><span class="p">]</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="nb">bytes</span><span class="p">)</span>
+</span><span data-line="266">        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">json_dumps</span><span class="p">(</span><span class="n">headers</span><span class="p">))</span>
+</span><span data-line="267">        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="sa">b</span><span class="s2">"</span><span class="se">\n</span><span class="s2">"</span><span class="p">)</span>
+</span><span data-line="268">        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="nb">bytes</span><span class="p">)</span>
+</span><span data-line="269">        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="sa">b</span><span class="s2">"</span><span class="se">\n</span><span class="s2">"</span><span class="p">)</span>
+</span><span data-line="270">
+</span><span data-line="271">    <span class="k">def</span><span class="w"> </span><span class="nf">serialize</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bytes</span><span class="p">:</span>
+</span><span data-line="272">        <span class="n">out</span> <span class="o">=</span> <span class="n">io</span><span class="o">.</span><span class="n">BytesIO</span><span class="p">()</span>
+</span><span data-line="273">        <span class="bp">self</span><span class="o">.</span><span class="n">serialize_into</span><span class="p">(</span><span class="n">out</span><span class="p">)</span>
+</span><span data-line="274">        <span class="k">return</span> <span class="n">out</span><span class="o">.</span><span class="n">getvalue</span><span class="p">()</span>
+</span><span data-line="275">
+</span><span data-line="276">    <span class="nd">@classmethod</span>
+</span><span data-line="277">    <span class="k">def</span><span class="w"> </span><span class="nf">deserialize_from</span><span class="p">(</span>
+</span><span data-line="278">        <span class="bp">cls</span><span class="p">,</span>
+</span><span data-line="279">        <span class="n">f</span><span class="p">:</span> <span class="s2">"Any"</span><span class="p">,</span>
+</span><span data-line="280">    <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"Optional[Item]"</span><span class="p">:</span>
+</span><span data-line="281">        <span class="n">line</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">readline</span><span class="p">()</span><span class="o">.</span><span class="n">rstrip</span><span class="p">()</span>
+</span><span data-line="282">        <span class="k">if</span> <span class="ow">not</span> <span class="n">line</span><span class="p">:</span>
+</span><span data-line="283">            <span class="k">return</span> <span class="kc">None</span>
+</span><span data-line="284">        <span class="n">headers</span> <span class="o">=</span> <span class="n">parse_json</span><span class="p">(</span><span class="n">line</span><span class="p">)</span>
+</span><span data-line="285">        <span class="n">length</span> <span class="o">=</span> <span class="n">headers</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"length"</span><span class="p">)</span>
+</span><span data-line="286">        <span class="k">if</span> <span class="n">length</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="287">            <span class="n">payload</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="n">length</span><span class="p">)</span>
+</span><span data-line="288">            <span class="n">f</span><span class="o">.</span><span class="n">readline</span><span class="p">()</span>
+</span><span data-line="289">        <span class="k">else</span><span class="p">:</span>
+</span><span data-line="290">            <span class="c1"># if no length was specified we need to read up to the end of line</span>
+</span><span data-line="291">            <span class="c1"># and remove it (if it is present, i.e. not the very last char in an eof terminated envelope)</span>
+</span><span data-line="292">            <span class="n">payload</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">readline</span><span class="p">()</span><span class="o">.</span><span class="n">rstrip</span><span class="p">(</span><span class="sa">b</span><span class="s2">"</span><span class="se">\n</span><span class="s2">"</span><span class="p">)</span>
+</span><span data-line="293">        <span class="k">if</span> <span class="n">headers</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"type"</span><span class="p">)</span> <span class="o">==</span> <span class="s2">"event"</span><span class="p">:</span>
+</span><span data-line="294">            <span class="n">rv</span> <span class="o">=</span> <span class="bp">cls</span><span class="p">(</span><span class="n">headers</span><span class="o">=</span><span class="n">headers</span><span class="p">,</span> <span class="n">payload</span><span class="o">=</span><span class="n">PayloadRef</span><span class="p">(</span><span class="n">json</span><span class="o">=</span><span class="n">parse_json</span><span class="p">(</span><span class="n">payload</span><span class="p">)))</span>
+</span><span data-line="295">        <span class="k">else</span><span class="p">:</span>
+</span><span data-line="296">            <span class="n">rv</span> <span class="o">=</span> <span class="bp">cls</span><span class="p">(</span><span class="n">headers</span><span class="o">=</span><span class="n">headers</span><span class="p">,</span> <span class="n">payload</span><span class="o">=</span><span class="n">payload</span><span class="p">)</span>
+</span><span data-line="297">        <span class="k">return</span> <span class="n">rv</span>
 </span><span data-line="298">
-</span><span data-line="299">    <span class="k">def</span><span class="w"> </span><span class="nf">serialize</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bytes</span><span class="p">:</span>
-</span><span data-line="300">        <span class="n">out</span> <span class="o">=</span> <span class="n">io</span><span class="o">.</span><span class="n">BytesIO</span><span class="p">()</span>
-</span><span data-line="301">        <span class="bp">self</span><span class="o">.</span><span class="n">serialize_into</span><span class="p">(</span><span class="n">out</span><span class="p">)</span>
-</span><span data-line="302">        <span class="k">return</span> <span class="n">out</span><span class="o">.</span><span class="n">getvalue</span><span class="p">()</span>
-</span><span data-line="303">
-</span><span data-line="304">    <span class="nd">@classmethod</span>
-</span><span data-line="305">    <span class="k">def</span><span class="w"> </span><span class="nf">deserialize_from</span><span class="p">(</span>
-</span><span data-line="306">        <span class="bp">cls</span><span class="p">,</span>
-</span><span data-line="307">        <span class="n">f</span><span class="p">:</span> <span class="s2">"Any"</span><span class="p">,</span>
-</span><span data-line="308">    <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"Optional[Item]"</span><span class="p">:</span>
-</span><span data-line="309">        <span class="n">line</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">readline</span><span class="p">()</span><span class="o">.</span><span class="n">rstrip</span><span class="p">()</span>
-</span><span data-line="310">        <span class="k">if</span> <span class="ow">not</span> <span class="n">line</span><span class="p">:</span>
-</span><span data-line="311">            <span class="k">return</span> <span class="kc">None</span>
-</span><span data-line="312">        <span class="n">headers</span> <span class="o">=</span> <span class="n">parse_json</span><span class="p">(</span><span class="n">line</span><span class="p">)</span>
-</span><span data-line="313">        <span class="n">length</span> <span class="o">=</span> <span class="n">headers</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"length"</span><span class="p">)</span>
-</span><span data-line="314">        <span class="k">if</span> <span class="n">length</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="315">            <span class="n">payload</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="n">length</span><span class="p">)</span>
-</span><span data-line="316">            <span class="n">f</span><span class="o">.</span><span class="n">readline</span><span class="p">()</span>
-</span><span data-line="317">        <span class="k">else</span><span class="p">:</span>
-</span><span data-line="318">            <span class="c1"># if no length was specified we need to read up to the end of line</span>
-</span><span data-line="319">            <span class="c1"># and remove it (if it is present, i.e. not the very last char in an eof terminated envelope)</span>
-</span><span data-line="320">            <span class="n">payload</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">readline</span><span class="p">()</span><span class="o">.</span><span class="n">rstrip</span><span class="p">(</span><span class="sa">b</span><span class="s2">"</span><span class="se">\n</span><span class="s2">"</span><span class="p">)</span>
-</span><span data-line="321">        <span class="k">if</span> <span class="n">headers</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"type"</span><span class="p">)</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"event"</span><span class="p">,</span> <span class="s2">"transaction"</span><span class="p">):</span>
-</span><span data-line="322">            <span class="n">rv</span> <span class="o">=</span> <span class="bp">cls</span><span class="p">(</span><span class="n">headers</span><span class="o">=</span><span class="n">headers</span><span class="p">,</span> <span class="n">payload</span><span class="o">=</span><span class="n">PayloadRef</span><span class="p">(</span><span class="n">json</span><span class="o">=</span><span class="n">parse_json</span><span class="p">(</span><span class="n">payload</span><span class="p">)))</span>
-</span><span data-line="323">        <span class="k">else</span><span class="p">:</span>
-</span><span data-line="324">            <span class="n">rv</span> <span class="o">=</span> <span class="bp">cls</span><span class="p">(</span><span class="n">headers</span><span class="o">=</span><span class="n">headers</span><span class="p">,</span> <span class="n">payload</span><span class="o">=</span><span class="n">payload</span><span class="p">)</span>
-</span><span data-line="325">        <span class="k">return</span> <span class="n">rv</span>
-</span><span data-line="326">
-</span><span data-line="327">    <span class="nd">@classmethod</span>
-</span><span data-line="328">    <span class="k">def</span><span class="w"> </span><span class="nf">deserialize</span><span class="p">(</span>
-</span><span data-line="329">        <span class="bp">cls</span><span class="p">,</span>
-</span><span data-line="330">        <span class="nb">bytes</span><span class="p">:</span> <span class="nb">bytes</span><span class="p">,</span>
-</span><span data-line="331">    <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"Optional[Item]"</span><span class="p">:</span>
-</span><span data-line="332">        <span class="k">return</span> <span class="bp">cls</span><span class="o">.</span><span class="n">deserialize_from</span><span class="p">(</span><span class="n">io</span><span class="o">.</span><span class="n">BytesIO</span><span class="p">(</span><span class="nb">bytes</span><span class="p">))</span></div>
+</span><span data-line="299">    <span class="nd">@classmethod</span>
+</span><span data-line="300">    <span class="k">def</span><span class="w"> </span><span class="nf">deserialize</span><span class="p">(</span>
+</span><span data-line="301">        <span class="bp">cls</span><span class="p">,</span>
+</span><span data-line="302">        <span class="nb">bytes</span><span class="p">:</span> <span class="nb">bytes</span><span class="p">,</span>
+</span><span data-line="303">    <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"Optional[Item]"</span><span class="p">:</span>
+</span><span data-line="304">        <span class="k">return</span> <span class="bp">cls</span><span class="o">.</span><span class="n">deserialize_from</span><span class="p">(</span><span class="n">io</span><span class="o">.</span><span class="n">BytesIO</span><span class="p">(</span><span class="nb">bytes</span><span class="p">))</span></div>
 
 </span></pre></div>
         </article><button class="back-to-top" type="button">
@@ -478,7 +450,7 @@ data-aria-dark="Switch to auto color mode">
     </div>
   </div>
 </footer>
-      <script src="../../_static/documentation_options.js?v=9b795c81"></script>
+      <script src="../../_static/documentation_options.js?v=1ea26b0a"></script>
       <script src="../../_static/doctools.js?v=9bcbadda"></script>
       <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
       <script src="../../_static/shibuya.js?v=50760d75"></script></body>
