@@ -33,6 +33,8 @@ class _SQSExtension(_ServiceExtension):
     ) -> "Optional[str]":
         if ctx.operation_name not in _MESSAGING_OPERATIONS:
             return None
+        # for example: `send <queue name>` when `messaging.operation.type=send`.
+        # https://opentelemetry.io/docs/specs/semconv/messaging/messaging-spans/#span-name
         return f"{attributes[SPANDATA.MESSAGING_OPERATION_TYPE]} {attributes[SPANDATA.MESSAGING_DESTINATION_NAME]}"
 
     def get_request_attributes(self, ctx: "AwsCallContext") -> "Attributes":
@@ -43,20 +45,23 @@ class _SQSExtension(_ServiceExtension):
         queue_url = ctx.params.get("QueueUrl")
         if queue_url is not None:
             attributes[SPANDATA.AWS_SQS_QUEUE_URL] = queue_url
-            # https://sqs.<region>.amazonaws.com/<account>/<queue name>
+
+            # `https://sqs.eu-north-1.amazonaws.com/123456789012/orders` => ['123456789012', 'orders']
             path = unquote(urlsplit(queue_url).path).strip("/").split("/")
+
             attributes[SPANDATA.MESSAGING_DESTINATION_NAME] = path[-1]
             if re.fullmatch(r"[0-9]{12}", path[0]):
                 attributes[SPANDATA.CLOUD_ACCOUNT_ID] = path[0]
         elif "QueueName" in ctx.params:
-            # `CreateQueue`, `GetQueueUrl`.
+            # `CreateQueue` & `GetQueueUrl` operations.
             attributes[SPANDATA.MESSAGING_DESTINATION_NAME] = ctx.params["QueueName"]
+
             if "QueueOwnerAWSAccountId" in ctx.params:
                 attributes[SPANDATA.CLOUD_ACCOUNT_ID] = ctx.params[
                     "QueueOwnerAWSAccountId"
                 ]
         elif "SourceArn" in ctx.params:
-            # message move tasks: arn:aws:sqs:<region>:<account>:<queue name>
+            # `arn:aws:sqs:eu-north-1:123456789012:orders` => `orders`
             attributes[SPANDATA.MESSAGING_DESTINATION_NAME] = ctx.params[
                 "SourceArn"
             ].split(":")[-1]
@@ -82,17 +87,27 @@ class _SQSExtension(_ServiceExtension):
         self, ctx: "AwsCallContext", response: "Any"
     ) -> "Attributes":
         attributes: "Attributes" = {}
-        # a `ClientError` response holds no results.
+
+        # `ClientError` response holds no results.
         if "Error" in response:
             return attributes
+
         if ctx.operation_name == "SendMessage":
             attributes[SPANDATA.MESSAGING_MESSAGE_ID] = response["MessageId"]
         elif ctx.operation_name == "ReceiveMessage":
             # `Messages` is left out when no message was received.
-            attributes[SPANDATA.MESSAGING_BATCH_MESSAGE_COUNT] = len(
-                response.get("Messages", ())
+            messages = response.get("Messages", ())
+            attributes[SPANDATA.MESSAGING_BATCH_MESSAGE_COUNT] = len(messages)
+            if len(messages) == 1:
+                attributes[SPANDATA.MESSAGING_MESSAGE_ID] = messages[0]["MessageId"]
+
+        # failed entries have a `200 OK` response; use their code when they share one.
+        # https://docs.aws.amazon.com/AWSSimpleQueueService/latest/APIReference/API_BatchResultErrorEntry.html
+        error_codes = {entry["Code"] for entry in response.get("Failed", ())}
+        if error_codes:
+            attributes[SPANDATA.ERROR_TYPE] = (
+                error_codes.pop()
+                if len(error_codes) == 1
+                else "aws_batch_partial_failure"
             )
-        # failed entries come back in a `200 OK` response.
-        if response.get("Failed"):
-            attributes[SPANDATA.ERROR_TYPE] = "aws_batch_partial_failure"
         return attributes

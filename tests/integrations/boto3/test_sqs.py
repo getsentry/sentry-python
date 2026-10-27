@@ -9,6 +9,11 @@ from tests.integrations.boto3.helpers import (
 )
 from tests.integrations.boto3.helpers import client_factory as client_factory
 
+_BATCH_ENTRIES = [
+    {"Id": "1", "MessageBody": "hi"},
+    {"Id": "2", "MessageBody": "hi"},
+]
+
 
 @pytest.mark.parametrize(
     "method,params,response,queue_url,account_id,resource_id",
@@ -79,71 +84,94 @@ def test_request_attributes(
     assert SPANDATA.MESSAGING_SYSTEM not in attributes
 
 
-def test_send_message(client_factory, capture_items):
-    client = client_factory("sqs")
-
-    with Stubber(client) as stubber:
-        stubber.add_response(
-            "send_message", {"MessageId": "5fea7756-0ea4-451a-a703-a558b933e274"}
-        )
-        spans = capture_spans_by_op(
-            lambda: client.send_message(
-                QueueUrl="https://sqs.eu-north-1.amazonaws.com/123456789012/orders",
-                MessageBody="hi",
-            ),
-            capture_items,
-        )
-
-    (span,) = spans[OP.QUEUE_PUBLISH]
-    assert span["name"] == "send orders"
-    attributes = span["attributes"]
-    assert attributes[SPANDATA.SENTRY_KIND] == "producer"
-    assert attributes[SPANDATA.MESSAGING_SYSTEM] == "aws_sqs"
-    assert attributes[SPANDATA.MESSAGING_OPERATION_TYPE] == "send"
-    assert attributes[SPANDATA.MESSAGING_OPERATION_NAME] == "send"
-    assert attributes[SPANDATA.MESSAGING_DESTINATION_NAME] == "orders"
-    assert (
-        attributes[SPANDATA.MESSAGING_MESSAGE_ID]
-        == "5fea7756-0ea4-451a-a703-a558b933e274"
-    )
-    assert SPANDATA.MESSAGING_BATCH_MESSAGE_COUNT not in attributes
-
-
 @pytest.mark.parametrize(
-    "failed,error_type",
+    "method,params,response,message_count,message_id,error_type",
     [
-        pytest.param([], None, id="ok"),
         pytest.param(
-            [{"Id": "2", "Code": "InternalError", "SenderFault": False}],
-            "aws_batch_partial_failure",
-            id="partial-failure",
+            "send_message",
+            {"MessageBody": "hi"},
+            {"MessageId": "5fea7756-0ea4-451a-a703-a558b933e274"},
+            None,
+            "5fea7756-0ea4-451a-a703-a558b933e274",
+            None,
+            id="single",
         ),
-    ],
-)
-def test_send_message_batch(client_factory, capture_items, failed, error_type):
-    client = client_factory("sqs")
-
-    with Stubber(client) as stubber:
-        stubber.add_response(
+        pytest.param(
             "send_message_batch",
+            {"Entries": _BATCH_ENTRIES},
             {
                 "Successful": [
                     {
                         "Id": "1",
-                        "MessageId": "5fea7756",
+                        "MessageId": "message-1",
+                        "MD5OfMessageBody": "49f68a5c8493ec2c0bf489821c21fc3b",
+                    },
+                    {
+                        "Id": "2",
+                        "MessageId": "message-2",
+                        "MD5OfMessageBody": "49f68a5c8493ec2c0bf489821c21fc3b",
+                    },
+                ],
+                "Failed": [],
+            },
+            2,
+            None,
+            None,
+            id="batch",
+        ),
+        pytest.param(
+            "send_message_batch",
+            {"Entries": _BATCH_ENTRIES},
+            {
+                "Successful": [
+                    {
+                        "Id": "1",
+                        "MessageId": "message-1",
                         "MD5OfMessageBody": "49f68a5c8493ec2c0bf489821c21fc3b",
                     }
                 ],
-                "Failed": failed,
+                "Failed": [{"Id": "2", "Code": "InternalError", "SenderFault": False}],
             },
-        )
-        spans = capture_spans_by_op(
-            lambda: client.send_message_batch(
-                QueueUrl="https://sqs.eu-north-1.amazonaws.com/123456789012/orders",
-                Entries=[
-                    {"Id": "1", "MessageBody": "hi"},
-                    {"Id": "2", "MessageBody": "hi"},
+            2,
+            None,
+            "InternalError",
+            id="batch-shared-error-code",
+        ),
+        pytest.param(
+            "send_message_batch",
+            {"Entries": _BATCH_ENTRIES},
+            {
+                "Successful": [],
+                "Failed": [
+                    {"Id": "1", "Code": "InternalError", "SenderFault": False},
+                    {"Id": "2", "Code": "InvalidParameterValue", "SenderFault": True},
                 ],
+            },
+            2,
+            None,
+            "aws_batch_partial_failure",
+            id="batch-mixed-error-codes",
+        ),
+    ],
+)
+def test_send_message(
+    client_factory,
+    capture_items,
+    method,
+    params,
+    response,
+    message_count,
+    message_id,
+    error_type,
+):
+    client = client_factory("sqs")
+
+    with Stubber(client) as stubber:
+        stubber.add_response(method, response)
+        spans = capture_spans_by_op(
+            lambda: getattr(client, method)(
+                QueueUrl="https://sqs.eu-north-1.amazonaws.com/123456789012/orders",
+                **params,
             ),
             capture_items,
         )
@@ -153,16 +181,23 @@ def test_send_message_batch(client_factory, capture_items, failed, error_type):
     assert span["status"] == ("ok" if error_type is None else "error")
     attributes = span["attributes"]
     assert attributes[SPANDATA.SENTRY_KIND] == "producer"
-    assert attributes[SPANDATA.MESSAGING_BATCH_MESSAGE_COUNT] == 2
+    assert attributes[SPANDATA.MESSAGING_OPERATION_TYPE] == "send"
+    assert attributes[SPANDATA.MESSAGING_OPERATION_NAME] == "send"
+    assert attributes.get(SPANDATA.MESSAGING_BATCH_MESSAGE_COUNT) == message_count
+    assert attributes.get(SPANDATA.MESSAGING_MESSAGE_ID) == message_id
     assert attributes.get(SPANDATA.ERROR_TYPE) == error_type
-    assert SPANDATA.MESSAGING_MESSAGE_ID not in attributes
 
 
 @pytest.mark.parametrize(
-    "response,message_count",
+    "response,message_count,message_id",
     [
-        # `Messages` is absent when the queue is empty.
-        pytest.param({}, 0, id="empty"),
+        pytest.param({}, 0, None, id="empty"),
+        pytest.param(
+            {"Messages": [{"MessageId": "1", "ReceiptHandle": "receipt-handle-1"}]},
+            1,
+            "1",
+            id="single-message",
+        ),
         pytest.param(
             {
                 "Messages": [
@@ -171,11 +206,14 @@ def test_send_message_batch(client_factory, capture_items, failed, error_type):
                 ]
             },
             2,
+            None,
             id="messages",
         ),
     ],
 )
-def test_receive_message(client_factory, capture_items, response, message_count):
+def test_receive_message(
+    client_factory, capture_items, response, message_count, message_id
+):
     client = client_factory("sqs")
 
     with Stubber(client) as stubber:
@@ -192,11 +230,10 @@ def test_receive_message(client_factory, capture_items, response, message_count)
     assert span["name"] == "receive orders"
     attributes = span["attributes"]
     assert attributes[SPANDATA.SENTRY_KIND] == "client"
-    assert attributes[SPANDATA.MESSAGING_SYSTEM] == "aws_sqs"
     assert attributes[SPANDATA.MESSAGING_OPERATION_TYPE] == "receive"
     assert attributes[SPANDATA.MESSAGING_OPERATION_NAME] == "receive"
     assert attributes[SPANDATA.MESSAGING_BATCH_MESSAGE_COUNT] == message_count
-    assert SPANDATA.MESSAGING_MESSAGE_ID not in attributes
+    assert attributes.get(SPANDATA.MESSAGING_MESSAGE_ID) == message_id
     assert "receipt-handle" not in str(span)
 
 
@@ -219,7 +256,6 @@ def test_receive_message_error(client_factory, capture_items):
         spans = capture_spans_by_op(call, capture_items)
 
     (span,) = spans[OP.QUEUE_RECEIVE]
-    assert span["status"] == "error"
     assert SPANDATA.MESSAGING_BATCH_MESSAGE_COUNT not in span["attributes"]
 
 

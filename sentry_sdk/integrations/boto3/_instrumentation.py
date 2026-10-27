@@ -180,10 +180,9 @@ def _start_client_span(
         with capture_internal_exceptions():
             attributes.update(service_ext.get_request_attributes(ctx))
 
-        with capture_internal_exceptions():
-            service_span_name = service_ext.get_span_name(ctx, attributes)
-            if service_span_name is not None:
-                span_name = service_span_name
+        service_span_name = service_ext.get_span_name(ctx, attributes)
+        if service_span_name is not None:
+            span_name = service_span_name
 
     # `start_span()` evaluates `ignore_spans` against the initial attributes.
     # https://opentelemetry.io/docs/specs/semconv/rpc/rpc-spans/#rpc-client-span
