@@ -15,7 +15,7 @@ from sentry_sdk.utils import (
 )
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, Optional
+    from typing import Any, Dict, Optional, Union
 
     from sentry_sdk._types import Event, EventProcessor
 
@@ -237,8 +237,8 @@ def _patch_prepare_middleware() -> None:
 
 
 def _exception_leads_to_http_5xx(ex: Exception, response: "falcon.Response") -> bool:
-    is_server_error = isinstance(ex, falcon.HTTPError) and (ex.status or "").startswith(
-        "5"
+    is_server_error = isinstance(ex, falcon.HTTPError) and _is_http_5xx_status(
+        ex.status or ""
     )
     is_unhandled_error = not isinstance(
         ex, (falcon.HTTPError, falcon.http_status.HTTPStatus)
@@ -250,12 +250,15 @@ def _exception_leads_to_http_5xx(ex: Exception, response: "falcon.Response") -> 
     # only perform this check on Falcon 3+, despite the risk that some handled errors might be
     # reported to Sentry as unhandled on Falcon 2.
     return (is_server_error or is_unhandled_error) and (
-        not FALCON3 or _has_http_5xx_status(response)
+        not FALCON3 or _is_http_5xx_status(response.status)
     )
 
 
-def _has_http_5xx_status(response: "falcon.Response") -> bool:
-    return response.status.startswith("5")
+def _is_http_5xx_status(status: "Union[int, str]") -> bool:
+    if isinstance(status, int):
+        return 500 <= status < 600
+    if isinstance(status, str):
+        return status.startswith("5")
 
 
 def _set_transaction_name_and_source(
