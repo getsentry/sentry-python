@@ -80,7 +80,7 @@ TEST_SUITE_CONFIG = {
     "celery": {
         "package": "celery",
         "deps": {
-            "*": ["newrelic<10.17.0", "redis", "pytest-forked"],
+            "*": ["newrelic<10.17.0", "redis", "pytest-forked", "pytest<9.2.0"],
             "py3.6": ["newrelic<8"],
             "py3.7": ["importlib-metadata<5.0"],
         },
@@ -108,6 +108,7 @@ TEST_SUITE_CONFIG = {
                 "djangorestframework",
                 "pytest-django",
                 "pytest-forked",
+                "pytest<9.2.0",
                 "Werkzeug",
                 "channels[daphne]",
                 "executing",
@@ -201,6 +202,7 @@ TEST_SUITE_CONFIG = {
                 "types-protobuf",
                 "pytest-asyncio",
                 "pytest-forked",
+                "pytest<9.2.0",
             ],
         },
         "python": ">=3.7",
@@ -416,7 +418,13 @@ TEST_SUITE_CONFIG = {
     "quart": {
         "package": "quart",
         "deps": {
-            "*": ["quart-auth", "pytest-asyncio", "pytest-forked", "Werkzeug"],
+            "*": [
+                "quart-auth",
+                "pytest-asyncio",
+                "pytest-forked",
+                "pytest<9.2.0",
+                "Werkzeug",
+            ],
             ">=0.19,<0.23": ["quart-flask-patch"],
             "<0.19": [
                 "blinker<1.6",
