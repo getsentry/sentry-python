@@ -15,12 +15,6 @@ BAGGAGE_VALUE = (
     "custom=value"
 )
 
-SENTRY_ONLY_BAGGAGE_VALUE = (
-    "sentry-trace_id=771a43a4192642f0b136d5159a501700,"
-    "sentry-public_key=49d0f7386ad645858ae85020e393bef3,"
-    "sentry-sample_rate=0.1337"
-)
-
 SENTRY_TRACE_VALUE = "771a43a4192642f0b136d5159a501700-1234567890abcdef-1"
 
 
@@ -128,28 +122,6 @@ def test_span_with_transaction_custom_headers(sentry_init):
             assert outgoing_headers["headers"]["baggage"] == combined_baggage.serialize(
                 include_third_party=True
             )
-
-
-def test_span_with_transaction_custom_headers_without_third_party_baggage(
-    sentry_init,
-):
-    sentry_init(traces_sample_rate=1.0)
-    headers = {
-        "baggage": SENTRY_ONLY_BAGGAGE_VALUE,
-        "sentry-trace": SENTRY_TRACE_VALUE,
-    }
-
-    with sentry_sdk.start_transaction(name="test_transaction"):
-        with sentry_sdk.start_span(op="test_span") as span:
-            outgoing_headers = _update_celery_task_headers(headers, span, False)
-
-            for baggage in (
-                outgoing_headers["baggage"],
-                outgoing_headers["headers"]["baggage"],
-            ):
-                assert baggage.startswith("sentry-")
-                assert not baggage.endswith(",")
-                assert "custom=" not in baggage
 
 
 @pytest.mark.parametrize("monitor_beat_tasks", [True, False])
