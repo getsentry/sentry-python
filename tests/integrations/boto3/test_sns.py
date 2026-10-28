@@ -4,7 +4,10 @@ from botocore.stub import Stubber
 
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.boto3 import Boto3Integration
-from tests.integrations.boto3.helpers import capture_spans_by_op
+from tests.integrations.boto3.helpers import (
+    capture_spans_by_op,
+    require_botocore_model_fields,
+)
 from tests.integrations.boto3.helpers import client_factory as client_factory
 from tests.integrations.utils import DATA_COLLECTION_USER_INFO_CASES
 
@@ -189,6 +192,11 @@ def test_publish(
     error_type,
 ):
     client = client_factory("sns")
+
+    require_botocore_model_fields(
+        client,
+        "publish_batch",
+    )
 
     with Stubber(client) as stubber:
         stubber.add_response(method, response)
