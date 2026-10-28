@@ -842,7 +842,7 @@ class Baggage:
                 item = Baggage.SENTRY_PREFIX + quote(key) + "=" + quote(str(val))
                 items.append(item)
 
-        if include_third_party:
+        if include_third_party and self.third_party_items:
             items.append(self.third_party_items)
 
         return ",".join(items)

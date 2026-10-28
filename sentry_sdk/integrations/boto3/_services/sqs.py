@@ -102,12 +102,10 @@ class _SQSExtension(_ServiceExtension):
                 attributes[SPANDATA.MESSAGING_MESSAGE_ID] = messages[0]["MessageId"]
 
         # failed entries have a `200 OK` response; use their code when they share one.
-        # https://docs.aws.amazon.com/AWSSimpleQueueService/latest/APIReference/API_BatchResultErrorEntry.html
+        # https://docs.aws.amazon.com/sns/latest/api/API_BatchResultErrorEntry.html
         error_codes = {entry["Code"] for entry in response.get("Failed", ())}
-        if error_codes:
-            attributes[SPANDATA.ERROR_TYPE] = (
-                error_codes.pop()
-                if len(error_codes) == 1
-                else "aws_batch_partial_failure"
-            )
+        if len(error_codes) == 1:
+            attributes[SPANDATA.ERROR_TYPE] = error_codes.pop()
+        elif error_codes:
+            attributes[SPANDATA.ERROR_TYPE] = "aws_batch_partial_failure"
         return attributes
