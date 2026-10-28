@@ -85,7 +85,7 @@ TEST_SUITE_CONFIG = {
     "celery": {
         "package": "celery",
         "deps": {
-            "*": ["newrelic<10.17.0", "redis", "pytest-forked"],
+            "*": ["newrelic<10.17.0", "redis", "pytest-forked", "pytest<9.2.0"],
             "py3.6": ["newrelic<8"],
             "py3.7": ["importlib-metadata<5.0"],
         },
@@ -113,6 +113,7 @@ TEST_SUITE_CONFIG = {
                 "djangorestframework",
                 "pytest-django",
                 "pytest-forked",
+                "pytest<9.2.0",
                 "Werkzeug",
                 "channels[daphne]",
                 "executing",
@@ -206,6 +207,7 @@ TEST_SUITE_CONFIG = {
                 "types-protobuf",
                 "pytest-asyncio",
                 "pytest-forked",
+                "pytest<9.2.0",
             ],
         },
         "python": ">=3.7",
@@ -214,8 +216,12 @@ TEST_SUITE_CONFIG = {
         "package": "httpx",
         "integration_name": "httpx",
         "deps": {
-            "*": ["anyio>=3,<5", "pytest-asyncio"],
+            # Old pytest-asyncio versions are not compatible with pytest>=9.2.0
+            "*": ["anyio>=3,<5", "pytest-asyncio", "pytest<9.2.0"],
             "<0.24": ["anyio<4"],
+            # pytest-cov>=7 requires pytest>=7, so installing the latest pytest-cov
+            # would override the pytest<7 pin these versions resolve to
+            "<0.21": ["pytest-cov<7"],
             ">=0.16,<0.17": ["pytest-httpx==0.10.0"],
             ">=0.17,<0.19": ["pytest-httpx==0.12.0"],
             ">=0.19,<0.21": ["pytest-httpx==0.14.0"],
@@ -421,7 +427,13 @@ TEST_SUITE_CONFIG = {
     "quart": {
         "package": "quart",
         "deps": {
-            "*": ["quart-auth", "pytest-asyncio", "pytest-forked", "Werkzeug"],
+            "*": [
+                "quart-auth",
+                "pytest-asyncio",
+                "pytest-forked",
+                "pytest<9.2.0",
+                "Werkzeug",
+            ],
             ">=0.19,<0.23": ["quart-flask-patch"],
             "<0.19": [
                 "blinker<1.6",
