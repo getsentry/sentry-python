@@ -193,10 +193,7 @@ def test_publish(
 ):
     client = client_factory("sns")
 
-    require_botocore_model_fields(
-        client,
-        "publish_batch",
-    )
+    require_botocore_model_fields(client, method)
 
     with Stubber(client) as stubber:
         stubber.add_response(method, response)
