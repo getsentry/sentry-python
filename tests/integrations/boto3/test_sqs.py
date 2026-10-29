@@ -1,3 +1,6 @@
+import copy
+import json
+
 import pytest
 from botocore.exceptions import ClientError
 from botocore.stub import Stubber
@@ -306,3 +309,116 @@ def test_delete_message(
     assert attributes[SPANDATA.MESSAGING_OPERATION_NAME] == "settle"
     assert attributes.get(SPANDATA.MESSAGING_BATCH_MESSAGE_COUNT) == message_count
     assert "receipt-handle" not in str(span)
+
+
+@pytest.mark.parametrize(
+    "names,sent_names",
+    [
+        pytest.param(None, ["sentry-trace", "baggage"], id="default"),
+        pytest.param(
+            ["orderId", "baggage"],
+            ["orderId", "baggage", "sentry-trace"],
+            id="caller-names",
+        ),
+        pytest.param(
+            ["baggage", "sentry-trace"],
+            ["baggage", "sentry-trace"],
+            id="already-requested",
+        ),
+        pytest.param(["All"], ["All"], id="all"),
+        pytest.param([".*"], [".*"], id="all-pattern"),
+    ],
+)
+def test_receive_message_requests_carrier(
+    client_factory, capture_items, names, sent_names
+):
+    client = client_factory("sqs")
+    queue_url = "https://sqs.eu-north-1.amazonaws.com/123456789012/orders"
+    params = {} if names is None else {"MessageAttributeNames": names}
+    caller_params = copy.deepcopy(params)
+
+    with Stubber(client) as stubber:
+        stubber.add_response(
+            "receive_message",
+            {},
+            {"QueueUrl": queue_url, "MessageAttributeNames": sent_names},
+        )
+        capture_spans_by_op(
+            lambda: client.receive_message(QueueUrl=queue_url, **params),
+            capture_items,
+        )
+
+    assert params == caller_params
+
+
+def test_receive_message_links(client_factory, capture_items):
+    client = client_factory("sqs")
+    sentry_trace = {
+        "sentry-trace": {
+            "DataType": "String",
+            "StringValue": "771a43a4192642f0b136d5159a501700-a3e9e5ba6f99f4d6-1",
+        }
+    }
+    sns_envelope = {
+        "Type": "Notification",
+        "MessageId": "sns-message-3",
+        "TopicArn": "arn:aws:sns:eu-north-1:123456789012:alerts",
+        "Message": "hi",
+        "MessageAttributes": {
+            "sentry-trace": {
+                "Type": "String",
+                "Value": "b2c1b1d6cb5f4a0d8a6a2f1c3e9d7b40-9c4f3a2b1e0d8f7a",
+            }
+        },
+    }
+    response = {
+        "Messages": [
+            # batch entries of one send share a context.
+            {"MessageId": "1", "Body": "hi", "MessageAttributes": sentry_trace},
+            {"MessageId": "2", "Body": "hi", "MessageAttributes": sentry_trace},
+            # SNS-to-SQS delivery without raw message delivery.
+            {"MessageId": "3", "Body": json.dumps(sns_envelope)},
+            # trace id with malformed sentry-trace.
+            {
+                "MessageId": "4",
+                "Body": "hi",
+                "MessageAttributes": {
+                    "sentry-trace": {
+                        "DataType": "String",
+                        "StringValue": "771a43a4192642f0b136d5159a501700",
+                    }
+                },
+            },
+            # JSON body that is not an SNS envelope.
+            {"MessageId": "5", "Body": '{"sentry-trace": "not an SNS envelope"}'},
+            {"MessageId": "6", "Body": "hi"},
+        ]
+    }
+
+    with Stubber(client) as stubber:
+        stubber.add_response("receive_message", response)
+        spans = capture_spans_by_op(
+            lambda: client.receive_message(
+                QueueUrl="https://sqs.eu-north-1.amazonaws.com/123456789012/orders"
+            ),
+            capture_items,
+        )
+
+    (span,) = spans[OP.QUEUE_RECEIVE]
+    link_type = {
+        SPANDATA.SENTRY_LINK_TYPE: {"value": "message_origin", "type": "string"}
+    }
+    assert span["links"] == [
+        # messages 1 and 2 share a context, so one link.
+        {
+            "trace_id": "771a43a4192642f0b136d5159a501700",
+            "span_id": "a3e9e5ba6f99f4d6",
+            "sampled": True,
+            "attributes": link_type,
+        },
+        {
+            "trace_id": "b2c1b1d6cb5f4a0d8a6a2f1c3e9d7b40",
+            "span_id": "9c4f3a2b1e0d8f7a",
+            "attributes": link_type,
+        },
+    ]

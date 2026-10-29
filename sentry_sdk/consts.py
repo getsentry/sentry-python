@@ -1393,6 +1393,12 @@ class SPANDATA:
     Example: "client", "server", "producer", "consumer", "internal"
     """
 
+    SENTRY_LINK_TYPE = "sentry.link.type"
+    """
+    Set on a span link. Describes the relationship between the span and the linked span.
+    Example: "message_origin"
+    """
+
     SENTRY_OP = "sentry.op"
     """
     The operation of a span.
