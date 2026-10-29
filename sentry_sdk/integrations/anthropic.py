@@ -93,7 +93,7 @@ if TYPE_CHECKING:
 
         _model: Optional[ModelParam]
         _usage: "_RecordedUsage"
-        _content_blocks: list[Any]
+        _content_blocks: dict[int, dict[str, Any]]
         _response_id: Optional[str]
         _finish_reason: Optional[str]
 
@@ -103,7 +103,7 @@ if TYPE_CHECKING:
 
         _model: Optional[ModelParam]
         _usage: "_RecordedUsage"
-        _content_blocks: list[Any]
+        _content_blocks: dict[int, dict[str, Any]]
         _response_id: Optional[str]
         _finish_reason: Optional[str]
 
@@ -113,7 +113,7 @@ if TYPE_CHECKING:
 
         _model: Optional[ModelParam]
         _usage: "_RecordedUsage"
-        _content_blocks: list[Any]
+        _content_blocks: dict[int, dict[str, Any]]
         _response_id: Optional[str]
         _finish_reason: Optional[str]
 
@@ -123,7 +123,7 @@ if TYPE_CHECKING:
 
         _model: Optional[ModelParam]
         _usage: "_RecordedUsage"
-        _content_blocks: list[Any]
+        _content_blocks: dict[int, dict[str, Any]]
         _response_id: Optional[str]
         _finish_reason: Optional[str]
 
@@ -323,24 +323,47 @@ def _collect_ai_data(
     event: "MessageStreamEvent",
     model: "str | None",
     usage: "_RecordedUsage",
-    content_blocks: "list[str]",
+    content_blocks: "dict[int, dict[str, Any]]",
     response_id: "str | None" = None,
     finish_reason: "str | None" = None,
-) -> "tuple[str | None, _RecordedUsage, list[str], str | None, str | None]":
+) -> "tuple[str | None, _RecordedUsage, dict[int, dict[str, Any]], str | None, str | None]":
     """
     Collect model information, token usage, and collect content blocks from the AI streaming response.
     """
     with capture_internal_exceptions():
         if hasattr(event, "type"):
             if event.type == "content_block_start":
-                pass
+                content_block = event.content_block
+                if content_block.type == "text":
+                    content_blocks[event.index] = {
+                        "type": "text",
+                        "text": content_block.text,
+                    }
+                elif content_block.type == "tool_use":
+                    content_blocks[event.index] = {
+                        "type": "tool_use",
+                        "id": content_block.id,
+                        "name": content_block.name,
+                        "input": "",
+                    }
             elif event.type == "content_block_delta":
-                if hasattr(event.delta, "text"):
-                    content_blocks.append(event.delta.text)
-                elif hasattr(event.delta, "partial_json"):
-                    content_blocks.append(event.delta.partial_json)
+                block = content_blocks.get(event.index)
+                if block is not None:
+                    if block["type"] == "text" and hasattr(event.delta, "text"):
+                        block["text"] += event.delta.text
+                    elif block["type"] == "tool_use" and hasattr(
+                        event.delta, "partial_json"
+                    ):
+                        block["input"] += event.delta.partial_json
             elif event.type == "content_block_stop":
-                pass
+                block = content_blocks.get(event.index)
+                if block is not None and block["type"] == "tool_use":
+                    try:
+                        block["input"] = (
+                            json.loads(block["input"]) if block["input"] else {}
+                        )
+                    except ValueError:
+                        pass
 
             # Token counting logic mirrors anthropic SDK, which also extracts already accumulated tokens.
             # https://github.com/anthropics/anthropic-sdk-python/blob/9c485f6966e10ae0ea9eabb3a921d2ea8145a25b/src/anthropic/lib/streaming/_messages.py#L433-L518
@@ -946,7 +969,7 @@ def _initialize_data_accumulation_state(
     if not hasattr(stream, "_model"):
         stream._model = None  # type: ignore[union-attr]
         stream._usage = _RecordedUsage()  # type: ignore[union-attr]
-        stream._content_blocks = []  # type: ignore[union-attr]
+        stream._content_blocks = {}  # type: ignore[union-attr]
         stream._response_id = None  # type: ignore[union-attr]
         stream._finish_reason = None  # type: ignore[union-attr]
 
@@ -979,7 +1002,7 @@ def _set_streaming_output_data(
     integration: "AnthropicIntegration",
     model: "Optional[str]",
     usage: "_RecordedUsage",
-    content_blocks: "list[str]",
+    content_blocks: "dict[int, dict[str, Any]]",
     response_id: "Optional[str]",
     finish_reason: "Optional[str]",
 ) -> None:
@@ -1002,7 +1025,7 @@ def _set_streaming_output_data(
         output_tokens=usage.output_tokens,
         cache_read_input_tokens=usage.cache_read_input_tokens,
         cache_write_input_tokens=usage.cache_write_input_tokens,
-        content_blocks=[{"text": "".join(content_blocks), "type": "text"}],
+        content_blocks=list(content_blocks.values()),
         response_id=response_id,
         finish_reason=finish_reason,
     )
