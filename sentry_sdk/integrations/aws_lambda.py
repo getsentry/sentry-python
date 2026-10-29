@@ -96,6 +96,32 @@ def _wrap_init_error(init_error: "F") -> "F":
     return sentry_init_error  # type: ignore
 
 
+def _get_messaging_batch_count(aws_event: "Any") -> "Optional[int]":
+    """
+    Returns the message count if the event is from a recognized messaging
+    service (SQS or SNS), or None otherwise.
+    """
+    if not isinstance(aws_event, dict):
+        return None
+
+    records = aws_event.get("Records")
+    if not isinstance(records, list) or not records:
+        return None
+
+    first_record = records[0]
+    if not isinstance(first_record, dict):
+        return None
+
+    event_source = (
+        first_record.get("eventSource") or first_record.get("EventSource") or ""
+    ).lower()
+
+    if event_source in ("aws:sqs", "aws:sns") or "Sns" in first_record:
+        return len(records)
+
+    return None
+
+
 def _wrap_handler(handler: "F") -> "F":
     @functools.wraps(handler)
     def sentry_handler(
@@ -117,7 +143,11 @@ def _wrap_handler(handler: "F") -> "F":
         if integration is None:
             return handler(aws_event, aws_context, *args, **kwargs)
 
-        if isinstance(aws_event, list) and len(aws_event) >= 1:
+        messaging_batch_count = _get_messaging_batch_count(aws_event)
+        if messaging_batch_count is not None:
+            request_data = aws_event
+            batch_size = messaging_batch_count
+        elif isinstance(aws_event, list) and len(aws_event) >= 1:
             request_data = aws_event[0]
             batch_size = len(aws_event)
         else:
@@ -240,9 +270,13 @@ def _wrap_handler(handler: "F") -> "F":
                         "aws.lambda.invoked_arn": aws_context.invoked_function_arn,
                         "aws.log.group.names": [aws_context.log_group_name],
                         "aws.log.stream.names": [aws_context.log_stream_name],
-                        "messaging.batch.message_count": batch_size,
                         **header_attributes,
                         **additional_attributes,
+                        **(
+                            {"messaging.batch.message_count": messaging_batch_count}
+                            if messaging_batch_count is not None
+                            else {}
+                        ),
                     },
                 )
             else:
