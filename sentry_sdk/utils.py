@@ -1721,10 +1721,6 @@ def ensure_integration_enabled(
     return patcher
 
 
-def nanosecond_time() -> int:
-    return time.perf_counter_ns()
-
-
 def now() -> float:
     return time.perf_counter()
 
