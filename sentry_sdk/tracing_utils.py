@@ -1042,34 +1042,6 @@ def _get_value(source: "Any", key: str) -> "Optional[Any]":
     return value
 
 
-def _get_usage_attributes(usage: "Any") -> "dict[str, Any]":
-    """
-    Get usage attributes.
-    """
-    attributes = {}
-
-    def _set_from_keys(attribute: str, keys: "tuple[str, ...]") -> None:
-        for key in keys:
-            value = _get_value(usage, key)
-            if value is not None and isinstance(value, int):
-                attributes[attribute] = value
-
-    _set_from_keys(
-        SPANDATA.GEN_AI_USAGE_INPUT_TOKENS,
-        ("prompt_tokens", "input_tokens"),
-    )
-    _set_from_keys(
-        SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS,
-        ("completion_tokens", "output_tokens"),
-    )
-    _set_from_keys(
-        SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS,
-        ("total_tokens",),
-    )
-
-    return attributes
-
-
 def _should_continue_trace(baggage: "Optional[Baggage]") -> bool:
     """
     Check if we should continue the incoming trace according to the strict_trace_continuation spec.
