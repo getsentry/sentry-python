@@ -2179,6 +2179,258 @@ async def test_streaming_chat_completion_empty_content_preserves_token_usage_asy
         assert span["data"]["gen_ai.usage.total_tokens"] == 20
 
 
+def _make_chat_completion_with_tool_call(content):
+    return ChatCompletion(
+        id="chatcmpl-1",
+        choices=[
+            Choice(
+                index=0,
+                finish_reason="tool_calls",
+                message=ChatCompletionMessage(
+                    role="assistant",
+                    content=content,
+                    tool_calls=[
+                        {
+                            "id": "call_1",
+                            "type": "function",
+                            "function": {
+                                "name": "get_weather",
+                                "arguments": '{"city": "Paris"}',
+                            },
+                        }
+                    ],
+                ),
+            )
+        ],
+        created=10000000,
+        model="model-id",
+        object="chat.completion",
+    )
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+@pytest.mark.parametrize(
+    "content",
+    [
+        pytest.param("Checking the weather.", id="with-content"),
+        pytest.param(None, id="tool-call-only"),
+    ],
+)
+@pytest.mark.parametrize(
+    "data_collection,send_default_pii,expect_output",
+    [
+        pytest.param(
+            {"gen_ai": {"outputs": True}},
+            False,
+            True,
+            id="gen-ai-outputs-enabled-overrides-pii-disabled",
+        ),
+        pytest.param(
+            {"gen_ai": {"outputs": False}},
+            True,
+            False,
+            id="gen-ai-outputs-disabled-overrides-pii-enabled",
+        ),
+        pytest.param(
+            None,
+            False,
+            False,
+            id="no-gen-ai-data-collection-falls-back-to-send-default-pii",
+        ),
+        pytest.param(
+            None,
+            True,
+            True,
+            id="no-gen-ai-data-collection-pii-enabled-collects",
+        ),
+    ],
+)
+@pytest.mark.skipif(
+    ChoiceDeltaToolCall is None,
+    reason="OpenAI version does not support tool calls.",
+)
+def test_nonstreaming_chat_completion_tool_calls(
+    sentry_init,
+    capture_events,
+    capture_items,
+    data_collection,
+    send_default_pii,
+    expect_output,
+    content,
+    stream_gen_ai_spans,
+    span_streaming,
+):
+    init_kwargs = {
+        "integrations": [OpenAIIntegration()],
+        "disabled_integrations": [StdlibIntegration],
+        "traces_sample_rate": 1.0,
+        "send_default_pii": send_default_pii,
+        "stream_gen_ai_spans": stream_gen_ai_spans,
+        "trace_lifecycle": "stream" if span_streaming else "static",
+    }
+    if data_collection is not None:
+        init_kwargs["data_collection"] = data_collection
+
+    sentry_init(**init_kwargs)
+
+    client = OpenAI(api_key="z")
+    client.chat.completions._post = mock.Mock(
+        return_value=_make_chat_completion_with_tool_call(content)
+    )
+
+    def create():
+        with start_transaction(name="openai tx"):
+            client.chat.completions.create(
+                model="some-model",
+                messages=[{"role": "user", "content": "Weather in Paris?"}],
+            )
+
+    if span_streaming or stream_gen_ai_spans:
+        items = capture_items("span")
+        create()
+        sentry_sdk.flush()
+        (span,) = (item.payload for item in items)
+        span_data = span["attributes"]
+    else:
+        events = capture_events()
+        create()
+        (transaction,) = events
+        (span,) = transaction["spans"]
+        span_data = span["data"]
+
+    if expect_output:
+        if content is None:
+            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span_data
+        else:
+            assert span_data[SPANDATA.GEN_AI_RESPONSE_TEXT] == content
+        assert json.loads(span_data[SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS]) == [
+            {
+                "id": "call_1",
+                "type": "function",
+                "function": {
+                    "name": "get_weather",
+                    "arguments": '{"city": "Paris"}',
+                },
+            }
+        ]
+    else:
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span_data
+        assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in span_data
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "content",
+    [
+        pytest.param("Checking the weather.", id="with-content"),
+        pytest.param(None, id="tool-call-only"),
+    ],
+)
+@pytest.mark.parametrize(
+    "data_collection,send_default_pii,expect_output",
+    [
+        pytest.param(
+            {"gen_ai": {"outputs": True}},
+            False,
+            True,
+            id="gen-ai-outputs-enabled-overrides-pii-disabled",
+        ),
+        pytest.param(
+            {"gen_ai": {"outputs": False}},
+            True,
+            False,
+            id="gen-ai-outputs-disabled-overrides-pii-enabled",
+        ),
+        pytest.param(
+            None,
+            False,
+            False,
+            id="no-gen-ai-data-collection-falls-back-to-send-default-pii",
+        ),
+        pytest.param(
+            None,
+            True,
+            True,
+            id="no-gen-ai-data-collection-pii-enabled-collects",
+        ),
+    ],
+)
+@pytest.mark.skipif(
+    ChoiceDeltaToolCall is None,
+    reason="OpenAI version does not support tool calls.",
+)
+async def test_nonstreaming_chat_completion_tool_calls_async(
+    sentry_init,
+    capture_events,
+    capture_items,
+    data_collection,
+    send_default_pii,
+    expect_output,
+    content,
+    stream_gen_ai_spans,
+    span_streaming,
+):
+    init_kwargs = {
+        "integrations": [OpenAIIntegration()],
+        "disabled_integrations": [StdlibIntegration],
+        "traces_sample_rate": 1.0,
+        "send_default_pii": send_default_pii,
+        "stream_gen_ai_spans": stream_gen_ai_spans,
+        "trace_lifecycle": "stream" if span_streaming else "static",
+    }
+    if data_collection is not None:
+        init_kwargs["data_collection"] = data_collection
+
+    sentry_init(**init_kwargs)
+
+    client = AsyncOpenAI(api_key="z")
+    client.chat.completions._post = AsyncMock(
+        return_value=_make_chat_completion_with_tool_call(content)
+    )
+
+    async def create():
+        with start_transaction(name="openai tx"):
+            await client.chat.completions.create(
+                model="some-model",
+                messages=[{"role": "user", "content": "Weather in Paris?"}],
+            )
+
+    if span_streaming or stream_gen_ai_spans:
+        items = capture_items("span")
+        await create()
+        sentry_sdk.flush()
+        (span,) = (item.payload for item in items)
+        span_data = span["attributes"]
+    else:
+        events = capture_events()
+        await create()
+        (transaction,) = events
+        (span,) = transaction["spans"]
+        span_data = span["data"]
+
+    if expect_output:
+        if content is None:
+            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span_data
+        else:
+            assert span_data[SPANDATA.GEN_AI_RESPONSE_TEXT] == content
+        assert json.loads(span_data[SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS]) == [
+            {
+                "id": "call_1",
+                "type": "function",
+                "function": {
+                    "name": "get_weather",
+                    "arguments": '{"city": "Paris"}',
+                },
+            }
+        ]
+    else:
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span_data
+        assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in span_data
+
+
 def _make_chat_completion_tool_call_stream(content, cities, choices_per_chunk):
     def choice(choice_index, delta, finish_reason=None):
         return DeltaChoice(index=choice_index, delta=delta, finish_reason=finish_reason)
