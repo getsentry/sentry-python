@@ -62,6 +62,9 @@ try:
     )
     from openai.types.responses.response_completed_event import ResponseCompletedEvent
     from openai.types.responses.response_created_event import ResponseCreatedEvent
+    from openai.types.responses.response_output_item_done_event import (
+        ResponseOutputItemDoneEvent,
+    )
     from openai.types.responses.response_text_delta_event import ResponseTextDeltaEvent
     from openai.types.responses.response_usage import (
         InputTokensDetails,
@@ -7376,6 +7379,97 @@ else:
     ]
 
 
+if SKIP_RESPONSES_TESTS:
+    EXAMPLE_RESPONSES_TOOL_CALL_STREAM = []
+else:
+    EXAMPLE_RESPONSES_TOOL_CALL_STREAM = [
+        ResponseCreatedEvent(
+            sequence_number=0,
+            type="response.created",
+            response=Response(
+                id="resp_1",
+                created_at=10000000,
+                model="response-model-id",
+                object="response",
+                output=[],
+                parallel_tool_calls=True,
+                tool_choice="auto",
+                tools=[],
+            ),
+        ),
+        ResponseTextDeltaEvent(
+            item_id="msg_1",
+            sequence_number=1,
+            type="response.output_text.delta",
+            logprobs=[],
+            content_index=0,
+            output_index=0,
+            delta="Checking the weather.",
+        ),
+        ResponseOutputItemDoneEvent(
+            sequence_number=2,
+            type="response.output_item.done",
+            output_index=1,
+            item=ResponseFunctionToolCall(
+                id="fc_1",
+                call_id="call_1",
+                name="get_weather",
+                arguments='{"city": "Paris"}',
+                type="function_call",
+                status="completed",
+            ),
+        ),
+        ResponseCompletedEvent(
+            sequence_number=3,
+            type="response.completed",
+            response=Response(
+                id="resp_1",
+                created_at=10000000,
+                model="response-model-id",
+                object="response",
+                output=[
+                    ResponseOutputMessage(
+                        id="msg_1",
+                        content=[
+                            ResponseOutputText(
+                                annotations=[],
+                                text="Checking the weather.",
+                                type="output_text",
+                            ),
+                        ],
+                        role="assistant",
+                        status="completed",
+                        type="message",
+                    ),
+                    ResponseFunctionToolCall(
+                        id="fc_1",
+                        call_id="call_1",
+                        name="get_weather",
+                        arguments='{"city": "Paris"}',
+                        type="function_call",
+                        status="completed",
+                    ),
+                ],
+                parallel_tool_calls=True,
+                tool_choice="auto",
+                tools=[],
+                usage=ResponseUsage(
+                    input_tokens=20,
+                    input_tokens_details=InputTokensDetails(
+                        cached_tokens=5,
+                        cache_write_tokens=0,
+                    ),
+                    output_tokens=10,
+                    output_tokens_details=OutputTokensDetails(
+                        reasoning_tokens=8,
+                    ),
+                    total_tokens=30,
+                ),
+            ),
+        ),
+    ]
+
+
 @pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.parametrize(
@@ -7638,6 +7732,204 @@ async def test_streaming_responses_api_async(
         assert span["data"]["gen_ai.usage.input_tokens"] == 20
         assert span["data"]["gen_ai.usage.output_tokens"] == 10
         assert span["data"]["gen_ai.usage.total_tokens"] == 30
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+@pytest.mark.parametrize(
+    "data_collection,send_default_pii,expect_output",
+    [
+        pytest.param(
+            {"gen_ai": {"outputs": True}},
+            False,
+            True,
+            id="gen-ai-outputs-enabled-overrides-pii-disabled",
+        ),
+        pytest.param(
+            {"gen_ai": {"outputs": False}},
+            True,
+            False,
+            id="gen-ai-outputs-disabled-overrides-pii-enabled",
+        ),
+        pytest.param(
+            None,
+            False,
+            False,
+            id="no-gen-ai-data-collection-falls-back-to-send-default-pii",
+        ),
+        pytest.param(
+            None,
+            True,
+            True,
+            id="no-gen-ai-data-collection-pii-enabled-collects",
+        ),
+    ],
+)
+@pytest.mark.skipif(SKIP_RESPONSES_TESTS, reason="Responses API not available")
+def test_streaming_responses_api_tool_calls(
+    sentry_init,
+    capture_events,
+    capture_items,
+    data_collection,
+    send_default_pii,
+    expect_output,
+    get_model_response,
+    server_side_event_chunks,
+    stream_gen_ai_spans,
+    span_streaming,
+):
+    init_kwargs = {
+        "integrations": [OpenAIIntegration()],
+        "disabled_integrations": [StdlibIntegration],
+        "traces_sample_rate": 1.0,
+        "send_default_pii": send_default_pii,
+        "stream_gen_ai_spans": stream_gen_ai_spans,
+        "trace_lifecycle": "stream" if span_streaming else "static",
+    }
+    if data_collection is not None:
+        init_kwargs["data_collection"] = data_collection
+
+    sentry_init(**init_kwargs)
+
+    client = OpenAI(api_key="z")
+    returned_stream = get_model_response(
+        server_side_event_chunks(EXAMPLE_RESPONSES_TOOL_CALL_STREAM)
+    )
+
+    with mock.patch.object(
+        client.responses._client._client,
+        "send",
+        return_value=returned_stream,
+    ):
+        span_data = _collect_responses_span_data(
+            capture_events,
+            capture_items,
+            span_streaming,
+            stream_gen_ai_spans,
+            lambda: list(
+                client.responses.create(
+                    model="some-model",
+                    input="Weather in Paris?",
+                    stream=True,
+                )
+            ),
+        )
+
+    if expect_output:
+        assert span_data[SPANDATA.GEN_AI_RESPONSE_TEXT] == "Checking the weather."
+        (tool_call,) = json.loads(span_data[SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS])
+        assert tool_call["type"] == "function_call"
+        assert tool_call["id"] == "fc_1"
+        assert tool_call["call_id"] == "call_1"
+        assert tool_call["name"] == "get_weather"
+        assert tool_call["arguments"] == '{"city": "Paris"}'
+    else:
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span_data
+        assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in span_data
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "data_collection,send_default_pii,expect_output",
+    [
+        pytest.param(
+            {"gen_ai": {"outputs": True}},
+            False,
+            True,
+            id="gen-ai-outputs-enabled-overrides-pii-disabled",
+        ),
+        pytest.param(
+            {"gen_ai": {"outputs": False}},
+            True,
+            False,
+            id="gen-ai-outputs-disabled-overrides-pii-enabled",
+        ),
+        pytest.param(
+            None,
+            False,
+            False,
+            id="no-gen-ai-data-collection-falls-back-to-send-default-pii",
+        ),
+        pytest.param(
+            None,
+            True,
+            True,
+            id="no-gen-ai-data-collection-pii-enabled-collects",
+        ),
+    ],
+)
+@pytest.mark.skipif(SKIP_RESPONSES_TESTS, reason="Responses API not available")
+async def test_streaming_responses_api_tool_calls_async(
+    sentry_init,
+    capture_events,
+    capture_items,
+    data_collection,
+    send_default_pii,
+    expect_output,
+    get_model_response,
+    async_iterator,
+    server_side_event_chunks,
+    stream_gen_ai_spans,
+    span_streaming,
+):
+    init_kwargs = {
+        "integrations": [OpenAIIntegration()],
+        "disabled_integrations": [StdlibIntegration],
+        "traces_sample_rate": 1.0,
+        "send_default_pii": send_default_pii,
+        "stream_gen_ai_spans": stream_gen_ai_spans,
+        "trace_lifecycle": "stream" if span_streaming else "static",
+    }
+    if data_collection is not None:
+        init_kwargs["data_collection"] = data_collection
+
+    sentry_init(**init_kwargs)
+
+    client = AsyncOpenAI(api_key="z")
+    returned_stream = get_model_response(
+        async_iterator(server_side_event_chunks(EXAMPLE_RESPONSES_TOOL_CALL_STREAM))
+    )
+
+    async def create():
+        with mock.patch.object(
+            client.responses._client._client,
+            "send",
+            return_value=returned_stream,
+        ), start_transaction(name="openai tx"):
+            response_stream = await client.responses.create(
+                model="some-model",
+                input="Weather in Paris?",
+                stream=True,
+            )
+            async for _ in response_stream:
+                pass
+
+    if span_streaming or stream_gen_ai_spans:
+        items = capture_items("span")
+        await create()
+        sentry_sdk.flush()
+        (span,) = (item.payload for item in items)
+        span_data = span["attributes"]
+    else:
+        events = capture_events()
+        await create()
+        (transaction,) = events
+        (span,) = transaction["spans"]
+        span_data = span["data"]
+
+    if expect_output:
+        assert span_data[SPANDATA.GEN_AI_RESPONSE_TEXT] == "Checking the weather."
+        (tool_call,) = json.loads(span_data[SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS])
+        assert tool_call["type"] == "function_call"
+        assert tool_call["id"] == "fc_1"
+        assert tool_call["call_id"] == "call_1"
+        assert tool_call["name"] == "get_weather"
+        assert tool_call["arguments"] == '{"city": "Paris"}'
+    else:
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span_data
+        assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in span_data
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
