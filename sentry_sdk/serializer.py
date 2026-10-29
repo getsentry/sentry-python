@@ -46,6 +46,7 @@ MAX_EVENT_BYTES = 10**6
 MAX_DATABAG_DEPTH: int = 5
 MAX_DATABAG_BREADTH: int = 10
 CYCLE_MARKER = "<cyclic>"
+_ATOMIC_TYPES = frozenset((str, int, float, bool, type(None)))
 
 
 global_repr_processors: "List[ReprProcessor]" = []
@@ -199,6 +200,16 @@ class _Serializer:
             self.path.append(segment)
 
         try:
+            if type(obj) in _ATOMIC_TYPES:
+                return self._serialize_node_impl(
+                    obj,
+                    is_databag=is_databag,
+                    is_request_body=is_request_body,
+                    should_repr_strings=should_repr_strings,
+                    remaining_depth=remaining_depth,
+                    remaining_breadth=remaining_breadth,
+                )
+
             with self.memo.memoize(obj) as result:
                 if result:
                     return CYCLE_MARKER
