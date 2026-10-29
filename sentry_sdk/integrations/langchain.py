@@ -441,7 +441,7 @@ class SentryLangchainCallback(BaseCallbackHandler):
                     ):
                         continue
 
-                    set_data_normalized(span, attribute, all_params[key], unpack=False)
+                    set_data_normalized(span, attribute, all_params[key])
 
             _set_tools_on_span(span, all_params.get("tools"))
 
@@ -472,7 +472,6 @@ class SentryLangchainCallback(BaseCallbackHandler):
                         span,
                         SPANDATA.GEN_AI_REQUEST_MESSAGES,
                         messages_data,
-                        unpack=False,
                     )
 
     def on_chat_model_start(
@@ -544,7 +543,7 @@ class SentryLangchainCallback(BaseCallbackHandler):
                     ):
                         continue
 
-                    set_data_normalized(span, attribute, all_params[key], unpack=False)
+                    set_data_normalized(span, attribute, all_params[key])
 
             _set_tools_on_span(span, all_params.get("tools"))
 
@@ -585,7 +584,6 @@ class SentryLangchainCallback(BaseCallbackHandler):
                         span,
                         SPANDATA.GEN_AI_REQUEST_MESSAGES,
                         messages_data,
-                        unpack=False,
                     )
 
     def on_chat_model_end(
@@ -673,7 +671,6 @@ class SentryLangchainCallback(BaseCallbackHandler):
                             span,
                             SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
                             tool_calls,
-                            unpack=False,
                         )
 
             if record_outputs:
@@ -1081,7 +1078,6 @@ def _set_tools_on_span(span: "Union[Span, StreamedSpan]", tools: "Any") -> None:
             span,
             attribute_name,
             simplified_tools,
-            unpack=False,
         )
 
 
@@ -1218,7 +1214,6 @@ def _wrap_agent_executor_invoke(f: "Callable[..., Any]") -> "Callable[..., Any]"
                             span,
                             SPANDATA.GEN_AI_REQUEST_MESSAGES,
                             messages_data,
-                            unpack=False,
                         )
 
                 output = result.get("output")
@@ -1260,7 +1255,6 @@ def _wrap_agent_executor_invoke(f: "Callable[..., Any]") -> "Callable[..., Any]"
                             span,
                             SPANDATA.GEN_AI_REQUEST_MESSAGES,
                             messages_data,
-                            unpack=False,
                         )
 
                 output = result.get("output")
@@ -1338,7 +1332,6 @@ def _wrap_agent_executor_stream(f: "Callable[..., Any]") -> "Callable[..., Any]"
                     span,
                     SPANDATA.GEN_AI_REQUEST_MESSAGES,
                     messages_data,
-                    unpack=False,
                 )
 
         # Run the agent
@@ -1454,9 +1447,7 @@ def _wrap_embedding_method(f: "Callable[..., Any]") -> "Callable[..., Any]":
                     input_data = args[0]
                     # Normalize to list format
                     texts = input_data if isinstance(input_data, list) else [input_data]
-                    set_data_normalized(
-                        span, SPANDATA.GEN_AI_EMBEDDINGS_INPUT, texts, unpack=False
-                    )
+                    set_data_normalized(span, SPANDATA.GEN_AI_EMBEDDINGS_INPUT, texts)
 
                 result = f(self, *args, **kwargs)
                 return result
@@ -1474,9 +1465,7 @@ def _wrap_embedding_method(f: "Callable[..., Any]") -> "Callable[..., Any]":
                     input_data = args[0]
                     # Normalize to list format
                     texts = input_data if isinstance(input_data, list) else [input_data]
-                    set_data_normalized(
-                        span, SPANDATA.GEN_AI_EMBEDDINGS_INPUT, texts, unpack=False
-                    )
+                    set_data_normalized(span, SPANDATA.GEN_AI_EMBEDDINGS_INPUT, texts)
 
                 result = f(self, *args, **kwargs)
                 return result
@@ -1521,9 +1510,7 @@ def _wrap_async_embedding_method(f: "Callable[..., Any]") -> "Callable[..., Any]
                     input_data = args[0]
                     # Normalize to list format
                     texts = input_data if isinstance(input_data, list) else [input_data]
-                    set_data_normalized(
-                        span, SPANDATA.GEN_AI_EMBEDDINGS_INPUT, texts, unpack=False
-                    )
+                    set_data_normalized(span, SPANDATA.GEN_AI_EMBEDDINGS_INPUT, texts)
 
                 result = await f(self, *args, **kwargs)
                 return result
@@ -1541,9 +1528,7 @@ def _wrap_async_embedding_method(f: "Callable[..., Any]") -> "Callable[..., Any]
                     input_data = args[0]
                     # Normalize to list format
                     texts = input_data if isinstance(input_data, list) else [input_data]
-                    set_data_normalized(
-                        span, SPANDATA.GEN_AI_EMBEDDINGS_INPUT, texts, unpack=False
-                    )
+                    set_data_normalized(span, SPANDATA.GEN_AI_EMBEDDINGS_INPUT, texts)
 
                 result = await f(self, *args, **kwargs)
                 return result

@@ -564,7 +564,6 @@ def _set_common_input_data(
                 span,
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
                 messages_data,
-                unpack=False,
             )
 
 
@@ -705,7 +704,6 @@ def _set_output_data(
                 span,
                 SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
                 output_messages["tool"],
-                unpack=False,
             )
 
         if len(output_messages["response"]) > 0:
