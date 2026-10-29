@@ -38,6 +38,12 @@ minimum_python_311 = pytest.mark.skipif(
 )
 
 
+minimum_python_312 = pytest.mark.skipif(
+    sys.version_info < (3, 12),
+    reason="Eager task factories were introduced in Python 3.12",
+)
+
+
 async def foo():
     await asyncio.sleep(0.01)
 
@@ -898,3 +904,132 @@ def test_loop_close_flushes_async_transport(sentry_init):
             loop.close()
         if original_loop:
             asyncio.set_event_loop(original_loop)
+
+
+def run_with_eager_task_factory(sentry_init, main, task_factory=None):
+    """
+    Runs main() in a new event loop that had an eager task factory when the
+    AsyncioIntegration was set up.
+    """
+
+    async def runner():
+        loop = asyncio.get_running_loop()
+        loop.set_task_factory(task_factory or asyncio.eager_task_factory)
+        sentry_init(traces_sample_rate=1.0, integrations=[AsyncioIntegration()])
+        # setup_once() runs once per process, so patch this loop explicitly
+        patch_asyncio()
+        return await main()
+
+    return asyncio.run(runner())
+
+
+@minimum_python_312
+def test_eager_task_factory_stays_eager(sentry_init, capture_events):
+    steps = []
+
+    async def child():
+        steps.append("child started")
+        await asyncio.sleep(0)
+
+    async def main():
+        events = capture_events()
+        with sentry_sdk.start_transaction(name="test_transaction"):
+            task = asyncio.create_task(child())
+            steps.append("create_task returned")
+            await task
+        return events
+
+    events = run_with_eager_task_factory(sentry_init, main)
+
+    assert steps == ["child started", "create_task returned"]
+    (event,) = events
+    (span,) = event["spans"]
+    assert span["op"] == OP.FUNCTION
+    assert span["description"] == child.__qualname__
+
+
+@minimum_python_312
+def test_eager_task_factory_is_recognizable(sentry_init):
+    async def main():
+        return asyncio.get_running_loop().get_task_factory()
+
+    task_factory = run_with_eager_task_factory(sentry_init, main)
+
+    assert task_factory.__code__ is asyncio.eager_task_factory.__code__
+
+
+@minimum_python_312
+def test_eager_task_factory_keeps_custom_task_constructor(sentry_init):
+    class CustomTask(asyncio.Task):
+        pass
+
+    async def main():
+        task = asyncio.create_task(foo())
+        await task
+        return task
+
+    task = run_with_eager_task_factory(
+        sentry_init, main, asyncio.create_eager_task_factory(CustomTask)
+    )
+
+    assert isinstance(task, CustomTask)
+
+
+@minimum_python_312
+def test_eager_task_factory_patched_once(sentry_init):
+    async def main():
+        loop = asyncio.get_running_loop()
+        task_factory = loop.get_task_factory()
+        patch_asyncio()
+        return task_factory, loop.get_task_factory()
+
+    first, second = run_with_eager_task_factory(sentry_init, main)
+
+    assert first is second
+
+
+@minimum_python_312
+def test_eager_task_factory_with_anyio_task_group(sentry_init, capture_events):
+    anyio = pytest.importorskip("anyio")
+    steps = []
+
+    async def child(event):
+        steps.append(asyncio.current_task().get_name())
+        await event.wait()
+
+    async def main():
+        events = capture_events()
+        with sentry_sdk.start_transaction(name="test_transaction"):
+            async with anyio.create_task_group() as tg:
+                tg.start_soon(child, anyio.Event(), name="child task")
+                steps.append("start_soon returned")
+                await anyio.sleep(0.01)
+                tg.cancel_scope.cancel()
+        return events
+
+    events = run_with_eager_task_factory(sentry_init, main)
+
+    # anyio defers task group children itself, which it can only do if it
+    # recognizes the loop's task factory as eager
+    assert steps == ["start_soon returned", "child task"]
+    (event,) = events
+    assert len(event["spans"]) == 1
+
+
+@minimum_python_312
+def test_eager_task_factory_with_unexpected_closure(sentry_init, monkeypatch):
+    def task_factory(loop, coro, **kwargs):
+        return asyncio.Task(coro, loop=loop, **kwargs)
+
+    # Looks like an eager task factory, but holds no task constructor
+    monkeypatch.setattr(asyncio, "eager_task_factory", task_factory)
+
+    async def main():
+        task = asyncio.create_task(foo())
+        await task
+        return asyncio.get_running_loop().get_task_factory()
+
+    sentry_task_factory = run_with_eager_task_factory(sentry_init, main, task_factory)
+
+    assert sentry_task_factory._is_sentry_task_factory
+    assert sentry_task_factory is not task_factory
