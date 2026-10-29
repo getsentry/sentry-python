@@ -3,13 +3,17 @@ from typing import TYPE_CHECKING
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.boto3._services.base import _ServiceExtension
-from sentry_sdk.integrations.boto3._utils import _get_aws_arn_attributes
+from sentry_sdk.integrations.boto3._utils import (
+    _get_aws_arn_attributes,
+    _inject_message_attributes,
+)
 
 if TYPE_CHECKING:
-    from typing import Any, Optional
+    from typing import Any, Dict, Optional
 
     from sentry_sdk._types import Attributes
     from sentry_sdk.integrations.boto3._context import AwsCallContext
+    from sentry_sdk.traces import Span
 
 _PUBLISH_OPERATIONS = ("Publish", "PublishBatch")
 
@@ -114,3 +118,13 @@ class _SNSExtension(_ServiceExtension):
         elif error_codes:
             attributes[SPANDATA.ERROR_TYPE] = "aws_batch_partial_failure"
         return attributes
+
+    def get_request_params(
+        self, ctx: "AwsCallContext", span: "Optional[Span]"
+    ) -> "Optional[Dict[str, Any]]":
+        if ctx.operation_name not in _PUBLISH_OPERATIONS:
+            return None
+
+        return _inject_message_attributes(
+            ctx, span, "Message", "PublishBatchRequestEntries"
+        )

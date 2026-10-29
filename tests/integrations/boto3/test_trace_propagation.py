@@ -1,17 +1,25 @@
+import copy
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from threading import Thread
 from urllib.parse import parse_qs, urlparse
 
 import boto3
+import pytest
 from botocore.auth import SIGNED_HEADERS_BLACKLIST
 from botocore.config import Config
+from botocore.stub import Stubber
 
 import sentry_sdk
+from sentry_sdk.consts import OP
 from sentry_sdk.integrations.boto3 import Boto3Integration
 from sentry_sdk.integrations.stdlib import StdlibIntegration
 from sentry_sdk.utils import (
     _get_aws_sigv4_signed_headers_from_authorization_header,
     _get_aws_sigv4_signed_headers_from_url_query_string,
+)
+from tests.integrations.boto3.helpers import (
+    capture_spans_by_op,
+    require_botocore_model_fields,
 )
 
 # botocore 1.43.115+ never signs `baggage`.
@@ -207,3 +215,144 @@ def test_presigned_urls_do_not_require_sentry_headers(sentry_init):
     # presigned URL query must not contain `sentry-trace` or `baggage`.
     assert "sentry-trace" not in url
     assert "baggage" not in url
+
+
+def _send(sentry_init, capture_items, service, messages, **options):
+    """
+    Send `messages`, i.e. `(body, message attributes)`, with the service's
+    (batch) API; return the publish span and the sent messages.
+    """
+    sentry_init(traces_sample_rate=1.0, integrations=[Boto3Integration()], **options)
+
+    client = boto3.client(  # type: ignore[attr-defined]
+        service,
+        region_name="eu-north-1",
+        aws_access_key_id="-",
+        aws_secret_access_key="-",
+    )
+
+    # service -> (single method, batch method, destination, body key, entries key)
+    single, batch, destination, body_key, entries_key = {
+        "sqs": (
+            "send_message",
+            "send_message_batch",
+            {"QueueUrl": "https://sqs.eu-north-1.amazonaws.com/123456789012/orders"},
+            "MessageBody",
+            "Entries",
+        ),
+        "sns": (
+            "publish",
+            "publish_batch",
+            {"TopicArn": "arn:aws:sns:eu-north-1:123456789012:alerts"},
+            "Message",
+            "PublishBatchRequestEntries",
+        ),
+    }[service]
+
+    entries = [
+        {"Id": str(i), body_key: body, "MessageAttributes": attributes}
+        for i, (body, attributes) in enumerate(messages)
+    ]
+    if len(entries) == 1:
+        method, response = single, {"MessageId": "1"}
+        (params,) = entries
+        # single-method API uses `MessageId` instead of `Id`.
+        del params["Id"]
+        params.update(destination)
+    else:
+        method, response = batch, {"Successful": [], "Failed": []}
+        params = {**destination, entries_key: entries}
+
+    require_botocore_model_fields(client, method)
+
+    sent_params = []
+    client.meta.events.register(
+        "before-parameter-build", lambda params, **kwargs: sent_params.append(params)
+    )
+    caller_params = copy.deepcopy(params)
+    with Stubber(client) as stubber:
+        stubber.add_response(method, response)
+        spans = capture_spans_by_op(
+            lambda: getattr(client, method)(**params), capture_items
+        )
+
+    # the caller's params are left as-is.
+    assert params == caller_params
+    (sent,) = sent_params
+    (span,) = spans[OP.QUEUE_PUBLISH]
+    return span, sent.get(entries_key, [sent])
+
+
+@pytest.mark.parametrize("message_count", [1, 2], ids=["single", "batch"])
+@pytest.mark.parametrize("service", ["sqs", "sns"])
+def test_message_attributes_propagation(
+    sentry_init, capture_items, service, message_count
+):
+    span, sent = _send(
+        sentry_init,
+        capture_items,
+        service,
+        [("hi", {"orderId": {"DataType": "String", "StringValue": "42"}})]
+        * message_count,
+    )
+
+    # every batch entry carries the context of the publish span.
+    assert len(sent) == message_count
+    for message in sent:
+        attributes = message["MessageAttributes"]
+        assert attributes.keys() == {"orderId", "sentry-trace", "baggage"}
+        assert attributes["sentry-trace"] == {
+            "DataType": "String",
+            "StringValue": f"{span['trace_id']}-{span['span_id']}-1",
+        }
+        assert attributes["baggage"]["DataType"] == "String"
+        assert (
+            f"sentry-trace_id={span['trace_id']}"
+            in attributes["baggage"]["StringValue"]
+        )
+
+
+@pytest.mark.parametrize(
+    "messages,options",
+    [
+        pytest.param(
+            [("hi", {"baggage": {"DataType": "String", "StringValue": "vendor=1"}})],
+            {},
+            id="caller-carrier",
+        ),
+        pytest.param(
+            [
+                (
+                    "hi",
+                    {
+                        f"attribute{i}": {"DataType": "String", "StringValue": "1"}
+                        for i in range(9)
+                    },
+                )
+            ],
+            {},
+            id="attribute-limit",
+        ),
+        pytest.param([("x" * 1024 * 256, {})], {}, id="message-size-limit"),
+        # 2 * (131_000 + ~385) > 262_144 which exceeds the message size limit.
+        pytest.param(
+            [("x" * 131_000, {}), ("x" * 131_000, {})],
+            {},
+            id="batch-size-limit",
+        ),
+        pytest.param(
+            [("hi", {})],
+            {"trace_propagation_targets": ["example.com"]},
+            id="trace-propagation-targets",
+        ),
+    ],
+)
+@pytest.mark.parametrize("service", ["sqs", "sns"])
+def test_message_attributes_propagation_skipped(
+    sentry_init, capture_items, service, messages, options
+):
+    _, sent = _send(sentry_init, capture_items, service, messages, **options)
+
+    assert [message["MessageAttributes"] for message in sent] == [
+        attributes for _, attributes in messages
+    ]

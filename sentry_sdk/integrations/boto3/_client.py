@@ -96,6 +96,10 @@ def _patch_botocore_client() -> None:
                 ctx.add_metadata(self)
             service_ext = _resolve_service(ctx.service_name)
             span = _start_client_span(ctx, service_ext)
+            if service_ext is not None:
+                with capture_internal_exceptions():
+                    # override the request params for e.g. trace propagation.
+                    api_params = service_ext.get_request_params(ctx, span) or api_params
 
         if span is None:
             return orig_make_api_call(self, operation_name, api_params)
@@ -122,6 +126,8 @@ def _patch_botocore_client() -> None:
                         attributes.update(
                             service_ext.get_response_attributes(ctx, parsed)
                         )
+                    with capture_internal_exceptions():
+                        span.add_links(service_ext.get_response_links(ctx, parsed))
                 with capture_internal_exceptions():
                     attributes.update(_get_response_attributes(parsed))
                 with capture_internal_exceptions():
