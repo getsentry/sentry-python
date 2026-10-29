@@ -986,15 +986,6 @@ def iter_event_stacktraces(event: "Event") -> "Iterator[Annotated[Dict[str, Any]
                 yield exception["stacktrace"]
 
 
-def iter_event_frames(event: "Event") -> "Iterator[Dict[str, Any]]":
-    for stacktrace in iter_event_stacktraces(event):
-        if isinstance(stacktrace, AnnotatedValue):
-            stacktrace = stacktrace.value or {}
-
-        for frame in stacktrace.get("frames") or ():
-            yield frame
-
-
 def handle_in_app(
     event: "Event",
     in_app_exclude: "Optional[List[str]]" = None,
