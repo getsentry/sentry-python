@@ -31,54 +31,114 @@ permissions:
 #     if: false  # TEMP: skipping, see PR #xxxx
 #     uses: ./.github/workflows/test-integrations-dbs.yml
 jobs:
+  files-changed:
+    name: Detect changed files
+    runs-on: ubuntu-22.04
+    timeout-minutes: 3
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      code: ${{ github.event_name != 'pull_request' || steps.changes.outputs.code == 'true' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: github.event_name == 'pull_request'
+      - name: Check for code changes
+        id: changes
+        if: github.event_name == 'pull_request'
+        uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
+        with:
+          token: ${{ github.token }}
+          predicate-quantifier: some-with-excludes
+          filters: |
+            code:
+              - '**'
+              - '!**/*.md'
+              - '!docs/**'
+              - '!LICENSE'
+              - '!.agents/**'
+              - '!.github/ISSUE_TEMPLATE/**'
+              - '!.github/CODEOWNERS'
+              - '!.git-blame-ignore-revs'
   common:
     name: Common
+    needs: files-changed
+    if: ${{ needs.files-changed.outputs.code == 'true' }}
     uses: ./.github/workflows/test-integrations-common.yml
   mcp:
     name: MCP
+    needs: files-changed
+    if: ${{ needs.files-changed.outputs.code == 'true' }}
     uses: ./.github/workflows/test-integrations-mcp.yml
   agents:
     name: Agents
+    needs: files-changed
+    if: ${{ needs.files-changed.outputs.code == 'true' }}
     uses: ./.github/workflows/test-integrations-agents.yml
   ai_workflow:
     name: AI Workflow
+    needs: files-changed
+    if: ${{ needs.files-changed.outputs.code == 'true' }}
     uses: ./.github/workflows/test-integrations-ai-workflow.yml
   ai:
     name: AI
+    needs: files-changed
+    if: ${{ needs.files-changed.outputs.code == 'true' }}
     uses: ./.github/workflows/test-integrations-ai.yml
   cloud:
     name: Cloud
+    needs: files-changed
+    if: ${{ needs.files-changed.outputs.code == 'true' }}
     uses: ./.github/workflows/test-integrations-cloud.yml
   dbs:
     name: DBs
+    needs: files-changed
+    if: ${{ needs.files-changed.outputs.code == 'true' }}
     uses: ./.github/workflows/test-integrations-dbs.yml
   flags:
     name: Flags
+    needs: files-changed
+    if: ${{ needs.files-changed.outputs.code == 'true' }}
     uses: ./.github/workflows/test-integrations-flags.yml
   gevent:
     name: Gevent
+    needs: files-changed
+    if: ${{ needs.files-changed.outputs.code == 'true' }}
     uses: ./.github/workflows/test-integrations-gevent.yml
   graphql:
     name: GraphQL
+    needs: files-changed
+    if: ${{ needs.files-changed.outputs.code == 'true' }}
     uses: ./.github/workflows/test-integrations-graphql.yml
   network:
     name: Network
+    needs: files-changed
+    if: ${{ needs.files-changed.outputs.code == 'true' }}
     uses: ./.github/workflows/test-integrations-network.yml
   tasks:
     name: Tasks
+    needs: files-changed
+    if: ${{ needs.files-changed.outputs.code == 'true' }}
     uses: ./.github/workflows/test-integrations-tasks.yml
   web_1:
     name: Web 1
+    needs: files-changed
+    if: ${{ needs.files-changed.outputs.code == 'true' }}
     uses: ./.github/workflows/test-integrations-web-1.yml
   web_2:
     name: Web 2
+    needs: files-changed
+    if: ${{ needs.files-changed.outputs.code == 'true' }}
     uses: ./.github/workflows/test-integrations-web-2.yml
   misc:
     name: Misc
+    needs: files-changed
+    if: ${{ needs.files-changed.outputs.code == 'true' }}
     uses: ./.github/workflows/test-integrations-misc.yml
   report:
     name: Combine and report coverage
     needs:
+      - files-changed
       - common
       - mcp
       - agents
@@ -95,7 +155,7 @@ jobs:
       - web_2
       - misc
     # Report whatever coverage exists, even if some test jobs failed.
-    if: ${{ !cancelled() }}
+    if: ${{ !cancelled() && needs.files-changed.outputs.code == 'true' }}
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -126,6 +186,7 @@ jobs:
   check-required:
     name: All tests passed
     needs:
+      - files-changed
       - common
       - mcp
       - agents
