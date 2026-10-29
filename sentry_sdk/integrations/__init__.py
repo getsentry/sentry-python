@@ -121,6 +121,7 @@ _MIN_VERSIONS = {
     "aiohttp": (3, 4),
     "aiomysql": (0, 3, 0),
     "anthropic": (0, 16),
+    "apscheduler": (3, 3),
     "ariadne": (0, 20),
     "arq": (0, 23),
     "asyncpg": (0, 23),
