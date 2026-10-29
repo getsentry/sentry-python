@@ -78,8 +78,6 @@ if TYPE_CHECKING:
     R = TypeVar("R")
 
 
-epoch = datetime(1970, 1, 1)
-
 # The logger is created here but initialized in the debug support module
 logger = logging.getLogger("sentry_sdk.errors")
 
@@ -245,10 +243,6 @@ def capture_internal_exception(exc_info: "ExcInfo") -> None:
     """
     if sentry_sdk.get_client().is_active():
         logger.error("Internal error in sentry_sdk", exc_info=exc_info)
-
-
-def to_timestamp(value: "datetime") -> float:
-    return (value - epoch).total_seconds()
 
 
 def format_timestamp(value: "datetime") -> str:
