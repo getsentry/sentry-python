@@ -31,7 +31,6 @@ except ImportError:
 from typing import TYPE_CHECKING
 
 import sentry_sdk
-from sentry_sdk._compat import PY37
 from sentry_sdk._types import SENSITIVE_DATA_SUBSTITUTE, Annotated, AnnotatedValue
 from sentry_sdk.consts import (
     DEFAULT_ADD_FULL_STACK,
@@ -1720,17 +1719,6 @@ def ensure_integration_enabled(
         return wraps(original_function)(runner)
 
     return patcher
-
-
-if PY37:
-
-    def nanosecond_time() -> int:
-        return time.perf_counter_ns()
-
-else:
-
-    def nanosecond_time() -> int:
-        return int(time.perf_counter() * 1e9)
 
 
 def now() -> float:
