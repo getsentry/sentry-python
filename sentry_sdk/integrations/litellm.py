@@ -157,7 +157,6 @@ def _input_callback(kwargs: "Dict[str, Any]") -> None:
                         span,
                         SPANDATA.GEN_AI_EMBEDDINGS_INPUT,
                         messages_data,
-                        unpack=False,
                     )
         else:
             # For chat, look for the 'messages' parameter
@@ -175,7 +174,6 @@ def _input_callback(kwargs: "Dict[str, Any]") -> None:
                         span,
                         SPANDATA.GEN_AI_REQUEST_MESSAGES,
                         messages_data,
-                        unpack=False,
                     )
 
     # Record other parameters

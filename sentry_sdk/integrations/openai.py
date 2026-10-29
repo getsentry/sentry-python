@@ -486,9 +486,7 @@ def _set_responses_api_input_data(
             else normalized_messages
         )
         if messages_data is not None:
-            set_data_normalized(
-                span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data, unpack=False
-            )
+            set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data)
         return
 
     # Input was provided as a list (potentially a multi-turn conversation)
@@ -505,9 +503,7 @@ def _set_responses_api_input_data(
             else normalized_messages
         )
         if messages_data is not None:
-            set_data_normalized(
-                span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data, unpack=False
-            )
+            set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data)
 
 
 def _set_completions_api_input_data(
@@ -592,9 +588,7 @@ def _set_completions_api_input_data(
             else normalized_messages
         )
         if messages_data is not None:
-            set_data_normalized(
-                span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data, unpack=False
-            )
+            set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data)
         return
 
     # dict special case following https://github.com/openai/openai-python/blob/3e0c05b84a2056870abf3bd6a5e7849020209cc3/src/openai/_utils/_transform.py#L194-L197
@@ -626,9 +620,7 @@ def _set_completions_api_input_data(
             else normalized_messages
         )
         if messages_data is not None:
-            set_data_normalized(
-                span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data, unpack=False
-            )
+            set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data)
 
 
 def _set_embeddings_input_data(
@@ -670,9 +662,7 @@ def _set_embeddings_input_data(
             else normalized_messages
         )
         if messages_data is not None:
-            set_data_normalized(
-                span, SPANDATA.GEN_AI_EMBEDDINGS_INPUT, messages_data, unpack=False
-            )
+            set_data_normalized(span, SPANDATA.GEN_AI_EMBEDDINGS_INPUT, messages_data)
 
         return
 
@@ -692,9 +682,7 @@ def _set_embeddings_input_data(
             else normalized_messages
         )
         if messages_data is not None:
-            set_data_normalized(
-                span, SPANDATA.GEN_AI_EMBEDDINGS_INPUT, messages_data, unpack=False
-            )
+            set_data_normalized(span, SPANDATA.GEN_AI_EMBEDDINGS_INPUT, messages_data)
 
 
 def _set_common_output_data(
@@ -775,7 +763,6 @@ def _set_common_output_data(
                         span,
                         SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
                         output_messages["tool"],
-                        unpack=False,
                     )
 
                 if record_outputs and len(output_messages["response"]) > 0:
@@ -804,7 +791,6 @@ def _set_common_output_data(
                     span,
                     SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
                     output_messages["tool"],
-                    unpack=False,
                 )
 
             if len(output_messages["response"]) > 0:

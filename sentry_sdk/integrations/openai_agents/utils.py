@@ -202,7 +202,6 @@ def _set_input_data(
             span,
             SPANDATA.GEN_AI_REQUEST_MESSAGES,
             messages_data,
-            unpack=False,
         )
 
 

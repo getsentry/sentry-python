@@ -100,7 +100,6 @@ def invoke_agent_span(
                     span,
                     SPANDATA.GEN_AI_REQUEST_MESSAGES,
                     messages_data,
-                    unpack=False,
                 )
 
     _set_agent_data(span, agent)
@@ -121,11 +120,9 @@ def update_invoke_agent_span(
     client = sentry_sdk.get_client()
     if has_data_collection_enabled(client.options):
         if client.options["data_collection"]["gen_ai"]["outputs"]:
-            set_data_normalized(
-                span, SPANDATA.GEN_AI_RESPONSE_TEXT, output, unpack=False
-            )
+            set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, output)
     elif should_send_default_pii():
-        set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, output, unpack=False)
+        set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, output)
 
     # Add conversation ID from agent
     conv_id = getattr(agent, "_sentry_conversation_id", None)
