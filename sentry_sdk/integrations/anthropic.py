@@ -1,7 +1,7 @@
 import json
 import sys
 from collections.abc import Iterable
-from functools import cached_property, wraps
+from functools import wraps
 from typing import TYPE_CHECKING, cast
 
 import sentry_sdk
@@ -220,7 +220,7 @@ class _StreamSpanContext:
 class AnthropicIntegration(Integration):
     identifier = "anthropic"
     origin = f"auto.ai.{identifier}"
-    version = None
+    version: "Union[tuple[int, ...], None]" = None
 
     def __init__(self: "AnthropicIntegration", include_prompts: bool = True) -> None:
         self.include_prompts = include_prompts
@@ -273,6 +273,11 @@ class AnthropicIntegration(Integration):
         # AsyncMessageStream inherits from AsyncStream, so patching Stream is sufficient on these versions.
         if not issubclass(AsyncMessageStream, AsyncStream):
             AsyncMessageStream.close = _wrap_async_close(AsyncMessageStream.close)  # type: ignore[method-assign]
+
+        try:
+            from functools import cached_property
+        except ImportError:
+            return
 
         # In newer anthropic SDK versions, _iterator is a cached_property instead of being eagerly assigned in __init__.
         # This is good for us, since we do a global patch instead of patching _iterator on every instance.
