@@ -165,6 +165,9 @@ async def _exit_context(body):
 
 
 @pytest.mark.asyncio
+@pytest.mark.skipif(
+    not STREAMING_BODY_INSTRUMENTED, reason="aiobotocore<3.8 bodies aren't instrumented"
+)
 @pytest.mark.parametrize("http_session", HTTP_SESSIONS)
 @pytest.mark.parametrize("consume", [_read, _close, _exit_context])
 async def test_streaming_body(
@@ -178,19 +181,11 @@ async def test_streaming_body(
             response = await client.get_object(Bucket="bucket", Key="key")
             sentry_sdk.flush()
             # the client span ends with the body, not when the call returns.
-            assert len(_client_spans(items)) == (
-                0 if STREAMING_BODY_INSTRUMENTED else 1
-            )
+            assert not _client_spans(items)
             await consume(response["Body"])
     sentry_sdk.flush()
 
-    spans = _client_spans(items)
-    if not STREAMING_BODY_INSTRUMENTED:
-        (span,) = spans
-        assert span["name"] == "S3.GetObject"
-        return
-
-    streaming_span, span = spans
+    streaming_span, span = _client_spans(items)
     assert span["name"] == "S3.GetObject"
     assert streaming_span["parent_span_id"] == span["span_id"]
     assert streaming_span["attributes"][SPANDATA.SENTRY_OP] == OP.HTTP_CLIENT_STREAM
