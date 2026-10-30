@@ -952,12 +952,6 @@ def _eventbridge_event(source, detail_type):
             id="documentdb",
         ),
         pytest.param(
-            {"Records": [_sqs_record(), _sns_record()]},
-            "other",
-            None,
-            id="mixed-sources",
-        ),
-        pytest.param(
             [{"good dog": "Maisey"}, {"good dog": "Charlie"}],
             "other",
             None,

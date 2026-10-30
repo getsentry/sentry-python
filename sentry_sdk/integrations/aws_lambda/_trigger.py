@@ -45,14 +45,8 @@ _EVENTBRIDGE_KEYS = frozenset(
 
 
 def _get_records_source(records: "list[Any]") -> "Optional[str]":
-    """The `eventSource` shared by all records; SNS spells it `EventSource`."""
-    sources = {
-        record.get("eventSource") or record.get("EventSource")
-        if isinstance(record, dict)
-        else None
-        for record in records
-    }
-    return sources.pop() if len(sources) == 1 else None
+    """The records' `eventSource`, one per event; SNS spells it `EventSource`."""
+    return records[0].get("eventSource") or records[0].get("EventSource")
 
 
 def _is_appsync_event(aws_event: "Any") -> bool:
@@ -60,8 +54,7 @@ def _is_appsync_event(aws_event: "Any") -> bool:
     return (
         isinstance(aws_event, dict)
         and "arguments" in aws_event
-        and isinstance(aws_event.get("info"), dict)
-        and "fieldName" in aws_event["info"]
+        and "fieldName" in aws_event.get("info", {})
     )
 
 
@@ -79,7 +72,7 @@ def _get_trigger(aws_event: "Any") -> str:
     # API Gateway REST APIs and ALB send `httpMethod`, HTTP APIs and function URLs
     # `requestContext.http`.
     request_context = aws_event.get("requestContext")
-    if isinstance(request_context, dict) and (
+    if request_context is not None and (
         "httpMethod" in aws_event or "http" in request_context
     ):
         return "http"
@@ -88,9 +81,9 @@ def _get_trigger(aws_event: "Any") -> str:
         return "http"
 
     records = aws_event.get("Records")
-    if isinstance(records, list) and records:
+    if records:
         # CloudFront and Lambda@Edge records have no `eventSource`.
-        if isinstance(records[0], dict) and "cf" in records[0]:
+        if "cf" in records[0]:
             return "http"
         return _TRIGGERS.get(_get_records_source(records), "other")
 
@@ -114,8 +107,8 @@ def _get_messaging_batch_size(aws_event: "Any") -> "Optional[int]":
         return None
 
     records = aws_event.get("Records")
-    if isinstance(records, list):
-        if records and _get_records_source(records) in ("aws:sqs", "aws:sns"):
+    if records:
+        if _get_records_source(records) in ("aws:sqs", "aws:sns"):
             return len(records)
         return None
 
