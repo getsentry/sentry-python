@@ -51,10 +51,8 @@ def _get_http_attributes(aws_event: "dict[str, Any]") -> "Attributes":
     data_collection = sentry_sdk.get_client().options["data_collection"]
     attributes: "Attributes" = {}
 
-    headers = aws_event.get("headers")
-    # some AWS services (e.g. EventBridge) send `headers` as a list or `None`.
-    if not isinstance(headers, dict):
-        headers = {}
+    # API Gateway sends `null` when a request has no headers.
+    headers = aws_event.get("headers") or {}
 
     # REST APIs and ALB send every value of a repeated header in `multiValueHeaders`,
     # HTTP APIs and function URLs send cookies in `cookies`.

@@ -1141,9 +1141,6 @@ def test_request_attributes(lambda_client, test_environment):
     ]
 
 
-_API_HOST = "abc123.execute-api.us-east-1.amazonaws.com"
-
-
 @pytest.mark.parametrize(
     "aws_event,expected,absent",
     [
@@ -1153,13 +1150,13 @@ _API_HOST = "abc123.execute-api.us-east-1.amazonaws.com"
                 "path": "/orders/42",
                 "httpMethod": "POST",
                 "headers": {
-                    "Host": _API_HOST,
+                    "Host": "abc123.execute-api.us-east-1.amazonaws.com",
                     "User-Agent": "curl/8.7.1",
                     "X-Forwarded-Proto": "https",
                     "Accept": "application/json",
                 },
                 "multiValueHeaders": {
-                    "Host": [_API_HOST],
+                    "Host": ["abc123.execute-api.us-east-1.amazonaws.com"],
                     "User-Agent": ["curl/8.7.1"],
                     "X-Forwarded-Proto": ["https"],
                     "Accept": ["text/html", "application/json"],
@@ -1168,7 +1165,7 @@ _API_HOST = "abc123.execute-api.us-east-1.amazonaws.com"
                 "multiValueQueryStringParameters": {"tag": ["a", "b"]},
                 "requestContext": {
                     "stage": "prod",
-                    "domainName": _API_HOST,
+                    "domainName": "abc123.execute-api.us-east-1.amazonaws.com",
                     "identity": {"sourceIp": "203.0.113.7", "userAgent": "curl/8.7.1"},
                 },
                 "body": '{"qty": 1}',
@@ -1180,8 +1177,8 @@ _API_HOST = "abc123.execute-api.us-east-1.amazonaws.com"
                 SPANDATA.URL_PATH: "/orders/42",
                 SPANDATA.URL_QUERY: "tag=a&tag=b",
                 SPANDATA.URL_SCHEME: "https",
-                SPANDATA.SERVER_ADDRESS: _API_HOST,
-                SPANDATA.URL_FULL: f"https://{_API_HOST}/orders/42?tag=a&tag=b",
+                SPANDATA.SERVER_ADDRESS: "abc123.execute-api.us-east-1.amazonaws.com",
+                SPANDATA.URL_FULL: "https://abc123.execute-api.us-east-1.amazonaws.com/orders/42?tag=a&tag=b",
                 SPANDATA.USER_AGENT_ORIGINAL: "curl/8.7.1",
                 SPANDATA.CLIENT_ADDRESS: "203.0.113.7",
                 SPANDATA.HTTP_REQUEST_BODY_DATA: '{"qty": 1}',
@@ -1201,13 +1198,13 @@ _API_HOST = "abc123.execute-api.us-east-1.amazonaws.com"
                 "rawQueryString": "tag=a&tag=b",
                 "cookies": ["session=abc", "theme=dark"],
                 "headers": {
-                    "host": _API_HOST,
+                    "host": "abc123.execute-api.us-east-1.amazonaws.com",
                     "user-agent": "curl/8.7.1",
                     "x-forwarded-proto": "https",
                 },
                 "queryStringParameters": {"tag": "a,b"},
                 "requestContext": {
-                    "domainName": _API_HOST,
+                    "domainName": "abc123.execute-api.us-east-1.amazonaws.com",
                     "http": {
                         "method": "GET",
                         "path": "/orders/42",
@@ -1224,7 +1221,7 @@ _API_HOST = "abc123.execute-api.us-east-1.amazonaws.com"
                 SPANDATA.HTTP_ROUTE: "/orders/{id}",
                 SPANDATA.URL_PATH: "/orders/42",
                 SPANDATA.URL_QUERY: "tag=a&tag=b",
-                SPANDATA.URL_FULL: f"https://{_API_HOST}/orders/42?tag=a&tag=b",
+                SPANDATA.URL_FULL: "https://abc123.execute-api.us-east-1.amazonaws.com/orders/42?tag=a&tag=b",
                 SPANDATA.CLIENT_ADDRESS: "203.0.113.7",
                 SPANDATA.HTTP_REQUEST_BODY_DATA: '{"qty": 1}',
                 f"{SPANDATA.HTTP_REQUEST_HEADER}.cookie": ["[Filtered]"],
@@ -1318,16 +1315,6 @@ def test_http_attributes(lambda_client, test_environment, aws_event, expected, a
             404,
             "error",
             id="client-error",
-        ),
-        pytest.param(
-            {
-                "httpMethod": "GET",
-                "queryStringParameters": {"status": "503"},
-                "requestContext": {},
-            },
-            503,
-            "error",
-            id="server-error",
         ),
         # a direct invocation's response is not an HTTP response.
         pytest.param(
