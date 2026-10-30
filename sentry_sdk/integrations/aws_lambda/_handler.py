@@ -45,8 +45,7 @@ if TYPE_CHECKING:
 TIMEOUT_WARNING_BUFFER = 1500
 MILLIS_TO_SECONDS = 1000.0
 BYTES_PER_MEBIBYTE = 1024 * 1024
-# a first invocation that starts this long after the SDK loaded found an environment
-# that Lambda initialized ahead of demand, so no request waited for it.
+# a first invocation this long after the SDK loaded found an environment initialized ahead of demand.
 # https://docs.aws.amazon.com/lambda/latest/dg/lambda-runtime-environment.html#runtimes-lifecycle-ib
 PROACTIVE_INITIALIZATION_THRESHOLD_SECONDS = 10
 
@@ -216,30 +215,24 @@ def _wrap_handler(handler: "F") -> "F":
 
             # https://docs.aws.amazon.com/lambda/latest/dg/configuration-envvars.html#configuration-envvars-runtime
             with capture_internal_exceptions():
-                if "AWS_LAMBDA_FUNCTION_MEMORY_SIZE" in environ:
-                    attributes[SPANDATA.FAAS_MAX_MEMORY] = (
-                        int(environ["AWS_LAMBDA_FUNCTION_MEMORY_SIZE"])
-                        * BYTES_PER_MEBIBYTE
-                    )
-
-                # the Sentry layer runs its own handler and keeps the function's in
-                # `SENTRY_INITIAL_HANDLER`.
-                entry_point = environ.get("SENTRY_INITIAL_HANDLER") or environ.get(
-                    "_HANDLER"
+                initialization_type = environ["AWS_LAMBDA_INITIALIZATION_TYPE"]
+                attributes.update(
+                    {
+                        SPANDATA.FAAS_MAX_MEMORY: int(
+                            environ["AWS_LAMBDA_FUNCTION_MEMORY_SIZE"]
+                        )
+                        * BYTES_PER_MEBIBYTE,
+                        # the Sentry layer keeps the function's handler in `SENTRY_INITIAL_HANDLER`.
+                        SPANDATA.FAAS_ENTRY_POINT: environ.get("SENTRY_INITIAL_HANDLER")
+                        or environ["_HANDLER"],
+                        SPANDATA.AWS_LAMBDA_INITIALIZATION_TYPE: initialization_type,
+                    }
                 )
-                if entry_point:
-                    attributes[SPANDATA.FAAS_ENTRY_POINT] = entry_point
-
-                initialization_type = environ.get("AWS_LAMBDA_INITIALIZATION_TYPE")
-                if initialization_type:
-                    attributes[SPANDATA.AWS_LAMBDA_INITIALIZATION_TYPE] = (
-                        initialization_type
-                    )
 
                 # provisioned concurrency and SnapStart say so in the initialization type.
                 if (
                     cold_start
-                    and initialization_type in (None, "on-demand")
+                    and initialization_type == "on-demand"
                     and time.monotonic() - _sdk_loaded_at
                     > PROACTIVE_INITIALIZATION_THRESHOLD_SECONDS
                 ):

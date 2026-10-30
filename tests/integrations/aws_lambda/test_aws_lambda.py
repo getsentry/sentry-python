@@ -761,6 +761,7 @@ def test_no_error(lambda_client, test_environment):
     assert _get_span_attr(attrs, SPANDATA.FAAS_INSTANCE) == LATEST_FUNCTION_VERSION
     assert _get_span_attr(attrs, SPANDATA.FAAS_MAX_MEMORY) == 128 * 1024 * 1024
     assert _get_span_attr(attrs, SPANDATA.FAAS_ENTRY_POINT) == "index.handler"
+    assert _get_span_attr(attrs, SPANDATA.AWS_LAMBDA_INITIALIZATION_TYPE) == "on-demand"
     duration = _get_span_attr(attrs, SPANDATA.AWS_LAMBDA_EXECUTION_DURATION_IN_MILLIS)
     assert duration >= 0
     assert _get_span_attr(attrs, SPANDATA.FAAS_DURATION_IN_MS) == int(duration)
