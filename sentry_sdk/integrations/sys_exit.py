@@ -59,7 +59,6 @@ class SysExitIntegration(Integration):
 def _capture_exception(exc: "SystemExit") -> None:
     event, hint = event_from_exception(
         exc,
-        client_options=sentry_sdk.get_client().options,
         mechanism={"type": SysExitIntegration.identifier, "handled": False},
     )
     sentry_sdk.capture_event(event, hint=hint)

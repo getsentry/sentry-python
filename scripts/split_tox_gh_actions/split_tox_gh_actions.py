@@ -165,13 +165,10 @@ GROUPS = {
     ],
     "Misc": [
         "loguru",
-        "opentelemetry",
         "otlp",
-        "potel",
         "pure_eval",
-        "trytond",
+        "trytond_wsgi",
         "typer",
-        "integration_deactivation",
         "shadowed_module",
     ],
 }

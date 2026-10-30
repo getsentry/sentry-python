@@ -5,22 +5,9 @@ from datetime import datetime, timezone
 import pytest
 
 import sentry_sdk
-from sentry_sdk._compat import PY37, PY38
+from sentry_sdk._compat import PY38
 
 pytest.importorskip("gevent")
-
-
-@pytest.fixture(scope="module")
-def monkeypatched_gevent():
-    try:
-        import gevent
-
-        gevent.monkey.patch_all()
-    except Exception as e:
-        if "_RLock__owner" in str(e):
-            pytest.skip("https://github.com/gevent/gevent/issues/1380")
-        else:
-            raise
 
 
 @pytest.fixture
@@ -46,10 +33,7 @@ def make_client(request, wsgi_capturing_server):
 @pytest.mark.parametrize("client_flush_method", ["close", "flush"])
 @pytest.mark.parametrize("use_pickle", (True, False))
 @pytest.mark.parametrize("compression_level", (0, 9, None))
-@pytest.mark.parametrize(
-    "compression_algo",
-    (("gzip", "br", "<invalid>", None) if PY37 else ("gzip", "<invalid>", None)),
-)
+@pytest.mark.parametrize("compression_algo", ("gzip", "br", "<invalid>", None))
 @pytest.mark.parametrize("http2", [True, False] if PY38 else [False])
 def test_transport_works_gevent(
     capturing_server,

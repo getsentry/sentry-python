@@ -1,118 +1,34 @@
-from contextvars import ContextVar
 from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk.consts import SPANDATA
-from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.traces import StreamedSpan
+from sentry_sdk.traces import Span
 from sentry_sdk.utils import (
     event_from_exception,
-    has_data_collection_enabled,
     safe_serialize,
 )
 
 if TYPE_CHECKING:
     from typing import Any, Optional, Union
 
-
-# Store the current agent context in a contextvar for re-entrant safety
-# Using a list as a stack to support nested agent calls
-_agent_context_stack: "ContextVar[list[dict[str, Any]]]" = ContextVar(
-    "pydantic_ai_agent_context_stack", default=[]
-)
+    from pydantic_ai import Agent
+    from pydantic_ai.models import AbstractModel, Model
 
 
-def push_agent(agent: "Any", is_streaming: bool = False) -> None:
-    """Push an agent context onto the stack along with its streaming flag."""
-    stack = _agent_context_stack.get().copy()
-    stack.append({"agent": agent, "is_streaming": is_streaming})
-    _agent_context_stack.set(stack)
-
-
-def pop_agent() -> None:
-    """Pop an agent context from the stack."""
-    stack = _agent_context_stack.get().copy()
-    if stack:
-        stack.pop()
-    _agent_context_stack.set(stack)
-
-
-def get_current_agent() -> "Any":
-    """Get the current agent from the contextvar stack."""
-    stack = _agent_context_stack.get()
-    if stack:
-        return stack[-1]["agent"]
-    return None
-
-
-def get_is_streaming() -> bool:
-    """Get the streaming flag from the contextvar stack."""
-    stack = _agent_context_stack.get()
-    if stack:
-        return stack[-1].get("is_streaming", False)
-    return False
-
-
-def _should_send_prompts_legacy() -> bool:
-    """
-    Check if prompts should be sent to Sentry based on the deprecated
-    ``send_default_pii`` option and the ``include_prompts`` integration setting.
-
-    TODO: Remove this once `send_default_pii` is deprecated.
-    """
-    if not should_send_default_pii():
-        return False
-
-    from . import PydanticAIIntegration
-
-    # Get the integration instance from the client
-    integration = sentry_sdk.get_client().get_integration(PydanticAIIntegration)
-
-    if integration is None:
-        return False
-
-    return getattr(integration, "include_prompts", False)
-
-
-def _should_send_inputs() -> bool:
-    client = sentry_sdk.get_client()
-    if has_data_collection_enabled(client.options):
-        return bool(client.options["data_collection"]["gen_ai"]["inputs"])
-
-    return _should_send_prompts_legacy()
-
-
-def _should_send_outputs() -> bool:
-    client = sentry_sdk.get_client()
-    if has_data_collection_enabled(client.options):
-        return bool(client.options["data_collection"]["gen_ai"]["outputs"])
-
-    return _should_send_prompts_legacy()
-
-
-def _set_agent_data(
-    span: "Union[sentry_sdk.tracing.Span, StreamedSpan]", agent: "Any"
-) -> None:
+def _set_agent_data(span: "Span", agent: "Optional[Agent]") -> None:
     """Set agent-related data on a span.
 
     Args:
         span: The span to set data on
-        agent: Agent object (can be None, will try to get from contextvar if not provided)
+        agent: Agent object
     """
-    # Extract agent name from agent object or contextvar
-    agent_obj = agent
-    if not agent_obj:
-        # Try to get from contextvar
-        agent_obj = get_current_agent()
-
-    if agent_obj and hasattr(agent_obj, "name") and agent_obj.name:
-        if isinstance(span, StreamedSpan):
-            span.set_attribute(SPANDATA.GEN_AI_AGENT_NAME, agent_obj.name)
-        else:
-            span.set_data(SPANDATA.GEN_AI_AGENT_NAME, agent_obj.name)
+    if agent and hasattr(agent, "name") and agent.name:
+        span.set_attribute(SPANDATA.GEN_AI_AGENT_NAME, agent.name)
 
 
-def _get_model_name(model_obj: "Any") -> "Optional[str]":
+def _get_model_name(
+    model_obj: "Optional[Union[AbstractModel, Model, str]]",
+) -> "Optional[str]":
     """Extract model name from a model object.
 
     Args:
@@ -137,72 +53,7 @@ def _get_model_name(model_obj: "Any") -> "Optional[str]":
         return str(model_obj)
 
 
-def _set_model_data(
-    span: "Union[sentry_sdk.tracing.Span, StreamedSpan]",
-    model: "Any",
-    model_settings: "Any",
-) -> None:
-    """Set model-related data on a span.
-
-    Args:
-        span: The span to set data on
-        model: Model object (can be None, will try to get from agent if not provided)
-        model_settings: Model settings (can be None, will try to get from agent if not provided)
-    """
-    # Try to get agent from contextvar if we need it
-    agent_obj = get_current_agent()
-
-    # Extract model information
-    model_obj = model
-    if not model_obj and agent_obj and hasattr(agent_obj, "model"):
-        model_obj = agent_obj.model
-
-    set_on_span = (
-        span.set_attribute if isinstance(span, StreamedSpan) else span.set_data
-    )
-
-    if model_obj:
-        # Set system from model
-        if hasattr(model_obj, "system"):
-            set_on_span(SPANDATA.GEN_AI_SYSTEM, model_obj.system)
-
-        # Set model name
-        model_name = _get_model_name(model_obj)
-        if model_name:
-            set_on_span(SPANDATA.GEN_AI_REQUEST_MODEL, model_name)
-
-    # Extract model settings
-    settings = model_settings
-    if not settings and agent_obj and hasattr(agent_obj, "model_settings"):
-        settings = agent_obj.model_settings
-
-    if settings:
-        settings_map = {
-            "max_tokens": SPANDATA.GEN_AI_REQUEST_MAX_TOKENS,
-            "temperature": SPANDATA.GEN_AI_REQUEST_TEMPERATURE,
-            "top_p": SPANDATA.GEN_AI_REQUEST_TOP_P,
-            "frequency_penalty": SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY,
-            "presence_penalty": SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY,
-        }
-
-        # ModelSettings is a TypedDict (dict at runtime), so use dict access
-        if isinstance(settings, dict):
-            for setting_name, spandata_key in settings_map.items():
-                value = settings.get(setting_name)
-                if value is not None:
-                    set_on_span(spandata_key, value)
-        else:
-            # Fallback for object-style settings
-            for setting_name, spandata_key in settings_map.items():
-                if hasattr(settings, setting_name):
-                    value = getattr(settings, setting_name)
-                    if value is not None:
-                        set_on_span(spandata_key, value)
-
-
-def _set_available_tools(
-    span: "Union[sentry_sdk.tracing.Span, StreamedSpan]", agent: "Any"
-) -> None:
+def _set_available_tools(span: "Span", agent: "Optional[Agent[Any, Any]]") -> None:
     """Set available tools data on a span from an agent's function toolset.
 
     Args:
@@ -213,16 +64,15 @@ def _set_available_tools(
         return
 
     client_options = sentry_sdk.get_client().options
-    if has_data_collection_enabled(client_options):
-        if not client_options["data_collection"]["gen_ai"]["inputs"]:
-            return
+    if not client_options["data_collection"]["gen_ai"]["inputs"]:
+        return
 
     try:
         tools = []
         # Get tools from the function toolset
         if hasattr(agent._function_toolset, "tools"):
             for tool_name, tool in agent._function_toolset.tools.items():
-                tool_info = {"name": tool_name}
+                tool_info: "dict[str, Any]" = {"name": tool_name}
 
                 # Add description from function_schema if available
                 if hasattr(tool, "function_schema"):
@@ -237,14 +87,10 @@ def _set_available_tools(
                 tools.append(tool_info)
 
         if tools:
-            if isinstance(span, StreamedSpan):
-                span.set_attribute(
-                    SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS, safe_serialize(tools)
-                )
-            else:
-                span.set_data(
-                    SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS, safe_serialize(tools)
-                )
+            span.set_attribute(
+                SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS, safe_serialize(tools)
+            )
+
     except Exception:
         # If we can't extract tools, just skip it
         pass
@@ -253,7 +99,6 @@ def _set_available_tools(
 def _capture_exception(exc: "Any", handled: bool = False) -> None:
     event, hint = event_from_exception(
         exc,
-        client_options=sentry_sdk.get_client().options,
         mechanism={"type": "pydantic_ai", "handled": handled},
     )
     sentry_sdk.capture_event(event, hint=hint)

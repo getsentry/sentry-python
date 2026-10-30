@@ -5,7 +5,6 @@ import sys
 import threading
 import time
 import uuid
-import warnings
 from collections import deque
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
@@ -82,19 +81,12 @@ def setup_continuous_profiler(
         # them to spawn a native thread for sampling.
         # Instead we default to the GeventContinuousScheduler which is capable of
         # spawning native threads within gevent.
-        default_profiler_mode = GeventContinuousScheduler.mode
+        profiler_mode = GeventContinuousScheduler.mode
     else:
-        default_profiler_mode = ThreadContinuousScheduler.mode
+        profiler_mode = ThreadContinuousScheduler.mode
 
     if options.get("profiler_mode") is not None:
         profiler_mode = options["profiler_mode"]
-    else:
-        # TODO: deprecate this and just use the existing `profiler_mode`
-        experiments = options.get("_experiments", {})
-
-        profiler_mode = (
-            experiments.get("continuous_profiling_mode") or default_profiler_mode
-        )
 
     frequency = DEFAULT_SAMPLING_FREQUENCY
 
@@ -153,29 +145,11 @@ def start_profiler() -> None:
     _scheduler.manual_start()
 
 
-def start_profile_session() -> None:
-    warnings.warn(
-        "The `start_profile_session` function is deprecated. Please use `start_profile` instead.",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-    start_profiler()
-
-
 def stop_profiler() -> None:
     if _scheduler is None:
         return
 
     _scheduler.manual_stop()
-
-
-def stop_profile_session() -> None:
-    warnings.warn(
-        "The `stop_profile_session` function is deprecated. Please use `stop_profile` instead.",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-    stop_profiler()
 
 
 def teardown_continuous_profiler() -> None:

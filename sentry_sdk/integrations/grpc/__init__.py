@@ -1,7 +1,7 @@
 from functools import wraps
 from typing import TYPE_CHECKING, Any, Optional, Sequence
 
-from sentry_sdk.integrations import DidNotEnable, Integration
+from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.utils import parse_version
 
 from .client import ClientInterceptor
@@ -175,6 +175,8 @@ class GRPCIntegration(Integration):
 
     @staticmethod
     def setup_once() -> None:
+        _check_minimum_version(GRPCIntegration, GRPC_VERSION)
+
         import grpc
 
         grpc.insecure_channel = _wrap_channel_sync(grpc.insecure_channel)

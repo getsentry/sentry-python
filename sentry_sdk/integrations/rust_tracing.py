@@ -32,15 +32,14 @@ Each native extension requires its own integration.
 
 import json
 from enum import Enum, auto
-from typing import Any, Callable, Dict, Optional, Union
+from typing import TYPE_CHECKING, Any, Callable, Dict, Optional
 
 import sentry_sdk
 from sentry_sdk.integrations import Integration
-from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.traces import StreamedSpan
-from sentry_sdk.tracing import Span as SentrySpan
-from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import SENSITIVE_DATA_SUBSTITUTE
+
+if TYPE_CHECKING:
+    from sentry_sdk.traces import Span
 
 
 class RustTracingLevel(Enum):
@@ -161,16 +160,11 @@ class RustTracingLayer:
         """
         By default, the values of tracing fields are not included in case they
         contain PII. A user may override that by passing `True` for the
-        `include_tracing_fields` keyword argument of this integration or by
-        setting `send_default_pii` to `True` in their Sentry client options.
+        `include_tracing_fields` keyword argument of this integration.
         """
-        return (
-            should_send_default_pii()
-            if self.include_tracing_fields is None
-            else self.include_tracing_fields
-        )
+        return bool(self.include_tracing_fields)
 
-    def on_event(self, event: str, sentry_span: "SentrySpan") -> None:
+    def on_event(self, event: str, sentry_span: "Span") -> None:
         deserialized_event = json.loads(event)
         metadata = deserialized_event.get("metadata", {})
 
@@ -184,9 +178,7 @@ class RustTracingLayer:
         elif event_type == EventTypeMapping.Event:
             process_event(deserialized_event)
 
-    def on_new_span(
-        self, attrs: str, span_id: str
-    ) -> "Optional[Union[SentrySpan, StreamedSpan]]":
+    def on_new_span(self, attrs: str, span_id: str) -> "Optional[Span]":
         attrs = json.loads(attrs)
         metadata = attrs.get("metadata", {})
 
@@ -206,66 +198,41 @@ class RustTracingLayer:
         else:
             sentry_span_name = "<unknown>"
 
-        span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
-        if span_streaming:
-            if sentry_sdk.traces.get_current_span() is None:
-                return None
-
-            sentry_span = sentry_sdk.traces.start_span(
-                name=sentry_span_name,
-                attributes={
-                    "sentry.op": "function",
-                    "sentry.origin": self.origin,
-                },
-            )
-            fields = metadata.get("fields", [])
-            for field in fields:
-                if self._include_tracing_fields():
-                    sentry_span.set_attribute(field, attrs.get(field))
-                else:
-                    sentry_span.set_attribute(field, SENSITIVE_DATA_SUBSTITUTE)
-
-            return sentry_span
+        if sentry_sdk.get_current_span() is None:
+            return None
 
         sentry_span = sentry_sdk.start_span(
-            op="function",
             name=sentry_span_name,
-            origin=self.origin,
+            attributes={
+                "sentry.op": "function",
+                "sentry.origin": self.origin,
+            },
         )
         fields = metadata.get("fields", [])
         for field in fields:
             if self._include_tracing_fields():
-                sentry_span.set_data(field, attrs.get(field))
+                sentry_span.set_attribute(field, attrs.get(field))
             else:
-                sentry_span.set_data(field, SENSITIVE_DATA_SUBSTITUTE)
+                sentry_span.set_attribute(field, SENSITIVE_DATA_SUBSTITUTE)
 
-        sentry_span.__enter__()
         return sentry_span
 
-    def on_close(self, span_id: str, sentry_span: "SentrySpan") -> None:
+    def on_close(self, span_id: str, sentry_span: "Span") -> None:
         if sentry_span is None:
             return
 
         sentry_span.__exit__(None, None, None)
 
-    def on_record(
-        self, span_id: str, values: str, sentry_span: "Union[SentrySpan, StreamedSpan]"
-    ) -> None:
+    def on_record(self, span_id: str, values: str, sentry_span: "Span") -> None:
         if sentry_span is None:
             return
-
-        set_on_span = (
-            sentry_span.set_attribute
-            if isinstance(sentry_span, StreamedSpan)
-            else sentry_span.set_data
-        )
 
         deserialized_values = json.loads(values)
         for key, value in deserialized_values.items():
             if self._include_tracing_fields():
-                set_on_span(key, value)
+                sentry_span.set_attribute(key, value)
             else:
-                set_on_span(key, SENSITIVE_DATA_SUBSTITUTE)
+                sentry_span.set_attribute(key, SENSITIVE_DATA_SUBSTITUTE)
 
 
 class RustTracingIntegration(Integration):
