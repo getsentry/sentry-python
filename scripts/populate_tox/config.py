@@ -446,6 +446,11 @@ TEST_SUITE_CONFIG = {
             "py3.7,py3.8": ["fakeredis<2.26.0"],
         },
     },
+    "redis_py_cluster_legacy": {
+        "package": "redis-py-cluster",
+        "include": ">=2.1",
+        "num_versions": 2,
+    },
     "requests": {
         "package": "requests",
         "num_versions": 2,
