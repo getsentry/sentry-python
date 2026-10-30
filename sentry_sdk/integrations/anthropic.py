@@ -87,7 +87,7 @@ if TYPE_CHECKING:
 
     from sentry_sdk._types import TextPart
 
-    class _PatchedRawMessageStream(Stream[RawMessageStreamEvent]):
+    class _PatchedRawMessageStream(Stream[Any]):
         _span: Union[Span, StreamedSpan]
         _integration: "AnthropicIntegration"
 
@@ -107,7 +107,7 @@ if TYPE_CHECKING:
         _response_id: Optional[str]
         _finish_reason: Optional[str]
 
-    class _PatchedRawAsyncMessageStream(AsyncStream[RawMessageStreamEvent]):
+    class _PatchedRawAsyncMessageStream(AsyncStream[Any]):
         _span: Union[Span, StreamedSpan]
         _integration: "AnthropicIntegration"
 
@@ -285,11 +285,14 @@ class AnthropicIntegration(Integration):
         if isinstance(Stream.__dict__.get("_iterator"), cached_property):
             _original_stream_iterator = Stream._iterator.func  # type: ignore[attr-defined]
 
-            def _sentry_patched_stream_iterator(self: "Any") -> "Any":
-                original = _original_stream_iterator(self)
+            def _sentry_patched_stream_iterator(self: "Stream[Any]") -> "Any":
+                iterator = _original_stream_iterator(self)
                 if not hasattr(self, "_span"):
-                    return original
-                return _wrap_synchronous_message_iterator(self, original)
+                    return iterator
+
+                return _wrap_synchronous_message_iterator(
+                    cast("_PatchedRawMessageStream", self), iterator
+                )
 
             patched = cached_property(_sentry_patched_stream_iterator)
             patched.__set_name__(Stream, "_iterator")
@@ -298,11 +301,15 @@ class AnthropicIntegration(Integration):
         if isinstance(AsyncStream.__dict__.get("_iterator"), cached_property):
             _original_async_stream_iterator = AsyncStream._iterator.func  # type: ignore[attr-defined]
 
-            def _sentry_patched_async_stream_iterator(self: "Any") -> "Any":
-                original = _original_async_stream_iterator(self)
+            def _sentry_patched_async_stream_iterator(
+                self: "AsyncStream[Any]",
+            ) -> "Any":
+                iterator = _original_async_stream_iterator(self)
                 if not hasattr(self, "_span"):
-                    return original
-                return _wrap_asynchronous_message_iterator(self, original)
+                    return iterator
+                return _wrap_asynchronous_message_iterator(
+                    cast("_PatchedRawAsyncMessageStream", self), iterator
+                )
 
             patched = cached_property(_sentry_patched_async_stream_iterator)
             patched.__set_name__(AsyncStream, "_iterator")
