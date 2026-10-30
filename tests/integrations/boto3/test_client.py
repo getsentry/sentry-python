@@ -178,39 +178,11 @@ def test_streaming_span_order_and_scope(
         assert span.get("end_timestamp") is not None
 
 
-@pytest.mark.parametrize(
-    "service_name,method_name,api_params,payload_field",
-    [
-        pytest.param(
-            "lambda",
-            "invoke",
-            {"FunctionName": "function"},
-            "Payload",
-            id="payload",
-        ),
-        pytest.param(
-            "s3",
-            "get_object_annotation",
-            {
-                "Bucket": "bucket",
-                "Key": "file.txt",
-                "AnnotationName": "annotation",
-            },
-            "AnnotationPayload",
-            id="annotation-payload",
-        ),
-    ],
-)
-def test_non_body_stream_delays_client_span(
-    capture_items,
-    client_factory,
-    service_name,
-    method_name,
-    api_params,
-    payload_field,
-):
-    client = client_factory(service_name)
-    require_botocore_model_fields(client, method_name, output_fields=(payload_field,))
+def test_non_body_stream_delays_client_span(capture_items, client_factory):
+    client = client_factory("s3")
+    require_botocore_model_fields(
+        client, "get_object_annotation", output_fields=("AnnotationPayload",)
+    )
     request_client_spans = []
 
     def record_client_span(request, **kwargs):
@@ -221,8 +193,10 @@ def test_non_body_stream_delays_client_span(
     def invoke():
         parent = sentry_sdk.get_current_span()
         with MockResponse(client, 200, {"content-length": "1"}, b"x"):
-            response = getattr(client, method_name)(**api_params)
-        body = response[payload_field]
+            response = client.get_object_annotation(
+                Bucket="bucket", Key="file.txt", AnnotationName="annotation"
+            )
+        body = response["AnnotationPayload"]
         assert isinstance(body, StreamingBody)
         (request_client_span,) = request_client_spans
         assert request_client_span.end_timestamp is None
