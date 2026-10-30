@@ -87,19 +87,15 @@ def _instrument_streaming_body(span: "Span", parsed: "Dict[str, Any]") -> bool:
             raise
         streaming_spans.finish()
 
-    try:
-        # aiobotocore's `read()` is a coroutine.
-        orig_read: "Callable[..., Awaitable[bytes]]" = body.read  # type: ignore[assignment]
-        orig_close = body.close
-        orig_aclose = body.aclose  # type: ignore[attr-defined]
+    # aiobotocore's `read()` is a coroutine.
+    orig_read: "Callable[..., Awaitable[bytes]]" = body.read  # type: ignore[assignment]
+    orig_close = body.close
+    orig_aclose = body.aclose  # type: ignore[attr-defined]
 
-        body.read = sentry_streaming_body_read  # type: ignore
-        body.close = sentry_streaming_body_close  # type: ignore
-        # `async with` closes the body through `aclose()`.
-        body.aclose = sentry_streaming_body_aclose  # type: ignore[attr-defined]
-    except Exception:
-        streaming_spans.finish()
-        raise
+    body.read = sentry_streaming_body_read  # type: ignore
+    body.close = sentry_streaming_body_close  # type: ignore
+    # `async with` closes the body through `aclose()`.
+    body.aclose = sentry_streaming_body_aclose  # type: ignore[attr-defined]
 
     return True
 

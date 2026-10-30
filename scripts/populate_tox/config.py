@@ -11,6 +11,7 @@ TEST_SUITE_CONFIG = {
             "*": ["pytest-asyncio", "pytest-aiohttp"],
             ">=3.8": ["httpx"],
         },
+        "python": "<3.15",
     },
     "aiohttp": {
         "package": "aiohttp",

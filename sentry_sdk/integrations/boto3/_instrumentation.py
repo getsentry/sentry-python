@@ -157,8 +157,8 @@ def _get_error_attributes(exception: "BaseException") -> "Attributes":
 
 def _start_client_span(
     ctx: "AwsCallContext",
-    service_ext: "Optional[_ServiceExtension]" = None,
-    origin: str = ORIGIN,
+    service_ext: "Optional[_ServiceExtension]",
+    origin: str,
 ) -> "Optional[Span]":
     if sentry_sdk.get_current_span() is None:
         return None
