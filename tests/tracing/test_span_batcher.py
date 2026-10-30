@@ -572,3 +572,112 @@ def test_flush_loop_swallows_flush_exception():
     batcher._flush_loop()
 
     assert calls == [1]
+
+
+def test_flush_serializes_outside_the_lock(sentry_init, capture_envelopes):
+    """Regression test for https://github.com/getsentry/sentry-python/issues/8023."""
+    sentry_init(
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+    )
+    capture_envelopes()
+
+    client = sentry_sdk.get_client()
+    batcher = client.span_batcher
+
+    lock_held_while_serializing = []
+    original_to_transport_format = batcher._to_transport_format
+
+    def record_lock_state(item):
+        lock_held_while_serializing.append(batcher._lock.locked())
+        return original_to_transport_format(item)
+
+    batcher._to_transport_format = record_lock_state
+
+    with sentry_sdk.traces.start_span(name="test span"):
+        pass
+
+    client.flush()
+
+    assert lock_held_while_serializing
+    assert not any(lock_held_while_serializing)
+
+
+def test_concurrent_add_not_blocked_during_serialization(
+    sentry_init, capture_envelopes
+):
+    """Verify concurrent additions are not blocked while spans are serialized."""
+    import threading
+
+    sentry_init(
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+    )
+    capture_envelopes()
+
+    client = sentry_sdk.get_client()
+    batcher = client.span_batcher
+
+    serializing_event = threading.Event()
+    continue_event = threading.Event()
+    original_to_transport_format = batcher._to_transport_format
+
+    def pause_serializing(item):
+        serializing_event.set()
+        continue_event.wait(timeout=5)
+        return original_to_transport_format(item)
+
+    batcher._to_transport_format = pause_serializing
+
+    with sentry_sdk.traces.start_span(name="span 1"):
+        pass
+
+    flush_thread = threading.Thread(target=client.flush)
+    flush_thread.start()
+
+    assert serializing_event.wait(timeout=5)
+
+    # The lock must NOT be held while serialization is paused
+    lock_acquired = batcher._lock.acquire(blocking=False)
+    if lock_acquired:
+        batcher._lock.release()
+
+    continue_event.set()
+    flush_thread.join()
+
+    assert lock_acquired is True
+
+
+def test_record_lost_called_outside_lock(
+    sentry_init, capture_record_lost_event_calls, monkeypatch
+):
+    """Verify record_lost is called outside the batcher lock when buffer overflows."""
+    monkeypatch.setattr(SpanBatcher, "MAX_BEFORE_DROP", 1)
+    monkeypatch.setattr(SpanBatcher, "FLUSH_WAIT_TIME", 100000)
+
+    sentry_init(
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+    )
+    record_lost_event_calls = capture_record_lost_event_calls()
+    client = sentry_sdk.get_client()
+    batcher = client.span_batcher
+
+    lock_held_on_lost = []
+    original_record_lost = batcher._record_lost_func
+
+    def record_lost(*args, **kwargs):
+        lock_held_on_lost.append(batcher._lock.locked())
+        return original_record_lost(*args, **kwargs)
+
+    batcher._record_lost_func = record_lost
+
+    with sentry_sdk.traces.start_span(name="parent"):
+        with sentry_sdk.traces.start_span(name="span 1"):
+            pass
+        with sentry_sdk.traces.start_span(name="span 2"):
+            pass
+
+    assert all(not held for held in lock_held_on_lost)
+    assert len(lock_held_on_lost) >= 1
+    assert ("queue_overflow", "span", None, 1) in record_lost_event_calls

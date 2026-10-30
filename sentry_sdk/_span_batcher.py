@@ -127,26 +127,30 @@ class SpanBatcher(Batcher["SpanJSON"]):
             with self._lock:
                 size = len(self._span_buffer[span["trace_id"]])
                 if size >= self.MAX_BEFORE_DROP:
-                    self._record_lost_func(
-                        reason="queue_overflow",
-                        data_category="span",
-                        quantity=1,
-                    )
-                    return None
-
-                self._span_buffer[span["trace_id"]].append(span)
-                self._running_size[span["trace_id"]] += self._estimate_size(span)
-
-                if (
-                    span["is_segment"] is True
-                    or size + 1 >= self.MAX_BEFORE_FLUSH
-                    or self._running_size[span["trace_id"]]
-                    >= self.MAX_BYTES_BEFORE_FLUSH
-                ):
-                    self._pending_flush.add(span["trace_id"])
-                    notify = True
+                    dropped = True
                 else:
-                    notify = False
+                    dropped = False
+                    self._span_buffer[span["trace_id"]].append(span)
+                    self._running_size[span["trace_id"]] += self._estimate_size(span)
+
+                    if (
+                        span["is_segment"] is True
+                        or size + 1 >= self.MAX_BEFORE_FLUSH
+                        or self._running_size[span["trace_id"]]
+                        >= self.MAX_BYTES_BEFORE_FLUSH
+                    ):
+                        self._pending_flush.add(span["trace_id"])
+                        notify = True
+                    else:
+                        notify = False
+
+            if dropped:
+                self._record_lost_func(
+                    reason="queue_overflow",
+                    data_category="span",
+                    quantity=1,
+                )
+                return None
 
             if notify:
                 self._flush_event.set()
@@ -195,50 +199,55 @@ class SpanBatcher(Batcher["SpanJSON"]):
             if not buckets:
                 return
 
-            envelopes = []
-
+            flushed_buckets: list[tuple[str, list["SpanJSON"]]] = []
             for bucket_id in buckets:
-                spans = self._span_buffer.get(bucket_id)
-                if not spans:
-                    continue
+                spans = self._span_buffer.pop(bucket_id, None)
+                if spans:
+                    flushed_buckets.append((bucket_id, spans))
+                    self._running_size.pop(bucket_id, None)
 
-                dsc = spans[0]["_segment_span"]._dynamic_sampling_context()
+        if not flushed_buckets:
+            return
 
-                # Max per envelope is 1000, so if we happen to have more than
-                # 1000 spans in one bucket, we'll need to separate them.
-                for start in range(0, len(spans), self.MAX_ENVELOPE_SIZE):
-                    end = min(start + self.MAX_ENVELOPE_SIZE, len(spans))
+        envelopes = []
 
-                    envelope = Envelope(
+        # Serialize outside the lock to prevent blocking concurrent additions
+        # and avoid lock-order inversion during serialization or GC finalizers.
+        for _, spans in flushed_buckets:
+            dsc = spans[0]["_segment_span"]._dynamic_sampling_context()
+
+            # Max per envelope is 1000, so if we happen to have more than
+            # 1000 spans in one bucket, we'll need to separate them.
+            for start in range(0, len(spans), self.MAX_ENVELOPE_SIZE):
+                end = min(start + self.MAX_ENVELOPE_SIZE, len(spans))
+
+                envelope = Envelope(
+                    headers={
+                        "sent_at": format_timestamp(datetime.now(timezone.utc)),
+                        "trace": dsc,
+                    }
+                )
+
+                envelope.add_item(
+                    Item(
+                        type=self.TYPE,
+                        content_type=self.CONTENT_TYPE,
                         headers={
-                            "sent_at": format_timestamp(datetime.now(timezone.utc)),
-                            "trace": dsc,
-                        }
+                            "item_count": end - start,
+                        },
+                        payload=PayloadRef(
+                            json={
+                                "version": 2,
+                                "items": [
+                                    self._to_transport_format(spans[j])
+                                    for j in range(start, end)
+                                ],
+                            }
+                        ),
                     )
+                )
 
-                    envelope.add_item(
-                        Item(
-                            type=self.TYPE,
-                            content_type=self.CONTENT_TYPE,
-                            headers={
-                                "item_count": end - start,
-                            },
-                            payload=PayloadRef(
-                                json={
-                                    "version": 2,
-                                    "items": [
-                                        self._to_transport_format(spans[j])
-                                        for j in range(start, end)
-                                    ],
-                                }
-                            ),
-                        )
-                    )
-
-                    envelopes.append(envelope)
-
-                del self._span_buffer[bucket_id]
-                del self._running_size[bucket_id]
+                envelopes.append(envelope)
 
         for envelope in envelopes:
             self._capture_func(envelope)
