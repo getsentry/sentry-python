@@ -193,8 +193,7 @@ Additionally, the OpenAI integration now sets `gen_ai.operation.name` to `chat` 
 - Dropped support for Huey below 2.0.
 - Dropped support for Litestar below 2.0.
 - Dropped support for PySpark below 3.0.
-- Dropped support for redis-py below 4.2.
-- Dropped support for the deprecated `redis-py-cluster` package (`rediscluster`). Use redis-py's built-in cluster support (`redis.cluster.RedisCluster`) instead, which the `RedisIntegration` instruments.
+- Dropped support for redis-py below 3.4.1.
 - Dropped support for Pydantic AI below 1.76.
 - Dropped support for OpenAI Agents below 0.10.3.
 - Dropped support for MCP below 2.0.
