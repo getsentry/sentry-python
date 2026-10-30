@@ -111,6 +111,7 @@ GROUPS = {
         "clickhouse_driver",
         "pymongo",
         "redis",
+        "redis_py_cluster_legacy",
         "sqlalchemy",
     ],
     "Flags": [

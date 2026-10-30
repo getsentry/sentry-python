@@ -212,16 +212,6 @@ def _enable_span_for_middleware(
     return middleware_class
 
 
-def _serialize_request_body_data(data: "Any") -> str:
-    # data may be a JSON-serializable value, an AnnotatedValue, or a dict with AnnotatedValue values
-    def _default(value: "Any") -> "Any":
-        if isinstance(value, AnnotatedValue):
-            return value.value
-        return str(value)
-
-    return json.dumps(data, default=_default)
-
-
 @ensure_integration_enabled(StarletteIntegration)
 def _capture_exception(exception: BaseException, handled: "Any" = False) -> None:
     event, hint = event_from_exception(

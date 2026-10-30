@@ -32,7 +32,7 @@ from sentry_sdk import (
     capture_message,
     isolation_scope,
 )
-from sentry_sdk._compat import PY37, PY38
+from sentry_sdk._compat import PY38
 from sentry_sdk.envelope import Envelope, Item, PayloadRef, parse_json
 from sentry_sdk.integrations.asyncio import AsyncioIntegration
 from sentry_sdk.integrations.logging import LoggingIntegration, ignore_logger_for_events
@@ -124,7 +124,7 @@ if PY38:
         (True, "close", False, 9, None, True),
         (False, "flush", False, 9, None, False),
     ]
-elif PY37:
+else:
     _transport_works_cases = [
         (True, "close", True, None, "gzip", False),
         (False, "flush", True, None, "br", False),
@@ -138,18 +138,6 @@ elif PY37:
         (False, "flush", True, 9, "br", False),
         (True, "close", False, 9, "<invalid>", False),
         (False, "flush", False, 9, None, False),
-    ]
-else:
-    _transport_works_cases = [
-        (True, "close", True, None, "gzip", False),
-        (False, "flush", True, None, "<invalid>", False),
-        (True, "close", False, None, None, False),
-        (False, "flush", False, 0, "gzip", False),
-        (True, "close", True, 0, "<invalid>", False),
-        (False, "flush", True, 0, None, False),
-        (True, "close", False, 9, "gzip", False),
-        (False, "flush", False, 9, "<invalid>", False),
-        (True, "close", True, 9, None, False),
     ]
 
 
