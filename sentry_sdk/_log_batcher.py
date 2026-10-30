@@ -6,7 +6,27 @@ from sentry_sdk.utils import serialize_attribute
 if TYPE_CHECKING:
     from typing import Any
 
-    from sentry_sdk._types import Log
+    from sentry_sdk._types import Log, SerializedAttributeValue
+
+
+def _sanitize_surrogates(s: str) -> str:
+    try:
+        s.encode("utf-8")
+        return s
+    except UnicodeEncodeError:
+        return s.encode("utf-16", "surrogatepass").decode("utf-16", "replace")
+
+
+def _serialize_and_sanitize_attribute(val: "Any") -> "SerializedAttributeValue":
+    serialized = serialize_attribute(val)
+    s_val = serialized["value"]
+    if isinstance(s_val, str):
+        serialized["value"] = _sanitize_surrogates(s_val)
+    elif isinstance(s_val, list):
+        serialized["value"] = [
+            _sanitize_surrogates(x) if isinstance(x, str) else x for x in s_val
+        ]
+    return serialized
 
 
 class LogBatcher(Batcher["Log"]):
@@ -28,9 +48,10 @@ class LogBatcher(Batcher["Log"]):
         res = {
             "timestamp": int(item["time_unix_nano"]) / 1.0e9,
             "level": str(item["severity_text"]),
-            "body": str(item["body"]),
+            "body": _sanitize_surrogates(str(item["body"])),
             "attributes": {
-                k: serialize_attribute(v) for (k, v) in item["attributes"].items()
+                _sanitize_surrogates(str(k)): _serialize_and_sanitize_attribute(v)
+                for (k, v) in item["attributes"].items()
             },
         }
 

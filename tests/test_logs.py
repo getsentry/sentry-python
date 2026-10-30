@@ -1010,3 +1010,56 @@ def test_flush_loop_swallows_flush_exception():
     batcher._flush_loop()
 
     assert calls == [1]
+
+
+@minimum_python_37
+def test_logs_lone_surrogates(sentry_init, capture_items):
+    import logging
+
+    from sentry_sdk._log_batcher import LogBatcher
+    from sentry_sdk.utils import json_dumps
+
+    sentry_init(enable_logs=True)
+    items = capture_items("log")
+
+    # String with a lone surrogate, e.g. from os.fsdecode on non-UTF-8 bytes
+    name_with_surrogate = b"report-\xff.csv".decode("utf-8", "surrogateescape")
+    attr_key_with_surrogate = b"key-\xff".decode("utf-8", "surrogateescape")
+
+    sentry_sdk.logger.info("opened {name}", name=name_with_surrogate)
+    logging.getLogger("app").warning("could not read %s", name_with_surrogate)
+
+    get_client().flush()
+
+    assert len(items) == 2
+
+    for item in items:
+        encoded = json_dumps(item.payload)
+        assert b"\\udc" not in encoded
+        assert b"\\ufffd" in encoded or "\ufffd".encode() in encoded
+
+    # Direct unit test on LogBatcher._to_transport_format
+    raw_log = {
+        "severity_text": "info",
+        "severity_number": 9,
+        "time_unix_nano": 1700000000000000000,
+        "body": f"file: {name_with_surrogate}",
+        "attributes": {
+            attr_key_with_surrogate: name_with_surrogate,
+            "paths": [name_with_surrogate, "normal.csv"],
+        },
+    }
+
+    res = LogBatcher._to_transport_format(raw_log)
+    assert "\ufffd" in res["body"]
+    assert "\udcff" not in res["body"]
+    assert "key-\ufffd" in res["attributes"]
+    assert res["attributes"]["key-\ufffd"]["value"] == "report-\ufffd.csv"
+    assert res["attributes"]["paths"]["value"] == [
+        "report-\ufffd.csv",
+        "normal.csv",
+    ]
+
+    encoded_direct = json_dumps(res)
+    assert b"\\udc" not in encoded_direct
+    assert b"\\ufffd" in encoded_direct
