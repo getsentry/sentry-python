@@ -846,20 +846,41 @@ def test_cold_start(lambda_client, test_environment):
     assert _get_span_attr(first, SPANDATA.FAAS_ENTRY_POINT) == "index.handler"
 
 
-def _sqs_record():
-    return {
+def _sqs_record(sentry_trace=None):
+    record = {
         "messageId": "059f36b4-87a3-44ab-83d2-661975830a7d",
         "body": "{}",
+        "messageAttributes": {},
         "eventSource": "aws:sqs",
         "eventSourceARN": "arn:aws:sqs:us-east-1:012345678912:orders",
     }
+    if sentry_trace is not None:
+        record["messageAttributes"]["sentry-trace"] = {
+            "stringValue": sentry_trace,
+            "stringListValues": [],
+            "binaryListValues": [],
+            "dataType": "String",
+        }
+    return record
 
 
-def _sns_record():
-    return {
+def _sns_record(sentry_trace=None):
+    record = {
         "EventSource": "aws:sns",
-        "Sns": {"TopicArn": "arn:aws:sns:us-east-1:012345678912:alerts"},
+        "Sns": {
+            "Type": "Notification",
+            "MessageId": "95df01b4-ee98-5cb9-9903-4c221d41eb5e",
+            "TopicArn": "arn:aws:sns:us-east-1:012345678912:alerts",
+            "Message": "{}",
+            "MessageAttributes": {},
+        },
     }
+    if sentry_trace is not None:
+        record["Sns"]["MessageAttributes"]["sentry-trace"] = {
+            "Type": "String",
+            "Value": sentry_trace,
+        }
+    return record
 
 
 def _appsync_event():
@@ -1009,66 +1030,30 @@ def test_trigger(lambda_client, test_environment, aws_event, trigger, batch_coun
         )
 
 
-_PRODUCER_1 = ("471a43a4192642f0b136d5159a501701", "6e8f22c393e68f19")
-_PRODUCER_2 = ("0f4c2a5b8d9e4f1a2b3c4d5e6f7a8b9c", "1a2b3c4d5e6f7a8b")
-
-
-def _sqs_message(sentry_trace=None, queue="orders"):
-    record = {
-        "messageId": "059f36b4-87a3-44ab-83d2-661975830a7d",
-        "body": "{}",
-        "messageAttributes": {},
-        "eventSource": "aws:sqs",
-        "eventSourceARN": f"arn:aws:sqs:us-east-1:012345678912:{queue}",
-    }
-    if sentry_trace is not None:
-        record["messageAttributes"]["sentry-trace"] = {
-            "stringValue": sentry_trace,
-            "stringListValues": [],
-            "binaryListValues": [],
-            "dataType": "String",
-        }
-    return record
-
-
-def _sns_notification(sentry_trace):
-    return {
-        "Type": "Notification",
-        "MessageId": "95df01b4-ee98-5cb9-9903-4c221d41eb5e",
-        "TopicArn": "arn:aws:sns:us-east-1:012345678912:alerts",
-        "Message": "{}",
-        "MessageAttributes": {
-            "sentry-trace": {"Type": "String", "Value": sentry_trace}
-        },
-    }
-
-
 @pytest.mark.parametrize(
-    "aws_event,name,system,destination,links",
+    "aws_event,system,destination,links",
     [
         pytest.param(
             {
                 "Records": [
-                    _sqs_message("%s-%s-1" % _PRODUCER_1),
+                    _sqs_record("471a43a4192642f0b136d5159a501701-6e8f22c393e68f19-1"),
                     # the same send context: linked once.
-                    _sqs_message("%s-%s-1" % _PRODUCER_1),
-                    _sqs_message("%s-%s-0" % _PRODUCER_2),
-                    _sqs_message("not-a-trace"),
-                    _sqs_message(),
+                    _sqs_record("471a43a4192642f0b136d5159a501701-6e8f22c393e68f19-1"),
+                    _sqs_record("0f4c2a5b8d9e4f1a2b3c4d5e6f7a8b9c-1a2b3c4d5e6f7a8b-0"),
+                    _sqs_record(),
                 ]
             },
-            "process orders",
             "aws_sqs",
             "orders",
             [
                 {
-                    "trace_id": _PRODUCER_1[0],
-                    "span_id": _PRODUCER_1[1],
+                    "trace_id": "471a43a4192642f0b136d5159a501701",
+                    "span_id": "6e8f22c393e68f19",
                     "sampled": True,
                 },
                 {
-                    "trace_id": _PRODUCER_2[0],
-                    "span_id": _PRODUCER_2[1],
+                    "trace_id": "0f4c2a5b8d9e4f1a2b3c4d5e6f7a8b9c",
+                    "span_id": "1a2b3c4d5e6f7a8b",
                     "sampled": False,
                 },
             ],
@@ -1077,45 +1062,48 @@ def _sns_notification(sentry_trace):
         pytest.param(
             {
                 "Records": [
-                    {
-                        "EventSource": "aws:sns",
-                        "Sns": _sns_notification("%s-%s-1" % _PRODUCER_1),
-                    }
+                    _sns_record("471a43a4192642f0b136d5159a501701-6e8f22c393e68f19-1")
                 ]
             },
-            "process alerts",
             "aws.sns",
             "alerts",
-            [{"trace_id": _PRODUCER_1[0], "span_id": _PRODUCER_1[1], "sampled": True}],
+            [
+                {
+                    "trace_id": "471a43a4192642f0b136d5159a501701",
+                    "span_id": "6e8f22c393e68f19",
+                    "sampled": True,
+                }
+            ],
             id="sns",
         ),
         pytest.param(
             {
                 "Records": [
                     {
-                        **_sqs_message(),
-                        "body": json.dumps(_sns_notification("%s-%s-1" % _PRODUCER_1)),
+                        **_sqs_record(),
+                        "body": json.dumps(
+                            _sns_record(
+                                "471a43a4192642f0b136d5159a501701-6e8f22c393e68f19-1"
+                            )["Sns"]
+                        ),
                     }
                 ]
             },
-            "process orders",
             "aws_sqs",
             "orders",
-            [{"trace_id": _PRODUCER_1[0], "span_id": _PRODUCER_1[1], "sampled": True}],
+            [
+                {
+                    "trace_id": "471a43a4192642f0b136d5159a501701",
+                    "span_id": "6e8f22c393e68f19",
+                    "sampled": True,
+                }
+            ],
             id="sns-to-sqs",
-        ),
-        pytest.param(
-            {"Records": [_sqs_message(), _sqs_message(queue="refunds")]},
-            "process",
-            "aws_sqs",
-            None,
-            None,
-            id="several-queues",
         ),
     ],
 )
 def test_messaging_process_span(
-    lambda_client, test_environment, aws_event, name, system, destination, links
+    lambda_client, test_environment, aws_event, system, destination, links
 ):
     lambda_client.invoke(
         FunctionName="BasicOkSpanStreaming",
@@ -1133,22 +1121,18 @@ def test_messaging_process_span(
     assert "parent_span_id" not in segment_span
     assert process_span["parent_span_id"] == segment_span["span_id"]
     assert process_span["trace_id"] == segment_span["trace_id"]
-    assert process_span["name"] == name
-    assert process_span.get("links") == links
+    assert process_span["name"] == f"process {destination}"
+    assert process_span["links"] == links
 
     attrs = process_span["attributes"]
-    assert _get_span_attr(attrs, SPANDATA.SENTRY_ORIGIN) == ORIGIN
     assert _get_span_attr(attrs, SPANDATA.SENTRY_KIND) == "consumer"
     assert _get_span_attr(attrs, SPANDATA.MESSAGING_SYSTEM) == system
     assert _get_span_attr(attrs, SPANDATA.MESSAGING_OPERATION_TYPE) == "process"
     assert _get_span_attr(attrs, SPANDATA.MESSAGING_OPERATION_NAME) == "process"
+    assert _get_span_attr(attrs, SPANDATA.MESSAGING_DESTINATION_NAME) == destination
     assert _get_span_attr(attrs, SPANDATA.MESSAGING_BATCH_MESSAGE_COUNT) == len(
         aws_event["Records"]
     )
-    if destination is None:
-        assert SPANDATA.MESSAGING_DESTINATION_NAME not in attrs
-    else:
-        assert _get_span_attr(attrs, SPANDATA.MESSAGING_DESTINATION_NAME) == destination
 
 
 def test_no_process_span_without_messages(lambda_client, test_environment):

@@ -12,7 +12,7 @@ from sentry_sdk.utils import capture_internal_exceptions
 if TYPE_CHECKING:
     from typing import Any, ContextManager, Optional
 
-    from sentry_sdk._types import Attributes, SpanLink
+    from sentry_sdk._types import SpanLink
 
 # `faas.trigger` of each `eventSource` of `Records` or of a top-level `eventSource`.
 # https://docs.aws.amazon.com/lambda/latest/dg/lambda-services.html
@@ -197,39 +197,33 @@ def _get_producer_links(records: "list[Any]") -> "list[SpanLink]":
 def _start_process_span(aws_event: "Any") -> "ContextManager[Any]":
     """A `queue.process` span around the handler for an SQS or SNS delivery."""
     records = aws_event.get("Records") if isinstance(aws_event, dict) else None
-    if not isinstance(records, list) or not records:
+    if not records:
         return nullcontext()
 
     event_source = _get_records_source(records)
     if event_source not in _MESSAGING_SYSTEMS:
         return nullcontext()
 
-    # `arn:aws:sqs:<region>:<account>:<queue>`, `arn:aws:sns:<region>:<account>:<topic>`
-    destinations = {
-        (
-            record["eventSourceARN"]
-            if event_source == "aws:sqs"
-            else record["Sns"]["TopicArn"]
-        ).split(":")[5]
-        for record in records
-    }
-    destination = destinations.pop() if len(destinations) == 1 else None
-
-    attributes: "Attributes" = {
-        SPANDATA.SENTRY_OP: OP.QUEUE_PROCESS,
-        SPANDATA.SENTRY_ORIGIN: ORIGIN,
-        SPANDATA.SENTRY_KIND: "consumer",
-        SPANDATA.MESSAGING_SYSTEM: _MESSAGING_SYSTEMS[event_source],
-        SPANDATA.MESSAGING_OPERATION_TYPE: "process",
-        SPANDATA.MESSAGING_OPERATION_NAME: "process",
-        SPANDATA.MESSAGING_BATCH_MESSAGE_COUNT: len(records),
-        SPANDATA.FAAS_TRIGGER: "pubsub",
-    }
-    if destination is not None:
-        attributes[SPANDATA.MESSAGING_DESTINATION_NAME] = destination
+    # one queue or topic per event: `arn:aws:sqs:<region>:<account>:<queue>`.
+    arn = (
+        records[0]["eventSourceARN"]
+        if event_source == "aws:sqs"
+        else records[0]["Sns"]["TopicArn"]
+    )
+    destination = arn.split(":")[5]
 
     return sentry_sdk.start_span(
-        name=f"process {destination}" if destination else "process",
-        attributes=attributes,
+        name=f"process {destination}",
+        attributes={
+            SPANDATA.SENTRY_OP: OP.QUEUE_PROCESS,
+            SPANDATA.SENTRY_ORIGIN: ORIGIN,
+            SPANDATA.SENTRY_KIND: "consumer",
+            SPANDATA.MESSAGING_SYSTEM: _MESSAGING_SYSTEMS[event_source],
+            SPANDATA.MESSAGING_OPERATION_TYPE: "process",
+            SPANDATA.MESSAGING_OPERATION_NAME: "process",
+            SPANDATA.MESSAGING_DESTINATION_NAME: destination,
+            SPANDATA.MESSAGING_BATCH_MESSAGE_COUNT: len(records),
+            SPANDATA.FAAS_TRIGGER: "pubsub",
+        },
         links=_get_producer_links(records),
     )
