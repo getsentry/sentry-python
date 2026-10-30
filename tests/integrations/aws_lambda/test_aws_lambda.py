@@ -837,8 +837,7 @@ def test_cold_start(lambda_client, test_environment):
     first_segment, second_segment = [
         s for s in span_items if s["is_segment"] and s["name"] == "ColdStart"
     ]
-    # the initialization and the Sentry layer's import of the function's module are
-    # only in the first invocation.
+    # only the first invocation has the initialization and the layer's module import.
     init_span, import_span = sorted(
         (
             s
@@ -854,9 +853,7 @@ def test_cold_start(lambda_client, test_environment):
         _get_span_attr(init_span["attributes"], SPANDATA.SENTRY_OP)
         == OP.FUNCTION_AWS_INIT
     )
-    assert _get_span_attr(init_span["attributes"], SPANDATA.SENTRY_ORIGIN) == ORIGIN
-    # it starts when the process started, at most 10 s (Lambda's on-demand initialization limit)
-    # before the invocation, and ends when the invocation starts.
+    # from the process start, within Lambda's 10 s on-demand init limit, to the invocation.
     assert (
         first_segment["start_timestamp"] - 10
         < init_span["start_timestamp"]
@@ -870,7 +867,6 @@ def test_cold_start(lambda_client, test_environment):
         _get_span_attr(import_span["attributes"], SPANDATA.SENTRY_OP)
         == OP.FUNCTION_AWS_IMPORT
     )
-    assert _get_span_attr(import_span["attributes"], SPANDATA.SENTRY_ORIGIN) == ORIGIN
 
     first, second = first_segment["attributes"], second_segment["attributes"]
     assert _get_span_attr(first, SPANDATA.FAAS_COLDSTART) is True

@@ -82,8 +82,7 @@ def sentry_lambda_handler(event: "Any", context: "Any") -> None:
     global _lambda_handler
     if _lambda_handler is None:
         initial_handler = os.environ["SENTRY_INITIAL_HANDLER"]
-        # the function's module is imported in its first invocation, and only once:
-        # loading it from a path runs its module-level code again.
+        # import the function's module once; loading it from a path reruns its module-level code.
         with sentry_sdk.start_span(
             name=initial_handler.rsplit(".", 1)[0].rsplit("/", 1)[-1],
             attributes={
