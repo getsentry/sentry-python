@@ -1,7 +1,7 @@
 import json
 import sys
 from collections.abc import Iterable
-from functools import wraps
+from functools import cached_property, wraps
 from typing import TYPE_CHECKING, cast
 
 import sentry_sdk
@@ -220,6 +220,7 @@ class _StreamSpanContext:
 class AnthropicIntegration(Integration):
     identifier = "anthropic"
     origin = f"auto.ai.{identifier}"
+    version = None
 
     def __init__(self: "AnthropicIntegration", include_prompts: bool = True) -> None:
         self.include_prompts = include_prompts
@@ -228,6 +229,7 @@ class AnthropicIntegration(Integration):
     def setup_once() -> None:
         version = package_version("anthropic")
         _check_minimum_version(AnthropicIntegration, version)
+        AnthropicIntegration.version = version
 
         """
         client.messages.create(stream=True) can return an instance of the Stream class, which implements the iterator protocol.
@@ -271,6 +273,35 @@ class AnthropicIntegration(Integration):
         # AsyncMessageStream inherits from AsyncStream, so patching Stream is sufficient on these versions.
         if not issubclass(AsyncMessageStream, AsyncStream):
             AsyncMessageStream.close = _wrap_async_close(AsyncMessageStream.close)  # type: ignore[method-assign]
+
+        # In newer anthropic SDK versions, _iterator is a cached_property instead of being eagerly assigned in __init__.
+        # This is good for us, since we do a global patch instead of patching _iterator on every instance.
+        # We also should apply a global patch to keep the cached "_iterator" lazy.
+        if isinstance(Stream.__dict__.get("_iterator"), cached_property):
+            _original_stream_iterator = Stream._iterator.func  # type: ignore[attr-defined]
+
+            def _sentry_patched_stream_iterator(self: "Any") -> "Any":
+                original = _original_stream_iterator(self)
+                if not hasattr(self, "_span"):
+                    return original
+                return _wrap_synchronous_message_iterator(self, original)
+
+            patched = cached_property(_sentry_patched_stream_iterator)
+            patched.__set_name__(Stream, "_iterator")
+            Stream._iterator = patched  # type: ignore[assignment,method-assign]
+
+        if isinstance(AsyncStream.__dict__.get("_iterator"), cached_property):
+            _original_async_stream_iterator = AsyncStream._iterator.func  # type: ignore[attr-defined]
+
+            def _sentry_patched_async_stream_iterator(self: "Any") -> "Any":
+                original = _original_async_stream_iterator(self)
+                if not hasattr(self, "_span"):
+                    return original
+                return _wrap_asynchronous_message_iterator(self, original)
+
+            patched = cached_property(_sentry_patched_async_stream_iterator)
+            patched.__set_name__(AsyncStream, "_iterator")
+            AsyncStream._iterator = patched  # type: ignore[assignment,method-assign]
 
 
 def _capture_exception(exc: "Any") -> None:
@@ -783,10 +814,15 @@ def _sentry_patched_create_sync(f: "Any", *args: "Any", **kwargs: "Any") -> "Any
         result._integration = integration  # type: ignore[attr-defined]
 
         _initialize_data_accumulation_state(result)
-        result._iterator = _wrap_synchronous_message_iterator(
-            cast("_PatchedRawMessageStream", result),
-            result._iterator,
-        )
+        # New versions use global patch since _iterator was changed to a cached property.
+        if AnthropicIntegration.version is not None and AnthropicIntegration.version < (
+            1,
+            14,
+        ):
+            result._iterator = _wrap_synchronous_message_iterator(  # type: ignore[misc]
+                cast("_PatchedRawMessageStream", result),
+                result._iterator,
+            )
 
         return result
 
@@ -881,10 +917,15 @@ async def _sentry_patched_create_async(
         result._integration = integration  # type: ignore[attr-defined]
 
         _initialize_data_accumulation_state(result)
-        result._iterator = _wrap_asynchronous_message_iterator(
-            cast("_PatchedRawAsyncMessageStream", result),
-            result._iterator,
-        )
+        # New versions use global patch since _iterator was changed to a cached property.
+        if AnthropicIntegration.version is not None and AnthropicIntegration.version < (
+            1,
+            14,
+        ):
+            result._iterator = _wrap_asynchronous_message_iterator(  # type: ignore[misc]
+                cast("_PatchedRawAsyncMessageStream", result),
+                result._iterator,
+            )
 
         return result
 
@@ -1134,7 +1175,7 @@ def _wrap_message_stream_manager_enter(f: "Any") -> "Any":
         )
 
         try:
-            stream = f(self)
+            stream: "_PatchedMessageStream" = f(self)
         except Exception as exc:
             exc_info = sys.exc_info()
             with capture_internal_exceptions():
@@ -1247,7 +1288,7 @@ def _wrap_async_message_stream_manager_aenter(f: "Any") -> "Any":
         )
 
         try:
-            stream = await f(self)
+            stream: "_PatchedAsyncMessageStream" = await f(self)
         except Exception as exc:
             exc_info = sys.exc_info()
             with capture_internal_exceptions():
