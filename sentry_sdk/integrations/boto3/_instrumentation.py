@@ -174,21 +174,15 @@ def _start_client_span(
     with capture_internal_exceptions():
         attributes.update(_get_client_attributes(ctx))
 
-    # `sentry.op` and `sentry.origin` are set to generic defaults;
-    # a service extension can override them with `get_span_op()` and `get_span_origin()`.
-    span_op = OP.HTTP_CLIENT
-    span_origin = ORIGIN
+    # `sentry.op` is set to a generic default, which a service extension can override
+    # with `get_span_op()`.
+    span_op = OP.RPC
 
     if service_ext is not None:
         with capture_internal_exceptions():
             service_op = service_ext.get_span_op(ctx)
             if service_op is not None:
                 span_op = service_op
-
-        with capture_internal_exceptions():
-            service_origin = service_ext.get_span_origin(ctx)
-            if service_origin is not None:
-                span_origin = service_origin
 
         with capture_internal_exceptions():
             attributes.update(service_ext.get_request_attributes(ctx))
@@ -203,7 +197,7 @@ def _start_client_span(
     attributes.update(
         {
             SPANDATA.SENTRY_OP: span_op,
-            SPANDATA.SENTRY_ORIGIN: span_origin,
+            SPANDATA.SENTRY_ORIGIN: ORIGIN,
         }
     )
     return sentry_sdk.start_span(

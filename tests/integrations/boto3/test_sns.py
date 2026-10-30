@@ -15,7 +15,7 @@ def test_request_attributes(client_factory, capture_items):
             lambda: client.delete_topic(**{"TopicArn": topic_arn}), capture_items
         )
 
-    (span,) = spans[OP.HTTP_CLIENT]
+    (span,) = spans[OP.RPC]
     attributes = span["attributes"]
     assert attributes[SPANDATA.CLOUD_ACCOUNT_ID] == "123456789012"
     assert attributes[SPANDATA.CLOUD_RESOURCE_ID] == topic_arn

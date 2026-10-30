@@ -497,6 +497,30 @@ class SPANDATA:
     Example: "wzHcyEWfmOGDIE5QOhTAqFDoDWP3y8IUvpNINCwL9N4TEHbUw0/gZJ+VZTmCNCWR7fezEN3eCiQ="
     """
 
+    AWS_KINESIS_STREAM_NAME = "aws.kinesis.stream_name"
+    """
+    The name of the AWS Kinesis stream the request refers to.
+    Example: "orders"
+    """
+
+    AWS_LAMBDA_INVOKED_ARN = "aws.lambda.invoked_arn"
+    """
+    The full ARN of the Lambda function that was invoked.
+    Example: "arn:aws:lambda:us-east-1:123456789012:function:my-function"
+    """
+
+    AWS_LOG_GROUP_NAMES = "aws.log.group.names"
+    """
+    The name(s) of the AWS log group(s) an application is writing to.
+    Example: ["/aws/lambda/my-function", "opentelemetry-service"]
+    """
+
+    AWS_LOG_STREAM_NAMES = "aws.log.stream.names"
+    """
+    The name(s) of the AWS log stream(s) an application is writing to.
+    Example: ["logs/main/10838bed-421f-43ef-870a-f43feacbbb5b"]
+    """
+
     AWS_REQUEST_ID = "aws.request_id"
     """
     The AWS request ID as returned in the response headers.
@@ -539,6 +563,48 @@ class SPANDATA:
     Example: "dfRtDYWFbkRONycy.Yxwh66Yjlx.cph0gtNBtJ"
     """
 
+    AWS_STEP_FUNCTIONS_ACTIVITY_ARN = "aws.step_functions.activity.arn"
+    """
+    The ARN of the AWS Step Functions activity the request refers to.
+    Example: "arn:aws:states:us-east-1:123456789012:activity:approve-order"
+    """
+
+    AWS_STEP_FUNCTIONS_ACTIVITY_NAME = "aws.step_functions.activity.name"
+    """
+    The name of the AWS Step Functions activity the request refers to.
+    Example: "approve-order"
+    """
+
+    AWS_STEP_FUNCTIONS_EXECUTION_ARN = "aws.step_functions.execution.arn"
+    """
+    The ARN of the AWS Step Functions execution the request refers to.
+    Example: "arn:aws:states:us-east-1:123456789012:execution:orders:4f9b1c2e"
+    """
+
+    AWS_STEP_FUNCTIONS_STATE_MACHINE_ARN = "aws.step_functions.state_machine.arn"
+    """
+    The ARN of the AWS Step Functions state machine the request refers to.
+    Example: "arn:aws:states:us-east-1:123456789012:stateMachine:orders"
+    """
+
+    AWS_STEP_FUNCTIONS_STATE_MACHINE_NAME = "aws.step_functions.state_machine.name"
+    """
+    The name of the AWS Step Functions state machine the request refers to, without a version or alias qualifier.
+    Example: "orders"
+    """
+
+    AWS_SECRETSMANAGER_SECRET_ARN = "aws.secretsmanager.secret.arn"
+    """
+    The ARN of the Secrets Manager secret the request refers to.
+    Example: "arn:aws:secretsmanager:us-east-1:123456789012:secret:db-password-AbCdEf"
+    """
+
+    AWS_SECRETSMANAGER_SECRET_NAME = "aws.secretsmanager.secret.name"
+    """
+    The name of the Secrets Manager secret the request refers to.
+    Example: "db-password"
+    """
+
     CACHE_HIT = "cache.hit"
     """
     A boolean indicating whether the requested data was found in the cache.
@@ -567,6 +633,12 @@ class SPANDATA:
     """
     The cloud account ID the resource is assigned to.
     Example: "123456789012"
+    """
+
+    CLOUD_PLATFORM = "cloud.platform"
+    """
+    The cloud platform in use.
+    Example: "aws_lambda"
     """
 
     CLOUD_PROVIDER = "cloud.provider"
@@ -750,6 +822,23 @@ class SPANDATA:
     """
     File size in bytes.
     Example: 1024
+    """
+    FAAS_INVOCATION_ID = "faas.invocation_id"
+    """
+    The invocation ID of the current function invocation.
+    Example: "af9d5aa4-a685-4c5f-a22b-444f80b3cc28"
+    """
+
+    FAAS_NAME = "faas.name"
+    """
+    The name of the serverless function.
+    Example: "my_function"
+    """
+
+    FAAS_VERSION = "faas.version"
+    """
+    The version of the function that was invoked.
+    Example: "$LATEST"
     """
 
     GEN_AI_AGENT_NAME = "gen_ai.agent.name"
@@ -1133,6 +1222,12 @@ class SPANDATA:
     Example: 418
     """
 
+    MESSAGING_BATCH_MESSAGE_COUNT = "messaging.batch.message_count"
+    """
+    The number of messages sent, received, or processed in the scope of the batching operation.
+    Example: 10
+    """
+
     MESSAGING_DESTINATION_NAME = "messaging.destination.name"
     """
     The destination name where the message is being consumed from,
@@ -1483,6 +1578,12 @@ class SPANDATA:
     Example: ["AtexitIntegration", "StdlibIntegration"]
     """
 
+    SENTRY_SEGMENT_NAME_SOURCE = "sentry.segment.name.source"
+    """
+    The source of the segment span name. Should only be set on segment spans.
+    Example: "route", "component", "view", "task", "custom", "url"
+    """
+
     USER_AGENT_ORIGINAL = "user_agent.original"
     """
     Value of the HTTP User-Agent header sent by the client.
@@ -1500,6 +1601,7 @@ class OP:
     DB = "db"
     DB_CURSOR_ITERATOR = "db.cursor.iter"
     DB_CURSOR_FETCH = "db.cursor.fetch"
+    DB_QUERY = "db.query"
     DB_REDIS = "db.redis"
     EVENT_DJANGO = "event.django"
     FUNCTION = "function"
@@ -1507,6 +1609,7 @@ class OP:
     FUNCTION_GCP = "function.gcp"
     GEN_AI_CHAT = "gen_ai.chat"
     GEN_AI_CREATE_AGENT = "gen_ai.create_agent"
+    GEN_AI_DECIDE = "gen_ai.decide"
     GEN_AI_EMBEDDINGS = "gen_ai.embeddings"
     GEN_AI_EVALUATE = "gen_ai.evaluate"
     GEN_AI_EXECUTE_TOOL = "gen_ai.execute_tool"
@@ -1540,6 +1643,16 @@ class OP:
     HUGGINGFACE_HUB_CHAT_COMPLETIONS_CREATE = (
         "ai.chat_completions.create.huggingface_hub"
     )
+    OBJECT_COPY = "object.copy"
+    OBJECT_DELETE = "object.delete"
+    OBJECT_GET = "object.get"
+    OBJECT_HEAD = "object.head"
+    OBJECT_LIST = "object.list"
+    OBJECT_MULTIPART_UPLOAD_ABORT = "object.multipart_upload.abort"
+    OBJECT_MULTIPART_UPLOAD_COMPLETE = "object.multipart_upload.complete"
+    OBJECT_MULTIPART_UPLOAD_CREATE = "object.multipart_upload.create"
+    OBJECT_PUT = "object.put"
+    OBJECT_UPLOAD_PART = "object.upload_part"
     QUEUE_PROCESS = "queue.process"
     QUEUE_PUBLISH = "queue.publish"
     QUEUE_SUBMIT_ARQ = "queue.submit.arq"
@@ -1553,6 +1666,7 @@ class OP:
     QUEUE_TASK_RAY = "queue.task.ray"
     QUEUE_TASK_DRAMATIQ = "queue.task.dramatiq"
     QUEUE_SUBMIT_DJANGO = "queue.submit.django"
+    RPC = "rpc"
     SUBPROCESS = "subprocess"
     SUBPROCESS_WAIT = "subprocess.wait"
     SUBPROCESS_COMMUNICATE = "subprocess.communicate"
@@ -1601,6 +1715,7 @@ class ClientConstructor:
         attach_stacktrace: bool = True,
         ca_certs: "Optional[str]" = None,
         traces_sample_rate: "Optional[float]" = None,
+        trace_lifecycle: "Optional[str]" = None,
         traces_sampler: "Optional[TracesSampler]" = None,
         profiler_mode: "Optional[ContinuousProfilerMode]" = None,
         profile_lifecycle: 'Literal["manual", "trace"]' = "manual",
@@ -1915,6 +2030,10 @@ class ClientConstructor:
             If you want to disable all tracing you need to set `traces_sample_rate=None`. In this case, no new traces
             will be started and no incoming traces will be continued.
 
+        :param trace_lifecycle: Controls how traces are sent. Span streaming is the only supported tracing mode,
+            so the only accepted value is `"stream"`. Other values are ignored and a warning is logged.
+            This option only exists for backwards compatibility with 2.x and has no effect.
+
         :param traces_sampler: A function responsible for determining the percentage chance a given service span will be
             sent to Sentry.
 
@@ -2041,4 +2160,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "2.72.0"
+VERSION = "3.0.0b2"

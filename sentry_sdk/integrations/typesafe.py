@@ -216,12 +216,12 @@ def _wrap_system_one(f: "Callable[..., Any]") -> "Callable[..., Any]":
             model = self._config.default_model
 
         with sentry_sdk.start_span(
-            name=f"evaluate {model}".strip(),
+            name=f"decide {model}".strip(),
             attributes={
-                "sentry.op": OP.GEN_AI_EVALUATE,
+                "sentry.op": OP.GEN_AI_DECIDE,
                 "sentry.origin": TypeSafeIntegration.origin,
                 SPANDATA.GEN_AI_PROVIDER_NAME: "typesafe",
-                SPANDATA.GEN_AI_OPERATION_NAME: "evaluate",
+                SPANDATA.GEN_AI_OPERATION_NAME: "decide",
             },
         ) as span:
             if model is not None:
@@ -300,12 +300,12 @@ def _wrap_system_one_async(f: "Callable[..., Any]") -> "Callable[..., Any]":
             model = self._config.default_model
 
         with sentry_sdk.start_span(
-            name=f"evaluate {model}".strip(),
+            name=f"decide {model}".strip(),
             attributes={
-                "sentry.op": OP.GEN_AI_EVALUATE,
+                "sentry.op": OP.GEN_AI_DECIDE,
                 "sentry.origin": TypeSafeIntegration.origin,
                 SPANDATA.GEN_AI_PROVIDER_NAME: "typesafe",
-                SPANDATA.GEN_AI_OPERATION_NAME: "evaluate",
+                SPANDATA.GEN_AI_OPERATION_NAME: "decide",
             },
         ) as span:
             if model is not None:

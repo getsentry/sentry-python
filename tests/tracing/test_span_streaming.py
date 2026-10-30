@@ -284,6 +284,7 @@ def test_before_send_span_unsupported_edit(sentry_init, capture_items):
     def before_send_span(span, hint):
         # Anything beyond attribute and name changes will be ignored
         span["trace_id"] = "my-trace-id"
+        span["links"][0]["attributes"]["kind"] = "changed"
 
         return span
 
@@ -294,7 +295,8 @@ def test_before_send_span_unsupported_edit(sentry_init, capture_items):
 
     items = capture_items("span")
 
-    with sentry_sdk.start_span(name="span"):
+    link = {"trace_id": "a" * 32, "span_id": "b" * 16, "attributes": {"kind": "a"}}
+    with sentry_sdk.start_span(name="span", links=[link]):
         ...
 
     sentry_sdk.flush()
@@ -305,6 +307,7 @@ def test_before_send_span_unsupported_edit(sentry_init, capture_items):
 
     assert span["name"] == "span"
     assert span["trace_id"] != "my-trace-id"
+    assert span["links"][0]["attributes"]["kind"] == {"type": "string", "value": "a"}
 
 
 def test_before_send_span_doesnt_receive_ignored_spans(sentry_init, capture_items):
@@ -433,6 +436,80 @@ def test_span_attributes_serialize_early(sentry_init, capture_items):
 
     assert span["attributes"]["attribute1"] == "[123, 'text']"
     assert "Class" in span["attributes"]["attribute2"]
+
+
+def test_span_links(sentry_init, capture_envelopes):
+    sentry_init(
+        traces_sample_rate=1.0,
+    )
+
+    envelopes = capture_envelopes()
+
+    previous_trace = {
+        "trace_id": "627a2885119dcc8184fae7eef09438cb",
+        "span_id": "6c71fc6b09b8b716",
+        "sampled": True,
+        "attributes": {"sentry.link.type": "previous_trace"},
+    }
+    with sentry_sdk.start_span(name="parent", links=[previous_trace]) as span:
+        span.add_link({"trace_id": "a" * 32, "span_id": "b" * 16})
+        span.add_links(
+            [
+                {
+                    "trace_id": "c" * 32,
+                    "span_id": "d" * 16,
+                    "sampled": False,
+                    "attributes": {"messaging.message.id": "1", "retries": 2},
+                }
+            ]
+        )
+        with sentry_sdk.start_span(name="child"):
+            ...
+        # span keeps its own copy.
+        previous_trace["attributes"]["sentry.link.type"] = "changed"
+
+    sentry_sdk.flush()
+    child, span = envelopes[0].items[0].payload.json["items"]
+
+    # empty `links` array is omitted.
+    assert "links" not in child
+    assert span["links"] == [
+        {
+            "trace_id": "627a2885119dcc8184fae7eef09438cb",
+            "span_id": "6c71fc6b09b8b716",
+            "sampled": True,
+            "attributes": {
+                "sentry.link.type": {"type": "string", "value": "previous_trace"}
+            },
+        },
+        {"trace_id": "a" * 32, "span_id": "b" * 16},
+        {
+            "trace_id": "c" * 32,
+            "span_id": "d" * 16,
+            "sampled": False,
+            "attributes": {
+                "messaging.message.id": {"type": "string", "value": "1"},
+                "retries": {"type": "integer", "value": 2},
+            },
+        },
+    ]
+
+
+def test_span_links_on_noop_span(sentry_init, capture_items):
+    sentry_init(
+        traces_sample_rate=0.0,
+    )
+
+    items = capture_items("span")
+
+    link = {"trace_id": "a" * 32, "span_id": "b" * 16}
+    with sentry_sdk.start_span(name="parent", links=[link]) as span:
+        assert isinstance(span, NoOpSpan)
+        span.add_link(link)
+        span.add_links([link])
+
+    sentry_sdk.flush()
+    assert items == []
 
 
 def test_traces_sampler_drops_span(sentry_init, capture_items):

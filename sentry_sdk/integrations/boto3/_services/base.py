@@ -1,10 +1,11 @@
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any, Optional
+    from typing import Any, Dict, Optional
 
     from sentry_sdk._types import Attributes
     from sentry_sdk.integrations.boto3._context import AwsCallContext
+    from sentry_sdk.traces import Span
 
 
 class _ServiceExtension:
@@ -21,10 +22,6 @@ class _ServiceExtension:
         """Return an optional `sentry.op` override, or `None` to keep the default."""
         return None
 
-    def get_span_origin(self, ctx: "AwsCallContext") -> "Optional[str]":
-        """Return an optional `sentry.origin` override, or `None` to keep the default."""
-        return None
-
     def get_span_name(
         self, ctx: "AwsCallContext", attributes: "Attributes"
     ) -> "Optional[str]":
@@ -35,8 +32,22 @@ class _ServiceExtension:
         """Return request attributes to add before the AWS request is made."""
         return {}
 
+    def get_request_params(
+        self, ctx: "AwsCallContext", span: "Optional[Span]"
+    ) -> "Optional[Dict[str, Any]]":
+        """
+        Return params to send instead of `ctx.params`, e.g. with trace propagation added,
+        or `None` to send them unchanged. Runs for every call, also when no span was
+        started (`span` is `None`), and must not mutate `ctx.params`.
+        """
+        return None
+
     def get_response_attributes(
         self, ctx: "AwsCallContext", response: "Any"
     ) -> "Attributes":
         """Return response attributes to add after the AWS request is made."""
         return {}
+
+    def has_streaming_response(self, ctx: "AwsCallContext") -> bool:
+        """Return whether a `StreamingBody` response is read over time, so the span ends when it's read or closed, or `False` to end it with the call."""
+        return True

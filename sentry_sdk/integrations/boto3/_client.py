@@ -126,8 +126,8 @@ def _patch_botocore_client() -> None:
                     attributes.update(_get_response_attributes(parsed))
                 with capture_internal_exceptions():
                     span.set_attributes(attributes)
-                    # a service extension reports a failure that didn't raise, e.g. failed
-                    # batch entries in a successful response, with `error.type`.
+                    # a service extension reports a failure that didn't raise, i.e. one
+                    # in a successful response, with `error.type`.
                     if SPANDATA.ERROR_TYPE in attributes:
                         span.status = SpanStatus.ERROR
         except BaseException as error:

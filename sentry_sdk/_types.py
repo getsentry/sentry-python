@@ -112,21 +112,6 @@ class AnnotatedValue:
             },
         )
 
-    @classmethod
-    def substituted_because_contains_sensitive_data(cls) -> "AnnotatedValue":
-        """The actual value was removed because it contained sensitive information."""
-        return AnnotatedValue(
-            value=SENSITIVE_DATA_SUBSTITUTE,
-            metadata={
-                "rem": [  # Remark
-                    [
-                        "!config",  # Because of SDK configuration (in this case the config is the hard coded removal of certain django cookies)
-                        "s",  # The fields original value was substituted
-                    ]
-                ]
-            },
-        )
-
 
 T = TypeVar("T")
 Annotated = Union[AnnotatedValue, T]
@@ -364,6 +349,16 @@ if TYPE_CHECKING:
 
     MetricProcessor = Callable[[Metric, Hint], Optional[Metric]]
 
+    SpanLink = TypedDict(
+        "SpanLink",
+        {
+            "span_id": str,
+            "trace_id": str,
+            "sampled": NotRequired[bool],
+            "attributes": NotRequired[Attributes],
+        },
+    )
+
     SpanJSON = TypedDict(
         "SpanJSON",
         {
@@ -376,6 +371,7 @@ if TYPE_CHECKING:
             "start_timestamp": float,
             "end_timestamp": NotRequired[float],
             "attributes": NotRequired[Attributes],
+            "links": NotRequired[list[SpanLink]],
             "_segment_span": NotRequired["sentry_sdk.traces.Span"],
         },
     )

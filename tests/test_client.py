@@ -643,6 +643,25 @@ def test_client_debug_option_enabled(sentry_init, caplog):
     assert "OK" in caplog.text
 
 
+@pytest.mark.parametrize(
+    "trace_lifecycle,warns",
+    [
+        (None, False),
+        ("stream", False),
+        ("static", True),
+        ("unknown", True),
+    ],
+)
+def test_trace_lifecycle_option(sentry_init, caplog, trace_lifecycle, warns):
+    sentry_init(debug=True, trace_lifecycle=trace_lifecycle)
+
+    warning = (
+        "Span streaming is the only tracing mode. "
+        "Ignoring unknown trace_lifecycle value."
+    )
+    assert (warning in caplog.text) is warns
+
+
 @pytest.mark.tests_internal_exceptions
 @pytest.mark.parametrize("with_client", (True, False))
 def test_client_debug_option_disabled(with_client, sentry_init, caplog):

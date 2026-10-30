@@ -1,4 +1,6 @@
+import copy
 import sys
+import time
 import uuid
 from datetime import datetime, timedelta, timezone
 from enum import Enum
@@ -17,7 +19,6 @@ from sentry_sdk.utils import (
     format_attribute,
     get_current_thread_meta,
     logger,
-    nanosecond_time,
     should_be_treated_as_error,
 )
 
@@ -33,7 +34,7 @@ if TYPE_CHECKING:
         overload,
     )
 
-    from sentry_sdk._types import Attributes, AttributeValue, SpanJSON
+    from sentry_sdk._types import Attributes, AttributeValue, SpanJSON, SpanLink
     from sentry_sdk.profiler.continuous_profiler import ContinuousProfile
 
     P = ParamSpec("P")
@@ -132,10 +133,11 @@ def start_span(
     attributes: "Optional[Attributes]" = None,
     parent_span: "Optional[Span]" = _DEFAULT_PARENT_SPAN,  # type: ignore[assignment]
     active: bool = True,
+    links: "Optional[list[SpanLink]]" = None,
 ) -> "Span":
 
     return sentry_sdk.get_current_scope().start_span(
-        name, attributes, parent_span, active
+        name, attributes, parent_span, active, links
     )
 
 
@@ -171,6 +173,7 @@ class Span:
     __slots__ = (
         "_name",
         "_attributes",
+        "_links",
         "_active",
         "_span_id",
         "_trace_id",
@@ -203,6 +206,7 @@ class Span:
         baggage: "Optional[Baggage]" = None,
         sample_rate: "Optional[float]" = None,
         sample_rand: "Optional[float]" = None,
+        links: "Optional[list[SpanLink]]" = None,
     ):
         self._name: str = name
         self._active: bool = active
@@ -214,6 +218,10 @@ class Span:
         if attributes:
             for attribute, value in attributes.items():
                 self.set_attribute(attribute, value)
+
+        self._links: "list[SpanLink]" = []
+        if links:
+            self.add_links(links)
 
         self._scope = scope
 
@@ -231,7 +239,7 @@ class Span:
 
         # profiling depends on this value and requires that
         # it is measured in nanoseconds
-        self._start_timestamp_monotonic_ns = nanosecond_time()
+        self._start_timestamp_monotonic_ns = time.perf_counter_ns()
 
         self._span_id: "Optional[str]" = None
 
@@ -344,7 +352,7 @@ class Span:
                 )
 
         if self._end_timestamp is None:
-            elapsed = nanosecond_time() - self._start_timestamp_monotonic_ns
+            elapsed = time.perf_counter_ns() - self._start_timestamp_monotonic_ns
             self._end_timestamp = self._start_timestamp + timedelta(
                 microseconds=elapsed / 1000
             )
@@ -371,6 +379,21 @@ class Span:
             del self._attributes[key]
         except KeyError:
             pass
+
+    def add_link(self, link: "SpanLink") -> None:
+        stored: "SpanLink" = {"trace_id": link["trace_id"], "span_id": link["span_id"]}
+        if "sampled" in link:
+            stored["sampled"] = link["sampled"]
+        if link.get("attributes"):
+            stored["attributes"] = {
+                key: format_attribute(value)
+                for key, value in link["attributes"].items()
+            }
+        self._links.append(stored)
+
+    def add_links(self, links: "list[SpanLink]") -> None:
+        for link in links:
+            self.add_link(link)
 
     @property
     def status(self) -> "str":
@@ -551,6 +574,9 @@ class Span:
 
         res["attributes"] = {k: v for k, v in self._attributes.items()}
 
+        if self._links:
+            res["links"] = copy.deepcopy(self._links)
+
         return res
 
 
@@ -672,6 +698,12 @@ class NoOpSpan(Span):
             self.set_attribute("sentry.segment.name.source", value)
 
     def remove_attribute(self, key: str) -> None:
+        pass
+
+    def add_link(self, link: "SpanLink") -> None:
+        pass
+
+    def add_links(self, links: "list[SpanLink]") -> None:
         pass
 
     @property

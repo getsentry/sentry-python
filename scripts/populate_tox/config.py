@@ -76,7 +76,7 @@ TEST_SUITE_CONFIG = {
     "celery": {
         "package": "celery",
         "deps": {
-            "*": ["newrelic<10.17.0", "redis", "pytest-forked"],
+            "*": ["newrelic<10.17.0", "redis", "pytest-forked", "pytest<9.2.0"],
             "py3.7": ["importlib-metadata<5.0"],
         },
     },
@@ -103,6 +103,7 @@ TEST_SUITE_CONFIG = {
                 "djangorestframework",
                 "pytest-django",
                 "pytest-forked",
+                "pytest<9.2.0",
                 "Werkzeug",
                 "channels[daphne]",
                 "executing",
@@ -193,6 +194,7 @@ TEST_SUITE_CONFIG = {
                 "types-protobuf",
                 "pytest-asyncio",
                 "pytest-forked",
+                "pytest<9.2.0",
             ],
         },
     },
@@ -200,8 +202,12 @@ TEST_SUITE_CONFIG = {
         "package": "httpx",
         "integration_name": "httpx",
         "deps": {
-            "*": ["anyio>=3,<5", "pytest-asyncio"],
+            # Old pytest-asyncio versions are not compatible with pytest>=9.2.0
+            "*": ["anyio>=3,<5", "pytest-asyncio", "pytest<9.2.0"],
             "<0.24": ["anyio<4"],
+            # pytest-cov>=7 requires pytest>=7, so installing the latest pytest-cov
+            # would override the pytest<7 pin these versions resolve to
+            "<0.21": ["pytest-cov<7"],
             ">=0.16,<0.17": ["pytest-httpx==0.10.0"],
             ">=0.17,<0.19": ["pytest-httpx==0.12.0"],
             ">=0.19,<0.21": ["pytest-httpx==0.14.0"],
@@ -277,6 +283,15 @@ TEST_SUITE_CONFIG = {
         "package": "litellm",
         "deps": {
             "*": ["anthropic", "google-genai", "pytest-asyncio", "httpx"],
+            # filelock 3.30.0-4.0.2 registers a Python audit hook on import. On
+            # CPython < 3.12, sys.settrace() is guarded by a process-wide flag
+            # that stays set while audit hooks run, so with coverage enabled a
+            # new thread can die in Thread._bootstrap with "Cannot install a
+            # trace function while another trace function is being installed"
+            # (python/cpython#98257). LiteLLM finishes spans in thread pool
+            # callbacks, so the span is lost. filelock 4.0.3 skips the hook on
+            # affected interpreters.
+            "py3.10,py3.11": ["filelock>=4.0.3"],
         },
         "include": "<=1.96",  # https://github.com/BerriAI/litellm/issues/36384
     },
@@ -392,7 +407,13 @@ TEST_SUITE_CONFIG = {
     "quart": {
         "package": "quart",
         "deps": {
-            "*": ["quart-auth", "pytest-asyncio", "pytest-forked", "Werkzeug"],
+            "*": [
+                "quart-auth",
+                "pytest-asyncio",
+                "pytest-forked",
+                "pytest<9.2.0",
+                "Werkzeug",
+            ],
             ">=0.19,<0.23": ["quart-flask-patch"],
             "<0.19": [
                 "blinker<1.6",
@@ -425,6 +446,11 @@ TEST_SUITE_CONFIG = {
             "py3.7,py3.8": ["fakeredis<2.26.0"],
         },
     },
+    "redis_py_cluster_legacy": {
+        "package": "redis-py-cluster",
+        "include": ">=2.1",
+        "num_versions": 2,
+    },
     "requests": {
         "package": "requests",
         "num_versions": 2,
@@ -440,6 +466,7 @@ TEST_SUITE_CONFIG = {
             # The default "addr" value was removed in https://github.com/cunla/fakeredis-py/commit/0441288fb22c8c191fc716b561e0001cf512abe5.
             # from fakeredis.
             ">=1.1.14": ["fakeredis<2.36.0"],
+            ">=2.0": ["rq-scheduler"],
             "<0.9": ["fakeredis<1.0", "redis<3.2.2"],
             ">=0.9,<0.14": ["fakeredis>=1.0,<1.7.4"],
             "py3.7": ["fakeredis!=2.26.0"],

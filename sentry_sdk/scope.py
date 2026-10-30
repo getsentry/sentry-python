@@ -76,6 +76,7 @@ if TYPE_CHECKING:
         Log,
         LogLevelStr,
         Metric,
+        SpanLink,
         Type,
     )
 
@@ -118,25 +119,6 @@ class ScopeType(Enum):
     ISOLATION = "isolation"
     GLOBAL = "global"
     MERGED = "merged"
-
-
-class _ScopeManager:
-    def __init__(self) -> None:
-        self._old_scopes: "List[Scope]" = []
-
-    def __enter__(self) -> "Scope":
-        isolation_scope = Scope.get_isolation_scope()
-
-        self._old_scopes.append(isolation_scope)
-
-        forked_scope = isolation_scope.fork()
-        _isolation_scope.set(forked_scope)
-
-        return forked_scope
-
-    def __exit__(self, exc_type: "Any", exc_value: "Any", tb: "Any") -> None:
-        old_scope = self._old_scopes.pop()
-        _isolation_scope.set(old_scope)
 
 
 def add_global_event_processor(processor: "EventProcessor") -> None:
@@ -937,6 +919,7 @@ class Scope:
         attributes: "Optional[Attributes]",
         parent_span: "Optional[Span]",
         active: bool,
+        links: "Optional[list[SpanLink]]" = None,
     ) -> "Span":
         """
         Start a span.
@@ -986,6 +969,11 @@ class Scope:
             you want to create a span that shouldn't have any children (unless
             provided explicitly via the `parent_span` argument), set this to `False`.
         :type active: bool
+
+        :param links: Spans to link the span to, without making them its parent,
+            e.g. in other traces. More can be added with `span.add_link()` or
+            `span.add_links()`.
+        :type links: "Optional[list[SpanLink]]"
 
         :return: The span that has been started.
         :rtype: Span
@@ -1055,6 +1043,7 @@ class Scope:
                 baggage=propagation_context.baggage,
                 sample_rand=sample_rand,
                 sample_rate=sample_rate,
+                links=links,
             )
 
         # This is a child span; take propagation context from the parent span
@@ -1090,6 +1079,7 @@ class Scope:
                 trace_id=parent_span.trace_id,
                 parent_span_id=parent_span.span_id,
                 parent_sampled=parent_span.sampled,
+                links=links,
             )
 
     def _update_sample_rate(self, sample_rate: float) -> None:
@@ -1458,10 +1448,6 @@ class Scope:
             ):
                 attributes[attribute_name] = self._user[user_attribute]
 
-    def _drop(self, cause: "Any", ty: str) -> "Optional[Any]":
-        logger.info("%s (%s) dropped event", ty, cause)
-        return None
-
     def run_error_processors(self, event: "Event", hint: "Hint") -> "Optional[Event]":
         """
         Runs the error processors on the event and returns the modified event.
@@ -1476,10 +1462,22 @@ class Scope:
 
             for error_processor in error_processors:
                 new_event = None
+                exception_raised = False
                 with capture_internal_exceptions():
-                    new_event = error_processor(event, exc_info)
+                    try:
+                        new_event = error_processor(event, exc_info)
+                    except Exception:
+                        exception_raised = True
+                        raise
                 if new_event is None:
-                    return self._drop(error_processor, "error processor")
+                    logger.info("%s (error processor) dropped event", error_processor)
+                    transport = sentry_sdk.get_client().transport
+                    if transport:
+                        transport.record_lost_event(
+                            "callback_error" if exception_raised else "event_processor",
+                            data_category="error",
+                        )
+                    return None
 
                 event = new_event
 
@@ -1506,10 +1504,23 @@ class Scope:
 
             for event_processor in event_processors:
                 new_event = None
+                exception_raised = False
                 with capture_internal_exceptions():
-                    new_event = event_processor(event, hint)
+                    try:
+                        new_event = event_processor(event, hint)
+                    except Exception:
+                        exception_raised = True
+                        raise
                 if new_event is None:
-                    return self._drop(event_processor, "event processor")
+                    logger.info("%s (event processor) dropped event", event_processor)
+                    transport = sentry_sdk.get_client().transport
+                    if transport:
+                        transport.record_lost_event(
+                            "callback_error" if exception_raised else "event_processor",
+                            data_category="error",
+                        )
+                    return None
+
                 event = new_event
 
         return event

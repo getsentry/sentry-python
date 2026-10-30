@@ -349,6 +349,12 @@ class _Client(BaseClient):
 
         try:
             _client_init_debug.set(self.options["debug"])
+
+            if self.options["trace_lifecycle"] not in (None, "stream"):
+                logger.warning(
+                    "Span streaming is the only tracing mode. Ignoring unknown trace_lifecycle value."
+                )
+
             self.transport = make_transport(self.options)
 
             self.monitor = None
@@ -464,13 +470,9 @@ class _Client(BaseClient):
         if scope is not None:
             event_ = scope.apply_to_event(event, hint, self.options)
 
-            # one of the event/error processors returned None
+            # one of the event/error processors returned None or raised;
+            # the client report is recorded in Scope._drop
             if event_ is None:
-                if self.transport:
-                    self.transport.record_lost_event(
-                        "event_processor",
-                        data_category="error",
-                    )
                 return None
 
             event = event_

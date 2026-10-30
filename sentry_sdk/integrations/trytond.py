@@ -1,5 +1,6 @@
 import sentry_sdk
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
+from sentry_sdk.integrations.logging import ignore_logger_for_events
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
 from sentry_sdk.utils import (
     ensure_integration_enabled,
@@ -21,13 +22,12 @@ class TrytondWSGIIntegration(Integration):
     identifier = "trytond_wsgi"
     origin = f"auto.http.{identifier}"
 
-    def __init__(self) -> None:
-        pass
-
     @staticmethod
     def setup_once() -> None:
         version = parse_version(TRYTOND_VERSION)
         _check_minimum_version(TrytondWSGIIntegration, version, "trytond")
+
+        ignore_logger_for_events("trytond.wsgi")
 
         app.wsgi_app = SentryWsgiMiddleware(
             app.wsgi_app,
