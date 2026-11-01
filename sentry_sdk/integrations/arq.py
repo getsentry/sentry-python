@@ -1,7 +1,10 @@
 import sys
+import time
+from datetime import timedelta, timezone
 
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA, SPANSTATUS
+from sentry_sdk.crons import monitor
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.scope import should_send_default_pii
@@ -15,6 +18,8 @@ from sentry_sdk.utils import (
     ensure_integration_enabled,
     event_from_exception,
     has_data_collection_enabled,
+    logger,
+    match_regex_list,
     parse_version,
     reraise,
 )
@@ -22,6 +27,7 @@ from sentry_sdk.utils import (
 try:
     import arq.worker
     from arq.connections import ArqRedis
+    from arq.typing import WEEKDAYS
     from arq.version import VERSION as ARQ_VERSION
     from arq.worker import JobExecutionFailed, Retry, RetryJob, Worker
 except ImportError:
@@ -30,14 +36,14 @@ except ImportError:
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, Optional, Union
+    from typing import Any, Dict, List, Optional, Union
 
     from arq.cron import CronJob
     from arq.jobs import Job
     from arq.typing import WorkerCoroutine
     from arq.worker import Function
 
-    from sentry_sdk._types import Event, EventProcessor, ExcInfo, Hint
+    from sentry_sdk._types import Event, EventProcessor, ExcInfo, Hint, MonitorConfig
 
 ARQ_CONTROL_FLOW_EXCEPTIONS = (JobExecutionFailed, Retry, RetryJob)
 
@@ -45,6 +51,14 @@ ARQ_CONTROL_FLOW_EXCEPTIONS = (JobExecutionFailed, Retry, RetryJob)
 class ArqIntegration(Integration):
     identifier = "arq"
     origin = f"auto.queue.{identifier}"
+
+    def __init__(
+        self,
+        monitor_cron_jobs: bool = False,
+        exclude_cron_jobs: "Optional[List[str]]" = None,
+    ) -> None:
+        self.monitor_cron_jobs = monitor_cron_jobs
+        self.exclude_cron_jobs = exclude_cron_jobs
 
     @staticmethod
     def setup_once() -> None:
@@ -278,7 +292,15 @@ def patch_create_worker() -> None:
                 _get_arq_cron_job(cron_job) for cron_job in kwargs.get("cron_jobs", [])
             ]
 
-        return old_create_worker(*args, **kwargs)
+        worker = old_create_worker(*args, **kwargs)
+
+        integration = sentry_sdk.get_client().get_integration(ArqIntegration)
+        if integration is not None and integration.monitor_cron_jobs:
+            for cron_job in worker.cron_jobs:
+                with capture_internal_exceptions():
+                    _monitor_cron_job(integration, cron_job, worker)
+
+        return worker
 
     arq.worker.create_worker = _sentry_create_worker
 
@@ -294,3 +316,115 @@ def _get_arq_cron_job(cron_job: "CronJob") -> "CronJob":
     cron_job.coroutine = _wrap_coroutine(cron_job.name, cron_job.coroutine)
 
     return cron_job
+
+
+def _monitor_cron_job(
+    integration: "ArqIntegration", cron_job: "CronJob", worker: "Worker"
+) -> None:
+    # Each create_worker call wraps the coroutine again.
+    if getattr(cron_job, "_sentry_monitored", False):
+        return
+    cron_job._sentry_monitored = True
+
+    # arq names cron jobs "cron:<function name>" by default.
+    monitor_slug = cron_job.name
+    if monitor_slug.startswith("cron:"):
+        monitor_slug = monitor_slug[len("cron:") :]
+    if match_regex_list(monitor_slug, integration.exclude_cron_jobs):
+        return
+
+    monitor_config = _get_monitor_config(cron_job, worker)
+    if monitor_config is None:
+        logger.debug(
+            "Not monitoring arq cron job %r: its schedule can't be expressed "
+            "as a Sentry Crons schedule.",
+            cron_job.name,
+        )
+        return
+
+    coroutine = cron_job.coroutine
+
+    async def _sentry_cron_coroutine(
+        ctx: "Dict[Any, Any]", *args: "Any", **kwargs: "Any"
+    ) -> "Any":
+        with monitor(monitor_slug=monitor_slug, monitor_config=monitor_config):
+            return await coroutine(ctx, *args, **kwargs)
+
+    cron_job.coroutine = _sentry_cron_coroutine
+
+
+def _get_crontab_field(value: "Any", offset: int = 0) -> "Optional[str]":
+    if value is None:
+        return "*"
+    if isinstance(value, int) and not isinstance(value, bool):
+        value = [value]
+    if not isinstance(value, (set, list, tuple)) or not value:
+        return None
+    if not all(isinstance(v, int) and not isinstance(v, bool) for v in value):
+        return None
+    if offset:
+        value = {(v + offset) % 7 for v in value}
+    return ",".join(str(v) for v in sorted(value))
+
+
+def _get_crontab(cron_job: "CronJob") -> "Optional[str]":
+    # Sentry crontabs have minute resolution.
+    if cron_job.second not in (0, {0}, [0], (0,)):
+        return None
+
+    weekday = cron_job.weekday
+    if isinstance(weekday, str):
+        weekday = WEEKDAYS.index(weekday.lower())
+
+    # arq requires both to match, cron requires either.
+    if cron_job.day is not None and weekday is not None:
+        return None
+
+    fields = [
+        _get_crontab_field(cron_job.minute),
+        _get_crontab_field(cron_job.hour),
+        _get_crontab_field(cron_job.day),
+        _get_crontab_field(cron_job.month),
+        # arq counts weekdays from Monday = 0, cron from Sunday = 0.
+        _get_crontab_field(weekday, offset=1),
+    ]
+    if None in fields:
+        return None
+    return " ".join(fields)  # type: ignore[arg-type]
+
+
+def _get_timezone_name(worker: "Worker") -> "Optional[str]":
+    tz = getattr(worker, "timezone", None)
+    if tz is None:
+        # Before arq 0.25, cron jobs ran in naive local time.
+        if time.timezone == 0 and (not time.daylight or time.altzone == 0):
+            return "UTC"
+        return None
+
+    # zoneinfo and pytz
+    name = getattr(tz, "key", None) or getattr(tz, "zone", None)
+    if isinstance(name, str):
+        return name
+
+    # arq defaults to the system's fixed UTC offset at startup.
+    if isinstance(tz, timezone):
+        offset = tz.utcoffset(None)
+        if offset % timedelta(hours=1):
+            return None
+        hours = offset // timedelta(hours=1)
+        return "Etc/GMT%+d" % -hours if hours else "UTC"
+
+    return None
+
+
+def _get_monitor_config(
+    cron_job: "CronJob", worker: "Worker"
+) -> "Optional[MonitorConfig]":
+    crontab = _get_crontab(cron_job)
+    timezone_name = _get_timezone_name(worker)
+    if crontab is None or timezone_name is None:
+        return None
+    return {
+        "schedule": {"type": "crontab", "value": crontab},
+        "timezone": timezone_name,
+    }

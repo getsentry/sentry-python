@@ -1485,6 +1485,12 @@ def test_enable_tracing_deprecated(sentry_init, enable_tracing):
         sentry_init(enable_tracing=enable_tracing)
 
 
+@pytest.mark.parametrize("send_default_pii", [True, False])
+def test_send_default_pii_deprecated(sentry_init, send_default_pii):
+    with pytest.warns(DeprecationWarning):
+        sentry_init(send_default_pii=send_default_pii)
+
+
 def test_transaction_profiling_warns(sentry_init):
     with pytest.warns(DeprecationWarning, match="Transaction-based profiling"):
         sentry_init(profiles_sample_rate=1.0)

@@ -10,6 +10,7 @@ import subprocess
 import sys
 import threading
 import time
+import warnings
 from collections import namedtuple
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -77,8 +78,6 @@ if TYPE_CHECKING:
     P = ParamSpec("P")
     R = TypeVar("R")
 
-
-epoch = datetime(1970, 1, 1)
 
 # The logger is created here but initialized in the debug support module
 logger = logging.getLogger("sentry_sdk.errors")
@@ -245,10 +244,6 @@ def capture_internal_exception(exc_info: "ExcInfo") -> None:
     """
     if sentry_sdk.get_client().is_active():
         logger.error("Internal error in sentry_sdk", exc_info=exc_info)
-
-
-def to_timestamp(value: "datetime") -> float:
-    return (value - epoch).total_seconds()
 
 
 def format_timestamp(value: "datetime") -> str:
@@ -2167,6 +2162,9 @@ def format_attribute(val: "Any") -> "AttributeValue":
     https://develop.sentry.dev/sdk/telemetry/attributes/
     """
     if isinstance(val, (bool, int, float, str)):
+        if isinstance(val, float) and (math.isinf(val) or math.isnan(val)):
+            return str(val)
+
         return val
 
     if isinstance(val, (list, tuple)) and not val:
@@ -2253,3 +2251,12 @@ def _is_localhost(
 @contextmanager
 def nullcontext() -> "Iterator[None]":
     yield
+
+
+def deprecation_warning(msg: str) -> None:
+    """
+    Emit a warnings.warn about a deprecation.
+
+    For other types of warnings, use logger.warning().
+    """
+    warnings.warn(msg, stacklevel=3, category=DeprecationWarning)

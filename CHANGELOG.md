@@ -1,5 +1,112 @@
 # Changelog
 
+## 2.73.0
+
+### New Features ✨
+
+- (arq) Add an option to monitor arq cron jobs by @wedamija in [#8051](https://github.com/getsentry/sentry-python/pull/8051)
+- (huey) Add an option to monitor Huey periodic tasks by @wedamija in [#8052](https://github.com/getsentry/sentry-python/pull/8052)
+- (rq) Add an option to monitor rq-scheduler jobs by @wedamija in [#8053](https://github.com/getsentry/sentry-python/pull/8053)
+- (types) Export Attributes from the public types module by @sansynx in [#8019](https://github.com/getsentry/sentry-python/pull/8019)
+
+### Bug Fixes 🐛
+
+- (arq) Don't monitor cron jobs with unsupported schedules by @wedamija in [#8098](https://github.com/getsentry/sentry-python/pull/8098)
+- (attributes) Handle special float values correctly by @sentrivana in [#8067](https://github.com/getsentry/sentry-python/pull/8067)
+- (celery) Don't round down beat schedule intervals by @wedamija in [#7842](https://github.com/getsentry/sentry-python/pull/7842)
+- (cohere) Stop swallowing exceptions during stream iteration by @intertermux-code in [#8017](https://github.com/getsentry/sentry-python/pull/8017)
+- (huggingface_hub) Stop swallowing exceptions during stream iteration by @intertermux-code in [#8018](https://github.com/getsentry/sentry-python/pull/8018)
+- Exclude litellm==1.107.0 from extras by @jonny-norwine in [#8104](https://github.com/getsentry/sentry-python/pull/8104)
+
+### Internal Changes 🔧
+
+#### Deps
+
+- Update github workflows by @renovate in [#8045](https://github.com/getsentry/sentry-python/pull/8045)
+- Update github workflows by @renovate in [#8036](https://github.com/getsentry/sentry-python/pull/8036)
+- Update github workflows by @renovate in [#7276](https://github.com/getsentry/sentry-python/pull/7276)
+
+#### Other
+
+- (litellm) Require filelock>=4.0.3 on Python 3.10/3.11 by @sentry-junior in [#8026](https://github.com/getsentry/sentry-python/pull/8026)
+- (monitor) Stop background health checks in tests that drive the monitor by @sentry-junior in [#8032](https://github.com/getsentry/sentry-python/pull/8032)
+- Update `AGENTS.md` by @sentrivana in [#8077](https://github.com/getsentry/sentry-python/pull/8077)
+- 🤖 Update test matrix with new releases (10/12) by @github-actions in [#7944](https://github.com/getsentry/sentry-python/pull/7944)
+
+## 2.72.0
+
+### New Features ✨
+
+#### Asgi
+
+- Set `user_agent.original` for inbound filters by @sentrivana in [#7794](https://github.com/getsentry/sentry-python/pull/7794)
+- Add `sentry.is_localhost` for inbound filters by @sentrivana in [#7781](https://github.com/getsentry/sentry-python/pull/7781)
+
+#### Boto3
+
+- Add `ServiceExtension` class by @pabloDeputter in [#7536](https://github.com/getsentry/sentry-python/pull/7536)
+- Add response, retry, and error span attributes by @pabloDeputter in [#7499](https://github.com/getsentry/sentry-python/pull/7499)
+- Add common OTel AWS client attributes by @pabloDeputter in [#7481](https://github.com/getsentry/sentry-python/pull/7481)
+
+#### Wsgi
+
+- Add `user_agent.original` attr for inbound filters by @sentrivana in [#7793](https://github.com/getsentry/sentry-python/pull/7793)
+- Add `sentry.is_localhost` for inbound filters by @sentrivana in [#7780](https://github.com/getsentry/sentry-python/pull/7780)
+
+#### Other
+
+- (aiohttp) Add `sentry.is_localhost` for inbound filters by @sentrivana in [#7785](https://github.com/getsentry/sentry-python/pull/7785)
+- (aiohttp,sanic,tornado) Add `user_agent.original` attr for inbound filters by @sentrivana in [#7795](https://github.com/getsentry/sentry-python/pull/7795)
+- (sanic) Add `sentry.is_localhost` for inbound filters by @sentrivana in [#7783](https://github.com/getsentry/sentry-python/pull/7783)
+- (tornado) Add `sentry.is_localhost` for inbound filters by @sentrivana in [#7787](https://github.com/getsentry/sentry-python/pull/7787)
+- (types) Export DataCollectionUserOptions from sentry_sdk.types by @sentrivana in [#7957](https://github.com/getsentry/sentry-python/pull/7957)
+- Better IPv6 localhost detection by @sentrivana in [#7786](https://github.com/getsentry/sentry-python/pull/7786)
+
+### Bug Fixes 🐛
+
+#### Boto3
+
+- Trace the complete botocore client-call lifecycle by @pabloDeputter in [#7538](https://github.com/getsentry/sentry-python/pull/7538)
+- Finish `StreamingBody` span correctly by @pabloDeputter in [#7540](https://github.com/getsentry/sentry-python/pull/7540)
+
+#### Other
+
+- (crons) Return `None` from `capture_checkin` when nothing is sent by @HardMax71 in [#7868](https://github.com/getsentry/sentry-python/pull/7868)
+- (scrubber) Scrub request bodies that are JSON arrays by @Om-singhaI in [#7561](https://github.com/getsentry/sentry-python/pull/7561)
+- Fix span, metrics, log client reports by @sentrivana in [#7933](https://github.com/getsentry/sentry-python/pull/7933)
+
+### Internal Changes 🔧
+
+#### Deps
+
+- Lock file maintenance by @renovate in [#7848](https://github.com/getsentry/sentry-python/pull/7848)
+- Lock file maintenance by @renovate in [#7484](https://github.com/getsentry/sentry-python/pull/7484)
+
+#### Openai Agents
+
+- Bump version for type checking to 0.23.1 by @alexander-alderman-webb in [#7935](https://github.com/getsentry/sentry-python/pull/7935)
+- Use `model_dump()` instead of deprecated `dict()` by @intertermux-code in [#7862](https://github.com/getsentry/sentry-python/pull/7862)
+
+#### Starlette
+
+- Drop direct `anyio` dependency by @alexander-alderman-webb in [#7724](https://github.com/getsentry/sentry-python/pull/7724)
+- Expect parametrized route in `starlette>=1.7` by @alexander-alderman-webb in [#7789](https://github.com/getsentry/sentry-python/pull/7789)
+
+#### Other
+
+- (boto3) Split integration into internal modules by @pabloDeputter in [#7537](https://github.com/getsentry/sentry-python/pull/7537)
+- (huggingface_hub) Use `httpx2-pytest` for `huggingface_hub>=2` by @alexander-alderman-webb in [#7790](https://github.com/getsentry/sentry-python/pull/7790)
+- (mypy) Bump version to 2.4.0 by @alexander-alderman-webb in [#7937](https://github.com/getsentry/sentry-python/pull/7937)
+- (openai) Stop directly calling `_calculate_*_token_usage()` by @alexander-alderman-webb in [#7875](https://github.com/getsentry/sentry-python/pull/7875)
+- (strawberry-graphql) Bump version for type checking to 0.332.0 by @alexander-alderman-webb in [#7936](https://github.com/getsentry/sentry-python/pull/7936)
+- Deprecate `ai.monitoring.record_token_usage()` by @alexander-alderman-webb in [#7918](https://github.com/getsentry/sentry-python/pull/7918)
+- Deprecate `send_default_pii` by @sentrivana in [#7694](https://github.com/getsentry/sentry-python/pull/7694)
+- Move FastAPI active thread tracking into Starlette by @faizansaiyed123 in [#7825](https://github.com/getsentry/sentry-python/pull/7825)
+- Upgrade ubuntu 20.04/22.04 runners to 24.04 by @joshuarli in [#7843](https://github.com/getsentry/sentry-python/pull/7843)
+- 🤖 Update test matrix with new releases (10/05) by @github-actions in [#7849](https://github.com/getsentry/sentry-python/pull/7849)
+- 🤖 Update test matrix with new releases (09/28) by @github-actions in [#7715](https://github.com/getsentry/sentry-python/pull/7715)
+- Deprecate transaction profiling by @sentrivana in [#7751](https://github.com/getsentry/sentry-python/pull/7751)
+
 ## 2.71.0
 
 ### New Features ✨

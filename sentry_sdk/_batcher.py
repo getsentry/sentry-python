@@ -20,6 +20,7 @@ class Batcher(Generic[T]):
     FLUSH_WAIT_TIME = 5.0
 
     TYPE = ""
+    CLIENT_REPORT_TYPE = ""
     CONTENT_TYPE = ""
 
     def __init__(
@@ -123,13 +124,16 @@ class Batcher(Generic[T]):
                 return None
 
             with self._lock:
-                if len(self._buffer) >= self.MAX_BEFORE_DROP:
-                    self._record_lost(item)
-                    return None
+                dropped = len(self._buffer) >= self.MAX_BEFORE_DROP
+                if not dropped:
+                    self._buffer.append(item)
+                    if len(self._buffer) >= self.MAX_BEFORE_FLUSH:
+                        self._flush_event.set()
 
-                self._buffer.append(item)
-                if len(self._buffer) >= self.MAX_BEFORE_FLUSH:
-                    self._flush_event.set()
+            # Record the loss outside of the lock, since this might involve
+            # serializing the item to report lost bytes
+            if dropped:
+                self._record_lost(item)
         finally:
             self._active.flag = False
 
@@ -149,24 +153,24 @@ class Batcher(Generic[T]):
         finally:
             self._active.flag = was_active
 
-    def _add_to_envelope(self, envelope: "Envelope") -> None:
-        envelope.add_item(
-            Item(
-                type=self.TYPE,
-                content_type=self.CONTENT_TYPE,
-                headers={
-                    "item_count": len(self._buffer),
-                },
-                payload=PayloadRef(
-                    json={
-                        "version": 2,
-                        "items": [
-                            self._to_transport_format(item) for item in self._buffer
-                        ],
-                    }
-                ),
-            )
+    @classmethod
+    def _to_envelope_item(cls, items: "list[T]") -> "Item":
+        return Item(
+            type=cls.TYPE,
+            content_type=cls.CONTENT_TYPE,
+            headers={
+                "item_count": len(items),
+            },
+            payload=PayloadRef(
+                json={
+                    "version": 2,
+                    "items": [cls._to_transport_format(item) for item in items],
+                }
+            ),
         )
+
+    def _add_to_envelope(self, envelope: "Envelope") -> None:
+        envelope.add_item(self._to_envelope_item(self._buffer))
 
     def _flush(self) -> "Optional[Envelope]":
         envelope = Envelope(
@@ -183,7 +187,17 @@ class Batcher(Generic[T]):
         return envelope
 
     def _record_lost(self, item: "T") -> None:
-        pass
+        envelope_item = None
+        with capture_internal_exceptions():
+            envelope_item = self._to_envelope_item([item])
+
+        if envelope_item:
+            self._record_lost_func(
+                reason="queue_overflow",
+                data_category=self.CLIENT_REPORT_TYPE,
+                item=envelope_item,
+                quantity=1,
+            )
 
     @staticmethod
     def _to_transport_format(item: "T") -> "Any":

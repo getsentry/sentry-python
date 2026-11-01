@@ -15,6 +15,7 @@ class MetricsBatcher(Batcher["Metric"]):
     FLUSH_WAIT_TIME = 5.0
 
     TYPE = "trace_metric"
+    CLIENT_REPORT_TYPE = "trace_metric"
     CONTENT_TYPE = "application/vnd.sentry.items.trace-metric+json"
 
     @staticmethod
@@ -39,10 +40,3 @@ class MetricsBatcher(Batcher["Metric"]):
             res["unit"] = item["unit"]
 
         return res
-
-    def _record_lost(self, item: "Metric") -> None:
-        self._record_lost_func(
-            reason="queue_overflow",
-            data_category="trace_metric",
-            quantity=1,
-        )

@@ -43,7 +43,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install uv
-        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
           enable-cache: false
       - name: Mark workspace safe for git (3.6/3.7 container)
@@ -73,7 +73,7 @@ jobs:
       - name: Upload coverage data
         if: ${{ !cancelled() }}
         continue-on-error: true
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: coverage-web_1-${{ matrix.python-version }}
           # .coverage-* / .junitxml-* are dotfiles, excluded by default

@@ -2,11 +2,9 @@ from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk.crons import MonitorStatus, capture_checkin
+from sentry_sdk.crons.utils import _get_interval_schedule
 from sentry_sdk.integrations import DidNotEnable
-from sentry_sdk.integrations.celery.utils import (
-    _get_humanized_interval,
-    _now_seconds_since_epoch,
-)
+from sentry_sdk.integrations.celery.utils import _now_seconds_since_epoch
 from sentry_sdk.utils import (
     logger,
     match_regex_list,
@@ -74,18 +72,27 @@ def _get_monitor_config(
             "{0._orig_day_of_week}".format(celery_schedule)
         )
     elif isinstance(celery_schedule, schedule):
-        schedule_type = "interval"
-        (schedule_value, schedule_unit) = _get_humanized_interval(
-            celery_schedule.seconds
-        )
+        seconds = celery_schedule.seconds
+        interval_schedule = _get_interval_schedule(seconds)
 
-        if schedule_unit == "second":
-            logger.warning(
-                "Intervals shorter than one minute are not supported by Sentry Crons. Monitor '%s' has an interval of %s seconds. Use the `exclude_beat_tasks` option in the celery integration to exclude it.",
-                monitor_name,
-                schedule_value,
-            )
+        if interval_schedule is None:
+            if seconds < 60:
+                logger.warning(
+                    "Intervals shorter than one minute are not supported by Sentry Crons. Monitor '%s' has an interval of %s seconds. Use the `exclude_beat_tasks` option in the celery integration to exclude it.",
+                    monitor_name,
+                    int(seconds),
+                )
+            else:
+                logger.warning(
+                    "Sentry Crons only supports intervals of whole minutes. Monitor '%s' has an interval of %s seconds. Use the `exclude_beat_tasks` option in the celery integration to exclude it.",
+                    monitor_name,
+                    int(seconds),
+                )
             return {}
+
+        schedule_type = "interval"
+        schedule_value = interval_schedule["value"]
+        schedule_unit = interval_schedule["unit"]
 
     else:
         logger.warning(

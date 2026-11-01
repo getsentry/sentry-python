@@ -1,3 +1,5 @@
+import pytest
+
 import sentry_sdk
 
 
@@ -221,3 +223,32 @@ def test_user_attributes(sentry_init, capture_items):
     assert span["attributes"]["user.name"] == "username"
     assert span["attributes"]["user.email"] == "username@example.com"
     assert span["attributes"]["user.ip_address"] == "127.0.0.1"
+
+
+@pytest.mark.parametrize(
+    "bad_value, expected",
+    [
+        (float("inf"), "inf"),
+        (float("-inf"), "-inf"),
+        (float("nan"), "nan"),
+    ],
+)
+def test_unserializable_attributes(sentry_init, capture_items, bad_value, expected):
+    sentry_init(
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+    )
+
+    items = capture_items("span")
+
+    with sentry_sdk.traces.start_span(name="login", attributes={"bad_attr": bad_value}):
+        pass
+
+    sentry_sdk.flush()
+
+    assert items
+
+    (span,) = [item.payload for item in items]
+
+    assert "bad_attr" in span["attributes"]
+    assert span["attributes"]["bad_attr"] == expected

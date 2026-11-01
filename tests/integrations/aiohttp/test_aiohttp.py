@@ -939,8 +939,21 @@ async def test_outgoing_trace_headers_appends_baggage_but_preserves_sentry_trace
 
 
 @pytest.mark.asyncio
-async def test_outgoing_trace_headers_preserves_signed_propagation_headers(
-    sentry_init, aiohttp_raw_server, aiohttp_client
+@pytest.mark.parametrize(
+    "signed_headers,baggage",
+    [
+        # both propagation headers are named in `SignedHeaders`.
+        ("baggage;host;sentry-trace", "vendor=value"),
+        # botocore 1.43.115+ never signs `baggage`; Sentry members were merged by
+        # the boto3 integration before signing.
+        (
+            "host;sentry-trace",
+            "vendor=value,sentry-trace_id=existing,sentry-sampled=true",
+        ),
+    ],
+)
+async def test_outgoing_trace_headers_preserves_existing_propagation_headers(
+    sentry_init, aiohttp_raw_server, aiohttp_client, signed_headers, baggage
 ):
     sentry_init(
         integrations=[AioHttpIntegration()],
@@ -951,11 +964,10 @@ async def test_outgoing_trace_headers_preserves_signed_propagation_headers(
         return web.Response(text="OK")
 
     raw_server = await aiohttp_raw_server(handler)
-    # both propagation headers are named in `SignedHeaders`.
     authorization = (
         "AWS4-HMAC-SHA256 "
         "Credential=test/20260804/eu-west-1/secretsmanager/aws4_request, "
-        "SignedHeaders=baggage;host;sentry-trace, "
+        f"SignedHeaders={signed_headers}, "
         "Signature=sixtyseven"
     )
 
@@ -964,15 +976,15 @@ async def test_outgoing_trace_headers_preserves_signed_propagation_headers(
         resp = await client.get(
             "/",
             headers={
-                "baggage": "vendor=value",
+                "baggage": baggage,
                 "sentry-trace": "existing-trace",
                 "Authorization": authorization,
             },
         )
 
     headers = resp.request_info.headers
-    # signed `baggage`: leave as-is.
-    assert headers["baggage"] == "vendor=value"
+    # signed `baggage` or `baggage` with Sentry members: leave as-is.
+    assert headers["baggage"] == baggage
     # signed `sentry-trace`: leave as-is.
     assert headers["sentry-trace"] == "existing-trace"
 

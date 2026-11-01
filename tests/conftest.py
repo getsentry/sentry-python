@@ -1025,19 +1025,6 @@ def json_rpc():
 
 
 @pytest.fixture()
-def select_mcp_transactions():
-    def inner(events):
-        return [
-            event
-            for event in events
-            if event["type"] == "transaction"
-            and event["contexts"]["trace"]["op"] == "mcp.server"
-        ]
-
-    return inner
-
-
-@pytest.fixture()
 def select_transactions_with_mcp_spans():
     def inner(events, method_name):
         return [

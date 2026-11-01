@@ -1,4 +1,4 @@
-# Agent Instructions
+# Working with the Codebase
 
 ## Tox
 
@@ -40,21 +40,61 @@ Do NOT edit these directly — modify source scripts instead:
 3. Add to group in `scripts/split_tox_gh_actions/split_tox_gh_actions.py`
 4. Run `scripts/generate-test-files.sh`
 
-## Integration Contract
 
-- Don't crash applications or swallow exceptions
-- Don't mutate object references or alter function signatures
-- Don't leak file descriptors or make unexpected DB requests
-- Write defensive code
-- Use end-to-end tests (not mocks)
+# SDK Implementation Guidelines
 
-## Key Paths
+## General Guidelines
 
-| Path | Description |
-|------|-------------|
-| `sentry_sdk/integrations/` | integration modules |
-| `sentry_sdk/ai/` | AI monitoring |
-| `sentry_sdk/crons/` | Cron monitoring |
-| `sentry_sdk/profiler/` | Performance profiling |
-| `tests/integrations/{name}/` | Integration test suites |
-| `scripts/populate_tox/config.py` | Test suite configuration |
+- Don't crash applications. SDK-caused exceptions should always be handled with `capture_internal_exceptions`.
+- Don't swallow exceptions not caused by the SDK. The user's app should behave the same as it would without the SDK. If exceptions would bubble all the way up and crash the app, they should do that.
+- Don't submit huge PRs. If a big feature can be meaningfully split into several PRs, split it. If the PRs depend on each other, stack them.
+- No side effects. Don't make extra DB or HTTP requests or leak file descriptors.
+- The user is instructed to initialize the SDK as early as possible. You may assume this is the case.
+
+## Maintainability & Code Structure
+
+- **Don't fragment code unnecessarily**:
+  - Only extract code into a function if it's used in multiple places or if it's overly complex and distracts from understanding the flow of the neighboring code.
+  - Prefer one file over splitting implementation into multiple files. Having to follow the flow of code by jumping through several files is not good style.
+- Keep constants at the top of the file, under imports.
+- Don't inline imports in functions. Strongly prefer adding imports to the top of the file, on the top level.
+
+## Integration Guidelines
+
+When integrating with a package:
+
+- Prefer the following approaches, in this order of preference:
+    1) Signals, hooks, callbacks provided by the package
+    2) Monkeypatching public functions
+    3) Monkeypatching private functions (the more integral to the package, the better, as they're less likely to change)
+    4) Other approaches only if the above fails
+- A mix of the approaches above is also acceptable.
+- **Minimize state.**
+    - If you need to store state (for instance, a running span), prefer storing it on an object of the package that gets passed around "for free".
+    - Keeping state manually (e.g., implementing lookup tables) should be a last resort option.
+- Write code for the most common usecase. Keep scope small. Features can always be added later, if requested. Don't design for special cases.
+- Don't mutate object references or alter function signatures.
+- Take into account that packages evolve and change.
+  - When monkeypatching a function, unless it's public, allow for it changing the order of arguments, or adding an argument, in the future.
+    ```python
+    # Bad monkeypatching
+    def patched_func(arg_you_need, another_arg, third_arg):
+        # Don't spell out all arguments. If a new argument is added or an argument
+        # we don't use is renamed, the patch breaks.
+        ...
+
+    # Good monkeypatching
+    def patched_func(arg_you_need, *args, **kwargs):
+        # Only assume the argument you need is there. Leave the rest of the
+        # arguments flexible, so that we don't break if they change.
+        ...
+    ```
+
+## Test Guidelines
+
+- Don't use mocks unless it can't be avoided.
+- Use end-to-end tests, not unit tests.
+- Avoid testing integration helpers or private methods directly.
+- Avoid testing things that can't realistically break.
+- Avoid duplicating tests (extend an existing one or use `parametrize`).
+- Assert on what Sentry captures with `capture_events`/`capture_items`.

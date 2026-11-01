@@ -48,7 +48,10 @@ def test_monitor_unhealthy(sentry_init):
     sentry_init(transport=UnhealthyTestTransport())
 
     monitor = sentry_sdk.get_client().monitor
-    monitor.interval = 0.1
+    # This test calls monitor.run() itself. Stop the background thread
+    # from running health checks too, or it can bump downsample_factor
+    # between our asserts on a slow runner (#8031).
+    monitor.kill()
 
     assert monitor.is_healthy() is True
 
@@ -69,7 +72,10 @@ def test_transaction_uses_downsampled_rate(
     record_lost_event_calls = capture_record_lost_event_calls()
 
     monitor = sentry_sdk.get_client().monitor
-    monitor.interval = 0.1
+    # This test calls monitor.run() itself. Stop the background thread
+    # from running health checks too, or it can bump downsample_factor
+    # between our asserts on a slow runner (#8031).
+    monitor.kill()
 
     assert monitor.is_healthy() is True
     monitor.run()
@@ -102,7 +108,10 @@ def test_segment_uses_downsampled_rate(
     record_lost_event_calls = capture_record_lost_event_calls()
 
     monitor = sentry_sdk.get_client().monitor
-    monitor.interval = 0.1
+    # This test calls monitor.run() itself. Stop the background thread
+    # from running health checks too, or it can bump downsample_factor
+    # between our asserts on a slow runner (#8031).
+    monitor.kill()
 
     assert monitor.is_healthy() is True
     monitor.run()

@@ -1,10 +1,12 @@
 import sys
 from datetime import datetime
+from functools import wraps
 from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk.api import continue_trace, get_baggage, get_traceparent
 from sentry_sdk.consts import OP, SPANDATA, SPANSTATUS
+from sentry_sdk.crons import monitor
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import SegmentNameSource, SpanStatus, StreamedSpan
@@ -21,19 +23,21 @@ from sentry_sdk.utils import (
     ensure_integration_enabled,
     event_from_exception,
     has_data_collection_enabled,
+    logger,
+    match_regex_list,
     reraise,
 )
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Optional, TypeVar, Union
+    from typing import Any, Callable, List, Optional, TypeVar, Union
 
-    from sentry_sdk._types import Event, EventProcessor, Hint
+    from sentry_sdk._types import Event, EventProcessor, Hint, MonitorConfig
     from sentry_sdk.utils import ExcInfo
 
     F = TypeVar("F", bound=Callable[..., Any])
 
 try:
-    from huey.api import Huey, PeriodicTask, Result, ResultGroup, Task
+    from huey.api import Huey, PeriodicTask, Result, ResultGroup, Task, crontab
     from huey.exceptions import CancelExecution, RetryTask, TaskLockedException
 except ImportError:
     raise DidNotEnable("Huey is not installed")
@@ -52,6 +56,14 @@ HUEY_CONTROL_FLOW_EXCEPTIONS = (CancelExecution, RetryTask, TaskLockedException)
 class HueyIntegration(Integration):
     identifier = "huey"
     origin = f"auto.queue.{identifier}"
+
+    def __init__(
+        self,
+        monitor_periodic_tasks: bool = False,
+        exclude_periodic_tasks: "Optional[List[str]]" = None,
+    ) -> None:
+        self.monitor_periodic_tasks = monitor_periodic_tasks
+        self.exclude_periodic_tasks = exclude_periodic_tasks
 
     @staticmethod
     def setup_once() -> None:
@@ -249,9 +261,99 @@ def patch_execute() -> None:
 
             if not getattr(task, "_sentry_is_patched", False):
                 task.execute = _wrap_task_execute(task.execute)
+                with capture_internal_exceptions():
+                    task.execute = _monitor_periodic_task(self, task, task.execute)
                 task._sentry_is_patched = True
 
             with span_ctx:
                 return old_execute(self, task, timestamp)
 
     Huey._execute = _sentry_execute
+
+
+def _monitor_periodic_task(
+    huey: "Huey", task: "Task", execute: "Callable[..., Any]"
+) -> "Callable[..., Any]":
+    integration = sentry_sdk.get_client().get_integration(HueyIntegration)
+    if (
+        integration is None
+        or not integration.monitor_periodic_tasks
+        or not isinstance(task, PeriodicTask)
+        or match_regex_list(task.name, integration.exclude_periodic_tasks)
+    ):
+        return execute
+
+    monitor_config = _get_monitor_config(huey, task)
+    if monitor_config is None:
+        logger.debug(
+            "Not monitoring Huey periodic task %r: its schedule can't be "
+            "expressed as a Sentry Crons schedule.",
+            task.name,
+        )
+        return execute
+
+    @wraps(execute)
+    def _sentry_monitored_execute(*args: "Any", **kwargs: "Any") -> "Any":
+        with monitor(monitor_slug=task.name, monitor_config=monitor_config):
+            return execute(*args, **kwargs)
+
+    return _sentry_monitored_execute
+
+
+_CRONTAB_CODE = crontab().__code__
+
+
+def _get_closure_var(func: "Any", name: str) -> "Any":
+    code = getattr(func, "__code__", None)
+    closure = getattr(func, "__closure__", None)
+    if code is None or closure is None or name not in code.co_freevars:
+        return None
+    return closure[code.co_freevars.index(name)].cell_contents
+
+
+def _get_crontab_field(values: "List[int]", first: int, last: int) -> str:
+    full = list(range(first, last + 1))
+    if values == full:
+        return "*"
+    if len(values) > 2:
+        step = values[1] - values[0]
+        if values == list(range(values[0], values[-1] + 1, step)):
+            if step == 1:
+                return "%d-%d" % (values[0], values[-1])
+            if values == full[::step]:
+                return "*/%d" % step
+            return "%d-%d/%d" % (values[0], values[-1], step)
+    return ",".join(str(v) for v in values)
+
+
+def _get_monitor_config(huey: "Huey", task: "Task") -> "Optional[MonitorConfig]":
+    # Huey only evaluates crontabs in UTC when `utc=True` (the default).
+    if not huey.utc:
+        return None
+
+    # `periodic_task` wraps the `crontab()` validator in a method.
+    validate = _get_closure_var(type(task).validate_datetime, "validate_datetime")
+    if getattr(validate, "__code__", None) is not _CRONTAB_CODE:
+        return None
+    months, days, weekdays, hours, minutes = _get_closure_var(validate, "cron_settings")
+    if not (months and days and weekdays and hours and minutes):
+        return None
+
+    day = _get_crontab_field(days, 1, 31)
+    # Huey 3 expands "*" to 0-7, with 7 also meaning Sunday.
+    weekday = _get_crontab_field(sorted({v % 7 for v in weekdays}), 0, 6)
+    # Huey requires both to match, cron requires either.
+    if day != "*" and weekday != "*":
+        return None
+
+    fields = (
+        _get_crontab_field(minutes, 0, 59),
+        _get_crontab_field(hours, 0, 23),
+        day,
+        _get_crontab_field(months, 1, 12),
+        weekday,
+    )
+    return {
+        "schedule": {"type": "crontab", "value": " ".join(fields)},
+        "timezone": "UTC",
+    }
