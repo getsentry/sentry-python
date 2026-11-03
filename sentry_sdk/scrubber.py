@@ -76,7 +76,7 @@ class EventScrubber:
         :param send_default_pii: Whether pii is sending is on, pii fields are not scrubbed.
         :param pii_denylist: The denylist to use for scrubbing when pii is not sent, defaults to DEFAULT_PII_DENYLIST.
         """
-        self.denylist = DEFAULT_DENYLIST.copy() if denylist is None else denylist
+        self.denylist = DEFAULT_DENYLIST.copy() if denylist is None else list(denylist)
 
         if not send_default_pii:
             pii_denylist = (

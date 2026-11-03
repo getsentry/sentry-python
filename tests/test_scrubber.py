@@ -336,3 +336,18 @@ def test_recursive_scrubber_does_not_override_original(sentry_init, capture_even
     (frame,) = frames
     assert data["csrf"] == "secret"
     assert frame["vars"]["data"]["csrf"] == "[Filtered]"
+
+
+def test_custom_denylist_is_not_mutated():
+    user_denylist = ["my_sensitive_var"]
+
+    scrubber = EventScrubber(denylist=user_denylist)
+
+    assert user_denylist == ["my_sensitive_var"]
+    assert "password" in scrubber.denylist
+
+    # A second scrubber built from the same list must not pile the PII entries
+    # into the caller's list.
+    EventScrubber(denylist=user_denylist)
+
+    assert user_denylist == ["my_sensitive_var"]
