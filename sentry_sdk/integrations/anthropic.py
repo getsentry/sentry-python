@@ -752,7 +752,10 @@ def _set_output_data(
 
         if len(output_messages["response"]) > 0:
             set_data_normalized(
-                span, SPANDATA.GEN_AI_RESPONSE_TEXT, output_messages["response"]
+                span,
+                SPANDATA.GEN_AI_RESPONSE_TEXT,
+                output_messages["response"],
+                unpack=False,
             )
 
     if input_tokens is not None:
@@ -1186,7 +1189,7 @@ def _wrap_message_stream_manager_enter(f: "Any") -> "Any":
         )
 
         try:
-            stream: "_PatchedMessageStream" = f(self)
+            stream = f(self)
         except Exception as exc:
             exc_info = sys.exc_info()
             with capture_internal_exceptions():
@@ -1199,7 +1202,7 @@ def _wrap_message_stream_manager_enter(f: "Any") -> "Any":
 
         _initialize_data_accumulation_state(stream)
         stream._iterator = _wrap_synchronous_message_iterator(
-            stream,
+            cast("_PatchedMessageStream", stream),
             stream._iterator,
         )
 
@@ -1299,7 +1302,7 @@ def _wrap_async_message_stream_manager_aenter(f: "Any") -> "Any":
         )
 
         try:
-            stream: "_PatchedAsyncMessageStream" = await f(self)
+            stream = await f(self)
         except Exception as exc:
             exc_info = sys.exc_info()
             with capture_internal_exceptions():
@@ -1312,7 +1315,7 @@ def _wrap_async_message_stream_manager_aenter(f: "Any") -> "Any":
 
         _initialize_data_accumulation_state(stream)
         stream._iterator = _wrap_asynchronous_message_iterator(
-            stream,
+            cast("_PatchedAsyncMessageStream", stream),
             stream._iterator,
         )
 
