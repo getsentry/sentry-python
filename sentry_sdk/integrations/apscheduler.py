@@ -54,8 +54,6 @@ class APSchedulerIntegration(Integration):
     def setup_once() -> None:
         version = package_version("apscheduler")
         _check_minimum_version(APSchedulerIntegration, version)
-        if version is not None and version[0] >= 4:
-            raise DidNotEnable("APScheduler 4 is not supported.")
 
         _patch_submit_job()
         _patch_run_job_error()
@@ -83,19 +81,12 @@ class _PendingCheckIn:
 
 
 class _CronsListener:
-    """
-    Tracks the check-ins of submitted runs and closes them.
-
-    Executors dispatch one `EVENT_JOB_EXECUTED`, `EVENT_JOB_ERROR` or
-    `EVENT_JOB_MISSED` per submitted run time, in the scheduler's process, for
-    every executor type.
-    """
+    """Closes the check-ins of submitted runs when their execution event arrives."""
 
     MASK = EVENT_JOB_EXECUTED | EVENT_JOB_ERROR | EVENT_JOB_MISSED
 
     def __init__(self) -> None:
         self.lock = threading.Lock()
-        # Keyed by (job id, scheduled run time).
         self.pending: "Dict[Tuple[str, Any], _PendingCheckIn]" = {}
 
     def add(self, job_id: str, run_time: "Any", pending: "_PendingCheckIn") -> None:
@@ -175,7 +166,6 @@ def _get_listener(scheduler: "Any") -> "_CronsListener":
 # APScheduler assigns `uuid4().hex` when a job is added without an `id`.
 _GENERATED_JOB_ID = re.compile(r"[0-9a-f]{32}")
 
-# Generated job ids already warned about.
 _warned_job_ids: "Set[str]" = set()
 
 
@@ -334,16 +324,7 @@ def _begin_check_in(
 
 
 def _patch_submit_job() -> None:
-    """
-    Send an `in_progress` check-in, with the monitor config derived from the
-    job's trigger, when the scheduler hands a due job to its executor.
-    `_CronsListener` sends the closing `ok`/`error` check-in.
-
-    `submit_job` is called in the scheduler's process for every executor type
-    and is the last place where the `Job` (and so its trigger) is at hand.
-    The check-ins are opened only once it accepts the job, so runs skipped
-    because of `max_instances` get none.
-    """
+    """Send an `in_progress` check-in once the executor accepts a due job."""
     old_submit_job = BaseExecutor.submit_job
 
     @wraps(old_submit_job)
