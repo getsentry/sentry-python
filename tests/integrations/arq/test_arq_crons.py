@@ -7,6 +7,7 @@ from arq import cron
 from arq.connections import ArqRedis
 from fakeredis.aioredis import FakeRedis
 
+import sentry_sdk
 from sentry_sdk.integrations.arq import ArqIntegration, _get_monitor_config
 
 try:
@@ -181,6 +182,26 @@ async def test_cron_job_monitored_once(sentry_init, capture_envelopes):
 
     statuses = [c["status"] for c in _check_ins(envelopes)]
     assert statuses[:4] == ["in_progress", "ok", "in_progress", "ok"]
+
+
+@sentry_sdk.monitor(monitor_slug="decorated")
+async def decorated_job(ctx):
+    pass
+
+
+@pytest.mark.asyncio
+async def test_monitor_decorated_cron_job_reports_once(sentry_init, capture_envelopes):
+    sentry_init(integrations=[ArqIntegration(monitor_cron_jobs=True)])
+    envelopes = capture_envelopes()
+
+    await _run_cron_jobs(
+        cron(decorated_job, run_at_startup=True), timezone=timezone.utc
+    )
+
+    assert [(c["monitor_slug"], c["status"]) for c in _check_ins(envelopes)] == [
+        ("decorated", "in_progress"),
+        ("decorated", "ok"),
+    ]
 
 
 class _Worker:

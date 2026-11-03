@@ -1,5 +1,6 @@
 import sys
 import time
+from functools import wraps
 
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA, SPANSTATUS
@@ -221,6 +222,7 @@ def _make_event_processor(
 
 
 def _wrap_coroutine(name: str, coroutine: "WorkerCoroutine") -> "WorkerCoroutine":
+    @wraps(coroutine)
     async def _sentry_coroutine(
         ctx: "Dict[Any, Any]", *args: "Any", **kwargs: "Any"
     ) -> "Any":
@@ -325,6 +327,10 @@ def _monitor_cron_job(
     if getattr(cron_job, "_sentry_monitored", False):
         return
     cron_job._sentry_monitored = True
+
+    # The coroutine reports its own check-ins.
+    if getattr(cron_job.coroutine, "_sentry_monitored", False):
+        return
 
     # arq names cron jobs "cron:<function name>" by default.
     monitor_slug = cron_job.name
