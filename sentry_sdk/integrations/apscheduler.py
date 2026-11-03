@@ -112,6 +112,14 @@ class _CronsListener:
         if pending is not None:
             self._close(pending, status)
 
+    def finish_missed(self, job_id: str, run_time: "Any") -> None:
+        with self.lock:
+            pending = self.pending.pop((job_id, run_time), None)
+        # Send nothing, so Sentry reports the slot as missed, unless a run that
+        # waited in a busy pool already sent `in_progress`.
+        if pending is not None and pending.opened:
+            self._close(pending, MonitorStatus.ERROR)
+
     def finish_oldest(self, job_id: str, status: str) -> None:
         with self.lock:
             key = next((key for key in self.pending if key[0] == job_id), None)
@@ -134,9 +142,8 @@ class _CronsListener:
 
     def __call__(self, event: "Any") -> None:
         with capture_internal_exceptions():
-            # Send nothing, so Sentry reports the slot as missed.
             if event.code == EVENT_JOB_MISSED:
-                self.discard(event.job_id, event.scheduled_run_time)
+                self.finish_missed(event.job_id, event.scheduled_run_time)
                 return
 
             status = (

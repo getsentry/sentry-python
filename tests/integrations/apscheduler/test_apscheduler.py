@@ -127,6 +127,52 @@ def test_missed_run_sends_no_check_in(sentry_init, capture_envelopes, executor):
     )
 
 
+def test_run_missed_after_in_progress_is_error(sentry_init, capture_envelopes):
+    sentry_init(integrations=[APSchedulerIntegration(monitor_jobs=True)])
+    envelopes = capture_envelopes()
+
+    started = threading.Event()
+    release = threading.Event()
+    missed = threading.Event()
+
+    def blocking_job():
+        started.set()
+        assert release.wait(timeout=10)
+
+    scheduler = BackgroundScheduler(timezone="UTC")
+    scheduler.add_executor(ThreadPoolExecutor(1), alias="default")
+    scheduler.add_listener(lambda event: missed.set(), EVENT_JOB_MISSED)
+    scheduler.add_job(
+        blocking_job,
+        CronTrigger(minute="*/5", timezone="UTC"),
+        id="blocker",
+        next_run_time=_utcnow(),
+        misfire_grace_time=None,
+    )
+    scheduler.start()
+    try:
+        assert started.wait(timeout=10)
+        # Waits behind the blocker in the only thread until it's past its grace time.
+        scheduler.add_job(
+            ok_job,
+            CronTrigger(minute="*/5", timezone="UTC"),
+            id="my-job",
+            next_run_time=_utcnow(),
+            misfire_grace_time=1,
+        )
+        time.sleep(1.5)
+        release.set()
+        assert missed.wait(timeout=10)
+    finally:
+        release.set()
+        scheduler.shutdown(wait=True)
+
+    check_ins = [c for c in _check_ins(envelopes) if c["monitor_slug"] == "my-job"]
+    assert [c["status"] for c in check_ins] == ["in_progress", "error"]
+    assert check_ins[0]["check_in_id"] == check_ins[1]["check_in_id"]
+    assert apscheduler_integration._listeners[scheduler].pending == {}
+
+
 def test_missed_run_drops_pending_check_in(sentry_init, capture_envelopes):
     sentry_init(integrations=[APSchedulerIntegration(monitor_jobs=True)])
     envelopes = capture_envelopes()
