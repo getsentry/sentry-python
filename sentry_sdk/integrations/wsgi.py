@@ -456,6 +456,11 @@ def _get_request_attributes(
 
     client_options = sentry_sdk.get_client().options
 
+    if not client_options.get("server_name"):
+        server_name = environ.get("SERVER_NAME")
+        if server_name:
+            attributes["server.address"] = server_name
+
     if has_data_collection_enabled(client_options):
         query_string = environ.get("QUERY_STRING")
         filtered_qs = None
