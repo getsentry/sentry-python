@@ -10,6 +10,7 @@ from apscheduler.events import (
     EVENT_JOB_EXECUTED,
     EVENT_JOB_MAX_INSTANCES,
     EVENT_JOB_MISSED,
+    JobExecutionEvent,
 )
 from apscheduler.executors.pool import ProcessPoolExecutor, ThreadPoolExecutor
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -107,18 +108,45 @@ def test_cron_job_error(sentry_init, capture_envelopes):
     assert check_ins[0]["check_in_id"] == check_ins[1]["check_in_id"]
 
 
-def test_missed_run_is_error(sentry_init, capture_envelopes):
+@pytest.mark.parametrize("executor", ["debug", "threadpool"])
+def test_missed_run_sends_no_check_in(sentry_init, capture_envelopes, executor):
     sentry_init(integrations=[APSchedulerIntegration(monitor_jobs=True)])
     envelopes = capture_envelopes()
 
     check_ins = _run_once(
         envelopes,
         CronTrigger(minute="*/5", timezone="UTC"),
+        executor=executor,
         next_run_time=_utcnow() - timedelta(minutes=1),
         misfire_grace_time=1,
     )
 
-    assert [c["status"] for c in check_ins] == ["in_progress", "error"]
+    assert check_ins == []
+    assert all(
+        not listener.pending for listener in apscheduler_integration._listeners.values()
+    )
+
+
+def test_missed_run_drops_pending_check_in(sentry_init, capture_envelopes):
+    sentry_init(integrations=[APSchedulerIntegration(monitor_jobs=True)])
+    envelopes = capture_envelopes()
+
+    scheduler = BackgroundScheduler(timezone="UTC")
+    job = scheduler.add_job(
+        ok_job, CronTrigger(minute="*/5", timezone="UTC"), id="my-job"
+    )
+    listener = apscheduler_integration._get_listener(scheduler)
+    run_time = job.trigger.get_next_fire_time(None, datetime.now(timezone.utc))
+    listener.add(
+        job.id,
+        run_time,
+        apscheduler_integration._PendingCheckIn("my-job", {}, 0),
+    )
+
+    listener(JobExecutionEvent(EVENT_JOB_MISSED, job.id, "default", run_time))
+
+    assert listener.pending == {}
+    assert _check_ins(envelopes) == []
 
 
 def test_backlog_checks_in_once(sentry_init, capture_envelopes):

@@ -2,6 +2,7 @@ import math
 import re
 import threading
 import weakref
+from datetime import datetime, timedelta, timezone
 from functools import wraps
 from typing import TYPE_CHECKING
 
@@ -133,6 +134,11 @@ class _CronsListener:
 
     def __call__(self, event: "Any") -> None:
         with capture_internal_exceptions():
+            # Send nothing, so Sentry reports the slot as missed.
+            if event.code == EVENT_JOB_MISSED:
+                self.discard(event.job_id, event.scheduled_run_time)
+                return
+
             status = (
                 MonitorStatus.OK
                 if event.code == EVENT_JOB_EXECUTED
@@ -290,6 +296,14 @@ def _get_monitor_config(trigger: "Any") -> "Optional[MonitorConfig]":
     return monitor_config
 
 
+def _is_missed(job: "Any", run_time: "Any") -> bool:
+    # The same test run_job uses to skip a run and report it missed.
+    grace_time = job.misfire_grace_time
+    if grace_time is None:
+        return False
+    return datetime.now(timezone.utc) - run_time > timedelta(seconds=grace_time)
+
+
 def _begin_check_in(
     integration: "APSchedulerIntegration",
     executor: "Any",
@@ -298,6 +312,11 @@ def _begin_check_in(
 ) -> "Optional[_CronsListener]":
     # The job reports its own check-ins.
     if getattr(job.func, "_sentry_monitored", False):
+        return None
+
+    # Pool executors send `in_progress` before the run starts, so skip missed
+    # runs here.
+    if _is_missed(job, run_time):
         return None
 
     monitor_slug = _get_monitor_slug(job)
