@@ -113,9 +113,10 @@ def test_missed_run_sends_no_check_in(sentry_init, capture_envelopes, executor):
     sentry_init(integrations=[APSchedulerIntegration(monitor_jobs=True)])
     envelopes = capture_envelopes()
 
+    # A cron slot could fall due during the test, and coalescing would run it.
     check_ins = _run_once(
         envelopes,
-        CronTrigger(minute="*/5", timezone="UTC"),
+        IntervalTrigger(hours=1, timezone="UTC"),
         executor=executor,
         next_run_time=_utcnow() - timedelta(minutes=1),
         misfire_grace_time=1,
