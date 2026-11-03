@@ -3,7 +3,6 @@ import os
 import threading
 import time
 from datetime import datetime, timedelta, timezone
-from unittest import mock
 
 import pytest
 from apscheduler.events import (
@@ -177,32 +176,52 @@ def test_monitor_decorated_job_reports_once(sentry_init, capture_envelopes):
     ]
 
 
-def test_generated_job_id_uses_job_name(sentry_init, capture_envelopes):
-    sentry_init(integrations=[APSchedulerIntegration(monitor_jobs=True)])
+def _generated_id_warnings(caplog):
+    return [r for r in caplog.records if "has no explicit `id`" in r.getMessage()]
+
+
+def test_generated_job_id_uses_job_name(sentry_init, capture_envelopes, caplog):
+    sentry_init(debug=True, integrations=[APSchedulerIntegration(monitor_jobs=True)])
     envelopes = capture_envelopes()
 
-    with mock.patch.object(apscheduler_integration.logger, "warning") as warning:
-        check_ins = _run_once(
-            envelopes, CronTrigger(minute="*/5", timezone="UTC"), id=None
-        )
+    check_ins = _run_once(envelopes, CronTrigger(minute="*/5", timezone="UTC"), id=None)
 
     assert [c["monitor_slug"] for c in check_ins] == ["ok_job", "ok_job"]
-    warning.assert_called_once()
-    assert "has no explicit `id`" in warning.call_args[0][0]
+    assert len(_generated_id_warnings(caplog)) == 1
 
 
-def test_generated_job_id_warns_once(monkeypatch):
-    monkeypatch.setattr(apscheduler_integration, "_warned_job_ids", set())
+def test_generated_job_id_warns_once(sentry_init, capture_envelopes, caplog):
+    sentry_init(debug=True, integrations=[APSchedulerIntegration(monitor_jobs=True)])
+    envelopes = capture_envelopes()
 
-    class FakeJob:
-        id = "0123456789abcdef0123456789abcdef"
-        name = "ok_job"
+    runs = []
+    ran = threading.Event()
 
-    with mock.patch.object(apscheduler_integration.logger, "warning") as warning:
-        apscheduler_integration._warn_generated_id(FakeJob())
-        apscheduler_integration._warn_generated_id(FakeJob())
+    def record_run(event):
+        runs.append(event)
+        ran.set()
 
-    warning.assert_called_once()
+    scheduler = BackgroundScheduler(timezone="UTC")
+    scheduler.add_executor("debug", alias="default")
+    scheduler.add_listener(record_run, EVENT_JOB_EXECUTED)
+    job = scheduler.add_job(
+        ok_job,
+        CronTrigger(minute="*/5", timezone="UTC"),
+        next_run_time=_utcnow(),
+        misfire_grace_time=None,
+    )
+    scheduler.start()
+    try:
+        assert ran.wait(timeout=10)
+        ran.clear()
+        scheduler.modify_job(job.id, next_run_time=_utcnow())
+        assert ran.wait(timeout=10)
+    finally:
+        scheduler.shutdown(wait=True)
+
+    assert len(runs) == 2
+    assert [c["status"] for c in _check_ins(envelopes)] == ["in_progress", "ok"] * 2
+    assert len(_generated_id_warnings(caplog)) == 1
 
 
 @pytest.mark.parametrize(
