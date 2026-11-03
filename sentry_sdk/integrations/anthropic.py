@@ -710,7 +710,10 @@ def _set_output_data(
 
         if len(output_messages["response"]) > 0:
             set_data_normalized(
-                span, SPANDATA.GEN_AI_RESPONSE_TEXT, output_messages["response"]
+                span,
+                SPANDATA.GEN_AI_RESPONSE_TEXT,
+                output_messages["response"],
+                unpack=False,
             )
 
     if input_tokens is not None:
