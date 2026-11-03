@@ -204,6 +204,26 @@ def test_monitor_decorated_job_reports_once(sentry_init, capture_envelopes):
     ]
 
 
+class DecoratedJobs:
+    @sentry_sdk.monitor(monitor_slug="decorated-method")
+    def run(self):
+        pass
+
+
+def test_monitor_decorated_method_reports_once(sentry_init, capture_envelopes):
+    sentry_init(integrations=[APSchedulerIntegration(monitor_jobs=True)])
+    envelopes = capture_envelopes()
+
+    check_ins = _run_once(
+        envelopes, CronTrigger(minute="*/5", timezone="UTC"), DecoratedJobs().run
+    )
+
+    assert [(c["monitor_slug"], c["status"]) for c in check_ins] == [
+        ("decorated-method", "in_progress"),
+        ("decorated-method", "ok"),
+    ]
+
+
 def _generated_id_warnings(caplog):
     return [r for r in caplog.records if "has no explicit `id`" in r.getMessage()]
 
@@ -604,6 +624,48 @@ def test_process_pool_worker_crash_is_error(sentry_init, capture_envelopes):
     check_ins = _check_ins(envelopes)
     assert [c["status"] for c in check_ins] == ["in_progress", "error"]
     assert check_ins[0]["check_in_id"] == check_ins[1]["check_in_id"]
+    assert apscheduler_integration._listeners[scheduler].pending == {}
+
+
+def slow_crashing_job():
+    time.sleep(1)
+    os._exit(1)
+
+
+def test_process_pool_crash_closes_every_running_instance(
+    sentry_init, capture_envelopes
+):
+    sentry_init(integrations=[APSchedulerIntegration(monitor_jobs=True)])
+    envelopes = capture_envelopes()
+
+    scheduler = BackgroundScheduler(timezone="UTC")
+    scheduler.add_executor(ProcessPoolExecutor(2), alias="default")
+    scheduler.add_job(
+        slow_crashing_job,
+        CronTrigger(minute="*/5", timezone="UTC"),
+        id="my-job",
+        next_run_time=_utcnow(),
+        misfire_grace_time=None,
+        max_instances=2,
+    )
+    scheduler.start()
+    try:
+        deadline = time.monotonic() + 10
+        while not _check_ins(envelopes) and time.monotonic() < deadline:
+            time.sleep(0.01)
+        scheduler.modify_job("my-job", next_run_time=_utcnow())
+        # A broken pool fails every run in it, each through _run_job_error.
+        while len(_check_ins(envelopes)) < 4 and time.monotonic() < deadline:
+            time.sleep(0.05)
+    finally:
+        scheduler.shutdown(wait=True)
+
+    check_ins = _check_ins(envelopes)
+    statuses = sorted(c["status"] for c in check_ins)
+    assert statuses == ["error", "error", "in_progress", "in_progress"]
+    ids = {c["check_in_id"] for c in check_ins if c["status"] == "in_progress"}
+    assert {c["check_in_id"] for c in check_ins if c["status"] == "error"} == ids
+    assert len(ids) == 2
     assert apscheduler_integration._listeners[scheduler].pending == {}
 
 
