@@ -266,6 +266,9 @@ def datetime_from_isoformat(value: str) -> "datetime":
         result = datetime.fromisoformat(value)
     except (AttributeError, ValueError):
         # py 3.6
+        if not isinstance(value, str) or len(value) < 6:
+            raise ValueError(f"Invalid ISO 8601 timestamp: {value!r}") from None
+
         timestamp_format = (
             "%Y-%m-%dT%H:%M:%S.%f" if "." in value else "%Y-%m-%dT%H:%M:%S"
         )

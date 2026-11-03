@@ -108,6 +108,18 @@ isoformat_inputs_and_datetime_outputs = (
 )
 
 
+@pytest.mark.parametrize("input_str", ["", "abc", "12345", "2020-", "x"])
+def test_datetime_from_isoformat_raises_value_error_for_short_input(input_str):
+    with pytest.raises(ValueError):
+        datetime_from_isoformat(input_str)
+
+    # The same input through the py 3.6 fallback path.
+    with mock.patch("sentry_sdk.utils.datetime") as datetime_mocked:
+        datetime_mocked.fromisoformat.side_effect = AttributeError()
+        datetime_mocked.strptime = datetime.strptime
+        with pytest.raises(ValueError):
+            datetime_from_isoformat(input_str)
+
 @pytest.mark.parametrize(
     ("input_str", "expected_output"),
     isoformat_inputs_and_datetime_outputs,
