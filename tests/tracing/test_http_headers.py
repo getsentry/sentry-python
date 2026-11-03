@@ -123,3 +123,14 @@ def test_iter_headers_span_streaming(sentry_init, monkeypatch):
             headers["sentry-trace"]
             == "12312012123120121231201212312012-0415201309082013-0"
         )
+
+
+@pytest.mark.parametrize("flag", ["00", "01"])
+def test_a_w3c_traceparent_forwarded_as_sentry_trace_is_parsed(flag):
+    header = f"00-12312012123120121231201212312012-0415201309082013-{flag}"
+
+    assert extract_sentrytrace_data(header) == {
+        "trace_id": "12312012123120121231201212312012",
+        "parent_span_id": "0415201309082013",
+        "parent_sampled": None,
+    }

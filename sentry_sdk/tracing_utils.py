@@ -488,7 +488,13 @@ def extract_sentrytrace_data(
     if not header:
         return None
 
-    if header.startswith("00-") and header.endswith("-00"):
+    if header.startswith("00-") and header.endswith(("-00", "-01")):
+        # A W3C traceparent header ("00-<trace_id>-<span_id>-<flag>") may be
+        # forwarded as sentry-trace. Strip the version prefix and the sampled
+        # flag so the trace/span ids below can be parsed. Only the "-00" flag
+        # was handled before, so headers with the "-01" flag (sampled) were
+        # silently dropped and a new trace was started instead of continuing
+        # the incoming one.
         header = header[3:-3]
 
     match = SENTRY_TRACE_REGEX.match(header)
