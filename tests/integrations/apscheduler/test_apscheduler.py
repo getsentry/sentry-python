@@ -19,6 +19,7 @@ from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.date import DateTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
+import sentry_sdk
 from sentry_sdk.integrations import apscheduler as apscheduler_integration
 from sentry_sdk.integrations.apscheduler import APSchedulerIntegration
 
@@ -139,6 +140,25 @@ def test_exclude_jobs(sentry_init, capture_envelopes):
     check_ins = _run_once(envelopes, CronTrigger(minute="*/5", timezone="UTC"))
 
     assert check_ins == []
+
+
+@sentry_sdk.monitor(monitor_slug="decorated")
+def decorated_job():
+    pass
+
+
+def test_monitor_decorated_job_reports_once(sentry_init, capture_envelopes):
+    sentry_init(integrations=[APSchedulerIntegration(monitor_jobs=True)])
+    envelopes = capture_envelopes()
+
+    check_ins = _run_once(
+        envelopes, CronTrigger(minute="*/5", timezone="UTC"), decorated_job
+    )
+
+    assert [(c["monitor_slug"], c["status"]) for c in check_ins] == [
+        ("decorated", "in_progress"),
+        ("decorated", "ok"),
+    ]
 
 
 def test_generated_job_id_uses_job_name(sentry_init, capture_envelopes):

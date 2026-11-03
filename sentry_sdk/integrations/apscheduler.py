@@ -306,6 +306,10 @@ def _begin_check_ins(
     job: "Any",
     run_times: "List[Any]",
 ) -> "Optional[_CronsListener]":
+    # The job reports its own check-ins.
+    if getattr(job.func, "_sentry_monitored", False):
+        return None
+
     monitor_slug = _get_monitor_slug(job)
     if match_regex_list(monitor_slug, integration.exclude_jobs):
         return None
