@@ -1,9 +1,10 @@
 from datetime import timedelta, timezone
+from functools import lru_cache
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from datetime import tzinfo
-    from typing import Optional, Tuple
+    from typing import FrozenSet, Optional, Set, Tuple
 
     from sentry_sdk._types import MonitorConfigSchedule, MonitorConfigScheduleUnit
 
@@ -31,15 +32,41 @@ def _get_interval_schedule(seconds: float) -> "Optional[MonitorConfigSchedule]":
     return None
 
 
+@lru_cache(maxsize=None)
+def _get_iana_timezone_names() -> "FrozenSet[str]":
+    names: "Set[str]" = set()
+    try:
+        from zoneinfo import available_timezones
+
+        names.update(available_timezones())
+    except ImportError:
+        try:
+            from backports.zoneinfo import available_timezones
+
+            names.update(available_timezones())
+        except ImportError:
+            pass
+
+    try:
+        import pytz
+
+        # pytz's lazy set looks empty to set.update until it's iterated.
+        names.update(iter(pytz.all_timezones_set))
+    except ImportError:
+        pass
+
+    return frozenset(names)
+
+
 def _get_timezone_name(tz: "tzinfo") -> "Optional[str]":
     """
     Return the IANA name of the timezone, or None if it has none.
     """
-    # zoneinfo and pytz
+    # zoneinfo and pytz. tzlocal can give a zone a non-IANA key, like "local"
+    # or the basename of a TZ file path.
     name = getattr(tz, "key", None) or getattr(tz, "zone", None)
     if isinstance(name, str):
-        # tzlocal's zone when it can't find the system's.
-        return None if name == "local" else name
+        return name if name in _get_iana_timezone_names() else None
 
     if isinstance(tz, timezone):
         offset = tz.utcoffset(None)
