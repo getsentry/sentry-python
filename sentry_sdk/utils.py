@@ -371,7 +371,7 @@ class Dsn:
         return "%s://%s%s@%s%s%s" % (
             self.scheme,
             self.public_key,
-            self.secret_key and "@" + self.secret_key or "",
+            self.secret_key and ":" + self.secret_key or "",
             self.netloc,
             self.path,
             self.project_id,

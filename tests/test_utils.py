@@ -1467,3 +1467,15 @@ def test_package_version_is_none():
 )
 def test_is_localhost(kwargs, expected):
     assert _is_localhost(**kwargs) is expected
+
+
+def test_dsn_str_roundtrip_with_secret_key():
+    dsn = Dsn("https://publickey:secretkey@sentry.io/123")
+
+    assert str(dsn) == "https://publickey:secretkey@sentry.io/123"
+
+    roundtripped = Dsn(str(dsn))
+    assert roundtripped.public_key == "publickey"
+    assert roundtripped.secret_key == "secretkey"
+    assert roundtripped.host == "sentry.io"
+    assert roundtripped.project_id == "123"
