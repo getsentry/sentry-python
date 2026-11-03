@@ -285,6 +285,21 @@ def test_cron_trigger_timezone(sentry_init, capture_envelopes):
     assert check_ins[0]["monitor_config"]["timezone"] == "Europe/Vienna"
 
 
+def test_cron_trigger_pytz_timezone(sentry_init, capture_envelopes):
+    pytz = pytest.importorskip("pytz")
+    sentry_init(integrations=[APSchedulerIntegration(monitor_jobs=True)])
+    envelopes = capture_envelopes()
+
+    check_ins = _run_once(
+        envelopes, CronTrigger(hour=9, timezone=pytz.timezone("Europe/Vienna"))
+    )
+
+    assert check_ins[0]["monitor_config"] == {
+        "schedule": {"type": "crontab", "value": "0 9 * * *"},
+        "timezone": "Europe/Vienna",
+    }
+
+
 @pytest.mark.parametrize(
     "offset, expected",
     [
@@ -408,6 +423,37 @@ def test_date_trigger_is_not_monitored(sentry_init, capture_envelopes):
     envelopes = capture_envelopes()
 
     check_ins = _run_once(envelopes, DateTrigger(run_date=_utcnow(), timezone="UTC"))
+
+    assert check_ins == []
+
+
+@pytest.mark.parametrize("trigger_name", ["OrTrigger", "AndTrigger"])
+def test_combining_trigger_is_not_monitored(
+    sentry_init, capture_envelopes, trigger_name
+):
+    combining = pytest.importorskip("apscheduler.triggers.combining")
+    sentry_init(integrations=[APSchedulerIntegration(monitor_jobs=True)])
+    envelopes = capture_envelopes()
+
+    # AndTrigger never finds a next fire time for crons that disagree.
+    trigger = getattr(combining, trigger_name)(
+        [
+            CronTrigger(minute="*/5", timezone="UTC"),
+            CronTrigger(minute="*/5", timezone="UTC"),
+        ]
+    )
+    check_ins = _run_once(envelopes, trigger)
+
+    assert check_ins == []
+
+
+def test_calendar_interval_trigger_is_not_monitored(sentry_init, capture_envelopes):
+    calendarinterval = pytest.importorskip("apscheduler.triggers.calendarinterval")
+    sentry_init(integrations=[APSchedulerIntegration(monitor_jobs=True)])
+    envelopes = capture_envelopes()
+
+    trigger = calendarinterval.CalendarIntervalTrigger(days=1, timezone="UTC")
+    check_ins = _run_once(envelopes, trigger)
 
     assert check_ins == []
 
