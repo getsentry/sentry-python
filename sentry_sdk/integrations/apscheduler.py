@@ -58,6 +58,7 @@ class APSchedulerIntegration(Integration):
             raise DidNotEnable("APScheduler 4 is not supported.")
 
         _patch_submit_job()
+        _patch_run_job_error()
 
 
 class _PendingCheckIn:
@@ -116,9 +117,17 @@ class _CronsListener:
     def finish(self, job_id: str, run_time: "Any", status: str) -> None:
         with self.lock:
             pending = self.pending.pop((job_id, run_time), None)
-        if pending is None:
-            return
+        if pending is not None:
+            self._close(pending, status)
 
+    def finish_oldest(self, job_id: str, status: str) -> None:
+        with self.lock:
+            key = next((key for key in self.pending if key[0] == job_id), None)
+            pending = None if key is None else self.pending.pop(key)
+        if pending is not None:
+            self._close(pending, status)
+
+    def _close(self, pending: "_PendingCheckIn", status: str) -> None:
         # Synchronous executors finish the run before `submit_job` returns.
         if not pending.opened:
             pending.open()
@@ -146,6 +155,11 @@ _listeners: "weakref.WeakKeyDictionary[Any, _CronsListener]" = (
     weakref.WeakKeyDictionary()
 )
 _listeners_lock = threading.Lock()
+
+
+def _find_listener(scheduler: "Any") -> "Optional[_CronsListener]":
+    with _listeners_lock:
+        return _listeners.get(scheduler)
 
 
 def _get_listener(scheduler: "Any") -> "_CronsListener":
@@ -372,3 +386,22 @@ def _patch_submit_job() -> None:
         return result
 
     BaseExecutor.submit_job = sentry_submit_job
+
+
+def _patch_run_job_error() -> None:
+    """Close the check-in of a run that failed inside the executor, which sends no event."""
+    old_run_job_error = BaseExecutor._run_job_error
+
+    @wraps(old_run_job_error)
+    def sentry_run_job_error(
+        self: "Any", job_id: str, *args: "Any", **kwargs: "Any"
+    ) -> "Any":
+        try:
+            return old_run_job_error(self, job_id, *args, **kwargs)
+        finally:
+            with capture_internal_exceptions():
+                listener = _find_listener(self._scheduler)
+                if listener is not None:
+                    listener.finish_oldest(job_id, MonitorStatus.ERROR)
+
+    BaseExecutor._run_job_error = sentry_run_job_error

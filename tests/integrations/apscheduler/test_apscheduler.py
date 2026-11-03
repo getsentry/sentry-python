@@ -1,5 +1,7 @@
 import asyncio
+import os
 import threading
+import time
 from datetime import datetime, timedelta, timezone
 from unittest import mock
 
@@ -442,6 +444,38 @@ def test_process_pool_executor(sentry_init, capture_envelopes):
 
     assert [c["status"] for c in check_ins] == ["in_progress", "error"]
     assert check_ins[0]["check_in_id"] == check_ins[1]["check_in_id"]
+
+
+def crashing_job():
+    os._exit(1)
+
+
+def test_process_pool_worker_crash_is_error(sentry_init, capture_envelopes):
+    sentry_init(integrations=[APSchedulerIntegration(monitor_jobs=True)])
+    envelopes = capture_envelopes()
+
+    scheduler = BackgroundScheduler(timezone="UTC")
+    scheduler.add_executor(ProcessPoolExecutor(1), alias="default")
+    scheduler.add_job(
+        crashing_job,
+        CronTrigger(minute="*/5", timezone="UTC"),
+        id="my-job",
+        next_run_time=_utcnow(),
+        misfire_grace_time=None,
+    )
+    scheduler.start()
+    try:
+        # A crashed worker sends no execution event, so wait for the check-ins.
+        deadline = time.monotonic() + 10
+        while len(_check_ins(envelopes)) < 2 and time.monotonic() < deadline:
+            time.sleep(0.05)
+    finally:
+        scheduler.shutdown(wait=True)
+
+    check_ins = _check_ins(envelopes)
+    assert [c["status"] for c in check_ins] == ["in_progress", "error"]
+    assert check_ins[0]["check_in_id"] == check_ins[1]["check_in_id"]
+    assert apscheduler_integration._listeners[scheduler].pending == {}
 
 
 async def async_ok_job():
