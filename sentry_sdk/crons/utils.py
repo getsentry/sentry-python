@@ -41,14 +41,16 @@ def _get_iana_timezone_names() -> "FrozenSet[str]":
         names.update(available_timezones())
     except ImportError:
         try:
-            from backports.zoneinfo import available_timezones
+            from backports.zoneinfo import (  # type: ignore[import-not-found, no-redef]
+                available_timezones,
+            )
 
             names.update(available_timezones())
         except ImportError:
             pass
 
     try:
-        import pytz
+        import pytz  # type: ignore[import-untyped]
 
         # pytz's lazy set looks empty to set.update until it's iterated.
         names.update(iter(pytz.all_timezones_set))
