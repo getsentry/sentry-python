@@ -220,7 +220,7 @@ class _StreamSpanContext:
 class AnthropicIntegration(Integration):
     identifier = "anthropic"
     origin = f"auto.ai.{identifier}"
-    version: "Union[tuple[int, ...], None]" = None
+    _version: "Union[tuple[int, ...], None]" = None
 
     def __init__(self: "AnthropicIntegration", include_prompts: bool = True) -> None:
         self.include_prompts = include_prompts
@@ -229,7 +229,7 @@ class AnthropicIntegration(Integration):
     def setup_once() -> None:
         version = package_version("anthropic")
         _check_minimum_version(AnthropicIntegration, version)
-        AnthropicIntegration.version = version
+        AnthropicIntegration._version = version
 
         """
         client.messages.create(stream=True) can return an instance of the Stream class, which implements the iterator protocol.
@@ -829,9 +829,13 @@ def _sentry_patched_create_sync(f: "Any", *args: "Any", **kwargs: "Any") -> "Any
 
         _initialize_data_accumulation_state(result)
         # New versions use global patch since _iterator was changed to a cached property.
-        if AnthropicIntegration.version is not None and AnthropicIntegration.version < (
-            1,
-            14,
+        if (
+            AnthropicIntegration._version is not None
+            and AnthropicIntegration._version
+            < (
+                1,
+                14,
+            )
         ):
             result._iterator = _wrap_synchronous_message_iterator(  # type: ignore[misc]
                 cast("_PatchedRawMessageStream", result),
@@ -932,9 +936,13 @@ async def _sentry_patched_create_async(
 
         _initialize_data_accumulation_state(result)
         # New versions use global patch since _iterator was changed to a cached property.
-        if AnthropicIntegration.version is not None and AnthropicIntegration.version < (
-            1,
-            14,
+        if (
+            AnthropicIntegration._version is not None
+            and AnthropicIntegration._version
+            < (
+                1,
+                14,
+            )
         ):
             result._iterator = _wrap_asynchronous_message_iterator(  # type: ignore[misc]
                 cast("_PatchedRawAsyncMessageStream", result),
