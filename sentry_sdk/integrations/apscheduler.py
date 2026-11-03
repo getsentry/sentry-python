@@ -300,11 +300,11 @@ def _get_monitor_config(trigger: "Any") -> "Optional[MonitorConfig]":
     return monitor_config
 
 
-def _begin_check_ins(
+def _begin_check_in(
     integration: "APSchedulerIntegration",
     executor: "Any",
     job: "Any",
-    run_times: "List[Any]",
+    run_time: "Any",
 ) -> "Optional[_CronsListener]":
     # The job reports its own check-ins.
     if getattr(job.func, "_sentry_monitored", False):
@@ -329,14 +329,7 @@ def _begin_check_ins(
         _warn_generated_id(job)
 
     listener = _get_listener(executor._scheduler)
-    start = now()
-
-    # Each run time gets its own execution event, so its own check-in.
-    for run_time in run_times:
-        listener.add(
-            job.id, run_time, _PendingCheckIn(monitor_slug, monitor_config, start)
-        )
-
+    listener.add(job.id, run_time, _PendingCheckIn(monitor_slug, monitor_config, now()))
     return listener
 
 
@@ -361,9 +354,12 @@ def _patch_submit_job() -> None:
         if integration is None or not integration.monitor_jobs:
             return old_submit_job(self, job, run_times, *args, **kwargs)
 
+        # A backlog of run times runs in one submit; check in once, closed by the
+        # last run time's event.
+        run_time = run_times[-1]
         listener = None
         with capture_internal_exceptions():
-            listener = _begin_check_ins(integration, self, job, run_times)
+            listener = _begin_check_in(integration, self, job, run_time)
 
         try:
             result = old_submit_job(self, job, run_times, *args, **kwargs)
@@ -371,21 +367,18 @@ def _patch_submit_job() -> None:
             # The run is skipped, not failed.
             if listener is not None:
                 with capture_internal_exceptions():
-                    for run_time in run_times:
-                        listener.discard(job.id, run_time)
+                    listener.discard(job.id, run_time)
             raise
         except BaseException:
             # Not submitted, so no execution event will close the check-ins.
             if listener is not None:
                 with capture_internal_exceptions():
-                    for run_time in run_times:
-                        listener.finish(job.id, run_time, MonitorStatus.ERROR)
+                    listener.finish(job.id, run_time, MonitorStatus.ERROR)
             raise
 
         if listener is not None:
             with capture_internal_exceptions():
-                for run_time in run_times:
-                    listener.open(job.id, run_time)
+                listener.open(job.id, run_time)
 
         return result
 
