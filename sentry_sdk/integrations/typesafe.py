@@ -25,26 +25,26 @@ if TYPE_CHECKING:
         Union,
     )
 
-    from typesafe_sdk import JSONContent
+    from typesafe_sdk import Content
     from typesafe_sdk._core.question_types import Questions
 
     class NoulModel(TypedDict):
         type: Literal["noul"]
-        instructions: NotRequired[JSONContent | None]
+        instructions: NotRequired[Content | None]
 
     class ChoiceModel(TypedDict):
         type: Literal["choice"]
-        criteria: NotRequired[Mapping[str, JSONContent | None]]
-        instructions: NotRequired[JSONContent | None]
+        criteria: NotRequired[Mapping[str, Content | None]]
+        instructions: NotRequired[Content | None]
 
     class ScoreModel(TypedDict):
         type: Literal["score"]
-        criteria: NotRequired[Sequence[JSONContent]]
-        instructions: NotRequired[JSONContent | None]
+        criteria: NotRequired[Sequence[Content]]
+        instructions: NotRequired[Content | None]
 
     class InputMessageModel(TypedDict):
         type: Literal["evaluation"]
-        state: NotRequired[JSONContent]
+        state: NotRequired[Content]
         questions: NotRequired[dict[str, Union[NoulModel, ChoiceModel, ScoreModel]]]
 
     class NoulEvaluationModel(TypedDict):
@@ -66,12 +66,25 @@ if TYPE_CHECKING:
 
 
 try:
-    from typesafe_sdk import Choice, ChoiceAnswer, Noul, NoulAnswer, Score, ScoreAnswer
+    from typesafe_sdk import (
+        Choice,
+        ChoiceAnswer,
+        Noul,
+        NoulAnswer,
+        Score,
+        ScoreAnswer,
+    )
     from typesafe_sdk._core.client.aio.client import AsyncTypeSafeClient
     from typesafe_sdk._core.client.sync.client import TypeSafeClient
     from typesafe_sdk._core.response_types import Answer, SystemOneResponse
 except ImportError:
     raise DidNotEnable("typesafe-sdk not installed")
+
+
+try:
+    from typesafe_sdk import Image
+except ImportError:
+    Image = None  # type: ignore[misc, assignment]
 
 
 class TypeSafeIntegration(Integration):
@@ -84,6 +97,16 @@ class TypeSafeIntegration(Integration):
         AsyncTypeSafeClient.system_one = _wrap_system_one_async(  # type: ignore[method-assign]
             AsyncTypeSafeClient.system_one
         )
+
+
+def _json_default(value: object) -> str:
+    """
+    Render an inline typesafe `Image` as its reference, mirroring the SDK's handling.
+    """
+    if Image is not None and isinstance(value, Image):
+        return str(value)
+
+    return "<unserializable>"
 
 
 def _transform_questions(
@@ -146,7 +169,7 @@ def _transform_questions(
             }
             if "criteria" in question:
                 choice["criteria"] = cast(
-                    "Mapping[str, JSONContent | None]", question["criteria"]
+                    "Mapping[str, Content | None]", question["criteria"]
                 )
             if "instructions" in question:
                 choice["instructions"] = question["instructions"]
@@ -159,7 +182,7 @@ def _transform_questions(
                 "type": question_type,
             }
             if "criteria" in question:
-                score["criteria"] = cast("Sequence[JSONContent]", question["criteria"])
+                score["criteria"] = cast("Sequence[Content]", question["criteria"])
             if "instructions" in question:
                 score["instructions"] = question["instructions"]
 
@@ -265,7 +288,13 @@ def _wrap_system_one(f: "Callable[..., Any]") -> "Callable[..., Any]":
                 if isinstance(questions, Mapping):
                     input_message["questions"] = _transform_questions(questions)
 
-                set_on_span(SPANDATA.GEN_AI_INPUT_MESSAGES, json.dumps([input_message]))
+                set_on_span(
+                    SPANDATA.GEN_AI_INPUT_MESSAGES,
+                    json.dumps(
+                        [input_message],
+                        default=_json_default,
+                    ),
+                )
 
             response = f(self, *args, **kwargs)
 
@@ -301,7 +330,8 @@ def _wrap_system_one(f: "Callable[..., Any]") -> "Callable[..., Any]":
                                     response.answers
                                 ),
                             }
-                        ]
+                        ],
+                        default=_json_default,
                     ),
                 )
 
@@ -372,7 +402,13 @@ def _wrap_system_one_async(f: "Callable[..., Any]") -> "Callable[..., Any]":
                 if isinstance(questions, Mapping):
                     input_message["questions"] = _transform_questions(questions)
 
-                set_on_span(SPANDATA.GEN_AI_INPUT_MESSAGES, json.dumps([input_message]))
+                set_on_span(
+                    SPANDATA.GEN_AI_INPUT_MESSAGES,
+                    json.dumps(
+                        [input_message],
+                        default=_json_default,
+                    ),
+                )
 
             response = await f(self, *args, **kwargs)
 
@@ -408,7 +444,8 @@ def _wrap_system_one_async(f: "Callable[..., Any]") -> "Callable[..., Any]":
                                     response.answers
                                 ),
                             }
-                        ]
+                        ],
+                        default=_json_default,
                     ),
                 )
 

@@ -447,10 +447,6 @@ def _get_request_attributes(
     if url_scheme:
         attributes["network.protocol.name"] = url_scheme
 
-    server_name = environ.get("SERVER_NAME")
-    if server_name:
-        attributes["server.address"] = server_name
-
     server_port = environ.get("SERVER_PORT")
     if server_port:
         try:

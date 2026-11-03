@@ -15,6 +15,11 @@ from typesafe_sdk import (
     Usage,
 )
 
+try:
+    from typesafe_sdk import Image
+except ImportError:
+    Image = None
+
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.typesafe import TypeSafeIntegration
@@ -623,3 +628,137 @@ async def test_system_one_async(
                 },
             }
         ]
+
+
+@pytest.mark.skipif(
+    Image is None, reason="Image was added in version v0.7.5 of typesafe-sdk"
+)
+def test_system_one_with_inline_image(
+    sentry_init,
+    capture_items,
+    typesafe_response,
+):
+    sentry_init(
+        integrations=[TypeSafeIntegration()],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+        trace_lifecycle="stream",
+    )
+
+    photo = Image(b"\x89PNG\r\n\x1a\nimage data")
+    listing = Image(b"\xff\xd8\xffimage data")
+
+    client = TypeSafeClient(api_key="z")
+    items = capture_items("span")
+
+    with mock.patch.object(
+        TypeSafeClient, "_request", return_value=typesafe_response
+    ), sentry_sdk.start_transaction(name="typesafe"):
+        client.system_one(
+            state=[
+                {"role": "user", "msg": ["Here is what came back:", photo]},
+                ("listing", listing),
+            ],
+            questions={
+                "same": Noul(instructions=["Is it the item in this photo?", listing]),
+                "condition": Choice(criteria={"new": photo, "used": None}),
+                "damage": Score(criteria=["none", {"example": [photo]}]),
+            },
+        )
+
+    sentry_sdk.flush()
+    spans = [item.payload for item in items]
+    (span,) = spans
+
+    assert json.loads(span["attributes"][SPANDATA.GEN_AI_INPUT_MESSAGES]) == [
+        {
+            "type": "evaluation",
+            "state": [
+                {"role": "user", "msg": ["Here is what came back:", str(photo)]},
+                ["listing", str(listing)],
+            ],
+            "questions": {
+                "same": {
+                    "type": "noul",
+                    "instructions": ["Is it the item in this photo?", str(listing)],
+                },
+                "condition": {
+                    "type": "choice",
+                    "criteria": {"new": str(photo), "used": None},
+                },
+                "damage": {
+                    "type": "score",
+                    "criteria": ["none", {"example": [str(photo)]}],
+                },
+            },
+        }
+    ]
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif(
+    Image is None, reason="Image was added in version v0.7.5 of typesafe-sdk"
+)
+async def test_system_one_async_with_inline_image(
+    sentry_init,
+    capture_items,
+    typesafe_response,
+):
+    sentry_init(
+        integrations=[TypeSafeIntegration()],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+        trace_lifecycle="stream",
+    )
+
+    photo = Image(b"\x89PNG\r\n\x1a\nimage data")
+    listing = Image(b"\xff\xd8\xffimage data")
+
+    client = AsyncTypeSafeClient(api_key="z")
+    items = capture_items("span")
+
+    with mock.patch.object(
+        AsyncTypeSafeClient,
+        "_request",
+        new_callable=mock.AsyncMock,
+        return_value=typesafe_response,
+    ), sentry_sdk.start_transaction(name="typesafe"):
+        await client.system_one(
+            state=[
+                {"role": "user", "msg": ["Here is what came back:", photo]},
+                ("listing", listing),
+            ],
+            questions={
+                "same": Noul(instructions=["Is it the item in this photo?", listing]),
+                "condition": Choice(criteria={"new": photo, "used": None}),
+                "damage": Score(criteria=["none", {"example": [photo]}]),
+            },
+        )
+
+    sentry_sdk.flush()
+    spans = [item.payload for item in items]
+    (span,) = spans
+
+    assert json.loads(span["attributes"][SPANDATA.GEN_AI_INPUT_MESSAGES]) == [
+        {
+            "type": "evaluation",
+            "state": [
+                {"role": "user", "msg": ["Here is what came back:", str(photo)]},
+                ["listing", str(listing)],
+            ],
+            "questions": {
+                "same": {
+                    "type": "noul",
+                    "instructions": ["Is it the item in this photo?", str(listing)],
+                },
+                "condition": {
+                    "type": "choice",
+                    "criteria": {"new": str(photo), "used": None},
+                },
+                "damage": {
+                    "type": "score",
+                    "criteria": ["none", {"example": [str(photo)]}],
+                },
+            },
+        }
+    ]

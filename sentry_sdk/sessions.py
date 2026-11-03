@@ -132,7 +132,6 @@ def track_session(
             scope.end_session()
 
 
-TERMINAL_SESSION_STATES = ("exited", "abnormal", "crashed")
 MAX_ENVELOPE_ITEMS = 100
 
 

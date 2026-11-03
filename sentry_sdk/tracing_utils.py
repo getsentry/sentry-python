@@ -67,18 +67,6 @@ SENTRY_TRACE_REGEX = re.compile(
 )
 
 
-# This is a normal base64 regex, modified to reflect that fact that we strip the
-# trailing = or == off
-base64_stripped = (
-    # any of the characters in the base64 "alphabet", in multiples of 4
-    "([a-zA-Z0-9+/]{4})*"
-    # either nothing or 2 or 3 base64-alphabet characters (see
-    # https://en.wikipedia.org/wiki/Base64#Decoding_Base64_without_padding for
-    # why there's never only 1 extra character)
-    "([a-zA-Z0-9+/]{2,3})?"
-)
-
-
 class EnvironHeaders(Mapping):  # type: ignore
     def __init__(
         self,
