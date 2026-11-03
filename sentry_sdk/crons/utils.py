@@ -57,6 +57,8 @@ def _get_iana_timezone_names() -> "FrozenSet[str]":
     except ImportError:
         pass
 
+    # Some systems keep these files in the zoneinfo directory, but they aren't zones.
+    names.difference_update(("localtime", "posixrules"))
     return frozenset(names)
 
 
