@@ -375,6 +375,18 @@ class SPANDATA:
     Example: "arn:aws:lambda:us-east-1:123456789012:function:my-function"
     """
 
+    AWS_LAMBDA_RESOURCE_MAPPING_ID = "aws.lambda.resource_mapping.id"
+    """
+    The UUID of the AWS Lambda event source mapping the request refers to.
+    Example: "587b4f6c-1d0e-4d48-8a3f-2c6f9a1e0b7d"
+    """
+
+    AWS_LAMBDA_TARGET_FUNCTION_NAME = "aws.lambda.target_function.name"
+    """
+    The name of the AWS Lambda function an AWS SDK call acts on, without a qualifier.
+    Example: "billing"
+    """
+
     AWS_LOG_GROUP_NAMES = "aws.log.group.names"
     """
     The name(s) of the AWS log group(s) an application is writing to.
@@ -668,6 +680,24 @@ class SPANDATA:
     """
     The invocation ID of the current function invocation.
     Example: "af9d5aa4-a685-4c5f-a22b-444f80b3cc28"
+    """
+
+    FAAS_INVOKED_NAME = "faas.invoked_name"
+    """
+    The name of the invoked function, without a qualifier.
+    Example: "billing"
+    """
+
+    FAAS_INVOKED_PROVIDER = "faas.invoked_provider"
+    """
+    The cloud provider of the invoked function.
+    Example: "aws"
+    """
+
+    FAAS_INVOKED_REGION = "faas.invoked_region"
+    """
+    The cloud region of the invoked function.
+    Example: "eu-north-1"
     """
 
     FAAS_NAME = "faas.name"
