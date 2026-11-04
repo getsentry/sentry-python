@@ -1,3 +1,4 @@
+import base64
 import copy
 import json
 from io import BytesIO
@@ -759,6 +760,14 @@ def test_other_operations_keep_generic_span(init_bedrock, capture_items, trace_m
     assert not any(key.startswith("gen_ai.") for key in span["attributes"])
 
 
+# base64-encoded media content, which isn't recorded.
+MEDIA_BASE64 = base64.b64encode(b"\x89PNG media bytes").decode()
+ANTHROPIC_MEDIA_SOURCE = {
+    "type": "base64",
+    "media_type": "image/png",
+    "data": MEDIA_BASE64,
+}
+
 INVOKE_MODEL_CASES = [
     pytest.param(
         "us.anthropic.claude-3-5-sonnet-20240620-v1:0",
@@ -872,6 +881,101 @@ INVOKE_MODEL_CASES = [
         id="anthropic_claude",
     ),
     pytest.param(
+        "anthropic.claude-3-5-sonnet-20240620-v1:0",
+        {
+            "anthropic_version": "bedrock-2023-05-31",
+            "max_tokens": 100,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": "What's in these?"},
+                        {"type": "image", "source": ANTHROPIC_MEDIA_SOURCE},
+                        {
+                            "type": "document",
+                            "source": {
+                                **ANTHROPIC_MEDIA_SOURCE,
+                                "media_type": "application/pdf",
+                            },
+                        },
+                    ],
+                },
+                {
+                    "role": "assistant",
+                    "content": [
+                        {
+                            "type": "tool_use",
+                            "id": "tool-1",
+                            "name": "screenshot",
+                            "input": {},
+                        }
+                    ],
+                },
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "tool_result",
+                            "tool_use_id": "tool-1",
+                            "content": [
+                                {"type": "text", "text": "Done."},
+                                {"type": "image", "source": ANTHROPIC_MEDIA_SOURCE},
+                            ],
+                        }
+                    ],
+                },
+            ],
+        },
+        {
+            "id": "msg_2",
+            "type": "message",
+            "role": "assistant",
+            "content": [{"type": "text", "text": "A cat."}],
+            "stop_reason": "end_turn",
+            "usage": {"input_tokens": 10, "output_tokens": 5},
+        },
+        {
+            SPANDATA.GEN_AI_REQUEST_MAX_TOKENS: 100,
+            SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS: ["end_turn"],
+            SPANDATA.GEN_AI_USAGE_INPUT_TOKENS: 10,
+            SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS: 5,
+            SPANDATA.GEN_AI_INPUT_MESSAGES: [
+                {
+                    "role": "user",
+                    "parts": [{"type": "text", "content": "What's in these?"}],
+                },
+                {
+                    "role": "assistant",
+                    "parts": [
+                        {
+                            "type": "tool_call",
+                            "id": "tool-1",
+                            "name": "screenshot",
+                            "arguments": {},
+                        },
+                    ],
+                },
+                {
+                    "role": "tool",
+                    "parts": [
+                        {
+                            "type": "tool_call_response",
+                            "id": "tool-1",
+                            "result": "Done.",
+                        }
+                    ],
+                },
+            ],
+            SPANDATA.GEN_AI_OUTPUT_MESSAGES: [
+                {
+                    "role": "assistant",
+                    "parts": [{"type": "text", "content": "A cat."}],
+                }
+            ],
+        },
+        id="anthropic_claude_media",
+    ),
+    pytest.param(
         "amazon.nova-lite-v1:0",
         {
             "schemaVersion": "messages-v1",
@@ -909,6 +1013,46 @@ INVOKE_MODEL_CASES = [
             ],
         },
         id="amazon_nova",
+    ),
+    pytest.param(
+        "amazon.nova-lite-v1:0",
+        {
+            "schemaVersion": "messages-v1",
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {"text": "What's this?"},
+                        {"image": {"format": "png", "source": {"bytes": MEDIA_BASE64}}},
+                    ],
+                }
+            ],
+            "inferenceConfig": {"max_new_tokens": 100},
+        },
+        {
+            "output": {
+                "message": {"role": "assistant", "content": [{"text": "A cat."}]}
+            },
+            "stopReason": "end_turn",
+            "usage": {"inputTokens": 10, "outputTokens": 5, "totalTokens": 15},
+        },
+        {
+            SPANDATA.GEN_AI_REQUEST_MAX_TOKENS: 100,
+            SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS: ["end_turn"],
+            SPANDATA.GEN_AI_USAGE_INPUT_TOKENS: 10,
+            SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS: 5,
+            SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS: 15,
+            SPANDATA.GEN_AI_INPUT_MESSAGES: [
+                {"role": "user", "parts": [{"type": "text", "content": "What's this?"}]}
+            ],
+            SPANDATA.GEN_AI_OUTPUT_MESSAGES: [
+                {
+                    "role": "assistant",
+                    "parts": [{"type": "text", "content": "A cat."}],
+                }
+            ],
+        },
+        id="amazon_nova_media",
     ),
     pytest.param(
         "amazon.titan-text-express-v1",
@@ -1153,6 +1297,8 @@ def test_invoke_model(
     assert gen_ai_attributes == _expected_gen_ai_attributes(
         trace_mode, expected_attributes
     )
+    # media content isn't recorded.
+    assert MEDIA_BASE64 not in json.dumps(span["attributes"])
     # only the gen_ai span is recorded, not an `http.client.stream` span.
     assert not any(
         span["attributes"].get(SPANDATA.SENTRY_OP) == OP.HTTP_CLIENT_STREAM
@@ -1326,11 +1472,28 @@ def test_invoke_model_unknown_model(init_bedrock, capture_items, trace_mode):
 
 
 @pytest.mark.parametrize("trace_mode", TRACE_MODES)
+@pytest.mark.parametrize(
+    "make_request_body",
+    [
+        pytest.param(
+            lambda: BytesIO(
+                json.dumps({"prompt": "Hello!", "max_gen_len": 1}).encode()
+            ),
+            id="file_like",
+        ),
+        pytest.param(
+            lambda: json.dumps({"prompt": "x" * 1_000_001, "max_gen_len": 1}).encode(),
+            id="large",
+        ),
+        pytest.param(lambda: b'{"prompt": "Hello!", "max_gen_len": 1', id="malformed"),
+    ],
+)
 def test_invoke_model_bodies_that_are_not_parsed(
-    init_bedrock, capture_items, trace_mode
+    init_bedrock, capture_items, trace_mode, make_request_body
 ):
     client = init_bedrock(trace_mode, send_default_pii=True)
-    # a file-like request body isn't read, and a large response body isn't parsed.
+    # a file-like request body isn't read, and large or malformed request bodies and
+    # a large response body aren't parsed. The response is unchanged.
     response_bytes = json.dumps(
         {"generation": "x" * 1_000_001, "stop_reason": "length"}
     ).encode()
@@ -1338,8 +1501,7 @@ def test_invoke_model_bodies_that_are_not_parsed(
 
     def call():
         response = client.invoke_model(
-            modelId="meta.llama3-8b-instruct-v1:0",
-            body=BytesIO(json.dumps({"prompt": "Hello!", "max_gen_len": 1}).encode()),
+            modelId="meta.llama3-8b-instruct-v1:0", body=make_request_body()
         )
         bodies.append(response["body"].read())
 

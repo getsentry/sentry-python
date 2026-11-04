@@ -139,8 +139,9 @@ INVOKE_MODEL_PROMPTS = {
     "mistral": "prompt",
 }
 
-# larger `InvokeModel` response bodies aren't parsed, e.g. image generation results.
-MAX_INVOKE_MODEL_RESPONSE_BYTES = 1_000_000
+# larger `InvokeModel` request and response bodies aren't parsed, e.g. requests with
+# images or image generation results.
+MAX_INVOKE_MODEL_BODY_BYTES = 1_000_000
 
 
 class _BedrockRuntimeExtension(_ServiceExtension):
@@ -252,11 +253,11 @@ class _BedrockRuntimeExtension(_ServiceExtension):
 
         def on_read(data: bytes) -> None:
             nonlocal size
-            if model_family is None or size > MAX_INVOKE_MODEL_RESPONSE_BYTES:
+            if model_family is None or size > MAX_INVOKE_MODEL_BODY_BYTES:
                 return
 
             size += len(data)
-            if size > MAX_INVOKE_MODEL_RESPONSE_BYTES:
+            if size > MAX_INVOKE_MODEL_BODY_BYTES:
                 chunks.clear()
             else:
                 chunks.append(data)
@@ -362,10 +363,18 @@ def _get_invoke_model_request_attributes(
     A request body that is a file-like object isn't read, as that would consume it.
     https://docs.aws.amazon.com/bedrock/latest/userguide/model-parameters.html
     """
-    if model_family is None or not isinstance(body, (bytes, bytearray, str)):
+    if (
+        model_family is None
+        or not isinstance(body, (bytes, bytearray, str))
+        or len(body) > MAX_INVOKE_MODEL_BODY_BYTES
+    ):
         return {}
 
-    request = json.loads(body)
+    try:
+        request = json.loads(body)
+    except ValueError:
+        # the request fails, as Bedrock rejects it.
+        return {}
 
     if not isinstance(request, Mapping):
         return {}
