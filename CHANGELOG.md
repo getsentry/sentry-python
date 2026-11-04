@@ -2,83 +2,31 @@
 
 ## 3.0.0b3
 
-### New Features ✨
+This is a pre-release of the next Python SDK major, to be released in November 2026.
 
-- (typesafe) Handle inline images by @alexander-alderman-webb in [#8164](https://github.com/getsentry/sentry-python/pull/8164)
+Want to give it a spin? Be our guest and [let us know](https://github.com/getsentry/sentry-python/discussions) how it went!
 
-### Bug Fixes 🐛
+### ✨ Notable Changes
+- Say goodbye to transactions: span streaming is now the default tracing model
+- The fine-grained `data_collection` supersedes the flat `send_default_pii`
 
-#### Anthropic
-
-- Preserve cached `_iterator` property by @alexander-alderman-webb in [#8163](https://github.com/getsentry/sentry-python/pull/8163)
-- Stop unpacking output arrays by @alexander-alderman-webb in [#8160](https://github.com/getsentry/sentry-python/pull/8160)
-
-#### Other
-
-- (ci) Restrict pytest because of incompatibilities by @sentrivana in [#8140](https://github.com/getsentry/sentry-python/pull/8140)
-- (falcon) Handle integer HTTP statuses by @jap and @sentrivana in [#8139](https://github.com/getsentry/sentry-python/pull/8139)
-- (tracing) Drop trailing comma when serializing baggage without third-party items by @alphasafal and @pabloDeputter in [#8119](https://github.com/getsentry/sentry-python/pull/8119)
-- (wsgi) Stop overwriting `server.address` by @alexander-alderman-webb in [#8171](https://github.com/getsentry/sentry-python/pull/8171)
-
-### Internal Changes 🔧
-
-#### Deps
-
-- Lock file maintenance by @renovate in [#8055](https://github.com/getsentry/sentry-python/pull/8055)
-- Bump grpcio to 1.84.1 by @geoffg-sentry with @sentry-junior in [#8136](https://github.com/getsentry/sentry-python/pull/8136)
-- Bump uv to 0.13.5 by @geoffg-sentry with @sentry-junior in [#8135](https://github.com/getsentry/sentry-python/pull/8135)
-
-#### Other
-
-- (mcp) Remove unused select_mcp_transactions fixture by @sentrivana with @sentry-junior in [#8150](https://github.com/getsentry/sentry-python/pull/8150)
-- (release) Bump craft to 3.9.0 and update config by @BYK with @sentry-junior in [#8181](https://github.com/getsentry/sentry-python/pull/8181)
-- (sessions) Remove unused TERMINAL_SESSION_STATES constant by @sentrivana with @sentry-junior in [#8151](https://github.com/getsentry/sentry-python/pull/8151)
-- (starlette) Remove unused \_serialize_request_body_data helper by @sentry-junior in [#8146](https://github.com/getsentry/sentry-python/pull/8146)
-- (toxgen) Remove unused `get_file_hash()` and `get_last_updated()` helpers by @sentry-junior in [#8173](https://github.com/getsentry/sentry-python/pull/8173)
-- (tracing) Remove unused base64_stripped regex by @sentry-junior in [#8148](https://github.com/getsentry/sentry-python/pull/8148)
-- (utils) Remove unused to_timestamp helper and epoch constant by @sentry-junior in [#8147](https://github.com/getsentry/sentry-python/pull/8147)
-- 🤖 Update test matrix with new releases (11/02) by @sentrivana with @github-actions in [#8172](https://github.com/getsentry/sentry-python/pull/8172)
-- Upgrade `sphinx` and remove `packaging` upper bound by @alexander-alderman-webb in [#8183](https://github.com/getsentry/sentry-python/pull/8183)
-- Update test matrix with new releases (27/10) by @alexander-alderman-webb in [#8126](https://github.com/getsentry/sentry-python/pull/8126)
-
-### Other
-
-- Next Python SDK major by @sentrivana in [#5005](https://github.com/getsentry/sentry-python/pull/5005)
+### 🗞️ Resources
+- [2.x to 3.x migration guide](https://docs.sentry.io/platforms/python/migration/2.x-to-3.x)
+- [detailed changelog](https://github.com/getsentry/sentry-python/blob/major/3.0/MIGRATION_GUIDE.md)
 
 ## 3.0.0b2
 
-### New Features ✨
+This is a pre-release of the next Python SDK major, to be released in November 2026.
 
-- (arq) Add an option to monitor arq cron jobs by @wedamija in [#8051](https://github.com/getsentry/sentry-python/pull/8051)
-- (huey) Add an option to monitor Huey periodic tasks by @wedamija in [#8052](https://github.com/getsentry/sentry-python/pull/8052)
-- (rq) Add an option to monitor rq-scheduler jobs by @wedamija in [#8053](https://github.com/getsentry/sentry-python/pull/8053)
+Want to give it a spin? Be our guest and [let us know](https://github.com/getsentry/sentry-python/discussions) how it went!
 
-### Bug Fixes 🐛
+### ✨ Notable Changes
+- Say goodbye to transactions: span streaming is now the default tracing model
+- The fine-grained `data_collection` supersedes the flat `send_default_pii`
 
-- (aiohttp) Leave existing `baggage` header alone if it has existin… by @pabloDeputter in [#8116](https://github.com/getsentry/sentry-python/pull/8116)
-- (arq) Don't monitor cron jobs with unsupported schedules by @wedamija in [#8098](https://github.com/getsentry/sentry-python/pull/8098)
-- (attributes) Handle special float values correctly by @sentrivana in [#8067](https://github.com/getsentry/sentry-python/pull/8067)
-- (boto3) Adapt to botocore no longer signing baggage by @sentrivana in [#8113](https://github.com/getsentry/sentry-python/pull/8113)
-- (celery) Don't round down beat schedule intervals by @wedamija in [#7842](https://github.com/getsentry/sentry-python/pull/7842)
-- Exclude litellm==1.107.0 from extras by @jonny-norwine in [#8104](https://github.com/getsentry/sentry-python/pull/8104)
-
-### Internal Changes 🔧
-
-#### Deps
-
-- Bump brotli to 1.2.1 by @sentry-junior in [#8122](https://github.com/getsentry/sentry-python/pull/8122)
-- Update github workflows by @renovate in [#8045](https://github.com/getsentry/sentry-python/pull/8045)
-- Update github workflows by @renovate in [#8036](https://github.com/getsentry/sentry-python/pull/8036)
-
-#### Other
-
-- (monitor) Stop background health checks in tests that drive the monitor by @sentry-junior in [#8032](https://github.com/getsentry/sentry-python/pull/8032)
-- Update `AGENTS.md` by @sentrivana in [#8077](https://github.com/getsentry/sentry-python/pull/8077)
-
-### Other
-
-- Next Python SDK major by @sentrivana in [#5005](https://github.com/getsentry/sentry-python/pull/5005)
-- Testing merge by @sentrivana in [#8115](https://github.com/getsentry/sentry-python/pull/8115)
+### 🗞️ Resources
+- [2.x to 3.x migration guide](https://docs.sentry.io/platforms/python/migration/2.x-to-3.x)
+- [detailed changelog](https://github.com/getsentry/sentry-python/blob/major/3.0/MIGRATION_GUIDE.md)
 
 ## 3.0.0b1
 
@@ -86,11 +34,11 @@ This is a pre-release of the next Python SDK major, to be released in November 2
 
 Want to give it a spin? Be our guest and [let us know](https://github.com/getsentry/sentry-python/discussions) how it went!
 
-## ✨ Notable Changes
+### ✨ Notable Changes
 - Say goodbye to transactions: span streaming is now the default tracing model
 - The fine-grained `data_collection` supersedes the flat `send_default_pii`
 
-## 🗞️ Resources
+### 🗞️ Resources
 - [2.x to 3.x migration guide](https://docs.sentry.io/platforms/python/migration/2.x-to-3.x)
 - [detailed changelog](https://github.com/getsentry/sentry-python/blob/major/3.0/MIGRATION_GUIDE.md)
 
