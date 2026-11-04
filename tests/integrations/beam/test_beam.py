@@ -200,7 +200,7 @@ def test_invoker_normal(init_beam, fn):
 
 
 @pytest.mark.parametrize("fn", [test_simple, test_callable, test_place_holder])
-def test_invoker_exception(init_beam, capture_events, capture_exceptions, fn):
+def test_invoker_exception(init_beam, capture_events, fn):
     invoker = init_beam(fn)
     events = capture_events()
 

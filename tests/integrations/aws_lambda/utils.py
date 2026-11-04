@@ -27,6 +27,13 @@ LAMBDA_FUNCTION_WITH_EMBEDDED_SDK_DIR = (
 LAMBDA_FUNCTION_TIMEOUT = 10
 SAM_PORT = 3001
 
+# functions invoked through a published version or an alias instead of `$LATEST`:
+# function name -> (qualifier of the invoked ARN, version the qualifier resolves to)
+QUALIFIED_FUNCTIONS = {
+    "RaiseErrorSpanStreaming": ("5", "5"),
+    "BasicOkSpanStreamingDataCollection": ("prod", "5"),
+}
+
 PYTHON_VERSION = f"python{sys.version_info.major}.{sys.version_info.minor}"
 
 # Match the host CPU architecture so local runs on ARM machines (e.g. macOS)
@@ -145,12 +152,11 @@ class LocalLambdaStack(Stack):
             sdk_path = os.path.join(
                 LAMBDA_FUNCTION_WITH_EMBEDDED_SDK_DIR, lambda_dir, "sentry_sdk"
             )
-            if not os.path.exists(sdk_path):
-                # Find the Sentry SDK in the current environment
-                import sentry_sdk as sdk_module
+            # refresh the embedded SDK so repeated runs cannot use stale source files.
+            import sentry_sdk as sdk_module
 
-                sdk_source = os.path.dirname(sdk_module.__file__)
-                shutil.copytree(sdk_source, sdk_path)
+            sdk_source = os.path.dirname(sdk_module.__file__)
+            shutil.copytree(sdk_source, sdk_path, dirs_exist_ok=True)
 
             # Install the requirements of Sentry SDK into the function directory
             subprocess.check_call(
@@ -166,6 +172,18 @@ class LocalLambdaStack(Stack):
                 ]
             )
 
+            environment = {"SENTRY_DSN": dsn}
+            if lambda_dir in QUALIFIED_FUNCTIONS:
+                qualifier, function_version = QUALIFIED_FUNCTIONS[lambda_dir]
+                # SAM builds the invoked ARN from `AWS_LAMBDA_FUNCTION_NAME`,
+                # so the qualifier is appended there; the function's `index.py` strips it again.
+                environment.update(
+                    {
+                        "AWS_LAMBDA_FUNCTION_NAME": f"{lambda_dir}:{qualifier}",
+                        "AWS_LAMBDA_FUNCTION_VERSION": function_version,
+                    }
+                )
+
             CfnResource(
                 self,
                 lambda_dir,
@@ -179,9 +197,7 @@ class LocalLambdaStack(Stack):
                     "Timeout": LAMBDA_FUNCTION_TIMEOUT,
                     "Architectures": [ARCHITECTURE],
                     "Environment": {
-                        "Variables": {
-                            "SENTRY_DSN": dsn,
-                        }
+                        "Variables": environment,
                     },
                 },
             )

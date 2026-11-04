@@ -65,13 +65,10 @@ IGNORE = {
     "aws_lambda",
     "cloud_resource_context",
     "common",
-    "integration_deactivation",
     "shadowed_module",
     "gcp",
     "gevent",
-    "opentelemetry",
     "otlp",
-    "potel",
 }
 
 # Free-threading is experimentally supported in 3.13, and officially supported in 3.14.

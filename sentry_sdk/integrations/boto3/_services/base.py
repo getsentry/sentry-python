@@ -21,10 +21,6 @@ class _ServiceExtension:
         """Return an optional `sentry.op` override, or `None` to keep the default."""
         return None
 
-    def get_span_origin(self, ctx: "AwsCallContext") -> "Optional[str]":
-        """Return an optional `sentry.origin` override, or `None` to keep the default."""
-        return None
-
     def get_request_attributes(self, ctx: "AwsCallContext") -> "Attributes":
         """Return request attributes to add before the AWS request is made."""
         return {}

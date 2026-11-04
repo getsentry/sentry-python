@@ -1,8 +1,17 @@
 from typing import TYPE_CHECKING
 
 import sentry_sdk
-from sentry_sdk.integrations import Integration
-from sentry_sdk.utils import capture_internal_exceptions, ensure_integration_enabled
+from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
+from sentry_sdk.utils import (
+    capture_internal_exceptions,
+    ensure_integration_enabled,
+    parse_version,
+)
+
+try:
+    from pyspark import __version__ as PYSPARK_VERSION
+except ImportError:
+    raise DidNotEnable("pyspark is not installed")
 
 if TYPE_CHECKING:
     from typing import Any, Optional
@@ -17,6 +26,9 @@ class SparkIntegration(Integration):
 
     @staticmethod
     def setup_once() -> None:
+        version = parse_version(PYSPARK_VERSION)
+        _check_minimum_version(SparkIntegration, version)
+
         _setup_sentry_tracing()
 
 
