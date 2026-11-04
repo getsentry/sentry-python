@@ -53,13 +53,59 @@ TRACE_MODES = [
     ),
 ]
 
+# `sentry_init()` options, `include_prompts`, and whether prompts (inputs) and
+# responses (outputs) are recorded.
+GEN_AI_DATA_COLLECTION_CASES = [
+    pytest.param({}, True, False, False, id="default"),
+    pytest.param({"send_default_pii": True}, True, True, True, id="send_default_pii"),
+    pytest.param(
+        {"send_default_pii": True},
+        False,
+        False,
+        False,
+        id="send_default_pii_without_include_prompts",
+    ),
+    pytest.param({"data_collection": {}}, True, True, True, id="data_collection"),
+    pytest.param(
+        {"data_collection": {"gen_ai": {"inputs": True, "outputs": False}}},
+        True,
+        True,
+        False,
+        id="data_collection_inputs_only",
+    ),
+    pytest.param(
+        {"data_collection": {"gen_ai": {"inputs": False, "outputs": True}}},
+        True,
+        False,
+        True,
+        id="data_collection_outputs_only",
+    ),
+    pytest.param(
+        {
+            "send_default_pii": True,
+            "data_collection": {"gen_ai": {"inputs": False, "outputs": False}},
+        },
+        True,
+        False,
+        False,
+        id="data_collection_wins_over_send_default_pii",
+    ),
+    pytest.param(
+        {"data_collection": {"gen_ai": {"inputs": True, "outputs": True}}},
+        False,
+        True,
+        True,
+        id="data_collection_ignores_include_prompts",
+    ),
+]
+
 
 @pytest.fixture
 def init_bedrock(sentry_init):
-    def inner(trace_mode, **kwargs):
+    def inner(trace_mode, include_prompts=True, **kwargs):
         sentry_init(
             traces_sample_rate=1.0,
-            integrations=[Boto3Integration()],
+            integrations=[Boto3Integration(include_prompts=include_prompts)],
             server_name="",
             **trace_mode,
             **kwargs,
@@ -119,36 +165,19 @@ def _get_bedrock_span(spans, origin=AI_ORIGIN):
 
 @pytest.mark.parametrize("trace_mode", TRACE_MODES)
 @pytest.mark.parametrize(
-    "init_kwargs, record_inputs, record_outputs",
-    [
-        pytest.param({}, False, False, id="default"),
-        pytest.param({"send_default_pii": True}, True, True, id="send_default_pii"),
-        pytest.param(
-            {"data_collection": {"gen_ai": {"inputs": True, "outputs": False}}},
-            True,
-            False,
-            id="data_collection_inputs_only",
-        ),
-        pytest.param(
-            {
-                "send_default_pii": True,
-                "data_collection": {"gen_ai": {"inputs": False, "outputs": True}},
-            },
-            False,
-            True,
-            id="data_collection_wins_over_send_default_pii",
-        ),
-    ],
+    "init_kwargs, include_prompts, record_inputs, record_outputs",
+    GEN_AI_DATA_COLLECTION_CASES,
 )
 def test_converse(
     init_bedrock,
     capture_items,
     trace_mode,
     init_kwargs,
+    include_prompts,
     record_inputs,
     record_outputs,
 ):
-    client = init_bedrock(trace_mode, **init_kwargs)
+    client = init_bedrock(trace_mode, include_prompts=include_prompts, **init_kwargs)
     params = {
         "modelId": MODEL_ID,
         "system": [{"text": "You are a helpful assistant."}],

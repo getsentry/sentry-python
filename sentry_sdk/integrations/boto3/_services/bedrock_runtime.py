@@ -1,15 +1,16 @@
 import json
 from collections.abc import Mapping
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
+import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.boto3._services.base import _ServiceExtension
-from sentry_sdk.integrations.boto3.consts import AI_ORIGIN
-from sentry_sdk.tracing_utils import _should_collect_gen_ai
-from sentry_sdk.utils import capture_internal_exceptions
+from sentry_sdk.integrations.boto3.consts import AI_ORIGIN, IDENTIFIER
+from sentry_sdk.scope import should_send_default_pii
+from sentry_sdk.utils import capture_internal_exceptions, has_data_collection_enabled
 
 if TYPE_CHECKING:
-    from typing import Any, Optional, Union
+    from typing import Any, Literal, Optional, Union
 
     from sentry_sdk._types import (
         Attributes,
@@ -21,6 +22,7 @@ if TYPE_CHECKING:
         ToolCallResponsePart,
         ToolDefinition,
     )
+    from sentry_sdk.integrations.boto3 import Boto3Integration
     from sentry_sdk.integrations.boto3._context import AwsCallContext
 
     ContentPart = Union[TextPart, ReasoningPart, ToolCallPart, ToolCallResponsePart]
@@ -94,6 +96,24 @@ class _BedrockRuntimeExtension(_ServiceExtension):
         return _get_converse_response_attributes(response)
 
 
+def _should_record_gen_ai(kind: 'Literal["inputs", "outputs"]') -> bool:
+    """
+    Record prompts (`inputs`) or responses (`outputs`) as `data_collection` allows,
+    or, if it isn't set, with `send_default_pii` and `include_prompts`, like the
+    other gen_ai integrations.
+    """
+    client = sentry_sdk.get_client()
+    if has_data_collection_enabled(client.options):
+        return bool(client.options["data_collection"]["gen_ai"][kind])
+
+    integration = cast("Optional[Boto3Integration]", client.get_integration(IDENTIFIER))
+    return (
+        should_send_default_pii()
+        and integration is not None
+        and integration.include_prompts
+    )
+
+
 def _get_converse_request_attributes(params: "Mapping[str, Any]") -> "Attributes":
     """
     https://docs.aws.amazon.com/bedrock/latest/APIReference/API_runtime_Converse.html#API_runtime_Converse_RequestSyntax
@@ -117,7 +137,7 @@ def _get_converse_request_attributes(params: "Mapping[str, Any]") -> "Attributes
                 inference_config["stopSequences"]
             )
 
-    if not _should_collect_gen_ai("inputs"):
+    if not _should_record_gen_ai("inputs"):
         return attributes
 
     with capture_internal_exceptions():
@@ -160,7 +180,7 @@ def _get_converse_response_attributes(response: "Any") -> "Attributes":
     if isinstance(usage, Mapping):
         attributes.update(_get_usage_attributes(usage))
 
-    if not _should_collect_gen_ai("outputs"):
+    if not _should_record_gen_ai("outputs"):
         return attributes
 
     with capture_internal_exceptions():
