@@ -176,12 +176,18 @@ def _start_client_span(
     with capture_internal_exceptions():
         attributes.update(_get_client_attributes(ctx))
 
-    # `sentry.span_op` and `sentry.span_origin` are set to generic defaults;
-    # a service extension can override them with `get_span_op()` and `get_span_origin()`.
+    # the span name, `sentry.span_op`, and `sentry.span_origin` are set to generic defaults;
+    # a service extension can override them with `get_span_name()`, `get_span_op()`, and
+    # `get_span_origin()`.
     span_op = OP.HTTP_CLIENT
     span_origin = ORIGIN
 
     if service_ext is not None:
+        with capture_internal_exceptions():
+            service_span_name = service_ext.get_span_name(ctx)
+            if service_span_name is not None:
+                span_name = service_span_name
+
         with capture_internal_exceptions():
             service_op = service_ext.get_span_op(ctx)
             if service_op is not None:

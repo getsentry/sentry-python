@@ -17,6 +17,10 @@ class _ServiceExtension:
 
     __slots__ = ()
 
+    def get_span_name(self, ctx: "AwsCallContext") -> "Optional[str]":
+        """Return an optional span name override, or `None` to keep the default."""
+        return None
+
     def get_span_op(self, ctx: "AwsCallContext") -> "Optional[str]":
         """Return an optional `sentry.op` override, or `None` to keep the default."""
         return None
