@@ -8,6 +8,13 @@ from sentry_sdk.ai.utils import (
     truncate_and_annotate_messages,
 )
 from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.integrations import DidNotEnable
+from sentry_sdk.integrations.boto3._instrumentation import (
+    _finish_span,
+    _get_error_attributes,
+    _patch_streaming_body,
+    _set_span_attributes,
+)
 from sentry_sdk.integrations.boto3._services.base import _ServiceExtension
 from sentry_sdk.integrations.boto3.consts import AI_ORIGIN, IDENTIFIER
 from sentry_sdk.scope import should_send_default_pii
@@ -16,7 +23,7 @@ from sentry_sdk.tracing_utils import should_truncate_gen_ai_input
 from sentry_sdk.utils import capture_internal_exceptions, has_data_collection_enabled
 
 if TYPE_CHECKING:
-    from typing import Any, Literal, Optional, Union
+    from typing import Any, Callable, Iterable, Literal, Optional, Union
 
     from sentry_sdk._types import (
         Attributes,
@@ -35,6 +42,11 @@ if TYPE_CHECKING:
 
     ContentPart = Union[TextPart, ReasoningPart, ToolCallPart, ToolCallResponsePart]
 
+try:
+    from botocore.response import StreamingBody
+except ImportError:
+    raise DidNotEnable("botocore not installed")
+
 
 # `gen_ai.provider.name` of Amazon Bedrock.
 # https://opentelemetry.io/docs/specs/semconv/registry/attributes/gen-ai/#gen-ai-provider-name
@@ -43,7 +55,92 @@ PROVIDER_NAME = "aws.bedrock"
 # `gen_ai.operation.name` and span op of each instrumented operation.
 GEN_AI_OPERATIONS = {
     "Converse": ("chat", OP.GEN_AI_CHAT),
+    "InvokeModel": ("generate_content", OP.GEN_AI_GENERATE_CONTENT),
 }
+
+# `InvokeModel` request and response bodies have a model-specific format. For each
+# model family: the object that holds the inference parameters in the request body,
+# or `None` for the top level, and the attribute of each parameter.
+# The model family is matched in the model ID, which can also be an inference profile
+# ID or an ARN, e.g. `us.anthropic.claude-3-5-sonnet-20240620-v1:0`, in this order;
+# `cohere.command-r` has to be matched before `cohere.command`.
+# https://docs.aws.amazon.com/bedrock/latest/userguide/model-parameters.html
+INVOKE_MODEL_PARAMETERS = {
+    "amazon.titan": (
+        "textGenerationConfig",
+        {
+            "maxTokenCount": SPANDATA.GEN_AI_REQUEST_MAX_TOKENS,
+            "temperature": SPANDATA.GEN_AI_REQUEST_TEMPERATURE,
+            "topP": SPANDATA.GEN_AI_REQUEST_TOP_P,
+            "stopSequences": SPANDATA.GEN_AI_REQUEST_STOP_SEQUENCES,
+        },
+    ),
+    "amazon.nova": (
+        "inferenceConfig",
+        {
+            "max_new_tokens": SPANDATA.GEN_AI_REQUEST_MAX_TOKENS,
+            "temperature": SPANDATA.GEN_AI_REQUEST_TEMPERATURE,
+            "top_p": SPANDATA.GEN_AI_REQUEST_TOP_P,
+            "stopSequences": SPANDATA.GEN_AI_REQUEST_STOP_SEQUENCES,
+        },
+    ),
+    "anthropic.claude": (
+        None,
+        {
+            "max_tokens": SPANDATA.GEN_AI_REQUEST_MAX_TOKENS,
+            "temperature": SPANDATA.GEN_AI_REQUEST_TEMPERATURE,
+            "top_p": SPANDATA.GEN_AI_REQUEST_TOP_P,
+            "stop_sequences": SPANDATA.GEN_AI_REQUEST_STOP_SEQUENCES,
+        },
+    ),
+    "meta.llama": (
+        None,
+        {
+            "max_gen_len": SPANDATA.GEN_AI_REQUEST_MAX_TOKENS,
+            "temperature": SPANDATA.GEN_AI_REQUEST_TEMPERATURE,
+            "top_p": SPANDATA.GEN_AI_REQUEST_TOP_P,
+        },
+    ),
+    "cohere.command-r": (
+        None,
+        {
+            "max_tokens": SPANDATA.GEN_AI_REQUEST_MAX_TOKENS,
+            "temperature": SPANDATA.GEN_AI_REQUEST_TEMPERATURE,
+            "p": SPANDATA.GEN_AI_REQUEST_TOP_P,
+            "stop_sequences": SPANDATA.GEN_AI_REQUEST_STOP_SEQUENCES,
+        },
+    ),
+    "cohere.command": (
+        None,
+        {
+            "max_tokens": SPANDATA.GEN_AI_REQUEST_MAX_TOKENS,
+            "temperature": SPANDATA.GEN_AI_REQUEST_TEMPERATURE,
+            "p": SPANDATA.GEN_AI_REQUEST_TOP_P,
+            "stop_sequences": SPANDATA.GEN_AI_REQUEST_STOP_SEQUENCES,
+        },
+    ),
+    "mistral": (
+        None,
+        {
+            "max_tokens": SPANDATA.GEN_AI_REQUEST_MAX_TOKENS,
+            "temperature": SPANDATA.GEN_AI_REQUEST_TEMPERATURE,
+            "top_p": SPANDATA.GEN_AI_REQUEST_TOP_P,
+            "stop": SPANDATA.GEN_AI_REQUEST_STOP_SEQUENCES,
+        },
+    ),
+}
+
+# the prompt of model families that take a single text prompt in `InvokeModel`.
+INVOKE_MODEL_PROMPTS = {
+    "amazon.titan": "inputText",
+    "meta.llama": "prompt",
+    "cohere.command-r": "message",
+    "cohere.command": "prompt",
+    "mistral": "prompt",
+}
+
+# larger `InvokeModel` response bodies aren't parsed, e.g. image generation results.
+MAX_INVOKE_MODEL_RESPONSE_BYTES = 1_000_000
 
 
 class _BedrockRuntimeExtension(_ServiceExtension):
@@ -90,33 +187,110 @@ class _BedrockRuntimeExtension(_ServiceExtension):
         if model_id:
             attributes[SPANDATA.GEN_AI_REQUEST_MODEL] = model_id
 
-        with capture_internal_exceptions():
-            attributes.update(_get_converse_request_attributes(ctx.params))
+        if ctx.operation_name != "InvokeModel":
+            with capture_internal_exceptions():
+                attributes.update(_get_converse_request_attributes(ctx.params))
 
         return attributes
 
     def get_span_start_attributes(
         self, ctx: "AwsCallContext", span: "Union[Span, StreamedSpan]"
     ) -> "Attributes":
-        if (
-            ctx.operation_name not in GEN_AI_OPERATIONS
-            # e.g. a span dropped by `ignore_spans`.
-            or isinstance(span, NoOpStreamedSpan)
-            or not _should_record_gen_ai("inputs")
+        # e.g. a span dropped by `ignore_spans`.
+        if ctx.operation_name not in GEN_AI_OPERATIONS or isinstance(
+            span, NoOpStreamedSpan
         ):
             return {}
 
+        # the request body is parsed once, for its parameters and input messages.
+        if ctx.operation_name == "InvokeModel":
+            return _get_invoke_model_request_attributes(
+                span,
+                _get_model_family(ctx.params.get("modelId")),
+                ctx.params.get("body"),
+            )
+
+        if not _should_record_gen_ai("inputs"):
+            return {}
+
         return _get_input_messages_attributes(
-            span, _transform_input_messages(ctx.params.get("messages"))
+            span,
+            _transform_input_messages(
+                ctx.params.get("messages"), _transform_content_blocks
+            ),
         )
 
     def get_response_attributes(
         self, ctx: "AwsCallContext", response: "Any"
     ) -> "Attributes":
-        if ctx.operation_name not in GEN_AI_OPERATIONS:
+        if ctx.operation_name != "Converse":
             return {}
 
         return _get_converse_response_attributes(response)
+
+    def instrument_response(
+        self,
+        ctx: "AwsCallContext",
+        span: "Union[Span, StreamedSpan]",
+        response: "Any",
+    ) -> bool:
+        """
+        The `InvokeModel` response body is a `StreamingBody`. Its bytes are recorded
+        as the caller reads them, and the span finishes once it's read or closed.
+        """
+        if ctx.operation_name != "InvokeModel" or isinstance(span, NoOpStreamedSpan):
+            return False
+
+        body = response.get("body") if isinstance(response, Mapping) else None
+        if not isinstance(body, StreamingBody):
+            return False
+
+        model_family = _get_model_family(ctx.params.get("modelId"))
+        headers = response.get("ResponseMetadata", {}).get("HTTPHeaders", {})
+        chunks: "list[bytes]" = []
+        size = 0
+
+        def on_read(data: bytes) -> None:
+            nonlocal size
+            if model_family is None or size > MAX_INVOKE_MODEL_RESPONSE_BYTES:
+                return
+
+            size += len(data)
+            if size > MAX_INVOKE_MODEL_RESPONSE_BYTES:
+                chunks.clear()
+            else:
+                chunks.append(data)
+
+        def on_finish(error: "Optional[BaseException]") -> None:
+            attributes: "Attributes" = {}
+            if error is not None:
+                with capture_internal_exceptions():
+                    attributes.update(_get_error_attributes(error))
+            else:
+                with capture_internal_exceptions():
+                    attributes.update(
+                        _get_invoke_model_response_attributes(
+                            model_family, b"".join(chunks), headers
+                        )
+                    )
+
+            with capture_internal_exceptions():
+                _set_span_attributes(span, attributes)
+            _finish_span(span, error)
+
+        _patch_streaming_body(body, on_finish, on_read)
+        return True
+
+
+def _get_model_family(model_id: "Any") -> "Optional[str]":
+    if not isinstance(model_id, str):
+        return None
+
+    for model_family in INVOKE_MODEL_PARAMETERS:
+        if model_family in model_id:
+            return model_family
+
+    return None
 
 
 def _should_record_gen_ai(kind: 'Literal["inputs", "outputs"]') -> bool:
@@ -161,24 +335,107 @@ def _get_converse_request_attributes(params: "Mapping[str, Any]") -> "Attributes
                 inference_config["stopSequences"]
             )
 
+    if _should_record_gen_ai("inputs"):
+        attributes.update(_get_converse_input_attributes(params))
+
+    return attributes
+
+
+def _get_converse_input_attributes(request: "Mapping[str, Any]") -> "Attributes":
+    """
+    Get the input attributes, except the input messages, of a request in the Converse
+    format, which `InvokeModel` requests to Amazon Nova models also use.
+    """
+    tool_config = request.get("toolConfig")
+    return _get_input_attributes(
+        _transform_system_instructions(request.get("system")),
+        _transform_tool_definitions(
+            tool_config.get("tools") if isinstance(tool_config, Mapping) else None
+        ),
+    )
+
+
+def _get_invoke_model_request_attributes(
+    span: "Union[Span, StreamedSpan]", model_family: "Optional[str]", body: "Any"
+) -> "Attributes":
+    """
+    A request body that is a file-like object isn't read, as that would consume it.
+    https://docs.aws.amazon.com/bedrock/latest/userguide/model-parameters.html
+    """
+    if model_family is None or not isinstance(body, (bytes, bytearray, str)):
+        return {}
+
+    request = json.loads(body)
+
+    if not isinstance(request, Mapping):
+        return {}
+
+    attributes: "Attributes" = {}
+
+    parameters_key, parameters = INVOKE_MODEL_PARAMETERS[model_family]
+    request_parameters = (
+        request.get(parameters_key) if parameters_key is not None else request
+    )
+    if isinstance(request_parameters, Mapping):
+        for key, attribute in parameters.items():
+            value = request_parameters.get(key)
+            if isinstance(value, (int, float, str, list)):
+                attributes[attribute] = value
+
     if not _should_record_gen_ai("inputs"):
         return attributes
 
+    input_messages: "list[InputMessage]" = []
+    if model_family == "amazon.nova":
+        attributes.update(_get_converse_input_attributes(request))
+        input_messages = _transform_input_messages(
+            request.get("messages"), _transform_content_blocks
+        )
+    elif model_family == "anthropic.claude":
+        attributes.update(
+            _get_input_attributes(
+                _transform_system_instructions(request.get("system")),
+                _transform_anthropic_tool_definitions(request.get("tools")),
+            )
+        )
+        input_messages = _transform_input_messages(
+            request.get("messages"), _transform_anthropic_content
+        )
+    else:
+        # Cohere Command R's system prompt.
+        attributes.update(
+            _get_input_attributes(
+                _transform_system_instructions(request.get("preamble")), []
+            )
+        )
+        prompt = request.get(INVOKE_MODEL_PROMPTS[model_family])
+        if isinstance(prompt, str):
+            input_messages = [
+                {"role": "user", "parts": [{"type": "text", "content": prompt}]}
+            ]
+
     with capture_internal_exceptions():
-        system_instructions = _transform_system_instructions(params.get("system"))
+        attributes.update(_get_input_messages_attributes(span, input_messages))
+
+    return attributes
+
+
+def _get_input_attributes(
+    system_instructions: "list[TextPart]", tool_definitions: "list[ToolDefinition]"
+) -> "Attributes":
+    attributes: "Attributes" = {}
+
+    # serialize each attribute separately so that an unserializable value only drops
+    # the attribute it's in.
+    with capture_internal_exceptions():
         if system_instructions:
             attributes[SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS] = json.dumps(
                 system_instructions
             )
 
     with capture_internal_exceptions():
-        tool_config = params.get("toolConfig")
-        if isinstance(tool_config, Mapping):
-            tool_definitions = _transform_tool_definitions(tool_config.get("tools"))
-            if tool_definitions:
-                attributes[SPANDATA.GEN_AI_TOOL_DEFINITIONS] = json.dumps(
-                    tool_definitions
-                )
+        if tool_definitions:
+            attributes[SPANDATA.GEN_AI_TOOL_DEFINITIONS] = json.dumps(tool_definitions)
 
     return attributes
 
@@ -246,38 +503,162 @@ def _get_converse_response_attributes(response: "Any") -> "Attributes":
 
     usage = response.get("usage")
     if isinstance(usage, Mapping):
-        attributes.update(_get_usage_attributes(usage))
+        attributes.update(
+            _get_usage_attributes(
+                usage.get("inputTokens"),
+                usage.get("outputTokens"),
+                usage.get("cacheReadInputTokens"),
+                usage.get("cacheWriteInputTokens"),
+                usage.get("totalTokens"),
+            )
+        )
 
-    if not _should_record_gen_ai("outputs"):
-        return attributes
-
-    with capture_internal_exceptions():
-        output = response.get("output")
-        message = output.get("message") if isinstance(output, Mapping) else None
-        if isinstance(message, Mapping):
-            output_message: "OutputMessage" = {"role": "assistant", "parts": []}
-            for part in _transform_content_blocks(message.get("content")):
-                # models don't respond with tool results.
-                if part["type"] != "tool_call_response":
-                    output_message["parts"].append(part)
-            attributes[SPANDATA.GEN_AI_OUTPUT_MESSAGES] = json.dumps([output_message])
+    output = response.get("output")
+    message = output.get("message") if isinstance(output, Mapping) else None
+    if isinstance(message, Mapping):
+        attributes.update(
+            _get_output_attributes(
+                [_to_output_message(_transform_content_blocks(message.get("content")))]
+            )
+        )
 
     return attributes
 
 
-def _get_usage_attributes(usage: "Mapping[str, Any]") -> "Attributes":
+def _get_invoke_model_response_attributes(
+    model_family: "Optional[str]", body: bytes, headers: "Mapping[str, str]"
+) -> "Attributes":
     """
-    Bedrock's `inputTokens` excludes the tokens read from or written to the prompt
+    https://docs.aws.amazon.com/bedrock/latest/userguide/model-parameters.html
+    """
+    attributes: "Attributes" = {}
+
+    response = None
+    if model_family is not None and body:
+        try:
+            response = json.loads(body)
+        except ValueError:
+            # e.g. a body that was closed before being read completely.
+            pass
+
+    if isinstance(response, Mapping):
+        with capture_internal_exceptions():
+            attributes.update(_parse_invoke_model_response(model_family, response))
+
+    # Bedrock reports the token usage of every model in response headers.
+    for attribute, header in (
+        (SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, "x-amzn-bedrock-input-token-count"),
+        (SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS, "x-amzn-bedrock-output-token-count"),
+    ):
+        if attribute not in attributes and header in headers:
+            with capture_internal_exceptions():
+                attributes[attribute] = int(headers[header])
+
+    return attributes
+
+
+def _parse_invoke_model_response(
+    model_family: "Optional[str]", response: "Mapping[str, Any]"
+) -> "Attributes":
+    attributes: "Attributes" = {}
+    finish_reasons: "list[Any]" = []
+    output_messages: "list[OutputMessage]" = []
+
+    if model_family == "amazon.nova":
+        usage = response.get("usage") or {}
+        attributes.update(
+            _get_usage_attributes(
+                usage.get("inputTokens"),
+                usage.get("outputTokens"),
+                usage.get("cacheReadInputTokenCount"),
+                usage.get("cacheWriteInputTokenCount"),
+                usage.get("totalTokens"),
+            )
+        )
+        finish_reasons = [response.get("stopReason")]
+        message = (response.get("output") or {}).get("message")
+        if isinstance(message, Mapping):
+            output_messages = [
+                _to_output_message(_transform_content_blocks(message.get("content")))
+            ]
+
+    elif model_family == "anthropic.claude":
+        usage = response.get("usage") or {}
+        attributes.update(
+            _get_usage_attributes(
+                usage.get("input_tokens"),
+                usage.get("output_tokens"),
+                usage.get("cache_read_input_tokens"),
+                usage.get("cache_creation_input_tokens"),
+            )
+        )
+        finish_reasons = [response.get("stop_reason")]
+        output_messages = [
+            _to_output_message(_transform_anthropic_content(response.get("content")))
+        ]
+
+    elif model_family == "amazon.titan":
+        results = response.get("results") or []
+        attributes.update(
+            _get_usage_attributes(
+                response.get("inputTextTokenCount"),
+                results[0].get("tokenCount") if results else None,
+            )
+        )
+        finish_reasons = [result.get("completionReason") for result in results]
+        output_messages = _to_text_output_messages(
+            result.get("outputText") for result in results
+        )
+
+    elif model_family == "meta.llama":
+        attributes.update(
+            _get_usage_attributes(
+                response.get("prompt_token_count"),
+                response.get("generation_token_count"),
+            )
+        )
+        finish_reasons = [response.get("stop_reason")]
+        output_messages = _to_text_output_messages([response.get("generation")])
+
+    elif model_family == "cohere.command-r":
+        finish_reasons = [response.get("finish_reason")]
+        output_messages = _to_text_output_messages([response.get("text")])
+
+    elif model_family == "cohere.command":
+        generations = response.get("generations") or []
+        finish_reasons = [generation.get("finish_reason") for generation in generations]
+        output_messages = _to_text_output_messages(
+            generation.get("text") for generation in generations
+        )
+
+    elif model_family == "mistral":
+        outputs = response.get("outputs") or []
+        finish_reasons = [output.get("stop_reason") for output in outputs]
+        output_messages = _to_text_output_messages(
+            output.get("text") for output in outputs
+        )
+
+    finish_reasons = [reason for reason in finish_reasons if isinstance(reason, str)]
+    if finish_reasons:
+        attributes[SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] = finish_reasons
+
+    attributes.update(_get_output_attributes(output_messages))
+    return attributes
+
+
+def _get_usage_attributes(
+    input_tokens: "Any",
+    output_tokens: "Any",
+    cache_read_input_tokens: "Any" = None,
+    cache_write_input_tokens: "Any" = None,
+    total_tokens: "Any" = None,
+) -> "Attributes":
+    """
+    Bedrock's input tokens exclude the tokens read from or written to the prompt
     cache, but `gen_ai.usage.input_tokens` includes them.
     https://docs.aws.amazon.com/bedrock/latest/userguide/prompt-caching.html
     """
     attributes: "Attributes" = {}
-
-    input_tokens = usage.get("inputTokens")
-    output_tokens = usage.get("outputTokens")
-    total_tokens = usage.get("totalTokens")
-    cache_read_input_tokens = usage.get("cacheReadInputTokens")
-    cache_write_input_tokens = usage.get("cacheWriteInputTokens")
 
     if cache_read_input_tokens is not None:
         attributes[SPANDATA.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS] = (
@@ -301,7 +682,42 @@ def _get_usage_attributes(usage: "Mapping[str, Any]") -> "Attributes":
     return attributes
 
 
+def _get_output_attributes(output_messages: "list[OutputMessage]") -> "Attributes":
+    attributes: "Attributes" = {}
+    if not output_messages or not _should_record_gen_ai("outputs"):
+        return attributes
+
+    with capture_internal_exceptions():
+        attributes[SPANDATA.GEN_AI_OUTPUT_MESSAGES] = json.dumps(output_messages)
+
+    return attributes
+
+
+def _to_output_message(parts: "list[ContentPart]") -> "OutputMessage":
+    output_message: "OutputMessage" = {"role": "assistant", "parts": []}
+    for part in parts:
+        # models don't respond with tool results.
+        if part["type"] != "tool_call_response":
+            output_message["parts"].append(part)
+
+    return output_message
+
+
+def _to_text_output_messages(texts: "Iterable[Any]") -> "list[OutputMessage]":
+    return [
+        {"role": "assistant", "parts": [{"type": "text", "content": text}]}
+        for text in texts
+        if isinstance(text, str)
+    ]
+
+
 def _transform_system_instructions(system: "Any") -> "list[TextPart]":
+    """
+    Transform a system prompt, or a list of Converse or Anthropic system content blocks.
+    """
+    if isinstance(system, str):
+        return [{"type": "text", "content": system}]
+
     if not isinstance(system, (list, tuple)):
         return []
 
@@ -312,10 +728,12 @@ def _transform_system_instructions(system: "Any") -> "list[TextPart]":
     ]
 
 
-def _transform_input_messages(messages: "Any") -> "list[InputMessage]":
+def _transform_input_messages(
+    messages: "Any", transform_content: "Callable[[Any], list[ContentPart]]"
+) -> "list[InputMessage]":
     """
-    Bedrock sends tool results in `user` messages; they're recorded as `tool`
-    messages, which is how `gen_ai.input.messages` represents them.
+    Tool results are sent in `user` messages; they're recorded as `tool` messages,
+    which is how `gen_ai.input.messages` represents them.
     """
     if not isinstance(messages, (list, tuple)):
         return []
@@ -331,7 +749,7 @@ def _transform_input_messages(messages: "Any") -> "list[InputMessage]":
 
         parts: "list[ContentPart]" = []
         tool_parts: "list[ContentPart]" = []
-        for part in _transform_content_blocks(message.get("content")):
+        for part in transform_content(message.get("content")):
             if part["type"] == "tool_call_response":
                 tool_parts.append(part)
             else:
@@ -402,6 +820,57 @@ def _transform_content_blocks(content: "Any") -> "list[ContentPart]":
     return parts
 
 
+def _transform_anthropic_content(content: "Any") -> "list[ContentPart]":
+    """
+    Transform the text, thinking, tool use, and tool result content of an Anthropic
+    Claude message. Media content, e.g. images and documents, is not recorded.
+    https://docs.aws.amazon.com/bedrock/latest/userguide/model-parameters-anthropic-claude-messages-request-response.html
+    """
+    if isinstance(content, str):
+        return [{"type": "text", "content": content}]
+
+    if not isinstance(content, (list, tuple)):
+        return []
+
+    parts: "list[ContentPart]" = []
+    for block in content:
+        if not isinstance(block, Mapping):
+            continue
+
+        block_type = block.get("type")
+        if block_type == "text" and isinstance(block.get("text"), str):
+            parts.append({"type": "text", "content": block["text"]})
+
+        elif block_type == "thinking" and isinstance(block.get("thinking"), str):
+            parts.append({"type": "reasoning", "content": block["thinking"]})
+
+        elif block_type == "tool_use":
+            tool_call: "ToolCallPart" = {"type": "tool_call"}
+            if "id" in block:
+                tool_call["id"] = block["id"]
+            if "name" in block:
+                tool_call["name"] = block["name"]
+            if "input" in block:
+                tool_call["arguments"] = block["input"]
+            parts.append(tool_call)
+
+        elif block_type == "tool_result":
+            tool_response: "ToolCallResponsePart" = {"type": "tool_call_response"}
+            if "tool_use_id" in block:
+                tool_response["id"] = block["tool_use_id"]
+
+            result = [
+                part["content"]
+                for part in _transform_anthropic_content(block.get("content"))
+                if part["type"] == "text"
+            ]
+            if result:
+                tool_response["result"] = result[0] if len(result) == 1 else result
+            parts.append(tool_response)
+
+    return parts
+
+
 def _transform_tool_definitions(tools: "Any") -> "list[ToolDefinition]":
     """
     https://docs.aws.amazon.com/bedrock/latest/APIReference/API_runtime_ToolSpecification.html
@@ -415,17 +884,37 @@ def _transform_tool_definitions(tools: "Any") -> "list[ToolDefinition]":
         if not isinstance(tool_spec, Mapping):
             continue
 
-        tool_definition: "ToolDefinition" = {"type": "function"}
-        if "name" in tool_spec:
-            tool_definition["name"] = tool_spec["name"]
-        if "description" in tool_spec:
-            tool_definition["description"] = tool_spec["description"]
-
         input_schema = tool_spec.get("inputSchema")
-        if isinstance(input_schema, Mapping) and isinstance(
-            input_schema.get("json"), Mapping
-        ):
-            tool_definition["parameters"] = dict(input_schema["json"])
-        tool_definitions.append(tool_definition)
+        tool_definitions.append(
+            _to_tool_definition(
+                tool_spec,
+                input_schema.get("json") if isinstance(input_schema, Mapping) else None,
+            )
+        )
 
     return tool_definitions
+
+
+def _transform_anthropic_tool_definitions(tools: "Any") -> "list[ToolDefinition]":
+    if not isinstance(tools, (list, tuple)):
+        return []
+
+    return [
+        _to_tool_definition(tool, tool.get("input_schema"))
+        for tool in tools
+        if isinstance(tool, Mapping)
+    ]
+
+
+def _to_tool_definition(
+    tool: "Mapping[str, Any]", parameters: "Any"
+) -> "ToolDefinition":
+    tool_definition: "ToolDefinition" = {"type": "function"}
+    if "name" in tool:
+        tool_definition["name"] = tool["name"]
+    if "description" in tool:
+        tool_definition["description"] = tool["description"]
+    if isinstance(parameters, Mapping):
+        tool_definition["parameters"] = dict(parameters)
+
+    return tool_definition

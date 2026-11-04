@@ -1321,6 +1321,7 @@ class OP:
     GEN_AI_EMBEDDINGS = "gen_ai.embeddings"
     GEN_AI_EVALUATE = "gen_ai.evaluate"
     GEN_AI_EXECUTE_TOOL = "gen_ai.execute_tool"
+    GEN_AI_GENERATE_CONTENT = "gen_ai.generate_content"
     GEN_AI_TEXT_COMPLETION = "gen_ai.text_completion"
     GEN_AI_HANDOFF = "gen_ai.handoff"
     GEN_AI_INVOKE_AGENT = "gen_ai.invoke_agent"

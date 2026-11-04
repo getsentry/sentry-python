@@ -50,3 +50,16 @@ class _ServiceExtension:
     ) -> "Attributes":
         """Return response attributes to add after the AWS request is made."""
         return {}
+
+    def instrument_response(
+        self,
+        ctx: "AwsCallContext",
+        span: "Union[Span, StreamedSpan]",
+        response: "Any",
+    ) -> bool:
+        """
+        Instrument a response that is read after the AWS request is made, e.g. a
+        streaming body. Return `True` if the extension finishes `span` once the
+        response is read, or `False` to finish it when the request is made.
+        """
+        return False
