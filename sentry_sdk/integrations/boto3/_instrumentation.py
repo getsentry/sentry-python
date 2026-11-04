@@ -213,13 +213,19 @@ def _start_client_span(
                 SPANDATA.SENTRY_ORIGIN: span_origin,
             }
         )
-        return sentry_sdk.traces.start_span(
+        streamed_span = sentry_sdk.traces.start_span(
             name=span_name,
             attributes=attributes,
             # `StreamingBody` responses outlive `_make_api_call()`. `_activate_client_span()`
             # activates this span only while the call itself runs.
             active=False,
         )
+        if service_ext is not None:
+            with capture_internal_exceptions():
+                streamed_span.set_attributes(
+                    service_ext.get_span_start_attributes(ctx, streamed_span)
+                )
+        return streamed_span
 
     span = sentry_sdk.start_span(
         name=span_name,
@@ -228,6 +234,9 @@ def _start_client_span(
     )
     with capture_internal_exceptions():
         _set_span_attributes(span, attributes)
+    if service_ext is not None:
+        with capture_internal_exceptions():
+            _set_span_attributes(span, service_ext.get_span_start_attributes(ctx, span))
     with capture_internal_exceptions():
         if ctx.service_id_hyphenized is not None:
             span.set_tag("aws.service_id", ctx.service_id_hyphenized)

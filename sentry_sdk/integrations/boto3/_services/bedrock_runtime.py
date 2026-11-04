@@ -3,10 +3,12 @@ from collections.abc import Mapping
 from typing import TYPE_CHECKING, cast
 
 import sentry_sdk
+from sentry_sdk.ai.utils import truncate_and_annotate_messages
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.boto3._services.base import _ServiceExtension
 from sentry_sdk.integrations.boto3.consts import AI_ORIGIN, IDENTIFIER
 from sentry_sdk.scope import should_send_default_pii
+from sentry_sdk.tracing_utils import should_truncate_gen_ai_input
 from sentry_sdk.utils import capture_internal_exceptions, has_data_collection_enabled
 
 if TYPE_CHECKING:
@@ -24,6 +26,8 @@ if TYPE_CHECKING:
     )
     from sentry_sdk.integrations.boto3 import Boto3Integration
     from sentry_sdk.integrations.boto3._context import AwsCallContext
+    from sentry_sdk.traces import StreamedSpan
+    from sentry_sdk.tracing import Span
 
     ContentPart = Union[TextPart, ReasoningPart, ToolCallPart, ToolCallResponsePart]
 
@@ -82,10 +86,15 @@ class _BedrockRuntimeExtension(_ServiceExtension):
         if model_id:
             attributes[SPANDATA.GEN_AI_REQUEST_MODEL] = model_id
 
-        with capture_internal_exceptions():
-            attributes.update(_get_converse_request_attributes(ctx.params))
-
         return attributes
+
+    def get_span_start_attributes(
+        self, ctx: "AwsCallContext", span: "Union[Span, StreamedSpan]"
+    ) -> "Attributes":
+        if ctx.operation_name not in GEN_AI_OPERATIONS:
+            return {}
+
+        return _get_converse_request_attributes(span, ctx.params)
 
     def get_response_attributes(
         self, ctx: "AwsCallContext", response: "Any"
@@ -114,7 +123,9 @@ def _should_record_gen_ai(kind: 'Literal["inputs", "outputs"]') -> bool:
     )
 
 
-def _get_converse_request_attributes(params: "Mapping[str, Any]") -> "Attributes":
+def _get_converse_request_attributes(
+    span: "Union[Span, StreamedSpan]", params: "Mapping[str, Any]"
+) -> "Attributes":
     """
     https://docs.aws.amazon.com/bedrock/latest/APIReference/API_runtime_Converse.html#API_runtime_Converse_RequestSyntax
     """
@@ -148,9 +159,11 @@ def _get_converse_request_attributes(params: "Mapping[str, Any]") -> "Attributes
             )
 
     with capture_internal_exceptions():
-        input_messages = _transform_input_messages(params.get("messages"))
-        if input_messages:
-            attributes[SPANDATA.GEN_AI_INPUT_MESSAGES] = json.dumps(input_messages)
+        attributes.update(
+            _get_input_messages_attributes(
+                span, _transform_input_messages(params.get("messages"))
+            )
+        )
 
     with capture_internal_exceptions():
         tool_config = params.get("toolConfig")
@@ -162,6 +175,28 @@ def _get_converse_request_attributes(params: "Mapping[str, Any]") -> "Attributes
                 )
 
     return attributes
+
+
+def _get_input_messages_attributes(
+    span: "Union[Span, StreamedSpan]", input_messages: "list[InputMessage]"
+) -> "Attributes":
+    """
+    Like the other `gen_ai` integrations, only the last message is kept when
+    `gen_ai` spans are sent in transactions, so that long histories don't exceed
+    the transaction size limit.
+    """
+    messages: "Optional[list[dict[str, Any]]]" = cast(
+        "list[dict[str, Any]]", input_messages
+    )
+    if should_truncate_gen_ai_input(sentry_sdk.get_client().options):
+        messages = truncate_and_annotate_messages(
+            messages, span, sentry_sdk.get_current_scope()
+        )
+
+    if not messages:
+        return {}
+
+    return {SPANDATA.GEN_AI_INPUT_MESSAGES: json.dumps(messages)}
 
 
 def _get_converse_response_attributes(response: "Any") -> "Attributes":

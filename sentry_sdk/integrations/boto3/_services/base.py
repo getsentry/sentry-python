@@ -1,10 +1,12 @@
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any, Optional
+    from typing import Any, Optional, Union
 
     from sentry_sdk._types import Attributes
     from sentry_sdk.integrations.boto3._context import AwsCallContext
+    from sentry_sdk.traces import StreamedSpan
+    from sentry_sdk.tracing import Span
 
 
 class _ServiceExtension:
@@ -31,6 +33,16 @@ class _ServiceExtension:
 
     def get_request_attributes(self, ctx: "AwsCallContext") -> "Attributes":
         """Return request attributes to add before the AWS request is made."""
+        return {}
+
+    def get_span_start_attributes(
+        self, ctx: "AwsCallContext", span: "Union[Span, StreamedSpan]"
+    ) -> "Attributes":
+        """
+        Return request attributes that need the started span, e.g. truncated
+        `gen_ai` messages. Unlike `get_request_attributes()`, they're added after
+        the span starts, so `ignore_spans` doesn't see them.
+        """
         return {}
 
     def get_response_attributes(

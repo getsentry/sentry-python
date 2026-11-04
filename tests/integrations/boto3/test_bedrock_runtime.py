@@ -154,6 +154,16 @@ def _capture_spans(capture_items, trace_mode, call):
     return spans
 
 
+def _expected_input_messages(trace_mode, input_messages):
+    """
+    Like the other `gen_ai` integrations, only the last input message is kept when
+    `gen_ai` spans are sent in transactions.
+    """
+    if trace_mode.get("stream_gen_ai_spans") is False:
+        return input_messages[-1:]
+    return input_messages
+
+
 def _get_bedrock_span(spans, origin=AI_ORIGIN):
     (span,) = (
         span
@@ -181,7 +191,11 @@ def test_converse(
     params = {
         "modelId": MODEL_ID,
         "system": [{"text": "You are a helpful assistant."}],
-        "messages": [{"role": "user", "content": [{"text": "Hello!"}]}],
+        "messages": [
+            {"role": "user", "content": [{"text": "Hi!"}]},
+            {"role": "assistant", "content": [{"text": "Hi! What do you need?"}]},
+            {"role": "user", "content": [{"text": "Hello!"}]},
+        ],
         "inferenceConfig": {
             "maxTokens": 100,
             "temperature": 0.5,
@@ -243,9 +257,19 @@ def test_converse(
         assert json.loads(attributes[SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]) == [
             {"type": "text", "content": "You are a helpful assistant."}
         ]
-        assert json.loads(attributes[SPANDATA.GEN_AI_INPUT_MESSAGES]) == [
-            {"role": "user", "parts": [{"type": "text", "content": "Hello!"}]}
-        ]
+        assert json.loads(
+            attributes[SPANDATA.GEN_AI_INPUT_MESSAGES]
+        ) == _expected_input_messages(
+            trace_mode,
+            [
+                {"role": "user", "parts": [{"type": "text", "content": "Hi!"}]},
+                {
+                    "role": "assistant",
+                    "parts": [{"type": "text", "content": "Hi! What do you need?"}],
+                },
+                {"role": "user", "parts": [{"type": "text", "content": "Hello!"}]},
+            ],
+        )
         assert json.loads(attributes[SPANDATA.GEN_AI_TOOL_DEFINITIONS]) == [
             {
                 "type": "function",
@@ -343,7 +367,7 @@ def test_converse_tool_use_and_reasoning(init_bedrock, capture_items, trace_mode
         )
 
     attributes = _get_bedrock_span(spans)["attributes"]
-    assert json.loads(attributes[SPANDATA.GEN_AI_INPUT_MESSAGES]) == [
+    expected_input_messages = [
         {"role": "user", "parts": [{"type": "text", "content": "Weather in Paris?"}]},
         {
             "role": "assistant",
@@ -370,6 +394,9 @@ def test_converse_tool_use_and_reasoning(init_bedrock, capture_items, trace_mode
         # media content isn't recorded.
         {"role": "user", "parts": [{"type": "text", "content": "And in London?"}]},
     ]
+    assert json.loads(
+        attributes[SPANDATA.GEN_AI_INPUT_MESSAGES]
+    ) == _expected_input_messages(trace_mode, expected_input_messages)
     assert json.loads(attributes[SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
         {
             "role": "assistant",
