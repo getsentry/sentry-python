@@ -1581,6 +1581,7 @@ class ClientConstructor:
         before_send_log: "Optional[Callable[[Log, Hint], Optional[Log]]]" = None,
         before_send_metric: "Optional[Callable[[Metric, Hint], Optional[Metric]]]" = None,
         before_send_span: "Optional[Callable[[SpanJSON, Hint], Optional[SpanJSON]]]" = None,
+        before_send_check_in: "Optional[EventProcessor]" = None,
         org_id: "Optional[str]" = None,
         strict_trace_continuation: bool = False,
     ) -> None:
@@ -1967,6 +1968,10 @@ class ClientConstructor:
         :param before_send_span: An optional function to modify spans before they're sent to Sentry.
             Modifications to the span's attributes and name will be retained. Unlike ``before_send_log``
             and ``before_send_metric``, spans cannot be dropped by returning None.
+
+        :param before_send_check_in: An optional function to modify or filter out cron check-ins before they're
+            sent to Sentry. Check-ins don't go through `before_send`. Any modifications to the check-in in this
+            function will be retained. If the function returns None, the check-in will not be sent to Sentry.
 
         :param ignore_spans: A sequence of span-matching rules. Matching spans are ignored.
 
