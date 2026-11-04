@@ -10,6 +10,7 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 - The `@trace` decorator doesn't accept a `template` parameter anymore.
 - The option `attach_stacktrace` is now `True` by default, meaning the SDK will attach stack traces to messages.
 - `add_attachment` no longer accepts an `add_to_transactions` argument.
+- Cron check-ins no longer go through `before_send`. Use the new `before_send_check_in` option to modify or drop check-ins before they're sent.
 - If a `before_breadcrumb` callback, an event processor, or an error processor raises an exception, the breadcrumb or event is now dropped. Previously, the SDK would log the exception and continue processing the unmodified breadcrumb or event.
 - The top-level manual tracing API is now wired to span streaming tracing:
   - `sentry_sdk.start_transaction` doesn't exist anymore. Use `sentry_sdk.start_span` instead.
