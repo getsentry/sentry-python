@@ -196,7 +196,9 @@ def test_nonstreaming_create_message(
             "content": "Hello, Claude",
         },
     ]
-    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi, I'm Claude."
+    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(
+        ["Hi, I'm Claude."]
+    )
 
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
@@ -338,7 +340,9 @@ async def test_nonstreaming_create_message_async(
             "content": "Hello, Claude",
         },
     ]
-    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi, I'm Claude."
+    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(
+        ["Hi, I'm Claude."]
+    )
 
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
@@ -520,7 +524,9 @@ def test_streaming_create_message(
             "content": "Hello, Claude",
         },
     ]
-    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi! I'm Claude!"
+    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(
+        ["Hi! I'm Claude!"]
+    )
 
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
@@ -735,7 +741,7 @@ def test_streaming_create_message_close(
         span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
         == '[{"role": "user", "content": "Hello, Claude"}]'
     )
-    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi!"
+    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(["Hi!"])
 
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
@@ -839,7 +845,7 @@ def test_streaming_create_message_api_error(
         span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
         == '[{"role": "user", "content": "Hello, Claude"}]'
     )
-    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi!"
+    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(["Hi!"])
 
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
@@ -956,7 +962,9 @@ def test_stream_messages(
             "content": "Hello, Claude",
         },
     ]
-    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi! I'm Claude!"
+    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(
+        ["Hi! I'm Claude!"]
+    )
 
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
@@ -1175,7 +1183,7 @@ def test_stream_messages_close(
         span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
         == '[{"role": "user", "content": "Hello, Claude"}]'
     )
-    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi!"
+    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(["Hi!"])
 
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
@@ -1279,7 +1287,7 @@ def test_stream_messages_api_error(
         span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
         == '[{"role": "user", "content": "Hello, Claude"}]'
     )
-    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi!"
+    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(["Hi!"])
 
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
@@ -1401,7 +1409,9 @@ async def test_streaming_create_message_async(
             "content": "Hello, Claude",
         },
     ]
-    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi! I'm Claude!"
+    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(
+        ["Hi! I'm Claude!"]
+    )
 
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
@@ -1624,7 +1634,7 @@ async def test_streaming_create_message_async_close(
         span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
         == '[{"role": "user", "content": "Hello, Claude"}]'
     )
-    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi!"
+    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(["Hi!"])
 
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
@@ -1732,7 +1742,7 @@ async def test_streaming_create_message_async_api_error(
         span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
         == '[{"role": "user", "content": "Hello, Claude"}]'
     )
-    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi!"
+    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(["Hi!"])
 
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
@@ -1854,7 +1864,9 @@ async def test_stream_message_async(
             "content": "Hello, Claude",
         },
     ]
-    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi! I'm Claude!"
+    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(
+        ["Hi! I'm Claude!"]
+    )
 
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
@@ -2074,7 +2086,7 @@ async def test_stream_messages_async_api_error(
         span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
         == '[{"role": "user", "content": "Hello, Claude"}]'
     )
-    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi!"
+    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(["Hi!"])
 
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
@@ -2194,7 +2206,7 @@ async def test_stream_messages_async_close(
         span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
         == '[{"role": "user", "content": "Hello, Claude"}]'
     )
-    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi!"
+    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(["Hi!"])
 
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
@@ -2333,9 +2345,8 @@ def test_streaming_create_message_with_input_json_delta(
         span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
         == '[{"role": "user", "content": "What is the weather like in San Francisco?"}]'
     )
-    assert (
-        span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
-        == '{"location": "San Francisco, CA"}'
+    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(
+        ['{"location": "San Francisco, CA"}']
     )
 
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 366
@@ -2603,9 +2614,8 @@ def test_stream_messages_with_input_json_delta(
         span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
         == '[{"role": "user", "content": "What is the weather like in San Francisco?"}]'
     )
-    assert (
-        span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
-        == '{"location": "San Francisco, CA"}'
+    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(
+        ['{"location": "San Francisco, CA"}']
     )
 
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 366
@@ -2880,9 +2890,8 @@ async def test_streaming_create_message_with_input_json_delta_async(
         span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
         == '[{"role": "user", "content": "What is the weather like in San Francisco?"}]'
     )
-    assert (
-        span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
-        == '{"location": "San Francisco, CA"}'
+    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(
+        ['{"location": "San Francisco, CA"}']
     )
 
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 366
@@ -3165,9 +3174,8 @@ async def test_stream_message_with_input_json_delta_async(
         span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
         == '[{"role": "user", "content": "What is the weather like in San Francisco?"}]'
     )
-    assert (
-        span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
-        == '{"location": "San Francisco, CA"}'
+    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(
+        ['{"location": "San Francisco, CA"}']
     )
 
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 366
@@ -3557,9 +3565,8 @@ def test_set_output_data_with_input_json_delta(sentry_init):
         content_blocks=[{"text": "".join(json_deltas), "type": "text"}],
     )
 
-    assert (
-        span._attributes.get(SPANDATA.GEN_AI_RESPONSE_TEXT)
-        == "{'test': 'data','more': 'json'}"
+    assert span._attributes.get(SPANDATA.GEN_AI_RESPONSE_TEXT) == json.dumps(
+        ["{'test': 'data','more': 'json'}"]
     )
     assert span._attributes.get(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS) == 10
     assert span._attributes.get(SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS) == 20
@@ -3703,7 +3710,9 @@ def test_nonstreaming_create_message_with_system_prompt(
     assert len(stored_messages) == 1
     assert stored_messages[0]["role"] == "user"
     assert stored_messages[0]["content"] == "Hello, Claude"
-    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi, I'm Claude."
+    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(
+        ["Hi, I'm Claude."]
+    )
 
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
@@ -3843,7 +3852,9 @@ async def test_nonstreaming_create_message_with_system_prompt_async(
     assert len(stored_messages) == 1
     assert stored_messages[0]["role"] == "user"
     assert stored_messages[0]["content"] == "Hello, Claude"
-    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi, I'm Claude."
+    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(
+        ["Hi, I'm Claude."]
+    )
 
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
@@ -4024,7 +4035,9 @@ def test_streaming_create_message_with_system_prompt(
     assert len(stored_messages) == 1
     assert stored_messages[0]["role"] == "user"
     assert stored_messages[0]["content"] == "Hello, Claude"
-    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi! I'm Claude!"
+    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(
+        ["Hi! I'm Claude!"]
+    )
 
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
@@ -4239,7 +4252,9 @@ def test_stream_messages_with_system_prompt(
     assert len(stored_messages) == 1
     assert stored_messages[0]["role"] == "user"
     assert stored_messages[0]["content"] == "Hello, Claude"
-    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi! I'm Claude!"
+    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(
+        ["Hi! I'm Claude!"]
+    )
 
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
@@ -4457,7 +4472,9 @@ async def test_stream_message_with_system_prompt_async(
     assert len(stored_messages) == 1
     assert stored_messages[0]["role"] == "user"
     assert stored_messages[0]["content"] == "Hello, Claude"
-    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi! I'm Claude!"
+    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(
+        ["Hi! I'm Claude!"]
+    )
 
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
@@ -4683,7 +4700,9 @@ async def test_streaming_create_message_with_system_prompt_async(
     assert len(stored_messages) == 1
     assert stored_messages[0]["role"] == "user"
     assert stored_messages[0]["content"] == "Hello, Claude"
-    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi! I'm Claude!"
+    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(
+        ["Hi! I'm Claude!"]
+    )
 
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
