@@ -547,7 +547,6 @@ class _Client(BaseClient):
                 ),
             )
 
-        # Check-ins don't go through before_send, they have their own callback
         if is_checkin:
             before_send = self.options["before_send_check_in"]
             data_category: "EventDataCategory" = "monitor"
