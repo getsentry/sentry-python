@@ -186,7 +186,7 @@ def test_missed_run_drops_pending_check_in(sentry_init, capture_envelopes):
     run_time = job.trigger.get_next_fire_time(None, datetime.now(timezone.utc))
     listener.add(
         job.id,
-        run_time,
+        [run_time],
         apscheduler_integration._PendingCheckIn("my-job", {}, 0),
     )
 
@@ -209,6 +209,29 @@ def test_backlog_checks_in_once(sentry_init, capture_envelopes):
     )
 
     assert [c["status"] for c in check_ins] == ["in_progress", "ok"]
+    assert check_ins[0]["check_in_id"] == check_ins[1]["check_in_id"]
+
+
+def test_backlog_with_a_failed_run_checks_in_error(sentry_init, capture_envelopes):
+    sentry_init(integrations=[APSchedulerIntegration(monitor_jobs=True)])
+    envelopes = capture_envelopes()
+    calls = []
+
+    def fails_first():
+        calls.append(None)
+        if len(calls) == 1:
+            raise ValueError("first run fails")
+
+    check_ins = _run_once(
+        envelopes,
+        IntervalTrigger(minutes=1, timezone="UTC"),
+        func=fails_first,
+        next_run_time=_utcnow() - timedelta(minutes=2, seconds=30),
+        coalesce=False,
+    )
+
+    assert len(calls) == 3
+    assert [c["status"] for c in check_ins] == ["in_progress", "error"]
     assert check_ins[0]["check_in_id"] == check_ins[1]["check_in_id"]
 
 

@@ -61,7 +61,15 @@ class APSchedulerIntegration(Integration):
 
 
 class _PendingCheckIn:
-    __slots__ = ("monitor_slug", "monitor_config", "start", "opened", "check_in_id")
+    __slots__ = (
+        "monitor_slug",
+        "monitor_config",
+        "start",
+        "opened",
+        "check_in_id",
+        "earlier_run_times",
+        "failed",
+    )
 
     def __init__(
         self, monitor_slug: str, monitor_config: "MonitorConfig", start: float
@@ -71,6 +79,8 @@ class _PendingCheckIn:
         self.start = start
         self.opened = False
         self.check_in_id: "Optional[str]" = None
+        self.earlier_run_times: "List[Any]" = []
+        self.failed = False
 
     def open(self) -> None:
         self.opened = True
@@ -89,10 +99,24 @@ class _CronsListener:
     def __init__(self) -> None:
         self.lock = threading.Lock()
         self.pending: "Dict[Tuple[str, Any], _PendingCheckIn]" = {}
+        # Earlier run times of a backlog, which share the last run time's check-in.
+        self.earlier: "Dict[Tuple[str, Any], _PendingCheckIn]" = {}
 
-    def add(self, job_id: str, run_time: "Any", pending: "_PendingCheckIn") -> None:
+    def add(
+        self, job_id: str, run_times: "List[Any]", pending: "_PendingCheckIn"
+    ) -> None:
+        pending.earlier_run_times = run_times[:-1]
         with self.lock:
-            self.pending[(job_id, run_time)] = pending
+            self.pending[(job_id, run_times[-1])] = pending
+            for run_time in pending.earlier_run_times:
+                self.earlier[(job_id, run_time)] = pending
+
+    def _pop(self, key: "Tuple[str, Any]") -> "Optional[_PendingCheckIn]":
+        pending = self.pending.pop(key, None)
+        if pending is not None:
+            for run_time in pending.earlier_run_times:
+                self.earlier.pop((key[0], run_time), None)
+        return pending
 
     def open(self, job_id: str, run_time: "Any") -> None:
         # Under the lock, so `in_progress` is always sent before `finish`
@@ -104,17 +128,24 @@ class _CronsListener:
 
     def discard(self, job_id: str, run_time: "Any") -> None:
         with self.lock:
-            self.pending.pop((job_id, run_time), None)
+            self._pop((job_id, run_time))
 
     def finish(self, job_id: str, run_time: "Any", status: str) -> None:
         with self.lock:
-            pending = self.pending.pop((job_id, run_time), None)
+            earlier = self.earlier.pop((job_id, run_time), None)
+            if earlier is not None:
+                if status == MonitorStatus.ERROR:
+                    earlier.failed = True
+                return
+            pending = self._pop((job_id, run_time))
         if pending is not None:
-            self._close(pending, status)
+            self._close(pending, MonitorStatus.ERROR if pending.failed else status)
 
     def finish_missed(self, job_id: str, run_time: "Any") -> None:
         with self.lock:
-            pending = self.pending.pop((job_id, run_time), None)
+            if self.earlier.pop((job_id, run_time), None) is not None:
+                return
+            pending = self._pop((job_id, run_time))
         # Send nothing, so Sentry reports the slot as missed, unless a run that
         # waited in a busy pool already sent `in_progress`.
         if pending is not None and pending.opened:
@@ -123,7 +154,7 @@ class _CronsListener:
     def finish_oldest(self, job_id: str, status: str) -> None:
         with self.lock:
             key = next((key for key in self.pending if key[0] == job_id), None)
-            pending = None if key is None else self.pending.pop(key)
+            pending = None if key is None else self._pop(key)
         if pending is not None:
             self._close(pending, status)
 
@@ -315,7 +346,7 @@ def _begin_check_in(
     integration: "APSchedulerIntegration",
     executor: "Any",
     job: "Any",
-    run_time: "Any",
+    run_times: "List[Any]",
 ) -> "Optional[_CronsListener]":
     # The job reports its own check-ins.
     if getattr(job.func, "_sentry_monitored", False):
@@ -323,7 +354,7 @@ def _begin_check_in(
 
     # Pool executors send `in_progress` before the run starts, so skip missed
     # runs here.
-    if _is_missed(job, run_time):
+    if _is_missed(job, run_times[-1]):
         return None
 
     monitor_slug = _get_monitor_slug(job)
@@ -345,7 +376,9 @@ def _begin_check_in(
         _warn_generated_id(job)
 
     listener = _get_listener(executor._scheduler)
-    listener.add(job.id, run_time, _PendingCheckIn(monitor_slug, monitor_config, now()))
+    listener.add(
+        job.id, run_times, _PendingCheckIn(monitor_slug, monitor_config, now())
+    )
     return listener
 
 
@@ -362,11 +395,11 @@ def _patch_submit_job() -> None:
             return old_submit_job(self, job, run_times, *args, **kwargs)
 
         # A backlog of run times runs in one submit; check in once, closed by the
-        # last run time's event.
+        # last run time's event, and as an error if any run failed.
         run_time = run_times[-1]
         listener = None
         with capture_internal_exceptions():
-            listener = _begin_check_in(integration, self, job, run_time)
+            listener = _begin_check_in(integration, self, job, run_times)
 
         try:
             result = old_submit_job(self, job, run_times, *args, **kwargs)
