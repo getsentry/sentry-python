@@ -1,5 +1,50 @@
 # Changelog
 
+## 3.0.0b3
+
+### New Features ✨
+
+- (typesafe) Handle inline images by @alexander-alderman-webb in [#8164](https://github.com/getsentry/sentry-python/pull/8164)
+
+### Bug Fixes 🐛
+
+#### Anthropic
+
+- Preserve cached `_iterator` property by @alexander-alderman-webb in [#8163](https://github.com/getsentry/sentry-python/pull/8163)
+- Stop unpacking output arrays by @alexander-alderman-webb in [#8160](https://github.com/getsentry/sentry-python/pull/8160)
+
+#### Other
+
+- (ci) Restrict pytest because of incompatibilities by @sentrivana in [#8140](https://github.com/getsentry/sentry-python/pull/8140)
+- (falcon) Handle integer HTTP statuses by @jap and @sentrivana in [#8139](https://github.com/getsentry/sentry-python/pull/8139)
+- (tracing) Drop trailing comma when serializing baggage without third-party items by @alphasafal and @pabloDeputter in [#8119](https://github.com/getsentry/sentry-python/pull/8119)
+- (wsgi) Stop overwriting `server.address` by @alexander-alderman-webb in [#8171](https://github.com/getsentry/sentry-python/pull/8171)
+
+### Internal Changes 🔧
+
+#### Deps
+
+- Lock file maintenance by @renovate in [#8055](https://github.com/getsentry/sentry-python/pull/8055)
+- Bump grpcio to 1.84.1 by @geoffg-sentry with @sentry-junior in [#8136](https://github.com/getsentry/sentry-python/pull/8136)
+- Bump uv to 0.13.5 by @geoffg-sentry with @sentry-junior in [#8135](https://github.com/getsentry/sentry-python/pull/8135)
+
+#### Other
+
+- (mcp) Remove unused select_mcp_transactions fixture by @sentrivana with @sentry-junior in [#8150](https://github.com/getsentry/sentry-python/pull/8150)
+- (release) Bump craft to 3.9.0 and update config by @BYK with @sentry-junior in [#8181](https://github.com/getsentry/sentry-python/pull/8181)
+- (sessions) Remove unused TERMINAL_SESSION_STATES constant by @sentrivana with @sentry-junior in [#8151](https://github.com/getsentry/sentry-python/pull/8151)
+- (starlette) Remove unused \_serialize_request_body_data helper by @sentry-junior in [#8146](https://github.com/getsentry/sentry-python/pull/8146)
+- (toxgen) Remove unused `get_file_hash()` and `get_last_updated()` helpers by @sentry-junior in [#8173](https://github.com/getsentry/sentry-python/pull/8173)
+- (tracing) Remove unused base64_stripped regex by @sentry-junior in [#8148](https://github.com/getsentry/sentry-python/pull/8148)
+- (utils) Remove unused to_timestamp helper and epoch constant by @sentry-junior in [#8147](https://github.com/getsentry/sentry-python/pull/8147)
+- 🤖 Update test matrix with new releases (11/02) by @sentrivana with @github-actions in [#8172](https://github.com/getsentry/sentry-python/pull/8172)
+- Upgrade `sphinx` and remove `packaging` upper bound by @alexander-alderman-webb in [#8183](https://github.com/getsentry/sentry-python/pull/8183)
+- Update test matrix with new releases (27/10) by @alexander-alderman-webb in [#8126](https://github.com/getsentry/sentry-python/pull/8126)
+
+### Other
+
+- Next Python SDK major by @sentrivana in [#5005](https://github.com/getsentry/sentry-python/pull/5005)
+
 ## 3.0.0b2
 
 ### New Features ✨
