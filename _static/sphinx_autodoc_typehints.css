@@ -1,0 +1,13 @@
+/* a value in a type or a default sits in a `.highlight` scope only so the Pygments style colors its tokens; the block
+   layout themes give `.highlight`, and the dark variant `body:not([data-theme="light"]) .highlight` furo generates,
+   stays off it, hence the selector outweighing both */
+html body .highlight.sphinx_autodoc_typehints-value {
+  display: inline;
+  width: auto;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: inherit;
+}

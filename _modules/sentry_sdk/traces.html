@@ -2,11 +2,12 @@
 <html lang="en" data-accent-color="violet" data-content_root="../../">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>sentry_sdk.traces - sentry-python 3.0.0b2 documentation</title><link rel="index" title="Index" href="../../genindex.html" /><link rel="search" title="Search" href="../../search.html" /><script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>sentry_sdk.traces - sentry-python 3.0.0b3 documentation</title><link rel="index" title="Index" href="../../genindex.html" /><link rel="search" title="Search" href="../../search.html" /><script>
     function setColorMode(t){let e=document.documentElement;e.setAttribute("data-color-mode",t);let a=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches,s=t;"auto"===t&&(s=a?"dark":"light"),"light"===s?(e.classList.remove("dark"),e.classList.add("light")):(e.classList.remove("light"),e.classList.add("dark"))}
     setColorMode(localStorage._theme||"auto");
   </script><link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=e1a1ceaf" />
     <link rel="stylesheet" type="text/css" href="../../_static/shibuya.css?v=2ceb65ce" />
+    <link rel="stylesheet" type="text/css" href="../../_static/sphinx_autodoc_typehints.css?v=057ac668" />
     <link media="print" rel="stylesheet" type="text/css" href="../../_static/print.css?v=20ff2c19" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -109,25 +110,25 @@ data-aria-dark="Switch to auto color mode">
           <h1>Source code for sentry_sdk.traces</h1><div class="highlight"><pre>
 <span></span><span data-line="1"><span class="kn">import</span><span class="w"> </span><span class="nn">copy</span>
 </span><span data-line="2"><span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
-</span><span data-line="3"><span class="kn">import</span><span class="w"> </span><span class="nn">uuid</span>
-</span><span data-line="4"><span class="kn">from</span><span class="w"> </span><span class="nn">datetime</span><span class="w"> </span><span class="kn">import</span> <span class="n">datetime</span><span class="p">,</span> <span class="n">timedelta</span><span class="p">,</span> <span class="n">timezone</span>
-</span><span data-line="5"><span class="kn">from</span><span class="w"> </span><span class="nn">enum</span><span class="w"> </span><span class="kn">import</span> <span class="n">Enum</span>
-</span><span data-line="6"><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">TYPE_CHECKING</span>
-</span><span data-line="7">
-</span><span data-line="8"><span class="kn">import</span><span class="w"> </span><span class="nn">sentry_sdk</span>
-</span><span data-line="9"><span class="kn">from</span><span class="w"> </span><span class="nn">sentry_sdk.consts</span><span class="w"> </span><span class="kn">import</span> <span class="n">SPANDATA</span>
-</span><span data-line="10"><span class="kn">from</span><span class="w"> </span><span class="nn">sentry_sdk.profiler.continuous_profiler</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
-</span><span data-line="11">    <span class="n">get_profiler_id</span><span class="p">,</span>
-</span><span data-line="12">    <span class="n">try_autostart_continuous_profiler</span><span class="p">,</span>
-</span><span data-line="13">    <span class="n">try_profile_lifecycle_trace_start</span><span class="p">,</span>
-</span><span data-line="14"><span class="p">)</span>
-</span><span data-line="15"><span class="kn">from</span><span class="w"> </span><span class="nn">sentry_sdk.utils</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
-</span><span data-line="16">    <span class="n">capture_internal_exceptions</span><span class="p">,</span>
-</span><span data-line="17">    <span class="n">deprecation_warning</span><span class="p">,</span>
-</span><span data-line="18">    <span class="n">format_attribute</span><span class="p">,</span>
-</span><span data-line="19">    <span class="n">get_current_thread_meta</span><span class="p">,</span>
-</span><span data-line="20">    <span class="n">logger</span><span class="p">,</span>
-</span><span data-line="21">    <span class="n">nanosecond_time</span><span class="p">,</span>
+</span><span data-line="3"><span class="kn">import</span><span class="w"> </span><span class="nn">time</span>
+</span><span data-line="4"><span class="kn">import</span><span class="w"> </span><span class="nn">uuid</span>
+</span><span data-line="5"><span class="kn">from</span><span class="w"> </span><span class="nn">datetime</span><span class="w"> </span><span class="kn">import</span> <span class="n">datetime</span><span class="p">,</span> <span class="n">timedelta</span><span class="p">,</span> <span class="n">timezone</span>
+</span><span data-line="6"><span class="kn">from</span><span class="w"> </span><span class="nn">enum</span><span class="w"> </span><span class="kn">import</span> <span class="n">Enum</span>
+</span><span data-line="7"><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">TYPE_CHECKING</span>
+</span><span data-line="8">
+</span><span data-line="9"><span class="kn">import</span><span class="w"> </span><span class="nn">sentry_sdk</span>
+</span><span data-line="10"><span class="kn">from</span><span class="w"> </span><span class="nn">sentry_sdk.consts</span><span class="w"> </span><span class="kn">import</span> <span class="n">SPANDATA</span>
+</span><span data-line="11"><span class="kn">from</span><span class="w"> </span><span class="nn">sentry_sdk.profiler.continuous_profiler</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+</span><span data-line="12">    <span class="n">get_profiler_id</span><span class="p">,</span>
+</span><span data-line="13">    <span class="n">try_autostart_continuous_profiler</span><span class="p">,</span>
+</span><span data-line="14">    <span class="n">try_profile_lifecycle_trace_start</span><span class="p">,</span>
+</span><span data-line="15"><span class="p">)</span>
+</span><span data-line="16"><span class="kn">from</span><span class="w"> </span><span class="nn">sentry_sdk.utils</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+</span><span data-line="17">    <span class="n">capture_internal_exceptions</span><span class="p">,</span>
+</span><span data-line="18">    <span class="n">deprecation_warning</span><span class="p">,</span>
+</span><span data-line="19">    <span class="n">format_attribute</span><span class="p">,</span>
+</span><span data-line="20">    <span class="n">get_current_thread_meta</span><span class="p">,</span>
+</span><span data-line="21">    <span class="n">logger</span><span class="p">,</span>
 </span><span data-line="22">    <span class="n">should_be_treated_as_error</span><span class="p">,</span>
 </span><span data-line="23"><span class="p">)</span>
 </span><span data-line="24">
@@ -348,7 +349,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="239">
 </span><span data-line="240">        <span class="c1"># profiling depends on this value and requires that</span>
 </span><span data-line="241">        <span class="c1"># it is measured in nanoseconds</span>
-</span><span data-line="242">        <span class="bp">self</span><span class="o">.</span><span class="n">_start_timestamp_monotonic_ns</span> <span class="o">=</span> <span class="n">nanosecond_time</span><span class="p">()</span>
+</span><span data-line="242">        <span class="bp">self</span><span class="o">.</span><span class="n">_start_timestamp_monotonic_ns</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">perf_counter_ns</span><span class="p">()</span>
 </span><span data-line="243">
 </span><span data-line="244">        <span class="bp">self</span><span class="o">.</span><span class="n">_span_id</span><span class="p">:</span> <span class="s2">"Optional[str]"</span> <span class="o">=</span> <span class="kc">None</span>
 </span><span data-line="245">
@@ -461,7 +462,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="352">                <span class="p">)</span>
 </span><span data-line="353">
 </span><span data-line="354">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_end_timestamp</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="355">            <span class="n">elapsed</span> <span class="o">=</span> <span class="n">nanosecond_time</span><span class="p">()</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">_start_timestamp_monotonic_ns</span>
+</span><span data-line="355">            <span class="n">elapsed</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">perf_counter_ns</span><span class="p">()</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">_start_timestamp_monotonic_ns</span>
 </span><span data-line="356">            <span class="bp">self</span><span class="o">.</span><span class="n">_end_timestamp</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_start_timestamp</span> <span class="o">+</span> <span class="n">timedelta</span><span class="p">(</span>
 </span><span data-line="357">                <span class="n">microseconds</span><span class="o">=</span><span class="n">elapsed</span> <span class="o">/</span> <span class="mi">1000</span>
 </span><span data-line="358">            <span class="p">)</span>
@@ -993,8 +994,8 @@ data-aria-dark="Switch to auto color mode">
     </div>
   </div>
 </footer>
-      <script src="../../_static/documentation_options.js?v=1ea26b0a"></script>
-      <script src="../../_static/doctools.js?v=9bcbadda"></script>
-      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../_static/documentation_options.js?v=badaef13"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../_static/shibuya.js?v=50760d75"></script></body>
 </html>
