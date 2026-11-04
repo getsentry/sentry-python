@@ -286,7 +286,7 @@ Additionally, the OpenAI integration now sets `gen_ai.operation.name` to `chat` 
 - `Scope.iter_headers` was removed.
 - `Scope.start_transaction`, `Scope.start_streamed_span`, and `Scope.continue_trace` were removed. Use the top-level `sentry_sdk.start_span` and `sentry_sdk.continue_trace` instead.
 - The `SPANSTATUS`, `SPANTEMPLATE`, and `INSTRUMENTER` constants were removed from `sentry_sdk.consts`.
-- The SDK won't set any tags on its own anymore.
+- The SDK won't set any tags on its own anymore. As a consequence, events passed to `before_send` (and other event processors) will not have a `"tags"` key unless tags were set explicitly (e.g. via `sentry_sdk.set_tag`) or by an integration. If you access `event["tags"]` directly, use `event.get("tags", {})` or `event.setdefault("tags", {})` instead.
 
 ## Migration
 
