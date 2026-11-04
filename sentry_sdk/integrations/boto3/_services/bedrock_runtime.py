@@ -811,8 +811,12 @@ class _StreamedResponse:
                         tool_call["arguments"] = content
                 parts.append(tool_call)
 
+        # `record_outputs` already gated the buffered content blocks.
         if parts:
-            attributes.update(_get_output_attributes([_to_output_message(parts)]))
+            with capture_internal_exceptions():
+                attributes[SPANDATA.GEN_AI_OUTPUT_MESSAGES] = json.dumps(
+                    [_to_output_message(parts)]
+                )
 
         return attributes
 
@@ -883,7 +887,11 @@ def _record_invoke_model_stream_event(
     if not payload:
         return
 
-    chunk = json.loads(payload)
+    try:
+        chunk = json.loads(payload)
+    except ValueError:
+        return
+
     if not isinstance(chunk, Mapping):
         return
 

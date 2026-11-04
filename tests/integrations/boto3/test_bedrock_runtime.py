@@ -2238,6 +2238,43 @@ def test_invoke_model_with_response_stream_data_collection(
 
 
 @pytest.mark.parametrize("trace_mode", TRACE_MODES)
+def test_invoke_model_with_response_stream_skips_malformed_chunks(
+    init_bedrock, capture_items, trace_mode
+):
+    client = init_bedrock(trace_mode, send_default_pii=True)
+    malformed_chunk = ("chunk", {"bytes": base64.b64encode(b"not json").decode()})
+    events = [malformed_chunk] + _invoke_model_stream_chunks(
+        {
+            "outputs": [{"text": "Hi!", "stop_reason": "stop"}],
+            "amazon-bedrock-invocationMetrics": {
+                "inputTokenCount": 7,
+                "outputTokenCount": 3,
+            },
+        }
+    )
+    received_chunks = []
+
+    def call():
+        response = client.invoke_model_with_response_stream(
+            modelId="mistral.mistral-7b-instruct-v0:2",
+            body=json.dumps({"prompt": "Hello!"}),
+        )
+        received_chunks.extend(event["chunk"]["bytes"] for event in response["body"])
+
+    with _event_stream_response(client, events):
+        spans = _capture_spans(capture_items, trace_mode, call)
+
+    assert received_chunks[0] == b"not json"
+    assert len(received_chunks) == 2
+
+    attributes = _get_attributes(_get_bedrock_span(spans))
+    assert attributes[SPANDATA.GEN_AI_OUTPUT_MESSAGES] == [
+        {"role": "assistant", "parts": [{"type": "text", "content": "Hi!"}]}
+    ]
+    assert attributes[SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 3
+
+
+@pytest.mark.parametrize("trace_mode", TRACE_MODES)
 def test_invoke_model_with_response_stream_error_is_unchanged(
     init_bedrock, capture_items, trace_mode
 ):
