@@ -1412,6 +1412,7 @@ def test_package_version_is_none():
     assert package_version("non_existent_package") is None
 
 
+@pytest.mark.skipif(sys.version_info < (3, 8), reason="requires importlib.metadata")
 def test_package_version_does_not_scan_installed_packages():
     with mock.patch("sentry_sdk.utils._generate_installed_modules") as generate:
         with mock.patch("sentry_sdk.utils._installed_modules", None):
