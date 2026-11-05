@@ -1412,6 +1412,14 @@ def test_package_version_is_none():
     assert package_version("non_existent_package") is None
 
 
+def test_package_version_does_not_scan_installed_packages():
+    with mock.patch("sentry_sdk.utils._generate_installed_modules") as generate:
+        with mock.patch("sentry_sdk.utils._installed_modules", None):
+            assert package_version("pytest") is not None
+
+    generate.assert_not_called()
+
+
 @pytest.mark.parametrize(
     "kwargs, expected",
     [
