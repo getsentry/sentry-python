@@ -738,7 +738,7 @@ def _set_output_data(
             if output["type"] == "text":
                 parts.append({"type": "text", "content": output["text"]})
             elif output["type"] == "thinking":
-                parts.append({"type": "reasoning", "content": output.get("thinking")})
+                parts.append({"type": "reasoning", "content": output["thinking"]})
             elif output["type"] == "tool_use":
                 tool_calls.append(output)
 
