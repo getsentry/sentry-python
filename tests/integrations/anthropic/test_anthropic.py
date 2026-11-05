@@ -6250,7 +6250,14 @@ async def test_span_origin_async(
 )
 @pytest.mark.parametrize("span_streaming", [True, False])
 def test_collect_ai_data_with_input_json_delta(span_streaming):
-    event = ContentBlockDeltaEvent(
+    start_event = ContentBlockStartEvent(
+        type="content_block_start",
+        index=0,
+        content_block=ToolUseBlock(
+            type="tool_use", id="toolu_123", name="get_weather", input={}
+        ),
+    )
+    delta_event = ContentBlockDeltaEvent(
         delta=InputJSONDelta(partial_json="test", type="input_json_delta"),
         index=0,
         type="content_block_delta",
@@ -6261,10 +6268,11 @@ def test_collect_ai_data_with_input_json_delta(span_streaming):
     usage.output_tokens = 20
     usage.input_tokens = 10
 
-    content_blocks = []
+    content_blocks: list = []
 
+    _collect_ai_data(start_event, model, usage, content_blocks)
     model, new_usage, new_content_blocks, response_id, finish_reason = _collect_ai_data(
-        event, model, usage, content_blocks
+        delta_event, model, usage, content_blocks
     )
     assert model is None
     assert new_usage.input_tokens == usage.input_tokens

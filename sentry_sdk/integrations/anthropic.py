@@ -65,9 +65,10 @@ except ImportError:
     raise DidNotEnable("Anthropic not installed")
 
 try:
-    from anthropic.types import ThinkingDelta
+    from anthropic.types import ThinkingBlock
 except ImportError:
-    ThinkingDelta = None
+    ThinkingBlock = None  # type: ignore[assignment,misc]
+
 
 if TYPE_CHECKING:
     from typing import (
@@ -380,23 +381,22 @@ def _collect_ai_data(
     with capture_internal_exceptions():
         if hasattr(event, "type"):
             if event.type == "content_block_start":
-                block_type = getattr(event.content_block, "type", "text")
-                content_blocks.append({"type": block_type, "text": ""})
-            elif event.type == "content_block_delta":
-                delta = event.delta
-                if ThinkingDelta is not None and isinstance(delta, ThinkingDelta):
-                    chunk = delta.thinking
-                elif hasattr(delta, "text"):
-                    chunk = delta.text
-                elif hasattr(delta, "partial_json"):
-                    chunk = delta.partial_json
+                if ThinkingBlock is not None and isinstance(
+                    event.content_block, ThinkingBlock
+                ):
+                    content_blocks.append({"type": "thinking", "thinking": ""})
                 else:
-                    chunk = None
-                if chunk is not None:
-                    if content_blocks:
-                        content_blocks[-1]["text"] += chunk
-                    else:
-                        content_blocks.append({"type": "text", "text": chunk})
+                    content_blocks.append({"type": "text", "text": ""})
+            elif event.type == "content_block_delta" and content_blocks:
+                block = content_blocks[-1]
+                if block["type"] == "thinking":
+                    block["thinking"] += event.delta.thinking
+                else:
+                    chunk = getattr(event.delta, "text", None) or getattr(
+                        event.delta, "partial_json", None
+                    )
+                    if chunk:
+                        block["text"] += chunk
             elif event.type == "content_block_stop":
                 pass
 
@@ -754,7 +754,9 @@ def _set_output_data(
             if output["type"] == "text":
                 parts.append({"type": "text", "content": output["text"]})
             elif output["type"] == "thinking":
-                parts.append({"type": "reasoning", "content": output.get("thinking")})
+                parts.append(
+                    {"type": "reasoning", "content": output.get("thinking", "")}
+                )
             elif output["type"] == "tool_use":
                 tool_calls.append(output)
 
@@ -1073,15 +1075,6 @@ def _set_streaming_output_data(
         + (usage.cache_write_input_tokens or 0)
     )
 
-    merged_blocks = []
-    for block in content_blocks:
-        block_type = block.get("type", "text")
-        text = block.get("text", "")
-        if block_type == "thinking":
-            merged_blocks.append({"type": "thinking", "thinking": text})
-        else:
-            merged_blocks.append({"type": "text", "text": text})
-
     _set_output_data(
         span=span,
         integration=integration,
@@ -1090,7 +1083,7 @@ def _set_streaming_output_data(
         output_tokens=usage.output_tokens,
         cache_read_input_tokens=usage.cache_read_input_tokens,
         cache_write_input_tokens=usage.cache_write_input_tokens,
-        content_blocks=merged_blocks,
+        content_blocks=content_blocks,
         response_id=response_id,
         finish_reason=finish_reason,
     )
