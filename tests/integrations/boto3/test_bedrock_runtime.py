@@ -180,7 +180,8 @@ def _get_bedrock_span(spans, origin=AI_ORIGIN):
 
 
 # The last Bedrock message, how it's recorded, and how it's recorded when it's
-# truncated. Its text, tool call arguments, and tool results share one limit.
+# truncated. Its text, tool call arguments, and tool results share one limit, and
+# JSON that doesn't fit is replaced by its truncated serialization.
 LAST_MESSAGE_CASES = [
     pytest.param(
         {"role": "user", "content": [{"text": "Hello!"}, {"text": LONG_TEXT}]},
@@ -268,7 +269,16 @@ LAST_MESSAGE_CASES = [
                 {
                     "type": "tool_call_response",
                     "id": "tool-1",
-                    "result": [{"weather": "rainy"}, TRUNCATED_TEXT, "..."],
+                    # the JSON item counts with its serialized length.
+                    "result": [
+                        {"weather": "rainy"},
+                        HUGE_TEXT[
+                            : MAX_SINGLE_MESSAGE_CONTENT_CHARS
+                            - len(json.dumps({"weather": "rainy"}))
+                        ]
+                        + "...",
+                        "...",
+                    ],
                 }
             ],
         },
@@ -310,6 +320,83 @@ LAST_MESSAGE_CASES = [
             ],
         },
         id="tool_call_arguments",
+    ),
+    pytest.param(
+        {
+            "role": "user",
+            "content": [
+                {
+                    "toolResult": {
+                        "toolUseId": "tool-1",
+                        "content": [{"json": {"blob": HUGE_TEXT}}],
+                    }
+                }
+            ],
+        },
+        {
+            "role": "tool",
+            "parts": [
+                {
+                    "type": "tool_call_response",
+                    "id": "tool-1",
+                    "result": {"blob": HUGE_TEXT},
+                }
+            ],
+        },
+        {
+            "role": "tool",
+            "parts": [
+                {
+                    "type": "tool_call_response",
+                    "id": "tool-1",
+                    "result": json.dumps({"blob": HUGE_TEXT})[
+                        :MAX_SINGLE_MESSAGE_CONTENT_CHARS
+                    ]
+                    + "...",
+                }
+            ],
+        },
+        id="tool_result_json",
+    ),
+    pytest.param(
+        {
+            "role": "assistant",
+            "content": [
+                {
+                    "toolUse": {
+                        "toolUseId": "tool-1",
+                        "name": "get_weather",
+                        "input": {"city": HUGE_TEXT},
+                    }
+                }
+            ],
+        },
+        {
+            "role": "assistant",
+            "parts": [
+                {
+                    "type": "tool_call",
+                    "id": "tool-1",
+                    "name": "get_weather",
+                    "arguments": {"city": HUGE_TEXT},
+                }
+            ],
+        },
+        {
+            "role": "assistant",
+            "parts": [
+                {
+                    "type": "tool_call",
+                    "id": "tool-1",
+                    "name": "get_weather",
+                    "arguments": json.dumps({"city": HUGE_TEXT})[
+                        :MAX_SINGLE_MESSAGE_CONTENT_CHARS
+                    ]
+                    + "...",
+                }
+            ],
+        },
+        id="tool_call_arguments_json",
     ),
 ]
 

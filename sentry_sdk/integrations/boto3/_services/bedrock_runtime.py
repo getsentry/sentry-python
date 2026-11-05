@@ -188,9 +188,11 @@ def _get_input_messages_attributes(
 ) -> "Attributes":
     """
     Like the other `gen_ai` integrations, only the last message is kept when
-    `gen_ai` spans are sent in transactions, and its text, string tool call
-    arguments, and tool results share one truncation limit, so that long
-    histories, prompts, and tool results don't exceed the transaction size limit.
+    `gen_ai` spans are sent in transactions, and its text, tool call arguments,
+    and tool results share one truncation limit, so that long histories, prompts,
+    and tool results don't exceed the transaction size limit. JSON arguments and
+    results count with their serialized length, and are replaced by their
+    truncated serialization when they don't fit.
     """
     messages: "Optional[list[dict[str, Any]]]" = cast(
         "list[dict[str, Any]]", input_messages
@@ -207,11 +209,10 @@ def _get_input_messages_attributes(
 
             def truncate(value: "Any") -> "Any":
                 nonlocal remaining
-                if not isinstance(value, str):
-                    return value
-                if len(value) > remaining:
-                    value = value[:remaining] + "..."
-                remaining = max(remaining - len(value), 0)
+                text = value if isinstance(value, str) else json.dumps(value)
+                if len(text) > remaining:
+                    value = text[:remaining] + "..."
+                remaining = max(remaining - len(text), 0)
                 return value
 
             # the last message is a copy, so its parts can be replaced.
