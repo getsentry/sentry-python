@@ -1188,10 +1188,17 @@ class Scope:
             "parent_sampled": transaction.parent_sampled,
         }
         sampling_context.update(custom_sampling_context)
+
+        keep_incoming_sample_rate = (
+            transaction.sampled is None
+            and transaction.parent_sampled is not None
+            and not callable(client.options.get("traces_sampler"))
+        )
+
         transaction._set_initial_sampling_decision(sampling_context=sampling_context)
 
         # update the sample rate in the dsc
-        if transaction.sample_rate is not None:
+        if transaction.sample_rate is not None and not keep_incoming_sample_rate:
             propagation_context = self.get_active_propagation_context()
             baggage = propagation_context.baggage
 
@@ -1337,7 +1344,12 @@ class Scope:
                 self,
             )
 
-            if sample_rate is not None:
+            keep_incoming_sample_rate = (
+                propagation_context.parent_sampled is not None
+                and not callable(self.get_client().options.get("traces_sampler"))
+            )
+
+            if sample_rate is not None and not keep_incoming_sample_rate:
                 self._update_sample_rate(sample_rate)
 
             if sampled is False or sampled is None:
