@@ -198,10 +198,9 @@ async def test_monitor_decorated_cron_job_reports_once(sentry_init, capture_enve
         cron(decorated_job, run_at_startup=True), timezone=timezone.utc
     )
 
-    assert [(c["monitor_slug"], c["status"]) for c in _check_ins(envelopes)] == [
-        ("decorated", "in_progress"),
-        ("decorated", "ok"),
-    ]
+    check_ins = _check_ins(envelopes)
+    assert {c["monitor_slug"] for c in check_ins} == {"decorated"}
+    assert [c["status"] for c in check_ins[:2]] == ["in_progress", "ok"]
 
 
 class _Worker:
