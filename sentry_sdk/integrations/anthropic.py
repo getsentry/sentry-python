@@ -64,6 +64,11 @@ try:
 except ImportError:
     raise DidNotEnable("Anthropic not installed")
 
+try:
+    from anthropic.types import ThinkingDelta
+except ImportError:
+    ThinkingDelta = None
+
 if TYPE_CHECKING:
     from typing import (
         Any,
@@ -365,22 +370,33 @@ def _collect_ai_data(
     event: "MessageStreamEvent",
     model: "str | None",
     usage: "_RecordedUsage",
-    content_blocks: "list[str]",
+    content_blocks: "list[Any]",
     response_id: "str | None" = None,
     finish_reason: "str | None" = None,
-) -> "tuple[str | None, _RecordedUsage, list[str], str | None, str | None]":
+) -> "tuple[str | None, _RecordedUsage, list[Any], str | None, str | None]":
     """
     Collect model information, token usage, and collect content blocks from the AI streaming response.
     """
     with capture_internal_exceptions():
         if hasattr(event, "type"):
             if event.type == "content_block_start":
-                pass
+                block_type = getattr(event.content_block, "type", "text")
+                content_blocks.append({"type": block_type, "text": ""})
             elif event.type == "content_block_delta":
-                if hasattr(event.delta, "text"):
-                    content_blocks.append(event.delta.text)
-                elif hasattr(event.delta, "partial_json"):
-                    content_blocks.append(event.delta.partial_json)
+                delta = event.delta
+                if ThinkingDelta is not None and isinstance(delta, ThinkingDelta):
+                    chunk = delta.thinking
+                elif hasattr(delta, "text"):
+                    chunk = delta.text
+                elif hasattr(delta, "partial_json"):
+                    chunk = delta.partial_json
+                else:
+                    chunk = None
+                if chunk is not None:
+                    if content_blocks:
+                        content_blocks[-1]["text"] += chunk
+                    else:
+                        content_blocks.append({"type": "text", "text": chunk})
             elif event.type == "content_block_stop":
                 pass
 
@@ -1042,7 +1058,7 @@ def _set_streaming_output_data(
     integration: "AnthropicIntegration",
     model: "Optional[str]",
     usage: "_RecordedUsage",
-    content_blocks: "list[str]",
+    content_blocks: "list[Any]",
     response_id: "Optional[str]",
     finish_reason: "Optional[str]",
 ) -> None:
@@ -1057,6 +1073,15 @@ def _set_streaming_output_data(
         + (usage.cache_write_input_tokens or 0)
     )
 
+    merged_blocks = []
+    for block in content_blocks:
+        block_type = block.get("type", "text")
+        text = block.get("text", "")
+        if block_type == "thinking":
+            merged_blocks.append({"type": "thinking", "thinking": text})
+        else:
+            merged_blocks.append({"type": "text", "text": text})
+
     _set_output_data(
         span=span,
         integration=integration,
@@ -1065,7 +1090,7 @@ def _set_streaming_output_data(
         output_tokens=usage.output_tokens,
         cache_read_input_tokens=usage.cache_read_input_tokens,
         cache_write_input_tokens=usage.cache_write_input_tokens,
-        content_blocks=[{"text": "".join(content_blocks), "type": "text"}],
+        content_blocks=merged_blocks,
         response_id=response_id,
         finish_reason=finish_reason,
     )
