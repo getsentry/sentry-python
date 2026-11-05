@@ -6,6 +6,7 @@ from botocore.exceptions import ClientError
 from botocore.stub import Stubber
 
 import sentry_sdk
+from sentry_sdk.ai.utils import MAX_SINGLE_MESSAGE_CONTENT_CHARS
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.boto3 import Boto3Integration
 from sentry_sdk.integrations.boto3.consts import AI_ORIGIN, ORIGIN
@@ -31,6 +32,8 @@ def _has_shape_member(shape_name, member_name):
 
 
 MODEL_ID = "anthropic.claude-3-5-sonnet-20240620-v1:0"
+# too long to be kept in full when the last input message is truncated.
+LONG_TEXT = "a" * MAX_SINGLE_MESSAGE_CONTENT_CHARS
 
 CONVERSE_RESPONSE = {
     "output": {
@@ -194,7 +197,7 @@ def test_converse(
         "messages": [
             {"role": "user", "content": [{"text": "Hi!"}]},
             {"role": "assistant", "content": [{"text": "Hi! What do you need?"}]},
-            {"role": "user", "content": [{"text": "Hello!"}]},
+            {"role": "user", "content": [{"text": "Hello!"}, {"text": LONG_TEXT}]},
         ],
         "inferenceConfig": {
             "maxTokens": 100,
@@ -257,18 +260,39 @@ def test_converse(
         assert json.loads(attributes[SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]) == [
             {"type": "text", "content": "You are a helpful assistant."}
         ]
-        assert json.loads(
-            attributes[SPANDATA.GEN_AI_INPUT_MESSAGES]
-        ) == _expected_input_messages(
-            trace_mode,
-            [
+        if trace_mode.get("stream_gen_ai_spans") is False:
+            # the last message's text is truncated as a whole.
+            expected_input_messages = [
+                {
+                    "role": "user",
+                    "parts": [
+                        {"type": "text", "content": "Hello!"},
+                        {
+                            "type": "text",
+                            "content": LONG_TEXT[: MAX_SINGLE_MESSAGE_CONTENT_CHARS - 6]
+                            + "...",
+                        },
+                    ],
+                }
+            ]
+        else:
+            expected_input_messages = [
                 {"role": "user", "parts": [{"type": "text", "content": "Hi!"}]},
                 {
                     "role": "assistant",
                     "parts": [{"type": "text", "content": "Hi! What do you need?"}],
                 },
-                {"role": "user", "parts": [{"type": "text", "content": "Hello!"}]},
-            ],
+                {
+                    "role": "user",
+                    "parts": [
+                        {"type": "text", "content": "Hello!"},
+                        {"type": "text", "content": LONG_TEXT},
+                    ],
+                },
+            ]
+        assert (
+            json.loads(attributes[SPANDATA.GEN_AI_INPUT_MESSAGES])
+            == expected_input_messages
         )
         assert json.loads(attributes[SPANDATA.GEN_AI_TOOL_DEFINITIONS]) == [
             {
