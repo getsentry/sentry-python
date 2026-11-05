@@ -24,9 +24,10 @@ from anthropic.types.message_delta_event import MessageDeltaEvent
 from anthropic.types.message_start_event import MessageStartEvent
 
 try:
-    from anthropic.types import ThinkingBlock
+    from anthropic.types import ThinkingBlock, ThinkingDelta
 except ImportError:
     ThinkingBlock = None
+    ThinkingDelta = None
 
 
 try:
@@ -158,6 +159,29 @@ def data_collection_tool_use_message():
 @pytest.fixture
 def streaming_anthropic_response():
     def inner(text_deltas, stop_reason):
+        thinking_events = []
+        if ThinkingBlock is not None:
+            thinking_events = [
+                ContentBlockStartEvent(
+                    type="content_block_start",
+                    index=0,
+                    content_block=ThinkingBlock(
+                        type="thinking",
+                        thinking="",
+                        signature="sig123",
+                    ),
+                ),
+                ContentBlockDeltaEvent(
+                    delta=ThinkingDelta(
+                        thinking="Let me reason step by step...",
+                        type="thinking_delta",
+                    ),
+                    index=0,
+                    type="content_block_delta",
+                ),
+                ContentBlockStopEvent(type="content_block_stop", index=0),
+            ]
+        text_index = 1 if ThinkingBlock is not None else 0
         return [
             MessageStartEvent(
                 message=Message(
@@ -171,20 +195,21 @@ def streaming_anthropic_response():
                 ),
                 type="message_start",
             ),
+            *thinking_events,
             ContentBlockStartEvent(
                 type="content_block_start",
-                index=0,
+                index=text_index,
                 content_block=TextBlock(type="text", text=""),
             ),
             *[
                 ContentBlockDeltaEvent(
                     delta=TextDelta(text=text, type="text_delta"),
-                    index=0,
+                    index=text_index,
                     type="content_block_delta",
                 )
                 for text in text_deltas
             ],
-            ContentBlockStopEvent(type="content_block_stop", index=0),
+            ContentBlockStopEvent(type="content_block_stop", index=text_index),
             MessageDeltaEvent(
                 delta=Delta(stop_reason=stop_reason),
                 usage=MessageDeltaUsage(output_tokens=10),
@@ -313,21 +338,19 @@ def test_nonstreaming_create_message(
                     "content": "Hello, Claude",
                 },
             ]
+            expected_parts = (
+                [
+                    {
+                        "type": "reasoning",
+                        "content": "Let me reason step by step...",
+                    },
+                    {"type": "text", "content": "Hi, I'm Claude."},
+                ]
+                if ThinkingBlock is not None
+                else [{"type": "text", "content": "Hi, I'm Claude."}]
+            )
             assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
-                {
-                    "role": "assistant",
-                    "parts": (
-                        [
-                            {
-                                "type": "reasoning",
-                                "content": "Let me reason step by step...",
-                            },
-                            {"type": "text", "content": "Hi, I'm Claude."},
-                        ]
-                        if ThinkingBlock is not None
-                        else [{"type": "text", "content": "Hi, I'm Claude."}]
-                    ),
-                }
+                {"role": "assistant", "parts": expected_parts}
             ]
         else:
             assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
@@ -383,21 +406,19 @@ def test_nonstreaming_create_message(
                     "content": "Hello, Claude",
                 },
             ]
+            expected_parts = (
+                [
+                    {
+                        "type": "reasoning",
+                        "content": "Let me reason step by step...",
+                    },
+                    {"type": "text", "content": "Hi, I'm Claude."},
+                ]
+                if ThinkingBlock is not None
+                else [{"type": "text", "content": "Hi, I'm Claude."}]
+            )
             assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
-                {
-                    "role": "assistant",
-                    "parts": (
-                        [
-                            {
-                                "type": "reasoning",
-                                "content": "Let me reason step by step...",
-                            },
-                            {"type": "text", "content": "Hi, I'm Claude."},
-                        ]
-                        if ThinkingBlock is not None
-                        else [{"type": "text", "content": "Hi, I'm Claude."}]
-                    ),
-                }
+                {"role": "assistant", "parts": expected_parts}
             ]
         else:
             assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
@@ -448,21 +469,19 @@ def test_nonstreaming_create_message(
                 span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
                 == '[{"role": "user", "content": "Hello, Claude"}]'
             )
+            expected_parts = (
+                [
+                    {
+                        "type": "reasoning",
+                        "content": "Let me reason step by step...",
+                    },
+                    {"type": "text", "content": "Hi, I'm Claude."},
+                ]
+                if ThinkingBlock is not None
+                else [{"type": "text", "content": "Hi, I'm Claude."}]
+            )
             assert json.loads(span["data"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
-                {
-                    "role": "assistant",
-                    "parts": (
-                        [
-                            {
-                                "type": "reasoning",
-                                "content": "Let me reason step by step...",
-                            },
-                            {"type": "text", "content": "Hi, I'm Claude."},
-                        ]
-                        if ThinkingBlock is not None
-                        else [{"type": "text", "content": "Hi, I'm Claude."}]
-                    ),
-                }
+                {"role": "assistant", "parts": expected_parts}
             ]
         else:
             assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
@@ -1118,21 +1137,19 @@ async def test_nonstreaming_create_message_async(
                     "content": "Hello, Claude",
                 },
             ]
+            expected_parts = (
+                [
+                    {
+                        "type": "reasoning",
+                        "content": "Let me reason step by step...",
+                    },
+                    {"type": "text", "content": "Hi, I'm Claude."},
+                ]
+                if ThinkingBlock is not None
+                else [{"type": "text", "content": "Hi, I'm Claude."}]
+            )
             assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
-                {
-                    "role": "assistant",
-                    "parts": (
-                        [
-                            {
-                                "type": "reasoning",
-                                "content": "Let me reason step by step...",
-                            },
-                            {"type": "text", "content": "Hi, I'm Claude."},
-                        ]
-                        if ThinkingBlock is not None
-                        else [{"type": "text", "content": "Hi, I'm Claude."}]
-                    ),
-                }
+                {"role": "assistant", "parts": expected_parts}
             ]
         else:
             assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
@@ -1186,21 +1203,19 @@ async def test_nonstreaming_create_message_async(
                     "content": "Hello, Claude",
                 },
             ]
+            expected_parts = (
+                [
+                    {
+                        "type": "reasoning",
+                        "content": "Let me reason step by step...",
+                    },
+                    {"type": "text", "content": "Hi, I'm Claude."},
+                ]
+                if ThinkingBlock is not None
+                else [{"type": "text", "content": "Hi, I'm Claude."}]
+            )
             assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
-                {
-                    "role": "assistant",
-                    "parts": (
-                        [
-                            {
-                                "type": "reasoning",
-                                "content": "Let me reason step by step...",
-                            },
-                            {"type": "text", "content": "Hi, I'm Claude."},
-                        ]
-                        if ThinkingBlock is not None
-                        else [{"type": "text", "content": "Hi, I'm Claude."}]
-                    ),
-                }
+                {"role": "assistant", "parts": expected_parts}
             ]
         else:
             assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
@@ -1248,21 +1263,19 @@ async def test_nonstreaming_create_message_async(
                 span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
                 == '[{"role": "user", "content": "Hello, Claude"}]'
             )
+            expected_parts = (
+                [
+                    {
+                        "type": "reasoning",
+                        "content": "Let me reason step by step...",
+                    },
+                    {"type": "text", "content": "Hi, I'm Claude."},
+                ]
+                if ThinkingBlock is not None
+                else [{"type": "text", "content": "Hi, I'm Claude."}]
+            )
             assert json.loads(span["data"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
-                {
-                    "role": "assistant",
-                    "parts": (
-                        [
-                            {
-                                "type": "reasoning",
-                                "content": "Let me reason step by step...",
-                            },
-                            {"type": "text", "content": "Hi, I'm Claude."},
-                        ]
-                        if ThinkingBlock is not None
-                        else [{"type": "text", "content": "Hi, I'm Claude."}]
-                    ),
-                }
+                {"role": "assistant", "parts": expected_parts}
             ]
         else:
             assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
@@ -1373,7 +1386,17 @@ def test_streaming_create_message(
             assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
                 {
                     "role": "assistant",
-                    "parts": [{"type": "text", "content": "Hi! I'm Claude!"}],
+                    "parts": (
+                        [
+                            {
+                                "type": "reasoning",
+                                "content": "Let me reason step by step...",
+                            },
+                            {"type": "text", "content": "Hi! I'm Claude!"},
+                        ]
+                        if ThinkingBlock is not None
+                        else [{"type": "text", "content": "Hi! I'm Claude!"}]
+                    ),
                 }
             ]
 
@@ -1436,7 +1459,17 @@ def test_streaming_create_message(
             assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
                 {
                     "role": "assistant",
-                    "parts": [{"type": "text", "content": "Hi! I'm Claude!"}],
+                    "parts": (
+                        [
+                            {
+                                "type": "reasoning",
+                                "content": "Let me reason step by step...",
+                            },
+                            {"type": "text", "content": "Hi! I'm Claude!"},
+                        ]
+                        if ThinkingBlock is not None
+                        else [{"type": "text", "content": "Hi! I'm Claude!"}]
+                    ),
                 }
             ]
 
@@ -1492,7 +1525,17 @@ def test_streaming_create_message(
             assert json.loads(span["data"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
                 {
                     "role": "assistant",
-                    "parts": [{"type": "text", "content": "Hi! I'm Claude!"}],
+                    "parts": (
+                        [
+                            {
+                                "type": "reasoning",
+                                "content": "Let me reason step by step...",
+                            },
+                            {"type": "text", "content": "Hi! I'm Claude!"},
+                        ]
+                        if ThinkingBlock is not None
+                        else [{"type": "text", "content": "Hi! I'm Claude!"}]
+                    ),
                 }
             ]
 
@@ -1761,7 +1804,17 @@ def test_streaming_create_message_data_collection_outputs(
         assert json.loads(span_data[SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
             {
                 "role": "assistant",
-                "parts": [{"type": "text", "content": "Hi! I'm Claude!"}],
+                "parts": (
+                    [
+                        {
+                            "type": "reasoning",
+                            "content": "Let me reason step by step...",
+                        },
+                        {"type": "text", "content": "Hi! I'm Claude!"},
+                    ]
+                    if ThinkingBlock is not None
+                    else [{"type": "text", "content": "Hi! I'm Claude!"}]
+                ),
             }
         ]
     else:
@@ -1819,7 +1872,7 @@ def test_streaming_create_message_close(
                 max_tokens=1024, messages=messages, model="model", stream=True
             )
 
-            for _ in range(4):
+            for _ in range(7 if ThinkingBlock is not None else 4):
                 next(messages)
 
             messages.close()
@@ -1842,7 +1895,20 @@ def test_streaming_create_message_close(
             == '[{"role": "user", "content": "Hello, Claude"}]'
         )
         assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
-            {"role": "assistant", "parts": [{"type": "text", "content": "Hi!"}]}
+            {
+                "role": "assistant",
+                "parts": (
+                    [
+                        {
+                            "type": "reasoning",
+                            "content": "Let me reason step by step...",
+                        },
+                        {"type": "text", "content": "Hi!"},
+                    ]
+                    if ThinkingBlock is not None
+                    else [{"type": "text", "content": "Hi!"}]
+                ),
+            }
         ]
 
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
@@ -1865,7 +1931,7 @@ def test_streaming_create_message_close(
                 max_tokens=1024, messages=messages, model="model", stream=True
             )
 
-            for _ in range(4):
+            for _ in range(7 if ThinkingBlock is not None else 4):
                 next(messages)
 
             messages.close()
@@ -1890,7 +1956,20 @@ def test_streaming_create_message_close(
             == '[{"role": "user", "content": "Hello, Claude"}]'
         )
         assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
-            {"role": "assistant", "parts": [{"type": "text", "content": "Hi!"}]}
+            {
+                "role": "assistant",
+                "parts": (
+                    [
+                        {
+                            "type": "reasoning",
+                            "content": "Let me reason step by step...",
+                        },
+                        {"type": "text", "content": "Hi!"},
+                    ]
+                    if ThinkingBlock is not None
+                    else [{"type": "text", "content": "Hi!"}]
+                ),
+            }
         ]
 
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
@@ -1913,7 +1992,7 @@ def test_streaming_create_message_close(
                 max_tokens=1024, messages=messages, model="model", stream=True
             )
 
-            for _ in range(4):
+            for _ in range(7 if ThinkingBlock is not None else 4):
                 next(messages)
 
             messages.close()
@@ -1937,7 +2016,20 @@ def test_streaming_create_message_close(
             == '[{"role": "user", "content": "Hello, Claude"}]'
         )
         assert json.loads(span["data"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
-            {"role": "assistant", "parts": [{"type": "text", "content": "Hi!"}]}
+            {
+                "role": "assistant",
+                "parts": (
+                    [
+                        {
+                            "type": "reasoning",
+                            "content": "Let me reason step by step...",
+                        },
+                        {"type": "text", "content": "Hi!"},
+                    ]
+                    if ThinkingBlock is not None
+                    else [{"type": "text", "content": "Hi!"}]
+                ),
+            }
         ]
 
         assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
@@ -2228,7 +2320,17 @@ def test_stream_messages(
             assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
                 {
                     "role": "assistant",
-                    "parts": [{"type": "text", "content": "Hi! I'm Claude!"}],
+                    "parts": (
+                        [
+                            {
+                                "type": "reasoning",
+                                "content": "Let me reason step by step...",
+                            },
+                            {"type": "text", "content": "Hi! I'm Claude!"},
+                        ]
+                        if ThinkingBlock is not None
+                        else [{"type": "text", "content": "Hi! I'm Claude!"}]
+                    ),
                 }
             ]
 
@@ -2291,7 +2393,17 @@ def test_stream_messages(
             assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
                 {
                     "role": "assistant",
-                    "parts": [{"type": "text", "content": "Hi! I'm Claude!"}],
+                    "parts": (
+                        [
+                            {
+                                "type": "reasoning",
+                                "content": "Let me reason step by step...",
+                            },
+                            {"type": "text", "content": "Hi! I'm Claude!"},
+                        ]
+                        if ThinkingBlock is not None
+                        else [{"type": "text", "content": "Hi! I'm Claude!"}]
+                    ),
                 }
             ]
 
@@ -2347,7 +2459,17 @@ def test_stream_messages(
             assert json.loads(span["data"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
                 {
                     "role": "assistant",
-                    "parts": [{"type": "text", "content": "Hi! I'm Claude!"}],
+                    "parts": (
+                        [
+                            {
+                                "type": "reasoning",
+                                "content": "Let me reason step by step...",
+                            },
+                            {"type": "text", "content": "Hi! I'm Claude!"},
+                        ]
+                        if ThinkingBlock is not None
+                        else [{"type": "text", "content": "Hi! I'm Claude!"}]
+                    ),
                 }
             ]
         else:
@@ -2494,7 +2616,17 @@ def test_stream_messages_data_collection_outputs(
         assert json.loads(span_data[SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
             {
                 "role": "assistant",
-                "parts": [{"type": "text", "content": "Hi! I'm Claude!"}],
+                "parts": (
+                    [
+                        {
+                            "type": "reasoning",
+                            "content": "Let me reason step by step...",
+                        },
+                        {"type": "text", "content": "Hi! I'm Claude!"},
+                    ]
+                    if ThinkingBlock is not None
+                    else [{"type": "text", "content": "Hi! I'm Claude!"}]
+                ),
             }
         ]
     else:
@@ -2552,7 +2684,7 @@ def test_stream_messages_close(
             messages=messages,
             model="model",
         ) as stream:
-            for _ in range(4):
+            for _ in range(7 if ThinkingBlock is not None else 4):
                 next(stream)
 
             # New versions add TextEvent, so consume one more event.
@@ -2579,7 +2711,20 @@ def test_stream_messages_close(
             == '[{"role": "user", "content": "Hello, Claude"}]'
         )
         assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
-            {"role": "assistant", "parts": [{"type": "text", "content": "Hi!"}]}
+            {
+                "role": "assistant",
+                "parts": (
+                    [
+                        {
+                            "type": "reasoning",
+                            "content": "Let me reason step by step...",
+                        },
+                        {"type": "text", "content": "Hi! I'm Claude!"},
+                    ]
+                    if ThinkingBlock is not None
+                    else [{"type": "text", "content": "Hi!"}]
+                ),
+            }
         ]
 
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
@@ -2602,7 +2747,7 @@ def test_stream_messages_close(
             messages=messages,
             model="model",
         ) as stream:
-            for _ in range(4):
+            for _ in range(7 if ThinkingBlock is not None else 4):
                 next(stream)
 
             # New versions add TextEvent, so consume one more event.
@@ -2631,7 +2776,20 @@ def test_stream_messages_close(
             == '[{"role": "user", "content": "Hello, Claude"}]'
         )
         assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
-            {"role": "assistant", "parts": [{"type": "text", "content": "Hi!"}]}
+            {
+                "role": "assistant",
+                "parts": (
+                    [
+                        {
+                            "type": "reasoning",
+                            "content": "Let me reason step by step...",
+                        },
+                        {"type": "text", "content": "Hi! I'm Claude!"},
+                    ]
+                    if ThinkingBlock is not None
+                    else [{"type": "text", "content": "Hi!"}]
+                ),
+            }
         ]
 
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
@@ -2654,7 +2812,7 @@ def test_stream_messages_close(
             messages=messages,
             model="model",
         ) as stream:
-            for _ in range(4):
+            for _ in range(7 if ThinkingBlock is not None else 4):
                 next(stream)
 
             # New versions add TextEvent, so consume one more event.
@@ -2682,7 +2840,20 @@ def test_stream_messages_close(
             == '[{"role": "user", "content": "Hello, Claude"}]'
         )
         assert json.loads(span["data"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
-            {"role": "assistant", "parts": [{"type": "text", "content": "Hi!"}]}
+            {
+                "role": "assistant",
+                "parts": (
+                    [
+                        {
+                            "type": "reasoning",
+                            "content": "Let me reason step by step...",
+                        },
+                        {"type": "text", "content": "Hi! I'm Claude!"},
+                    ]
+                    if ThinkingBlock is not None
+                    else [{"type": "text", "content": "Hi!"}]
+                ),
+            }
         ]
 
         assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
@@ -2979,7 +3150,17 @@ async def test_streaming_create_message_async(
             assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
                 {
                     "role": "assistant",
-                    "parts": [{"type": "text", "content": "Hi! I'm Claude!"}],
+                    "parts": (
+                        [
+                            {
+                                "type": "reasoning",
+                                "content": "Let me reason step by step...",
+                            },
+                            {"type": "text", "content": "Hi! I'm Claude!"},
+                        ]
+                        if ThinkingBlock is not None
+                        else [{"type": "text", "content": "Hi! I'm Claude!"}]
+                    ),
                 }
             ]
 
@@ -3041,7 +3222,17 @@ async def test_streaming_create_message_async(
             assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
                 {
                     "role": "assistant",
-                    "parts": [{"type": "text", "content": "Hi! I'm Claude!"}],
+                    "parts": (
+                        [
+                            {
+                                "type": "reasoning",
+                                "content": "Let me reason step by step...",
+                            },
+                            {"type": "text", "content": "Hi! I'm Claude!"},
+                        ]
+                        if ThinkingBlock is not None
+                        else [{"type": "text", "content": "Hi! I'm Claude!"}]
+                    ),
                 }
             ]
 
@@ -3098,7 +3289,17 @@ async def test_streaming_create_message_async(
             assert json.loads(span["data"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
                 {
                     "role": "assistant",
-                    "parts": [{"type": "text", "content": "Hi! I'm Claude!"}],
+                    "parts": (
+                        [
+                            {
+                                "type": "reasoning",
+                                "content": "Let me reason step by step...",
+                            },
+                            {"type": "text", "content": "Hi! I'm Claude!"},
+                        ]
+                        if ThinkingBlock is not None
+                        else [{"type": "text", "content": "Hi! I'm Claude!"}]
+                    ),
                 }
             ]
 
@@ -3249,7 +3450,17 @@ async def test_streaming_create_message_data_collection_outputs_async(
         assert json.loads(span_data[SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
             {
                 "role": "assistant",
-                "parts": [{"type": "text", "content": "Hi! I'm Claude!"}],
+                "parts": (
+                    [
+                        {
+                            "type": "reasoning",
+                            "content": "Let me reason step by step...",
+                        },
+                        {"type": "text", "content": "Hi! I'm Claude!"},
+                    ]
+                    if ThinkingBlock is not None
+                    else [{"type": "text", "content": "Hi! I'm Claude!"}]
+                ),
             }
         ]
     else:
@@ -3311,7 +3522,7 @@ async def test_streaming_create_message_async_close(
                 max_tokens=1024, messages=messages, model="model", stream=True
             )
 
-            for _ in range(4):
+            for _ in range(7 if ThinkingBlock is not None else 4):
                 await messages.__anext__()
             await messages.close()
 
@@ -3333,7 +3544,20 @@ async def test_streaming_create_message_async_close(
             == '[{"role": "user", "content": "Hello, Claude"}]'
         )
         assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
-            {"role": "assistant", "parts": [{"type": "text", "content": "Hi!"}]}
+            {
+                "role": "assistant",
+                "parts": (
+                    [
+                        {
+                            "type": "reasoning",
+                            "content": "Let me reason step by step...",
+                        },
+                        {"type": "text", "content": "Hi!"},
+                    ]
+                    if ThinkingBlock is not None
+                    else [{"type": "text", "content": "Hi!"}]
+                ),
+            }
         ]
 
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
@@ -3356,7 +3580,7 @@ async def test_streaming_create_message_async_close(
                 max_tokens=1024, messages=messages, model="model", stream=True
             )
 
-            for _ in range(4):
+            for _ in range(7 if ThinkingBlock is not None else 4):
                 await messages.__anext__()
             await messages.close()
 
@@ -3380,7 +3604,20 @@ async def test_streaming_create_message_async_close(
             == '[{"role": "user", "content": "Hello, Claude"}]'
         )
         assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
-            {"role": "assistant", "parts": [{"type": "text", "content": "Hi!"}]}
+            {
+                "role": "assistant",
+                "parts": (
+                    [
+                        {
+                            "type": "reasoning",
+                            "content": "Let me reason step by step...",
+                        },
+                        {"type": "text", "content": "Hi!"},
+                    ]
+                    if ThinkingBlock is not None
+                    else [{"type": "text", "content": "Hi!"}]
+                ),
+            }
         ]
 
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
@@ -3403,7 +3640,7 @@ async def test_streaming_create_message_async_close(
                 max_tokens=1024, messages=messages, model="model", stream=True
             )
 
-            for _ in range(4):
+            for _ in range(7 if ThinkingBlock is not None else 4):
                 await messages.__anext__()
             await messages.close()
 
@@ -3426,7 +3663,20 @@ async def test_streaming_create_message_async_close(
             == '[{"role": "user", "content": "Hello, Claude"}]'
         )
         assert json.loads(span["data"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
-            {"role": "assistant", "parts": [{"type": "text", "content": "Hi!"}]}
+            {
+                "role": "assistant",
+                "parts": (
+                    [
+                        {
+                            "type": "reasoning",
+                            "content": "Let me reason step by step...",
+                        },
+                        {"type": "text", "content": "Hi!"},
+                    ]
+                    if ThinkingBlock is not None
+                    else [{"type": "text", "content": "Hi!"}]
+                ),
+            }
         ]
 
         assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
@@ -3725,7 +3975,17 @@ async def test_stream_message_async(
             assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
                 {
                     "role": "assistant",
-                    "parts": [{"type": "text", "content": "Hi! I'm Claude!"}],
+                    "parts": (
+                        [
+                            {
+                                "type": "reasoning",
+                                "content": "Let me reason step by step...",
+                            },
+                            {"type": "text", "content": "Hi! I'm Claude!"},
+                        ]
+                        if ThinkingBlock is not None
+                        else [{"type": "text", "content": "Hi! I'm Claude!"}]
+                    ),
                 }
             ]
 
@@ -3785,7 +4045,17 @@ async def test_stream_message_async(
             assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
                 {
                     "role": "assistant",
-                    "parts": [{"type": "text", "content": "Hi! I'm Claude!"}],
+                    "parts": (
+                        [
+                            {
+                                "type": "reasoning",
+                                "content": "Let me reason step by step...",
+                            },
+                            {"type": "text", "content": "Hi! I'm Claude!"},
+                        ]
+                        if ThinkingBlock is not None
+                        else [{"type": "text", "content": "Hi! I'm Claude!"}]
+                    ),
                 }
             ]
 
@@ -3839,7 +4109,17 @@ async def test_stream_message_async(
             assert json.loads(span["data"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
                 {
                     "role": "assistant",
-                    "parts": [{"type": "text", "content": "Hi! I'm Claude!"}],
+                    "parts": (
+                        [
+                            {
+                                "type": "reasoning",
+                                "content": "Let me reason step by step...",
+                            },
+                            {"type": "text", "content": "Hi! I'm Claude!"},
+                        ]
+                        if ThinkingBlock is not None
+                        else [{"type": "text", "content": "Hi! I'm Claude!"}]
+                    ),
                 }
             ]
 
@@ -3988,7 +4268,17 @@ async def test_stream_messages_data_collection_outputs_async(
         assert json.loads(span_data[SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
             {
                 "role": "assistant",
-                "parts": [{"type": "text", "content": "Hi! I'm Claude!"}],
+                "parts": (
+                    [
+                        {
+                            "type": "reasoning",
+                            "content": "Let me reason step by step...",
+                        },
+                        {"type": "text", "content": "Hi! I'm Claude!"},
+                    ]
+                    if ThinkingBlock is not None
+                    else [{"type": "text", "content": "Hi! I'm Claude!"}]
+                ),
             }
         ]
     else:
@@ -4235,7 +4525,7 @@ async def test_stream_messages_async_close(
                 messages=messages,
                 model="model",
             ) as stream:
-                for _ in range(4):
+                for _ in range(7 if ThinkingBlock is not None else 4):
                     await stream.__anext__()
 
                 # New versions add TextEvent, so consume one more event.
@@ -4264,7 +4554,20 @@ async def test_stream_messages_async_close(
             == '[{"role": "user", "content": "Hello, Claude"}]'
         )
         assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
-            {"role": "assistant", "parts": [{"type": "text", "content": "Hi!"}]}
+            {
+                "role": "assistant",
+                "parts": (
+                    [
+                        {
+                            "type": "reasoning",
+                            "content": "Let me reason step by step...",
+                        },
+                        {"type": "text", "content": "Hi! I'm Claude!"},
+                    ]
+                    if ThinkingBlock is not None
+                    else [{"type": "text", "content": "Hi!"}]
+                ),
+            }
         ]
 
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
@@ -4288,7 +4591,7 @@ async def test_stream_messages_async_close(
                 messages=messages,
                 model="model",
             ) as stream:
-                for _ in range(4):
+                for _ in range(7 if ThinkingBlock is not None else 4):
                     await stream.__anext__()
 
                 # New versions add TextEvent, so consume one more event.
@@ -4316,7 +4619,20 @@ async def test_stream_messages_async_close(
             == '[{"role": "user", "content": "Hello, Claude"}]'
         )
         assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
-            {"role": "assistant", "parts": [{"type": "text", "content": "Hi!"}]}
+            {
+                "role": "assistant",
+                "parts": (
+                    [
+                        {
+                            "type": "reasoning",
+                            "content": "Let me reason step by step...",
+                        },
+                        {"type": "text", "content": "Hi! I'm Claude!"},
+                    ]
+                    if ThinkingBlock is not None
+                    else [{"type": "text", "content": "Hi!"}]
+                ),
+            }
         ]
 
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
@@ -4340,7 +4656,7 @@ async def test_stream_messages_async_close(
                 messages=messages,
                 model="model",
             ) as stream:
-                for _ in range(4):
+                for _ in range(7 if ThinkingBlock is not None else 4):
                     await stream.__anext__()
 
                 # New versions add TextEvent, so consume one more event.
@@ -4370,7 +4686,20 @@ async def test_stream_messages_async_close(
             == '[{"role": "user", "content": "Hello, Claude"}]'
         )
         assert json.loads(span["data"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
-            {"role": "assistant", "parts": [{"type": "text", "content": "Hi!"}]}
+            {
+                "role": "assistant",
+                "parts": (
+                    [
+                        {
+                            "type": "reasoning",
+                            "content": "Let me reason step by step...",
+                        },
+                        {"type": "text", "content": "Hi! I'm Claude!"},
+                    ]
+                    if ThinkingBlock is not None
+                    else [{"type": "text", "content": "Hi!"}]
+                ),
+            }
         ]
 
         assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
@@ -5940,7 +6269,7 @@ def test_collect_ai_data_with_input_json_delta(span_streaming):
     assert model is None
     assert new_usage.input_tokens == usage.input_tokens
     assert new_usage.output_tokens == usage.output_tokens
-    assert new_content_blocks == ["test"]
+    assert new_content_blocks == [{"type": "text", "text": "test"}]
     assert response_id is None
     assert finish_reason is None
 
@@ -6277,21 +6606,19 @@ def test_nonstreaming_create_message_with_system_prompt(
             assert len(stored_messages) == 1
             assert stored_messages[0]["role"] == "user"
             assert stored_messages[0]["content"] == "Hello, Claude"
+            expected_parts = (
+                [
+                    {
+                        "type": "reasoning",
+                        "content": "Let me reason step by step...",
+                    },
+                    {"type": "text", "content": "Hi, I'm Claude."},
+                ]
+                if ThinkingBlock is not None
+                else [{"type": "text", "content": "Hi, I'm Claude."}]
+            )
             assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
-                {
-                    "role": "assistant",
-                    "parts": (
-                        [
-                            {
-                                "type": "reasoning",
-                                "content": "Let me reason step by step...",
-                            },
-                            {"type": "text", "content": "Hi, I'm Claude."},
-                        ]
-                        if ThinkingBlock is not None
-                        else [{"type": "text", "content": "Hi, I'm Claude."}]
-                    ),
-                }
+                {"role": "assistant", "parts": expected_parts}
             ]
         else:
             assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["attributes"]
@@ -6352,21 +6679,19 @@ def test_nonstreaming_create_message_with_system_prompt(
             assert len(stored_messages) == 1
             assert stored_messages[0]["role"] == "user"
             assert stored_messages[0]["content"] == "Hello, Claude"
+            expected_parts = (
+                [
+                    {
+                        "type": "reasoning",
+                        "content": "Let me reason step by step...",
+                    },
+                    {"type": "text", "content": "Hi, I'm Claude."},
+                ]
+                if ThinkingBlock is not None
+                else [{"type": "text", "content": "Hi, I'm Claude."}]
+            )
             assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
-                {
-                    "role": "assistant",
-                    "parts": (
-                        [
-                            {
-                                "type": "reasoning",
-                                "content": "Let me reason step by step...",
-                            },
-                            {"type": "text", "content": "Hi, I'm Claude."},
-                        ]
-                        if ThinkingBlock is not None
-                        else [{"type": "text", "content": "Hi, I'm Claude."}]
-                    ),
-                }
+                {"role": "assistant", "parts": expected_parts}
             ]
         else:
             assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["attributes"]
@@ -6426,21 +6751,19 @@ def test_nonstreaming_create_message_with_system_prompt(
             assert len(stored_messages) == 1
             assert stored_messages[0]["role"] == "user"
             assert stored_messages[0]["content"] == "Hello, Claude"
+            expected_parts = (
+                [
+                    {
+                        "type": "reasoning",
+                        "content": "Let me reason step by step...",
+                    },
+                    {"type": "text", "content": "Hi, I'm Claude."},
+                ]
+                if ThinkingBlock is not None
+                else [{"type": "text", "content": "Hi, I'm Claude."}]
+            )
             assert json.loads(span["data"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
-                {
-                    "role": "assistant",
-                    "parts": (
-                        [
-                            {
-                                "type": "reasoning",
-                                "content": "Let me reason step by step...",
-                            },
-                            {"type": "text", "content": "Hi, I'm Claude."},
-                        ]
-                        if ThinkingBlock is not None
-                        else [{"type": "text", "content": "Hi, I'm Claude."}]
-                    ),
-                }
+                {"role": "assistant", "parts": expected_parts}
             ]
         else:
             assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["data"]
@@ -6541,21 +6864,19 @@ async def test_nonstreaming_create_message_with_system_prompt_async(
             assert len(stored_messages) == 1
             assert stored_messages[0]["role"] == "user"
             assert stored_messages[0]["content"] == "Hello, Claude"
+            expected_parts = (
+                [
+                    {
+                        "type": "reasoning",
+                        "content": "Let me reason step by step...",
+                    },
+                    {"type": "text", "content": "Hi, I'm Claude."},
+                ]
+                if ThinkingBlock is not None
+                else [{"type": "text", "content": "Hi, I'm Claude."}]
+            )
             assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
-                {
-                    "role": "assistant",
-                    "parts": (
-                        [
-                            {
-                                "type": "reasoning",
-                                "content": "Let me reason step by step...",
-                            },
-                            {"type": "text", "content": "Hi, I'm Claude."},
-                        ]
-                        if ThinkingBlock is not None
-                        else [{"type": "text", "content": "Hi, I'm Claude."}]
-                    ),
-                }
+                {"role": "assistant", "parts": expected_parts}
             ]
         else:
             assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["attributes"]
@@ -6616,21 +6937,19 @@ async def test_nonstreaming_create_message_with_system_prompt_async(
             assert len(stored_messages) == 1
             assert stored_messages[0]["role"] == "user"
             assert stored_messages[0]["content"] == "Hello, Claude"
+            expected_parts = (
+                [
+                    {
+                        "type": "reasoning",
+                        "content": "Let me reason step by step...",
+                    },
+                    {"type": "text", "content": "Hi, I'm Claude."},
+                ]
+                if ThinkingBlock is not None
+                else [{"type": "text", "content": "Hi, I'm Claude."}]
+            )
             assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
-                {
-                    "role": "assistant",
-                    "parts": (
-                        [
-                            {
-                                "type": "reasoning",
-                                "content": "Let me reason step by step...",
-                            },
-                            {"type": "text", "content": "Hi, I'm Claude."},
-                        ]
-                        if ThinkingBlock is not None
-                        else [{"type": "text", "content": "Hi, I'm Claude."}]
-                    ),
-                }
+                {"role": "assistant", "parts": expected_parts}
             ]
         else:
             assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["attributes"]
@@ -6690,21 +7009,19 @@ async def test_nonstreaming_create_message_with_system_prompt_async(
             assert len(stored_messages) == 1
             assert stored_messages[0]["role"] == "user"
             assert stored_messages[0]["content"] == "Hello, Claude"
+            expected_parts = (
+                [
+                    {
+                        "type": "reasoning",
+                        "content": "Let me reason step by step...",
+                    },
+                    {"type": "text", "content": "Hi, I'm Claude."},
+                ]
+                if ThinkingBlock is not None
+                else [{"type": "text", "content": "Hi, I'm Claude."}]
+            )
             assert json.loads(span["data"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
-                {
-                    "role": "assistant",
-                    "parts": (
-                        [
-                            {
-                                "type": "reasoning",
-                                "content": "Let me reason step by step...",
-                            },
-                            {"type": "text", "content": "Hi, I'm Claude."},
-                        ]
-                        if ThinkingBlock is not None
-                        else [{"type": "text", "content": "Hi, I'm Claude."}]
-                    ),
-                }
+                {"role": "assistant", "parts": expected_parts}
             ]
         else:
             assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["data"]
@@ -6820,7 +7137,17 @@ def test_streaming_create_message_with_system_prompt(
             assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
                 {
                     "role": "assistant",
-                    "parts": [{"type": "text", "content": "Hi! I'm Claude!"}],
+                    "parts": (
+                        [
+                            {
+                                "type": "reasoning",
+                                "content": "Let me reason step by step...",
+                            },
+                            {"type": "text", "content": "Hi! I'm Claude!"},
+                        ]
+                        if ThinkingBlock is not None
+                        else [{"type": "text", "content": "Hi! I'm Claude!"}]
+                    ),
                 }
             ]
 
@@ -6886,7 +7213,17 @@ def test_streaming_create_message_with_system_prompt(
             assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
                 {
                     "role": "assistant",
-                    "parts": [{"type": "text", "content": "Hi! I'm Claude!"}],
+                    "parts": (
+                        [
+                            {
+                                "type": "reasoning",
+                                "content": "Let me reason step by step...",
+                            },
+                            {"type": "text", "content": "Hi! I'm Claude!"},
+                        ]
+                        if ThinkingBlock is not None
+                        else [{"type": "text", "content": "Hi! I'm Claude!"}]
+                    ),
                 }
             ]
 
@@ -6951,7 +7288,17 @@ def test_streaming_create_message_with_system_prompt(
             assert json.loads(span["data"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
                 {
                     "role": "assistant",
-                    "parts": [{"type": "text", "content": "Hi! I'm Claude!"}],
+                    "parts": (
+                        [
+                            {
+                                "type": "reasoning",
+                                "content": "Let me reason step by step...",
+                            },
+                            {"type": "text", "content": "Hi! I'm Claude!"},
+                        ]
+                        if ThinkingBlock is not None
+                        else [{"type": "text", "content": "Hi! I'm Claude!"}]
+                    ),
                 }
             ]
 
@@ -7064,7 +7411,17 @@ def test_stream_messages_with_system_prompt(
             assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
                 {
                     "role": "assistant",
-                    "parts": [{"type": "text", "content": "Hi! I'm Claude!"}],
+                    "parts": (
+                        [
+                            {
+                                "type": "reasoning",
+                                "content": "Let me reason step by step...",
+                            },
+                            {"type": "text", "content": "Hi! I'm Claude!"},
+                        ]
+                        if ThinkingBlock is not None
+                        else [{"type": "text", "content": "Hi! I'm Claude!"}]
+                    ),
                 }
             ]
         else:
@@ -7125,7 +7482,17 @@ def test_stream_messages_with_system_prompt(
             assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
                 {
                     "role": "assistant",
-                    "parts": [{"type": "text", "content": "Hi! I'm Claude!"}],
+                    "parts": (
+                        [
+                            {
+                                "type": "reasoning",
+                                "content": "Let me reason step by step...",
+                            },
+                            {"type": "text", "content": "Hi! I'm Claude!"},
+                        ]
+                        if ThinkingBlock is not None
+                        else [{"type": "text", "content": "Hi! I'm Claude!"}]
+                    ),
                 }
             ]
         else:
@@ -7184,7 +7551,17 @@ def test_stream_messages_with_system_prompt(
             assert json.loads(span["data"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
                 {
                     "role": "assistant",
-                    "parts": [{"type": "text", "content": "Hi! I'm Claude!"}],
+                    "parts": (
+                        [
+                            {
+                                "type": "reasoning",
+                                "content": "Let me reason step by step...",
+                            },
+                            {"type": "text", "content": "Hi! I'm Claude!"},
+                        ]
+                        if ThinkingBlock is not None
+                        else [{"type": "text", "content": "Hi! I'm Claude!"}]
+                    ),
                 }
             ]
         else:
@@ -7302,7 +7679,17 @@ async def test_stream_message_with_system_prompt_async(
             assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
                 {
                     "role": "assistant",
-                    "parts": [{"type": "text", "content": "Hi! I'm Claude!"}],
+                    "parts": (
+                        [
+                            {
+                                "type": "reasoning",
+                                "content": "Let me reason step by step...",
+                            },
+                            {"type": "text", "content": "Hi! I'm Claude!"},
+                        ]
+                        if ThinkingBlock is not None
+                        else [{"type": "text", "content": "Hi! I'm Claude!"}]
+                    ),
                 }
             ]
         else:
@@ -7365,7 +7752,17 @@ async def test_stream_message_with_system_prompt_async(
             assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
                 {
                     "role": "assistant",
-                    "parts": [{"type": "text", "content": "Hi! I'm Claude!"}],
+                    "parts": (
+                        [
+                            {
+                                "type": "reasoning",
+                                "content": "Let me reason step by step...",
+                            },
+                            {"type": "text", "content": "Hi! I'm Claude!"},
+                        ]
+                        if ThinkingBlock is not None
+                        else [{"type": "text", "content": "Hi! I'm Claude!"}]
+                    ),
                 }
             ]
         else:
@@ -7426,7 +7823,17 @@ async def test_stream_message_with_system_prompt_async(
             assert json.loads(span["data"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
                 {
                     "role": "assistant",
-                    "parts": [{"type": "text", "content": "Hi! I'm Claude!"}],
+                    "parts": (
+                        [
+                            {
+                                "type": "reasoning",
+                                "content": "Let me reason step by step...",
+                            },
+                            {"type": "text", "content": "Hi! I'm Claude!"},
+                        ]
+                        if ThinkingBlock is not None
+                        else [{"type": "text", "content": "Hi! I'm Claude!"}]
+                    ),
                 }
             ]
 
@@ -7548,7 +7955,17 @@ async def test_streaming_create_message_with_system_prompt_async(
             assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
                 {
                     "role": "assistant",
-                    "parts": [{"type": "text", "content": "Hi! I'm Claude!"}],
+                    "parts": (
+                        [
+                            {
+                                "type": "reasoning",
+                                "content": "Let me reason step by step...",
+                            },
+                            {"type": "text", "content": "Hi! I'm Claude!"},
+                        ]
+                        if ThinkingBlock is not None
+                        else [{"type": "text", "content": "Hi! I'm Claude!"}]
+                    ),
                 }
             ]
 
@@ -7615,7 +8032,17 @@ async def test_streaming_create_message_with_system_prompt_async(
             assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
                 {
                     "role": "assistant",
-                    "parts": [{"type": "text", "content": "Hi! I'm Claude!"}],
+                    "parts": (
+                        [
+                            {
+                                "type": "reasoning",
+                                "content": "Let me reason step by step...",
+                            },
+                            {"type": "text", "content": "Hi! I'm Claude!"},
+                        ]
+                        if ThinkingBlock is not None
+                        else [{"type": "text", "content": "Hi! I'm Claude!"}]
+                    ),
                 }
             ]
 
@@ -7678,7 +8105,17 @@ async def test_streaming_create_message_with_system_prompt_async(
             assert json.loads(span["data"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
                 {
                     "role": "assistant",
-                    "parts": [{"type": "text", "content": "Hi! I'm Claude!"}],
+                    "parts": (
+                        [
+                            {
+                                "type": "reasoning",
+                                "content": "Let me reason step by step...",
+                            },
+                            {"type": "text", "content": "Hi! I'm Claude!"},
+                        ]
+                        if ThinkingBlock is not None
+                        else [{"type": "text", "content": "Hi! I'm Claude!"}]
+                    ),
                 }
             ]
 
