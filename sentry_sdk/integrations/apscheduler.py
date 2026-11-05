@@ -19,7 +19,7 @@ from sentry_sdk.utils import (
 )
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, List, Optional, Set, Tuple
+    from typing import Any, Dict, List, Optional, Tuple
 
     from sentry_sdk._types import MonitorConfig
 
@@ -43,12 +43,7 @@ except ImportError:
 class APSchedulerIntegration(Integration):
     identifier = "apscheduler"
 
-    def __init__(
-        self,
-        monitor_jobs: bool = False,
-        exclude_jobs: "Optional[List[str]]" = None,
-    ) -> None:
-        self.monitor_jobs = monitor_jobs
+    def __init__(self, exclude_jobs: "Optional[List[str]]" = None) -> None:
         self.exclude_jobs = exclude_jobs
 
     @staticmethod
@@ -57,20 +52,9 @@ class APSchedulerIntegration(Integration):
         _check_minimum_version(APSchedulerIntegration, version)
 
         _patch_submit_job()
-        _patch_run_job_error()
 
 
 class _PendingCheckIn:
-    __slots__ = (
-        "monitor_slug",
-        "monitor_config",
-        "start",
-        "opened",
-        "check_in_id",
-        "earlier_run_times",
-        "failed",
-    )
-
     def __init__(
         self, monitor_slug: str, monitor_config: "MonitorConfig", start: float
     ) -> None:
@@ -79,8 +63,6 @@ class _PendingCheckIn:
         self.start = start
         self.opened = False
         self.check_in_id: "Optional[str]" = None
-        self.earlier_run_times: "List[Any]" = []
-        self.failed = False
 
     def open(self) -> None:
         self.opened = True
@@ -88,6 +70,19 @@ class _PendingCheckIn:
             monitor_slug=self.monitor_slug,
             monitor_config=self.monitor_config,
             status=MonitorStatus.IN_PROGRESS,
+        )
+
+    def close(self, status: str) -> None:
+        # Synchronous executors finish the run before `submit_job` returns.
+        if not self.opened:
+            self.open()
+
+        capture_checkin(
+            monitor_slug=self.monitor_slug,
+            monitor_config=self.monitor_config,
+            check_in_id=self.check_in_id,
+            duration=now() - self.start,
+            status=status,
         )
 
 
@@ -99,24 +94,10 @@ class _CronsListener:
     def __init__(self) -> None:
         self.lock = threading.Lock()
         self.pending: "Dict[Tuple[str, Any], _PendingCheckIn]" = {}
-        # Earlier run times of a backlog, which share the last run time's check-in.
-        self.earlier: "Dict[Tuple[str, Any], _PendingCheckIn]" = {}
 
-    def add(
-        self, job_id: str, run_times: "List[Any]", pending: "_PendingCheckIn"
-    ) -> None:
-        pending.earlier_run_times = run_times[:-1]
+    def add(self, job_id: str, run_time: "Any", pending: "_PendingCheckIn") -> None:
         with self.lock:
-            self.pending[(job_id, run_times[-1])] = pending
-            for run_time in pending.earlier_run_times:
-                self.earlier[(job_id, run_time)] = pending
-
-    def _pop(self, key: "Tuple[str, Any]") -> "Optional[_PendingCheckIn]":
-        pending = self.pending.pop(key, None)
-        if pending is not None:
-            for run_time in pending.earlier_run_times:
-                self.earlier.pop((key[0], run_time), None)
-        return pending
+            self.pending[(job_id, run_time)] = pending
 
     def open(self, job_id: str, run_time: "Any") -> None:
         # Under the lock, so `in_progress` is always sent before `finish`
@@ -128,48 +109,21 @@ class _CronsListener:
 
     def discard(self, job_id: str, run_time: "Any") -> None:
         with self.lock:
-            self._pop((job_id, run_time))
+            self.pending.pop((job_id, run_time), None)
 
     def finish(self, job_id: str, run_time: "Any", status: str) -> None:
         with self.lock:
-            earlier = self.earlier.pop((job_id, run_time), None)
-            if earlier is not None:
-                if status == MonitorStatus.ERROR:
-                    earlier.failed = True
-                return
-            pending = self._pop((job_id, run_time))
+            pending = self.pending.pop((job_id, run_time), None)
         if pending is not None:
-            self._close(pending, MonitorStatus.ERROR if pending.failed else status)
+            pending.close(status)
 
     def finish_missed(self, job_id: str, run_time: "Any") -> None:
         with self.lock:
-            if self.earlier.pop((job_id, run_time), None) is not None:
-                return
-            pending = self._pop((job_id, run_time))
+            pending = self.pending.pop((job_id, run_time), None)
         # Send nothing, so Sentry reports the slot as missed, unless a run that
         # waited in a busy pool already sent `in_progress`.
         if pending is not None and pending.opened:
-            self._close(pending, MonitorStatus.ERROR)
-
-    def finish_oldest(self, job_id: str, status: str) -> None:
-        with self.lock:
-            key = next((key for key in self.pending if key[0] == job_id), None)
-            pending = None if key is None else self._pop(key)
-        if pending is not None:
-            self._close(pending, status)
-
-    def _close(self, pending: "_PendingCheckIn", status: str) -> None:
-        # Synchronous executors finish the run before `submit_job` returns.
-        if not pending.opened:
-            pending.open()
-
-        capture_checkin(
-            monitor_slug=pending.monitor_slug,
-            monitor_config=pending.monitor_config,
-            check_in_id=pending.check_in_id,
-            duration=now() - pending.start,
-            status=status,
-        )
+            pending.close(MonitorStatus.ERROR)
 
     def __call__(self, event: "Any") -> None:
         with capture_internal_exceptions():
@@ -185,16 +139,11 @@ class _CronsListener:
             self.finish(event.job_id, event.scheduled_run_time, status)
 
 
-# One listener per scheduler. Weak keys so we don't keep schedulers alive.
+# Weak keys so we don't keep schedulers alive.
 _listeners: "weakref.WeakKeyDictionary[Any, _CronsListener]" = (
     weakref.WeakKeyDictionary()
 )
 _listeners_lock = threading.Lock()
-
-
-def _find_listener(scheduler: "Any") -> "Optional[_CronsListener]":
-    with _listeners_lock:
-        return _listeners.get(scheduler)
 
 
 def _get_listener(scheduler: "Any") -> "_CronsListener":
@@ -209,32 +158,6 @@ def _get_listener(scheduler: "Any") -> "_CronsListener":
 
 # APScheduler assigns `uuid4().hex` when a job is added without an `id`.
 _GENERATED_JOB_ID = re.compile(r"[0-9a-f]{32}")
-
-_warned_job_ids: "Set[str]" = set()
-
-
-def _has_generated_id(job: "Any") -> bool:
-    return _GENERATED_JOB_ID.fullmatch(job.id) is not None
-
-
-def _get_monitor_slug(job: "Any") -> str:
-    # Generated ids change on every restart, which would create a new monitor
-    # each time. Fall back to the job name (the function name by default).
-    if _has_generated_id(job):
-        return job.name
-    return job.id
-
-
-def _warn_generated_id(job: "Any") -> None:
-    if job.id in _warned_job_ids:
-        return
-    _warned_job_ids.add(job.id)
-    logger.warning(
-        "APScheduler job %r has no explicit `id`, so its name is used as its "
-        "monitor slug, and jobs with the same name share a monitor. Pass `id` "
-        "to `add_job` to give it its own monitor.",
-        job.name,
-    )
 
 
 def _get_crontab_day_of_week(field: "Any") -> "Optional[str]":
@@ -299,10 +222,6 @@ def _get_crontab(trigger: "CronTrigger") -> "Optional[str]":
 
 
 def _get_monitor_config(trigger: "Any") -> "Optional[MonitorConfig]":
-    # Sentry schedules have no end, so finite triggers would alert as missed.
-    if getattr(trigger, "end_date", None) is not None:
-        return None
-
     monitor_config: "MonitorConfig"
     if isinstance(trigger, CronTrigger):
         crontab = _get_crontab(trigger)
@@ -322,7 +241,10 @@ def _get_monitor_config(trigger: "Any") -> "Optional[MonitorConfig]":
             return None
         monitor_config = {"schedule": schedule}
     else:
-        # DateTrigger (one-off) and combining triggers have no schedule to monitor.
+        return None
+
+    # Sentry schedules have no end, so finite triggers would alert as missed.
+    if trigger.end_date is not None:
         return None
 
     # Jitter delays runs by up to that many seconds; add it to Sentry's
@@ -348,7 +270,6 @@ def _begin_check_in(
     job: "Any",
     run_times: "List[Any]",
 ) -> "Optional[_CronsListener]":
-    # The job reports its own check-ins.
     if getattr(job.func, "_sentry_monitored", False):
         return None
 
@@ -357,7 +278,10 @@ def _begin_check_in(
     if _is_missed(job, run_times[-1]):
         return None
 
-    monitor_slug = _get_monitor_slug(job)
+    # Generated ids change on every restart, which would create a new monitor
+    # each time. Fall back to the job name (the function name by default).
+    has_generated_id = _GENERATED_JOB_ID.fullmatch(job.id) is not None
+    monitor_slug = job.name if has_generated_id else job.id
     if match_regex_list(monitor_slug, integration.exclude_jobs):
         return None
 
@@ -372,12 +296,17 @@ def _begin_check_in(
         )
         return None
 
-    if _has_generated_id(job):
-        _warn_generated_id(job)
+    if has_generated_id:
+        logger.debug(
+            "APScheduler job %r has no explicit `id`, so its name is used as its "
+            "monitor slug, and jobs with the same name share a monitor. Pass `id` "
+            "to `add_job` to give it its own monitor.",
+            job.name,
+        )
 
     listener = _get_listener(executor._scheduler)
     listener.add(
-        job.id, run_times, _PendingCheckIn(monitor_slug, monitor_config, now())
+        job.id, run_times[-1], _PendingCheckIn(monitor_slug, monitor_config, now())
     )
     return listener
 
@@ -391,11 +320,11 @@ def _patch_submit_job() -> None:
         self: "Any", job: "Any", run_times: "List[Any]", *args: "Any", **kwargs: "Any"
     ) -> "Any":
         integration = sentry_sdk.get_client().get_integration(APSchedulerIntegration)
-        if integration is None or not integration.monitor_jobs:
+        if integration is None:
             return old_submit_job(self, job, run_times, *args, **kwargs)
 
-        # A backlog of run times runs in one submit; check in once, closed by the
-        # last run time's event, and as an error if any run failed.
+        # A backlog of run times runs in one submit. Check in once, and close it
+        # with the last run time's event.
         run_time = run_times[-1]
         listener = None
         with capture_internal_exceptions():
@@ -404,13 +333,12 @@ def _patch_submit_job() -> None:
         try:
             result = old_submit_job(self, job, run_times, *args, **kwargs)
         except MaxInstancesReachedError:
-            # The run is skipped, not failed.
             if listener is not None:
                 with capture_internal_exceptions():
                     listener.discard(job.id, run_time)
             raise
         except BaseException:
-            # Not submitted, so no execution event will close the check-ins.
+            # Not submitted, so no execution event will close the check-in.
             if listener is not None:
                 with capture_internal_exceptions():
                     listener.finish(job.id, run_time, MonitorStatus.ERROR)
@@ -423,22 +351,3 @@ def _patch_submit_job() -> None:
         return result
 
     BaseExecutor.submit_job = sentry_submit_job
-
-
-def _patch_run_job_error() -> None:
-    """Close the check-in of a run that failed inside the executor, which sends no event."""
-    old_run_job_error = BaseExecutor._run_job_error
-
-    @wraps(old_run_job_error)
-    def sentry_run_job_error(
-        self: "Any", job_id: str, *args: "Any", **kwargs: "Any"
-    ) -> "Any":
-        try:
-            return old_run_job_error(self, job_id, *args, **kwargs)
-        finally:
-            with capture_internal_exceptions():
-                listener = _find_listener(self._scheduler)
-                if listener is not None:
-                    listener.finish_oldest(job_id, MonitorStatus.ERROR)
-
-    BaseExecutor._run_job_error = sentry_run_job_error

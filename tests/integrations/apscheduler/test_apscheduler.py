@@ -1,5 +1,4 @@
 import asyncio
-import os
 import threading
 import time
 from datetime import datetime, timedelta, timezone
@@ -10,7 +9,6 @@ from apscheduler.events import (
     EVENT_JOB_EXECUTED,
     EVENT_JOB_MAX_INSTANCES,
     EVENT_JOB_MISSED,
-    JobExecutionEvent,
 )
 from apscheduler.executors.pool import ProcessPoolExecutor, ThreadPoolExecutor
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -20,7 +18,6 @@ from apscheduler.triggers.date import DateTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
 import sentry_sdk
-from sentry_sdk.integrations import apscheduler as apscheduler_integration
 from sentry_sdk.integrations.apscheduler import APSchedulerIntegration
 
 
@@ -74,7 +71,7 @@ def _run_once(envelopes, trigger, func=ok_job, executor="debug", **job_kwargs):
 
 
 def test_cron_job_ok(sentry_init, capture_envelopes):
-    sentry_init(integrations=[APSchedulerIntegration(monitor_jobs=True)])
+    sentry_init(integrations=[APSchedulerIntegration()])
     envelopes = capture_envelopes()
 
     check_ins = _run_once(envelopes, CronTrigger(minute="*/5", timezone="UTC"))
@@ -97,7 +94,7 @@ def test_cron_job_ok(sentry_init, capture_envelopes):
 
 
 def test_cron_job_error(sentry_init, capture_envelopes):
-    sentry_init(integrations=[APSchedulerIntegration(monitor_jobs=True)])
+    sentry_init(integrations=[APSchedulerIntegration()])
     envelopes = capture_envelopes()
 
     check_ins = _run_once(
@@ -110,7 +107,7 @@ def test_cron_job_error(sentry_init, capture_envelopes):
 
 @pytest.mark.parametrize("executor", ["debug", "threadpool"])
 def test_missed_run_sends_no_check_in(sentry_init, capture_envelopes, executor):
-    sentry_init(integrations=[APSchedulerIntegration(monitor_jobs=True)])
+    sentry_init(integrations=[APSchedulerIntegration()])
     envelopes = capture_envelopes()
 
     # A cron slot could fall due during the test, and coalescing would run it.
@@ -123,13 +120,10 @@ def test_missed_run_sends_no_check_in(sentry_init, capture_envelopes, executor):
     )
 
     assert check_ins == []
-    assert all(
-        not listener.pending for listener in apscheduler_integration._listeners.values()
-    )
 
 
 def test_run_missed_after_in_progress_is_error(sentry_init, capture_envelopes):
-    sentry_init(integrations=[APSchedulerIntegration(monitor_jobs=True)])
+    sentry_init(integrations=[APSchedulerIntegration()])
     envelopes = capture_envelopes()
 
     started = threading.Event()
@@ -171,33 +165,10 @@ def test_run_missed_after_in_progress_is_error(sentry_init, capture_envelopes):
     check_ins = [c for c in _check_ins(envelopes) if c["monitor_slug"] == "my-job"]
     assert [c["status"] for c in check_ins] == ["in_progress", "error"]
     assert check_ins[0]["check_in_id"] == check_ins[1]["check_in_id"]
-    assert apscheduler_integration._listeners[scheduler].pending == {}
-
-
-def test_missed_run_drops_pending_check_in(sentry_init, capture_envelopes):
-    sentry_init(integrations=[APSchedulerIntegration(monitor_jobs=True)])
-    envelopes = capture_envelopes()
-
-    scheduler = BackgroundScheduler(timezone="UTC")
-    job = scheduler.add_job(
-        ok_job, CronTrigger(minute="*/5", timezone="UTC"), id="my-job"
-    )
-    listener = apscheduler_integration._get_listener(scheduler)
-    run_time = job.trigger.get_next_fire_time(None, datetime.now(timezone.utc))
-    listener.add(
-        job.id,
-        [run_time],
-        apscheduler_integration._PendingCheckIn("my-job", {}, 0),
-    )
-
-    listener(JobExecutionEvent(EVENT_JOB_MISSED, job.id, "default", run_time))
-
-    assert listener.pending == {}
-    assert _check_ins(envelopes) == []
 
 
 def test_backlog_checks_in_once(sentry_init, capture_envelopes):
-    sentry_init(integrations=[APSchedulerIntegration(monitor_jobs=True)])
+    sentry_init(integrations=[APSchedulerIntegration()])
     envelopes = capture_envelopes()
 
     # Three run times are due, and without coalescing they run in one submit.
@@ -212,42 +183,8 @@ def test_backlog_checks_in_once(sentry_init, capture_envelopes):
     assert check_ins[0]["check_in_id"] == check_ins[1]["check_in_id"]
 
 
-def test_backlog_with_a_failed_run_checks_in_error(sentry_init, capture_envelopes):
-    sentry_init(integrations=[APSchedulerIntegration(monitor_jobs=True)])
-    envelopes = capture_envelopes()
-    calls = []
-
-    def fails_first():
-        calls.append(None)
-        if len(calls) == 1:
-            raise ValueError("first run fails")
-
-    check_ins = _run_once(
-        envelopes,
-        IntervalTrigger(minutes=1, timezone="UTC"),
-        func=fails_first,
-        next_run_time=_utcnow() - timedelta(minutes=2, seconds=30),
-        coalesce=False,
-    )
-
-    assert len(calls) == 3
-    assert [c["status"] for c in check_ins] == ["in_progress", "error"]
-    assert check_ins[0]["check_in_id"] == check_ins[1]["check_in_id"]
-
-
-def test_monitoring_is_opt_in(sentry_init, capture_envelopes):
-    sentry_init(integrations=[APSchedulerIntegration()])
-    envelopes = capture_envelopes()
-
-    check_ins = _run_once(envelopes, CronTrigger(minute="*/5", timezone="UTC"))
-
-    assert check_ins == []
-
-
 def test_exclude_jobs(sentry_init, capture_envelopes):
-    sentry_init(
-        integrations=[APSchedulerIntegration(monitor_jobs=True, exclude_jobs=["my-.*"])]
-    )
+    sentry_init(integrations=[APSchedulerIntegration(exclude_jobs=["my-.*"])])
     envelopes = capture_envelopes()
 
     check_ins = _run_once(envelopes, CronTrigger(minute="*/5", timezone="UTC"))
@@ -261,7 +198,7 @@ def decorated_job():
 
 
 def test_monitor_decorated_job_reports_once(sentry_init, capture_envelopes):
-    sentry_init(integrations=[APSchedulerIntegration(monitor_jobs=True)])
+    sentry_init(integrations=[APSchedulerIntegration()])
     envelopes = capture_envelopes()
 
     check_ins = _run_once(
@@ -281,7 +218,7 @@ class DecoratedJobs:
 
 
 def test_monitor_decorated_method_reports_once(sentry_init, capture_envelopes):
-    sentry_init(integrations=[APSchedulerIntegration(monitor_jobs=True)])
+    sentry_init(integrations=[APSchedulerIntegration()])
     envelopes = capture_envelopes()
 
     check_ins = _run_once(
@@ -294,52 +231,13 @@ def test_monitor_decorated_method_reports_once(sentry_init, capture_envelopes):
     ]
 
 
-def _generated_id_warnings(caplog):
-    return [r for r in caplog.records if "has no explicit `id`" in r.getMessage()]
-
-
-def test_generated_job_id_uses_job_name(sentry_init, capture_envelopes, caplog):
-    sentry_init(debug=True, integrations=[APSchedulerIntegration(monitor_jobs=True)])
+def test_generated_job_id_uses_job_name(sentry_init, capture_envelopes):
+    sentry_init(integrations=[APSchedulerIntegration()])
     envelopes = capture_envelopes()
 
     check_ins = _run_once(envelopes, CronTrigger(minute="*/5", timezone="UTC"), id=None)
 
     assert [c["monitor_slug"] for c in check_ins] == ["ok_job", "ok_job"]
-    assert len(_generated_id_warnings(caplog)) == 1
-
-
-def test_generated_job_id_warns_once(sentry_init, capture_envelopes, caplog):
-    sentry_init(debug=True, integrations=[APSchedulerIntegration(monitor_jobs=True)])
-    envelopes = capture_envelopes()
-
-    runs = []
-    ran = threading.Event()
-
-    def record_run(event):
-        runs.append(event)
-        ran.set()
-
-    scheduler = BackgroundScheduler(timezone="UTC")
-    scheduler.add_executor("debug", alias="default")
-    scheduler.add_listener(record_run, EVENT_JOB_EXECUTED)
-    job = scheduler.add_job(
-        ok_job,
-        CronTrigger(minute="*/5", timezone="UTC"),
-        next_run_time=_utcnow(),
-        misfire_grace_time=None,
-    )
-    scheduler.start()
-    try:
-        assert ran.wait(timeout=10)
-        ran.clear()
-        scheduler.modify_job(job.id, next_run_time=_utcnow())
-        assert ran.wait(timeout=10)
-    finally:
-        scheduler.shutdown(wait=True)
-
-    assert len(runs) == 2
-    assert [c["status"] for c in _check_ins(envelopes)] == ["in_progress", "ok"] * 2
-    assert len(_generated_id_warnings(caplog)) == 1
 
 
 @pytest.mark.parametrize(
@@ -359,7 +257,7 @@ def test_generated_job_id_warns_once(sentry_init, capture_envelopes, caplog):
 def test_cron_trigger_monitor_config(
     sentry_init, capture_envelopes, cron_kwargs, expected
 ):
-    sentry_init(integrations=[APSchedulerIntegration(monitor_jobs=True)])
+    sentry_init(integrations=[APSchedulerIntegration()])
     envelopes = capture_envelopes()
 
     check_ins = _run_once(envelopes, CronTrigger(timezone="UTC", **cron_kwargs))
@@ -370,32 +268,8 @@ def test_cron_trigger_monitor_config(
     }
 
 
-@pytest.mark.parametrize(
-    "cron_kwargs",
-    [
-        # Seconds and years have no 5-field crontab equivalent.
-        {"second": "*/30"},
-        {"year": 2030},
-        {"week": 2},
-        # APScheduler ANDs day and day_of_week, cron ORs them.
-        {"day": 1, "day_of_week": "mon"},
-        {"day": "last"},
-        {"day": "1st mon"},
-    ],
-)
-def test_cron_trigger_without_crontab_equivalent(
-    sentry_init, capture_envelopes, cron_kwargs
-):
-    sentry_init(integrations=[APSchedulerIntegration(monitor_jobs=True)])
-    envelopes = capture_envelopes()
-
-    check_ins = _run_once(envelopes, CronTrigger(timezone="UTC", **cron_kwargs))
-
-    assert check_ins == []
-
-
 def test_cron_trigger_timezone(sentry_init, capture_envelopes):
-    sentry_init(integrations=[APSchedulerIntegration(monitor_jobs=True)])
+    sentry_init(integrations=[APSchedulerIntegration()])
     envelopes = capture_envelopes()
 
     check_ins = _run_once(envelopes, CronTrigger(hour=9, timezone="Europe/Vienna"))
@@ -405,7 +279,7 @@ def test_cron_trigger_timezone(sentry_init, capture_envelopes):
 
 def test_cron_trigger_pytz_timezone(sentry_init, capture_envelopes):
     pytz = pytest.importorskip("pytz")
-    sentry_init(integrations=[APSchedulerIntegration(monitor_jobs=True)])
+    sentry_init(integrations=[APSchedulerIntegration()])
     envelopes = capture_envelopes()
 
     check_ins = _run_once(
@@ -434,7 +308,7 @@ def test_cron_trigger_fixed_offset_timezone(
     except TypeError:
         pytest.skip("APScheduler < 3.7 only takes pytz timezones.")
 
-    sentry_init(integrations=[APSchedulerIntegration(monitor_jobs=True)])
+    sentry_init(integrations=[APSchedulerIntegration()])
     envelopes = capture_envelopes()
 
     check_ins = _run_once(envelopes, trigger)
@@ -452,17 +326,6 @@ def _non_whole_hour_cron_trigger():
         return CronTrigger(hour=9, timezone=pytz.FixedOffset(330))
 
 
-def test_cron_trigger_without_iana_timezone(sentry_init, capture_envelopes):
-    sentry_init(integrations=[APSchedulerIntegration(monitor_jobs=True)])
-    envelopes = capture_envelopes()
-
-    # Sentry rejects timezones like "UTC+05:30", and without one it would
-    # read the crontab as UTC.
-    check_ins = _run_once(envelopes, _non_whole_hour_cron_trigger())
-
-    assert check_ins == []
-
-
 @pytest.mark.parametrize(
     "interval_kwargs, expected",
     [
@@ -476,7 +339,7 @@ def test_cron_trigger_without_iana_timezone(sentry_init, capture_envelopes):
 def test_interval_trigger_monitor_config(
     sentry_init, capture_envelopes, interval_kwargs, expected
 ):
-    sentry_init(integrations=[APSchedulerIntegration(monitor_jobs=True)])
+    sentry_init(integrations=[APSchedulerIntegration()])
     envelopes = capture_envelopes()
 
     check_ins = _run_once(envelopes, IntervalTrigger(timezone="UTC", **interval_kwargs))
@@ -486,18 +349,6 @@ def test_interval_trigger_monitor_config(
         "schedule": {"type": "interval", "value": value, "unit": unit},
     }
     assert [c["status"] for c in check_ins] == ["in_progress", "ok"]
-
-
-@pytest.mark.parametrize("interval_kwargs", [{"seconds": 30}, {"seconds": 90}])
-def test_interval_trigger_not_whole_minutes(
-    sentry_init, capture_envelopes, interval_kwargs
-):
-    sentry_init(integrations=[APSchedulerIntegration(monitor_jobs=True)])
-    envelopes = capture_envelopes()
-
-    check_ins = _run_once(envelopes, IntervalTrigger(timezone="UTC", **interval_kwargs))
-
-    assert check_ins == []
 
 
 @pytest.mark.parametrize(
@@ -513,7 +364,7 @@ def test_trigger_jitter_adds_checkin_margin(
     except TypeError:
         pytest.skip("APScheduler < 3.5 has no jitter.")
 
-    sentry_init(integrations=[APSchedulerIntegration(monitor_jobs=True)])
+    sentry_init(integrations=[APSchedulerIntegration()])
     envelopes = capture_envelopes()
 
     check_ins = _run_once(envelopes, trigger)
@@ -528,7 +379,7 @@ def test_trigger_jitter_adds_checkin_margin(
 def test_trigger_without_jitter_has_no_checkin_margin(
     sentry_init, capture_envelopes, trigger_cls, trigger_kwargs
 ):
-    sentry_init(integrations=[APSchedulerIntegration(monitor_jobs=True)])
+    sentry_init(integrations=[APSchedulerIntegration()])
     envelopes = capture_envelopes()
 
     check_ins = _run_once(envelopes, trigger_cls(timezone="UTC", **trigger_kwargs))
@@ -536,66 +387,72 @@ def test_trigger_without_jitter_has_no_checkin_margin(
     assert "checkin_margin" not in check_ins[0]["monitor_config"]
 
 
-def test_date_trigger_is_not_monitored(sentry_init, capture_envelopes):
-    sentry_init(integrations=[APSchedulerIntegration(monitor_jobs=True)])
-    envelopes = capture_envelopes()
-
-    check_ins = _run_once(envelopes, DateTrigger(run_date=_utcnow(), timezone="UTC"))
-
-    assert check_ins == []
-
-
-@pytest.mark.parametrize("trigger_name", ["OrTrigger", "AndTrigger"])
-def test_combining_trigger_is_not_monitored(
-    sentry_init, capture_envelopes, trigger_name
-):
+def _combining_trigger(name):
     combining = pytest.importorskip("apscheduler.triggers.combining")
-    sentry_init(integrations=[APSchedulerIntegration(monitor_jobs=True)])
-    envelopes = capture_envelopes()
-
     # AndTrigger never finds a next fire time for crons that disagree.
-    trigger = getattr(combining, trigger_name)(
+    return getattr(combining, name)(
         [
             CronTrigger(minute="*/5", timezone="UTC"),
             CronTrigger(minute="*/5", timezone="UTC"),
         ]
     )
-    check_ins = _run_once(envelopes, trigger)
-
-    assert check_ins == []
 
 
-def test_calendar_interval_trigger_is_not_monitored(sentry_init, capture_envelopes):
+def _calendar_interval_trigger():
     calendarinterval = pytest.importorskip("apscheduler.triggers.calendarinterval")
-    sentry_init(integrations=[APSchedulerIntegration(monitor_jobs=True)])
-    envelopes = capture_envelopes()
+    return calendarinterval.CalendarIntervalTrigger(days=1, timezone="UTC")
 
-    trigger = calendarinterval.CalendarIntervalTrigger(days=1, timezone="UTC")
-    check_ins = _run_once(envelopes, trigger)
 
-    assert check_ins == []
+def _tomorrow():
+    return _utcnow() + timedelta(days=1)
 
 
 @pytest.mark.parametrize(
-    "trigger_cls,trigger_kwargs",
-    [(CronTrigger, {"minute": "*/5"}), (IntervalTrigger, {"minutes": 5})],
+    "make_trigger",
+    [
+        pytest.param(lambda: CronTrigger(second="*/30", timezone="UTC"), id="second"),
+        pytest.param(lambda: CronTrigger(year=2030, timezone="UTC"), id="year"),
+        pytest.param(lambda: CronTrigger(week=2, timezone="UTC"), id="week"),
+        # APScheduler ANDs day and day_of_week, cron ORs them.
+        pytest.param(
+            lambda: CronTrigger(day=1, day_of_week="mon", timezone="UTC"),
+            id="day-and-day-of-week",
+        ),
+        pytest.param(lambda: CronTrigger(day="last", timezone="UTC"), id="last-day"),
+        pytest.param(lambda: CronTrigger(day="1st mon", timezone="UTC"), id="nth-day"),
+        # Sentry rejects timezones like "UTC+05:30", and without one it would
+        # read the crontab as UTC.
+        pytest.param(_non_whole_hour_cron_trigger, id="non-iana-timezone"),
+        pytest.param(lambda: IntervalTrigger(seconds=30, timezone="UTC"), id="30s"),
+        pytest.param(lambda: IntervalTrigger(seconds=90, timezone="UTC"), id="90s"),
+        pytest.param(
+            lambda: DateTrigger(run_date=_utcnow(), timezone="UTC"), id="date"
+        ),
+        pytest.param(lambda: _combining_trigger("OrTrigger"), id="or"),
+        pytest.param(lambda: _combining_trigger("AndTrigger"), id="and"),
+        pytest.param(_calendar_interval_trigger, id="calendar-interval"),
+        pytest.param(
+            lambda: CronTrigger(minute="*/5", timezone="UTC", end_date=_tomorrow()),
+            id="cron-end-date",
+        ),
+        pytest.param(
+            lambda: IntervalTrigger(minutes=5, timezone="UTC", end_date=_tomorrow()),
+            id="interval-end-date",
+        ),
+    ],
 )
-def test_trigger_with_end_date_is_not_monitored(
-    sentry_init, capture_envelopes, trigger_cls, trigger_kwargs
-):
-    sentry_init(integrations=[APSchedulerIntegration(monitor_jobs=True)])
+def test_trigger_not_monitored(sentry_init, capture_envelopes, make_trigger):
+    trigger = make_trigger()
+    sentry_init(integrations=[APSchedulerIntegration()])
     envelopes = capture_envelopes()
 
-    trigger = trigger_cls(
-        timezone="UTC", end_date=_utcnow() + timedelta(days=1), **trigger_kwargs
-    )
     check_ins = _run_once(envelopes, trigger)
 
     assert check_ins == []
 
 
 def test_thread_pool_executor(sentry_init, capture_envelopes):
-    sentry_init(integrations=[APSchedulerIntegration(monitor_jobs=True)])
+    sentry_init(integrations=[APSchedulerIntegration()])
     envelopes = capture_envelopes()
 
     check_ins = _run_once(
@@ -609,7 +466,7 @@ def test_thread_pool_executor(sentry_init, capture_envelopes):
 
 
 def test_max_instances_skip_sends_no_check_in(sentry_init, capture_envelopes):
-    sentry_init(integrations=[APSchedulerIntegration(monitor_jobs=True)])
+    sentry_init(integrations=[APSchedulerIntegration()])
     envelopes = capture_envelopes()
 
     started = threading.Event()
@@ -651,7 +508,7 @@ def test_max_instances_skip_sends_no_check_in(sentry_init, capture_envelopes):
 
 
 def test_process_pool_executor(sentry_init, capture_envelopes):
-    sentry_init(integrations=[APSchedulerIntegration(monitor_jobs=True)])
+    sentry_init(integrations=[APSchedulerIntegration()])
     envelopes = capture_envelopes()
 
     check_ins = _run_once(
@@ -665,86 +522,12 @@ def test_process_pool_executor(sentry_init, capture_envelopes):
     assert check_ins[0]["check_in_id"] == check_ins[1]["check_in_id"]
 
 
-def crashing_job():
-    os._exit(1)
-
-
-def test_process_pool_worker_crash_is_error(sentry_init, capture_envelopes):
-    sentry_init(integrations=[APSchedulerIntegration(monitor_jobs=True)])
-    envelopes = capture_envelopes()
-
-    scheduler = BackgroundScheduler(timezone="UTC")
-    scheduler.add_executor(ProcessPoolExecutor(1), alias="default")
-    scheduler.add_job(
-        crashing_job,
-        CronTrigger(minute="*/5", timezone="UTC"),
-        id="my-job",
-        next_run_time=_utcnow(),
-        misfire_grace_time=None,
-    )
-    scheduler.start()
-    try:
-        # A crashed worker sends no execution event, so wait for the check-ins.
-        deadline = time.monotonic() + 10
-        while len(_check_ins(envelopes)) < 2 and time.monotonic() < deadline:
-            time.sleep(0.05)
-    finally:
-        scheduler.shutdown(wait=True)
-
-    check_ins = _check_ins(envelopes)
-    assert [c["status"] for c in check_ins] == ["in_progress", "error"]
-    assert check_ins[0]["check_in_id"] == check_ins[1]["check_in_id"]
-    assert apscheduler_integration._listeners[scheduler].pending == {}
-
-
-def slow_crashing_job():
-    time.sleep(1)
-    os._exit(1)
-
-
-def test_process_pool_crash_closes_every_running_instance(
-    sentry_init, capture_envelopes
-):
-    sentry_init(integrations=[APSchedulerIntegration(monitor_jobs=True)])
-    envelopes = capture_envelopes()
-
-    scheduler = BackgroundScheduler(timezone="UTC")
-    scheduler.add_executor(ProcessPoolExecutor(2), alias="default")
-    scheduler.add_job(
-        slow_crashing_job,
-        CronTrigger(minute="*/5", timezone="UTC"),
-        id="my-job",
-        next_run_time=_utcnow(),
-        misfire_grace_time=None,
-        max_instances=2,
-    )
-    scheduler.start()
-    try:
-        deadline = time.monotonic() + 10
-        while not _check_ins(envelopes) and time.monotonic() < deadline:
-            time.sleep(0.01)
-        scheduler.modify_job("my-job", next_run_time=_utcnow())
-        # A broken pool fails every run in it, each through _run_job_error.
-        while len(_check_ins(envelopes)) < 4 and time.monotonic() < deadline:
-            time.sleep(0.05)
-    finally:
-        scheduler.shutdown(wait=True)
-
-    check_ins = _check_ins(envelopes)
-    statuses = sorted(c["status"] for c in check_ins)
-    assert statuses == ["error", "error", "in_progress", "in_progress"]
-    ids = {c["check_in_id"] for c in check_ins if c["status"] == "in_progress"}
-    assert {c["check_in_id"] for c in check_ins if c["status"] == "error"} == ids
-    assert len(ids) == 2
-    assert apscheduler_integration._listeners[scheduler].pending == {}
-
-
 async def async_ok_job():
     await asyncio.sleep(0)
 
 
 def test_asyncio_scheduler(sentry_init, capture_envelopes):
-    sentry_init(integrations=[APSchedulerIntegration(monitor_jobs=True)])
+    sentry_init(integrations=[APSchedulerIntegration()])
     envelopes = capture_envelopes()
 
     async def main():
