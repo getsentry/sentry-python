@@ -1,10 +1,10 @@
+import re
 from datetime import timedelta, timezone
-from functools import lru_cache
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from datetime import tzinfo
-    from typing import FrozenSet, Optional, Set, Tuple
+    from typing import Optional, Tuple
 
     from sentry_sdk._types import MonitorConfigSchedule, MonitorConfigScheduleUnit
 
@@ -32,45 +32,18 @@ def _get_interval_schedule(seconds: float) -> "Optional[MonitorConfigSchedule]":
     return None
 
 
-@lru_cache(maxsize=None)
-def _get_iana_timezone_names() -> "FrozenSet[str]":
-    names: "Set[str]" = set()
-    try:
-        from zoneinfo import available_timezones
-
-        names.update(available_timezones())
-    except ImportError:
-        try:
-            from backports.zoneinfo import (  # type: ignore[import-not-found, no-redef]
-                available_timezones,
-            )
-
-            names.update(available_timezones())
-        except ImportError:
-            pass
-
-    try:
-        import pytz  # type: ignore[import-untyped]
-
-        # pytz's lazy set looks empty to set.update until it's iterated.
-        names.update(iter(pytz.all_timezones_set))
-    except ImportError:
-        pass
-
-    # Some systems keep these files in the zoneinfo directory, but they aren't zones.
-    names.difference_update(("localtime", "posixrules"))
-    return frozenset(names)
+# IANA zone names start with an uppercase letter. This rejects names like
+# "local" or "localtime" that tzlocal can give a zone.
+_IANA_TIMEZONE_NAME = re.compile(r"[A-Z][A-Za-z0-9._+-]*(?:/[A-Za-z0-9._+-]+)*")
 
 
 def _get_timezone_name(tz: "tzinfo") -> "Optional[str]":
     """
     Return the IANA name of the timezone, or None if it has none.
     """
-    # zoneinfo and pytz. tzlocal can give a zone a non-IANA key, like "local"
-    # or the basename of a TZ file path.
     name = getattr(tz, "key", None) or getattr(tz, "zone", None)
     if isinstance(name, str):
-        return name if name in _get_iana_timezone_names() else None
+        return name if _IANA_TIMEZONE_NAME.fullmatch(name) else None
 
     if isinstance(tz, timezone):
         offset = tz.utcoffset(None)

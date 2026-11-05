@@ -24,6 +24,13 @@ from anthropic.types.message_delta_event import MessageDeltaEvent
 from anthropic.types.message_start_event import MessageStartEvent
 
 try:
+    from anthropic.types import ThinkingBlock, ThinkingDelta
+except ImportError:
+    ThinkingBlock = None
+    ThinkingDelta = None
+
+
+try:
     from anthropic import APIStatusError
     from anthropic.types import ErrorResponse, OverloadedError
 except ImportError:
@@ -78,7 +85,18 @@ EXAMPLE_MESSAGE = Message(
     id="msg_01XFDUDYJgAACzvnptvVoYEL",
     model="model",
     role="assistant",
-    content=[TextBlock(type="text", text="Hi, I'm Claude.")],
+    content=(
+        [
+            ThinkingBlock(
+                type="thinking",
+                thinking="Let me reason step by step...",
+                signature="sig123",
+            ),
+            TextBlock(type="text", text="Hi, I'm Claude."),
+        ]
+        if ThinkingBlock is not None
+        else [TextBlock(type="text", text="Hi, I'm Claude.")]
+    ),
     type="message",
     stop_reason="end_turn",
     usage=Usage(input_tokens=10, output_tokens=20),
@@ -136,6 +154,151 @@ def data_collection_tool_use_message():
         stop_reason="tool_use",
         usage=Usage(input_tokens=10, output_tokens=20),
     )
+
+
+@pytest.fixture
+def streaming_anthropic_response():
+    def inner(text_deltas, stop_reason):
+        thinking_events = []
+        if ThinkingBlock is not None:
+            thinking_events = [
+                ContentBlockStartEvent(
+                    type="content_block_start",
+                    index=0,
+                    content_block=ThinkingBlock(
+                        type="thinking",
+                        thinking="",
+                        signature="sig123",
+                    ),
+                ),
+                ContentBlockDeltaEvent(
+                    delta=ThinkingDelta(
+                        thinking="Let me reason step by step...",
+                        type="thinking_delta",
+                    ),
+                    index=0,
+                    type="content_block_delta",
+                ),
+                ContentBlockStopEvent(type="content_block_stop", index=0),
+            ]
+        text_index = 1 if ThinkingBlock is not None else 0
+        return [
+            MessageStartEvent(
+                message=Message(
+                    id="msg_01XFDUDYJgAACzvnptvVoYEL",
+                    model="model",
+                    role="assistant",
+                    content=[TextBlock(type="text", text="")],
+                    type="message",
+                    stop_reason="end_turn",
+                    usage=Usage(input_tokens=10, output_tokens=20),
+                ),
+                type="message_start",
+            ),
+            *thinking_events,
+            ContentBlockStartEvent(
+                type="content_block_start",
+                index=text_index,
+                content_block=TextBlock(type="text", text=""),
+            ),
+            *[
+                ContentBlockDeltaEvent(
+                    delta=TextDelta(text=text, type="text_delta"),
+                    index=text_index,
+                    type="content_block_delta",
+                )
+                for text in text_deltas
+            ],
+            ContentBlockStopEvent(type="content_block_stop", index=text_index),
+            MessageDeltaEvent(
+                delta=Delta(stop_reason=stop_reason),
+                usage=MessageDeltaUsage(output_tokens=10),
+                type="message_delta",
+            ),
+        ]
+
+    return inner
+
+
+@pytest.fixture
+def streaming_anthropic_text_response():
+    return [
+        MessageStartEvent(
+            message=Message(
+                id="msg_01XFDUDYJgAACzvnptvVoYEL",
+                model="model",
+                role="assistant",
+                content=[TextBlock(type="text", text="")],
+                type="message",
+                stop_reason="end_turn",
+                usage=Usage(input_tokens=10, output_tokens=20),
+            ),
+            type="message_start",
+        ),
+        ContentBlockStartEvent(
+            type="content_block_start",
+            index=0,
+            content_block=TextBlock(type="text", text=""),
+        ),
+        ContentBlockDeltaEvent(
+            delta=TextDelta(text="Hi", type="text_delta"),
+            index=0,
+            type="content_block_delta",
+        ),
+        ContentBlockDeltaEvent(
+            delta=TextDelta(text="!", type="text_delta"),
+            index=0,
+            type="content_block_delta",
+        ),
+        ContentBlockDeltaEvent(
+            delta=TextDelta(text=" I'm Claude!", type="text_delta"),
+            index=0,
+            type="content_block_delta",
+        ),
+        ContentBlockStopEvent(type="content_block_stop", index=0),
+        MessageDeltaEvent(
+            delta=Delta(stop_reason="max_tokens"),
+            usage=MessageDeltaUsage(output_tokens=10),
+            type="message_delta",
+        ),
+    ]
+
+
+@pytest.fixture
+def streaming_anthropic_error_response():
+    return [
+        MessageStartEvent(
+            message=Message(
+                id="msg_01XFDUDYJgAACzvnptvVoYEL",
+                model="model",
+                role="assistant",
+                content=[TextBlock(type="text", text="")],
+                type="message",
+                stop_reason="end_turn",
+                usage=Usage(input_tokens=10, output_tokens=20),
+            ),
+            type="message_start",
+        ),
+        ContentBlockStartEvent(
+            type="content_block_start",
+            index=0,
+            content_block=TextBlock(type="text", text=""),
+        ),
+        ContentBlockDeltaEvent(
+            delta=TextDelta(text="Hi", type="text_delta"),
+            index=0,
+            type="content_block_delta",
+        ),
+        ContentBlockDeltaEvent(
+            delta=TextDelta(text="!", type="text_delta"),
+            index=0,
+            type="content_block_delta",
+        ),
+        ErrorResponse(
+            type="error",
+            error=OverloadedError(message="Overloaded", type="overloaded_error"),
+        ),
+    ]
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
@@ -219,12 +382,23 @@ def test_nonstreaming_create_message(
                     "content": "Hello, Claude",
                 },
             ]
-            assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(
-                ["Hi, I'm Claude."]
+            expected_parts = (
+                [
+                    {
+                        "type": "reasoning",
+                        "content": "Let me reason step by step...",
+                    },
+                    {"type": "text", "content": "Hi, I'm Claude."},
+                ]
+                if ThinkingBlock is not None
+                else [{"type": "text", "content": "Hi, I'm Claude."}]
             )
+            assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+                {"role": "assistant", "parts": expected_parts}
+            ]
         else:
             assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
+            assert SPANDATA.GEN_AI_OUTPUT_MESSAGES not in span["attributes"]
 
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
@@ -276,12 +450,23 @@ def test_nonstreaming_create_message(
                     "content": "Hello, Claude",
                 },
             ]
-            assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(
-                ["Hi, I'm Claude."]
+            expected_parts = (
+                [
+                    {
+                        "type": "reasoning",
+                        "content": "Let me reason step by step...",
+                    },
+                    {"type": "text", "content": "Hi, I'm Claude."},
+                ]
+                if ThinkingBlock is not None
+                else [{"type": "text", "content": "Hi, I'm Claude."}]
             )
+            assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+                {"role": "assistant", "parts": expected_parts}
+            ]
         else:
             assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
+            assert SPANDATA.GEN_AI_OUTPUT_MESSAGES not in span["attributes"]
 
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
@@ -328,12 +513,23 @@ def test_nonstreaming_create_message(
                 span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
                 == '[{"role": "user", "content": "Hello, Claude"}]'
             )
-            assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(
-                ["Hi, I'm Claude."]
+            expected_parts = (
+                [
+                    {
+                        "type": "reasoning",
+                        "content": "Let me reason step by step...",
+                    },
+                    {"type": "text", "content": "Hi, I'm Claude."},
+                ]
+                if ThinkingBlock is not None
+                else [{"type": "text", "content": "Hi, I'm Claude."}]
             )
+            assert json.loads(span["data"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+                {"role": "assistant", "parts": expected_parts}
+            ]
         else:
             assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
+            assert SPANDATA.GEN_AI_OUTPUT_MESSAGES not in span["data"]
 
         assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
         assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
@@ -748,15 +944,23 @@ def test_nonstreaming_create_message_data_collection_outputs(
     assert span_data[SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
 
     if outputs_collected:
-        assert span_data[SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(
-            [DATA_COLLECTION_EXPECTED_RESPONSE_TEXT]
-        )
+        assert json.loads(span_data[SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+            {
+                "role": "assistant",
+                "parts": [
+                    {
+                        "type": "text",
+                        "content": DATA_COLLECTION_EXPECTED_RESPONSE_TEXT,
+                    }
+                ],
+            }
+        ]
         assert (
             json.loads(span_data[SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS])
             == DATA_COLLECTION_EXPECTED_TOOL_CALLS
         )
     else:
-        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span_data
+        assert SPANDATA.GEN_AI_OUTPUT_MESSAGES not in span_data
         assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in span_data
 
 
@@ -875,15 +1079,23 @@ async def test_nonstreaming_create_message_data_collection_outputs_async(
     assert span_data[SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
 
     if outputs_collected:
-        assert span_data[SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(
-            [DATA_COLLECTION_EXPECTED_RESPONSE_TEXT]
-        )
+        assert json.loads(span_data[SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+            {
+                "role": "assistant",
+                "parts": [
+                    {
+                        "type": "text",
+                        "content": DATA_COLLECTION_EXPECTED_RESPONSE_TEXT,
+                    }
+                ],
+            }
+        ]
         assert (
             json.loads(span_data[SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS])
             == DATA_COLLECTION_EXPECTED_TOOL_CALLS
         )
     else:
-        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span_data
+        assert SPANDATA.GEN_AI_OUTPUT_MESSAGES not in span_data
         assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in span_data
 
 
@@ -969,12 +1181,23 @@ async def test_nonstreaming_create_message_async(
                     "content": "Hello, Claude",
                 },
             ]
-            assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(
-                ["Hi, I'm Claude."]
+            expected_parts = (
+                [
+                    {
+                        "type": "reasoning",
+                        "content": "Let me reason step by step...",
+                    },
+                    {"type": "text", "content": "Hi, I'm Claude."},
+                ]
+                if ThinkingBlock is not None
+                else [{"type": "text", "content": "Hi, I'm Claude."}]
             )
+            assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+                {"role": "assistant", "parts": expected_parts}
+            ]
         else:
             assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
+            assert SPANDATA.GEN_AI_OUTPUT_MESSAGES not in span["attributes"]
 
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
@@ -1024,12 +1247,23 @@ async def test_nonstreaming_create_message_async(
                     "content": "Hello, Claude",
                 },
             ]
-            assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(
-                ["Hi, I'm Claude."]
+            expected_parts = (
+                [
+                    {
+                        "type": "reasoning",
+                        "content": "Let me reason step by step...",
+                    },
+                    {"type": "text", "content": "Hi, I'm Claude."},
+                ]
+                if ThinkingBlock is not None
+                else [{"type": "text", "content": "Hi, I'm Claude."}]
             )
+            assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+                {"role": "assistant", "parts": expected_parts}
+            ]
         else:
             assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
+            assert SPANDATA.GEN_AI_OUTPUT_MESSAGES not in span["attributes"]
 
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
@@ -1073,12 +1307,23 @@ async def test_nonstreaming_create_message_async(
                 span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
                 == '[{"role": "user", "content": "Hello, Claude"}]'
             )
-            assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(
-                ["Hi, I'm Claude."]
+            expected_parts = (
+                [
+                    {
+                        "type": "reasoning",
+                        "content": "Let me reason step by step...",
+                    },
+                    {"type": "text", "content": "Hi, I'm Claude."},
+                ]
+                if ThinkingBlock is not None
+                else [{"type": "text", "content": "Hi, I'm Claude."}]
             )
+            assert json.loads(span["data"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+                {"role": "assistant", "parts": expected_parts}
+            ]
         else:
             assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
+            assert SPANDATA.GEN_AI_OUTPUT_MESSAGES not in span["data"]
 
         assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
         assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
@@ -1110,43 +1355,16 @@ def test_streaming_create_message(
     server_side_event_chunks,
     stream_gen_ai_spans,
     span_streaming,
+    streaming_anthropic_response,
 ):
     client = Anthropic(api_key="z")
 
     response = get_model_response(
         server_side_event_chunks(
-            [
-                MessageStartEvent(
-                    message=EXAMPLE_MESSAGE,
-                    type="message_start",
-                ),
-                ContentBlockStartEvent(
-                    type="content_block_start",
-                    index=0,
-                    content_block=TextBlock(type="text", text=""),
-                ),
-                ContentBlockDeltaEvent(
-                    delta=TextDelta(text="Hi", type="text_delta"),
-                    index=0,
-                    type="content_block_delta",
-                ),
-                ContentBlockDeltaEvent(
-                    delta=TextDelta(text="!", type="text_delta"),
-                    index=0,
-                    type="content_block_delta",
-                ),
-                ContentBlockDeltaEvent(
-                    delta=TextDelta(text=" I'm Claude!", type="text_delta"),
-                    index=0,
-                    type="content_block_delta",
-                ),
-                ContentBlockStopEvent(type="content_block_stop", index=0),
-                MessageDeltaEvent(
-                    delta=Delta(stop_reason="max_tokens"),
-                    usage=MessageDeltaUsage(output_tokens=10),
-                    type="message_delta",
-                ),
-            ]
+            streaming_anthropic_response(
+                text_deltas=("Hi", "!", " I'm Claude!"),
+                stop_reason="max_tokens",
+            )
         )
     )
 
@@ -1209,13 +1427,24 @@ def test_streaming_create_message(
                     "content": "Hello, Claude",
                 },
             ]
-            assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(
-                ["Hi! I'm Claude!"]
+            expected_parts = (
+                [
+                    {
+                        "type": "reasoning",
+                        "content": "Let me reason step by step...",
+                    },
+                    {"type": "text", "content": "Hi! I'm Claude!"},
+                ]
+                if ThinkingBlock is not None
+                else [{"type": "text", "content": "Hi! I'm Claude!"}]
             )
+            assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+                {"role": "assistant", "parts": expected_parts}
+            ]
 
         else:
             assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
+            assert SPANDATA.GEN_AI_OUTPUT_MESSAGES not in span["attributes"]
 
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
@@ -1269,13 +1498,24 @@ def test_streaming_create_message(
                     "content": "Hello, Claude",
                 },
             ]
-            assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(
-                ["Hi! I'm Claude!"]
+            expected_parts = (
+                [
+                    {
+                        "type": "reasoning",
+                        "content": "Let me reason step by step...",
+                    },
+                    {"type": "text", "content": "Hi! I'm Claude!"},
+                ]
+                if ThinkingBlock is not None
+                else [{"type": "text", "content": "Hi! I'm Claude!"}]
             )
+            assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+                {"role": "assistant", "parts": expected_parts}
+            ]
 
         else:
             assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
+            assert SPANDATA.GEN_AI_OUTPUT_MESSAGES not in span["attributes"]
 
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
@@ -1322,13 +1562,24 @@ def test_streaming_create_message(
                 span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
                 == '[{"role": "user", "content": "Hello, Claude"}]'
             )
-            assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(
-                ["Hi! I'm Claude!"]
+            expected_parts = (
+                [
+                    {
+                        "type": "reasoning",
+                        "content": "Let me reason step by step...",
+                    },
+                    {"type": "text", "content": "Hi! I'm Claude!"},
+                ]
+                if ThinkingBlock is not None
+                else [{"type": "text", "content": "Hi! I'm Claude!"}]
             )
+            assert json.loads(span["data"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+                {"role": "assistant", "parts": expected_parts}
+            ]
 
         else:
             assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
+            assert SPANDATA.GEN_AI_OUTPUT_MESSAGES not in span["data"]
 
         assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
         assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
@@ -1384,6 +1635,7 @@ def test_streaming_create_message_data_collection(
     server_side_event_chunks,
     stream_gen_ai_spans,
     span_streaming,
+    streaming_anthropic_response,
 ):
     sentry_init_kwargs = dict(
         integrations=[AnthropicIntegration(include_prompts=include_prompts)],
@@ -1401,28 +1653,10 @@ def test_streaming_create_message_data_collection(
 
     response = get_model_response(
         server_side_event_chunks(
-            [
-                MessageStartEvent(
-                    message=EXAMPLE_MESSAGE,
-                    type="message_start",
-                ),
-                ContentBlockStartEvent(
-                    type="content_block_start",
-                    index=0,
-                    content_block=TextBlock(type="text", text=""),
-                ),
-                ContentBlockDeltaEvent(
-                    delta=TextDelta(text="Hi", type="text_delta"),
-                    index=0,
-                    type="content_block_delta",
-                ),
-                ContentBlockStopEvent(type="content_block_stop", index=0),
-                MessageDeltaEvent(
-                    delta=Delta(stop_reason="max_tokens"),
-                    usage=MessageDeltaUsage(output_tokens=10),
-                    type="message_delta",
-                ),
-            ]
+            streaming_anthropic_response(
+                text_deltas=("Hi",),
+                stop_reason="max_tokens",
+            )
         )
     )
 
@@ -1533,6 +1767,7 @@ def test_streaming_create_message_data_collection_outputs(
     server_side_event_chunks,
     stream_gen_ai_spans,
     span_streaming,
+    streaming_anthropic_response,
 ):
     sentry_init_kwargs = dict(
         integrations=[AnthropicIntegration(include_prompts=include_prompts)],
@@ -1550,33 +1785,10 @@ def test_streaming_create_message_data_collection_outputs(
 
     response = get_model_response(
         server_side_event_chunks(
-            [
-                MessageStartEvent(
-                    message=EXAMPLE_MESSAGE,
-                    type="message_start",
-                ),
-                ContentBlockStartEvent(
-                    type="content_block_start",
-                    index=0,
-                    content_block=TextBlock(type="text", text=""),
-                ),
-                ContentBlockDeltaEvent(
-                    delta=TextDelta(text="Hi", type="text_delta"),
-                    index=0,
-                    type="content_block_delta",
-                ),
-                ContentBlockDeltaEvent(
-                    delta=TextDelta(text="! I'm Claude!", type="text_delta"),
-                    index=0,
-                    type="content_block_delta",
-                ),
-                ContentBlockStopEvent(type="content_block_stop", index=0),
-                MessageDeltaEvent(
-                    delta=Delta(stop_reason="max_tokens"),
-                    usage=MessageDeltaUsage(output_tokens=10),
-                    type="message_delta",
-                ),
-            ]
+            streaming_anthropic_response(
+                text_deltas=("Hi", "! I'm Claude!"),
+                stop_reason="max_tokens",
+            )
         )
     )
 
@@ -1627,11 +1839,22 @@ def test_streaming_create_message_data_collection_outputs(
     assert span_data[SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
 
     if outputs_collected:
-        assert span_data[SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(
-            ["Hi! I'm Claude!"]
+        expected_parts = (
+            [
+                {
+                    "type": "reasoning",
+                    "content": "Let me reason step by step...",
+                },
+                {"type": "text", "content": "Hi! I'm Claude!"},
+            ]
+            if ThinkingBlock is not None
+            else [{"type": "text", "content": "Hi! I'm Claude!"}]
         )
+        assert json.loads(span_data[SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+            {"role": "assistant", "parts": expected_parts}
+        ]
     else:
-        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span_data
+        assert SPANDATA.GEN_AI_OUTPUT_MESSAGES not in span_data
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
@@ -1644,44 +1867,12 @@ def test_streaming_create_message_close(
     server_side_event_chunks,
     stream_gen_ai_spans,
     span_streaming,
+    streaming_anthropic_text_response,
 ):
     client = Anthropic(api_key="z")
 
     response = get_model_response(
-        server_side_event_chunks(
-            [
-                MessageStartEvent(
-                    message=EXAMPLE_MESSAGE,
-                    type="message_start",
-                ),
-                ContentBlockStartEvent(
-                    type="content_block_start",
-                    index=0,
-                    content_block=TextBlock(type="text", text=""),
-                ),
-                ContentBlockDeltaEvent(
-                    delta=TextDelta(text="Hi", type="text_delta"),
-                    index=0,
-                    type="content_block_delta",
-                ),
-                ContentBlockDeltaEvent(
-                    delta=TextDelta(text="!", type="text_delta"),
-                    index=0,
-                    type="content_block_delta",
-                ),
-                ContentBlockDeltaEvent(
-                    delta=TextDelta(text=" I'm Claude!", type="text_delta"),
-                    index=0,
-                    type="content_block_delta",
-                ),
-                ContentBlockStopEvent(type="content_block_stop", index=0),
-                MessageDeltaEvent(
-                    delta=Delta(stop_reason="max_tokens"),
-                    usage=MessageDeltaUsage(output_tokens=10),
-                    type="message_delta",
-                ),
-            ]
-        )
+        server_side_event_chunks(streaming_anthropic_text_response)
     )
 
     sentry_init(
@@ -1734,7 +1925,9 @@ def test_streaming_create_message_close(
             span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
             == '[{"role": "user", "content": "Hello, Claude"}]'
         )
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(["Hi!"])
+        assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+            {"role": "assistant", "parts": [{"type": "text", "content": "Hi!"}]}
+        ]
 
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
@@ -1780,7 +1973,9 @@ def test_streaming_create_message_close(
             span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
             == '[{"role": "user", "content": "Hello, Claude"}]'
         )
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(["Hi!"])
+        assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+            {"role": "assistant", "parts": [{"type": "text", "content": "Hi!"}]}
+        ]
 
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
@@ -1825,7 +2020,9 @@ def test_streaming_create_message_close(
             span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
             == '[{"role": "user", "content": "Hello, Claude"}]'
         )
-        assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(["Hi!"])
+        assert json.loads(span["data"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+            {"role": "assistant", "parts": [{"type": "text", "content": "Hi!"}]}
+        ]
 
         assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
         assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
@@ -1850,39 +2047,12 @@ def test_streaming_create_message_api_error(
     server_side_event_chunks,
     stream_gen_ai_spans,
     span_streaming,
+    streaming_anthropic_error_response,
 ):
     client = Anthropic(api_key="z")
 
     response = get_model_response(
-        server_side_event_chunks(
-            [
-                MessageStartEvent(
-                    message=EXAMPLE_MESSAGE,
-                    type="message_start",
-                ),
-                ContentBlockStartEvent(
-                    type="content_block_start",
-                    index=0,
-                    content_block=TextBlock(type="text", text=""),
-                ),
-                ContentBlockDeltaEvent(
-                    delta=TextDelta(text="Hi", type="text_delta"),
-                    index=0,
-                    type="content_block_delta",
-                ),
-                ContentBlockDeltaEvent(
-                    delta=TextDelta(text="!", type="text_delta"),
-                    index=0,
-                    type="content_block_delta",
-                ),
-                ErrorResponse(
-                    type="error",
-                    error=OverloadedError(
-                        message="Overloaded", type="overloaded_error"
-                    ),
-                ),
-            ]
-        )
+        server_side_event_chunks(streaming_anthropic_error_response)
     )
 
     sentry_init(
@@ -1934,7 +2104,9 @@ def test_streaming_create_message_api_error(
             span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
             == '[{"role": "user", "content": "Hello, Claude"}]'
         )
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(["Hi!"])
+        assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+            {"role": "assistant", "parts": [{"type": "text", "content": "Hi!"}]}
+        ]
 
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
@@ -1979,7 +2151,9 @@ def test_streaming_create_message_api_error(
             span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
             == '[{"role": "user", "content": "Hello, Claude"}]'
         )
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(["Hi!"])
+        assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+            {"role": "assistant", "parts": [{"type": "text", "content": "Hi!"}]}
+        ]
 
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
@@ -2025,7 +2199,9 @@ def test_streaming_create_message_api_error(
             span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
             == '[{"role": "user", "content": "Hello, Claude"}]'
         )
-        assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(["Hi!"])
+        assert json.loads(span["data"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+            {"role": "assistant", "parts": [{"type": "text", "content": "Hi!"}]}
+        ]
 
         assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
         assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
@@ -2061,43 +2237,16 @@ def test_stream_messages(
     server_side_event_chunks,
     stream_gen_ai_spans,
     span_streaming,
+    streaming_anthropic_response,
 ):
     client = Anthropic(api_key="z")
 
     response = get_model_response(
         server_side_event_chunks(
-            [
-                MessageStartEvent(
-                    message=EXAMPLE_MESSAGE,
-                    type="message_start",
-                ),
-                ContentBlockStartEvent(
-                    type="content_block_start",
-                    index=0,
-                    content_block=TextBlock(type="text", text=""),
-                ),
-                ContentBlockDeltaEvent(
-                    delta=TextDelta(text="Hi", type="text_delta"),
-                    index=0,
-                    type="content_block_delta",
-                ),
-                ContentBlockDeltaEvent(
-                    delta=TextDelta(text="!", type="text_delta"),
-                    index=0,
-                    type="content_block_delta",
-                ),
-                ContentBlockDeltaEvent(
-                    delta=TextDelta(text=" I'm Claude!", type="text_delta"),
-                    index=0,
-                    type="content_block_delta",
-                ),
-                ContentBlockStopEvent(type="content_block_stop", index=0),
-                MessageDeltaEvent(
-                    delta=Delta(stop_reason="max_tokens"),
-                    usage=MessageDeltaUsage(output_tokens=10),
-                    type="message_delta",
-                ),
-            ]
+            streaming_anthropic_response(
+                text_deltas=("Hi", "!", " I'm Claude!"),
+                stop_reason="max_tokens",
+            )
         )
     )
 
@@ -2160,13 +2309,24 @@ def test_stream_messages(
                     "content": "Hello, Claude",
                 },
             ]
-            assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(
-                ["Hi! I'm Claude!"]
+            expected_parts = (
+                [
+                    {
+                        "type": "reasoning",
+                        "content": "Let me reason step by step...",
+                    },
+                    {"type": "text", "content": "Hi! I'm Claude!"},
+                ]
+                if ThinkingBlock is not None
+                else [{"type": "text", "content": "Hi! I'm Claude!"}]
             )
+            assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+                {"role": "assistant", "parts": expected_parts}
+            ]
 
         else:
             assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
+            assert SPANDATA.GEN_AI_OUTPUT_MESSAGES not in span["attributes"]
 
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
@@ -2220,13 +2380,24 @@ def test_stream_messages(
                     "content": "Hello, Claude",
                 },
             ]
-            assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(
-                ["Hi! I'm Claude!"]
+            expected_parts = (
+                [
+                    {
+                        "type": "reasoning",
+                        "content": "Let me reason step by step...",
+                    },
+                    {"type": "text", "content": "Hi! I'm Claude!"},
+                ]
+                if ThinkingBlock is not None
+                else [{"type": "text", "content": "Hi! I'm Claude!"}]
             )
+            assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+                {"role": "assistant", "parts": expected_parts}
+            ]
 
         else:
             assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
+            assert SPANDATA.GEN_AI_OUTPUT_MESSAGES not in span["attributes"]
 
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
@@ -2273,12 +2444,23 @@ def test_stream_messages(
                 span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
                 == '[{"role": "user", "content": "Hello, Claude"}]'
             )
-            assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(
-                ["Hi! I'm Claude!"]
+            expected_parts = (
+                [
+                    {
+                        "type": "reasoning",
+                        "content": "Let me reason step by step...",
+                    },
+                    {"type": "text", "content": "Hi! I'm Claude!"},
+                ]
+                if ThinkingBlock is not None
+                else [{"type": "text", "content": "Hi! I'm Claude!"}]
             )
+            assert json.loads(span["data"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+                {"role": "assistant", "parts": expected_parts}
+            ]
         else:
             assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
+            assert SPANDATA.GEN_AI_OUTPUT_MESSAGES not in span["data"]
 
         assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
         assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
@@ -2344,6 +2526,7 @@ def test_stream_messages_data_collection_outputs(
     server_side_event_chunks,
     stream_gen_ai_spans,
     span_streaming,
+    streaming_anthropic_response,
 ):
     sentry_init_kwargs = dict(
         integrations=[AnthropicIntegration(include_prompts=include_prompts)],
@@ -2361,33 +2544,10 @@ def test_stream_messages_data_collection_outputs(
 
     response = get_model_response(
         server_side_event_chunks(
-            [
-                MessageStartEvent(
-                    message=EXAMPLE_MESSAGE,
-                    type="message_start",
-                ),
-                ContentBlockStartEvent(
-                    type="content_block_start",
-                    index=0,
-                    content_block=TextBlock(type="text", text=""),
-                ),
-                ContentBlockDeltaEvent(
-                    delta=TextDelta(text="Hi", type="text_delta"),
-                    index=0,
-                    type="content_block_delta",
-                ),
-                ContentBlockDeltaEvent(
-                    delta=TextDelta(text="! I'm Claude!", type="text_delta"),
-                    index=0,
-                    type="content_block_delta",
-                ),
-                ContentBlockStopEvent(type="content_block_stop", index=0),
-                MessageDeltaEvent(
-                    delta=Delta(stop_reason="max_tokens"),
-                    usage=MessageDeltaUsage(output_tokens=10),
-                    type="message_delta",
-                ),
-            ]
+            streaming_anthropic_response(
+                text_deltas=("Hi", "! I'm Claude!"),
+                stop_reason="max_tokens",
+            )
         )
     )
 
@@ -2439,11 +2599,22 @@ def test_stream_messages_data_collection_outputs(
     assert span_data[SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
 
     if outputs_collected:
-        assert span_data[SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(
-            ["Hi! I'm Claude!"]
+        expected_parts = (
+            [
+                {
+                    "type": "reasoning",
+                    "content": "Let me reason step by step...",
+                },
+                {"type": "text", "content": "Hi! I'm Claude!"},
+            ]
+            if ThinkingBlock is not None
+            else [{"type": "text", "content": "Hi! I'm Claude!"}]
         )
+        assert json.loads(span_data[SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+            {"role": "assistant", "parts": expected_parts}
+        ]
     else:
-        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span_data
+        assert SPANDATA.GEN_AI_OUTPUT_MESSAGES not in span_data
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
@@ -2456,44 +2627,12 @@ def test_stream_messages_close(
     server_side_event_chunks,
     stream_gen_ai_spans,
     span_streaming,
+    streaming_anthropic_text_response,
 ):
     client = Anthropic(api_key="z")
 
     response = get_model_response(
-        server_side_event_chunks(
-            [
-                MessageStartEvent(
-                    message=EXAMPLE_MESSAGE,
-                    type="message_start",
-                ),
-                ContentBlockStartEvent(
-                    type="content_block_start",
-                    index=0,
-                    content_block=TextBlock(type="text", text=""),
-                ),
-                ContentBlockDeltaEvent(
-                    delta=TextDelta(text="Hi", type="text_delta"),
-                    index=0,
-                    type="content_block_delta",
-                ),
-                ContentBlockDeltaEvent(
-                    delta=TextDelta(text="!", type="text_delta"),
-                    index=0,
-                    type="content_block_delta",
-                ),
-                ContentBlockDeltaEvent(
-                    delta=TextDelta(text=" I'm Claude!", type="text_delta"),
-                    index=0,
-                    type="content_block_delta",
-                ),
-                ContentBlockStopEvent(type="content_block_stop", index=0),
-                MessageDeltaEvent(
-                    delta=Delta(stop_reason="max_tokens"),
-                    usage=MessageDeltaUsage(output_tokens=10),
-                    type="message_delta",
-                ),
-            ]
-        )
+        server_side_event_chunks(streaming_anthropic_text_response)
     )
 
     sentry_init(
@@ -2550,7 +2689,9 @@ def test_stream_messages_close(
             span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
             == '[{"role": "user", "content": "Hello, Claude"}]'
         )
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(["Hi!"])
+        assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+            {"role": "assistant", "parts": [{"type": "text", "content": "Hi!"}]}
+        ]
 
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
@@ -2600,7 +2741,9 @@ def test_stream_messages_close(
             span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
             == '[{"role": "user", "content": "Hello, Claude"}]'
         )
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(["Hi!"])
+        assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+            {"role": "assistant", "parts": [{"type": "text", "content": "Hi!"}]}
+        ]
 
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
@@ -2649,7 +2792,9 @@ def test_stream_messages_close(
             span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
             == '[{"role": "user", "content": "Hello, Claude"}]'
         )
-        assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(["Hi!"])
+        assert json.loads(span["data"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+            {"role": "assistant", "parts": [{"type": "text", "content": "Hi!"}]}
+        ]
 
         assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
         assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
@@ -2674,39 +2819,12 @@ def test_stream_messages_api_error(
     server_side_event_chunks,
     stream_gen_ai_spans,
     span_streaming,
+    streaming_anthropic_error_response,
 ):
     client = Anthropic(api_key="z")
 
     response = get_model_response(
-        server_side_event_chunks(
-            [
-                MessageStartEvent(
-                    message=EXAMPLE_MESSAGE,
-                    type="message_start",
-                ),
-                ContentBlockStartEvent(
-                    type="content_block_start",
-                    index=0,
-                    content_block=TextBlock(type="text", text=""),
-                ),
-                ContentBlockDeltaEvent(
-                    delta=TextDelta(text="Hi", type="text_delta"),
-                    index=0,
-                    type="content_block_delta",
-                ),
-                ContentBlockDeltaEvent(
-                    delta=TextDelta(text="!", type="text_delta"),
-                    index=0,
-                    type="content_block_delta",
-                ),
-                ErrorResponse(
-                    type="error",
-                    error=OverloadedError(
-                        message="Overloaded", type="overloaded_error"
-                    ),
-                ),
-            ]
-        )
+        server_side_event_chunks(streaming_anthropic_error_response)
     )
 
     sentry_init(
@@ -2758,7 +2876,9 @@ def test_stream_messages_api_error(
             span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
             == '[{"role": "user", "content": "Hello, Claude"}]'
         )
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(["Hi!"])
+        assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+            {"role": "assistant", "parts": [{"type": "text", "content": "Hi!"}]}
+        ]
 
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
@@ -2804,7 +2924,9 @@ def test_stream_messages_api_error(
             span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
             == '[{"role": "user", "content": "Hello, Claude"}]'
         )
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(["Hi!"])
+        assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+            {"role": "assistant", "parts": [{"type": "text", "content": "Hi!"}]}
+        ]
 
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
@@ -2850,7 +2972,9 @@ def test_stream_messages_api_error(
             span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
             == '[{"role": "user", "content": "Hello, Claude"}]'
         )
-        assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(["Hi!"])
+        assert json.loads(span["data"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+            {"role": "assistant", "parts": [{"type": "text", "content": "Hi!"}]}
+        ]
 
         assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
         assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
@@ -2888,46 +3012,19 @@ async def test_streaming_create_message_async(
     server_side_event_chunks,
     stream_gen_ai_spans,
     span_streaming,
+    streaming_anthropic_response,
 ):
     client = AsyncAnthropic(api_key="z")
 
     response = get_model_response(
         async_iterator(
             server_side_event_chunks(
-                [
-                    MessageStartEvent(
-                        message=EXAMPLE_MESSAGE,
-                        type="message_start",
-                    ),
-                    ContentBlockStartEvent(
-                        type="content_block_start",
-                        index=0,
-                        content_block=TextBlock(type="text", text=""),
-                    ),
-                    ContentBlockDeltaEvent(
-                        delta=TextDelta(text="Hi", type="text_delta"),
-                        index=0,
-                        type="content_block_delta",
-                    ),
-                    ContentBlockDeltaEvent(
-                        delta=TextDelta(text="!", type="text_delta"),
-                        index=0,
-                        type="content_block_delta",
-                    ),
-                    ContentBlockDeltaEvent(
-                        delta=TextDelta(text=" I'm Claude!", type="text_delta"),
-                        index=0,
-                        type="content_block_delta",
-                    ),
-                    ContentBlockStopEvent(type="content_block_stop", index=0),
-                    MessageDeltaEvent(
-                        delta=Delta(stop_reason="max_tokens"),
-                        usage=MessageDeltaUsage(output_tokens=10),
-                        type="message_delta",
-                    ),
-                ]
+                streaming_anthropic_response(
+                    text_deltas=("Hi", "!", " I'm Claude!"),
+                    stop_reason="max_tokens",
+                )
             )
-        ),
+        )
     )
 
     sentry_init(
@@ -2990,13 +3087,24 @@ async def test_streaming_create_message_async(
                     "content": "Hello, Claude",
                 },
             ]
-            assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(
-                ["Hi! I'm Claude!"]
+            expected_parts = (
+                [
+                    {
+                        "type": "reasoning",
+                        "content": "Let me reason step by step...",
+                    },
+                    {"type": "text", "content": "Hi! I'm Claude!"},
+                ]
+                if ThinkingBlock is not None
+                else [{"type": "text", "content": "Hi! I'm Claude!"}]
             )
+            assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+                {"role": "assistant", "parts": expected_parts}
+            ]
 
         else:
             assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
+            assert SPANDATA.GEN_AI_OUTPUT_MESSAGES not in span["attributes"]
 
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
@@ -3049,13 +3157,24 @@ async def test_streaming_create_message_async(
                     "content": "Hello, Claude",
                 },
             ]
-            assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(
-                ["Hi! I'm Claude!"]
+            expected_parts = (
+                [
+                    {
+                        "type": "reasoning",
+                        "content": "Let me reason step by step...",
+                    },
+                    {"type": "text", "content": "Hi! I'm Claude!"},
+                ]
+                if ThinkingBlock is not None
+                else [{"type": "text", "content": "Hi! I'm Claude!"}]
             )
+            assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+                {"role": "assistant", "parts": expected_parts}
+            ]
 
         else:
             assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
+            assert SPANDATA.GEN_AI_OUTPUT_MESSAGES not in span["attributes"]
 
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
@@ -3103,13 +3222,24 @@ async def test_streaming_create_message_async(
                 span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
                 == '[{"role": "user", "content": "Hello, Claude"}]'
             )
-            assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(
-                ["Hi! I'm Claude!"]
+            expected_parts = (
+                [
+                    {
+                        "type": "reasoning",
+                        "content": "Let me reason step by step...",
+                    },
+                    {"type": "text", "content": "Hi! I'm Claude!"},
+                ]
+                if ThinkingBlock is not None
+                else [{"type": "text", "content": "Hi! I'm Claude!"}]
             )
+            assert json.loads(span["data"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+                {"role": "assistant", "parts": expected_parts}
+            ]
 
         else:
             assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
+            assert SPANDATA.GEN_AI_OUTPUT_MESSAGES not in span["data"]
 
         assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
         assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
@@ -3177,6 +3307,7 @@ async def test_streaming_create_message_data_collection_outputs_async(
     server_side_event_chunks,
     stream_gen_ai_spans,
     span_streaming,
+    streaming_anthropic_response,
 ):
     sentry_init_kwargs = dict(
         integrations=[AnthropicIntegration(include_prompts=include_prompts)],
@@ -3195,35 +3326,12 @@ async def test_streaming_create_message_data_collection_outputs_async(
     response = get_model_response(
         async_iterator(
             server_side_event_chunks(
-                [
-                    MessageStartEvent(
-                        message=EXAMPLE_MESSAGE,
-                        type="message_start",
-                    ),
-                    ContentBlockStartEvent(
-                        type="content_block_start",
-                        index=0,
-                        content_block=TextBlock(type="text", text=""),
-                    ),
-                    ContentBlockDeltaEvent(
-                        delta=TextDelta(text="Hi", type="text_delta"),
-                        index=0,
-                        type="content_block_delta",
-                    ),
-                    ContentBlockDeltaEvent(
-                        delta=TextDelta(text="! I'm Claude!", type="text_delta"),
-                        index=0,
-                        type="content_block_delta",
-                    ),
-                    ContentBlockStopEvent(type="content_block_stop", index=0),
-                    MessageDeltaEvent(
-                        delta=Delta(stop_reason="max_tokens"),
-                        usage=MessageDeltaUsage(output_tokens=10),
-                        type="message_delta",
-                    ),
-                ]
+                streaming_anthropic_response(
+                    text_deltas=("Hi", "! I'm Claude!"),
+                    stop_reason="max_tokens",
+                )
             )
-        ),
+        )
     )
 
     create_kwargs = dict(
@@ -3273,11 +3381,22 @@ async def test_streaming_create_message_data_collection_outputs_async(
     assert span_data[SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
 
     if outputs_collected:
-        assert span_data[SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(
-            ["Hi! I'm Claude!"]
+        expected_parts = (
+            [
+                {
+                    "type": "reasoning",
+                    "content": "Let me reason step by step...",
+                },
+                {"type": "text", "content": "Hi! I'm Claude!"},
+            ]
+            if ThinkingBlock is not None
+            else [{"type": "text", "content": "Hi! I'm Claude!"}]
         )
+        assert json.loads(span_data[SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+            {"role": "assistant", "parts": expected_parts}
+        ]
     else:
-        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span_data
+        assert SPANDATA.GEN_AI_OUTPUT_MESSAGES not in span_data
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
@@ -3292,46 +3411,12 @@ async def test_streaming_create_message_async_close(
     server_side_event_chunks,
     stream_gen_ai_spans,
     span_streaming,
+    streaming_anthropic_text_response,
 ):
     client = AsyncAnthropic(api_key="z")
 
     response = get_model_response(
-        async_iterator(
-            server_side_event_chunks(
-                [
-                    MessageStartEvent(
-                        message=EXAMPLE_MESSAGE,
-                        type="message_start",
-                    ),
-                    ContentBlockStartEvent(
-                        type="content_block_start",
-                        index=0,
-                        content_block=TextBlock(type="text", text=""),
-                    ),
-                    ContentBlockDeltaEvent(
-                        delta=TextDelta(text="Hi", type="text_delta"),
-                        index=0,
-                        type="content_block_delta",
-                    ),
-                    ContentBlockDeltaEvent(
-                        delta=TextDelta(text="!", type="text_delta"),
-                        index=0,
-                        type="content_block_delta",
-                    ),
-                    ContentBlockDeltaEvent(
-                        delta=TextDelta(text=" I'm Claude!", type="text_delta"),
-                        index=0,
-                        type="content_block_delta",
-                    ),
-                    ContentBlockStopEvent(type="content_block_stop", index=0),
-                    MessageDeltaEvent(
-                        delta=Delta(stop_reason="max_tokens"),
-                        usage=MessageDeltaUsage(output_tokens=10),
-                        type="message_delta",
-                    ),
-                ]
-            )
-        )
+        async_iterator(server_side_event_chunks(streaming_anthropic_text_response))
     )
 
     sentry_init(
@@ -3383,7 +3468,9 @@ async def test_streaming_create_message_async_close(
             span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
             == '[{"role": "user", "content": "Hello, Claude"}]'
         )
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(["Hi!"])
+        assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+            {"role": "assistant", "parts": [{"type": "text", "content": "Hi!"}]}
+        ]
 
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
@@ -3428,7 +3515,9 @@ async def test_streaming_create_message_async_close(
             span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
             == '[{"role": "user", "content": "Hello, Claude"}]'
         )
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(["Hi!"])
+        assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+            {"role": "assistant", "parts": [{"type": "text", "content": "Hi!"}]}
+        ]
 
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
@@ -3472,7 +3561,9 @@ async def test_streaming_create_message_async_close(
             span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
             == '[{"role": "user", "content": "Hello, Claude"}]'
         )
-        assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(["Hi!"])
+        assert json.loads(span["data"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+            {"role": "assistant", "parts": [{"type": "text", "content": "Hi!"}]}
+        ]
 
         assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
         assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
@@ -3499,41 +3590,12 @@ async def test_streaming_create_message_async_api_error(
     server_side_event_chunks,
     stream_gen_ai_spans,
     span_streaming,
+    streaming_anthropic_error_response,
 ):
     client = AsyncAnthropic(api_key="z")
 
     response = get_model_response(
-        async_iterator(
-            server_side_event_chunks(
-                [
-                    MessageStartEvent(
-                        message=EXAMPLE_MESSAGE,
-                        type="message_start",
-                    ),
-                    ContentBlockStartEvent(
-                        type="content_block_start",
-                        index=0,
-                        content_block=TextBlock(type="text", text=""),
-                    ),
-                    ContentBlockDeltaEvent(
-                        delta=TextDelta(text="Hi", type="text_delta"),
-                        index=0,
-                        type="content_block_delta",
-                    ),
-                    ContentBlockDeltaEvent(
-                        delta=TextDelta(text="!", type="text_delta"),
-                        index=0,
-                        type="content_block_delta",
-                    ),
-                    ErrorResponse(
-                        type="error",
-                        error=OverloadedError(
-                            message="Overloaded", type="overloaded_error"
-                        ),
-                    ),
-                ]
-            )
-        )
+        async_iterator(server_side_event_chunks(streaming_anthropic_error_response))
     )
 
     sentry_init(
@@ -3585,7 +3647,9 @@ async def test_streaming_create_message_async_api_error(
             span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
             == '[{"role": "user", "content": "Hello, Claude"}]'
         )
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(["Hi!"])
+        assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+            {"role": "assistant", "parts": [{"type": "text", "content": "Hi!"}]}
+        ]
 
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
@@ -3631,7 +3695,9 @@ async def test_streaming_create_message_async_api_error(
             span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
             == '[{"role": "user", "content": "Hello, Claude"}]'
         )
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(["Hi!"])
+        assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+            {"role": "assistant", "parts": [{"type": "text", "content": "Hi!"}]}
+        ]
 
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
@@ -3677,7 +3743,9 @@ async def test_streaming_create_message_async_api_error(
             span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
             == '[{"role": "user", "content": "Hello, Claude"}]'
         )
-        assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(["Hi!"])
+        assert json.loads(span["data"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+            {"role": "assistant", "parts": [{"type": "text", "content": "Hi!"}]}
+        ]
 
         assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
         assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
@@ -3715,46 +3783,19 @@ async def test_stream_message_async(
     server_side_event_chunks,
     stream_gen_ai_spans,
     span_streaming,
+    streaming_anthropic_response,
 ):
     client = AsyncAnthropic(api_key="z")
 
     response = get_model_response(
         async_iterator(
             server_side_event_chunks(
-                [
-                    MessageStartEvent(
-                        message=EXAMPLE_MESSAGE,
-                        type="message_start",
-                    ),
-                    ContentBlockStartEvent(
-                        type="content_block_start",
-                        index=0,
-                        content_block=TextBlock(type="text", text=""),
-                    ),
-                    ContentBlockDeltaEvent(
-                        delta=TextDelta(text="Hi", type="text_delta"),
-                        index=0,
-                        type="content_block_delta",
-                    ),
-                    ContentBlockDeltaEvent(
-                        delta=TextDelta(text="!", type="text_delta"),
-                        index=0,
-                        type="content_block_delta",
-                    ),
-                    ContentBlockDeltaEvent(
-                        delta=TextDelta(text=" I'm Claude!", type="text_delta"),
-                        index=0,
-                        type="content_block_delta",
-                    ),
-                    ContentBlockStopEvent(type="content_block_stop", index=0),
-                    MessageDeltaEvent(
-                        delta=Delta(),
-                        usage=MessageDeltaUsage(output_tokens=10),
-                        type="message_delta",
-                    ),
-                ]
+                streaming_anthropic_response(
+                    text_deltas=("Hi", "!", " I'm Claude!"),
+                    stop_reason=None,
+                )
             )
-        ),
+        )
     )
 
     sentry_init(
@@ -3817,13 +3858,24 @@ async def test_stream_message_async(
                     "content": "Hello, Claude",
                 },
             ]
-            assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(
-                ["Hi! I'm Claude!"]
+            expected_parts = (
+                [
+                    {
+                        "type": "reasoning",
+                        "content": "Let me reason step by step...",
+                    },
+                    {"type": "text", "content": "Hi! I'm Claude!"},
+                ]
+                if ThinkingBlock is not None
+                else [{"type": "text", "content": "Hi! I'm Claude!"}]
             )
+            assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+                {"role": "assistant", "parts": expected_parts}
+            ]
 
         else:
             assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
+            assert SPANDATA.GEN_AI_OUTPUT_MESSAGES not in span["attributes"]
 
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
@@ -3874,13 +3926,24 @@ async def test_stream_message_async(
                     "content": "Hello, Claude",
                 },
             ]
-            assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(
-                ["Hi! I'm Claude!"]
+            expected_parts = (
+                [
+                    {
+                        "type": "reasoning",
+                        "content": "Let me reason step by step...",
+                    },
+                    {"type": "text", "content": "Hi! I'm Claude!"},
+                ]
+                if ThinkingBlock is not None
+                else [{"type": "text", "content": "Hi! I'm Claude!"}]
             )
+            assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+                {"role": "assistant", "parts": expected_parts}
+            ]
 
         else:
             assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
+            assert SPANDATA.GEN_AI_OUTPUT_MESSAGES not in span["attributes"]
 
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
@@ -3925,13 +3988,24 @@ async def test_stream_message_async(
                 span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
                 == '[{"role": "user", "content": "Hello, Claude"}]'
             )
-            assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(
-                ["Hi! I'm Claude!"]
+            expected_parts = (
+                [
+                    {
+                        "type": "reasoning",
+                        "content": "Let me reason step by step...",
+                    },
+                    {"type": "text", "content": "Hi! I'm Claude!"},
+                ]
+                if ThinkingBlock is not None
+                else [{"type": "text", "content": "Hi! I'm Claude!"}]
             )
+            assert json.loads(span["data"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+                {"role": "assistant", "parts": expected_parts}
+            ]
 
         else:
             assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
+            assert SPANDATA.GEN_AI_OUTPUT_MESSAGES not in span["data"]
 
         assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
         assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
@@ -3998,6 +4072,7 @@ async def test_stream_messages_data_collection_outputs_async(
     server_side_event_chunks,
     stream_gen_ai_spans,
     span_streaming,
+    streaming_anthropic_response,
 ):
     sentry_init_kwargs = dict(
         integrations=[AnthropicIntegration(include_prompts=include_prompts)],
@@ -4016,35 +4091,12 @@ async def test_stream_messages_data_collection_outputs_async(
     response = get_model_response(
         async_iterator(
             server_side_event_chunks(
-                [
-                    MessageStartEvent(
-                        message=EXAMPLE_MESSAGE,
-                        type="message_start",
-                    ),
-                    ContentBlockStartEvent(
-                        type="content_block_start",
-                        index=0,
-                        content_block=TextBlock(type="text", text=""),
-                    ),
-                    ContentBlockDeltaEvent(
-                        delta=TextDelta(text="Hi", type="text_delta"),
-                        index=0,
-                        type="content_block_delta",
-                    ),
-                    ContentBlockDeltaEvent(
-                        delta=TextDelta(text="! I'm Claude!", type="text_delta"),
-                        index=0,
-                        type="content_block_delta",
-                    ),
-                    ContentBlockStopEvent(type="content_block_stop", index=0),
-                    MessageDeltaEvent(
-                        delta=Delta(stop_reason="max_tokens"),
-                        usage=MessageDeltaUsage(output_tokens=10),
-                        type="message_delta",
-                    ),
-                ]
+                streaming_anthropic_response(
+                    text_deltas=("Hi", "! I'm Claude!"),
+                    stop_reason="max_tokens",
+                )
             )
-        ),
+        )
     )
 
     stream_kwargs = dict(
@@ -4093,11 +4145,22 @@ async def test_stream_messages_data_collection_outputs_async(
     assert span_data[SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
 
     if outputs_collected:
-        assert span_data[SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(
-            ["Hi! I'm Claude!"]
+        expected_parts = (
+            [
+                {
+                    "type": "reasoning",
+                    "content": "Let me reason step by step...",
+                },
+                {"type": "text", "content": "Hi! I'm Claude!"},
+            ]
+            if ThinkingBlock is not None
+            else [{"type": "text", "content": "Hi! I'm Claude!"}]
         )
+        assert json.loads(span_data[SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+            {"role": "assistant", "parts": expected_parts}
+        ]
     else:
-        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span_data
+        assert SPANDATA.GEN_AI_OUTPUT_MESSAGES not in span_data
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
@@ -4116,41 +4179,12 @@ async def test_stream_messages_async_api_error(
     server_side_event_chunks,
     stream_gen_ai_spans,
     span_streaming,
+    streaming_anthropic_error_response,
 ):
     client = AsyncAnthropic(api_key="z")
 
     response = get_model_response(
-        async_iterator(
-            server_side_event_chunks(
-                [
-                    MessageStartEvent(
-                        message=EXAMPLE_MESSAGE,
-                        type="message_start",
-                    ),
-                    ContentBlockStartEvent(
-                        type="content_block_start",
-                        index=0,
-                        content_block=TextBlock(type="text", text=""),
-                    ),
-                    ContentBlockDeltaEvent(
-                        delta=TextDelta(text="Hi", type="text_delta"),
-                        index=0,
-                        type="content_block_delta",
-                    ),
-                    ContentBlockDeltaEvent(
-                        delta=TextDelta(text="!", type="text_delta"),
-                        index=0,
-                        type="content_block_delta",
-                    ),
-                    ErrorResponse(
-                        type="error",
-                        error=OverloadedError(
-                            message="Overloaded", type="overloaded_error"
-                        ),
-                    ),
-                ]
-            )
-        )
+        async_iterator(server_side_event_chunks(streaming_anthropic_error_response))
     )
 
     sentry_init(
@@ -4202,7 +4236,9 @@ async def test_stream_messages_async_api_error(
             span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
             == '[{"role": "user", "content": "Hello, Claude"}]'
         )
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(["Hi!"])
+        assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+            {"role": "assistant", "parts": [{"type": "text", "content": "Hi!"}]}
+        ]
 
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
@@ -4246,7 +4282,9 @@ async def test_stream_messages_async_api_error(
             span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
             == '[{"role": "user", "content": "Hello, Claude"}]'
         )
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(["Hi!"])
+        assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+            {"role": "assistant", "parts": [{"type": "text", "content": "Hi!"}]}
+        ]
 
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
@@ -4292,7 +4330,9 @@ async def test_stream_messages_async_api_error(
             span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
             == '[{"role": "user", "content": "Hello, Claude"}]'
         )
-        assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(["Hi!"])
+        assert json.loads(span["data"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+            {"role": "assistant", "parts": [{"type": "text", "content": "Hi!"}]}
+        ]
 
         assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
         assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
@@ -4319,46 +4359,12 @@ async def test_stream_messages_async_close(
     server_side_event_chunks,
     stream_gen_ai_spans,
     span_streaming,
+    streaming_anthropic_text_response,
 ):
     client = AsyncAnthropic(api_key="z")
 
     response = get_model_response(
-        async_iterator(
-            server_side_event_chunks(
-                [
-                    MessageStartEvent(
-                        message=EXAMPLE_MESSAGE,
-                        type="message_start",
-                    ),
-                    ContentBlockStartEvent(
-                        type="content_block_start",
-                        index=0,
-                        content_block=TextBlock(type="text", text=""),
-                    ),
-                    ContentBlockDeltaEvent(
-                        delta=TextDelta(text="Hi", type="text_delta"),
-                        index=0,
-                        type="content_block_delta",
-                    ),
-                    ContentBlockDeltaEvent(
-                        delta=TextDelta(text="!", type="text_delta"),
-                        index=0,
-                        type="content_block_delta",
-                    ),
-                    ContentBlockDeltaEvent(
-                        delta=TextDelta(text=" I'm Claude!", type="text_delta"),
-                        index=0,
-                        type="content_block_delta",
-                    ),
-                    ContentBlockStopEvent(type="content_block_stop", index=0),
-                    MessageDeltaEvent(
-                        delta=Delta(stop_reason="max_tokens"),
-                        usage=MessageDeltaUsage(output_tokens=10),
-                        type="message_delta",
-                    ),
-                ]
-            )
-        )
+        async_iterator(server_side_event_chunks(streaming_anthropic_text_response))
     )
 
     sentry_init(
@@ -4418,7 +4424,9 @@ async def test_stream_messages_async_close(
             span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
             == '[{"role": "user", "content": "Hello, Claude"}]'
         )
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(["Hi!"])
+        assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+            {"role": "assistant", "parts": [{"type": "text", "content": "Hi!"}]}
+        ]
 
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
@@ -4468,7 +4476,9 @@ async def test_stream_messages_async_close(
             span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
             == '[{"role": "user", "content": "Hello, Claude"}]'
         )
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(["Hi!"])
+        assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+            {"role": "assistant", "parts": [{"type": "text", "content": "Hi!"}]}
+        ]
 
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
@@ -4520,7 +4530,9 @@ async def test_stream_messages_async_close(
             span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
             == '[{"role": "user", "content": "Hello, Claude"}]'
         )
-        assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(["Hi!"])
+        assert json.loads(span["data"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+            {"role": "assistant", "parts": [{"type": "text", "content": "Hi!"}]}
+        ]
 
         assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
         assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
@@ -4675,12 +4687,17 @@ def test_streaming_create_message_with_input_json_delta(
                 span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
                 == '[{"role": "user", "content": "What is the weather like in San Francisco?"}]'
             )
-            assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(
-                ['{"location": "San Francisco, CA"}']
-            )
+            assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+                {
+                    "role": "assistant",
+                    "parts": [
+                        {"type": "text", "content": '{"location": "San Francisco, CA"}'}
+                    ],
+                }
+            ]
         else:
             assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
+            assert SPANDATA.GEN_AI_OUTPUT_MESSAGES not in span["attributes"]
 
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 366
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 41
@@ -4721,12 +4738,17 @@ def test_streaming_create_message_with_input_json_delta(
                 span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
                 == '[{"role": "user", "content": "What is the weather like in San Francisco?"}]'
             )
-            assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(
-                ['{"location": "San Francisco, CA"}']
-            )
+            assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+                {
+                    "role": "assistant",
+                    "parts": [
+                        {"type": "text", "content": '{"location": "San Francisco, CA"}'}
+                    ],
+                }
+            ]
         else:
             assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
+            assert SPANDATA.GEN_AI_OUTPUT_MESSAGES not in span["attributes"]
 
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 366
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 41
@@ -4768,12 +4790,17 @@ def test_streaming_create_message_with_input_json_delta(
                 span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
                 == '[{"role": "user", "content": "What is the weather like in San Francisco?"}]'
             )
-            assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(
-                ['{"location": "San Francisco, CA"}']
-            )
+            assert json.loads(span["data"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+                {
+                    "role": "assistant",
+                    "parts": [
+                        {"type": "text", "content": '{"location": "San Francisco, CA"}'}
+                    ],
+                }
+            ]
         else:
             assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
+            assert SPANDATA.GEN_AI_OUTPUT_MESSAGES not in span["data"]
 
         assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 366
         assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 41
@@ -4925,12 +4952,17 @@ def test_stream_messages_with_input_json_delta(
                 span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
                 == '[{"role": "user", "content": "What is the weather like in San Francisco?"}]'
             )
-            assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(
-                ['{"location": "San Francisco, CA"}']
-            )
+            assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+                {
+                    "role": "assistant",
+                    "parts": [
+                        {"type": "text", "content": '{"location": "San Francisco, CA"}'}
+                    ],
+                }
+            ]
         else:
             assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
+            assert SPANDATA.GEN_AI_OUTPUT_MESSAGES not in span["attributes"]
 
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 366
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 41
@@ -4971,12 +5003,17 @@ def test_stream_messages_with_input_json_delta(
                 span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
                 == '[{"role": "user", "content": "What is the weather like in San Francisco?"}]'
             )
-            assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(
-                ['{"location": "San Francisco, CA"}']
-            )
+            assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+                {
+                    "role": "assistant",
+                    "parts": [
+                        {"type": "text", "content": '{"location": "San Francisco, CA"}'}
+                    ],
+                }
+            ]
         else:
             assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
+            assert SPANDATA.GEN_AI_OUTPUT_MESSAGES not in span["attributes"]
 
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 366
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 41
@@ -5017,12 +5054,17 @@ def test_stream_messages_with_input_json_delta(
                 span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
                 == '[{"role": "user", "content": "What is the weather like in San Francisco?"}]'
             )
-            assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(
-                ['{"location": "San Francisco, CA"}']
-            )
+            assert json.loads(span["data"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+                {
+                    "role": "assistant",
+                    "parts": [
+                        {"type": "text", "content": '{"location": "San Francisco, CA"}'}
+                    ],
+                }
+            ]
         else:
             assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
+            assert SPANDATA.GEN_AI_OUTPUT_MESSAGES not in span["data"]
 
         assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 366
         assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 41
@@ -5181,13 +5223,18 @@ async def test_streaming_create_message_with_input_json_delta_async(
                 span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
                 == '[{"role": "user", "content": "What is the weather like in San Francisco?"}]'
             )
-            assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(
-                ['{"location": "San Francisco, CA"}']
-            )
+            assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+                {
+                    "role": "assistant",
+                    "parts": [
+                        {"type": "text", "content": '{"location": "San Francisco, CA"}'}
+                    ],
+                }
+            ]
 
         else:
             assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
+            assert SPANDATA.GEN_AI_OUTPUT_MESSAGES not in span["attributes"]
 
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 366
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 41
@@ -5228,13 +5275,18 @@ async def test_streaming_create_message_with_input_json_delta_async(
                 span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
                 == '[{"role": "user", "content": "What is the weather like in San Francisco?"}]'
             )
-            assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(
-                ['{"location": "San Francisco, CA"}']
-            )
+            assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+                {
+                    "role": "assistant",
+                    "parts": [
+                        {"type": "text", "content": '{"location": "San Francisco, CA"}'}
+                    ],
+                }
+            ]
 
         else:
             assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
+            assert SPANDATA.GEN_AI_OUTPUT_MESSAGES not in span["attributes"]
 
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 366
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 41
@@ -5275,13 +5327,18 @@ async def test_streaming_create_message_with_input_json_delta_async(
                 span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
                 == '[{"role": "user", "content": "What is the weather like in San Francisco?"}]'
             )
-            assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(
-                ['{"location": "San Francisco, CA"}']
-            )
+            assert json.loads(span["data"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+                {
+                    "role": "assistant",
+                    "parts": [
+                        {"type": "text", "content": '{"location": "San Francisco, CA"}'}
+                    ],
+                }
+            ]
 
         else:
             assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
+            assert SPANDATA.GEN_AI_OUTPUT_MESSAGES not in span["data"]
 
         assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 366
         assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 41
@@ -5441,12 +5498,17 @@ async def test_stream_message_with_input_json_delta_async(
                 span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
                 == '[{"role": "user", "content": "What is the weather like in San Francisco?"}]'
             )
-            assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(
-                ['{"location": "San Francisco, CA"}']
-            )
+            assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+                {
+                    "role": "assistant",
+                    "parts": [
+                        {"type": "text", "content": '{"location": "San Francisco, CA"}'}
+                    ],
+                }
+            ]
         else:
             assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
+            assert SPANDATA.GEN_AI_OUTPUT_MESSAGES not in span["attributes"]
 
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 366
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 41
@@ -5488,12 +5550,17 @@ async def test_stream_message_with_input_json_delta_async(
                 span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
                 == '[{"role": "user", "content": "What is the weather like in San Francisco?"}]'
             )
-            assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(
-                ['{"location": "San Francisco, CA"}']
-            )
+            assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+                {
+                    "role": "assistant",
+                    "parts": [
+                        {"type": "text", "content": '{"location": "San Francisco, CA"}'}
+                    ],
+                }
+            ]
         else:
             assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
+            assert SPANDATA.GEN_AI_OUTPUT_MESSAGES not in span["attributes"]
 
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 366
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 41
@@ -5535,13 +5602,18 @@ async def test_stream_message_with_input_json_delta_async(
                 span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
                 == '[{"role": "user", "content": "What is the weather like in San Francisco?"}]'
             )
-            assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(
-                ['{"location": "San Francisco, CA"}']
-            )
+            assert json.loads(span["data"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+                {
+                    "role": "assistant",
+                    "parts": [
+                        {"type": "text", "content": '{"location": "San Francisco, CA"}'}
+                    ],
+                }
+            ]
 
         else:
             assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
+            assert SPANDATA.GEN_AI_OUTPUT_MESSAGES not in span["data"]
 
         assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 366
         assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 41
@@ -6010,7 +6082,14 @@ async def test_span_origin_async(
 )
 @pytest.mark.parametrize("span_streaming", [True, False])
 def test_collect_ai_data_with_input_json_delta(span_streaming):
-    event = ContentBlockDeltaEvent(
+    start_event = ContentBlockStartEvent(
+        type="content_block_start",
+        index=0,
+        content_block=ToolUseBlock(
+            type="tool_use", id="toolu_123", name="get_weather", input={}
+        ),
+    )
+    delta_event = ContentBlockDeltaEvent(
         delta=InputJSONDelta(partial_json="test", type="input_json_delta"),
         index=0,
         type="content_block_delta",
@@ -6021,15 +6100,16 @@ def test_collect_ai_data_with_input_json_delta(span_streaming):
     usage.output_tokens = 20
     usage.input_tokens = 10
 
-    content_blocks = []
+    content_blocks: list = []
 
+    _collect_ai_data(start_event, model, usage, content_blocks)
     model, new_usage, new_content_blocks, response_id, finish_reason = _collect_ai_data(
-        event, model, usage, content_blocks
+        delta_event, model, usage, content_blocks
     )
     assert model is None
     assert new_usage.input_tokens == usage.input_tokens
     assert new_usage.output_tokens == usage.output_tokens
-    assert new_content_blocks == ["test"]
+    assert new_content_blocks == [{"type": "text", "text": "test"}]
     assert response_id is None
     assert finish_reason is None
 
@@ -6061,9 +6141,14 @@ def test_set_output_data_with_input_json_delta(sentry_init):
             content_blocks=[{"text": "".join(json_deltas), "type": "text"}],
         )
 
-        assert span._data.get(SPANDATA.GEN_AI_RESPONSE_TEXT) == json.dumps(
-            ["{'test': 'data','more': 'json'}"]
-        )
+        assert json.loads(span._data.get(SPANDATA.GEN_AI_OUTPUT_MESSAGES)) == [
+            {
+                "role": "assistant",
+                "parts": [
+                    {"type": "text", "content": "{'test': 'data','more': 'json'}"}
+                ],
+            }
+        ]
         assert span._data.get(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS) == 10
         assert span._data.get(SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS) == 20
         assert span._data.get(SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS) == 30
@@ -6361,13 +6446,24 @@ def test_nonstreaming_create_message_with_system_prompt(
             assert len(stored_messages) == 1
             assert stored_messages[0]["role"] == "user"
             assert stored_messages[0]["content"] == "Hello, Claude"
-            assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(
-                ["Hi, I'm Claude."]
+            expected_parts = (
+                [
+                    {
+                        "type": "reasoning",
+                        "content": "Let me reason step by step...",
+                    },
+                    {"type": "text", "content": "Hi, I'm Claude."},
+                ]
+                if ThinkingBlock is not None
+                else [{"type": "text", "content": "Hi, I'm Claude."}]
             )
+            assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+                {"role": "assistant", "parts": expected_parts}
+            ]
         else:
             assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["attributes"]
             assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
+            assert SPANDATA.GEN_AI_OUTPUT_MESSAGES not in span["attributes"]
 
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
@@ -6423,13 +6519,24 @@ def test_nonstreaming_create_message_with_system_prompt(
             assert len(stored_messages) == 1
             assert stored_messages[0]["role"] == "user"
             assert stored_messages[0]["content"] == "Hello, Claude"
-            assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(
-                ["Hi, I'm Claude."]
+            expected_parts = (
+                [
+                    {
+                        "type": "reasoning",
+                        "content": "Let me reason step by step...",
+                    },
+                    {"type": "text", "content": "Hi, I'm Claude."},
+                ]
+                if ThinkingBlock is not None
+                else [{"type": "text", "content": "Hi, I'm Claude."}]
             )
+            assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+                {"role": "assistant", "parts": expected_parts}
+            ]
         else:
             assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["attributes"]
             assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
+            assert SPANDATA.GEN_AI_OUTPUT_MESSAGES not in span["attributes"]
 
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
@@ -6484,13 +6591,24 @@ def test_nonstreaming_create_message_with_system_prompt(
             assert len(stored_messages) == 1
             assert stored_messages[0]["role"] == "user"
             assert stored_messages[0]["content"] == "Hello, Claude"
-            assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(
-                ["Hi, I'm Claude."]
+            expected_parts = (
+                [
+                    {
+                        "type": "reasoning",
+                        "content": "Let me reason step by step...",
+                    },
+                    {"type": "text", "content": "Hi, I'm Claude."},
+                ]
+                if ThinkingBlock is not None
+                else [{"type": "text", "content": "Hi, I'm Claude."}]
             )
+            assert json.loads(span["data"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+                {"role": "assistant", "parts": expected_parts}
+            ]
         else:
             assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["data"]
             assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
+            assert SPANDATA.GEN_AI_OUTPUT_MESSAGES not in span["data"]
 
         assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
         assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
@@ -6586,13 +6704,24 @@ async def test_nonstreaming_create_message_with_system_prompt_async(
             assert len(stored_messages) == 1
             assert stored_messages[0]["role"] == "user"
             assert stored_messages[0]["content"] == "Hello, Claude"
-            assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(
-                ["Hi, I'm Claude."]
+            expected_parts = (
+                [
+                    {
+                        "type": "reasoning",
+                        "content": "Let me reason step by step...",
+                    },
+                    {"type": "text", "content": "Hi, I'm Claude."},
+                ]
+                if ThinkingBlock is not None
+                else [{"type": "text", "content": "Hi, I'm Claude."}]
             )
+            assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+                {"role": "assistant", "parts": expected_parts}
+            ]
         else:
             assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["attributes"]
             assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
+            assert SPANDATA.GEN_AI_OUTPUT_MESSAGES not in span["attributes"]
 
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
@@ -6648,13 +6777,24 @@ async def test_nonstreaming_create_message_with_system_prompt_async(
             assert len(stored_messages) == 1
             assert stored_messages[0]["role"] == "user"
             assert stored_messages[0]["content"] == "Hello, Claude"
-            assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(
-                ["Hi, I'm Claude."]
+            expected_parts = (
+                [
+                    {
+                        "type": "reasoning",
+                        "content": "Let me reason step by step...",
+                    },
+                    {"type": "text", "content": "Hi, I'm Claude."},
+                ]
+                if ThinkingBlock is not None
+                else [{"type": "text", "content": "Hi, I'm Claude."}]
             )
+            assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+                {"role": "assistant", "parts": expected_parts}
+            ]
         else:
             assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["attributes"]
             assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
+            assert SPANDATA.GEN_AI_OUTPUT_MESSAGES not in span["attributes"]
 
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
@@ -6709,13 +6849,24 @@ async def test_nonstreaming_create_message_with_system_prompt_async(
             assert len(stored_messages) == 1
             assert stored_messages[0]["role"] == "user"
             assert stored_messages[0]["content"] == "Hello, Claude"
-            assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(
-                ["Hi, I'm Claude."]
+            expected_parts = (
+                [
+                    {
+                        "type": "reasoning",
+                        "content": "Let me reason step by step...",
+                    },
+                    {"type": "text", "content": "Hi, I'm Claude."},
+                ]
+                if ThinkingBlock is not None
+                else [{"type": "text", "content": "Hi, I'm Claude."}]
             )
+            assert json.loads(span["data"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+                {"role": "assistant", "parts": expected_parts}
+            ]
         else:
             assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["data"]
             assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
+            assert SPANDATA.GEN_AI_OUTPUT_MESSAGES not in span["data"]
 
         assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
         assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
@@ -6745,44 +6896,17 @@ def test_streaming_create_message_with_system_prompt(
     server_side_event_chunks,
     stream_gen_ai_spans,
     span_streaming,
+    streaming_anthropic_response,
 ):
     """Test that system prompts are properly captured in streaming mode."""
     client = Anthropic(api_key="z")
 
     response = get_model_response(
         server_side_event_chunks(
-            [
-                MessageStartEvent(
-                    message=EXAMPLE_MESSAGE,
-                    type="message_start",
-                ),
-                ContentBlockStartEvent(
-                    type="content_block_start",
-                    index=0,
-                    content_block=TextBlock(type="text", text=""),
-                ),
-                ContentBlockDeltaEvent(
-                    delta=TextDelta(text="Hi", type="text_delta"),
-                    index=0,
-                    type="content_block_delta",
-                ),
-                ContentBlockDeltaEvent(
-                    delta=TextDelta(text="!", type="text_delta"),
-                    index=0,
-                    type="content_block_delta",
-                ),
-                ContentBlockDeltaEvent(
-                    delta=TextDelta(text=" I'm Claude!", type="text_delta"),
-                    index=0,
-                    type="content_block_delta",
-                ),
-                ContentBlockStopEvent(type="content_block_stop", index=0),
-                MessageDeltaEvent(
-                    delta=Delta(),
-                    usage=MessageDeltaUsage(output_tokens=10),
-                    type="message_delta",
-                ),
-            ]
+            streaming_anthropic_response(
+                text_deltas=("Hi", "!", " I'm Claude!"),
+                stop_reason=None,
+            )
         )
     )
 
@@ -6850,14 +6974,25 @@ def test_streaming_create_message_with_system_prompt(
             assert len(stored_messages) == 1
             assert stored_messages[0]["role"] == "user"
             assert stored_messages[0]["content"] == "Hello, Claude"
-            assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(
-                ["Hi! I'm Claude!"]
+            expected_parts = (
+                [
+                    {
+                        "type": "reasoning",
+                        "content": "Let me reason step by step...",
+                    },
+                    {"type": "text", "content": "Hi! I'm Claude!"},
+                ]
+                if ThinkingBlock is not None
+                else [{"type": "text", "content": "Hi! I'm Claude!"}]
             )
+            assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+                {"role": "assistant", "parts": expected_parts}
+            ]
 
         else:
             assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["attributes"]
             assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
+            assert SPANDATA.GEN_AI_OUTPUT_MESSAGES not in span["attributes"]
 
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
@@ -6913,14 +7048,25 @@ def test_streaming_create_message_with_system_prompt(
             assert len(stored_messages) == 1
             assert stored_messages[0]["role"] == "user"
             assert stored_messages[0]["content"] == "Hello, Claude"
-            assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(
-                ["Hi! I'm Claude!"]
+            expected_parts = (
+                [
+                    {
+                        "type": "reasoning",
+                        "content": "Let me reason step by step...",
+                    },
+                    {"type": "text", "content": "Hi! I'm Claude!"},
+                ]
+                if ThinkingBlock is not None
+                else [{"type": "text", "content": "Hi! I'm Claude!"}]
             )
+            assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+                {"role": "assistant", "parts": expected_parts}
+            ]
 
         else:
             assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["attributes"]
             assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
+            assert SPANDATA.GEN_AI_OUTPUT_MESSAGES not in span["attributes"]
 
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
@@ -6975,14 +7121,25 @@ def test_streaming_create_message_with_system_prompt(
             assert len(stored_messages) == 1
             assert stored_messages[0]["role"] == "user"
             assert stored_messages[0]["content"] == "Hello, Claude"
-            assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(
-                ["Hi! I'm Claude!"]
+            expected_parts = (
+                [
+                    {
+                        "type": "reasoning",
+                        "content": "Let me reason step by step...",
+                    },
+                    {"type": "text", "content": "Hi! I'm Claude!"},
+                ]
+                if ThinkingBlock is not None
+                else [{"type": "text", "content": "Hi! I'm Claude!"}]
             )
+            assert json.loads(span["data"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+                {"role": "assistant", "parts": expected_parts}
+            ]
 
         else:
             assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["data"]
             assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
+            assert SPANDATA.GEN_AI_OUTPUT_MESSAGES not in span["data"]
 
         assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
         assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
@@ -7011,44 +7168,17 @@ def test_stream_messages_with_system_prompt(
     server_side_event_chunks,
     stream_gen_ai_spans,
     span_streaming,
+    streaming_anthropic_response,
 ):
     """Test that system prompts are properly captured in streaming mode."""
     client = Anthropic(api_key="z")
 
     response = get_model_response(
         server_side_event_chunks(
-            [
-                MessageStartEvent(
-                    message=EXAMPLE_MESSAGE,
-                    type="message_start",
-                ),
-                ContentBlockStartEvent(
-                    type="content_block_start",
-                    index=0,
-                    content_block=TextBlock(type="text", text=""),
-                ),
-                ContentBlockDeltaEvent(
-                    delta=TextDelta(text="Hi", type="text_delta"),
-                    index=0,
-                    type="content_block_delta",
-                ),
-                ContentBlockDeltaEvent(
-                    delta=TextDelta(text="!", type="text_delta"),
-                    index=0,
-                    type="content_block_delta",
-                ),
-                ContentBlockDeltaEvent(
-                    delta=TextDelta(text=" I'm Claude!", type="text_delta"),
-                    index=0,
-                    type="content_block_delta",
-                ),
-                ContentBlockStopEvent(type="content_block_stop", index=0),
-                MessageDeltaEvent(
-                    delta=Delta(),
-                    usage=MessageDeltaUsage(output_tokens=10),
-                    type="message_delta",
-                ),
-            ]
+            streaming_anthropic_response(
+                text_deltas=("Hi", "!", " I'm Claude!"),
+                stop_reason=None,
+            )
         )
     )
 
@@ -7112,13 +7242,24 @@ def test_stream_messages_with_system_prompt(
             assert len(stored_messages) == 1
             assert stored_messages[0]["role"] == "user"
             assert stored_messages[0]["content"] == "Hello, Claude"
-            assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(
-                ["Hi! I'm Claude!"]
+            expected_parts = (
+                [
+                    {
+                        "type": "reasoning",
+                        "content": "Let me reason step by step...",
+                    },
+                    {"type": "text", "content": "Hi! I'm Claude!"},
+                ]
+                if ThinkingBlock is not None
+                else [{"type": "text", "content": "Hi! I'm Claude!"}]
             )
+            assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+                {"role": "assistant", "parts": expected_parts}
+            ]
         else:
             assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["attributes"]
             assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
+            assert SPANDATA.GEN_AI_OUTPUT_MESSAGES not in span["attributes"]
 
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
@@ -7170,13 +7311,24 @@ def test_stream_messages_with_system_prompt(
             assert len(stored_messages) == 1
             assert stored_messages[0]["role"] == "user"
             assert stored_messages[0]["content"] == "Hello, Claude"
-            assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(
-                ["Hi! I'm Claude!"]
+            expected_parts = (
+                [
+                    {
+                        "type": "reasoning",
+                        "content": "Let me reason step by step...",
+                    },
+                    {"type": "text", "content": "Hi! I'm Claude!"},
+                ]
+                if ThinkingBlock is not None
+                else [{"type": "text", "content": "Hi! I'm Claude!"}]
             )
+            assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+                {"role": "assistant", "parts": expected_parts}
+            ]
         else:
             assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["attributes"]
             assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
+            assert SPANDATA.GEN_AI_OUTPUT_MESSAGES not in span["attributes"]
 
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
@@ -7226,13 +7378,24 @@ def test_stream_messages_with_system_prompt(
             assert len(stored_messages) == 1
             assert stored_messages[0]["role"] == "user"
             assert stored_messages[0]["content"] == "Hello, Claude"
-            assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(
-                ["Hi! I'm Claude!"]
+            expected_parts = (
+                [
+                    {
+                        "type": "reasoning",
+                        "content": "Let me reason step by step...",
+                    },
+                    {"type": "text", "content": "Hi! I'm Claude!"},
+                ]
+                if ThinkingBlock is not None
+                else [{"type": "text", "content": "Hi! I'm Claude!"}]
             )
+            assert json.loads(span["data"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+                {"role": "assistant", "parts": expected_parts}
+            ]
         else:
             assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["data"]
             assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
+            assert SPANDATA.GEN_AI_OUTPUT_MESSAGES not in span["data"]
 
         assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
         assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
@@ -7263,6 +7426,7 @@ async def test_stream_message_with_system_prompt_async(
     server_side_event_chunks,
     stream_gen_ai_spans,
     span_streaming,
+    streaming_anthropic_response,
 ):
     """Test that system prompts are properly captured in streaming mode (async)."""
     client = AsyncAnthropic(api_key="z")
@@ -7270,38 +7434,10 @@ async def test_stream_message_with_system_prompt_async(
     response = get_model_response(
         async_iterator(
             server_side_event_chunks(
-                [
-                    MessageStartEvent(
-                        message=EXAMPLE_MESSAGE,
-                        type="message_start",
-                    ),
-                    ContentBlockStartEvent(
-                        type="content_block_start",
-                        index=0,
-                        content_block=TextBlock(type="text", text=""),
-                    ),
-                    ContentBlockDeltaEvent(
-                        delta=TextDelta(text="Hi", type="text_delta"),
-                        index=0,
-                        type="content_block_delta",
-                    ),
-                    ContentBlockDeltaEvent(
-                        delta=TextDelta(text="!", type="text_delta"),
-                        index=0,
-                        type="content_block_delta",
-                    ),
-                    ContentBlockDeltaEvent(
-                        delta=TextDelta(text=" I'm Claude!", type="text_delta"),
-                        index=0,
-                        type="content_block_delta",
-                    ),
-                    ContentBlockStopEvent(type="content_block_stop", index=0),
-                    MessageDeltaEvent(
-                        delta=Delta(),
-                        usage=MessageDeltaUsage(output_tokens=10),
-                        type="message_delta",
-                    ),
-                ]
+                streaming_anthropic_response(
+                    text_deltas=("Hi", "!", " I'm Claude!"),
+                    stop_reason=None,
+                )
             )
         )
     )
@@ -7368,13 +7504,24 @@ async def test_stream_message_with_system_prompt_async(
             assert len(stored_messages) == 1
             assert stored_messages[0]["role"] == "user"
             assert stored_messages[0]["content"] == "Hello, Claude"
-            assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(
-                ["Hi! I'm Claude!"]
+            expected_parts = (
+                [
+                    {
+                        "type": "reasoning",
+                        "content": "Let me reason step by step...",
+                    },
+                    {"type": "text", "content": "Hi! I'm Claude!"},
+                ]
+                if ThinkingBlock is not None
+                else [{"type": "text", "content": "Hi! I'm Claude!"}]
             )
+            assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+                {"role": "assistant", "parts": expected_parts}
+            ]
         else:
             assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["attributes"]
             assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
+            assert SPANDATA.GEN_AI_OUTPUT_MESSAGES not in span["attributes"]
 
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
@@ -7428,13 +7575,24 @@ async def test_stream_message_with_system_prompt_async(
             assert len(stored_messages) == 1
             assert stored_messages[0]["role"] == "user"
             assert stored_messages[0]["content"] == "Hello, Claude"
-            assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(
-                ["Hi! I'm Claude!"]
+            expected_parts = (
+                [
+                    {
+                        "type": "reasoning",
+                        "content": "Let me reason step by step...",
+                    },
+                    {"type": "text", "content": "Hi! I'm Claude!"},
+                ]
+                if ThinkingBlock is not None
+                else [{"type": "text", "content": "Hi! I'm Claude!"}]
             )
+            assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+                {"role": "assistant", "parts": expected_parts}
+            ]
         else:
             assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["attributes"]
             assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
+            assert SPANDATA.GEN_AI_OUTPUT_MESSAGES not in span["attributes"]
 
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
@@ -7486,14 +7644,25 @@ async def test_stream_message_with_system_prompt_async(
             assert len(stored_messages) == 1
             assert stored_messages[0]["role"] == "user"
             assert stored_messages[0]["content"] == "Hello, Claude"
-            assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(
-                ["Hi! I'm Claude!"]
+            expected_parts = (
+                [
+                    {
+                        "type": "reasoning",
+                        "content": "Let me reason step by step...",
+                    },
+                    {"type": "text", "content": "Hi! I'm Claude!"},
+                ]
+                if ThinkingBlock is not None
+                else [{"type": "text", "content": "Hi! I'm Claude!"}]
             )
+            assert json.loads(span["data"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+                {"role": "assistant", "parts": expected_parts}
+            ]
 
         else:
             assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["data"]
             assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
+            assert SPANDATA.GEN_AI_OUTPUT_MESSAGES not in span["data"]
 
         assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
         assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
@@ -7524,6 +7693,7 @@ async def test_streaming_create_message_with_system_prompt_async(
     server_side_event_chunks,
     stream_gen_ai_spans,
     span_streaming,
+    streaming_anthropic_response,
 ):
     """Test that system prompts are properly captured in streaming mode (async)."""
     client = AsyncAnthropic(api_key="z")
@@ -7531,38 +7701,10 @@ async def test_streaming_create_message_with_system_prompt_async(
     response = get_model_response(
         async_iterator(
             server_side_event_chunks(
-                [
-                    MessageStartEvent(
-                        message=EXAMPLE_MESSAGE,
-                        type="message_start",
-                    ),
-                    ContentBlockStartEvent(
-                        type="content_block_start",
-                        index=0,
-                        content_block=TextBlock(type="text", text=""),
-                    ),
-                    ContentBlockDeltaEvent(
-                        delta=TextDelta(text="Hi", type="text_delta"),
-                        index=0,
-                        type="content_block_delta",
-                    ),
-                    ContentBlockDeltaEvent(
-                        delta=TextDelta(text="!", type="text_delta"),
-                        index=0,
-                        type="content_block_delta",
-                    ),
-                    ContentBlockDeltaEvent(
-                        delta=TextDelta(text=" I'm Claude!", type="text_delta"),
-                        index=0,
-                        type="content_block_delta",
-                    ),
-                    ContentBlockStopEvent(type="content_block_stop", index=0),
-                    MessageDeltaEvent(
-                        delta=Delta(),
-                        usage=MessageDeltaUsage(output_tokens=10),
-                        type="message_delta",
-                    ),
-                ]
+                streaming_anthropic_response(
+                    text_deltas=("Hi", "!", " I'm Claude!"),
+                    stop_reason=None,
+                )
             )
         )
     )
@@ -7632,14 +7774,25 @@ async def test_streaming_create_message_with_system_prompt_async(
             assert len(stored_messages) == 1
             assert stored_messages[0]["role"] == "user"
             assert stored_messages[0]["content"] == "Hello, Claude"
-            assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(
-                ["Hi! I'm Claude!"]
+            expected_parts = (
+                [
+                    {
+                        "type": "reasoning",
+                        "content": "Let me reason step by step...",
+                    },
+                    {"type": "text", "content": "Hi! I'm Claude!"},
+                ]
+                if ThinkingBlock is not None
+                else [{"type": "text", "content": "Hi! I'm Claude!"}]
             )
+            assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+                {"role": "assistant", "parts": expected_parts}
+            ]
 
         else:
             assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["attributes"]
             assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
+            assert SPANDATA.GEN_AI_OUTPUT_MESSAGES not in span["attributes"]
 
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
@@ -7696,14 +7849,25 @@ async def test_streaming_create_message_with_system_prompt_async(
             assert len(stored_messages) == 1
             assert stored_messages[0]["role"] == "user"
             assert stored_messages[0]["content"] == "Hello, Claude"
-            assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(
-                ["Hi! I'm Claude!"]
+            expected_parts = (
+                [
+                    {
+                        "type": "reasoning",
+                        "content": "Let me reason step by step...",
+                    },
+                    {"type": "text", "content": "Hi! I'm Claude!"},
+                ]
+                if ThinkingBlock is not None
+                else [{"type": "text", "content": "Hi! I'm Claude!"}]
             )
+            assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+                {"role": "assistant", "parts": expected_parts}
+            ]
 
         else:
             assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["attributes"]
             assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
+            assert SPANDATA.GEN_AI_OUTPUT_MESSAGES not in span["attributes"]
 
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
@@ -7756,14 +7920,25 @@ async def test_streaming_create_message_with_system_prompt_async(
             assert len(stored_messages) == 1
             assert stored_messages[0]["role"] == "user"
             assert stored_messages[0]["content"] == "Hello, Claude"
-            assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == json.dumps(
-                ["Hi! I'm Claude!"]
+            expected_parts = (
+                [
+                    {
+                        "type": "reasoning",
+                        "content": "Let me reason step by step...",
+                    },
+                    {"type": "text", "content": "Hi! I'm Claude!"},
+                ]
+                if ThinkingBlock is not None
+                else [{"type": "text", "content": "Hi! I'm Claude!"}]
             )
+            assert json.loads(span["data"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+                {"role": "assistant", "parts": expected_parts}
+            ]
 
         else:
             assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["data"]
             assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
+            assert SPANDATA.GEN_AI_OUTPUT_MESSAGES not in span["data"]
 
         assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
         assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10

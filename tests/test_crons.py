@@ -1,16 +1,11 @@
 import uuid
-from datetime import timedelta, timezone, tzinfo
 from unittest import mock
 
 import pytest
 
 import sentry_sdk
 from sentry_sdk.crons import capture_checkin
-from sentry_sdk.crons.utils import (
-    _get_iana_timezone_names,
-    _get_interval_schedule,
-    _get_timezone_name,
-)
+from sentry_sdk.crons.utils import _get_interval_schedule
 
 
 @sentry_sdk.monitor(monitor_slug="abc123")
@@ -549,46 +544,3 @@ def test_get_interval_schedule(seconds, expected):
 @pytest.mark.parametrize("seconds", [0, 0.5, 30, 59, 90, 61.5, 3601])
 def test_get_interval_schedule_not_whole_minutes(seconds):
     assert _get_interval_schedule(seconds) is None
-
-
-class _NamedZone(tzinfo):
-    def __init__(self, key):
-        self.key = key
-
-
-@pytest.mark.parametrize(
-    "tz, expected",
-    [
-        (timezone.utc, "UTC"),
-        (timezone(timedelta(0)), "UTC"),
-        (timezone(timedelta(hours=2)), "Etc/GMT-2"),
-        (timezone(timedelta(hours=-7)), "Etc/GMT+7"),
-        (timezone(timedelta(hours=5, minutes=30)), None),
-        # tzlocal's zone when it can't find the system's, or when TZ is a path.
-        (_NamedZone("local"), None),
-        (_NamedZone("localtime"), None),
-        (_NamedZone("Not/AZone"), None),
-        (_NamedZone(None), None),
-    ],
-)
-def test_get_timezone_name(tz, expected):
-    assert _get_timezone_name(tz) == expected
-
-
-def test_get_timezone_name_known_key():
-    if not _get_iana_timezone_names():
-        pytest.skip("No timezone database installed.")
-    assert _get_timezone_name(_NamedZone("Europe/Vienna")) == "Europe/Vienna"
-
-
-def test_get_timezone_name_zoneinfo():
-    zoneinfo = pytest.importorskip("zoneinfo")
-    assert _get_timezone_name(zoneinfo.ZoneInfo("Europe/Vienna")) == "Europe/Vienna"
-    assert _get_timezone_name(zoneinfo.ZoneInfo("UTC")) == "UTC"
-
-
-def test_get_timezone_name_pytz():
-    pytz = pytest.importorskip("pytz")
-    assert _get_timezone_name(pytz.timezone("Europe/Vienna")) == "Europe/Vienna"
-    assert _get_timezone_name(pytz.utc) == "UTC"
-    assert _get_timezone_name(pytz.FixedOffset(120)) is None

@@ -64,6 +64,12 @@ try:
 except ImportError:
     raise DidNotEnable("Anthropic not installed")
 
+try:
+    from anthropic.types import ThinkingBlock, ThinkingDelta
+except ImportError:
+    ThinkingBlock = None  # type: ignore[assignment,misc]
+    ThinkingDelta = None  # type: ignore[assignment,misc]
+
 if TYPE_CHECKING:
     from typing import (
         Any,
@@ -85,7 +91,7 @@ if TYPE_CHECKING:
         ToolUnionParam,
     )
 
-    from sentry_sdk._types import TextPart
+    from sentry_sdk._types import ReasoningPart, TextPart
 
     class _PatchedRawMessageStream(Stream[Any]):
         _span: Union[Span, StreamedSpan]
@@ -93,7 +99,7 @@ if TYPE_CHECKING:
 
         _model: Optional[ModelParam]
         _usage: "_RecordedUsage"
-        _content_blocks: list[Any]
+        _content_blocks: "list[dict[str, Any]]"
         _response_id: Optional[str]
         _finish_reason: Optional[str]
 
@@ -103,7 +109,7 @@ if TYPE_CHECKING:
 
         _model: Optional[ModelParam]
         _usage: "_RecordedUsage"
-        _content_blocks: list[Any]
+        _content_blocks: "list[dict[str, Any]]"
         _response_id: Optional[str]
         _finish_reason: Optional[str]
 
@@ -113,7 +119,7 @@ if TYPE_CHECKING:
 
         _model: Optional[ModelParam]
         _usage: "_RecordedUsage"
-        _content_blocks: list[Any]
+        _content_blocks: "list[dict[str, Any]]"
         _response_id: Optional[str]
         _finish_reason: Optional[str]
 
@@ -123,7 +129,7 @@ if TYPE_CHECKING:
 
         _model: Optional[ModelParam]
         _usage: "_RecordedUsage"
-        _content_blocks: list[Any]
+        _content_blocks: "list[dict[str, Any]]"
         _response_id: Optional[str]
         _finish_reason: Optional[str]
 
@@ -365,22 +371,32 @@ def _collect_ai_data(
     event: "MessageStreamEvent",
     model: "str | None",
     usage: "_RecordedUsage",
-    content_blocks: "list[str]",
+    content_blocks: "list[dict[str, Any]]",
     response_id: "str | None" = None,
     finish_reason: "str | None" = None,
-) -> "tuple[str | None, _RecordedUsage, list[str], str | None, str | None]":
+) -> "tuple[str | None, _RecordedUsage, list[dict[str, Any]], str | None, str | None]":
     """
     Collect model information, token usage, and collect content blocks from the AI streaming response.
     """
     with capture_internal_exceptions():
         if hasattr(event, "type"):
             if event.type == "content_block_start":
-                pass
+                if ThinkingBlock is not None and isinstance(
+                    event.content_block, ThinkingBlock
+                ):
+                    content_blocks.append({"type": "thinking", "thinking": ""})
+                elif event.content_block.type in ("text", "tool_use"):
+                    content_blocks.append({"type": "text", "text": ""})
+                else:
+                    content_blocks.append({"type": event.content_block.type})
             elif event.type == "content_block_delta":
-                if hasattr(event.delta, "text"):
-                    content_blocks.append(event.delta.text)
+                block = content_blocks[event.index]
+                if ThinkingDelta is not None and isinstance(event.delta, ThinkingDelta):
+                    block["thinking"] += event.delta.thinking
+                elif hasattr(event.delta, "text"):
+                    block["text"] += event.delta.text
                 elif hasattr(event.delta, "partial_json"):
-                    content_blocks.append(event.delta.partial_json)
+                    block["text"] += event.delta.partial_json
             elif event.type == "content_block_stop":
                 pass
 
@@ -707,7 +723,7 @@ def _set_output_data(
     output_tokens: "int | None",
     cache_read_input_tokens: "int | None",
     cache_write_input_tokens: "int | None",
-    content_blocks: "list[Any]",
+    content_blocks: "list[dict[str, Any]]",
     response_id: "str | None" = None,
     finish_reason: "str | None" = None,
 ) -> None:
@@ -731,30 +747,30 @@ def _set_output_data(
         record_outputs = True
 
     if record_outputs:
-        output_messages: "dict[str, list[Any]]" = {
-            "response": [],
-            "tool": [],
-        }
+        parts: "list[Union[TextPart, ReasoningPart]]" = []
+        tool_calls = []
 
         for output in content_blocks:
             if output["type"] == "text":
-                output_messages["response"].append(output["text"])
+                parts.append({"type": "text", "content": output["text"]})
+            elif output["type"] == "thinking":
+                parts.append({"type": "reasoning", "content": output["thinking"]})
             elif output["type"] == "tool_use":
-                output_messages["tool"].append(output)
+                tool_calls.append(output)
 
-        if len(output_messages["tool"]) > 0:
+        if len(tool_calls) > 0:
             set_data_normalized(
                 span,
                 SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
-                output_messages["tool"],
+                tool_calls,
                 unpack=False,
             )
 
-        if len(output_messages["response"]) > 0:
+        if len(parts) > 0:
             set_data_normalized(
                 span,
-                SPANDATA.GEN_AI_RESPONSE_TEXT,
-                output_messages["response"],
+                SPANDATA.GEN_AI_OUTPUT_MESSAGES,
+                [{"role": "assistant", "parts": parts}],
                 unpack=False,
             )
 
@@ -1042,7 +1058,7 @@ def _set_streaming_output_data(
     integration: "AnthropicIntegration",
     model: "Optional[str]",
     usage: "_RecordedUsage",
-    content_blocks: "list[str]",
+    content_blocks: "list[dict[str, Any]]",
     response_id: "Optional[str]",
     finish_reason: "Optional[str]",
 ) -> None:
@@ -1065,7 +1081,7 @@ def _set_streaming_output_data(
         output_tokens=usage.output_tokens,
         cache_read_input_tokens=usage.cache_read_input_tokens,
         cache_write_input_tokens=usage.cache_write_input_tokens,
-        content_blocks=[{"text": "".join(content_blocks), "type": "text"}],
+        content_blocks=content_blocks,
         response_id=response_id,
         finish_reason=finish_reason,
     )

@@ -328,7 +328,6 @@ def _monitor_cron_job(
         return
     cron_job._sentry_monitored = True
 
-    # The coroutine reports its own check-ins.
     if getattr(cron_job.coroutine, "_sentry_monitored", False):
         return
 
