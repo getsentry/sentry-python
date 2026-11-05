@@ -85,7 +85,7 @@ if TYPE_CHECKING:
         ToolUnionParam,
     )
 
-    from sentry_sdk._types import TextPart
+    from sentry_sdk._types import ReasoningPart, TextPart
 
     class _PatchedRawMessageStream(Stream[Any]):
         _span: Union[Span, StreamedSpan]
@@ -731,30 +731,30 @@ def _set_output_data(
         record_outputs = True
 
     if record_outputs:
-        output_messages: "dict[str, list[Any]]" = {
-            "response": [],
-            "tool": [],
-        }
+        parts: "list[Union[TextPart, ReasoningPart]]" = []
+        tool_calls = []
 
         for output in content_blocks:
             if output["type"] == "text":
-                output_messages["response"].append(output["text"])
+                parts.append({"type": "text", "content": output["text"]})
+            elif output["type"] == "thinking":
+                parts.append({"type": "reasoning", "content": output.get("thinking")})
             elif output["type"] == "tool_use":
-                output_messages["tool"].append(output)
+                tool_calls.append(output)
 
-        if len(output_messages["tool"]) > 0:
+        if len(tool_calls) > 0:
             set_data_normalized(
                 span,
                 SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
-                output_messages["tool"],
+                tool_calls,
                 unpack=False,
             )
 
-        if len(output_messages["response"]) > 0:
+        if len(parts) > 0:
             set_data_normalized(
                 span,
-                SPANDATA.GEN_AI_RESPONSE_TEXT,
-                output_messages["response"],
+                SPANDATA.GEN_AI_OUTPUT_MESSAGES,
+                [{"role": "assistant", "parts": parts}],
                 unpack=False,
             )
 
