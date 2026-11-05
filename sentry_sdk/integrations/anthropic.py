@@ -57,6 +57,8 @@ try:
         MessageDeltaEvent,
         MessageStartEvent,
         MessageStopEvent,
+        TextBlock,
+        ToolUseBlock,
     )
 
     if TYPE_CHECKING:
@@ -65,10 +67,10 @@ except ImportError:
     raise DidNotEnable("Anthropic not installed")
 
 try:
-    from anthropic.types import ThinkingBlock
+    from anthropic.types import ThinkingBlock, ThinkingDelta
 except ImportError:
     ThinkingBlock = None  # type: ignore[assignment,misc]
-
+    ThinkingDelta = None  # type: ignore[assignment,misc]
 
 if TYPE_CHECKING:
     from typing import (
@@ -99,7 +101,7 @@ if TYPE_CHECKING:
 
         _model: Optional[ModelParam]
         _usage: "_RecordedUsage"
-        _content_blocks: list[Any]
+        _content_blocks: list[dict[str, str]]
         _response_id: Optional[str]
         _finish_reason: Optional[str]
 
@@ -109,7 +111,7 @@ if TYPE_CHECKING:
 
         _model: Optional[ModelParam]
         _usage: "_RecordedUsage"
-        _content_blocks: list[Any]
+        _content_blocks: list[dict[str, str]]
         _response_id: Optional[str]
         _finish_reason: Optional[str]
 
@@ -119,7 +121,7 @@ if TYPE_CHECKING:
 
         _model: Optional[ModelParam]
         _usage: "_RecordedUsage"
-        _content_blocks: list[Any]
+        _content_blocks: list[dict[str, str]]
         _response_id: Optional[str]
         _finish_reason: Optional[str]
 
@@ -129,7 +131,7 @@ if TYPE_CHECKING:
 
         _model: Optional[ModelParam]
         _usage: "_RecordedUsage"
-        _content_blocks: list[Any]
+        _content_blocks: list[dict[str, str]]
         _response_id: Optional[str]
         _finish_reason: Optional[str]
 
@@ -371,10 +373,10 @@ def _collect_ai_data(
     event: "MessageStreamEvent",
     model: "str | None",
     usage: "_RecordedUsage",
-    content_blocks: "list[Any]",
+    content_blocks: "list[dict[str, str]]",
     response_id: "str | None" = None,
     finish_reason: "str | None" = None,
-) -> "tuple[str | None, _RecordedUsage, list[Any], str | None, str | None]":
+) -> "tuple[str | None, _RecordedUsage, list[dict[str, str]], str | None, str | None]":
     """
     Collect model information, token usage, and collect content blocks from the AI streaming response.
     """
@@ -385,18 +387,16 @@ def _collect_ai_data(
                     event.content_block, ThinkingBlock
                 ):
                     content_blocks.append({"type": "thinking", "thinking": ""})
-                else:
+                elif isinstance(event.content_block, (TextBlock, ToolUseBlock)):
                     content_blocks.append({"type": "text", "text": ""})
             elif event.type == "content_block_delta" and content_blocks:
-                block = content_blocks[-1]
-                if block["type"] == "thinking":
-                    block["thinking"] += event.delta.thinking
-                else:
-                    chunk = getattr(event.delta, "text", None) or getattr(
-                        event.delta, "partial_json", None
-                    )
-                    if chunk:
-                        block["text"] += chunk
+                delta = event.delta
+                if ThinkingDelta is not None and isinstance(delta, ThinkingDelta):
+                    content_blocks[-1]["thinking"] += delta.thinking
+                elif hasattr(event.delta, "text"):
+                    content_blocks[-1]["text"] += event.delta.text
+                elif hasattr(event.delta, "partial_json"):
+                    content_blocks[-1]["text"] += event.delta.partial_json
             elif event.type == "content_block_stop":
                 pass
 
@@ -723,7 +723,7 @@ def _set_output_data(
     output_tokens: "int | None",
     cache_read_input_tokens: "int | None",
     cache_write_input_tokens: "int | None",
-    content_blocks: "list[Any]",
+    content_blocks: "list[dict[str, str]]",
     response_id: "str | None" = None,
     finish_reason: "str | None" = None,
 ) -> None:
@@ -754,9 +754,7 @@ def _set_output_data(
             if output["type"] == "text":
                 parts.append({"type": "text", "content": output["text"]})
             elif output["type"] == "thinking":
-                parts.append(
-                    {"type": "reasoning", "content": output.get("thinking", "")}
-                )
+                parts.append({"type": "reasoning", "content": output.get("thinking")})
             elif output["type"] == "tool_use":
                 tool_calls.append(output)
 
@@ -1060,7 +1058,7 @@ def _set_streaming_output_data(
     integration: "AnthropicIntegration",
     model: "Optional[str]",
     usage: "_RecordedUsage",
-    content_blocks: "list[Any]",
+    content_blocks: "list[dict[str, str]]",
     response_id: "Optional[str]",
     finish_reason: "Optional[str]",
 ) -> None:
