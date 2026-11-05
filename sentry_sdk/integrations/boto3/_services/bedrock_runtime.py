@@ -188,8 +188,9 @@ def _get_input_messages_attributes(
 ) -> "Attributes":
     """
     Like the other `gen_ai` integrations, only the last message is kept when
-    `gen_ai` spans are sent in transactions, and its text is truncated, so that
-    long histories and prompts don't exceed the transaction size limit.
+    `gen_ai` spans are sent in transactions, and its text, string tool call
+    arguments, and tool results share one truncation limit, so that long
+    histories, prompts, and tool results don't exceed the transaction size limit.
     """
     messages: "Optional[list[dict[str, Any]]]" = cast(
         "list[dict[str, Any]]", input_messages
