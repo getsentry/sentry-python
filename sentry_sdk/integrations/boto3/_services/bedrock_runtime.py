@@ -200,14 +200,29 @@ def _get_input_messages_attributes(
         )
         if messages:
             # `truncate_and_annotate_messages()` only truncates a message's
-            # `content`, which this format keeps in each part.
+            # `content`, but this format keeps the text, tool call arguments, and
+            # tool results in each part. They share the message's limit.
             remaining = MAX_SINGLE_MESSAGE_CONTENT_CHARS
+
+            def truncate(value: "Any") -> "Any":
+                nonlocal remaining
+                if not isinstance(value, str):
+                    return value
+                if len(value) > remaining:
+                    value = value[:remaining] + "..."
+                remaining = max(remaining - len(value), 0)
+                return value
+
+            # the last message is a copy, so its parts can be replaced.
             for part in messages[-1].get("parts") or []:
-                content = part.get("content")
-                if isinstance(content, str):
-                    if len(content) > remaining:
-                        part["content"] = content[:remaining] + "..."
-                    remaining = max(remaining - len(content), 0)
+                for key in ("content", "arguments"):
+                    if key in part:
+                        part[key] = truncate(part[key])
+                result = part.get("result")
+                if isinstance(result, list):
+                    part["result"] = [truncate(item) for item in result]
+                elif result is not None:
+                    part["result"] = truncate(result)
 
     if not messages:
         return {}

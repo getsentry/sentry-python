@@ -1,3 +1,4 @@
+import copy
 import json
 
 import boto3
@@ -32,8 +33,10 @@ def _has_shape_member(shape_name, member_name):
 
 
 MODEL_ID = "anthropic.claude-3-5-sonnet-20240620-v1:0"
-# too long to be kept in full when the last input message is truncated.
+# as long as the last input message's text can be without being truncated.
 LONG_TEXT = "a" * MAX_SINGLE_MESSAGE_CONTENT_CHARS
+HUGE_TEXT = "a" * (MAX_SINGLE_MESSAGE_CONTENT_CHARS * 30)
+TRUNCATED_TEXT = LONG_TEXT + "..."
 
 CONVERSE_RESPONSE = {
     "output": {
@@ -176,10 +179,149 @@ def _get_bedrock_span(spans, origin=AI_ORIGIN):
     return span
 
 
+# The last Bedrock message, how it's recorded, and how it's recorded when it's
+# truncated. Its text, tool call arguments, and tool results share one limit.
+LAST_MESSAGE_CASES = [
+    pytest.param(
+        {"role": "user", "content": [{"text": "Hello!"}, {"text": LONG_TEXT}]},
+        {
+            "role": "user",
+            "parts": [
+                {"type": "text", "content": "Hello!"},
+                {"type": "text", "content": LONG_TEXT},
+            ],
+        },
+        {
+            "role": "user",
+            "parts": [
+                {"type": "text", "content": "Hello!"},
+                {
+                    "type": "text",
+                    "content": LONG_TEXT[: MAX_SINGLE_MESSAGE_CONTENT_CHARS - 6]
+                    + "...",
+                },
+            ],
+        },
+        id="text",
+    ),
+    pytest.param(
+        {"role": "user", "content": [{"text": LONG_TEXT}]},
+        {"role": "user", "parts": [{"type": "text", "content": LONG_TEXT}]},
+        {"role": "user", "parts": [{"type": "text", "content": LONG_TEXT}]},
+        id="text_at_limit",
+    ),
+    pytest.param(
+        {
+            "role": "user",
+            "content": [
+                {
+                    "toolResult": {
+                        "toolUseId": "tool-1",
+                        "content": [{"text": HUGE_TEXT}],
+                    }
+                }
+            ],
+        },
+        {
+            "role": "tool",
+            "parts": [
+                {"type": "tool_call_response", "id": "tool-1", "result": HUGE_TEXT}
+            ],
+        },
+        {
+            "role": "tool",
+            "parts": [
+                {"type": "tool_call_response", "id": "tool-1", "result": TRUNCATED_TEXT}
+            ],
+        },
+        id="tool_result",
+    ),
+    pytest.param(
+        {
+            "role": "user",
+            "content": [
+                {
+                    "toolResult": {
+                        "toolUseId": "tool-1",
+                        "content": [
+                            {"json": {"weather": "rainy"}},
+                            {"text": HUGE_TEXT},
+                            {"text": "Done."},
+                        ],
+                    }
+                }
+            ],
+        },
+        {
+            "role": "tool",
+            "parts": [
+                {
+                    "type": "tool_call_response",
+                    "id": "tool-1",
+                    "result": [{"weather": "rainy"}, HUGE_TEXT, "Done."],
+                }
+            ],
+        },
+        {
+            "role": "tool",
+            "parts": [
+                {
+                    "type": "tool_call_response",
+                    "id": "tool-1",
+                    "result": [{"weather": "rainy"}, TRUNCATED_TEXT, "..."],
+                }
+            ],
+        },
+        id="tool_result_list",
+    ),
+    pytest.param(
+        {
+            "role": "assistant",
+            "content": [
+                {
+                    "toolUse": {
+                        "toolUseId": "tool-1",
+                        "name": "get_weather",
+                        "input": HUGE_TEXT,
+                    }
+                }
+            ],
+        },
+        {
+            "role": "assistant",
+            "parts": [
+                {
+                    "type": "tool_call",
+                    "id": "tool-1",
+                    "name": "get_weather",
+                    "arguments": HUGE_TEXT,
+                }
+            ],
+        },
+        {
+            "role": "assistant",
+            "parts": [
+                {
+                    "type": "tool_call",
+                    "id": "tool-1",
+                    "name": "get_weather",
+                    "arguments": TRUNCATED_TEXT,
+                }
+            ],
+        },
+        id="tool_call_arguments",
+    ),
+]
+
+
 @pytest.mark.parametrize("trace_mode", TRACE_MODES)
 @pytest.mark.parametrize(
     "init_kwargs, include_prompts, record_inputs, record_outputs",
     GEN_AI_DATA_COLLECTION_CASES,
+)
+@pytest.mark.parametrize(
+    "last_message, expected_last_message, expected_truncated_last_message",
+    LAST_MESSAGE_CASES,
 )
 def test_converse(
     init_bedrock,
@@ -189,6 +331,9 @@ def test_converse(
     include_prompts,
     record_inputs,
     record_outputs,
+    last_message,
+    expected_last_message,
+    expected_truncated_last_message,
 ):
     client = init_bedrock(trace_mode, include_prompts=include_prompts, **init_kwargs)
     params = {
@@ -197,7 +342,7 @@ def test_converse(
         "messages": [
             {"role": "user", "content": [{"text": "Hi!"}]},
             {"role": "assistant", "content": [{"text": "Hi! What do you need?"}]},
-            {"role": "user", "content": [{"text": "Hello!"}, {"text": LONG_TEXT}]},
+            last_message,
         ],
         "inferenceConfig": {
             "maxTokens": 100,
@@ -223,8 +368,10 @@ def test_converse(
         },
     }
 
+    original_params = copy.deepcopy(params)
+
     with Stubber(client) as stubber:
-        stubber.add_response("converse", CONVERSE_RESPONSE, params)
+        stubber.add_response("converse", CONVERSE_RESPONSE, original_params)
         responses = []
         spans = _capture_spans(
             capture_items,
@@ -233,6 +380,8 @@ def test_converse(
         )
 
     assert responses[0]["output"] == CONVERSE_RESPONSE["output"]
+    # the request isn't changed by the truncation.
+    assert params == original_params
 
     span = _get_bedrock_span(spans)
     attributes = span["attributes"]
@@ -261,20 +410,7 @@ def test_converse(
             {"type": "text", "content": "You are a helpful assistant."}
         ]
         if trace_mode.get("stream_gen_ai_spans") is False:
-            # the last message's text is truncated as a whole.
-            expected_input_messages = [
-                {
-                    "role": "user",
-                    "parts": [
-                        {"type": "text", "content": "Hello!"},
-                        {
-                            "type": "text",
-                            "content": LONG_TEXT[: MAX_SINGLE_MESSAGE_CONTENT_CHARS - 6]
-                            + "...",
-                        },
-                    ],
-                }
-            ]
+            expected_input_messages = [expected_truncated_last_message]
         else:
             expected_input_messages = [
                 {"role": "user", "parts": [{"type": "text", "content": "Hi!"}]},
@@ -282,13 +418,7 @@ def test_converse(
                     "role": "assistant",
                     "parts": [{"type": "text", "content": "Hi! What do you need?"}],
                 },
-                {
-                    "role": "user",
-                    "parts": [
-                        {"type": "text", "content": "Hello!"},
-                        {"type": "text", "content": LONG_TEXT},
-                    ],
-                },
+                expected_last_message,
             ]
         assert (
             json.loads(attributes[SPANDATA.GEN_AI_INPUT_MESSAGES])
