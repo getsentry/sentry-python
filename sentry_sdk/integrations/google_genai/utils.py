@@ -950,7 +950,6 @@ def set_span_data_for_request(
                             span,
                             SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
                             formatted_tools,
-                            unpack=False,
                         )
                 else:
                     # To remove once data collection has been fully rolled out
@@ -958,7 +957,6 @@ def set_span_data_for_request(
                         span,
                         SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
                         formatted_tools,
-                        unpack=False,
                     )
 
     record_inputs = False
@@ -1002,7 +1000,6 @@ def set_span_data_for_request(
                     span,
                     SPANDATA.GEN_AI_REQUEST_MESSAGES,
                     messages_data,
-                    unpack=False,
                 )
 
     # Extract parameters directly from config (not nested under generation_config)
@@ -1167,7 +1164,6 @@ def set_span_data_for_embed_request(
                     span,
                     SPANDATA.GEN_AI_EMBEDDINGS_INPUT,
                     input_texts,
-                    unpack=False,
                 )
 
 

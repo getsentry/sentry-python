@@ -224,9 +224,7 @@ def _set_input_messages(
                 if should_truncate_gen_ai_input(client.options)
                 else normalized_messages
             )
-            set_data_normalized(
-                span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data, unpack=False
-            )
+            set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data)
     except Exception:
         # If we fail to format messages, just skip it
         pass

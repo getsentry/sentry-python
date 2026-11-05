@@ -145,9 +145,7 @@ def invoke_agent_span(
                 if should_truncate_gen_ai_input(client.options)
                 else normalized_messages
             )
-            set_data_normalized(
-                span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data, unpack=False
-            )
+            set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data)
 
     return span
 
@@ -165,9 +163,7 @@ def update_invoke_agent_span(
 
     # Set response text if prompts are enabled
     if _should_send_outputs() and output:
-        set_data_normalized(
-            span, SPANDATA.GEN_AI_RESPONSE_TEXT, str(output), unpack=False
-        )
+        set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, str(output))
 
     # Set model name from response if available
     if hasattr(result, "response"):

@@ -232,7 +232,6 @@ def _wrap_pregel_invoke(f: "Callable[..., Any]") -> "Callable[..., Any]":
                                 span,
                                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
                                 messages_data,
-                                unpack=False,
                             )
 
                 result = f(self, *args, **kwargs)
@@ -274,7 +273,6 @@ def _wrap_pregel_invoke(f: "Callable[..., Any]") -> "Callable[..., Any]":
                                 span,
                                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
                                 messages_data,
-                                unpack=False,
                             )
 
                 result = f(self, *args, **kwargs)
@@ -333,7 +331,6 @@ def _wrap_pregel_ainvoke(f: "Callable[..., Any]") -> "Callable[..., Any]":
                                 span,
                                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
                                 messages_data,
-                                unpack=False,
                             )
 
                 result = await f(self, *args, **kwargs)
@@ -372,7 +369,6 @@ def _wrap_pregel_ainvoke(f: "Callable[..., Any]") -> "Callable[..., Any]":
                             span,
                             SPANDATA.GEN_AI_REQUEST_MESSAGES,
                             messages_data,
-                            unpack=False,
                         )
 
             result = await f(self, *args, **kwargs)
@@ -513,5 +509,4 @@ def _set_response_attributes(
                 span,
                 SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
                 safe_serialize(tool_calls),
-                unpack=False,
             )

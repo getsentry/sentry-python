@@ -139,13 +139,9 @@ def _wrap_huggingface_task(f: "Callable[..., Any]", op: str) -> "Callable[..., A
         # Input attributes
         if has_data_collection_enabled(client.options):
             if client.options["data_collection"]["gen_ai"]["inputs"]:
-                set_data_normalized(
-                    span, SPANDATA.GEN_AI_REQUEST_MESSAGES, prompt, unpack=False
-                )
+                set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_MESSAGES, prompt)
         elif should_send_default_pii() and integration.include_prompts:
-            set_data_normalized(
-                span, SPANDATA.GEN_AI_REQUEST_MESSAGES, prompt, unpack=False
-            )
+            set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_MESSAGES, prompt)
 
         for attribute, span_attribute in attribute_mapping.items():
             value = kwargs.get(attribute, None)
@@ -153,7 +149,7 @@ def _wrap_huggingface_task(f: "Callable[..., Any]", op: str) -> "Callable[..., A
                 if isinstance(value, (int, float, bool, str)):
                     _set_span_data_attribute(span, span_attribute, value)
                 else:
-                    set_data_normalized(span, span_attribute, value, unpack=False)
+                    set_data_normalized(span, span_attribute, value)
 
         # LLM Execution
         try:
@@ -230,14 +226,12 @@ def _wrap_huggingface_task(f: "Callable[..., Any]", op: str) -> "Callable[..., A
                             span,
                             SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
                             tool_calls,
-                            unpack=False,
                         )
                 elif should_send_default_pii() and integration.include_prompts:
                     set_data_normalized(
                         span,
                         SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
                         tool_calls,
-                        unpack=False,
                     )
 
             if len(response_text_buffer) > 0:
@@ -436,7 +430,6 @@ def _wrap_huggingface_task(f: "Callable[..., Any]", op: str) -> "Callable[..., A
                                         span,
                                         SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
                                         tool_calls,
-                                        unpack=False,
                                     )
                             elif (
                                 should_send_default_pii()
@@ -446,7 +439,6 @@ def _wrap_huggingface_task(f: "Callable[..., Any]", op: str) -> "Callable[..., A
                                     span,
                                     SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
                                     tool_calls,
-                                    unpack=False,
                                 )
 
                         if len(response_text_buffer) > 0:

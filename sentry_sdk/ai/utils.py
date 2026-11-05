@@ -463,7 +463,7 @@ def transform_message_content(content: "Any") -> "Any":
     return content
 
 
-def _normalize_data(data: "Any", unpack: bool = True) -> "Any":
+def _normalize_data(data: "Any") -> "Any":
     # convert pydantic data (e.g. OpenAI v1+) to json compatible format
     if hasattr(data, "model_dump"):
         # Check if it's a class (type) rather than an instance
@@ -472,18 +472,16 @@ def _normalize_data(data: "Any", unpack: bool = True) -> "Any":
             return f"<ClassType: {data.__name__}>"
 
         try:
-            return _normalize_data(data.model_dump(), unpack=unpack)
+            return _normalize_data(data.model_dump())
         except Exception as e:
             logger.warning("Could not convert pydantic data to JSON: %s", e)
             return data if isinstance(data, (int, float, bool, str)) else str(data)
 
     if isinstance(data, list):
-        if unpack and len(data) == 1:
-            return _normalize_data(data[0], unpack=unpack)  # remove empty dimensions
-        return list(_normalize_data(x, unpack=unpack) for x in data)
+        return list(_normalize_data(x) for x in data)
 
     if isinstance(data, dict):
-        return {k: _normalize_data(v, unpack=unpack) for (k, v) in data.items()}
+        return {k: _normalize_data(v) for (k, v) in data.items()}
 
     return data if isinstance(data, (int, float, bool, str)) else str(data)
 
@@ -492,9 +490,8 @@ def set_data_normalized(
     span: "Union[Span, StreamedSpan]",
     key: str,
     value: "Any",
-    unpack: bool = True,
 ) -> None:
-    normalized = _normalize_data(value, unpack=unpack)
+    normalized = _normalize_data(value)
     if isinstance(normalized, (int, float, bool, str)):
         _set_span_data_attribute(span, key, normalized)
     else:
