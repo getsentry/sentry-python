@@ -387,14 +387,16 @@ def _collect_ai_data(
                     content_blocks.append({"type": "thinking", "thinking": ""})
                 elif event.content_block.type in ("text", "tool_use"):
                     content_blocks.append({"type": "text", "text": ""})
-            elif event.type == "content_block_delta" and content_blocks:
-                delta = event.delta
-                if ThinkingDelta is not None and isinstance(delta, ThinkingDelta):
-                    content_blocks[-1]["thinking"] += delta.thinking
-                elif hasattr(delta, "text"):
-                    content_blocks[-1]["text"] += delta.text
-                elif hasattr(delta, "partial_json"):
-                    content_blocks[-1]["text"] += delta.partial_json
+                else:
+                    content_blocks.append({"type": event.content_block.type})
+            elif event.type == "content_block_delta":
+                block = content_blocks[event.index]
+                if ThinkingDelta is not None and isinstance(event.delta, ThinkingDelta):
+                    block["thinking"] += event.delta.thinking
+                elif hasattr(event.delta, "text"):
+                    block["text"] += event.delta.text
+                elif hasattr(event.delta, "partial_json"):
+                    block["text"] += event.delta.partial_json
             elif event.type == "content_block_stop":
                 pass
 

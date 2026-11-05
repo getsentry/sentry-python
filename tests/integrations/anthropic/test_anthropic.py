@@ -222,42 +222,46 @@ def streaming_anthropic_response():
 
 @pytest.fixture
 def streaming_anthropic_text_response():
-    def inner(text_deltas, stop_reason):
-        return [
-            MessageStartEvent(
-                message=Message(
-                    id="msg_01XFDUDYJgAACzvnptvVoYEL",
-                    model="model",
-                    role="assistant",
-                    content=[TextBlock(type="text", text="")],
-                    type="message",
-                    stop_reason="end_turn",
-                    usage=Usage(input_tokens=10, output_tokens=20),
-                ),
-                type="message_start",
+    return [
+        MessageStartEvent(
+            message=Message(
+                id="msg_01XFDUDYJgAACzvnptvVoYEL",
+                model="model",
+                role="assistant",
+                content=[TextBlock(type="text", text="")],
+                type="message",
+                stop_reason="end_turn",
+                usage=Usage(input_tokens=10, output_tokens=20),
             ),
-            ContentBlockStartEvent(
-                type="content_block_start",
-                index=0,
-                content_block=TextBlock(type="text", text=""),
-            ),
-            *[
-                ContentBlockDeltaEvent(
-                    delta=TextDelta(text=text, type="text_delta"),
-                    index=0,
-                    type="content_block_delta",
-                )
-                for text in text_deltas
-            ],
-            ContentBlockStopEvent(type="content_block_stop", index=0),
-            MessageDeltaEvent(
-                delta=Delta(stop_reason=stop_reason),
-                usage=MessageDeltaUsage(output_tokens=10),
-                type="message_delta",
-            ),
-        ]
-
-    return inner
+            type="message_start",
+        ),
+        ContentBlockStartEvent(
+            type="content_block_start",
+            index=0,
+            content_block=TextBlock(type="text", text=""),
+        ),
+        ContentBlockDeltaEvent(
+            delta=TextDelta(text="Hi", type="text_delta"),
+            index=0,
+            type="content_block_delta",
+        ),
+        ContentBlockDeltaEvent(
+            delta=TextDelta(text="!", type="text_delta"),
+            index=0,
+            type="content_block_delta",
+        ),
+        ContentBlockDeltaEvent(
+            delta=TextDelta(text=" I'm Claude!", type="text_delta"),
+            index=0,
+            type="content_block_delta",
+        ),
+        ContentBlockStopEvent(type="content_block_stop", index=0),
+        MessageDeltaEvent(
+            delta=Delta(stop_reason="max_tokens"),
+            usage=MessageDeltaUsage(output_tokens=10),
+            type="message_delta",
+        ),
+    ]
 
 
 @pytest.fixture
@@ -1868,12 +1872,7 @@ def test_streaming_create_message_close(
     client = Anthropic(api_key="z")
 
     response = get_model_response(
-        server_side_event_chunks(
-            streaming_anthropic_text_response(
-                text_deltas=("Hi", "!", " I'm Claude!"),
-                stop_reason="max_tokens",
-            )
-        )
+        server_side_event_chunks(streaming_anthropic_text_response)
     )
 
     sentry_init(
@@ -1926,9 +1925,8 @@ def test_streaming_create_message_close(
             span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
             == '[{"role": "user", "content": "Hello, Claude"}]'
         )
-        expected_parts = [{"type": "text", "content": "Hi!"}]
         assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
-            {"role": "assistant", "parts": expected_parts}
+            {"role": "assistant", "parts": [{"type": "text", "content": "Hi!"}]}
         ]
 
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
@@ -1975,9 +1973,8 @@ def test_streaming_create_message_close(
             span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
             == '[{"role": "user", "content": "Hello, Claude"}]'
         )
-        expected_parts = [{"type": "text", "content": "Hi!"}]
         assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
-            {"role": "assistant", "parts": expected_parts}
+            {"role": "assistant", "parts": [{"type": "text", "content": "Hi!"}]}
         ]
 
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
@@ -2023,9 +2020,8 @@ def test_streaming_create_message_close(
             span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
             == '[{"role": "user", "content": "Hello, Claude"}]'
         )
-        expected_parts = [{"type": "text", "content": "Hi!"}]
         assert json.loads(span["data"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
-            {"role": "assistant", "parts": expected_parts}
+            {"role": "assistant", "parts": [{"type": "text", "content": "Hi!"}]}
         ]
 
         assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
@@ -2636,12 +2632,7 @@ def test_stream_messages_close(
     client = Anthropic(api_key="z")
 
     response = get_model_response(
-        server_side_event_chunks(
-            streaming_anthropic_text_response(
-                text_deltas=("Hi", "!", " I'm Claude!"),
-                stop_reason="max_tokens",
-            )
-        )
+        server_side_event_chunks(streaming_anthropic_text_response)
     )
 
     sentry_init(
@@ -2698,9 +2689,8 @@ def test_stream_messages_close(
             span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
             == '[{"role": "user", "content": "Hello, Claude"}]'
         )
-        expected_parts = [{"type": "text", "content": "Hi!"}]
         assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
-            {"role": "assistant", "parts": expected_parts}
+            {"role": "assistant", "parts": [{"type": "text", "content": "Hi!"}]}
         ]
 
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
@@ -2751,9 +2741,8 @@ def test_stream_messages_close(
             span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
             == '[{"role": "user", "content": "Hello, Claude"}]'
         )
-        expected_parts = [{"type": "text", "content": "Hi!"}]
         assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
-            {"role": "assistant", "parts": expected_parts}
+            {"role": "assistant", "parts": [{"type": "text", "content": "Hi!"}]}
         ]
 
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
@@ -2803,9 +2792,8 @@ def test_stream_messages_close(
             span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
             == '[{"role": "user", "content": "Hello, Claude"}]'
         )
-        expected_parts = [{"type": "text", "content": "Hi!"}]
         assert json.loads(span["data"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
-            {"role": "assistant", "parts": expected_parts}
+            {"role": "assistant", "parts": [{"type": "text", "content": "Hi!"}]}
         ]
 
         assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
@@ -3428,14 +3416,7 @@ async def test_streaming_create_message_async_close(
     client = AsyncAnthropic(api_key="z")
 
     response = get_model_response(
-        async_iterator(
-            server_side_event_chunks(
-                streaming_anthropic_text_response(
-                    text_deltas=("Hi", "!", " I'm Claude!"),
-                    stop_reason="max_tokens",
-                )
-            )
-        )
+        async_iterator(server_side_event_chunks(streaming_anthropic_text_response))
     )
 
     sentry_init(
@@ -3487,9 +3468,8 @@ async def test_streaming_create_message_async_close(
             span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
             == '[{"role": "user", "content": "Hello, Claude"}]'
         )
-        expected_parts = [{"type": "text", "content": "Hi!"}]
         assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
-            {"role": "assistant", "parts": expected_parts}
+            {"role": "assistant", "parts": [{"type": "text", "content": "Hi!"}]}
         ]
 
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
@@ -3535,9 +3515,8 @@ async def test_streaming_create_message_async_close(
             span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
             == '[{"role": "user", "content": "Hello, Claude"}]'
         )
-        expected_parts = [{"type": "text", "content": "Hi!"}]
         assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
-            {"role": "assistant", "parts": expected_parts}
+            {"role": "assistant", "parts": [{"type": "text", "content": "Hi!"}]}
         ]
 
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
@@ -3582,9 +3561,8 @@ async def test_streaming_create_message_async_close(
             span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
             == '[{"role": "user", "content": "Hello, Claude"}]'
         )
-        expected_parts = [{"type": "text", "content": "Hi!"}]
         assert json.loads(span["data"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
-            {"role": "assistant", "parts": expected_parts}
+            {"role": "assistant", "parts": [{"type": "text", "content": "Hi!"}]}
         ]
 
         assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
@@ -4386,14 +4364,7 @@ async def test_stream_messages_async_close(
     client = AsyncAnthropic(api_key="z")
 
     response = get_model_response(
-        async_iterator(
-            server_side_event_chunks(
-                streaming_anthropic_text_response(
-                    text_deltas=("Hi", "!", " I'm Claude!"),
-                    stop_reason="max_tokens",
-                )
-            )
-        )
+        async_iterator(server_side_event_chunks(streaming_anthropic_text_response))
     )
 
     sentry_init(
@@ -4453,9 +4424,8 @@ async def test_stream_messages_async_close(
             span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
             == '[{"role": "user", "content": "Hello, Claude"}]'
         )
-        expected_parts = [{"type": "text", "content": "Hi!"}]
         assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
-            {"role": "assistant", "parts": expected_parts}
+            {"role": "assistant", "parts": [{"type": "text", "content": "Hi!"}]}
         ]
 
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
@@ -4506,9 +4476,8 @@ async def test_stream_messages_async_close(
             span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
             == '[{"role": "user", "content": "Hello, Claude"}]'
         )
-        expected_parts = [{"type": "text", "content": "Hi!"}]
         assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
-            {"role": "assistant", "parts": expected_parts}
+            {"role": "assistant", "parts": [{"type": "text", "content": "Hi!"}]}
         ]
 
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
@@ -4561,9 +4530,8 @@ async def test_stream_messages_async_close(
             span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
             == '[{"role": "user", "content": "Hello, Claude"}]'
         )
-        expected_parts = [{"type": "text", "content": "Hi!"}]
         assert json.loads(span["data"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
-            {"role": "assistant", "parts": expected_parts}
+            {"role": "assistant", "parts": [{"type": "text", "content": "Hi!"}]}
         ]
 
         assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
