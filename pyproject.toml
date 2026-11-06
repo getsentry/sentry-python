@@ -246,6 +246,10 @@ module = "huey.*"
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
+module = "apscheduler.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
 module = "openai.*"
 ignore_missing_imports = true
 
