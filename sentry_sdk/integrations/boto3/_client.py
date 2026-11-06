@@ -144,9 +144,14 @@ def _patch_botocore_client() -> None:
 
         streaming_body_instrumented = False
         with capture_internal_exceptions():
-            streaming_body_instrumented = _instrument_streaming_body(span, parsed)
+            if service_ext is not None:
+                streaming_body_instrumented = service_ext.instrument_response(
+                    ctx, span, parsed
+                )
+            if not streaming_body_instrumented:
+                streaming_body_instrumented = _instrument_streaming_body(span, parsed)
 
-        # `StreamingBody`s finish their span when consumed or closed.
+        # streaming responses finish their span when consumed or closed.
         if not streaming_body_instrumented:
             _finish_span(span)
         return parsed

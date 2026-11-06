@@ -25,7 +25,7 @@ from sentry_sdk.utils import (
 )
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, Mapping, Optional, Union
+    from typing import Any, Callable, Dict, Mapping, Optional, Union
 
     from sentry_sdk._types import Attributes
     from sentry_sdk.integrations.boto3._context import AwsCallContext
@@ -294,17 +294,8 @@ def _instrument_streaming_body(
             origin=ORIGIN,
         )
 
-    finished = False
-    read_in_progress = False
-
     def finish_span(error: "Optional[BaseException]" = None) -> None:
-        nonlocal finished
-        if finished:
-            return
-
-        finished = True
-        # finish the stream span before the client span, and only once across
-        # read and close.
+        # finish the stream span before the client span.
         if error is not None:
             with capture_internal_exceptions():
                 attributes = _get_error_attributes(error)
@@ -313,6 +304,32 @@ def _instrument_streaming_body(
 
         _finish_span(streaming_span, error)
         _finish_span(span, error)
+
+    _patch_streaming_body(body, finish_span)
+    return True
+
+
+def _patch_streaming_body(
+    body: "StreamingBody",
+    on_finish: "Callable[[Optional[BaseException]], None]",
+    on_read: "Optional[Callable[[bytes], None]]" = None,
+) -> None:
+    """
+    Call `on_finish` once, when `body` is consumed, closed, or fails to be read.
+    `on_read` receives the bytes returned by each `read()`.
+    """
+    finished = False
+    read_in_progress = False
+
+    def finish(error: "Optional[BaseException]" = None) -> None:
+        nonlocal finished
+        if finished:
+            return
+
+        # only finish once across read and close.
+        finished = True
+        with capture_internal_exceptions():
+            on_finish(error)
 
     def content_length_reached() -> bool:
         content_length = body._content_length  # type: ignore[attr-defined]
@@ -323,6 +340,9 @@ def _instrument_streaming_body(
         read_in_progress = True
         try:
             read_return_value = orig_read(*args, **kwargs)
+            if on_read is not None:
+                with capture_internal_exceptions():
+                    on_read(read_return_value)
             with capture_internal_exceptions():
                 amount_of_bytes_requested = args[0] if args else kwargs.get("amt")
                 # detect read-to-end, eof, or the known content length being consumed.
@@ -332,10 +352,10 @@ def _instrument_streaming_body(
                     or (amount_of_bytes_requested > 0 and not read_return_value)
                     or content_length_reached()
                 ):
-                    finish_span()
+                    finish()
             return read_return_value
         except BaseException as error:
-            finish_span(error)
+            finish(error)
             raise
         finally:
             read_in_progress = False
@@ -343,18 +363,18 @@ def _instrument_streaming_body(
     def sentry_streaming_body_close(*args: "Any", **kwargs: "Any") -> None:
         try:
             orig_close(*args, **kwargs)
-            finish_span()
+            finish()
         except BaseException as error:
-            finish_span(error)
+            finish(error)
             raise
 
     def sentry_raw_stream_close(*args: "Any", **kwargs: "Any") -> None:
         try:
             orig_raw_close(*args, **kwargs)
             if not read_in_progress:
-                finish_span()
+                finish()
         except BaseException as error:
-            finish_span(error)
+            finish(error)
             raise
 
     try:
@@ -367,10 +387,8 @@ def _instrument_streaming_body(
         body.read = sentry_streaming_body_read  # type: ignore
         body.close = sentry_streaming_body_close  # type: ignore
     except Exception:
-        finish_span()
+        finish()
         raise
-
-    return True
 
 
 def _set_request_attributes(

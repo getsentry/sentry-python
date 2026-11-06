@@ -1,8 +1,11 @@
+import base64
 import copy
 import json
+from io import BytesIO
 
 import boto3
 import pytest
+from botocore.awsrequest import AWSResponse
 from botocore.exceptions import ClientError
 from botocore.stub import Stubber
 
@@ -11,6 +14,7 @@ from sentry_sdk.ai.utils import MAX_SINGLE_MESSAGE_CONTENT_CHARS
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.boto3 import Boto3Integration
 from sentry_sdk.integrations.boto3.consts import AI_ORIGIN, ORIGIN
+from tests.integrations.boto3.aws_mock import Body, MockResponse
 
 session = boto3.Session(  # type: ignore[attr-defined]
     aws_access_key_id="-",
@@ -168,6 +172,18 @@ def _expected_input_messages(trace_mode, input_messages):
     if trace_mode.get("stream_gen_ai_spans") is False:
         return input_messages[-1:]
     return input_messages
+
+
+def _expected_gen_ai_attributes(trace_mode, attributes):
+    if SPANDATA.GEN_AI_INPUT_MESSAGES not in attributes:
+        return attributes
+
+    return {
+        **attributes,
+        SPANDATA.GEN_AI_INPUT_MESSAGES: _expected_input_messages(
+            trace_mode, attributes[SPANDATA.GEN_AI_INPUT_MESSAGES]
+        ),
+    }
 
 
 def _get_bedrock_span(spans, origin=AI_ORIGIN):
@@ -742,3 +758,761 @@ def test_other_operations_keep_generic_span(init_bedrock, capture_items, trace_m
     assert span["name"] == "aws.bedrock-runtime.ListAsyncInvokes"
     assert span["attributes"][SPANDATA.SENTRY_OP] == OP.HTTP_CLIENT
     assert not any(key.startswith("gen_ai.") for key in span["attributes"])
+
+
+# base64-encoded media content, which isn't recorded.
+MEDIA_BASE64 = base64.b64encode(b"\x89PNG media bytes").decode()
+ANTHROPIC_MEDIA_SOURCE = {
+    "type": "base64",
+    "media_type": "image/png",
+    "data": MEDIA_BASE64,
+}
+
+INVOKE_MODEL_CASES = [
+    pytest.param(
+        "us.anthropic.claude-3-5-sonnet-20240620-v1:0",
+        {
+            "anthropic_version": "bedrock-2023-05-31",
+            "max_tokens": 100,
+            "temperature": 0.5,
+            "top_p": 0.9,
+            "stop_sequences": ["STOP"],
+            "system": "Be brief.",
+            "messages": [
+                {"role": "user", "content": "Weather in Paris?"},
+                {
+                    "role": "assistant",
+                    "content": [
+                        {"type": "thinking", "thinking": "I need the tool."},
+                        {
+                            "type": "tool_use",
+                            "id": "tool-1",
+                            "name": "get_weather",
+                            "input": {"city": "Paris"},
+                        },
+                    ],
+                },
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "tool_result",
+                            "tool_use_id": "tool-1",
+                            "content": "rainy",
+                        }
+                    ],
+                },
+            ],
+            "tools": [
+                {
+                    "name": "get_weather",
+                    "description": "Get the weather for a city.",
+                    "input_schema": {"type": "object"},
+                }
+            ],
+        },
+        {
+            "id": "msg_1",
+            "type": "message",
+            "role": "assistant",
+            "content": [{"type": "text", "text": "Hi!"}],
+            "stop_reason": "end_turn",
+            "usage": {
+                "input_tokens": 10,
+                "output_tokens": 5,
+                "cache_read_input_tokens": 100,
+                "cache_creation_input_tokens": 50,
+            },
+        },
+        {
+            SPANDATA.GEN_AI_REQUEST_MAX_TOKENS: 100,
+            SPANDATA.GEN_AI_REQUEST_TEMPERATURE: 0.5,
+            SPANDATA.GEN_AI_REQUEST_TOP_P: 0.9,
+            SPANDATA.GEN_AI_REQUEST_STOP_SEQUENCES: ["STOP"],
+            SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS: ["end_turn"],
+            # Anthropic's `input_tokens` excludes cached tokens.
+            SPANDATA.GEN_AI_USAGE_INPUT_TOKENS: 160,
+            SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS: 5,
+            SPANDATA.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS: 100,
+            SPANDATA.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS: 50,
+            SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS: [
+                {"type": "text", "content": "Be brief."}
+            ],
+            SPANDATA.GEN_AI_INPUT_MESSAGES: [
+                {
+                    "role": "user",
+                    "parts": [{"type": "text", "content": "Weather in Paris?"}],
+                },
+                {
+                    "role": "assistant",
+                    "parts": [
+                        {"type": "reasoning", "content": "I need the tool."},
+                        {
+                            "type": "tool_call",
+                            "id": "tool-1",
+                            "name": "get_weather",
+                            "arguments": {"city": "Paris"},
+                        },
+                    ],
+                },
+                {
+                    "role": "tool",
+                    "parts": [
+                        {
+                            "type": "tool_call_response",
+                            "id": "tool-1",
+                            "result": "rainy",
+                        }
+                    ],
+                },
+            ],
+            SPANDATA.GEN_AI_TOOL_DEFINITIONS: [
+                {
+                    "type": "function",
+                    "name": "get_weather",
+                    "description": "Get the weather for a city.",
+                    "parameters": {"type": "object"},
+                }
+            ],
+            SPANDATA.GEN_AI_OUTPUT_MESSAGES: [
+                {"role": "assistant", "parts": [{"type": "text", "content": "Hi!"}]}
+            ],
+        },
+        id="anthropic_claude",
+    ),
+    pytest.param(
+        "anthropic.claude-3-5-sonnet-20240620-v1:0",
+        {
+            "anthropic_version": "bedrock-2023-05-31",
+            "max_tokens": 100,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": "What's in these?"},
+                        {"type": "image", "source": ANTHROPIC_MEDIA_SOURCE},
+                        {
+                            "type": "document",
+                            "source": {
+                                **ANTHROPIC_MEDIA_SOURCE,
+                                "media_type": "application/pdf",
+                            },
+                        },
+                    ],
+                },
+                {
+                    "role": "assistant",
+                    "content": [
+                        {
+                            "type": "tool_use",
+                            "id": "tool-1",
+                            "name": "screenshot",
+                            "input": {},
+                        }
+                    ],
+                },
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "tool_result",
+                            "tool_use_id": "tool-1",
+                            "content": [
+                                {"type": "text", "text": "Done."},
+                                {"type": "image", "source": ANTHROPIC_MEDIA_SOURCE},
+                            ],
+                        }
+                    ],
+                },
+            ],
+        },
+        {
+            "id": "msg_2",
+            "type": "message",
+            "role": "assistant",
+            "content": [{"type": "text", "text": "A cat."}],
+            "stop_reason": "end_turn",
+            "usage": {"input_tokens": 10, "output_tokens": 5},
+        },
+        {
+            SPANDATA.GEN_AI_REQUEST_MAX_TOKENS: 100,
+            SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS: ["end_turn"],
+            SPANDATA.GEN_AI_USAGE_INPUT_TOKENS: 10,
+            SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS: 5,
+            SPANDATA.GEN_AI_INPUT_MESSAGES: [
+                {
+                    "role": "user",
+                    "parts": [{"type": "text", "content": "What's in these?"}],
+                },
+                {
+                    "role": "assistant",
+                    "parts": [
+                        {
+                            "type": "tool_call",
+                            "id": "tool-1",
+                            "name": "screenshot",
+                            "arguments": {},
+                        },
+                    ],
+                },
+                {
+                    "role": "tool",
+                    "parts": [
+                        {
+                            "type": "tool_call_response",
+                            "id": "tool-1",
+                            "result": "Done.",
+                        }
+                    ],
+                },
+            ],
+            SPANDATA.GEN_AI_OUTPUT_MESSAGES: [
+                {
+                    "role": "assistant",
+                    "parts": [{"type": "text", "content": "A cat."}],
+                }
+            ],
+        },
+        id="anthropic_claude_media",
+    ),
+    pytest.param(
+        "amazon.nova-lite-v1:0",
+        {
+            "schemaVersion": "messages-v1",
+            "system": [{"text": "Be brief."}],
+            "messages": [{"role": "user", "content": [{"text": "Hello!"}]}],
+            "inferenceConfig": {
+                "max_new_tokens": 100,
+                "temperature": 0.5,
+                "top_p": 0.9,
+                "stopSequences": ["STOP"],
+            },
+        },
+        {
+            "output": {"message": {"role": "assistant", "content": [{"text": "Hi!"}]}},
+            "stopReason": "end_turn",
+            "usage": {"inputTokens": 10, "outputTokens": 5, "totalTokens": 15},
+        },
+        {
+            SPANDATA.GEN_AI_REQUEST_MAX_TOKENS: 100,
+            SPANDATA.GEN_AI_REQUEST_TEMPERATURE: 0.5,
+            SPANDATA.GEN_AI_REQUEST_TOP_P: 0.9,
+            SPANDATA.GEN_AI_REQUEST_STOP_SEQUENCES: ["STOP"],
+            SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS: ["end_turn"],
+            SPANDATA.GEN_AI_USAGE_INPUT_TOKENS: 10,
+            SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS: 5,
+            SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS: 15,
+            SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS: [
+                {"type": "text", "content": "Be brief."}
+            ],
+            SPANDATA.GEN_AI_INPUT_MESSAGES: [
+                {"role": "user", "parts": [{"type": "text", "content": "Hello!"}]}
+            ],
+            SPANDATA.GEN_AI_OUTPUT_MESSAGES: [
+                {"role": "assistant", "parts": [{"type": "text", "content": "Hi!"}]}
+            ],
+        },
+        id="amazon_nova",
+    ),
+    pytest.param(
+        "amazon.nova-lite-v1:0",
+        {
+            "schemaVersion": "messages-v1",
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {"text": "What's this?"},
+                        {"image": {"format": "png", "source": {"bytes": MEDIA_BASE64}}},
+                    ],
+                }
+            ],
+            "inferenceConfig": {"max_new_tokens": 100},
+        },
+        {
+            "output": {
+                "message": {"role": "assistant", "content": [{"text": "A cat."}]}
+            },
+            "stopReason": "end_turn",
+            "usage": {"inputTokens": 10, "outputTokens": 5, "totalTokens": 15},
+        },
+        {
+            SPANDATA.GEN_AI_REQUEST_MAX_TOKENS: 100,
+            SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS: ["end_turn"],
+            SPANDATA.GEN_AI_USAGE_INPUT_TOKENS: 10,
+            SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS: 5,
+            SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS: 15,
+            SPANDATA.GEN_AI_INPUT_MESSAGES: [
+                {"role": "user", "parts": [{"type": "text", "content": "What's this?"}]}
+            ],
+            SPANDATA.GEN_AI_OUTPUT_MESSAGES: [
+                {
+                    "role": "assistant",
+                    "parts": [{"type": "text", "content": "A cat."}],
+                }
+            ],
+        },
+        id="amazon_nova_media",
+    ),
+    pytest.param(
+        "amazon.titan-text-express-v1",
+        {
+            "inputText": "Hello!",
+            "textGenerationConfig": {
+                "maxTokenCount": 100,
+                "temperature": 0.5,
+                "topP": 0.9,
+                "stopSequences": ["User:"],
+            },
+        },
+        {
+            "inputTextTokenCount": 10,
+            "results": [
+                {"tokenCount": 5, "outputText": "Hi!", "completionReason": "FINISH"}
+            ],
+        },
+        {
+            SPANDATA.GEN_AI_REQUEST_MAX_TOKENS: 100,
+            SPANDATA.GEN_AI_REQUEST_TEMPERATURE: 0.5,
+            SPANDATA.GEN_AI_REQUEST_TOP_P: 0.9,
+            SPANDATA.GEN_AI_REQUEST_STOP_SEQUENCES: ["User:"],
+            SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS: ["FINISH"],
+            SPANDATA.GEN_AI_USAGE_INPUT_TOKENS: 10,
+            SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS: 5,
+            SPANDATA.GEN_AI_INPUT_MESSAGES: [
+                {"role": "user", "parts": [{"type": "text", "content": "Hello!"}]}
+            ],
+            SPANDATA.GEN_AI_OUTPUT_MESSAGES: [
+                {"role": "assistant", "parts": [{"type": "text", "content": "Hi!"}]}
+            ],
+        },
+        id="amazon_titan",
+    ),
+    pytest.param(
+        "meta.llama3-8b-instruct-v1:0",
+        {"prompt": "Hello!", "max_gen_len": 100, "temperature": 0.5, "top_p": 0.9},
+        {
+            "generation": "Hi!",
+            "prompt_token_count": 10,
+            "generation_token_count": 5,
+            "stop_reason": "stop",
+        },
+        {
+            SPANDATA.GEN_AI_REQUEST_MAX_TOKENS: 100,
+            SPANDATA.GEN_AI_REQUEST_TEMPERATURE: 0.5,
+            SPANDATA.GEN_AI_REQUEST_TOP_P: 0.9,
+            SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS: ["stop"],
+            SPANDATA.GEN_AI_USAGE_INPUT_TOKENS: 10,
+            SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS: 5,
+            SPANDATA.GEN_AI_INPUT_MESSAGES: [
+                {"role": "user", "parts": [{"type": "text", "content": "Hello!"}]}
+            ],
+            SPANDATA.GEN_AI_OUTPUT_MESSAGES: [
+                {"role": "assistant", "parts": [{"type": "text", "content": "Hi!"}]}
+            ],
+        },
+        id="meta_llama",
+    ),
+    pytest.param(
+        "cohere.command-r-v1:0",
+        {
+            "message": "Hello!",
+            "preamble": "Be brief.",
+            "max_tokens": 100,
+            "temperature": 0.5,
+            "p": 0.9,
+            "stop_sequences": ["STOP"],
+        },
+        {"response_id": "1", "text": "Hi!", "finish_reason": "COMPLETE"},
+        {
+            SPANDATA.GEN_AI_REQUEST_MAX_TOKENS: 100,
+            SPANDATA.GEN_AI_REQUEST_TEMPERATURE: 0.5,
+            SPANDATA.GEN_AI_REQUEST_TOP_P: 0.9,
+            SPANDATA.GEN_AI_REQUEST_STOP_SEQUENCES: ["STOP"],
+            SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS: ["COMPLETE"],
+            # the response body has no usage; it's in the response headers.
+            SPANDATA.GEN_AI_USAGE_INPUT_TOKENS: 7,
+            SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS: 3,
+            SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS: [
+                {"type": "text", "content": "Be brief."}
+            ],
+            SPANDATA.GEN_AI_INPUT_MESSAGES: [
+                {"role": "user", "parts": [{"type": "text", "content": "Hello!"}]}
+            ],
+            SPANDATA.GEN_AI_OUTPUT_MESSAGES: [
+                {"role": "assistant", "parts": [{"type": "text", "content": "Hi!"}]}
+            ],
+        },
+        id="cohere_command_r",
+    ),
+    pytest.param(
+        "cohere.command-text-v14",
+        {
+            "prompt": "Hello!",
+            "max_tokens": 100,
+            "temperature": 0.5,
+            "p": 0.9,
+            "stop_sequences": ["STOP"],
+        },
+        {
+            "id": "1",
+            "prompt": "Hello!",
+            "generations": [{"id": "1", "text": "Hi!", "finish_reason": "COMPLETE"}],
+        },
+        {
+            SPANDATA.GEN_AI_REQUEST_MAX_TOKENS: 100,
+            SPANDATA.GEN_AI_REQUEST_TEMPERATURE: 0.5,
+            SPANDATA.GEN_AI_REQUEST_TOP_P: 0.9,
+            SPANDATA.GEN_AI_REQUEST_STOP_SEQUENCES: ["STOP"],
+            SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS: ["COMPLETE"],
+            SPANDATA.GEN_AI_USAGE_INPUT_TOKENS: 7,
+            SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS: 3,
+            SPANDATA.GEN_AI_INPUT_MESSAGES: [
+                {"role": "user", "parts": [{"type": "text", "content": "Hello!"}]}
+            ],
+            SPANDATA.GEN_AI_OUTPUT_MESSAGES: [
+                {"role": "assistant", "parts": [{"type": "text", "content": "Hi!"}]}
+            ],
+        },
+        id="cohere_command",
+    ),
+    pytest.param(
+        "mistral.mistral-7b-instruct-v0:2",
+        {
+            "prompt": "<s>[INST] Hello! [/INST]",
+            "max_tokens": 100,
+            "temperature": 0.5,
+            "top_p": 0.9,
+            "stop": ["STOP"],
+        },
+        {"outputs": [{"text": "Hi!", "stop_reason": "stop"}]},
+        {
+            SPANDATA.GEN_AI_REQUEST_MAX_TOKENS: 100,
+            SPANDATA.GEN_AI_REQUEST_TEMPERATURE: 0.5,
+            SPANDATA.GEN_AI_REQUEST_TOP_P: 0.9,
+            SPANDATA.GEN_AI_REQUEST_STOP_SEQUENCES: ["STOP"],
+            SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS: ["stop"],
+            SPANDATA.GEN_AI_USAGE_INPUT_TOKENS: 7,
+            SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS: 3,
+            SPANDATA.GEN_AI_INPUT_MESSAGES: [
+                {
+                    "role": "user",
+                    "parts": [{"type": "text", "content": "<s>[INST] Hello! [/INST]"}],
+                }
+            ],
+            SPANDATA.GEN_AI_OUTPUT_MESSAGES: [
+                {"role": "assistant", "parts": [{"type": "text", "content": "Hi!"}]}
+            ],
+        },
+        id="mistral",
+    ),
+]
+
+# attributes that hold JSON-serialized prompts and responses.
+GEN_AI_MESSAGE_ATTRIBUTES = (
+    SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+    SPANDATA.GEN_AI_INPUT_MESSAGES,
+    SPANDATA.GEN_AI_TOOL_DEFINITIONS,
+    SPANDATA.GEN_AI_OUTPUT_MESSAGES,
+)
+
+
+def _invoke_model_response(client, body, input_tokens=7, output_tokens=3):
+    """
+    Respond to `InvokeModel` with `body`, and its token usage in the headers.
+    """
+    return MockResponse(
+        client,
+        200,
+        {
+            "content-type": "application/json",
+            "content-length": str(len(body)),
+            "x-amzn-requestid": "request-id",
+            "x-amzn-bedrock-input-token-count": str(input_tokens),
+            "x-amzn-bedrock-output-token-count": str(output_tokens),
+        },
+        body,
+    )
+
+
+def _get_attributes(span):
+    """
+    Return the span's attributes, with the gen_ai message attributes deserialized.
+    """
+    return {
+        key: json.loads(value) if key in GEN_AI_MESSAGE_ATTRIBUTES else value
+        for key, value in span["attributes"].items()
+    }
+
+
+@pytest.mark.parametrize("trace_mode", TRACE_MODES)
+@pytest.mark.parametrize(
+    "model_id, request_body, response_body, expected_attributes", INVOKE_MODEL_CASES
+)
+def test_invoke_model(
+    init_bedrock,
+    capture_items,
+    trace_mode,
+    model_id,
+    request_body,
+    response_body,
+    expected_attributes,
+):
+    client = init_bedrock(trace_mode, send_default_pii=True)
+    response_bytes = json.dumps(response_body).encode()
+    bodies = []
+
+    def call():
+        response = client.invoke_model(modelId=model_id, body=json.dumps(request_body))
+        bodies.append(response["body"].read())
+
+    with _invoke_model_response(client, response_bytes):
+        spans = _capture_spans(capture_items, trace_mode, call)
+
+    assert bodies == [response_bytes]
+
+    span = _get_bedrock_span(spans)
+    attributes = _get_attributes(span)
+    assert span["name"] == f"generate_content {model_id}"
+    assert span["status"] == "ok"
+    assert attributes[SPANDATA.SENTRY_OP] == OP.GEN_AI_GENERATE_CONTENT
+    assert attributes[SPANDATA.GEN_AI_PROVIDER_NAME] == "aws.bedrock"
+    assert attributes[SPANDATA.GEN_AI_OPERATION_NAME] == "generate_content"
+    assert attributes[SPANDATA.GEN_AI_REQUEST_MODEL] == model_id
+    assert attributes[SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
+    assert attributes[SPANDATA.RPC_METHOD] == "InvokeModel"
+    assert attributes[SPANDATA.AWS_REQUEST_ID] == "request-id"
+    gen_ai_attributes = {
+        key: value
+        for key, value in attributes.items()
+        if key.startswith("gen_ai.")
+        and key
+        not in (
+            SPANDATA.GEN_AI_PROVIDER_NAME,
+            SPANDATA.GEN_AI_OPERATION_NAME,
+            SPANDATA.GEN_AI_REQUEST_MODEL,
+            SPANDATA.GEN_AI_RESPONSE_STREAMING,
+        )
+    }
+    assert gen_ai_attributes == _expected_gen_ai_attributes(
+        trace_mode, expected_attributes
+    )
+    # media content isn't recorded.
+    assert MEDIA_BASE64 not in json.dumps(span["attributes"])
+    # only the gen_ai span is recorded, not an `http.client.stream` span.
+    assert not any(
+        span["attributes"].get(SPANDATA.SENTRY_OP) == OP.HTTP_CLIENT_STREAM
+        for span in spans
+    )
+
+
+@pytest.mark.parametrize("trace_mode", TRACE_MODES)
+@pytest.mark.parametrize(
+    "init_kwargs, include_prompts, record_inputs, record_outputs",
+    GEN_AI_DATA_COLLECTION_CASES,
+)
+def test_invoke_model_data_collection(
+    init_bedrock,
+    capture_items,
+    trace_mode,
+    init_kwargs,
+    include_prompts,
+    record_inputs,
+    record_outputs,
+):
+    client = init_bedrock(trace_mode, include_prompts=include_prompts, **init_kwargs)
+    model_id, request_body, response_body, expected_attributes = INVOKE_MODEL_CASES[
+        0
+    ].values
+
+    def call():
+        response = client.invoke_model(modelId=model_id, body=json.dumps(request_body))
+        response["body"].read()
+
+    with _invoke_model_response(client, json.dumps(response_body).encode()):
+        spans = _capture_spans(capture_items, trace_mode, call)
+
+    attributes = _get_attributes(_get_bedrock_span(spans))
+    expected_attributes = _expected_gen_ai_attributes(trace_mode, expected_attributes)
+    for attribute, recorded in (
+        (SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS, record_inputs),
+        (SPANDATA.GEN_AI_INPUT_MESSAGES, record_inputs),
+        (SPANDATA.GEN_AI_TOOL_DEFINITIONS, record_inputs),
+        (SPANDATA.GEN_AI_OUTPUT_MESSAGES, record_outputs),
+    ):
+        if recorded:
+            assert attributes[attribute] == expected_attributes[attribute]
+        else:
+            assert attribute not in attributes
+    # the other attributes are always recorded.
+    assert attributes[SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
+    assert attributes[SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["end_turn"]
+    assert attributes[SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 160
+
+
+@pytest.mark.parametrize("trace_mode", TRACE_MODES)
+@pytest.mark.parametrize(
+    "read_body, parsed",
+    [
+        pytest.param(lambda body: body.read(), True, id="read"),
+        pytest.param(
+            lambda body: b"".join(iter(lambda: body.read(4), b"")),
+            True,
+            id="read_amt",
+        ),
+        pytest.param(
+            lambda body: b"".join(body.iter_chunks(chunk_size=4)),
+            True,
+            id="iter_chunks",
+        ),
+        pytest.param(
+            lambda body: (body.read(4), body.close())[0], False, id="close_early"
+        ),
+    ],
+)
+def test_invoke_model_body_consumption(
+    init_bedrock, capture_items, trace_mode, read_body, parsed
+):
+    client = init_bedrock(trace_mode, send_default_pii=True)
+    response_bytes = json.dumps(
+        {"outputs": [{"text": "Hi!", "stop_reason": "stop"}]}
+    ).encode()
+    bodies = []
+
+    def call():
+        response = client.invoke_model(
+            modelId="mistral.mistral-7b-instruct-v0:2",
+            body=json.dumps({"prompt": "Hello!"}),
+        )
+        bodies.append(read_body(response["body"]))
+
+    with _invoke_model_response(client, response_bytes):
+        spans = _capture_spans(capture_items, trace_mode, call)
+
+    assert bodies == [response_bytes if parsed else response_bytes[:4]]
+
+    span = _get_bedrock_span(spans)
+    attributes = span["attributes"]
+    assert span["status"] == "ok"
+    assert attributes[SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 7
+    assert attributes[SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 3
+    if parsed:
+        assert attributes[SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["stop"]
+        assert SPANDATA.GEN_AI_OUTPUT_MESSAGES in attributes
+    else:
+        assert SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS not in attributes
+        assert SPANDATA.GEN_AI_OUTPUT_MESSAGES not in attributes
+
+
+@pytest.mark.parametrize("trace_mode", TRACE_MODES)
+def test_invoke_model_body_read_error_is_unchanged(
+    init_bedrock, capture_items, trace_mode
+):
+    client = init_bedrock(trace_mode)
+    original_exception = OSError("stream read failed")
+
+    class _FailingBody(Body):
+        def read(self, *args, **kwargs):
+            raise original_exception
+
+    def respond(request, **kwargs):
+        return AWSResponse(
+            request.url, 200, {"content-length": "10"}, _FailingBody(b"")
+        )
+
+    client.meta.events.register("before-send", respond)
+
+    def call():
+        response = client.invoke_model(
+            modelId=MODEL_ID, body=json.dumps({"max_tokens": 100})
+        )
+        with pytest.raises(OSError) as exc_info:
+            response["body"].read()
+        assert exc_info.value is original_exception
+
+    spans = _capture_spans(capture_items, trace_mode, call)
+
+    span = _get_bedrock_span(spans)
+    assert span["status"] == "error"
+    assert span["attributes"][SPANDATA.ERROR_TYPE] == "OSError"
+    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
+
+
+@pytest.mark.parametrize("trace_mode", TRACE_MODES)
+def test_invoke_model_unknown_model(init_bedrock, capture_items, trace_mode):
+    client = init_bedrock(trace_mode, send_default_pii=True)
+    model_id = "ai21.jamba-1-5-mini-v1:0"
+
+    def call():
+        response = client.invoke_model(
+            modelId=model_id,
+            body=json.dumps(
+                {"messages": [{"role": "user", "content": "Hello!"}], "max_tokens": 1}
+            ),
+        )
+        response["body"].read()
+
+    with _invoke_model_response(client, b'{"choices": []}'):
+        spans = _capture_spans(capture_items, trace_mode, call)
+
+    span = _get_bedrock_span(spans)
+    assert span["name"] == f"generate_content {model_id}"
+    assert {
+        key: value
+        for key, value in span["attributes"].items()
+        if key.startswith("gen_ai.")
+    } == {
+        SPANDATA.GEN_AI_PROVIDER_NAME: "aws.bedrock",
+        SPANDATA.GEN_AI_OPERATION_NAME: "generate_content",
+        SPANDATA.GEN_AI_REQUEST_MODEL: model_id,
+        SPANDATA.GEN_AI_RESPONSE_STREAMING: False,
+        SPANDATA.GEN_AI_USAGE_INPUT_TOKENS: 7,
+        SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS: 3,
+    }
+
+
+@pytest.mark.parametrize("trace_mode", TRACE_MODES)
+@pytest.mark.parametrize(
+    "make_request_body",
+    [
+        pytest.param(
+            lambda: BytesIO(
+                json.dumps({"prompt": "Hello!", "max_gen_len": 1}).encode()
+            ),
+            id="file_like",
+        ),
+        pytest.param(
+            lambda: json.dumps({"prompt": "x" * 1_000_001, "max_gen_len": 1}).encode(),
+            id="large",
+        ),
+        pytest.param(lambda: b'{"prompt": "Hello!", "max_gen_len": 1', id="malformed"),
+    ],
+)
+def test_invoke_model_bodies_that_are_not_parsed(
+    init_bedrock, capture_items, trace_mode, make_request_body
+):
+    client = init_bedrock(trace_mode, send_default_pii=True)
+    # a file-like request body isn't read, and large or malformed request bodies and
+    # a large response body aren't parsed. The response is unchanged.
+    response_bytes = json.dumps(
+        {"generation": "x" * 1_000_001, "stop_reason": "length"}
+    ).encode()
+    bodies = []
+
+    def call():
+        response = client.invoke_model(
+            modelId="meta.llama3-8b-instruct-v1:0", body=make_request_body()
+        )
+        bodies.append(response["body"].read())
+
+    with _invoke_model_response(client, response_bytes):
+        spans = _capture_spans(capture_items, trace_mode, call)
+
+    assert bodies == [response_bytes]
+
+    attributes = _get_bedrock_span(spans)["attributes"]
+    assert SPANDATA.GEN_AI_REQUEST_MAX_TOKENS not in attributes
+    assert SPANDATA.GEN_AI_INPUT_MESSAGES not in attributes
+    assert SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS not in attributes
+    assert SPANDATA.GEN_AI_OUTPUT_MESSAGES not in attributes
+    assert attributes[SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 7
