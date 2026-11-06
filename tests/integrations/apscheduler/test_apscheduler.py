@@ -18,6 +18,7 @@ from apscheduler.triggers.date import DateTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
 import sentry_sdk
+from sentry_sdk.integrations import apscheduler as apscheduler_integration
 from sentry_sdk.integrations.apscheduler import APSchedulerIntegration
 
 
@@ -181,6 +182,141 @@ def test_backlog_checks_in_once(sentry_init, capture_envelopes):
 
     assert [c["status"] for c in check_ins] == ["in_progress", "ok"]
     assert check_ins[0]["check_in_id"] == check_ins[1]["check_in_id"]
+
+
+def test_without_integration_sends_no_check_ins(sentry_init, capture_envelopes):
+    sentry_init()
+    envelopes = capture_envelopes()
+
+    check_ins = _run_once(envelopes, CronTrigger(minute="*/5", timezone="UTC"))
+
+    assert check_ins == []
+
+
+@pytest.mark.tests_internal_exceptions
+@pytest.mark.parametrize("executor", ["debug", "threadpool"])
+def test_check_in_error_does_not_break_job(
+    sentry_init, capture_envelopes, monkeypatch, executor
+):
+    calls = []
+
+    def broken_capture_checkin(*args, **kwargs):
+        calls.append(kwargs["status"])
+        raise RuntimeError("broken")
+
+    monkeypatch.setattr(
+        apscheduler_integration, "capture_checkin", broken_capture_checkin
+    )
+    sentry_init(integrations=[APSchedulerIntegration()])
+    envelopes = capture_envelopes()
+
+    ran = threading.Event()
+    executed = []
+
+    def job():
+        ran.set()
+
+    scheduler = BackgroundScheduler(timezone="UTC")
+    scheduler.add_executor(executor, alias="default")
+    scheduler.add_listener(lambda event: executed.append(event), EVENT_JOB_EXECUTED)
+    scheduler.add_job(
+        job,
+        CronTrigger(minute="*/5", timezone="UTC"),
+        id="my-job",
+        next_run_time=_utcnow(),
+        misfire_grace_time=None,
+    )
+    scheduler.start()
+    try:
+        assert ran.wait(timeout=10)
+    finally:
+        scheduler.shutdown(wait=True)
+
+    assert len(executed) == 1
+    assert calls
+    assert _check_ins(envelopes) == []
+
+
+def test_modified_trigger_updates_monitor_config(sentry_init, capture_envelopes):
+    sentry_init(integrations=[APSchedulerIntegration()])
+    envelopes = capture_envelopes()
+
+    finished = threading.Event()
+    scheduler = BackgroundScheduler(timezone="UTC")
+    scheduler.add_executor("debug", alias="default")
+    scheduler.add_listener(lambda event: finished.set(), EVENT_JOB_EXECUTED)
+    scheduler.add_job(
+        ok_job,
+        CronTrigger(minute="*/5", timezone="UTC"),
+        id="my-job",
+        next_run_time=_utcnow(),
+        misfire_grace_time=None,
+    )
+    scheduler.start()
+    try:
+        assert finished.wait(timeout=10)
+        finished.clear()
+        scheduler.modify_job(
+            "my-job",
+            trigger=IntervalTrigger(hours=2, timezone="UTC"),
+            next_run_time=_utcnow(),
+        )
+        assert finished.wait(timeout=10)
+    finally:
+        scheduler.shutdown(wait=True)
+
+    crons_listeners = [
+        listener
+        for listener, _ in scheduler._listeners
+        if isinstance(listener, apscheduler_integration._CronsListener)
+    ]
+    assert len(crons_listeners) == 1
+
+    check_ins = _check_ins(envelopes)
+    assert [c["status"] for c in check_ins] == ["in_progress", "ok"] * 2
+    assert [c["monitor_config"]["schedule"] for c in check_ins[::2]] == [
+        {"type": "crontab", "value": "*/5 * * * *"},
+        {"type": "interval", "value": 2, "unit": "hour"},
+    ]
+    assert check_ins[0]["check_in_id"] != check_ins[2]["check_in_id"]
+
+
+def test_multiple_schedulers(sentry_init, capture_envelopes):
+    sentry_init(integrations=[APSchedulerIntegration()])
+    envelopes = capture_envelopes()
+
+    finished = threading.Semaphore(0)
+    schedulers = []
+    for _ in range(2):
+        scheduler = BackgroundScheduler(timezone="UTC")
+        scheduler.add_executor(ThreadPoolExecutor(), alias="default")
+        scheduler.add_listener(lambda event: finished.release(), EVENT_JOB_EXECUTED)
+        scheduler.add_job(
+            ok_job,
+            CronTrigger(minute="*/5", timezone="UTC"),
+            id="my-job",
+            next_run_time=_utcnow(),
+            misfire_grace_time=None,
+        )
+        schedulers.append(scheduler)
+
+    for scheduler in schedulers:
+        scheduler.start()
+    try:
+        for _ in schedulers:
+            assert finished.acquire(timeout=10)
+    finally:
+        for scheduler in schedulers:
+            scheduler.shutdown(wait=True)
+
+    check_ins = _check_ins(envelopes)
+    assert sorted(c["status"] for c in check_ins) == ["in_progress"] * 2 + ["ok"] * 2
+    in_progress_ids = {
+        c["check_in_id"] for c in check_ins if c["status"] == "in_progress"
+    }
+    ok_ids = {c["check_in_id"] for c in check_ins if c["status"] == "ok"}
+    assert len(in_progress_ids) == 2
+    assert ok_ids == in_progress_ids
 
 
 def test_exclude_jobs(sentry_init, capture_envelopes):
