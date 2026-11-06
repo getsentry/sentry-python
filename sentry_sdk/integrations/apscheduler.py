@@ -49,8 +49,8 @@ except ImportError:
 class APSchedulerIntegration(Integration):
     identifier = "apscheduler"
 
-    def __init__(self, exclude_jobs: "Optional[List[str]]" = None) -> None:
-        self.exclude_jobs = exclude_jobs
+    def __init__(self, exclude_cron_jobs: "Optional[List[str]]" = None) -> None:
+        self.exclude_cron_jobs = exclude_cron_jobs
 
     @staticmethod
     def setup_once() -> None:
@@ -290,7 +290,7 @@ def _begin_check_in(
     # each time. Fall back to the job name (the function name by default).
     has_generated_id = _GENERATED_JOB_ID.fullmatch(job.id) is not None
     monitor_slug = job.name if has_generated_id else job.id
-    if match_regex_list(monitor_slug, integration.exclude_jobs):
+    if match_regex_list(monitor_slug, integration.exclude_cron_jobs):
         return None
 
     monitor_config = _get_monitor_config(job.trigger)

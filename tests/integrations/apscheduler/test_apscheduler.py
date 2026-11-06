@@ -319,8 +319,8 @@ def test_multiple_schedulers(sentry_init, capture_envelopes):
     assert ok_ids == in_progress_ids
 
 
-def test_exclude_jobs(sentry_init, capture_envelopes):
-    sentry_init(integrations=[APSchedulerIntegration(exclude_jobs=["my-.*"])])
+def test_exclude_cron_jobs(sentry_init, capture_envelopes):
+    sentry_init(integrations=[APSchedulerIntegration(exclude_cron_jobs=["my-.*"])])
     envelopes = capture_envelopes()
 
     check_ins = _run_once(envelopes, CronTrigger(minute="*/5", timezone="UTC"))
