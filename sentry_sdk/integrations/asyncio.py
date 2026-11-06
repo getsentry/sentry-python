@@ -94,6 +94,35 @@ def patch_loop_close() -> None:
     loop._sentry_flush_patched = True  # type: ignore
 
 
+def _get_eager_task_constructor(task_factory: "Any") -> "Optional[Callable[..., Any]]":
+    """
+    Returns the task constructor of an eager task factory (Python 3.12+), and
+    None for any other task factory.
+    """
+    # There is no public way to tell whether a task factory is eager, so
+    # libraries that need to know (anyio, for one) compare code objects: every
+    # factory returned by asyncio.create_eager_task_factory(),
+    # asyncio.eager_task_factory included, shares the same one.
+    eager_task_factory = getattr(asyncio, "eager_task_factory", None)
+    if (
+        eager_task_factory is None
+        or getattr(task_factory, "__code__", None) is not eager_task_factory.__code__
+    ):
+        return None
+
+    # WARNING:
+    # This relies on create_eager_task_factory() closing over
+    # custom_task_constructor only. If asyncio changes that, the factory is
+    # treated like any other task factory.
+    try:
+        (cell,) = task_factory.__closure__
+    except (TypeError, ValueError):
+        return None
+
+    task_constructor = cell.cell_contents
+    return task_constructor if callable(task_constructor) else None
+
+
 def _create_task_with_factory(
     orig_task_factory: "Any",
     loop: "asyncio.AbstractEventLoop",
@@ -131,6 +160,24 @@ def patch_asyncio() -> None:
         if getattr(orig_task_factory, "_is_sentry_task_factory", False):
             return
 
+        inner_task_factory: "Any" = orig_task_factory
+        eager_task_constructor = _get_eager_task_constructor(orig_task_factory)
+
+        if eager_task_constructor is not None:
+            # Create tasks with the original constructor, not the original
+            # factory. The factory makes every task eager unless it is told
+            # otherwise, which it can only be from Python 3.14, and a library
+            # that calls the constructor below directly does so to get a task
+            # that is not eager.
+            def _task_factory_from_constructor(
+                loop: "asyncio.AbstractEventLoop",
+                coro: "Coroutine[Any, Any, Any]",
+                **kwargs: "Any",
+            ) -> "Any":
+                return eager_task_constructor(coro, loop=loop, **kwargs)
+
+            inner_task_factory = _task_factory_from_constructor
+
         def _sentry_task_factory(
             loop: "asyncio.AbstractEventLoop",
             coro: "Coroutine[Any, Any, Any]",
@@ -139,7 +186,7 @@ def patch_asyncio() -> None:
             # Check if this is an internal Sentry task
             if is_internal_task():
                 return _create_task_with_factory(
-                    orig_task_factory, loop, coro, **kwargs
+                    inner_task_factory, loop, coro, **kwargs
                 )
 
             @_wrap_coroutine(coro)
@@ -181,7 +228,7 @@ def patch_asyncio() -> None:
                 return result
 
             task = _create_task_with_factory(
-                orig_task_factory, loop, _task_with_sentry_span_creation(), **kwargs
+                inner_task_factory, loop, _task_with_sentry_span_creation(), **kwargs
             )
 
             # Set the task name to include the original coroutine's name
@@ -193,8 +240,35 @@ def patch_asyncio() -> None:
 
             return task
 
-        _sentry_task_factory._is_sentry_task_factory = True  # type: ignore
-        loop.set_task_factory(_sentry_task_factory)  # type: ignore
+        task_factory: "Any" = _sentry_task_factory
+
+        if eager_task_constructor is not None:
+            # Wrapping an eager task factory in a plain function hides that it
+            # is eager. Install a factory that is itself recognizable as eager
+            # and do the wrapping in its task constructor instead.
+            def _sentry_task_constructor(
+                coro: "Coroutine[Any, Any, Any]",
+                *,
+                loop: "asyncio.AbstractEventLoop",
+                **kwargs: "Any",
+            ) -> "asyncio.Future[Any]":
+                task: "Any" = _sentry_task_factory(loop, coro, **kwargs)
+
+                # The eager factory always passes eager_start. Without it this
+                # is a direct call, and no create_task() follows to apply the
+                # name the caller asked for.
+                name = kwargs.get("name")
+                if "eager_start" not in kwargs and name is not None:
+                    task.set_name(name)
+
+                return task
+
+            task_factory = asyncio.create_eager_task_factory(  # type: ignore[attr-defined]
+                _sentry_task_constructor
+            )
+
+        task_factory._is_sentry_task_factory = True
+        loop.set_task_factory(task_factory)
 
     except RuntimeError:
         # When there is no running loop, we have nothing to patch.
