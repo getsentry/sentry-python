@@ -24,7 +24,6 @@ try:
         set_value,
     )
     from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
-    from opentelemetry.propagate import set_global_textmap
     from opentelemetry.propagators.textmap import (
         CarrierT,
         Getter,
@@ -132,6 +131,14 @@ def setup_capture_exceptions() -> None:
 
 class SentryOTLPPropagator(TextMapPropagator):
     """
+    Propagator for the Sentry-specific ``sentry-trace`` and ``baggage`` headers.
+
+    The OTLPIntegration doesn't set up any propagator. OpenTelemetry's default
+    propagators (W3C ``traceparent`` and ``baggage``) are used unless configured
+    otherwise. If you need to continue traces from or propagate traces to services
+    that only understand Sentry's headers, set this propagator up manually with
+    ``opentelemetry.propagate.set_global_textmap``.
+
     !!! Note regarding baggage:
     We cannot meaningfully populate a new baggage as a head SDK
     when we are using OTLP since we don't have any sort of transaction semantic to
@@ -238,8 +245,6 @@ class OTLPIntegration(Integration):
         Set to False to setup the TracerProvider manually.
     :param collector_url: URL of your own OpenTelemetry collector, defaults to None.
         When set, the exporter will send traces to this URL instead of the Sentry OTLP endpoint derived from the DSN.
-    :param setup_propagator: Automatically configure the Sentry Propagator for Distributed Tracing, defaults to True.
-        Set to False to configure propagators manually or to disable propagation.
     :param capture_exceptions: Intercept and capture exceptions on the OpenTelemetry Span in Sentry as well, defaults to False.
         Set to True to turn on capturing but be aware that since Sentry captures most exceptions, duplicate exceptions might be dropped by DedupeIntegration in many cases.
     """
@@ -250,12 +255,10 @@ class OTLPIntegration(Integration):
         self,
         setup_otlp_traces_exporter: bool = True,
         collector_url: "Optional[str]" = None,
-        setup_propagator: bool = True,
         capture_exceptions: bool = False,
     ) -> None:
         self.setup_otlp_traces_exporter = setup_otlp_traces_exporter
         self.collector_url = collector_url
-        self.setup_propagator = setup_propagator
         self.capture_exceptions = capture_exceptions
 
     @staticmethod
@@ -270,10 +273,5 @@ class OTLPIntegration(Integration):
             logger.debug("[OTLP] Setting up OTLP exporter")
             dsn: "Optional[str]" = options.get("dsn") if options else None
             setup_otlp_traces_exporter(dsn, collector_url=self.collector_url)
-
-        if self.setup_propagator:
-            logger.debug("[OTLP] Setting up propagator for distributed tracing")
-            # TODO-neel better propagator support, chain with existing ones if possible instead of replacing
-            set_global_textmap(SentryOTLPPropagator())
 
         setup_capture_exceptions()

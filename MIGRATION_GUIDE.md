@@ -52,6 +52,19 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 - Whether the MCP integration records tool arguments, tool results, and prompt contents is now controlled by `data_collection`'s new `mcp` setting (`{"inputs": bool, "outputs": bool}`, both `True` by default) instead of the `gen_ai` setting.
 - With `handled_tool_call_exceptions=True` (the default), the Pydantic AI integration now reports an error for every failed tool argument validation attempt, including retries. Previously, only one error was reported per tool call.
 - The Pydantic AI integration no longer sets the `gen_ai.response.streaming` span attribute.
+- The `OTLPIntegration` no longer sets up a propagator, and its `setup_propagator` option was removed. Distributed tracing now uses the propagators configured in OpenTelemetry (by default, W3C `traceparent` and `baggage`). If you need to propagate Sentry's `sentry-trace` and `baggage` headers, for example to talk to services instrumented with Sentry SDKs instead of OpenTelemetry, set up the `SentryOTLPPropagator` manually:
+
+  ```python
+  from opentelemetry.propagate import set_global_textmap
+  from opentelemetry.propagators.composite import CompositePropagator
+  from opentelemetry.trace.propagation.tracecontext import TraceContextTextMapPropagator
+
+  from sentry_sdk.integrations.otlp import SentryOTLPPropagator
+
+  set_global_textmap(
+      CompositePropagator([TraceContextTextMapPropagator(), SentryOTLPPropagator()])
+  )
+  ```
 
 #### Span operation consolidation
 
