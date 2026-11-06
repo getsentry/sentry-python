@@ -38,7 +38,7 @@ pip install --upgrade sentry-sdk
 
 ### Basic Configuration
 
-Here's a quick configuration example to get Sentry up and running:
+Here is a quick configuration example to get Sentry up and running:
 
 ```python
 import sentry_sdk
