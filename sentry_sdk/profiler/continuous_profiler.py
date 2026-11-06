@@ -6,6 +6,7 @@ import threading
 import time
 import uuid
 import warnings
+import weakref
 from collections import deque
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
@@ -443,6 +444,8 @@ class ThreadContinuousScheduler(ContinuousScheduler):
     mode: "ContinuousProfilerMode" = "thread"
     name = "sentry.profiler.ThreadContinuousScheduler"
 
+    thread: "Optional[threading.Thread]"
+
     def __init__(
         self,
         frequency: int,
@@ -452,8 +455,34 @@ class ThreadContinuousScheduler(ContinuousScheduler):
     ) -> None:
         super().__init__(frequency, options, sdk_info, capture_func)
 
-        self.thread: "Optional[threading.Thread]" = None
+        self._reset_thread_state()
+
+        # See https://github.com/getsentry/sentry-python/issues/6165.
+        # If os.fork() runs while another thread holds self.lock, the
+        # child inherits the lock locked but the holding thread does
+        # not exist in the child, so the lock can never be released and
+        # ensure_running deadlocks forever. Reinitialise the lock,
+        # cached thread/pid, running flag, and buffer in the child so
+        # it starts clean regardless of inherited state. We bind via a
+        # WeakMethod so the permanently-registered fork handler does
+        # not pin this scheduler: register_at_fork has no unregister
+        # API. POSIX-only; Windows uses spawn.
+        if hasattr(os, "register_at_fork"):
+            weak_reset = weakref.WeakMethod(self._reset_thread_state)
+
+            def _reset_in_child() -> None:
+                method = weak_reset()
+                if method is not None:
+                    method()
+
+            os.register_at_fork(after_in_child=_reset_in_child)
+
+    def _reset_thread_state(self) -> None:
+        self.thread = None
         self.lock = threading.Lock()
+        self.pid = None
+        self.running = False
+        self.buffer = None
 
     def ensure_running(self) -> None:
         self.soft_shutdown = False
