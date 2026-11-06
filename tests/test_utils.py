@@ -1330,6 +1330,47 @@ def test_get_lines_from_file_handle_linecache_errors():
         assert result == expected_result
 
 
+def test_get_lines_from_file_prefers_linecache(tmp_path):
+    filename = tmp_path / "source.py"
+    filename.write_text("before\ntarget\nafter\n")
+    calls = []
+
+    class Loader:
+        def get_source(self, module):
+            calls.append(module)
+            return "loader source\n"
+
+    result = get_lines_from_file(
+        str(filename), 1, loader=Loader(), module="source_module"
+    )
+
+    assert result == (["before"], "target", ["after"])
+    assert calls == []
+
+
+def test_get_lines_from_file_falls_back_to_loader(tmp_path):
+    filename = tmp_path / "missing.py"
+    calls = []
+
+    class Loader:
+        def get_source(self, module):
+            calls.append(module)
+            return "before\none\ntarget\nafter\n"
+
+    result = get_lines_from_file(
+        str(filename), 2, loader=Loader(), module="fallback_module"
+    )
+
+    assert result == (["before", "one"], "target", ["after"])
+    assert calls == ["fallback_module"]
+
+
+def test_get_lines_from_file_without_source(tmp_path):
+    result = get_lines_from_file(str(tmp_path / "missing.py"), 0)
+
+    assert result == ([], None, [])
+
+
 @pytest.mark.parametrize(
     "options,expected_context_lines",
     [
