@@ -13,6 +13,11 @@ class Boto3Integration(Integration):
     identifier = IDENTIFIER
     origin = ORIGIN
 
+    def __init__(self: "Boto3Integration", include_prompts: bool = True) -> None:
+        # whether to record gen_ai prompts and responses, e.g. of Bedrock Runtime
+        # calls, when `send_default_pii` is on and `data_collection` isn't set.
+        self.include_prompts = include_prompts
+
     @staticmethod
     def setup_once() -> None:
         version = parse_version(BOTOCORE_VERSION)

@@ -733,6 +733,12 @@ class SPANDATA:
     Example: "1234567890"
     """
 
+    GEN_AI_REQUEST_STOP_SEQUENCES = "gen_ai.request.stop_sequences"
+    """
+    List of sequences that the model will use to stop generating further tokens.
+    Example: ["forest", "lived"]
+    """
+
     GEN_AI_REQUEST_TEMPERATURE = "gen_ai.request.temperature"
     """
     The temperature parameter used to control randomness in the output.

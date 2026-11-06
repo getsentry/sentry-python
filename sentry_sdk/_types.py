@@ -479,16 +479,22 @@ if TYPE_CHECKING:
 
     class ToolCallPart(TypedDict):
         type: Literal["tool_call"]
+        id: NotRequired[str]
         name: NotRequired[str]
         arguments: NotRequired[Any]
 
+    class ToolCallResponsePart(TypedDict):
+        type: Literal["tool_call_response"]
+        id: NotRequired[str]
+        result: NotRequired[Any]
+
     class InputMessage(TypedDict):
         role: Literal["user", "assistant", "tool"]
-        parts: list[Union[TextPart, ReasoningPart, ToolCallPart]]
+        parts: list[Union[TextPart, ReasoningPart, ToolCallPart, ToolCallResponsePart]]
 
     class OutputMessage(TypedDict):
         role: Literal["assistant"]
-        parts: list[Union[TextPart, ReasoningPart]]
+        parts: list[Union[TextPart, ReasoningPart, ToolCallPart]]
 
     class ToolDefinition(TypedDict):
         type: str
