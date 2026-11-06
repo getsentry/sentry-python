@@ -218,6 +218,21 @@ def _set_span_input_data(
         _set_span_data_attribute(span, f"mcp.request.argument.{k}", safe_serialize(v))
 
 
+def _is_error_tool_result(result: "Any") -> bool:
+    """
+    Whether a tool call result reports a tool-level error (`isError` is true).
+
+    The result is a CallToolResult object (`isError` in mcp v1, `is_error` in
+    mcp v2) or its serialized dict form (`isError`).
+    """
+    if isinstance(result, dict):
+        return result.get("isError") is True
+    return (
+        getattr(result, "isError", None) is True
+        or getattr(result, "is_error", None) is True
+    )
+
+
 def _extract_tool_result_content(result: "Any") -> "Any":
     """
     Extract meaningful content from MCP tool result.
@@ -367,6 +382,9 @@ async def _tool_handler_wrapper(
             if result is None:
                 return result
 
+            if _is_error_tool_result(result):
+                _set_span_data_attribute(span, SPANDATA.ERROR_TYPE, "tool_error")
+
             # Get integration to check PII settings
             integration = client.get_integration(MCPIntegration)
             if integration is None:
@@ -460,6 +478,9 @@ async def _instrument_v2_tool_call(
                 with capture_internal_exceptions():
                     _capture_exception(e)
                 raise
+
+            if _is_error_tool_result(result):
+                _set_span_data_attribute(span, SPANDATA.ERROR_TYPE, "tool_error")
 
             if not isinstance(result, dict):
                 return result

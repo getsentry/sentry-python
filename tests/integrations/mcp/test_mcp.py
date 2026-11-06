@@ -63,7 +63,12 @@ if IS_MCP_V2:
         TextResourceContents,
     )
 else:
-    from mcp.types import GetPromptResult, PromptMessage, TextContent
+    from mcp.types import (
+        CallToolResult,
+        GetPromptResult,
+        PromptMessage,
+        TextContent,
+    )
 
 from mcp.server.sse import SseServerTransport
 from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
@@ -749,6 +754,7 @@ async def test_tool_handler_with_error(
         assert not error_payload["exception"]["values"][0]["mechanism"]["handled"]
 
         assert span["status"] == "error"
+        assert SPANDATA.ERROR_TYPE not in span["attributes"]
     else:
         events = capture_events()
         with start_transaction(name="mcp tx"):
@@ -786,6 +792,145 @@ async def test_tool_handler_with_error(
 
         assert span["status"] == "internal_error"
         assert span["tags"]["status"] == "internal_error"
+        assert SPANDATA.ERROR_TYPE not in span["data"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif(
+    MCP_PACKAGE_VERSION < (1, 19, 0),
+    reason="Handlers can only return a CallToolResult from mcp 1.19",
+)
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("is_error", [True, False])
+async def test_tool_result_is_error(
+    sentry_init, capture_events, capture_items, span_streaming, is_error, stdio
+):
+    """A tool result with isError=true sets error.type, but not the span status"""
+    sentry_init(
+        integrations=[MCPIntegration()],
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
+
+    server = Server("test-server")
+
+    if IS_MCP_V2:
+
+        async def test_tool(ctx, params):
+            return CallToolResult(
+                content=[TextContent(type="text", text="warehouse DB timeout")],
+                is_error=is_error,
+            )
+
+        server.add_request_handler("tools/call", CallToolRequestParams, test_tool)
+    else:
+
+        @server.call_tool()
+        async def test_tool(tool_name, arguments):
+            return CallToolResult(
+                content=[TextContent(type="text", text="warehouse DB timeout")],
+                isError=is_error,
+            )
+
+    if span_streaming:
+        items = capture_items("event", "span")
+        with sentry_sdk.traces.start_span(name="mcp tx"):
+            result = await stdio(
+                server,
+                method="tools/call",
+                params={"name": "lookup", "arguments": {}},
+                request_id="req-is-error",
+            )
+        sentry_sdk.flush()
+
+        assert not [item for item in items if item.type == "event"]
+        span = _find_mcp_span(items, method_name="tools/call")
+        assert span is not None
+        data = span["attributes"]
+    else:
+        events = capture_events()
+        with start_transaction(name="mcp tx"):
+            result = await stdio(
+                server,
+                method="tools/call",
+                params={"name": "lookup", "arguments": {}},
+                request_id="req-is-error",
+            )
+
+        (tx,) = events
+        assert len(tx["spans"]) == 1
+        span = tx["spans"][0]
+        data = span["data"]
+
+    assert _get_response(result).result["isError"] is is_error
+    # The span status is left as it is for a successful call
+    if span_streaming:
+        assert span["status"] == "ok"
+    else:
+        assert "status" not in span
+
+    if is_error:
+        assert data[SPANDATA.ERROR_TYPE] == "tool_error"
+    else:
+        assert SPANDATA.ERROR_TYPE not in data
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif(not IS_MCP_V2, reason="MCPServer is MCP v2 only")
+@pytest.mark.parametrize("span_streaming", [True, False])
+async def test_mcpserver_raising_tool_sets_error_type(
+    sentry_init, capture_events, capture_items, span_streaming, stdio
+):
+    """MCPServer turns an exception raised by a tool into an isError result
+    before the middleware sees it, so the span gets error.type=tool_error."""
+    from mcp.server import MCPServer
+
+    sentry_init(
+        integrations=[MCPIntegration()],
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
+
+    mcp_server = MCPServer("test-server")
+
+    @mcp_server.tool()
+    def failing(x: int) -> int:
+        raise ValueError("Tool execution failed")
+
+    if span_streaming:
+        items = capture_items("span")
+        with sentry_sdk.traces.start_span(name="mcp tx"):
+            result = await stdio(
+                mcp_server._lowlevel_server,
+                method="tools/call",
+                params={"name": "failing", "arguments": {"x": 1}},
+                request_id="req-mcpserver-error",
+            )
+        sentry_sdk.flush()
+        span = _find_mcp_span(items, method_name="tools/call")
+        assert span is not None
+        data = span["attributes"]
+    else:
+        events = capture_events()
+        with start_transaction(name="mcp tx"):
+            result = await stdio(
+                mcp_server._lowlevel_server,
+                method="tools/call",
+                params={"name": "failing", "arguments": {"x": 1}},
+                request_id="req-mcpserver-error",
+            )
+        # MCPServer also logs the unexpected exception, which is captured as an event
+        (tx,) = (event for event in events if event.get("type") == "transaction")
+        assert len(tx["spans"]) == 1
+        span = tx["spans"][0]
+        data = span["data"]
+
+    assert _get_response(result).result["isError"] is True
+    if span_streaming:
+        assert span["status"] == "ok"
+    else:
+        assert "status" not in span
+    assert data[SPANDATA.ERROR_TYPE] == "tool_error"
 
 
 @pytest.mark.asyncio
