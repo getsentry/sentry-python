@@ -25,7 +25,7 @@ from sentry_sdk.utils import (
 )
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Dict, Mapping, Optional, Union
+    from typing import Any, Callable, Dict, Iterator, Mapping, Optional, Union
 
     from sentry_sdk._types import Attributes
     from sentry_sdk.integrations.boto3._context import AwsCallContext
@@ -33,6 +33,7 @@ if TYPE_CHECKING:
 
 try:
     from botocore.awsrequest import AWSRequest
+    from botocore.eventstream import EventStream
     from botocore.exceptions import ClientError
     from botocore.response import StreamingBody
 except ImportError:
@@ -389,6 +390,92 @@ def _patch_streaming_body(
     except Exception:
         finish()
         raise
+
+
+class _EventStreamHooks:
+    """
+    Callbacks of an instrumented `EventStream`, stored on the stream.
+    """
+
+    __slots__ = ("on_event", "on_finish", "finished")
+
+    def __init__(
+        self,
+        on_event: "Callable[[Any], None]",
+        on_finish: "Callable[[Optional[BaseException]], None]",
+    ) -> None:
+        self.on_event = on_event
+        self.on_finish = on_finish
+        self.finished = False
+
+    def finish(self, error: "Optional[BaseException]" = None) -> None:
+        # only finish once across iteration and close.
+        if self.finished:
+            return
+
+        self.finished = True
+        with capture_internal_exceptions():
+            self.on_finish(error)
+
+
+def _instrument_event_stream(
+    stream: "EventStream[Any]",
+    on_event: "Callable[[Any], None]",
+    on_finish: "Callable[[Optional[BaseException]], None]",
+) -> None:
+    """
+    Call `on_event` with each event the caller receives from `stream`, and
+    `on_finish` once, when `stream` is exhausted, closed, stops being iterated,
+    or fails.
+    """
+    stream._sentry_hooks = _EventStreamHooks(on_event, on_finish)  # type: ignore[attr-defined]
+
+
+def _patch_event_stream() -> None:
+    """
+    Patch `EventStream` globally, since its iterator is a method; streams without
+    hooks are unchanged.
+    """
+    orig_iter = EventStream.__iter__
+    orig_close = EventStream.close
+
+    def sentry_event_stream_iter(self: "EventStream[Any]") -> "Iterator[Any]":
+        hooks: "Optional[_EventStreamHooks]" = getattr(self, "_sentry_hooks", None)
+        if hooks is None:
+            yield from orig_iter(self)
+            return
+
+        try:
+            for event in orig_iter(self):
+                with capture_internal_exceptions():
+                    hooks.on_event(event)
+                yield event
+        except GeneratorExit:
+            # the caller stopped iterating, e.g. with `break`.
+            hooks.finish()
+            raise
+        except BaseException as error:
+            hooks.finish(error)
+            raise
+
+        hooks.finish()
+
+    def sentry_event_stream_close(
+        self: "EventStream[Any]", *args: "Any", **kwargs: "Any"
+    ) -> None:
+        hooks: "Optional[_EventStreamHooks]" = getattr(self, "_sentry_hooks", None)
+        try:
+            orig_close(self, *args, **kwargs)
+        except BaseException as error:
+            if hooks is not None:
+                hooks.finish(error)
+            raise
+
+        if hooks is not None:
+            hooks.finish()
+
+    EventStream.__iter__ = sentry_event_stream_iter  # type: ignore[method-assign]
+    EventStream.close = sentry_event_stream_close  # type: ignore[method-assign]
 
 
 def _set_request_attributes(

@@ -1,12 +1,14 @@
 import base64
+import binascii
 import copy
 import json
+import struct
 from io import BytesIO
 
 import boto3
 import pytest
 from botocore.awsrequest import AWSResponse
-from botocore.exceptions import ClientError
+from botocore.exceptions import ClientError, EventStreamError
 from botocore.stub import Stubber
 
 import sentry_sdk
@@ -1516,3 +1518,785 @@ def test_invoke_model_bodies_that_are_not_parsed(
     assert SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS not in attributes
     assert SPANDATA.GEN_AI_OUTPUT_MESSAGES not in attributes
     assert attributes[SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 7
+
+
+def _encode_event_stream_message(headers, payload):
+    """
+    Encode a message in the `application/vnd.amazon.eventstream` format, with
+    string headers.
+    https://docs.aws.amazon.com/transcribe/latest/dg/streaming-setting-up.html#streaming-event-stream
+    """
+    encoded_headers = b"".join(
+        struct.pack("B", len(name))
+        + name.encode()
+        + b"\x07"
+        + struct.pack(">H", len(value))
+        + value.encode()
+        for name, value in headers.items()
+    )
+    prelude = struct.pack(
+        ">II", 16 + len(encoded_headers) + len(payload), len(encoded_headers)
+    )
+    message = (
+        prelude + struct.pack(">I", binascii.crc32(prelude)) + encoded_headers + payload
+    )
+    return message + struct.pack(">I", binascii.crc32(message))
+
+
+def _event_stream_response(client, events):
+    """
+    Respond with an event stream of `(event type, payload)` events. An event type of
+    `None` is a `modelStreamErrorException`.
+    """
+    body = b"".join(
+        _encode_event_stream_message(
+            {
+                ":message-type": "event",
+                ":event-type": event_type,
+                ":content-type": "application/json",
+            }
+            if event_type is not None
+            else {
+                ":message-type": "exception",
+                ":exception-type": "modelStreamErrorException",
+                ":content-type": "application/json",
+            },
+            json.dumps(payload).encode(),
+        )
+        for event_type, payload in events
+    )
+    return MockResponse(
+        client,
+        200,
+        {
+            "content-type": "application/vnd.amazon.eventstream",
+            "x-amzn-requestid": "request-id",
+        },
+        body,
+    )
+
+
+def _invoke_model_stream_chunks(*chunks):
+    return [
+        ("chunk", {"bytes": base64.b64encode(json.dumps(chunk).encode()).decode()})
+        for chunk in chunks
+    ]
+
+
+CONVERSE_STREAM_EVENTS = [
+    ("messageStart", {"role": "assistant"}),
+    ("contentBlockDelta", {"contentBlockIndex": 0, "delta": {"text": "Let me "}}),
+    ("contentBlockDelta", {"contentBlockIndex": 0, "delta": {"text": "check."}}),
+    ("contentBlockStop", {"contentBlockIndex": 0}),
+    (
+        "contentBlockStart",
+        {
+            "contentBlockIndex": 1,
+            "start": {"toolUse": {"toolUseId": "tool-1", "name": "get_weather"}},
+        },
+    ),
+    (
+        "contentBlockDelta",
+        {"contentBlockIndex": 1, "delta": {"toolUse": {"input": '{"city": '}}},
+    ),
+    (
+        "contentBlockDelta",
+        {"contentBlockIndex": 1, "delta": {"toolUse": {"input": '"Paris"}'}}},
+    ),
+    ("contentBlockStop", {"contentBlockIndex": 1}),
+    ("messageStop", {"stopReason": "tool_use"}),
+    (
+        "metadata",
+        {
+            "usage": {"inputTokens": 12, "outputTokens": 8, "totalTokens": 20},
+            "metrics": {"latencyMs": 100},
+        },
+    ),
+]
+
+CONVERSE_STREAM_PARAMS = {
+    "modelId": MODEL_ID,
+    "messages": [{"role": "user", "content": [{"text": "Weather in Paris?"}]}],
+    "inferenceConfig": {"maxTokens": 100},
+}
+
+
+@pytest.mark.parametrize("trace_mode", TRACE_MODES)
+@pytest.mark.parametrize(
+    "init_kwargs, include_prompts, record_inputs, record_outputs",
+    GEN_AI_DATA_COLLECTION_CASES,
+)
+def test_converse_stream(
+    init_bedrock,
+    capture_items,
+    trace_mode,
+    init_kwargs,
+    include_prompts,
+    record_inputs,
+    record_outputs,
+):
+    client = init_bedrock(trace_mode, include_prompts=include_prompts, **init_kwargs)
+    received_events = []
+
+    def call():
+        response = client.converse_stream(**CONVERSE_STREAM_PARAMS)
+        received_events.extend(response["stream"])
+
+    with _event_stream_response(client, CONVERSE_STREAM_EVENTS):
+        spans = _capture_spans(capture_items, trace_mode, call)
+
+    # the caller receives the events unchanged.
+    assert received_events == [
+        {event_type: payload} for event_type, payload in CONVERSE_STREAM_EVENTS
+    ]
+
+    span = _get_bedrock_span(spans)
+    attributes = _get_attributes(span)
+    assert span["name"] == f"chat {MODEL_ID}"
+    assert span["status"] == "ok"
+    assert attributes[SPANDATA.SENTRY_OP] == OP.GEN_AI_CHAT
+    assert attributes[SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+    assert attributes[SPANDATA.GEN_AI_PROVIDER_NAME] == "aws.bedrock"
+    assert attributes[SPANDATA.GEN_AI_REQUEST_MODEL] == MODEL_ID
+    assert attributes[SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert attributes[SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
+    assert attributes[SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["tool_use"]
+    assert attributes[SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 12
+    assert attributes[SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 8
+    assert attributes[SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 20
+    assert attributes[SPANDATA.RPC_METHOD] == "ConverseStream"
+    assert attributes[SPANDATA.AWS_REQUEST_ID] == "request-id"
+
+    if record_inputs:
+        assert attributes[SPANDATA.GEN_AI_INPUT_MESSAGES] == [
+            {
+                "role": "user",
+                "parts": [{"type": "text", "content": "Weather in Paris?"}],
+            }
+        ]
+    else:
+        assert SPANDATA.GEN_AI_INPUT_MESSAGES not in attributes
+
+    if record_outputs:
+        assert attributes[SPANDATA.GEN_AI_OUTPUT_MESSAGES] == [
+            {
+                "role": "assistant",
+                "parts": [
+                    {"type": "text", "content": "Let me check."},
+                    {
+                        "type": "tool_call",
+                        "id": "tool-1",
+                        "name": "get_weather",
+                        "arguments": {"city": "Paris"},
+                    },
+                ],
+            }
+        ]
+    else:
+        assert SPANDATA.GEN_AI_OUTPUT_MESSAGES not in attributes
+
+
+def _consume_until_error(stream):
+    events = []
+    with pytest.raises(EventStreamError) as exc_info:
+        for event in stream:
+            events.append(event)
+    assert exc_info.value.response["Error"]["Code"] == "modelStreamErrorException"
+    return events
+
+
+def _break_after_first_event(stream):
+    events = []
+    for event in stream:
+        events.append(event)
+        break
+    return events
+
+
+def _close_unread(stream):
+    stream.close()
+    return []
+
+
+def _close_after_first_event(stream):
+    events = [next(iter(stream))]
+    stream.close()
+    return events
+
+
+@pytest.mark.parametrize("trace_mode", TRACE_MODES)
+@pytest.mark.parametrize(
+    "events, consume, received, status",
+    [
+        pytest.param(CONVERSE_STREAM_EVENTS, list, 10, "ok", id="exhausted"),
+        pytest.param(
+            CONVERSE_STREAM_EVENTS, _break_after_first_event, 1, "ok", id="break"
+        ),
+        pytest.param(
+            CONVERSE_STREAM_EVENTS, _close_after_first_event, 1, "ok", id="close"
+        ),
+        pytest.param(
+            CONVERSE_STREAM_EVENTS,
+            _close_unread,
+            0,
+            "ok",
+            id="close_unread",
+        ),
+        pytest.param(
+            CONVERSE_STREAM_EVENTS[:2] + [(None, {"message": "Model error"})],
+            _consume_until_error,
+            2,
+            "error",
+            id="error",
+        ),
+    ],
+)
+def test_converse_stream_consumption(
+    init_bedrock, capture_items, trace_mode, events, consume, received, status
+):
+    client = init_bedrock(trace_mode, send_default_pii=True)
+    received_events = []
+
+    def call():
+        response = client.converse_stream(**CONVERSE_STREAM_PARAMS)
+        received_events.extend(consume(response["stream"]))
+
+    with _event_stream_response(client, events):
+        spans = _capture_spans(capture_items, trace_mode, call)
+
+    assert received_events == [
+        {event_type: payload} for event_type, payload in events[:received]
+    ]
+
+    # the span finishes once, with the response received so far.
+    span = _get_bedrock_span(spans)
+    attributes = _get_attributes(span)
+    assert span["status"] == status
+    if status == "error":
+        assert attributes[SPANDATA.ERROR_TYPE] == "modelStreamErrorException"
+    else:
+        assert SPANDATA.ERROR_TYPE not in attributes
+
+    if received == len(CONVERSE_STREAM_EVENTS):
+        assert attributes[SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["tool_use"]
+    else:
+        assert SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS not in attributes
+        assert SPANDATA.GEN_AI_USAGE_INPUT_TOKENS not in attributes
+
+    if received >= 2:
+        assert attributes[SPANDATA.GEN_AI_OUTPUT_MESSAGES][0]["parts"][0] == {
+            "type": "text",
+            "content": "Let me check." if received > 2 else "Let me ",
+        }
+    else:
+        assert SPANDATA.GEN_AI_OUTPUT_MESSAGES not in attributes
+
+
+@pytest.mark.parametrize("trace_mode", TRACE_MODES)
+def test_converse_stream_without_parent_span(init_bedrock, capture_items, trace_mode):
+    client = init_bedrock(trace_mode, send_default_pii=True)
+    items = capture_items("transaction", "span")
+
+    with _event_stream_response(client, CONVERSE_STREAM_EVENTS):
+        response = client.converse_stream(**CONVERSE_STREAM_PARAMS)
+        received_events = list(response["stream"])
+    sentry_sdk.flush()
+
+    assert received_events == [
+        {event_type: payload} for event_type, payload in CONVERSE_STREAM_EVENTS
+    ]
+    assert not items
+
+
+INVOKE_MODEL_STREAM_CASES = [
+    pytest.param(
+        "us.anthropic.claude-3-5-sonnet-20240620-v1:0",
+        {
+            "anthropic_version": "bedrock-2023-05-31",
+            "max_tokens": 100,
+            "messages": [{"role": "user", "content": "Weather in Paris?"}],
+        },
+        [
+            {
+                "type": "message_start",
+                "message": {
+                    "role": "assistant",
+                    "content": [],
+                    "usage": {
+                        "input_tokens": 10,
+                        "output_tokens": 1,
+                        "cache_read_input_tokens": 100,
+                        "cache_creation_input_tokens": 0,
+                    },
+                },
+            },
+            {
+                "type": "content_block_start",
+                "index": 0,
+                "content_block": {"type": "thinking", "thinking": ""},
+            },
+            {
+                "type": "content_block_delta",
+                "index": 0,
+                "delta": {"type": "thinking_delta", "thinking": "I need the tool."},
+            },
+            {
+                "type": "content_block_delta",
+                "index": 0,
+                "delta": {"type": "signature_delta", "signature": "abc"},
+            },
+            {"type": "content_block_stop", "index": 0},
+            {
+                "type": "content_block_start",
+                "index": 1,
+                "content_block": {"type": "text", "text": ""},
+            },
+            {
+                "type": "content_block_delta",
+                "index": 1,
+                "delta": {"type": "text_delta", "text": "Let me "},
+            },
+            {
+                "type": "content_block_delta",
+                "index": 1,
+                "delta": {"type": "text_delta", "text": "check."},
+            },
+            {"type": "content_block_stop", "index": 1},
+            {
+                "type": "content_block_start",
+                "index": 2,
+                "content_block": {
+                    "type": "tool_use",
+                    "id": "tool-1",
+                    "name": "get_weather",
+                    "input": {},
+                },
+            },
+            {
+                "type": "content_block_delta",
+                "index": 2,
+                "delta": {"type": "input_json_delta", "partial_json": '{"city": '},
+            },
+            {
+                "type": "content_block_delta",
+                "index": 2,
+                "delta": {"type": "input_json_delta", "partial_json": '"Paris"}'},
+            },
+            {"type": "content_block_stop", "index": 2},
+            {
+                "type": "message_delta",
+                "delta": {"stop_reason": "tool_use"},
+                "usage": {"output_tokens": 25},
+            },
+            {
+                "type": "message_stop",
+                "amazon-bedrock-invocationMetrics": {
+                    "inputTokenCount": 10,
+                    "outputTokenCount": 25,
+                },
+            },
+        ],
+        {
+            SPANDATA.GEN_AI_REQUEST_MAX_TOKENS: 100,
+            SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS: ["tool_use"],
+            SPANDATA.GEN_AI_USAGE_INPUT_TOKENS: 110,
+            SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS: 25,
+            SPANDATA.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS: 100,
+            SPANDATA.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS: 0,
+            SPANDATA.GEN_AI_INPUT_MESSAGES: [
+                {
+                    "role": "user",
+                    "parts": [{"type": "text", "content": "Weather in Paris?"}],
+                }
+            ],
+            SPANDATA.GEN_AI_OUTPUT_MESSAGES: [
+                {
+                    "role": "assistant",
+                    "parts": [
+                        {"type": "reasoning", "content": "I need the tool."},
+                        {"type": "text", "content": "Let me check."},
+                        {
+                            "type": "tool_call",
+                            "id": "tool-1",
+                            "name": "get_weather",
+                            "arguments": {"city": "Paris"},
+                        },
+                    ],
+                }
+            ],
+        },
+        id="anthropic_claude",
+    ),
+    pytest.param(
+        "amazon.nova-lite-v1:0",
+        {
+            "messages": [{"role": "user", "content": [{"text": "Hello!"}]}],
+            "inferenceConfig": {"max_new_tokens": 100},
+        },
+        [
+            {"messageStart": {"role": "assistant"}},
+            {"contentBlockDelta": {"delta": {"text": "Hi"}, "contentBlockIndex": 0}},
+            {"contentBlockDelta": {"delta": {"text": "!"}, "contentBlockIndex": 0}},
+            {"contentBlockStop": {"contentBlockIndex": 0}},
+            {"messageStop": {"stopReason": "end_turn"}},
+            {
+                "metadata": {"usage": {"inputTokens": 10, "outputTokens": 5}},
+                "amazon-bedrock-invocationMetrics": {
+                    "inputTokenCount": 10,
+                    "outputTokenCount": 5,
+                },
+            },
+        ],
+        {
+            SPANDATA.GEN_AI_REQUEST_MAX_TOKENS: 100,
+            SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS: ["end_turn"],
+            SPANDATA.GEN_AI_USAGE_INPUT_TOKENS: 10,
+            SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS: 5,
+            SPANDATA.GEN_AI_INPUT_MESSAGES: [
+                {"role": "user", "parts": [{"type": "text", "content": "Hello!"}]}
+            ],
+            SPANDATA.GEN_AI_OUTPUT_MESSAGES: [
+                {"role": "assistant", "parts": [{"type": "text", "content": "Hi!"}]}
+            ],
+        },
+        id="amazon_nova",
+    ),
+    pytest.param(
+        "amazon.titan-text-express-v1",
+        {"inputText": "Hello!", "textGenerationConfig": {"maxTokenCount": 100}},
+        [
+            {
+                "outputText": "Hi",
+                "index": 0,
+                "totalOutputTextTokenCount": 1,
+                "completionReason": None,
+                "inputTextTokenCount": 10,
+            },
+            {
+                "outputText": "!",
+                "index": 0,
+                "totalOutputTextTokenCount": 5,
+                "completionReason": "FINISH",
+                "inputTextTokenCount": None,
+                "amazon-bedrock-invocationMetrics": {
+                    "inputTokenCount": 10,
+                    "outputTokenCount": 5,
+                },
+            },
+        ],
+        {
+            SPANDATA.GEN_AI_REQUEST_MAX_TOKENS: 100,
+            SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS: ["FINISH"],
+            SPANDATA.GEN_AI_USAGE_INPUT_TOKENS: 10,
+            SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS: 5,
+            SPANDATA.GEN_AI_INPUT_MESSAGES: [
+                {"role": "user", "parts": [{"type": "text", "content": "Hello!"}]}
+            ],
+            SPANDATA.GEN_AI_OUTPUT_MESSAGES: [
+                {"role": "assistant", "parts": [{"type": "text", "content": "Hi!"}]}
+            ],
+        },
+        id="amazon_titan",
+    ),
+    pytest.param(
+        "meta.llama3-8b-instruct-v1:0",
+        {"prompt": "Hello!", "max_gen_len": 100},
+        [
+            {
+                "generation": "Hi",
+                "prompt_token_count": 10,
+                "generation_token_count": 1,
+                "stop_reason": None,
+            },
+            {
+                "generation": "!",
+                "prompt_token_count": None,
+                "generation_token_count": 5,
+                "stop_reason": "stop",
+                "amazon-bedrock-invocationMetrics": {
+                    "inputTokenCount": 10,
+                    "outputTokenCount": 5,
+                },
+            },
+        ],
+        {
+            SPANDATA.GEN_AI_REQUEST_MAX_TOKENS: 100,
+            SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS: ["stop"],
+            SPANDATA.GEN_AI_USAGE_INPUT_TOKENS: 10,
+            SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS: 5,
+            SPANDATA.GEN_AI_INPUT_MESSAGES: [
+                {"role": "user", "parts": [{"type": "text", "content": "Hello!"}]}
+            ],
+            SPANDATA.GEN_AI_OUTPUT_MESSAGES: [
+                {"role": "assistant", "parts": [{"type": "text", "content": "Hi!"}]}
+            ],
+        },
+        id="meta_llama",
+    ),
+    pytest.param(
+        "cohere.command-r-v1:0",
+        {"message": "Hello!", "max_tokens": 100},
+        [
+            {"is_finished": False, "event_type": "stream-start", "generation_id": "1"},
+            {"is_finished": False, "event_type": "text-generation", "text": "Hi"},
+            {"is_finished": False, "event_type": "text-generation", "text": "!"},
+            {
+                "is_finished": True,
+                "event_type": "stream-end",
+                "finish_reason": "COMPLETE",
+                "response": {"text": "Hi!"},
+                "amazon-bedrock-invocationMetrics": {
+                    "inputTokenCount": 7,
+                    "outputTokenCount": 3,
+                },
+            },
+        ],
+        {
+            SPANDATA.GEN_AI_REQUEST_MAX_TOKENS: 100,
+            SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS: ["COMPLETE"],
+            # the chunks have no usage; it's in Bedrock's invocation metrics.
+            SPANDATA.GEN_AI_USAGE_INPUT_TOKENS: 7,
+            SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS: 3,
+            SPANDATA.GEN_AI_INPUT_MESSAGES: [
+                {"role": "user", "parts": [{"type": "text", "content": "Hello!"}]}
+            ],
+            SPANDATA.GEN_AI_OUTPUT_MESSAGES: [
+                {"role": "assistant", "parts": [{"type": "text", "content": "Hi!"}]}
+            ],
+        },
+        id="cohere_command_r",
+    ),
+    pytest.param(
+        "cohere.command-text-v14",
+        {"prompt": "Hello!", "max_tokens": 100},
+        [
+            {"generations": [{"text": "Hi"}]},
+            {
+                "generations": [{"text": "!", "finish_reason": "COMPLETE"}],
+                "amazon-bedrock-invocationMetrics": {
+                    "inputTokenCount": 7,
+                    "outputTokenCount": 3,
+                },
+            },
+        ],
+        {
+            SPANDATA.GEN_AI_REQUEST_MAX_TOKENS: 100,
+            SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS: ["COMPLETE"],
+            SPANDATA.GEN_AI_USAGE_INPUT_TOKENS: 7,
+            SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS: 3,
+            SPANDATA.GEN_AI_INPUT_MESSAGES: [
+                {"role": "user", "parts": [{"type": "text", "content": "Hello!"}]}
+            ],
+            SPANDATA.GEN_AI_OUTPUT_MESSAGES: [
+                {"role": "assistant", "parts": [{"type": "text", "content": "Hi!"}]}
+            ],
+        },
+        id="cohere_command",
+    ),
+    pytest.param(
+        "mistral.mistral-7b-instruct-v0:2",
+        {"prompt": "Hello!", "max_tokens": 100},
+        [
+            {"outputs": [{"text": "Hi", "stop_reason": None}]},
+            {
+                "outputs": [{"text": "!", "stop_reason": "stop"}],
+                "amazon-bedrock-invocationMetrics": {
+                    "inputTokenCount": 7,
+                    "outputTokenCount": 3,
+                },
+            },
+        ],
+        {
+            SPANDATA.GEN_AI_REQUEST_MAX_TOKENS: 100,
+            SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS: ["stop"],
+            SPANDATA.GEN_AI_USAGE_INPUT_TOKENS: 7,
+            SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS: 3,
+            SPANDATA.GEN_AI_INPUT_MESSAGES: [
+                {"role": "user", "parts": [{"type": "text", "content": "Hello!"}]}
+            ],
+            SPANDATA.GEN_AI_OUTPUT_MESSAGES: [
+                {"role": "assistant", "parts": [{"type": "text", "content": "Hi!"}]}
+            ],
+        },
+        id="mistral",
+    ),
+    pytest.param(
+        "ai21.jamba-1-5-mini-v1:0",
+        {"messages": [{"role": "user", "content": "Hello!"}], "max_tokens": 100},
+        [
+            {"choices": [{"delta": {"content": "Hi!"}}]},
+            {
+                "choices": [{"finish_reason": "stop"}],
+                "amazon-bedrock-invocationMetrics": {
+                    "inputTokenCount": 7,
+                    "outputTokenCount": 3,
+                },
+            },
+        ],
+        {
+            SPANDATA.GEN_AI_USAGE_INPUT_TOKENS: 7,
+            SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS: 3,
+        },
+        id="unknown_model",
+    ),
+]
+
+
+@pytest.mark.parametrize("trace_mode", TRACE_MODES)
+@pytest.mark.parametrize(
+    "model_id, request_body, chunks, expected_attributes", INVOKE_MODEL_STREAM_CASES
+)
+def test_invoke_model_with_response_stream(
+    init_bedrock,
+    capture_items,
+    trace_mode,
+    model_id,
+    request_body,
+    chunks,
+    expected_attributes,
+):
+    client = init_bedrock(trace_mode, send_default_pii=True)
+    received_chunks = []
+
+    def call():
+        response = client.invoke_model_with_response_stream(
+            modelId=model_id, body=json.dumps(request_body)
+        )
+        received_chunks.extend(
+            json.loads(event["chunk"]["bytes"]) for event in response["body"]
+        )
+
+    with _event_stream_response(client, _invoke_model_stream_chunks(*chunks)):
+        spans = _capture_spans(capture_items, trace_mode, call)
+
+    assert received_chunks == chunks
+
+    span = _get_bedrock_span(spans)
+    attributes = _get_attributes(span)
+    assert span["name"] == f"generate_content {model_id}"
+    assert span["status"] == "ok"
+    assert attributes[SPANDATA.SENTRY_OP] == OP.GEN_AI_GENERATE_CONTENT
+    assert attributes[SPANDATA.RPC_METHOD] == "InvokeModelWithResponseStream"
+    assert {
+        key: value
+        for key, value in attributes.items()
+        if key.startswith("gen_ai.")
+        and key
+        not in (
+            SPANDATA.GEN_AI_PROVIDER_NAME,
+            SPANDATA.GEN_AI_OPERATION_NAME,
+            SPANDATA.GEN_AI_REQUEST_MODEL,
+        )
+    } == {SPANDATA.GEN_AI_RESPONSE_STREAMING: True, **expected_attributes}
+    assert attributes[SPANDATA.GEN_AI_PROVIDER_NAME] == "aws.bedrock"
+    assert attributes[SPANDATA.GEN_AI_OPERATION_NAME] == "generate_content"
+    assert attributes[SPANDATA.GEN_AI_REQUEST_MODEL] == model_id
+
+
+@pytest.mark.parametrize("trace_mode", TRACE_MODES)
+@pytest.mark.parametrize(
+    "init_kwargs, include_prompts, record_inputs, record_outputs",
+    GEN_AI_DATA_COLLECTION_CASES,
+)
+def test_invoke_model_with_response_stream_data_collection(
+    init_bedrock,
+    capture_items,
+    trace_mode,
+    init_kwargs,
+    include_prompts,
+    record_inputs,
+    record_outputs,
+):
+    client = init_bedrock(trace_mode, include_prompts=include_prompts, **init_kwargs)
+    model_id, request_body, chunks, expected_attributes = INVOKE_MODEL_STREAM_CASES[
+        0
+    ].values
+
+    def call():
+        response = client.invoke_model_with_response_stream(
+            modelId=model_id, body=json.dumps(request_body)
+        )
+        for _ in response["body"]:
+            pass
+
+    with _event_stream_response(client, _invoke_model_stream_chunks(*chunks)):
+        spans = _capture_spans(capture_items, trace_mode, call)
+
+    attributes = _get_attributes(_get_bedrock_span(spans))
+    for attribute, recorded in (
+        (SPANDATA.GEN_AI_INPUT_MESSAGES, record_inputs),
+        (SPANDATA.GEN_AI_OUTPUT_MESSAGES, record_outputs),
+    ):
+        if recorded:
+            assert attributes[attribute] == expected_attributes[attribute]
+        else:
+            assert attribute not in attributes
+    assert (
+        attributes[SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS]
+        == expected_attributes[SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS]
+    )
+
+
+@pytest.mark.parametrize("trace_mode", TRACE_MODES)
+def test_invoke_model_with_response_stream_skips_malformed_chunks(
+    init_bedrock, capture_items, trace_mode
+):
+    client = init_bedrock(trace_mode, send_default_pii=True)
+    malformed_chunk = ("chunk", {"bytes": base64.b64encode(b"not json").decode()})
+    events = [malformed_chunk] + _invoke_model_stream_chunks(
+        {
+            "outputs": [{"text": "Hi!", "stop_reason": "stop"}],
+            "amazon-bedrock-invocationMetrics": {
+                "inputTokenCount": 7,
+                "outputTokenCount": 3,
+            },
+        }
+    )
+    received_chunks = []
+
+    def call():
+        response = client.invoke_model_with_response_stream(
+            modelId="mistral.mistral-7b-instruct-v0:2",
+            body=json.dumps({"prompt": "Hello!"}),
+        )
+        received_chunks.extend(event["chunk"]["bytes"] for event in response["body"])
+
+    with _event_stream_response(client, events):
+        spans = _capture_spans(capture_items, trace_mode, call)
+
+    assert received_chunks[0] == b"not json"
+    assert len(received_chunks) == 2
+
+    attributes = _get_attributes(_get_bedrock_span(spans))
+    assert attributes[SPANDATA.GEN_AI_OUTPUT_MESSAGES] == [
+        {"role": "assistant", "parts": [{"type": "text", "content": "Hi!"}]}
+    ]
+    assert attributes[SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 3
+
+
+@pytest.mark.parametrize("trace_mode", TRACE_MODES)
+def test_invoke_model_with_response_stream_error_is_unchanged(
+    init_bedrock, capture_items, trace_mode
+):
+    client = init_bedrock(trace_mode)
+    events = _invoke_model_stream_chunks(
+        {"outputs": [{"text": "Hi", "stop_reason": None}]}
+    ) + [(None, {"message": "Model error"})]
+    received_chunks = []
+
+    def call():
+        response = client.invoke_model_with_response_stream(
+            modelId="mistral.mistral-7b-instruct-v0:2",
+            body=json.dumps({"prompt": "Hello!"}),
+        )
+        received_chunks.extend(_consume_until_error(response["body"]))
+
+    with _event_stream_response(client, events):
+        spans = _capture_spans(capture_items, trace_mode, call)
+
+    assert len(received_chunks) == 1
+
+    span = _get_bedrock_span(spans)
+    assert span["status"] == "error"
+    assert span["attributes"][SPANDATA.ERROR_TYPE] == "modelStreamErrorException"
+    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True

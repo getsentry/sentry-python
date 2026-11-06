@@ -12,6 +12,7 @@ from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.integrations.boto3._instrumentation import (
     _finish_span,
     _get_error_attributes,
+    _instrument_event_stream,
     _patch_streaming_body,
     _set_span_attributes,
 )
@@ -43,6 +44,7 @@ if TYPE_CHECKING:
     ContentPart = Union[TextPart, ReasoningPart, ToolCallPart, ToolCallResponsePart]
 
 try:
+    from botocore.eventstream import EventStream
     from botocore.response import StreamingBody
 except ImportError:
     raise DidNotEnable("botocore not installed")
@@ -55,8 +57,15 @@ PROVIDER_NAME = "aws.bedrock"
 # `gen_ai.operation.name` and span op of each instrumented operation.
 GEN_AI_OPERATIONS = {
     "Converse": ("chat", OP.GEN_AI_CHAT),
+    "ConverseStream": ("chat", OP.GEN_AI_CHAT),
     "InvokeModel": ("generate_content", OP.GEN_AI_GENERATE_CONTENT),
+    "InvokeModelWithResponseStream": ("generate_content", OP.GEN_AI_GENERATE_CONTENT),
 }
+
+# operations with a model-specific request body; the others use the Converse format.
+INVOKE_MODEL_OPERATIONS = ("InvokeModel", "InvokeModelWithResponseStream")
+
+STREAMING_OPERATIONS = ("ConverseStream", "InvokeModelWithResponseStream")
 
 # `InvokeModel` request and response bodies have a model-specific format. For each
 # model family: the object that holds the inference parameters in the request body,
@@ -181,14 +190,15 @@ class _BedrockRuntimeExtension(_ServiceExtension):
         attributes: "Attributes" = {
             SPANDATA.GEN_AI_PROVIDER_NAME: PROVIDER_NAME,
             SPANDATA.GEN_AI_OPERATION_NAME: operation_name,
-            SPANDATA.GEN_AI_RESPONSE_STREAMING: False,
+            SPANDATA.GEN_AI_RESPONSE_STREAMING: ctx.operation_name
+            in STREAMING_OPERATIONS,
         }
 
         model_id = ctx.params.get("modelId")
         if model_id:
             attributes[SPANDATA.GEN_AI_REQUEST_MODEL] = model_id
 
-        if ctx.operation_name != "InvokeModel":
+        if ctx.operation_name not in INVOKE_MODEL_OPERATIONS:
             with capture_internal_exceptions():
                 attributes.update(_get_converse_request_attributes(ctx.params))
 
@@ -204,7 +214,7 @@ class _BedrockRuntimeExtension(_ServiceExtension):
             return {}
 
         # the request body is parsed once, for its parameters and input messages.
-        if ctx.operation_name == "InvokeModel":
+        if ctx.operation_name in INVOKE_MODEL_OPERATIONS:
             return _get_invoke_model_request_attributes(
                 span,
                 _get_model_family(ctx.params.get("modelId")),
@@ -236,51 +246,107 @@ class _BedrockRuntimeExtension(_ServiceExtension):
         response: "Any",
     ) -> bool:
         """
-        The `InvokeModel` response body is a `StreamingBody`. Its bytes are recorded
-        as the caller reads them, and the span finishes once it's read or closed.
+        The `InvokeModel` response body and the streamed responses are read by the
+        caller. They're recorded as the caller reads them, and the span finishes once
+        they're consumed or closed.
         """
-        if ctx.operation_name != "InvokeModel" or isinstance(span, NoOpStreamedSpan):
-            return False
-
-        body = response.get("body") if isinstance(response, Mapping) else None
-        if not isinstance(body, StreamingBody):
+        if isinstance(span, NoOpStreamedSpan) or not isinstance(response, Mapping):
             return False
 
         model_family = _get_model_family(ctx.params.get("modelId"))
-        headers = response.get("ResponseMetadata", {}).get("HTTPHeaders", {})
-        chunks: "list[bytes]" = []
-        size = 0
 
-        def on_read(data: bytes) -> None:
-            nonlocal size
-            if model_family is None or size > MAX_INVOKE_MODEL_BODY_BYTES:
-                return
+        if ctx.operation_name == "InvokeModel":
+            body = response.get("body")
+            if not isinstance(body, StreamingBody):
+                return False
 
-            size += len(data)
-            if size > MAX_INVOKE_MODEL_BODY_BYTES:
-                chunks.clear()
+            _instrument_invoke_model_body(span, model_family, body, response)
+            return True
+
+        if ctx.operation_name == "ConverseStream":
+            stream = response.get("stream")
+        elif ctx.operation_name == "InvokeModelWithResponseStream":
+            stream = response.get("body")
+        else:
+            return False
+
+        if not isinstance(stream, EventStream):
+            return False
+
+        streamed_response = _StreamedResponse()
+
+        def on_event(event: "Any") -> None:
+            if ctx.operation_name == "ConverseStream":
+                _record_converse_stream_event(streamed_response, event)
             else:
-                chunks.append(data)
+                _record_invoke_model_stream_event(
+                    streamed_response, model_family, event
+                )
 
-        def on_finish(error: "Optional[BaseException]") -> None:
-            attributes: "Attributes" = {}
-            if error is not None:
-                with capture_internal_exceptions():
-                    attributes.update(_get_error_attributes(error))
-            else:
-                with capture_internal_exceptions():
-                    attributes.update(
-                        _get_invoke_model_response_attributes(
-                            model_family, b"".join(chunks), headers
-                        )
-                    )
-
-            with capture_internal_exceptions():
-                _set_span_attributes(span, attributes)
-            _finish_span(span, error)
-
-        _patch_streaming_body(body, on_finish, on_read)
+        _instrument_event_stream(
+            stream,
+            on_event,
+            lambda error: _finish_gen_ai_span(
+                span, error, streamed_response.get_attributes
+            ),
+        )
         return True
+
+
+def _instrument_invoke_model_body(
+    span: "Union[Span, StreamedSpan]",
+    model_family: "Optional[str]",
+    body: "StreamingBody",
+    response: "Mapping[str, Any]",
+) -> None:
+    headers = response.get("ResponseMetadata", {}).get("HTTPHeaders", {})
+    chunks: "list[bytes]" = []
+    size = 0
+
+    def on_read(data: bytes) -> None:
+        nonlocal size
+        if model_family is None or size > MAX_INVOKE_MODEL_BODY_BYTES:
+            return
+
+        size += len(data)
+        if size > MAX_INVOKE_MODEL_BODY_BYTES:
+            chunks.clear()
+        else:
+            chunks.append(data)
+
+    _patch_streaming_body(
+        body,
+        lambda error: _finish_gen_ai_span(
+            span,
+            error,
+            lambda: _get_invoke_model_response_attributes(
+                model_family, b"".join(chunks), headers
+            ),
+        ),
+        on_read,
+    )
+
+
+def _finish_gen_ai_span(
+    span: "Union[Span, StreamedSpan]",
+    error: "Optional[BaseException]",
+    get_response_attributes: "Callable[[], Attributes]",
+) -> None:
+    """
+    Finish a span once its response is read, with the attributes of the response
+    that was read.
+    """
+    attributes: "Attributes" = {}
+    with capture_internal_exceptions():
+        attributes.update(get_response_attributes())
+
+    if error is not None:
+        with capture_internal_exceptions():
+            attributes.update(_get_error_attributes(error))
+
+    with capture_internal_exceptions():
+        _set_span_attributes(span, attributes)
+    _finish_span(span, error)
 
 
 def _get_model_family(model_id: "Any") -> "Optional[str]":
@@ -653,6 +719,279 @@ def _parse_invoke_model_response(
 
     attributes.update(_get_output_attributes(output_messages))
     return attributes
+
+
+class _StreamedResponse:
+    """
+    A `ConverseStream` or `InvokeModelWithResponseStream` response, accumulated from
+    the events the caller receives.
+    """
+
+    __slots__ = ("record_outputs", "finish_reason", "usage", "content_blocks")
+
+    def __init__(self) -> None:
+        # only buffer the response content if it's recorded.
+        self.record_outputs = _should_record_gen_ai("outputs")
+        self.finish_reason: "Optional[str]" = None
+        # arguments of `_get_usage_attributes()`.
+        self.usage: "dict[str, Any]" = {}
+        # the part type, streamed fragments, and tool call ID and name of each content
+        # block, by index.
+        self.content_blocks: "dict[Any, dict[str, Any]]" = {}
+
+    def set_finish_reason(self, finish_reason: "Any") -> None:
+        if isinstance(finish_reason, str):
+            self.finish_reason = finish_reason
+
+    def set_usage(self, overwrite: bool = True, **usage: "Any") -> None:
+        for key, value in usage.items():
+            if isinstance(value, int) and (overwrite or key not in self.usage):
+                self.usage[key] = value
+
+    def start_tool_call(self, index: "Any", tool_call_id: "Any", name: "Any") -> None:
+        if self.record_outputs:
+            self.content_blocks[index] = {
+                "type": "tool_call",
+                "fragments": [],
+                "id": tool_call_id,
+                "name": name,
+            }
+
+    def add_fragment(
+        self,
+        index: "Any",
+        part_type: 'Literal["text", "reasoning", "tool_call"]',
+        fragment: "Any",
+    ) -> None:
+        """
+        Add streamed text, reasoning, or tool call arguments to a content block.
+        """
+        if not self.record_outputs or not isinstance(fragment, str):
+            return
+
+        content_block = self.content_blocks.setdefault(
+            index, {"type": part_type, "fragments": []}
+        )
+        content_block["fragments"].append(fragment)
+
+    def get_attributes(self) -> "Attributes":
+        attributes: "Attributes" = {}
+        if self.finish_reason is not None:
+            attributes[SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] = [self.finish_reason]
+
+        attributes.update(
+            _get_usage_attributes(
+                self.usage.get("input_tokens"),
+                self.usage.get("output_tokens"),
+                self.usage.get("cache_read_input_tokens"),
+                self.usage.get("cache_write_input_tokens"),
+                self.usage.get("total_tokens"),
+            )
+        )
+
+        parts: "list[ContentPart]" = []
+        # content blocks start in order.
+        for content_block in self.content_blocks.values():
+            content = "".join(content_block["fragments"])
+            if content_block["type"] == "text":
+                parts.append({"type": "text", "content": content})
+            elif content_block["type"] == "reasoning":
+                parts.append({"type": "reasoning", "content": content})
+            else:
+                tool_call: "ToolCallPart" = {"type": "tool_call"}
+                if content_block.get("id") is not None:
+                    tool_call["id"] = content_block["id"]
+                if content_block.get("name") is not None:
+                    tool_call["name"] = content_block["name"]
+                if content:
+                    try:
+                        tool_call["arguments"] = json.loads(content)
+                    except ValueError:
+                        # e.g. a stream that stopped before the arguments were complete.
+                        tool_call["arguments"] = content
+                parts.append(tool_call)
+
+        # `record_outputs` already gated the buffered content blocks.
+        if parts:
+            with capture_internal_exceptions():
+                attributes[SPANDATA.GEN_AI_OUTPUT_MESSAGES] = json.dumps(
+                    [_to_output_message(parts)]
+                )
+
+        return attributes
+
+
+def _record_converse_stream_event(
+    response: "_StreamedResponse", event: "Mapping[str, Any]"
+) -> None:
+    """
+    Record a `ConverseStream` event, or a streamed Amazon Nova `InvokeModel` chunk,
+    which has the same format.
+    https://docs.aws.amazon.com/bedrock/latest/APIReference/API_runtime_ConverseStreamOutput.html
+    """
+    content_block_start = event.get("contentBlockStart")
+    if isinstance(content_block_start, Mapping):
+        tool_use = (content_block_start.get("start") or {}).get("toolUse")
+        if isinstance(tool_use, Mapping):
+            response.start_tool_call(
+                content_block_start.get("contentBlockIndex"),
+                tool_use.get("toolUseId"),
+                tool_use.get("name"),
+            )
+
+    content_block_delta = event.get("contentBlockDelta")
+    if isinstance(content_block_delta, Mapping):
+        index = content_block_delta.get("contentBlockIndex")
+        delta = content_block_delta.get("delta") or {}
+        if "text" in delta:
+            response.add_fragment(index, "text", delta["text"])
+        elif isinstance(delta.get("toolUse"), Mapping):
+            response.add_fragment(index, "tool_call", delta["toolUse"].get("input"))
+        elif isinstance(delta.get("reasoningContent"), Mapping):
+            response.add_fragment(
+                index, "reasoning", delta["reasoningContent"].get("text")
+            )
+
+    message_stop = event.get("messageStop")
+    if isinstance(message_stop, Mapping):
+        response.set_finish_reason(message_stop.get("stopReason"))
+
+    metadata = event.get("metadata")
+    usage = metadata.get("usage") if isinstance(metadata, Mapping) else None
+    if isinstance(usage, Mapping):
+        response.set_usage(
+            input_tokens=usage.get("inputTokens"),
+            output_tokens=usage.get("outputTokens"),
+            total_tokens=usage.get("totalTokens"),
+            # Converse and Nova name the prompt cache usage differently.
+            cache_read_input_tokens=usage.get(
+                "cacheReadInputTokens", usage.get("cacheReadInputTokenCount")
+            ),
+            cache_write_input_tokens=usage.get(
+                "cacheWriteInputTokens", usage.get("cacheWriteInputTokenCount")
+            ),
+        )
+
+
+def _record_invoke_model_stream_event(
+    response: "_StreamedResponse",
+    model_family: "Optional[str]",
+    event: "Mapping[str, Any]",
+) -> None:
+    """
+    Record an `InvokeModelWithResponseStream` event. Its chunk has the format of the
+    model family's streamed response.
+    https://docs.aws.amazon.com/bedrock/latest/userguide/model-parameters.html
+    """
+    payload = (event.get("chunk") or {}).get("bytes")
+    if not payload:
+        return
+
+    try:
+        chunk = json.loads(payload)
+    except ValueError:
+        return
+
+    if not isinstance(chunk, Mapping):
+        return
+
+    if model_family == "amazon.nova":
+        _record_converse_stream_event(response, chunk)
+    elif model_family == "anthropic.claude":
+        _record_anthropic_stream_event(response, chunk)
+    elif model_family is not None:
+        _record_text_stream_chunk(response, model_family, chunk)
+
+    # Bedrock adds the token usage of every model to the last chunk.
+    metrics = chunk.get("amazon-bedrock-invocationMetrics")
+    if isinstance(metrics, Mapping):
+        response.set_usage(
+            overwrite=False,
+            input_tokens=metrics.get("inputTokenCount"),
+            output_tokens=metrics.get("outputTokenCount"),
+        )
+
+
+def _record_anthropic_stream_event(
+    response: "_StreamedResponse", event: "Mapping[str, Any]"
+) -> None:
+    """
+    https://docs.anthropic.com/en/docs/build-with-claude/streaming
+    """
+    event_type = event.get("type")
+    if event_type == "message_start":
+        usage = (event.get("message") or {}).get("usage") or {}
+        # the output tokens are reported by `message_delta`.
+        response.set_usage(
+            input_tokens=usage.get("input_tokens"),
+            cache_read_input_tokens=usage.get("cache_read_input_tokens"),
+            cache_write_input_tokens=usage.get("cache_creation_input_tokens"),
+        )
+
+    elif event_type == "content_block_start":
+        content_block = event.get("content_block") or {}
+        if content_block.get("type") == "tool_use":
+            response.start_tool_call(
+                event.get("index"), content_block.get("id"), content_block.get("name")
+            )
+
+    elif event_type == "content_block_delta":
+        index = event.get("index")
+        delta = event.get("delta") or {}
+        delta_type = delta.get("type")
+        if delta_type == "text_delta":
+            response.add_fragment(index, "text", delta.get("text"))
+        elif delta_type == "thinking_delta":
+            response.add_fragment(index, "reasoning", delta.get("thinking"))
+        elif delta_type == "input_json_delta":
+            response.add_fragment(index, "tool_call", delta.get("partial_json"))
+
+    elif event_type == "message_delta":
+        response.set_finish_reason((event.get("delta") or {}).get("stop_reason"))
+        response.set_usage(
+            output_tokens=(event.get("usage") or {}).get("output_tokens")
+        )
+
+
+def _record_text_stream_chunk(
+    response: "_StreamedResponse", model_family: str, chunk: "Mapping[str, Any]"
+) -> None:
+    """
+    Record a streamed chunk of a model family that generates text from a prompt.
+    """
+    text = finish_reason = None
+
+    if model_family == "amazon.titan":
+        text = chunk.get("outputText")
+        finish_reason = chunk.get("completionReason")
+        response.set_usage(
+            input_tokens=chunk.get("inputTextTokenCount"),
+            output_tokens=chunk.get("totalOutputTextTokenCount"),
+        )
+
+    elif model_family == "meta.llama":
+        text = chunk.get("generation")
+        finish_reason = chunk.get("stop_reason")
+        response.set_usage(
+            input_tokens=chunk.get("prompt_token_count"),
+            output_tokens=chunk.get("generation_token_count"),
+        )
+
+    elif model_family in ("cohere.command-r", "cohere.command"):
+        # Cohere Command chunks may also have the format of its response.
+        generations = chunk.get("generations")
+        generation = generations[0] if generations else chunk
+        text = generation.get("text")
+        finish_reason = generation.get("finish_reason")
+
+    elif model_family == "mistral":
+        outputs = chunk.get("outputs")
+        if outputs:
+            text = outputs[0].get("text")
+            finish_reason = outputs[0].get("stop_reason")
+
+    response.add_fragment(0, "text", text)
+    response.set_finish_reason(finish_reason)
 
 
 def _get_usage_attributes(
