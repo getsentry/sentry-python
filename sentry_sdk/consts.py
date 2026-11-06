@@ -486,6 +486,24 @@ class SPANDATA:
     Example: "http.handler"
     """
 
+    CPYTHON_GC_COLLECTED_OBJECTS = "cpython.gc.collected_objects"
+    """
+    The number of objects collected during a garbage collection run.
+    Example: 42
+    """
+
+    CPYTHON_GC_GENERATION = "cpython.gc.generation"
+    """
+    The generation that a garbage collection run collected.
+    Example: 2
+    """
+
+    CPYTHON_GC_UNCOLLECTABLE_OBJECTS = "cpython.gc.uncollectable_objects"
+    """
+    The number of objects found to be uncollectable during a garbage collection run.
+    Example: 0
+    """
+
     DB_MONGODB_COLLECTION = "db.mongodb.collection"
     """
     The MongoDB collection being accessed within the database.
@@ -1310,6 +1328,7 @@ class OP:
     FUNCTION = "function"
     FUNCTION_AWS = "function.aws"
     FUNCTION_GCP = "function.gcp"
+    GC = "gc"
     GEN_AI_CHAT = "gen_ai.chat"
     GEN_AI_CREATE_AGENT = "gen_ai.create_agent"
     GEN_AI_EMBEDDINGS = "gen_ai.embeddings"
