@@ -1837,6 +1837,16 @@ def _get_installed_modules() -> "Dict[str, str]":
 
 
 def package_version(package: str) -> "Optional[Tuple[int, ...]]":
+    try:
+        from importlib import metadata
+
+        metadata_version = metadata.version(package)
+        if metadata_version is not None:
+            return parse_version(metadata_version)
+    except Exception:
+        # < py3.8, or missing or broken metadata for this package
+        pass
+
     normalized_package = _normalize_module_name(
         _replace_hyphens_dots_and_underscores_with_dashes(package)
     )
