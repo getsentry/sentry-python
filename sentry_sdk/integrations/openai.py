@@ -710,6 +710,21 @@ def _set_common_output_data(
 
     # Chat Completions API
     if hasattr(response, "choices") and response.choices is not None:
+        finish_reasons = [
+            choice.finish_reason
+            for choice in response.choices
+            if hasattr(choice, "finish_reason") and choice.finish_reason is not None
+        ]
+        if len(finish_reasons) > 0:
+            if isinstance(span, StreamedSpan):
+                span.set_attribute(
+                    SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS, finish_reasons
+                )
+            else:
+                span.set_data(
+                    SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS, finish_reasons
+                )
+
         if has_data_collection_enabled(client.options):
             if client.options["data_collection"]["gen_ai"]["outputs"]:
                 response_text = [
@@ -1046,6 +1061,7 @@ def _wrap_synchronous_completions_chunk_iterator(
     streaming_message_total_token_usage = None
     client = sentry_sdk.get_client()
 
+    finish_reasons: "list[str]" = []
     for x in old_iterator:
         if isinstance(span, StreamedSpan):
             span.set_attribute(SPANDATA.GEN_AI_RESPONSE_MODEL, x.model)
@@ -1063,7 +1079,21 @@ def _wrap_synchronous_completions_chunk_iterator(
                         if len(data_buf) <= choice_index:
                             data_buf.append([])
                         data_buf[choice_index].append(content or "")
+                    if (
+                        hasattr(choice, "finish_reason")
+                        and choice.finish_reason is not None
+                    ):
+                        finish_reasons.append(choice.finish_reason)
                     choice_index += 1
+            if len(finish_reasons) > 0:
+                if isinstance(span, StreamedSpan):
+                    span.set_attribute(
+                        SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS, finish_reasons
+                    )
+                else:
+                    span.set_data(
+                        SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS, finish_reasons
+                    )
             if hasattr(x, "usage"):
                 streaming_message_total_token_usage = x.usage
 
@@ -1117,6 +1147,7 @@ async def _wrap_asynchronous_completions_chunk_iterator(
     streaming_message_total_token_usage = None
     client = sentry_sdk.get_client()
 
+    finish_reasons: "list[str]" = []
     async for x in old_iterator:
         if isinstance(span, StreamedSpan):
             span.set_attribute(SPANDATA.GEN_AI_RESPONSE_MODEL, x.model)
@@ -1134,7 +1165,21 @@ async def _wrap_asynchronous_completions_chunk_iterator(
                         if len(data_buf) <= choice_index:
                             data_buf.append([])
                         data_buf[choice_index].append(content or "")
+                    if (
+                        hasattr(choice, "finish_reason")
+                        and choice.finish_reason is not None
+                    ):
+                        finish_reasons.append(choice.finish_reason)
                     choice_index += 1
+            if len(finish_reasons) > 0:
+                if isinstance(span, StreamedSpan):
+                    span.set_attribute(
+                        SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS, finish_reasons
+                    )
+                else:
+                    span.set_data(
+                        SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS, finish_reasons
+                    )
             if hasattr(x, "usage"):
                 streaming_message_total_token_usage = x.usage
 
