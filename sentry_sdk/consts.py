@@ -117,6 +117,19 @@ class SPANTEMPLATE(str, Enum):
         return self.value
 
 
+class GEN_AI_OPERATION(str, Enum):
+    """Semantic operation names used in gen_ai.operation.name span data."""
+
+    CHAT = "chat"
+    CREATE_AGENT = "create_agent"
+    EMBEDDINGS = "embeddings"
+    EVALUATE = "evaluate"
+    EXECUTE_TOOL = "execute_tool"
+    HANDOFF = "handoff"
+    INVOKE_AGENT = "invoke_agent"
+    TEXT_COMPLETION = "text_completion"
+
+
 class INSTRUMENTER:
     SENTRY = "sentry"
     OTEL = "otel"
