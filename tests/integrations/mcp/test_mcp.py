@@ -11,7 +11,7 @@ This test suite covers:
 - Span data validation
 - Origin tracking
 
-The tests drive real MCP servers over the stdio, StreamableHTTP, and SSE
+The tests drive real MCP servers over in-memory streams, StreamableHTTP, and SSE
 transports to verify that the integration properly instruments MCP handlers
 with Sentry spans.
 """
@@ -66,6 +66,7 @@ else:
     from mcp.types import GetPromptResult, PromptMessage, TextContent
 
 from mcp.server.sse import SseServerTransport
+from mcp.server.streamable_http import StreamableHTTPServerTransport
 from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
 from starlette.applications import Starlette
 from starlette.responses import Response
@@ -344,7 +345,7 @@ async def test_wrapping_handler_is_idempotent(
     "send_default_pii, include_prompts",
     [(True, True), (True, False), (False, True), (False, False)],
 )
-async def test_tool_handler_stdio(
+async def test_tool_handler_in_memory(
     sentry_init,
     capture_events,
     capture_items,
@@ -441,8 +442,10 @@ async def test_tool_handler_stdio(
     # Check span data
     assert data[SPANDATA.MCP_TOOL_NAME] == "calculate"
     assert data[SPANDATA.MCP_METHOD_NAME] == "tools/call"
-    assert data[SPANDATA.MCP_TRANSPORT] == "stdio"
-    assert data[SPANDATA.NETWORK_TRANSPORT] == "pipe"
+    assert SPANDATA.MCP_TRANSPORT not in data
+    assert SPANDATA.NETWORK_TRANSPORT not in data
+    assert SPANDATA.NETWORK_PROTOCOL_NAME not in data
+    assert SPANDATA.NETWORK_PROTOCOL_VERSION not in data
     assert data[SPANDATA.MCP_REQUEST_ID] == "req-123"
     assert SPANDATA.MCP_SESSION_ID not in data
     assert data["mcp.request.argument.x"] == "10"
@@ -581,8 +584,10 @@ async def test_tool_handler_streamable_http(
     # Check span data
     assert data[SPANDATA.MCP_TOOL_NAME] == "process"
     assert data[SPANDATA.MCP_METHOD_NAME] == "tools/call"
-    assert data[SPANDATA.MCP_TRANSPORT] == "http"
-    assert data[SPANDATA.NETWORK_TRANSPORT] == "tcp"
+    assert data[SPANDATA.MCP_TRANSPORT] == "StreamableHTTPServerTransport"
+    assert data[SPANDATA.NETWORK_PROTOCOL_NAME] == "http"
+    assert data[SPANDATA.NETWORK_PROTOCOL_VERSION] == "1.1"
+    assert SPANDATA.NETWORK_TRANSPORT not in data
     assert data[SPANDATA.MCP_REQUEST_ID] == "req-456"
     assert data[SPANDATA.MCP_SESSION_ID] == session_id
     assert data["mcp.request.argument.data"] == "test"
@@ -598,14 +603,21 @@ async def test_tool_handler_streamable_http(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize(
+    "http_version, custom_transport",
+    [("1.1", False), ("2", True), ("3", True), (None, True)],
+)
 async def test_tool_handler_stateless_streamable_http(
     sentry_init,
     capture_events,
     capture_items,
     select_transactions_with_mcp_spans,
     span_streaming,
+    http_version,
+    custom_transport,
+    monkeypatch,
 ):
-    """A stateless StreamableHTTP server is still reported as the http transport.
+    """A stateless server records its implementation and known HTTP attributes.
 
     Such a server issues no session id, so the client sends no
     `mcp-session-id` header. That says nothing about the transport.
@@ -616,7 +628,25 @@ async def test_tool_handler_stateless_streamable_http(
         trace_lifecycle="stream" if span_streaming else "static",
     )
 
+    class CustomHTTPTransport(StreamableHTTPServerTransport):
+        pass
+
+    if custom_transport:
+        monkeypatch.setattr(
+            "mcp.server.streamable_http_manager.StreamableHTTPServerTransport",
+            CustomHTTPTransport,
+        )
+
     server = Server("test-server")
+    app = _streamable_http_app(server, stateless=True)
+
+    async def app_with_http_version(scope, receive, send):
+        if scope["type"] == "http":
+            if http_version is None:
+                scope.pop("http_version", None)
+            else:
+                scope["http_version"] = http_version
+        await app(scope, receive, send)
 
     if IS_MCP_V2:
 
@@ -635,7 +665,7 @@ async def test_tool_handler_stateless_streamable_http(
 
         # A stateless server accepts each request on its own, so there is no
         # handshake to replay and no session id to echo back.
-        with TestClient(_streamable_http_app(server, stateless=True)) as client:
+        with TestClient(app_with_http_version) as client:
             response = client.post(
                 "/mcp/",
                 headers={
@@ -661,7 +691,7 @@ async def test_tool_handler_stateless_streamable_http(
 
         # A stateless server accepts each request on its own, so there is no
         # handshake to replay and no session id to echo back.
-        with TestClient(_streamable_http_app(server, stateless=True)) as client:
+        with TestClient(app_with_http_version) as client:
             response = client.post(
                 "/mcp/",
                 headers={
@@ -684,8 +714,18 @@ async def test_tool_handler_stateless_streamable_http(
         assert len(transactions) == 1
         data = transactions[0]["spans"][0]["data"]
 
-    assert data[SPANDATA.MCP_TRANSPORT] == "http"
-    assert data[SPANDATA.NETWORK_TRANSPORT] == "tcp"
+    assert data[SPANDATA.MCP_TRANSPORT] == (
+        "CustomHTTPTransport" if custom_transport else "StreamableHTTPServerTransport"
+    )
+    assert data[SPANDATA.NETWORK_PROTOCOL_NAME] == "http"
+    if http_version is None:
+        assert SPANDATA.NETWORK_PROTOCOL_VERSION not in data
+    else:
+        assert data[SPANDATA.NETWORK_PROTOCOL_VERSION] == http_version
+    if http_version == "3":
+        assert data[SPANDATA.NETWORK_TRANSPORT] == "quic"
+    else:
+        assert SPANDATA.NETWORK_TRANSPORT not in data
     assert data[SPANDATA.MCP_REQUEST_ID] == "req-789"
     assert SPANDATA.MCP_SESSION_ID not in data
 
@@ -794,7 +834,7 @@ async def test_tool_handler_with_error(
     "send_default_pii, include_prompts",
     [(True, True), (True, False), (False, True), (False, False)],
 )
-async def test_prompt_handler_stdio(
+async def test_prompt_handler_in_memory(
     sentry_init,
     capture_events,
     capture_items,
@@ -888,7 +928,7 @@ async def test_prompt_handler_stdio(
     # Check span data
     assert data[SPANDATA.MCP_PROMPT_NAME] == "code_help"
     assert data[SPANDATA.MCP_METHOD_NAME] == "prompts/get"
-    assert data[SPANDATA.MCP_TRANSPORT] == "stdio"
+    assert SPANDATA.MCP_TRANSPORT not in data
     assert data[SPANDATA.MCP_REQUEST_ID] == "req-prompt"
     assert data["mcp.request.argument.language"] == "python"
 
@@ -1112,7 +1152,7 @@ async def test_prompt_handler_with_error(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("span_streaming", [True, False])
-async def test_resource_handler_stdio(
+async def test_resource_handler_in_memory(
     sentry_init, capture_events, capture_items, span_streaming, stdio
 ):
     """Test that synchronous resource handlers create proper spans"""
@@ -1200,7 +1240,7 @@ async def test_resource_handler_stdio(
     # Check span data
     assert data[SPANDATA.MCP_RESOURCE_URI] == "file:///path/to/file.txt"
     assert data[SPANDATA.MCP_METHOD_NAME] == "resources/read"
-    assert data[SPANDATA.MCP_TRANSPORT] == "stdio"
+    assert SPANDATA.MCP_TRANSPORT not in data
     assert data[SPANDATA.MCP_REQUEST_ID] == "req-resource"
     assert data[SPANDATA.MCP_RESOURCE_PROTOCOL] == "file"
     # Resources don't capture result content
@@ -1873,10 +1913,16 @@ async def test_tool_with_complex_arguments(
 @pytest.mark.asyncio
 @pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.skipif(IS_MCP_V2, reason="SSE scope propagation not supported in MCP v2")
+@pytest.mark.parametrize("custom_transport", [False, True])
 async def test_sse_transport_detection(
-    sentry_init, capture_events, capture_items, span_streaming, json_rpc_sse
+    sentry_init,
+    capture_events,
+    capture_items,
+    span_streaming,
+    json_rpc_sse,
+    custom_transport,
 ):
-    """Test that SSE transport is correctly detected via query parameter"""
+    """SSE records its concrete implementation and HTTP metadata."""
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
@@ -1884,7 +1930,12 @@ async def test_sse_transport_detection(
     )
 
     server = Server("test-server")
-    sse = SseServerTransport("/messages/")
+
+    class CustomSSETransport(SseServerTransport):
+        pass
+
+    transport_class = CustomSSETransport if custom_transport else SseServerTransport
+    sse = transport_class("/messages/")
 
     sse_connection_closed = asyncio.Event()
 
@@ -1963,17 +2014,24 @@ async def test_sse_transport_detection(
         tx = transactions[0]
         data = tx["spans"][0]["data"]
 
-    # Check that SSE transport is detected
-    assert data[SPANDATA.MCP_TRANSPORT] == "sse"
-    assert data[SPANDATA.NETWORK_TRANSPORT] == "tcp"
+    assert data[SPANDATA.MCP_TRANSPORT] == transport_class.__name__
+    assert data[SPANDATA.NETWORK_PROTOCOL_NAME] == "http"
+    assert data[SPANDATA.NETWORK_PROTOCOL_VERSION] == "1.1"
+    assert SPANDATA.NETWORK_TRANSPORT not in data
     assert data[SPANDATA.MCP_SESSION_ID] == session_id
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.skipif(not IS_MCP_V2, reason="MCP v2 SSE transport detection")
+@pytest.mark.parametrize("custom_transport", [False, True])
 async def test_sse_transport_detection_v2(
-    sentry_init, capture_events, capture_items, span_streaming, json_rpc_sse
+    sentry_init,
+    capture_events,
+    capture_items,
+    span_streaming,
+    json_rpc_sse,
+    custom_transport,
 ):
     """Test that SSE transport is detected on MCP v2.
 
@@ -1992,7 +2050,12 @@ async def test_sse_transport_detection_v2(
     )
 
     server = Server("test-server")
-    sse = SseServerTransport("/messages/")
+
+    class CustomSSETransport(SseServerTransport):
+        pass
+
+    transport_class = CustomSSETransport if custom_transport else SseServerTransport
+    sse = transport_class("/messages/")
 
     sse_connection_closed = asyncio.Event()
 
@@ -2078,8 +2141,10 @@ async def test_sse_transport_detection_v2(
                 break
         assert data is not None
 
-    assert data[SPANDATA.MCP_TRANSPORT] == "sse"
-    assert data[SPANDATA.NETWORK_TRANSPORT] == "tcp"
+    assert data[SPANDATA.MCP_TRANSPORT] == transport_class.__name__
+    assert data[SPANDATA.NETWORK_PROTOCOL_NAME] == "http"
+    assert data[SPANDATA.NETWORK_PROTOCOL_VERSION] == "1.1"
+    assert SPANDATA.NETWORK_TRANSPORT not in data
     assert data[SPANDATA.MCP_SESSION_ID] == session_id
 
 
@@ -2300,7 +2365,7 @@ async def test_tool_data_collection_inputs(
     # Non-sensitive identifying attributes are never gated
     assert data[SPANDATA.MCP_TOOL_NAME] == "calculate"
     assert data[SPANDATA.MCP_METHOD_NAME] == "tools/call"
-    assert data[SPANDATA.MCP_TRANSPORT] == "stdio"
+    assert SPANDATA.MCP_TRANSPORT not in data
     assert data[SPANDATA.MCP_REQUEST_ID] == "req-1"
 
 
