@@ -216,6 +216,10 @@ def _success_callback(
         return
 
     try:
+        set_on_span = (
+            span.set_attribute if isinstance(span, StreamedSpan) else span.set_data
+        )
+
         # Record model information
         if hasattr(completion_response, "model"):
             set_data_normalized(
@@ -254,13 +258,23 @@ def _success_callback(
                         span, SPANDATA.GEN_AI_RESPONSE_TEXT, response_messages
                     )
 
+        # Record the final response cost. Prefer the top-level value so callers
+        # can use LiteLLM's logging hooks to replace its calculated cost before
+        # observability callbacks run.
+        response_cost = kwargs.get("response_cost")
+        if response_cost is None:
+            standard_logging_object = kwargs.get("standard_logging_object")
+            if isinstance(standard_logging_object, dict):
+                response_cost = standard_logging_object.get("response_cost")
+
+        if isinstance(response_cost, (int, float)) and not isinstance(
+            response_cost, bool
+        ):
+            set_on_span(SPANDATA.GEN_AI_COST_TOTAL_TOKENS, response_cost)
+
         # Record token usage
         if hasattr(completion_response, "usage"):
             usage = completion_response.usage
-
-            set_on_span = (
-                span.set_attribute if isinstance(span, StreamedSpan) else span.set_data
-            )
 
             input_tokens = getattr(usage, "prompt_tokens", None)
             if input_tokens is not None:
