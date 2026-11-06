@@ -151,26 +151,22 @@ def test_does_not_setup_exporter_when_disabled(sentry_init):
     assert tracer_provider is existing_tracer_provider
 
 
-def test_sets_propagator(sentry_init):
+def test_does_not_set_propagator_by_default(sentry_init):
     sentry_init(
         dsn="https://mysecret@bla.ingest.sentry.io/12312012",
         integrations=[OTLPIntegration()],
     )
 
-    propagator = get_global_textmap()
-    assert isinstance(get_global_textmap(), SentryOTLPPropagator)
-    assert propagator is not original_propagator
+    assert get_global_textmap() is original_propagator
 
 
-def test_does_not_set_propagator_if_disabled(sentry_init):
+def test_sets_propagator_if_enabled(sentry_init):
     sentry_init(
         dsn="https://mysecret@bla.ingest.sentry.io/12312012",
-        integrations=[OTLPIntegration(setup_propagator=False)],
+        integrations=[OTLPIntegration(setup_propagator=True)],
     )
 
-    propagator = get_global_textmap()
-    assert not isinstance(propagator, SentryOTLPPropagator)
-    assert propagator is original_propagator
+    assert isinstance(get_global_textmap(), SentryOTLPPropagator)
 
 
 def test_otel_propagation_context(sentry_init):
@@ -194,7 +190,7 @@ def test_otel_propagation_context(sentry_init):
 def test_propagator_inject_head_of_trace(sentry_init):
     sentry_init(
         dsn="https://mysecret@bla.ingest.sentry.io/12312012",
-        integrations=[OTLPIntegration()],
+        integrations=[OTLPIntegration(setup_propagator=True)],
     )
 
     tracer = trace.get_tracer(__name__)
@@ -218,7 +214,7 @@ def test_propagator_inject_head_of_trace(sentry_init):
 def test_propagator_inject_continue_trace(sentry_init):
     sentry_init(
         dsn="https://mysecret@bla.ingest.sentry.io/12312012",
-        integrations=[OTLPIntegration()],
+        integrations=[OTLPIntegration(setup_propagator=True)],
     )
 
     tracer = trace.get_tracer(__name__)
