@@ -18,7 +18,7 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ["3.8","3.9","3.10","3.11","3.12","3.13","3.14","3.14t","3.15","3.15t"]
-        os: [ubuntu-22.04]
+        os: [ubuntu-22.04-arm]
     env:
       # 3.6/3.7 run in the python:X.Y container; tell uv to use that system Python.
       TOX_UV_PYTHON_PREFERENCE: ${{ (matrix.python-version == '3.6' || matrix.python-version == '3.7') && 'only-system' || 'managed' }}

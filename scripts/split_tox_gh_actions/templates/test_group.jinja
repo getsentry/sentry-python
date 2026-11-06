@@ -6,7 +6,7 @@
       fail-fast: false
       matrix:
         python-version: [{{ py_versions|join(",") }}]
-        os: [ubuntu-22.04]
+        os: [{{ 'ubuntu-22.04-arm' if group in ['AI', 'AI Workflow', 'Web 1'] else 'ubuntu-22.04' }}]
 
     {% if needs_docker or needs_postgres or needs_redis or needs_mysql %}
     services:
