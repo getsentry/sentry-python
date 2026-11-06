@@ -21,6 +21,12 @@ from sentry_sdk.utils import (
 if TYPE_CHECKING:
     from typing import Any, Dict, List, Optional, Tuple
 
+    from apscheduler.events import JobExecutionEvent
+    from apscheduler.job import Job
+    from apscheduler.schedulers.base import BaseScheduler
+    from apscheduler.triggers.base import BaseTrigger
+    from apscheduler.triggers.cron.fields import BaseField
+
     from sentry_sdk._types import MonitorConfig
 
 try:
@@ -93,13 +99,15 @@ class _CronsListener:
 
     def __init__(self) -> None:
         self.lock = threading.Lock()
-        self.pending: "Dict[Tuple[str, Any], _PendingCheckIn]" = {}
+        self.pending: "Dict[Tuple[str, datetime], _PendingCheckIn]" = {}
 
-    def add(self, job_id: str, run_time: "Any", pending: "_PendingCheckIn") -> None:
+    def add(
+        self, job_id: str, run_time: "datetime", pending: "_PendingCheckIn"
+    ) -> None:
         with self.lock:
             self.pending[(job_id, run_time)] = pending
 
-    def open(self, job_id: str, run_time: "Any") -> None:
+    def open(self, job_id: str, run_time: "datetime") -> None:
         # Under the lock, so `in_progress` is always sent before `finish`
         # sends the closing check-in.
         with self.lock:
@@ -107,17 +115,17 @@ class _CronsListener:
             if pending is not None and not pending.opened:
                 pending.open()
 
-    def discard(self, job_id: str, run_time: "Any") -> None:
+    def discard(self, job_id: str, run_time: "datetime") -> None:
         with self.lock:
             self.pending.pop((job_id, run_time), None)
 
-    def finish(self, job_id: str, run_time: "Any", status: str) -> None:
+    def finish(self, job_id: str, run_time: "datetime", status: str) -> None:
         with self.lock:
             pending = self.pending.pop((job_id, run_time), None)
         if pending is not None:
             pending.close(status)
 
-    def finish_missed(self, job_id: str, run_time: "Any") -> None:
+    def finish_missed(self, job_id: str, run_time: "datetime") -> None:
         with self.lock:
             pending = self.pending.pop((job_id, run_time), None)
         # Send nothing, so Sentry reports the slot as missed, unless a run that
@@ -125,7 +133,7 @@ class _CronsListener:
         if pending is not None and pending.opened:
             pending.close(MonitorStatus.ERROR)
 
-    def __call__(self, event: "Any") -> None:
+    def __call__(self, event: "JobExecutionEvent") -> None:
         with capture_internal_exceptions():
             if event.code == EVENT_JOB_MISSED:
                 self.finish_missed(event.job_id, event.scheduled_run_time)
@@ -140,13 +148,13 @@ class _CronsListener:
 
 
 # Weak keys so we don't keep schedulers alive.
-_listeners: "weakref.WeakKeyDictionary[Any, _CronsListener]" = (
+_listeners: "weakref.WeakKeyDictionary[BaseScheduler, _CronsListener]" = (
     weakref.WeakKeyDictionary()
 )
 _listeners_lock = threading.Lock()
 
 
-def _get_listener(scheduler: "Any") -> "_CronsListener":
+def _get_listener(scheduler: "BaseScheduler") -> "_CronsListener":
     with _listeners_lock:
         listener = _listeners.get(scheduler)
         if listener is None:
@@ -160,7 +168,7 @@ def _get_listener(scheduler: "Any") -> "_CronsListener":
 _GENERATED_JOB_ID = re.compile(r"[0-9a-f]{32}")
 
 
-def _get_crontab_day_of_week(field: "Any") -> "Optional[str]":
+def _get_crontab_day_of_week(field: "BaseField") -> "Optional[str]":
     # APScheduler counts weekdays from Monday = 0, cron from Sunday = 0. Emit
     # Monday = 1 ... Sunday = 7, which cron also accepts, so ranges stay ranges.
     values = []
@@ -186,7 +194,7 @@ def _get_crontab_day_of_week(field: "Any") -> "Optional[str]":
     return ",".join(values)
 
 
-def _get_crontab_field(field: "Any") -> "Optional[str]":
+def _get_crontab_field(field: "BaseField") -> "Optional[str]":
     for expr in field.expressions:
         # Rules out "last", "1st mon" and the like.
         if not (type(expr) is AllExpression or isinstance(expr, RangeExpression)):
@@ -221,19 +229,19 @@ def _get_crontab(trigger: "CronTrigger") -> "Optional[str]":
     return f"{minute} {hour} {day} {month} {day_of_week}"
 
 
-def _get_monitor_config(trigger: "Any") -> "Optional[MonitorConfig]":
+def _get_monitor_config(trigger: "BaseTrigger") -> "Optional[MonitorConfig]":
     monitor_config: "MonitorConfig"
     if isinstance(trigger, CronTrigger):
         crontab = _get_crontab(trigger)
         if crontab is None:
             return None
         # Without a timezone Sentry would read the crontab as UTC.
-        timezone = _get_timezone_name(trigger.timezone)
-        if timezone is None:
+        timezone_name = _get_timezone_name(trigger.timezone)
+        if timezone_name is None:
             return None
         monitor_config = {
             "schedule": {"type": "crontab", "value": crontab},
-            "timezone": timezone,
+            "timezone": timezone_name,
         }
     elif isinstance(trigger, IntervalTrigger):
         schedule = _get_interval_schedule(trigger.interval.total_seconds())
@@ -256,7 +264,7 @@ def _get_monitor_config(trigger: "Any") -> "Optional[MonitorConfig]":
     return monitor_config
 
 
-def _is_missed(job: "Any", run_time: "Any") -> bool:
+def _is_missed(job: "Job", run_time: "datetime") -> bool:
     # The same test run_job uses to skip a run and report it missed.
     grace_time = job.misfire_grace_time
     if grace_time is None:
@@ -266,9 +274,9 @@ def _is_missed(job: "Any", run_time: "Any") -> bool:
 
 def _begin_check_in(
     integration: "APSchedulerIntegration",
-    executor: "Any",
-    job: "Any",
-    run_times: "List[Any]",
+    executor: "BaseExecutor",
+    job: "Job",
+    run_times: "List[datetime]",
 ) -> "Optional[_CronsListener]":
     if getattr(job.func, "_sentry_monitored", False):
         return None
@@ -317,37 +325,38 @@ def _patch_submit_job() -> None:
 
     @wraps(old_submit_job)
     def sentry_submit_job(
-        self: "Any", job: "Any", run_times: "List[Any]", *args: "Any", **kwargs: "Any"
-    ) -> "Any":
+        self: "BaseExecutor",
+        job: "Job",
+        run_times: "List[datetime]",
+        *args: "Any",
+        **kwargs: "Any",
+    ) -> None:
         integration = sentry_sdk.get_client().get_integration(APSchedulerIntegration)
         if integration is None:
             return old_submit_job(self, job, run_times, *args, **kwargs)
 
         # A backlog of run times runs in one submit. Check in once, and close it
         # with the last run time's event.
-        run_time = run_times[-1]
         listener = None
         with capture_internal_exceptions():
             listener = _begin_check_in(integration, self, job, run_times)
 
         try:
-            result = old_submit_job(self, job, run_times, *args, **kwargs)
+            old_submit_job(self, job, run_times, *args, **kwargs)
         except MaxInstancesReachedError:
             if listener is not None:
                 with capture_internal_exceptions():
-                    listener.discard(job.id, run_time)
+                    listener.discard(job.id, run_times[-1])
             raise
         except BaseException:
             # Not submitted, so no execution event will close the check-in.
             if listener is not None:
                 with capture_internal_exceptions():
-                    listener.finish(job.id, run_time, MonitorStatus.ERROR)
+                    listener.finish(job.id, run_times[-1], MonitorStatus.ERROR)
             raise
 
         if listener is not None:
             with capture_internal_exceptions():
-                listener.open(job.id, run_time)
-
-        return result
+                listener.open(job.id, run_times[-1])
 
     BaseExecutor.submit_job = sentry_submit_job
