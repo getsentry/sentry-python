@@ -292,6 +292,33 @@ def _should_be_included(
     )
 
 
+def _caller_frames(frame: "Optional[FrameType]") -> "Iterator[FrameType]":
+    """
+    Yields ``frame`` and the frames that called it. When the current
+    greenlet's frames run out, continues into those of its parent greenlet,
+    where they were suspended to switch to it. Async SQLAlchemy runs the
+    driver, and so the cursor events that create query spans, inside such a
+    greenlet, started from the coroutine that awaited the query.
+    """
+    while frame is not None:
+        yield frame
+        frame = frame.f_back
+
+    greenlet = sys.modules.get("greenlet")
+    if greenlet is None:
+        return
+
+    try:
+        parent = greenlet.getcurrent().parent
+        frame = parent.gr_frame if parent is not None else None
+    except Exception:
+        return
+
+    while frame is not None:
+        yield frame
+        frame = frame.f_back
+
+
 def add_source(
     span: "Union[sentry_sdk.tracing.Span, sentry_sdk.traces.StreamedSpan]",
     project_root: "Optional[str]",
@@ -302,8 +329,8 @@ def add_source(
     Adds OTel compatible source code information to the span
     """
     # Find the correct frame
-    frame: "Union[FrameType, None]" = sys._getframe()
-    while frame is not None:
+    frame: "Union[FrameType, None]" = None
+    for frame in _caller_frames(sys._getframe()):
         abs_path = _get_frame_module_abs_path(frame)
 
         try:
@@ -325,8 +352,6 @@ def add_source(
         )
         if should_be_included:
             break
-
-        frame = frame.f_back
     else:
         frame = None
 
