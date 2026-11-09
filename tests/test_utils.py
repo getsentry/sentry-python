@@ -1180,50 +1180,42 @@ def test_get_current_thread_meta_running_thread():
     assert (thread.ident, thread.name) == results.get(timeout=1)
 
 
-def test_get_current_thread_meta_bad_running_thread():
+def get_current_thread_meta_patched(**patch_kwargs):
     results = Queue(maxsize=1)
 
     def target():
-        with mock.patch("threading.current_thread", side_effect=["fake thread"]):
+        with mock.patch("threading.current_thread", **patch_kwargs):
             results.put(get_current_thread_meta())
 
     thread = threading.Thread(target=target)
     thread.start()
     thread.join()
+    return results.get(timeout=1)
 
+
+def test_get_current_thread_meta_bad_running_thread():
     main_thread = threading.main_thread()
-    assert (main_thread.ident, main_thread.name) == results.get(timeout=1)
+    assert (
+        main_thread.ident,
+        main_thread.name,
+    ) == get_current_thread_meta_patched(side_effect=["fake thread"])
 
 
 def test_get_current_thread_meta_main_thread():
-    results = Queue(maxsize=1)
-
-    def target():
-        # mock that somehow the current thread doesn't exist
-        with mock.patch("threading.current_thread", side_effect=[None]):
-            results.put(get_current_thread_meta())
-
     main_thread = threading.main_thread()
-
-    thread = threading.Thread(target=target)
-    thread.start()
-    thread.join()
-    assert (main_thread.ident, main_thread.name) == results.get(timeout=1)
+    # mock that somehow the current thread doesn't exist
+    assert (
+        main_thread.ident,
+        main_thread.name,
+    ) == get_current_thread_meta_patched(side_effect=[None])
 
 
 def test_get_current_thread_meta_failed_to_get_main_thread():
-    results = Queue(maxsize=1)
-
-    def target():
-        with mock.patch("threading.current_thread", return_value="fake thread"):
-            results.put(get_current_thread_meta())
-
     main_thread = threading.main_thread()
-
-    thread = threading.Thread(target=target)
-    thread.start()
-    thread.join()
-    assert (main_thread.ident, main_thread.name) == results.get(timeout=1)
+    assert (
+        main_thread.ident,
+        main_thread.name,
+    ) == get_current_thread_meta_patched(return_value="fake thread")
 
 
 @pytest.mark.parametrize(
