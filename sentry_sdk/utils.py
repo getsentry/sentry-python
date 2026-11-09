@@ -28,6 +28,11 @@ except ImportError:
     # Python 3.10 and below
     BaseExceptionGroup = None  # type: ignore
 
+try:
+    from importlib import metadata as importlib_metadata
+except ImportError:
+    importlib_metadata = None  # type: ignore[assignment]
+
 from typing import TYPE_CHECKING
 
 import sentry_sdk
@@ -1840,6 +1845,14 @@ def package_version(package: str) -> "Optional[Tuple[int, ...]]":
     normalized_package = _normalize_module_name(
         _replace_hyphens_dots_and_underscores_with_dashes(package)
     )
+
+    if importlib_metadata is not None:
+        # Look up the single distribution instead of scanning (and parsing
+        # the metadata of) every installed package on each call.
+        try:
+            return parse_version(importlib_metadata.version(normalized_package))
+        except importlib_metadata.PackageNotFoundError:
+            return None
 
     installed_packages = {
         _replace_hyphens_dots_and_underscores_with_dashes(module): v
