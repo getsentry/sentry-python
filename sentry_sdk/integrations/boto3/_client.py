@@ -14,9 +14,7 @@ from sentry_sdk.integrations.boto3._instrumentation import (
     _set_span_attributes,
     _start_client_span,
 )
-from sentry_sdk.integrations.boto3._services.registry import (
-    _resolve_service,
-)
+from sentry_sdk.integrations.boto3._services.bedrock import _BedrockExtension
 from sentry_sdk.integrations.boto3.consts import IDENTIFIER
 from sentry_sdk.traces import NoOpStreamedSpan, StreamedSpan
 from sentry_sdk.utils import capture_internal_exceptions
@@ -104,7 +102,11 @@ def _patch_botocore_client() -> None:
             with capture_internal_exceptions():
                 # add optional metadata to the context, e.g. service-name, region-name, etc.
                 ctx.add_metadata(self)
-            service_ext = _resolve_service(ctx.service_name)
+
+            service_ext = None
+            if ctx.service_name == "bedrock-runtime":
+                service_ext = _BedrockExtension()
+
             span = _start_client_span(ctx, service_ext)
 
         if span is None:

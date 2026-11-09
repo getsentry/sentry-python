@@ -12,8 +12,6 @@ from botocore.stub import Stubber
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.boto3 import Boto3Integration
-from sentry_sdk.integrations.boto3._services.base import _ServiceExtension
-from sentry_sdk.integrations.boto3._services.registry import _SERVICE_EXTENSIONS
 from sentry_sdk.integrations.boto3.consts import AWS_RPC_SYSTEM_NAME, ORIGIN
 from sentry_sdk.integrations.stdlib import StdlibIntegration
 from sentry_sdk.traces import StreamedSpan
@@ -344,71 +342,6 @@ def _span_attributes(span, span_streaming):
     return span["attributes"] if span_streaming else span["data"]
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
-def test_service_extension_customizes_client_span(
-    capture_items,
-    client_factory,
-    monkeypatch,
-    span_streaming,
-):
-    class TestServiceExtension(_ServiceExtension):
-        def get_span_op(self, ctx):
-            return "aws.test"
-
-        def get_span_origin(self, ctx):
-            return "auto.aws.test"
-
-        def get_request_attributes(self, ctx):
-            return {
-                "aws.test.request": ctx.params["Key"],
-                SPANDATA.SENTRY_KIND: "producer",
-            }
-
-        def get_response_attributes(self, ctx, response):
-            return {
-                "aws.test.response": response["ResponseMetadata"]["RequestId"],
-                SPANDATA.HTTP_STATUS_CODE: 418,
-            }
-
-    monkeypatch.setitem(_SERVICE_EXTENSIONS, "s3", TestServiceExtension())
-    client = client_factory()
-    api_params = {"Bucket": "bucket", "Key": "foo"}
-
-    with Stubber(client) as stubber:
-        stubber.add_response(
-            "head_object",
-            {
-                "ResponseMetadata": {
-                    "HTTPStatusCode": 200,
-                    "RequestId": "request-id",
-                    "HostId": "extended-request-id",
-                }
-            },
-            api_params,
-        )
-        spans_by_op = _capture_boto3_spans_by_op(
-            lambda: client.head_object(**api_params),
-            capture_items,
-            span_streaming,
-            expected_origin="auto.aws.test",
-        )
-
-    spans = spans_by_op.get("aws.test", [])
-    assert len(spans) == 1
-    attributes = _span_attributes(spans[0], span_streaming)
-    assert attributes["aws.test.request"] == "foo"
-    assert attributes["aws.test.response"] == "request-id"
-    assert attributes[SPANDATA.SENTRY_KIND] == "producer"
-    assert attributes[SPANDATA.RPC_METHOD] == "HeadObject"
-    assert attributes[SPANDATA.HTTP_STATUS_CODE] == 200
-    assert attributes[SPANDATA.AWS_EXTENDED_REQUEST_ID] == "extended-request-id"
-    _assert_span_finished(spans[0], span_streaming)
-    if span_streaming:
-        assert attributes[SPANDATA.SENTRY_ORIGIN] == "auto.aws.test"
-    else:
-        assert spans[0]["origin"] == "auto.aws.test"
-
-
 @pytest.mark.parametrize(
     (
         "service_name",
@@ -608,69 +541,6 @@ def test_retries_exhausted_has_one_failed_client_span(
     attributes = _span_attributes(client_spans[0], span_streaming)
     assert attributes[SPANDATA.HTTP_STATUS_CODE] == 500
     assert attributes[SPANDATA.HTTP_REQUEST_RESEND_COUNT] == 1
-
-
-@pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("with_service_extension", [False, True])
-def test_client_error_has_response_attributes_and_is_unchanged(
-    capture_items,
-    client_factory,
-    monkeypatch,
-    span_streaming,
-    with_service_extension,
-):
-    class TestServiceExtension(_ServiceExtension):
-        def get_response_attributes(self, ctx, response):
-            return {
-                "aws.test.error": response["Error"]["Code"],
-                SPANDATA.ERROR_TYPE: "must-not-override",
-                SPANDATA.HTTP_STATUS_CODE: 418,
-            }
-
-    if with_service_extension:
-        monkeypatch.setitem(_SERVICE_EXTENSIONS, "s3", TestServiceExtension())
-    client = client_factory()
-    original_exception = ClientError(
-        {
-            "Error": {
-                "Code": "AccessDeniedException",
-                "Message": "must not become a span attribute",
-            },
-            "ResponseMetadata": {
-                "RequestId": "request-id",
-                "HTTPStatusCode": 403,
-                "RetryAttempts": 1,
-            },
-        },
-        "HeadObject",
-    )
-
-    def raise_client_error(**kwargs):
-        raise original_exception
-
-    client.meta.events.register("before-parameter-build", raise_client_error)
-
-    def invoke_failing_client_method():
-        with pytest.raises(ClientError) as exc_info:
-            client.head_object(Bucket="bucket", Key="foo")
-        assert exc_info.value is original_exception
-
-    spans_by_op = _capture_boto3_spans_by_op(
-        invoke_failing_client_method, capture_items, span_streaming
-    )
-    client_spans = spans_by_op.get(OP.HTTP_CLIENT, [])
-    _assert_one_failed_span(client_spans, span_streaming)
-    attributes = _span_attributes(client_spans[0], span_streaming)
-
-    assert attributes[SPANDATA.AWS_REQUEST_ID] == "request-id"
-    assert attributes[SPANDATA.HTTP_STATUS_CODE] == 403
-    assert attributes[SPANDATA.HTTP_REQUEST_RESEND_COUNT] == 1
-    assert attributes[SPANDATA.ERROR_TYPE] == "AccessDeniedException"
-    if with_service_extension:
-        assert attributes["aws.test.error"] == "AccessDeniedException"
-    assert "Error.Message" not in attributes
-    assert "exception.message" not in attributes
-    assert "error.message" not in attributes
 
 
 @pytest.mark.parametrize(
