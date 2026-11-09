@@ -756,7 +756,7 @@ def test_no_error(lambda_client, test_environment):
     assert _get_span_attr(attrs, SPANDATA.AWS_LOG_STREAM_NAMES) == [
         LATEST_FUNCTION_VERSION
     ]
-    assert _get_span_attr(attrs, SPANDATA.MESSAGING_BATCH_MESSAGE_COUNT) == 1
+    assert SPANDATA.MESSAGING_BATCH_MESSAGE_COUNT not in attrs
 
 
 def test_error(lambda_client, test_environment):
@@ -810,7 +810,44 @@ def test_error(lambda_client, test_environment):
     assert _get_span_attr(attrs, SPANDATA.AWS_LOG_STREAM_NAMES) == [
         LATEST_FUNCTION_VERSION
     ]
-    assert _get_span_attr(attrs, SPANDATA.MESSAGING_BATCH_MESSAGE_COUNT) == 1
+    assert SPANDATA.MESSAGING_BATCH_MESSAGE_COUNT not in attrs
+
+
+_SQS_RECORD = {"eventSource": "aws:sqs"}
+_SNS_RECORD = {"EventSource": "aws:sns"}
+
+
+@pytest.mark.parametrize(
+    "aws_event,batch_count",
+    [
+        pytest.param({"Records": [_SQS_RECORD, _SQS_RECORD]}, 2, id="sqs"),
+        pytest.param({"Records": [_SNS_RECORD]}, 1, id="sns"),
+        pytest.param({"Records": [{"eventSource": "aws:s3"}]}, None, id="s3"),
+        pytest.param({"Records": [_SQS_RECORD, _SNS_RECORD]}, None, id="mixed"),
+        pytest.param({"httpMethod": "GET", "path": "/"}, None, id="http"),
+        pytest.param(
+            [{"good dog": "Maisey"}, {"good dog": "Charlie"}], None, id="list"
+        ),
+    ],
+)
+def test_messaging_batch_message_count(
+    lambda_client, test_environment, aws_event, batch_count
+):
+    lambda_client.invoke(
+        FunctionName="BasicOkSpanStreaming",
+        Payload=json.dumps(aws_event),
+    )
+
+    (segment_span,) = [
+        s for s in test_environment["server"].span_items if s["is_segment"]
+    ]
+    attrs = segment_span["attributes"]
+    if batch_count is None:
+        assert SPANDATA.MESSAGING_BATCH_MESSAGE_COUNT not in attrs
+    else:
+        assert (
+            _get_span_attr(attrs, SPANDATA.MESSAGING_BATCH_MESSAGE_COUNT) == batch_count
+        )
 
 
 def test_trace_continuation(lambda_client, test_environment):

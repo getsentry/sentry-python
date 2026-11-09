@@ -29,7 +29,7 @@ from sentry_sdk.utils import (
 )
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Mapping, TypeVar
+    from typing import Any, Callable, Mapping, Optional, TypeVar
 
     from sentry_sdk._types import Attributes
 
@@ -37,6 +37,30 @@ if TYPE_CHECKING:
 
 TIMEOUT_WARNING_BUFFER = 1500
 MILLIS_TO_SECONDS = 1000.0
+
+# `eventSource` of SQS records, `EventSource` of SNS records.
+MESSAGING_EVENT_SOURCES = ("aws:sqs", "aws:sns")
+
+
+def _get_messaging_batch_size(aws_event: "Any") -> "Optional[int]":
+    """The number of SQS or SNS messages in the event, or `None` for any other event."""
+    if not isinstance(aws_event, dict):
+        return None
+
+    records = aws_event.get("Records")
+    if not isinstance(records, list) or not records:
+        return None
+
+    sources = {
+        record.get("eventSource") or record.get("EventSource")
+        if isinstance(record, dict)
+        else None
+        for record in records
+    }
+    if len(sources) != 1 or sources.pop() not in MESSAGING_EVENT_SOURCES:
+        return None
+
+    return len(records)
 
 
 def _wrap_handler(handler: "F") -> "F":
@@ -64,10 +88,8 @@ def _wrap_handler(handler: "F") -> "F":
 
         if isinstance(aws_event, list) and len(aws_event) >= 1:
             request_data = aws_event[0]
-            batch_size = len(aws_event)
         else:
             request_data = aws_event
-            batch_size = 1
 
         if not isinstance(request_data, dict):
             # If we're not dealing with a dictionary, we won't be able to get
@@ -160,10 +182,14 @@ def _wrap_handler(handler: "F") -> "F":
                 SPANDATA.SENTRY_SEGMENT_NAME_SOURCE: SegmentNameSource.COMPONENT,
                 SPANDATA.CLOUD_PROVIDER: CLOUD_PROVIDER,
                 SPANDATA.CLOUD_PLATFORM: CLOUD_PLATFORM,
-                SPANDATA.MESSAGING_BATCH_MESSAGE_COUNT: batch_size,
                 **header_attributes,
                 **additional_attributes,
             }
+
+            with capture_internal_exceptions():
+                batch_size = _get_messaging_batch_size(aws_event)
+                if batch_size is not None:
+                    attributes[SPANDATA.MESSAGING_BATCH_MESSAGE_COUNT] = batch_size
 
             with capture_internal_exceptions():
                 invoked_function_arn = aws_context.invoked_function_arn
