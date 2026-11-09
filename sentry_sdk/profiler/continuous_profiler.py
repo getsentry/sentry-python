@@ -291,9 +291,6 @@ class ContinuousScheduler:
     def teardown(self) -> None:
         raise NotImplementedError
 
-    def pause(self) -> None:
-        raise NotImplementedError
-
     def reset_buffer(self) -> None:
         self.buffer = ProfileBuffer(
             self.options, self.sdk_info, PROFILE_BUFFER_SECONDS, self.capture_func
