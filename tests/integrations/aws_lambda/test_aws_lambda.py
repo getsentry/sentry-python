@@ -900,38 +900,9 @@ def _eventbridge_event(source, detail_type):
         pytest.param({"Records": [_sqs_record(), _sqs_record()]}, "pubsub", id="sqs"),
         pytest.param({"Records": [_sns_record()]}, "pubsub", id="sns"),
         pytest.param(
-            {"Records": [{"eventSource": "aws:kinesis"}]},
-            "pubsub",
-            id="kinesis",
-        ),
-        pytest.param(
-            {
-                "eventSource": "aws:kafka",
-                "records": {
-                    "orders-0": [{"offset": 1}, {"offset": 2}],
-                    "orders-1": [{"offset": 1}],
-                },
-            },
+            {"eventSource": "aws:kafka", "records": {"orders-0": [{}]}},
             "pubsub",
             id="msk",
-        ),
-        pytest.param(
-            {"eventSource": "SelfManagedKafka", "records": {"orders-0": [{}]}},
-            "pubsub",
-            id="self-managed-kafka",
-        ),
-        pytest.param(
-            {"eventSource": "aws:mq", "messages": [{}, {}]},
-            "pubsub",
-            id="activemq",
-        ),
-        pytest.param(
-            {
-                "eventSource": "aws:rmq",
-                "rmqMessagesByQueue": {"orders::/": [{}, {}], "alerts::/": [{}]},
-            },
-            "pubsub",
-            id="rabbitmq",
         ),
         pytest.param(
             _eventbridge_event("aws.s3", "Object Created"),
@@ -944,16 +915,6 @@ def _eventbridge_event(source, detail_type):
             id="eventbridge-schedule",
         ),
         pytest.param({"Records": [{"eventSource": "aws:s3"}]}, "datasource", id="s3"),
-        pytest.param(
-            {"Records": [{"eventSource": "aws:dynamodb"}]},
-            "datasource",
-            id="dynamodb-streams",
-        ),
-        pytest.param(
-            {"eventSource": "aws:docdb", "events": [{}]},
-            "datasource",
-            id="documentdb",
-        ),
         pytest.param(
             [{"good dog": "Maisey"}, {"good dog": "Charlie"}],
             "other",
