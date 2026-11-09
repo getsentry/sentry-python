@@ -15,7 +15,7 @@ class _BedrockExtension(_ServiceExtension):
     skip_if_no_active_span = False
 
     def get_span_op(self, ctx: "AwsCallContext") -> "Optional[str]":
-        if ctx.operation_name == "Converse" and ctx.operation_name == "ConverseStream":
+        if ctx.operation_name != "Converse" and ctx.operation_name != "ConverseStream":
             return None
         return OP.GEN_AI_CHAT
 
