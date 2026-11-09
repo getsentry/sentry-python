@@ -1,10 +1,12 @@
+import re
+
 import pytest
 import responses
 from gql import Client, __version__, gql
 from gql.transport.exceptions import TransportQueryError
 from gql.transport.requests import RequestsHTTPTransport
 
-from sentry_sdk.integrations.gql import GQLIntegration
+from sentry_sdk.integrations.gql import GQLIntegration, _request_info_from_transport
 from sentry_sdk.utils import parse_version
 
 GQL_VERSION = parse_version(__version__)
@@ -273,3 +275,64 @@ def test_real_gql_request_with_error_data_collection_variables(
         assert event["request"]["data"].get("variables")
     else:
         assert not event["request"]["data"].get("variables")
+
+
+@pytest.mark.parametrize("send_default_pii", (False, True))
+@responses.activate
+def test_transport_url_is_sanitized(sentry_init, capture_events, send_default_pii):
+    sentry_init(integrations=[GQLIntegration()], send_default_pii=send_default_pii)
+    events = capture_events()
+
+    responses.add(
+        method=responses.POST,
+        url=re.compile(r"https://.*api\.example\.com/graphql.*"),
+        json={"errors": [{"message": "some error"}]},
+        status=200,
+    )
+    transport = RequestsHTTPTransport(
+        url="https://user:password@api.example.com/graphql?access_token=secret&v=1#frag"
+    )
+    client = Client(transport=transport)
+
+    with pytest.raises(TransportQueryError):
+        client.execute(gql("query Example { example }"))
+
+    (event,) = events
+    assert event["request"]["url"] == (
+        "https://[Filtered]:[Filtered]@api.example.com/graphql"
+    )
+    assert event["request"]["query_string"] == "access_token=[Filtered]&v=[Filtered]"
+    assert "password" not in str(event["request"])
+    assert "secret" not in str(event["request"])
+
+
+def test_transport_url_without_query_has_no_query_string():
+    class FakeTransport:
+        url = "https://api.example.com/graphql"
+
+    assert _request_info_from_transport(FakeTransport()) == {
+        "method": "POST",
+        "url": "https://api.example.com/graphql",
+    }
+
+
+def test_transport_url_object_is_sanitized():
+    class FakeUrl:
+        def __str__(self):
+            return "https://user:password@api.example.com/graphql?token=secret"
+
+    class FakeTransport:
+        url = FakeUrl()
+
+    assert _request_info_from_transport(FakeTransport()) == {
+        "method": "POST",
+        "url": "https://[Filtered]:[Filtered]@api.example.com/graphql",
+        "query_string": "token=[Filtered]",
+    }
+
+
+def test_transport_without_url():
+    class FakeTransport:
+        pass
+
+    assert _request_info_from_transport(FakeTransport()) == {"method": "POST"}

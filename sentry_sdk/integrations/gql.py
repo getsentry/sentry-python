@@ -2,9 +2,11 @@ import sentry_sdk
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.utils import (
+    capture_internal_exceptions,
     ensure_integration_enabled,
     event_from_exception,
     has_data_collection_enabled,
+    parse_url,
     parse_version,
 )
 
@@ -99,9 +101,16 @@ def _request_info_from_transport(
     }
 
     try:
-        request_info["url"] = transport.url
+        url = transport.url
     except AttributeError:
-        pass
+        return request_info
+
+    with capture_internal_exceptions():
+        # Some transports accept a URL object as well as a string.
+        parsed_url = parse_url(str(url))
+        request_info["url"] = parsed_url.url
+        if parsed_url.query:
+            request_info["query_string"] = parsed_url.query
 
     return request_info
 
