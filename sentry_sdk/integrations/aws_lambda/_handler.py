@@ -1,5 +1,6 @@
 import functools
 import sys
+from contextlib import nullcontext
 from os import environ
 from typing import TYPE_CHECKING
 from urllib.parse import urlencode
@@ -15,6 +16,7 @@ from sentry_sdk.integrations.aws_lambda._request import (
 from sentry_sdk.integrations.aws_lambda._trigger import (
     _get_messaging_batch_size,
     _get_trigger,
+    _start_process_span,
 )
 from sentry_sdk.integrations.aws_lambda.consts import (
     CLOUD_PLATFORM,
@@ -33,7 +35,7 @@ from sentry_sdk.utils import (
 )
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Mapping, TypeVar
+    from typing import Any, Callable, ContextManager, Mapping, TypeVar
 
     from sentry_sdk._types import Attributes
 
@@ -216,7 +218,11 @@ def _wrap_handler(handler: "F") -> "F":
                 attributes=attributes,
             ):
                 try:
-                    return handler(aws_event, aws_context, *args, **kwargs)
+                    process_span: "ContextManager[Any]" = nullcontext()
+                    with capture_internal_exceptions():
+                        process_span = _start_process_span(aws_event)
+                    with process_span:
+                        return handler(aws_event, aws_context, *args, **kwargs)
                 except Exception:
                     exc_info = sys.exc_info()
                     sentry_event, hint = event_from_exception(
