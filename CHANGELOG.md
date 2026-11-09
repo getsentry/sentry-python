@@ -2,41 +2,17 @@
 
 ## 3.0.0b4
 
-### New Features ✨
+This is a pre-release of the next Python SDK major, to be released in November 2026.
 
-#### Anthropic
+Want to give it a spin? Be our guest and [let us know](https://github.com/getsentry/sentry-python/discussions) how it went!
 
-- Record reasoning parts in streaming output by @alexander-alderman-webb in [#8193](https://github.com/getsentry/sentry-python/pull/8193)
-- Record reasoning parts in nonstreaming output by @alexander-alderman-webb in [#8192](https://github.com/getsentry/sentry-python/pull/8192)
+### ✨ Notable Changes
+- Say goodbye to transactions: span streaming is now the default tracing model
+- The fine-grained `data_collection` supersedes the flat `send_default_pii`
 
-#### Other
-
-- (crons) Mark @monitor jobs so scheduler integrations skip them by @wedamija in [#8198](https://github.com/getsentry/sentry-python/pull/8198)
-
-### Bug Fixes 🐛
-
-- (sampling) Respect incoming sample rate if not explicitly overridden by @sentrivana in [#8185](https://github.com/getsentry/sentry-python/pull/8185)
-- (utils) Look up package versions without scanning all installed packages by @Shellghostt in [#8215](https://github.com/getsentry/sentry-python/pull/8215)
-
-### Documentation 📚
-
-- Point Sentry Conventions links to conventions.sentry.dev by @cleptric and @claude in [#8200](https://github.com/getsentry/sentry-python/pull/8200)
-
-### Internal Changes 🔧
-
-#### Warden
-
-- Remove find-bugs, already covered by code-review by @dcramer with @sentry-junior in [#8204](https://github.com/getsentry/sentry-python/pull/8204)
-- Enable incremental review by @Jeffreyhung with @sentry-junior in [#8199](https://github.com/getsentry/sentry-python/pull/8199)
-
-#### Other
-
-- (profiling) Remove unused ContinuousScheduler.pause stub by @sentry-junior in [#8224](https://github.com/getsentry/sentry-python/pull/8224)
-
-### Other
-
-- [do not merge] Testing sync by @sentrivana in [#8230](https://github.com/getsentry/sentry-python/pull/8230)
-- Next Python SDK major by @sentrivana in [#5005](https://github.com/getsentry/sentry-python/pull/5005)
+### 🗞️ Resources
+- [2.x to 3.x migration guide](https://docs.sentry.io/platforms/python/migration/2.x-to-3.x)
+- [detailed changelog](https://github.com/getsentry/sentry-python/blob/major/3.0/MIGRATION_GUIDE.md)
 
 ## 3.0.0b3
 
