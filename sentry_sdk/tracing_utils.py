@@ -57,18 +57,6 @@ SENTRY_TRACE_REGEX = re.compile(
 )
 
 
-# This is a normal base64 regex, modified to reflect that fact that we strip the
-# trailing = or == off
-base64_stripped = (
-    # any of the characters in the base64 "alphabet", in multiples of 4
-    "([a-zA-Z0-9+/]{4})*"
-    # either nothing or 2 or 3 base64-alphabet characters (see
-    # https://en.wikipedia.org/wiki/Base64#Decoding_Base64_without_padding for
-    # why there's never only 1 extra character)
-    "([a-zA-Z0-9+/]{2,3})?"
-)
-
-
 class EnvironHeaders(Mapping):  # type: ignore
     def __init__(
         self,
@@ -176,39 +164,6 @@ def add_http_breadcrumb(status_code: "Optional[int]", data: "dict[str, Any]") ->
         kwargs["level"] = level
 
     sentry_sdk.add_breadcrumb(**kwargs)
-
-
-def get_url_attributes_legacy(
-    client: "sentry_sdk.client.BaseClient",
-    parsed_url: "Optional[ParsedUrl]",
-) -> "Attributes":
-    """Build the `url.*` span attributes for an outgoing HTTP request.
-
-    The query string is filtered according to `data_collection`.
-    """
-    attributes: "Attributes" = {}
-    if parsed_url is None:
-        return attributes
-
-    query: "Optional[str]" = None
-    if parsed_url.query:
-        query = _apply_data_collection_filtering_to_query_string(
-            query_string=parsed_url.query,
-            behaviour=client.options["data_collection"]["url_query_params"],
-        )
-
-    url_full = parsed_url.url
-    if query:
-        attributes[SPANDATA.URL_QUERY] = query
-        url_full += "?" + query
-
-    if parsed_url.fragment:
-        attributes[SPANDATA.URL_FRAGMENT] = parsed_url.fragment
-        url_full += "#" + parsed_url.fragment
-
-    attributes[SPANDATA.URL_FULL] = url_full
-
-    return attributes
 
 
 def get_url_attributes(
@@ -842,7 +797,7 @@ class Baggage:
                 item = Baggage.SENTRY_PREFIX + quote(key) + "=" + quote(str(val))
                 items.append(item)
 
-        if include_third_party:
+        if include_third_party and self.third_party_items:
             items.append(self.third_party_items)
 
         return ",".join(items)
@@ -1052,34 +1007,6 @@ def _get_value(source: "Any", key: str) -> "Optional[Any]":
             except Exception:
                 value = None
     return value
-
-
-def _get_usage_attributes(usage: "Any") -> "dict[str, Any]":
-    """
-    Get usage attributes.
-    """
-    attributes = {}
-
-    def _set_from_keys(attribute: str, keys: "tuple[str, ...]") -> None:
-        for key in keys:
-            value = _get_value(usage, key)
-            if value is not None and isinstance(value, int):
-                attributes[attribute] = value
-
-    _set_from_keys(
-        SPANDATA.GEN_AI_USAGE_INPUT_TOKENS,
-        ("prompt_tokens", "input_tokens"),
-    )
-    _set_from_keys(
-        SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS,
-        ("completion_tokens", "output_tokens"),
-    )
-    _set_from_keys(
-        SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS,
-        ("total_tokens",),
-    )
-
-    return attributes
 
 
 def _should_continue_trace(baggage: "Optional[Baggage]") -> bool:

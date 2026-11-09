@@ -1042,36 +1042,6 @@ def _transform_target_python_versions(
         return updated
 
 
-def get_file_hash() -> str:
-    """Calculate a hash of the tox.ini file."""
-    hasher = hashlib.md5()
-
-    with open(TOX_FILE, "rb") as f:
-        buf = f.read()
-        hasher.update(buf)
-
-    return hasher.hexdigest()
-
-
-def get_last_updated() -> Optional[datetime]:
-    repo_root = subprocess.run(
-        ["git", "rev-parse", "--show-toplevel"],
-        capture_output=True,
-        text=True,
-    ).stdout.strip()
-    tox_ini_path = Path(repo_root) / "tox.ini"
-
-    timestamp = subprocess.run(
-        ["git", "log", "-1", "--pretty=%ct", str(tox_ini_path)],
-        capture_output=True,
-        text=True,
-    ).stdout.strip()
-
-    timestamp = datetime.fromtimestamp(int(timestamp), timezone.utc)
-    print(f"Last committed tox.ini update: {timestamp}")
-    return timestamp
-
-
 def _normalize_name(package: str) -> str:
     # From https://peps.python.org/pep-0503/#normalized-names
     # but normalizing to underscores instead of hyphens since tox-formatted packages

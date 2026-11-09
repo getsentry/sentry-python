@@ -1,5 +1,6 @@
 import copy
 import sys
+import time
 import uuid
 from datetime import datetime, timedelta, timezone
 from enum import Enum
@@ -18,7 +19,6 @@ from sentry_sdk.utils import (
     format_attribute,
     get_current_thread_meta,
     logger,
-    nanosecond_time,
     should_be_treated_as_error,
 )
 
@@ -239,7 +239,7 @@ class Span:
 
         # profiling depends on this value and requires that
         # it is measured in nanoseconds
-        self._start_timestamp_monotonic_ns = nanosecond_time()
+        self._start_timestamp_monotonic_ns = time.perf_counter_ns()
 
         self._span_id: "Optional[str]" = None
 
@@ -352,7 +352,7 @@ class Span:
                 )
 
         if self._end_timestamp is None:
-            elapsed = nanosecond_time() - self._start_timestamp_monotonic_ns
+            elapsed = time.perf_counter_ns() - self._start_timestamp_monotonic_ns
             self._end_timestamp = self._start_timestamp + timedelta(
                 microseconds=elapsed / 1000
             )

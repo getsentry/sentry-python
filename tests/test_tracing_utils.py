@@ -133,11 +133,11 @@ def test_strip_sentry_baggage(header, expected):
         (Baggage(sentry_items={}, mutable=False), '<Baggage "", mutable=False>'),
         (
             Baggage(sentry_items={"foo": "bar"}),
-            '<Baggage "sentry-foo=bar,", mutable=True>',
+            '<Baggage "sentry-foo=bar", mutable=True>',
         ),
         (
             Baggage(sentry_items={"foo": "bar"}, mutable=False),
-            '<Baggage "sentry-foo=bar,", mutable=False>',
+            '<Baggage "sentry-foo=bar", mutable=False>',
         ),
         (
             Baggage(sentry_items={"foo": "bar"}, third_party_items="asdf=1234,"),

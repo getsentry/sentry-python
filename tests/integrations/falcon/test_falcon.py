@@ -1,4 +1,5 @@
 import logging
+from http import HTTPStatus
 
 import falcon
 import falcon.testing
@@ -8,6 +9,7 @@ import sentry_sdk
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.falcon import FalconIntegration
 from sentry_sdk.integrations.logging import LoggingIntegration
+from sentry_sdk.utils import parse_version
 
 try:
     import falcon.asgi
@@ -15,6 +17,9 @@ except ImportError:
     pass
 else:
     import falcon.inspect  # We only need this module for the ASGI test
+
+
+FALCON_VERSION = parse_version(falcon.__version__)
 
 
 @pytest.fixture
@@ -178,18 +183,41 @@ def test_unhandled_errors(
     assert " by zero" in event["exception"]["values"][0]["value"]
 
 
+@pytest.mark.parametrize(
+    "status",
+    [
+        falcon.HTTP_502,
+        pytest.param(
+            502,
+            marks=pytest.mark.skipif(
+                (FALCON_VERSION or ()) < (4,),
+                reason="Integer HTTPError statuses require Falcon 4+",
+            ),
+        ),
+        pytest.param(
+            HTTPStatus.BAD_GATEWAY,
+            id="HTTPStatus.BAD_GATEWAY",
+            marks=pytest.mark.skipif(
+                (FALCON_VERSION or ()) < (4,),
+                reason="Integer HTTPError statuses require Falcon 4+",
+            ),
+        ),
+    ],
+)
 def test_raised_5xx_errors(
     sentry_init,
     capture_exceptions,
     capture_items,
+    status,
 ):
+    """String, integer, and http.HTTPStatus 5xx HTTPError statuses should be captured."""
     sentry_init(
         integrations=[FalconIntegration()],
     )
 
     class Resource:
         def on_get(self, req, resp):
-            raise falcon.HTTPError(falcon.HTTP_502)
+            raise falcon.HTTPError(status)
 
     app = falcon.API()
     app.add_route("/", Resource())
@@ -210,18 +238,41 @@ def test_raised_5xx_errors(
     assert event["exception"]["values"][0]["type"] == "HTTPError"
 
 
+@pytest.mark.parametrize(
+    "status",
+    [
+        falcon.HTTP_400,
+        pytest.param(
+            400,
+            marks=pytest.mark.skipif(
+                (FALCON_VERSION or ()) < (4,),
+                reason="Integer HTTPError statuses require Falcon 4+",
+            ),
+        ),
+        pytest.param(
+            HTTPStatus.BAD_REQUEST,
+            id="HTTPStatus.BAD_REQUEST",
+            marks=pytest.mark.skipif(
+                (FALCON_VERSION or ()) < (4,),
+                reason="Integer HTTPError statuses require Falcon 4+",
+            ),
+        ),
+    ],
+)
 def test_raised_4xx_errors(
     sentry_init,
     capture_exceptions,
     capture_items,
+    status,
 ):
+    """String, integer, and http.HTTPStatus 4xx HTTPError statuses should not be captured."""
     sentry_init(
         integrations=[FalconIntegration()],
     )
 
     class Resource:
         def on_get(self, req, resp):
-            raise falcon.HTTPError(falcon.HTTP_400)
+            raise falcon.HTTPError(status)
 
     app = falcon.API()
     app.add_route("/", Resource())
@@ -236,22 +287,41 @@ def test_raised_4xx_errors(
     assert len(events) == 0
 
 
+@pytest.mark.parametrize(
+    "status",
+    [
+        falcon.HTTP_508,
+        pytest.param(
+            508,
+            marks=pytest.mark.skipif(
+                (FALCON_VERSION or ()) < (4,),
+                reason="Integer HTTPStatus statuses require Falcon 4+",
+            ),
+        ),
+        pytest.param(
+            HTTPStatus.LOOP_DETECTED,
+            id="HTTPStatus.LOOP_DETECTED",
+            marks=pytest.mark.skipif(
+                (FALCON_VERSION or ()) < (4,),
+                reason="Integer HTTPStatus statuses require Falcon 4+",
+            ),
+        ),
+    ],
+)
 def test_http_status(
     sentry_init,
     capture_exceptions,
     capture_items,
+    status,
 ):
-    """
-    This just demonstrates, that if Falcon raises a HTTPStatus with code 500
-    (instead of a HTTPError with code 500) Sentry will not capture it.
-    """
+    """String, integer, and http.HTTPStatus 5xx falcon.HTTPStatus exceptions are not captured."""
     sentry_init(
         integrations=[FalconIntegration()],
     )
 
     class Resource:
         def on_get(self, req, resp):
-            raise falcon.http_status.HTTPStatus(falcon.HTTP_508)
+            raise falcon.http_status.HTTPStatus(status)
 
     app = falcon.API()
     app.add_route("/", Resource())
@@ -265,6 +335,53 @@ def test_http_status(
 
     assert len(exceptions) == 0
     assert len(events) == 0
+
+
+@pytest.mark.parametrize(
+    "status",
+    [
+        400,
+        pytest.param(HTTPStatus.BAD_REQUEST, id="HTTPStatus.BAD_REQUEST"),
+        499,
+        500,
+        pytest.param(
+            HTTPStatus.INTERNAL_SERVER_ERROR, id="HTTPStatus.INTERNAL_SERVER_ERROR"
+        ),
+        599,
+        600,
+    ],
+)
+def test_integer_response_status(sentry_init, capture_items, status):
+    """A handler's integer or HTTPStatus response status should capture only 5xx errors."""
+    sentry_init(
+        integrations=[FalconIntegration()],
+    )
+
+    class Resource:
+        def on_get(self, req, resp):
+            raise ValueError("handled error")
+
+    def error_handler(req, resp, ex, params):
+        resp.status = status
+
+    app = falcon.API()
+    app.add_route("/", Resource())
+    app.add_error_handler(ValueError, error_handler)
+    items = capture_items("event")
+
+    response = falcon.testing.TestClient(app).simulate_get("/")
+
+    # this exists in falcon >= 3
+    assert response.status_code == status
+    if 500 <= status < 600:
+        (event,) = (item.payload for item in items)
+        exception = event["exception"]["values"][-1]
+        assert exception["type"] == "ValueError"
+        assert exception["value"] == "handled error"
+        assert exception["mechanism"]["type"] == "falcon"
+        assert exception["mechanism"]["handled"] is False
+    else:
+        assert not items
 
 
 @pytest.mark.parametrize("max_value_length", [1024, None])

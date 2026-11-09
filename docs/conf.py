@@ -1,20 +1,6 @@
 import os
 import sys
-import typing
 from datetime import datetime
-
-# prevent circular imports
-import sphinx.builders.html
-import sphinx.builders.latex
-import sphinx.builders.texinfo
-import sphinx.builders.text
-import sphinx.domains.c  # noqa: F401
-import sphinx.domains.cpp  # noqa: F401
-import sphinx.ext.autodoc  # noqa: F401
-import sphinx.ext.intersphinx  # noqa: F401
-import urllib3.exceptions  # noqa: F401
-
-typing.TYPE_CHECKING = True
 
 #
 # Configuration file for the Sphinx documentation builder.
@@ -31,7 +17,7 @@ project = "sentry-python"
 copyright = "2019-{}, Sentry Team and Contributors".format(datetime.now().year)
 author = "Sentry Team and Contributors"
 
-release = "3.0.0b2"
+release = "3.0.0b3"
 version = ".".join(release.split(".")[:2])  # The short X.Y version.
 
 
