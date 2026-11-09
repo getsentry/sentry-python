@@ -16,7 +16,7 @@ dev = [
 
 toxgen = [
     "jinja2",
-    "packaging<26.0",
+    "packaging",
     "pip",
     "requests",
 ]
@@ -24,7 +24,7 @@ toxgen = [
 docs = [
     "gevent",
     "shibuya",
-    "sphinx<8.2",
+    "sphinx",
     "sphinx-autodoc-typehints[type_comments]>=2.3.0",
     "typing-extensions",
 ]
@@ -81,7 +81,7 @@ typing = [
     "aiohttp>=3.14.3",
     "openai-agents>=0.22.0",
     "mistralai>=2.10.1",
-    "typesafe-sdk>=0.7.2",
+    "typesafe-sdk>=0.7.5",
 ]
 test = [
     "dataclasses ; python_full_version < '3.7'",

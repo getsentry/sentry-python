@@ -5,6 +5,7 @@ from urllib.parse import unquote, urlsplit
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.boto3._services.base import _ServiceExtension
 from sentry_sdk.integrations.boto3._utils import _get_aws_arn_attributes
+from sentry_sdk.utils import capture_internal_exceptions
 
 if TYPE_CHECKING:
     from typing import Any, Optional
@@ -35,7 +36,13 @@ class _SQSExtension(_ServiceExtension):
             return None
         # for example: `send <queue name>` when `messaging.operation.type=send`.
         # https://opentelemetry.io/docs/specs/semconv/messaging/messaging-spans/#span-name
-        return f"{attributes[SPANDATA.MESSAGING_OPERATION_TYPE]} {attributes[SPANDATA.MESSAGING_DESTINATION_NAME]}"
+        operation_type = _MESSAGING_OPERATIONS[ctx.operation_name][1]
+        destination_name = attributes.get(SPANDATA.MESSAGING_DESTINATION_NAME)
+        return (
+            f"{operation_type} {destination_name}"
+            if destination_name
+            else operation_type
+        )
 
     def get_request_attributes(self, ctx: "AwsCallContext") -> "Attributes":
         attributes = _get_aws_arn_attributes(
@@ -46,12 +53,13 @@ class _SQSExtension(_ServiceExtension):
         if queue_url is not None:
             attributes[SPANDATA.AWS_SQS_QUEUE_URL] = queue_url
 
-            # `https://sqs.eu-north-1.amazonaws.com/123456789012/orders` => ['123456789012', 'orders']
-            path = unquote(urlsplit(queue_url).path).strip("/").split("/")
+            with capture_internal_exceptions():
+                # `https://sqs.eu-north-1.amazonaws.com/123456789012/orders` => ['123456789012', 'orders']
+                path = unquote(urlsplit(queue_url).path).strip("/").split("/")
 
-            attributes[SPANDATA.MESSAGING_DESTINATION_NAME] = path[-1]
-            if re.fullmatch(r"[0-9]{12}", path[0]):
-                attributes[SPANDATA.CLOUD_ACCOUNT_ID] = path[0]
+                attributes[SPANDATA.MESSAGING_DESTINATION_NAME] = path[-1]
+                if re.fullmatch(r"[0-9]{12}", path[0]):
+                    attributes[SPANDATA.CLOUD_ACCOUNT_ID] = path[0]
         elif "QueueName" in ctx.params:
             # `CreateQueue` & `GetQueueUrl` operations.
             attributes[SPANDATA.MESSAGING_DESTINATION_NAME] = ctx.params["QueueName"]
