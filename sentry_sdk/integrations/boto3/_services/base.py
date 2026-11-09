@@ -16,6 +16,7 @@ class _ServiceExtension:
     """
 
     __slots__ = ()
+    skip_if_no_active_span = True
 
     def get_span_op(self, ctx: "AwsCallContext") -> "Optional[str]":
         """Return an optional `sentry.op` override, or `None` to keep the default."""
