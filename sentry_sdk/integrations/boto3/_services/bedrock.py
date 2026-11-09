@@ -28,11 +28,30 @@ class _BedrockExtension(_ServiceExtension):
         if ctx.operation_name != "Converse" and ctx.operation_name != "ConverseStream":
             return {}
 
-        return {
+        attributes: "Attributes" = {
             SPANDATA.GEN_AI_PROVIDER_NAME: "aws.bedrock",
             SPANDATA.GEN_AI_OPERATION_NAME: "chat",
             SPANDATA.GEN_AI_RESPONSE_STREAMING: ctx.operation_name == "ConverseStream",
         }
+
+        inference_config = ctx.params.get("inferenceConfig")
+
+        if not isinstance(inference_config, dict):
+            return attributes
+
+        max_tokens = inference_config.get("maxTokens")
+        if max_tokens is not None:
+            attributes[SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] = max_tokens
+
+        temperature = inference_config.get("temperature")
+        if temperature is not None:
+            attributes[SPANDATA.GEN_AI_REQUEST_TEMPERATURE] = temperature
+
+        top_p = inference_config.get("topP")
+        if top_p is not None:
+            attributes[SPANDATA.GEN_AI_REQUEST_TOP_P] = top_p
+
+        return attributes
 
     def get_response_attributes(
         self,
