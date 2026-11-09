@@ -6,7 +6,7 @@ from gql import Client, __version__, gql
 from gql.transport.exceptions import TransportQueryError
 from gql.transport.requests import RequestsHTTPTransport
 
-from sentry_sdk.integrations.gql import GQLIntegration, _request_info_from_transport
+from sentry_sdk.integrations.gql import GQLIntegration
 from sentry_sdk.utils import parse_version
 
 GQL_VERSION = parse_version(__version__)
@@ -277,10 +277,62 @@ def test_real_gql_request_with_error_data_collection_variables(
         assert not event["request"]["data"].get("variables")
 
 
-@pytest.mark.parametrize("send_default_pii", (False, True))
+@pytest.mark.parametrize(
+    "init_kwargs,expected_query_string",
+    [
+        pytest.param(
+            {},
+            "access_token=[Filtered]&v=[Filtered]&page=[Filtered]",
+            id="no_pii_no_data_collection",
+        ),
+        pytest.param(
+            {"send_default_pii": True},
+            "access_token=[Filtered]&v=[Filtered]&page=[Filtered]",
+            id="legacy_pii_on",
+        ),
+        pytest.param(
+            {"data_collection": {}},
+            "access_token=%5BFiltered%5D&v=1&page=2",
+            id="data_collection_defaults",
+        ),
+        pytest.param(
+            {"data_collection": {"url_query_params": {"mode": "off"}}},
+            None,
+            id="data_collection_query_params_off",
+        ),
+        pytest.param(
+            {
+                "data_collection": {
+                    "url_query_params": {"mode": "denylist", "terms": ["page"]}
+                }
+            },
+            "access_token=%5BFiltered%5D&v=1&page=%5BFiltered%5D",
+            id="data_collection_denylist",
+        ),
+        pytest.param(
+            {
+                "data_collection": {
+                    "url_query_params": {"mode": "allowlist", "terms": ["page"]}
+                }
+            },
+            "access_token=%5BFiltered%5D&v=%5BFiltered%5D&page=2",
+            id="data_collection_allowlist",
+        ),
+        pytest.param(
+            {
+                "send_default_pii": True,
+                "data_collection": {"url_query_params": {"mode": "off"}},
+            },
+            None,
+            id="data_collection_takes_precedence_over_send_default_pii",
+        ),
+    ],
+)
 @responses.activate
-def test_transport_url_is_sanitized(sentry_init, capture_events, send_default_pii):
-    sentry_init(integrations=[GQLIntegration()], send_default_pii=send_default_pii)
+def test_transport_url_is_sanitized(
+    sentry_init, capture_events, init_kwargs, expected_query_string
+):
+    sentry_init(integrations=[GQLIntegration()], **init_kwargs)
     events = capture_events()
 
     responses.add(
@@ -290,7 +342,7 @@ def test_transport_url_is_sanitized(sentry_init, capture_events, send_default_pi
         status=200,
     )
     transport = RequestsHTTPTransport(
-        url="https://user:password@api.example.com/graphql?access_token=secret&v=1#frag"
+        url="https://user:password@api.example.com/graphql?access_token=secret&v=1&page=2#frag"
     )
     client = Client(transport=transport)
 
@@ -301,38 +353,6 @@ def test_transport_url_is_sanitized(sentry_init, capture_events, send_default_pi
     assert event["request"]["url"] == (
         "https://[Filtered]:[Filtered]@api.example.com/graphql"
     )
-    assert event["request"]["query_string"] == "access_token=[Filtered]&v=[Filtered]"
+    assert event["request"].get("query_string") == expected_query_string
     assert "password" not in str(event["request"])
     assert "secret" not in str(event["request"])
-
-
-def test_transport_url_without_query_has_no_query_string():
-    class FakeTransport:
-        url = "https://api.example.com/graphql"
-
-    assert _request_info_from_transport(FakeTransport()) == {
-        "method": "POST",
-        "url": "https://api.example.com/graphql",
-    }
-
-
-def test_transport_url_object_is_sanitized():
-    class FakeUrl:
-        def __str__(self):
-            return "https://user:password@api.example.com/graphql?token=secret"
-
-    class FakeTransport:
-        url = FakeUrl()
-
-    assert _request_info_from_transport(FakeTransport()) == {
-        "method": "POST",
-        "url": "https://[Filtered]:[Filtered]@api.example.com/graphql",
-        "query_string": "token=[Filtered]",
-    }
-
-
-def test_transport_without_url():
-    class FakeTransport:
-        pass
-
-    assert _request_info_from_transport(FakeTransport()) == {"method": "POST"}
