@@ -5,6 +5,7 @@ from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.boto3._services.base import _ServiceExtension
 from sentry_sdk.integrations.boto3._utils import (
     _get_aws_arn_attributes,
+    _get_batch_error_type,
     _inject_message_attributes,
 )
 
@@ -110,13 +111,9 @@ class _SNSExtension(_ServiceExtension):
         if ctx.operation_name == "Publish":
             attributes[SPANDATA.MESSAGING_MESSAGE_ID] = response["MessageId"]
 
-        # failed entries have a `200 OK` response; use their code when they share one.
-        # https://docs.aws.amazon.com/sns/latest/api/API_BatchResultErrorEntry.html
-        error_codes = {entry["Code"] for entry in response.get("Failed", ())}
-        if len(error_codes) == 1:
-            attributes[SPANDATA.ERROR_TYPE] = error_codes.pop()
-        elif error_codes:
-            attributes[SPANDATA.ERROR_TYPE] = "aws_batch_partial_failure"
+        error_type = _get_batch_error_type(response)
+        if error_type is not None:
+            attributes[SPANDATA.ERROR_TYPE] = error_type
         return attributes
 
     def get_request_params(

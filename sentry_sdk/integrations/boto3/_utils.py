@@ -53,6 +53,21 @@ def _get_aws_arn_attributes(
     return {}
 
 
+def _get_batch_error_type(response: "Any") -> "Optional[str]":
+    """
+    `error.type` for a batch call whose response has `Failed` entries.
+    Failed entries come back in a `200 OK` response; use their code when they share one.
+    https://docs.aws.amazon.com/AWSSimpleQueueService/latest/APIReference/API_BatchResultErrorEntry.html
+    https://docs.aws.amazon.com/sns/latest/api/API_BatchResultErrorEntry.html
+    """
+    error_codes = {entry["Code"] for entry in response.get("Failed", ())}
+    if len(error_codes) == 1:
+        return error_codes.pop()
+    if error_codes:
+        return "aws_batch_partial_failure"
+    return None
+
+
 def _inject_message_attributes(
     ctx: "AwsCallContext", span: "Optional[Span]", body_key: str, entries_key: str
 ) -> "Optional[Dict[str, Any]]":

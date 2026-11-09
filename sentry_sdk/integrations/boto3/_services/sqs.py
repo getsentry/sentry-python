@@ -7,6 +7,7 @@ from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.boto3._services.base import _ServiceExtension
 from sentry_sdk.integrations.boto3._utils import (
     _get_aws_arn_attributes,
+    _get_batch_error_type,
     _inject_message_attributes,
 )
 from sentry_sdk.traces import BAGGAGE_HEADER_NAME, SENTRY_TRACE_HEADER_NAME, NoOpSpan
@@ -90,9 +91,14 @@ class _SQSExtension(_ServiceExtension):
         )
 
     def get_request_attributes(self, ctx: "AwsCallContext") -> "Attributes":
-        attributes = _get_aws_arn_attributes(
-            (ctx.params.get("DestinationArn"), ctx.params.get("SourceArn")), ("sqs",)
-        )
+        attributes: "Attributes" = {}
+        with capture_internal_exceptions():
+            attributes.update(
+                _get_aws_arn_attributes(
+                    (ctx.params.get("DestinationArn"), ctx.params.get("SourceArn")),
+                    ("sqs",),
+                )
+            )
 
         queue_url = ctx.params.get("QueueUrl")
         if queue_url is not None:
@@ -131,9 +137,10 @@ class _SQSExtension(_ServiceExtension):
             if operation_type == "send":
                 attributes[SPANDATA.SENTRY_KIND] = "producer"
             if "Entries" in ctx.params:
-                attributes[SPANDATA.MESSAGING_BATCH_MESSAGE_COUNT] = len(
-                    ctx.params["Entries"]
-                )
+                with capture_internal_exceptions():
+                    attributes[SPANDATA.MESSAGING_BATCH_MESSAGE_COUNT] = len(
+                        ctx.params["Entries"]
+                    )
         return attributes
 
     def get_response_attributes(
@@ -154,13 +161,9 @@ class _SQSExtension(_ServiceExtension):
             if len(messages) == 1:
                 attributes[SPANDATA.MESSAGING_MESSAGE_ID] = messages[0]["MessageId"]
 
-        # failed entries have a `200 OK` response; use their code when they share one.
-        # https://docs.aws.amazon.com/sns/latest/api/API_BatchResultErrorEntry.html
-        error_codes = {entry["Code"] for entry in response.get("Failed", ())}
-        if len(error_codes) == 1:
-            attributes[SPANDATA.ERROR_TYPE] = error_codes.pop()
-        elif error_codes:
-            attributes[SPANDATA.ERROR_TYPE] = "aws_batch_partial_failure"
+        error_type = _get_batch_error_type(response)
+        if error_type is not None:
+            attributes[SPANDATA.ERROR_TYPE] = error_type
         return attributes
 
     def get_response_links(
