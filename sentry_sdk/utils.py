@@ -31,7 +31,6 @@ except ImportError:
 from typing import TYPE_CHECKING
 
 import sentry_sdk
-from sentry_sdk._compat import PY37
 from sentry_sdk._types import SENSITIVE_DATA_SUBSTITUTE, Annotated, AnnotatedValue
 from sentry_sdk.consts import (
     DEFAULT_ADD_FULL_STACK,
@@ -77,8 +76,6 @@ if TYPE_CHECKING:
     P = ParamSpec("P")
     R = TypeVar("R")
 
-
-epoch = datetime(1970, 1, 1)
 
 # The logger is created here but initialized in the debug support module
 logger = logging.getLogger("sentry_sdk.errors")
@@ -245,10 +242,6 @@ def capture_internal_exception(exc_info: "ExcInfo") -> None:
     """
     if sentry_sdk.get_client().is_active():
         logger.error("Internal error in sentry_sdk", exc_info=exc_info)
-
-
-def to_timestamp(value: "datetime") -> float:
-    return (value - epoch).total_seconds()
 
 
 def format_timestamp(value: "datetime") -> str:
@@ -993,15 +986,6 @@ def iter_event_stacktraces(event: "Event") -> "Iterator[Annotated[Dict[str, Any]
                 yield exception["stacktrace"]
 
 
-def iter_event_frames(event: "Event") -> "Iterator[Dict[str, Any]]":
-    for stacktrace in iter_event_stacktraces(event):
-        if isinstance(stacktrace, AnnotatedValue):
-            stacktrace = stacktrace.value or {}
-
-        for frame in stacktrace.get("frames") or ():
-            yield frame
-
-
 def handle_in_app(
     event: "Event",
     in_app_exclude: "Optional[List[str]]" = None,
@@ -1726,17 +1710,6 @@ def ensure_integration_enabled(
         return wraps(original_function)(runner)
 
     return patcher
-
-
-if PY37:
-
-    def nanosecond_time() -> int:
-        return time.perf_counter_ns()
-
-else:
-
-    def nanosecond_time() -> int:
-        return int(time.perf_counter() * 1e9)
 
 
 def now() -> float:
