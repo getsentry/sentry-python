@@ -19,15 +19,6 @@ _TRIGGERS: "dict[Optional[str], str]" = {
     "aws:docdb": "datasource",
 }
 
-# event sources that group their messages by topic-partition or queue.
-# https://docs.aws.amazon.com/lambda/latest/dg/with-msk.html
-# https://docs.aws.amazon.com/lambda/latest/dg/with-mq.html
-_GROUPED_MESSAGES_KEYS: "dict[Optional[str], str]" = {
-    "aws:kafka": "records",
-    "SelfManagedKafka": "records",
-    "aws:rmq": "rmqMessagesByQueue",
-}
-
 # https://docs.aws.amazon.com/eventbridge/latest/ref/overiew-event-structure.html
 _EVENTBRIDGE_KEYS = frozenset(
     (
@@ -96,28 +87,3 @@ def _get_trigger(aws_event: "Any") -> str:
         return "pubsub"
 
     return _TRIGGERS.get(aws_event.get("eventSource"), "other")
-
-
-def _get_messaging_batch_size(aws_event: "Any") -> "Optional[int]":
-    """
-    The number of messages delivered by a messaging event source, or `None` for any
-    other event (HTTP, direct invocation, datasource, ...).
-    """
-    if not isinstance(aws_event, dict):
-        return None
-
-    records = aws_event.get("Records")
-    if records:
-        if _get_records_source(records) in ("aws:sqs", "aws:sns"):
-            return len(records)
-        return None
-
-    event_source = aws_event.get("eventSource")
-    if event_source == "aws:mq":
-        return len(aws_event["messages"])
-
-    grouped_messages_key = _GROUPED_MESSAGES_KEYS.get(event_source)
-    if grouped_messages_key is None:
-        return None
-
-    return sum(len(messages) for messages in aws_event[grouped_messages_key].values())
