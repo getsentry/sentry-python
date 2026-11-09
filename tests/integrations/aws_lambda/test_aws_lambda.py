@@ -1089,6 +1089,32 @@ def test_no_process_span_without_messages(lambda_client, test_environment):
     assert span["is_segment"]
 
 
+def test_process_span_error(lambda_client, test_environment):
+    response = lambda_client.invoke(
+        FunctionName="RaiseErrorSpanStreaming",
+        Payload=json.dumps({"Records": [_sqs_record()]}),
+    )
+
+    # the handler's exception still reaches the Lambda runtime.
+    assert json.loads(response["Payload"].read())["errorMessage"] == "Oh!"
+
+    (error_event,) = test_environment["server"].envelopes
+    (exception,) = error_event["exception"]["values"]
+    assert exception["value"] == "Oh!"
+    assert not exception["mechanism"]["handled"]
+
+    span_items = test_environment["server"].span_items
+    (segment_span,) = [s for s in span_items if s["is_segment"]]
+    (process_span,) = [
+        s
+        for s in span_items
+        if _get_span_attr(s["attributes"], SPANDATA.SENTRY_OP) == OP.QUEUE_PROCESS
+    ]
+    assert process_span["parent_span_id"] == segment_span["span_id"]
+    assert process_span["status"] == "error"
+    assert segment_span["status"] == "error"
+
+
 def test_trace_continuation(lambda_client, test_environment):
     trace_id = "471a43a4192642f0b136d5159a501701"
     parent_span_id = "6e8f22c393e68f19"
