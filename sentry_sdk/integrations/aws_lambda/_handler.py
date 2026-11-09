@@ -14,7 +14,6 @@ from sentry_sdk.integrations.aws_lambda._request import (
     _make_request_event_processor,
 )
 from sentry_sdk.integrations.aws_lambda._trigger import (
-    _get_messaging_batch_size,
     _get_trigger,
     _start_process_span,
 )
@@ -170,12 +169,6 @@ def _wrap_handler(handler: "F") -> "F":
 
             with capture_internal_exceptions():
                 attributes[SPANDATA.FAAS_TRIGGER] = _get_trigger(aws_event)
-                # HTTP and direct invocations aren't batches, even when the payload is a list.
-                messaging_batch_size = _get_messaging_batch_size(aws_event)
-                if messaging_batch_size is not None:
-                    attributes[SPANDATA.MESSAGING_BATCH_MESSAGE_COUNT] = (
-                        messaging_batch_size
-                    )
 
             with capture_internal_exceptions():
                 invoked_function_arn = aws_context.invoked_function_arn

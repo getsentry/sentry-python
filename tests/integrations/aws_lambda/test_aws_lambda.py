@@ -874,12 +874,11 @@ def _eventbridge_event(source, detail_type):
 
 
 @pytest.mark.parametrize(
-    "aws_event,trigger,batch_count",
+    "aws_event,trigger",
     [
         pytest.param(
             {"httpMethod": "GET", "path": "/", "requestContext": {"stage": "prod"}},
             "http",
-            None,
             id="api-gateway-rest",
         ),
         pytest.param(
@@ -889,27 +888,20 @@ def _eventbridge_event(source, detail_type):
                 "requestContext": {"http": {"method": "GET"}},
             },
             "http",
-            None,
             id="api-gateway-http",
         ),
         pytest.param(
             {"Records": [{"cf": {"request": {"uri": "/"}}}]},
             "http",
-            None,
             id="cloudfront",
         ),
-        pytest.param(_appsync_event(), "http", None, id="appsync"),
-        pytest.param(
-            [_appsync_event(), _appsync_event()], "http", None, id="appsync-batch"
-        ),
-        pytest.param(
-            {"Records": [_sqs_record(), _sqs_record()]}, "pubsub", 2, id="sqs"
-        ),
-        pytest.param({"Records": [_sns_record()]}, "pubsub", 1, id="sns"),
+        pytest.param(_appsync_event(), "http", id="appsync"),
+        pytest.param([_appsync_event(), _appsync_event()], "http", id="appsync-batch"),
+        pytest.param({"Records": [_sqs_record(), _sqs_record()]}, "pubsub", id="sqs"),
+        pytest.param({"Records": [_sns_record()]}, "pubsub", id="sns"),
         pytest.param(
             {"Records": [{"eventSource": "aws:kinesis"}]},
             "pubsub",
-            None,
             id="kinesis",
         ),
         pytest.param(
@@ -921,19 +913,16 @@ def _eventbridge_event(source, detail_type):
                 },
             },
             "pubsub",
-            3,
             id="msk",
         ),
         pytest.param(
             {"eventSource": "SelfManagedKafka", "records": {"orders-0": [{}]}},
             "pubsub",
-            1,
             id="self-managed-kafka",
         ),
         pytest.param(
             {"eventSource": "aws:mq", "messages": [{}, {}]},
             "pubsub",
-            2,
             id="activemq",
         ),
         pytest.param(
@@ -942,45 +931,37 @@ def _eventbridge_event(source, detail_type):
                 "rmqMessagesByQueue": {"orders::/": [{}, {}], "alerts::/": [{}]},
             },
             "pubsub",
-            3,
             id="rabbitmq",
         ),
         pytest.param(
             _eventbridge_event("aws.s3", "Object Created"),
             "pubsub",
-            None,
             id="eventbridge",
         ),
         pytest.param(
             _eventbridge_event("aws.events", "Scheduled Event"),
             "timer",
-            None,
             id="eventbridge-schedule",
         ),
-        pytest.param(
-            {"Records": [{"eventSource": "aws:s3"}]}, "datasource", None, id="s3"
-        ),
+        pytest.param({"Records": [{"eventSource": "aws:s3"}]}, "datasource", id="s3"),
         pytest.param(
             {"Records": [{"eventSource": "aws:dynamodb"}]},
             "datasource",
-            None,
             id="dynamodb-streams",
         ),
         pytest.param(
             {"eventSource": "aws:docdb", "events": [{}]},
             "datasource",
-            None,
             id="documentdb",
         ),
         pytest.param(
             [{"good dog": "Maisey"}, {"good dog": "Charlie"}],
             "other",
-            None,
             id="list",
         ),
     ],
 )
-def test_trigger(lambda_client, test_environment, aws_event, trigger, batch_count):
+def test_trigger(lambda_client, test_environment, aws_event, trigger):
     lambda_client.invoke(
         FunctionName="BasicOkSpanStreaming",
         Payload=json.dumps(aws_event),
@@ -991,12 +972,6 @@ def test_trigger(lambda_client, test_environment, aws_event, trigger, batch_coun
     ]
     attrs = segment_span["attributes"]
     assert _get_span_attr(attrs, SPANDATA.FAAS_TRIGGER) == trigger
-    if batch_count is None:
-        assert SPANDATA.MESSAGING_BATCH_MESSAGE_COUNT not in attrs
-    else:
-        assert (
-            _get_span_attr(attrs, SPANDATA.MESSAGING_BATCH_MESSAGE_COUNT) == batch_count
-        )
 
 
 @pytest.mark.parametrize(
