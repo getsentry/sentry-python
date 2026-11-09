@@ -1180,13 +1180,19 @@ def test_get_current_thread_meta_running_thread():
     assert (thread.ident, thread.name) == results.get(timeout=1)
 
 
-def get_current_thread_meta_patched(**patch_kwargs):
+def get_current_thread_meta_patched(fake_thread):
     results = Queue(maxsize=1)
     patched = threading.Event()
     other_caller_done = threading.Event()
+    real_current_thread = threading.current_thread
+
+    def current_thread():
+        if threading.get_ident() == thread.ident:
+            return fake_thread
+        return real_current_thread()
 
     def target():
-        with mock.patch("threading.current_thread", **patch_kwargs):
+        with mock.patch("threading.current_thread", current_thread):
             patched.set()
             other_caller_done.wait()
             results.put(get_current_thread_meta())
@@ -1202,23 +1208,21 @@ def get_current_thread_meta_patched(**patch_kwargs):
     return results.get(timeout=1)
 
 
-@pytest.mark.xfail(strict=True, raises=StopIteration)
 def test_get_current_thread_meta_bad_running_thread():
     main_thread = threading.main_thread()
     assert (
         main_thread.ident,
         main_thread.name,
-    ) == get_current_thread_meta_patched(side_effect=["fake thread"])
+    ) == get_current_thread_meta_patched("fake thread")
 
 
-@pytest.mark.xfail(strict=True, raises=StopIteration)
 def test_get_current_thread_meta_main_thread():
     main_thread = threading.main_thread()
     # mock that somehow the current thread doesn't exist
     assert (
         main_thread.ident,
         main_thread.name,
-    ) == get_current_thread_meta_patched(side_effect=[None])
+    ) == get_current_thread_meta_patched(None)
 
 
 def test_get_current_thread_meta_failed_to_get_main_thread():
@@ -1226,7 +1230,7 @@ def test_get_current_thread_meta_failed_to_get_main_thread():
     assert (
         main_thread.ident,
         main_thread.name,
-    ) == get_current_thread_meta_patched(return_value="fake thread")
+    ) == get_current_thread_meta_patched("fake thread")
 
 
 @pytest.mark.parametrize(
