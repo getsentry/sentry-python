@@ -1,4 +1,5 @@
 import copy
+import json
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from threading import Thread
 from urllib.parse import parse_qs, urlparse
@@ -356,3 +357,49 @@ def test_message_attributes_propagation_skipped(
     assert [message["MessageAttributes"] for message in sent] == [
         attributes for _, attributes in messages
     ]
+
+
+@pytest.mark.parametrize("service", ["sqs", "sns"])
+def test_message_attributes_round_trip(sentry_init, capture_items, service):
+    """A receive span links to the send span whose context the message carries."""
+    publish_span, (sent,) = _send(sentry_init, capture_items, service, [("hi", {})])
+
+    if service == "sqs":
+        message = {"MessageAttributes": sent["MessageAttributes"], "Body": "hi"}
+    else:
+        # an SNS subscription without raw message delivery wraps the message and its
+        # attributes in a JSON notification.
+        notification = {
+            "Type": "Notification",
+            "MessageId": "sns-1",
+            "TopicArn": "arn:aws:sns:eu-north-1:123456789012:alerts",
+            "Message": "hi",
+            "MessageAttributes": {
+                name: {"Type": value["DataType"], "Value": value["StringValue"]}
+                for name, value in sent["MessageAttributes"].items()
+            },
+        }
+        message = {"Body": json.dumps(notification)}
+
+    client = boto3.client(  # type: ignore[attr-defined]
+        "sqs",
+        region_name="eu-north-1",
+        aws_access_key_id="-",
+        aws_secret_access_key="-",
+    )
+    with Stubber(client) as stubber:
+        stubber.add_response(
+            "receive_message", {"Messages": [{"MessageId": "1", **message}]}
+        )
+        spans = capture_spans_by_op(
+            lambda: client.receive_message(
+                QueueUrl="https://sqs.eu-north-1.amazonaws.com/123456789012/orders"
+            ),
+            capture_items,
+        )
+
+    (receive_span,) = spans[OP.QUEUE_RECEIVE]
+    (link,) = receive_span["links"]
+    assert link["trace_id"] == publish_span["trace_id"]
+    assert link["span_id"] == publish_span["span_id"]
+    assert link["sampled"] is True
