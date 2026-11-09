@@ -35,7 +35,7 @@ _MESSAGING_SYSTEMS = {"aws:sqs": "aws_sqs", "aws:sns": "aws.sns"}
 
 # OTel's default limit; Lambda delivers up to 10,000 SQS messages at once.
 # https://opentelemetry.io/docs/specs/otel/trace/sdk/#span-limits
-MAX_PRODUCER_LINKS = 128
+_MAX_PRODUCER_LINKS = 128
 
 # https://docs.aws.amazon.com/eventbridge/latest/ref/overiew-event-structure.html
 _EVENTBRIDGE_KEYS = frozenset(
@@ -154,7 +154,7 @@ def _get_producer_links(records: "list[Any]") -> "list[SpanLink]":
             if producer["parent_sampled"] is not None:
                 link["sampled"] = bool(producer["parent_sampled"])
             links.append(link)
-            if len(links) == MAX_PRODUCER_LINKS:
+            if len(links) == _MAX_PRODUCER_LINKS:
                 break
 
     return links
@@ -189,7 +189,6 @@ def _start_process_span(aws_event: "Any") -> "ContextManager[Any]":
             SPANDATA.MESSAGING_OPERATION_NAME: "process",
             SPANDATA.MESSAGING_DESTINATION_NAME: destination,
             SPANDATA.MESSAGING_BATCH_MESSAGE_COUNT: len(records),
-            SPANDATA.FAAS_TRIGGER: "pubsub",
         },
         links=_get_producer_links(records),
     )
