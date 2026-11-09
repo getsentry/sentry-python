@@ -42,6 +42,58 @@ Want to give it a spin? Be our guest and [let us know](https://github.com/getsen
 - [2.x to 3.x migration guide](https://docs.sentry.io/platforms/python/migration/2.x-to-3.x)
 - [detailed changelog](https://github.com/getsentry/sentry-python/blob/major/3.0/MIGRATION_GUIDE.md)
 
+## 2.74.0
+
+### New Features ✨
+
+#### Anthropic
+
+- Record reasoning parts in streaming output by @alexander-alderman-webb in [#8193](https://github.com/getsentry/sentry-python/pull/8193)
+- Record reasoning parts in nonstreaming output by @alexander-alderman-webb in [#8192](https://github.com/getsentry/sentry-python/pull/8192)
+
+#### Other
+
+- (typesafe) Handle inline images by @alexander-alderman-webb in [#8164](https://github.com/getsentry/sentry-python/pull/8164)
+
+### Bug Fixes 🐛
+
+#### Anthropic
+
+- Preserve cached `_iterator` property by @alexander-alderman-webb in [#8163](https://github.com/getsentry/sentry-python/pull/8163)
+- Stop unpacking output arrays by @alexander-alderman-webb in [#8160](https://github.com/getsentry/sentry-python/pull/8160)
+
+#### Other
+
+- (aiohttp) Leave existing `baggage` header alone if it has existin… by @pabloDeputter in [#8116](https://github.com/getsentry/sentry-python/pull/8116)
+- (boto3) Adapt to botocore no longer signing baggage by @sentrivana in [#8113](https://github.com/getsentry/sentry-python/pull/8113)
+- (ci) Restrict pytest because of incompatibilities by @sentrivana in [#8140](https://github.com/getsentry/sentry-python/pull/8140)
+- (falcon) Handle integer HTTP statuses by @jap and @sentrivana in [#8139](https://github.com/getsentry/sentry-python/pull/8139)
+- (sampling) Respect incoming sample rate if not explicitly overridden by @sentrivana in [#8185](https://github.com/getsentry/sentry-python/pull/8185)
+- (tracing) Drop trailing comma when serializing baggage without third-party items by @alphasafal and @pabloDeputter in [#8119](https://github.com/getsentry/sentry-python/pull/8119)
+- (wsgi) Stop overwriting `server.address` by @alexander-alderman-webb in [#8171](https://github.com/getsentry/sentry-python/pull/8171)
+
+### Internal Changes 🔧
+
+#### Deps
+
+- Lock file maintenance by @renovate in [#8055](https://github.com/getsentry/sentry-python/pull/8055)
+- Bump grpcio to 1.84.1 by @geoffg-sentry with @sentry-junior in [#8136](https://github.com/getsentry/sentry-python/pull/8136)
+- Bump uv to 0.13.5 by @geoffg-sentry with @sentry-junior in [#8135](https://github.com/getsentry/sentry-python/pull/8135)
+- Bump brotli to 1.2.1 by @geoffg-sentry with @sentry-junior in [#8122](https://github.com/getsentry/sentry-python/pull/8122)
+
+#### Other
+
+- (mcp) Remove unused select_mcp_transactions fixture by @sentrivana with @sentry-junior in [#8150](https://github.com/getsentry/sentry-python/pull/8150)
+- (release) Bump craft to 3.9.0 and update config by @BYK with @sentry-junior in [#8181](https://github.com/getsentry/sentry-python/pull/8181)
+- (sessions) Remove unused TERMINAL_SESSION_STATES constant by @sentrivana with @sentry-junior in [#8151](https://github.com/getsentry/sentry-python/pull/8151)
+- (starlette) Remove unused \_serialize_request_body_data helper by @sentry-junior in [#8146](https://github.com/getsentry/sentry-python/pull/8146)
+- (toxgen) Remove unused `get_file_hash()` and `get_last_updated()` helpers by @sentry-junior in [#8173](https://github.com/getsentry/sentry-python/pull/8173)
+- (tracing) Remove unused base64_stripped regex by @sentry-junior in [#8148](https://github.com/getsentry/sentry-python/pull/8148)
+- (utils) Remove unused to_timestamp helper and epoch constant by @sentry-junior in [#8147](https://github.com/getsentry/sentry-python/pull/8147)
+- 🤖 Update test matrix with new releases (11/02) by @sentrivana with @github-actions in [#8172](https://github.com/getsentry/sentry-python/pull/8172)
+- Upgrade `sphinx` and remove `packaging` upper bound by @alexander-alderman-webb in [#8183](https://github.com/getsentry/sentry-python/pull/8183)
+- Update test matrix with new releases (27/10) by @alexander-alderman-webb in [#8126](https://github.com/getsentry/sentry-python/pull/8126)
+
 ## 2.73.0
 
 ### New Features ✨
