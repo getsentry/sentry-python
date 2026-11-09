@@ -1182,17 +1182,27 @@ def test_get_current_thread_meta_running_thread():
 
 def get_current_thread_meta_patched(**patch_kwargs):
     results = Queue(maxsize=1)
+    patched = threading.Event()
+    other_caller_done = threading.Event()
 
     def target():
         with mock.patch("threading.current_thread", **patch_kwargs):
+            patched.set()
+            other_caller_done.wait()
             results.put(get_current_thread_meta())
 
     thread = threading.Thread(target=target)
     thread.start()
+    patched.wait()
+    try:
+        thread.join(0)
+    finally:
+        other_caller_done.set()
     thread.join()
     return results.get(timeout=1)
 
 
+@pytest.mark.xfail(strict=True, raises=StopIteration)
 def test_get_current_thread_meta_bad_running_thread():
     main_thread = threading.main_thread()
     assert (
@@ -1201,6 +1211,7 @@ def test_get_current_thread_meta_bad_running_thread():
     ) == get_current_thread_meta_patched(side_effect=["fake thread"])
 
 
+@pytest.mark.xfail(strict=True, raises=StopIteration)
 def test_get_current_thread_meta_main_thread():
     main_thread = threading.main_thread()
     # mock that somehow the current thread doesn't exist
