@@ -1,5 +1,43 @@
 # Changelog
 
+## 3.0.0b4
+
+### New Features ✨
+
+#### Anthropic
+
+- Record reasoning parts in streaming output by @alexander-alderman-webb in [#8193](https://github.com/getsentry/sentry-python/pull/8193)
+- Record reasoning parts in nonstreaming output by @alexander-alderman-webb in [#8192](https://github.com/getsentry/sentry-python/pull/8192)
+
+#### Other
+
+- (crons) Mark @monitor jobs so scheduler integrations skip them by @wedamija in [#8198](https://github.com/getsentry/sentry-python/pull/8198)
+
+### Bug Fixes 🐛
+
+- (sampling) Respect incoming sample rate if not explicitly overridden by @sentrivana in [#8185](https://github.com/getsentry/sentry-python/pull/8185)
+- (utils) Look up package versions without scanning all installed packages by @Shellghostt in [#8215](https://github.com/getsentry/sentry-python/pull/8215)
+
+### Documentation 📚
+
+- Point Sentry Conventions links to conventions.sentry.dev by @cleptric and @claude in [#8200](https://github.com/getsentry/sentry-python/pull/8200)
+
+### Internal Changes 🔧
+
+#### Warden
+
+- Remove find-bugs, already covered by code-review by @dcramer with @sentry-junior in [#8204](https://github.com/getsentry/sentry-python/pull/8204)
+- Enable incremental review by @Jeffreyhung with @sentry-junior in [#8199](https://github.com/getsentry/sentry-python/pull/8199)
+
+#### Other
+
+- (profiling) Remove unused ContinuousScheduler.pause stub by @sentry-junior in [#8224](https://github.com/getsentry/sentry-python/pull/8224)
+
+### Other
+
+- [do not merge] Testing sync by @sentrivana in [#8230](https://github.com/getsentry/sentry-python/pull/8230)
+- Next Python SDK major by @sentrivana in [#5005](https://github.com/getsentry/sentry-python/pull/5005)
+
 ## 3.0.0b3
 
 This is a pre-release of the next Python SDK major, to be released in November 2026.
