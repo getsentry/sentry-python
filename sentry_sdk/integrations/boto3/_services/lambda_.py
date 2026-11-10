@@ -9,6 +9,7 @@ from sentry_sdk.integrations.boto3._utils import (
     _get_propagation_headers,
 )
 from sentry_sdk.integrations.boto3.consts import CLOUD_PROVIDER
+from sentry_sdk.traces import SpanStatus
 from sentry_sdk.utils import capture_internal_exceptions
 
 if TYPE_CHECKING:
@@ -56,9 +57,9 @@ class _LambdaExtension(_ServiceExtension):
 
         return attributes
 
-    def get_response_attributes(
-        self, ctx: "AwsCallContext", response: "Any"
-    ) -> "Attributes":
+    def on_success_response(
+        self, ctx: "AwsCallContext", response: "Any", span: "Span"
+    ) -> None:
         attributes: "Attributes" = {}
 
         if "UUID" in response:
@@ -69,7 +70,13 @@ class _LambdaExtension(_ServiceExtension):
         if "FunctionError" in response:
             attributes[SPANDATA.ERROR_TYPE] = "lambda_function_error"
 
-        return attributes
+        span.set_attributes(attributes)
+        if SPANDATA.ERROR_TYPE in attributes:
+            span.status = SpanStatus.ERROR
+
+        # `Invoke`'s `Payload` is a `StreamingBody`, but span
+        # shouldn't be kept open until the caller reads it.
+        span.end()
 
     def get_request_params(
         self, ctx: "AwsCallContext", span: "Optional[Span]"
@@ -106,8 +113,3 @@ class _LambdaExtension(_ServiceExtension):
             return None
 
         return {**ctx.params, "ClientContext": encoded}
-
-    def has_streaming_response(self, ctx: "AwsCallContext") -> bool:
-        # `Invoke`'s `Payload` is a `StreamingBody`, but span
-        # shouldn't be kept open until the caller reads it.
-        return ctx.operation_name != "Invoke"

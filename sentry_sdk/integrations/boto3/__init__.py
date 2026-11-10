@@ -1,5 +1,6 @@
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.integrations.boto3._client import _patch_botocore_client
+from sentry_sdk.integrations.boto3._services.bedrock import _patch_event_stream
 from sentry_sdk.integrations.boto3.consts import IDENTIFIER, ORIGIN
 from sentry_sdk.utils import parse_version
 
@@ -19,3 +20,4 @@ class Boto3Integration(Integration):
         _check_minimum_version(Boto3Integration, version, "botocore")
 
         _patch_botocore_client()
+        _patch_event_stream()
