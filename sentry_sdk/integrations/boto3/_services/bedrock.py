@@ -87,21 +87,26 @@ class _BedrockExtension(_ServiceExtension):
         if ctx.operation_name == "Converse":
             usage = cast("ConverseResponseTypeDef", response)["usage"]
 
-            set_on_span(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, usage["inputTokens"])
             set_on_span(SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS, usage["outputTokens"])
             set_on_span(SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, usage["totalTokens"])
 
+            input_tokens = usage["inputTokens"]
+
             cache_read_tokens = usage.get("cacheReadInputTokens")
             if cache_read_tokens is not None:
+                input_tokens += cache_read_tokens
                 set_on_span(
                     SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED, cache_read_tokens
                 )
 
             cache_write_tokens = usage.get("cacheWriteInputTokens")
             if cache_write_tokens is not None:
+                input_tokens += cache_write_tokens
                 set_on_span(
                     SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE, cache_write_tokens
                 )
+
+            set_on_span(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, input_tokens)
 
             if isinstance(span, StreamedSpan):
                 span.end()
