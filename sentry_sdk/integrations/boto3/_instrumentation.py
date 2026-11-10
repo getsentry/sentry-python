@@ -150,7 +150,9 @@ def _start_client_span(
     ctx: "AwsCallContext",
     service_ext: "Optional[_ServiceExtension]" = None,
 ) -> "Optional[Span]":
-    if sentry_sdk.get_current_span() is None:
+    if (
+        service_ext is None or service_ext.skip_if_no_active_span
+    ) and sentry_sdk.get_current_span() is None:
         return None
 
     # https://opentelemetry.io/docs/specs/semconv/cloud-providers/aws-sdk/#aws-sdk-spans
@@ -164,21 +166,18 @@ def _start_client_span(
         # https://opentelemetry.io/docs/specs/semconv/cloud-providers/aws-sdk/#aws-sdk-spans
         SPANDATA.SENTRY_KIND: "client",
     }
-    with capture_internal_exceptions():
-        attributes.update(_get_client_attributes(ctx))
+    attributes.update(_get_client_attributes(ctx))
 
     # `sentry.op` is set to a generic default, which a service extension can override
     # with `get_span_op()`.
     span_op = OP.RPC
 
     if service_ext is not None:
-        with capture_internal_exceptions():
-            service_op = service_ext.get_span_op(ctx)
-            if service_op is not None:
-                span_op = service_op
+        service_op = service_ext.get_span_op(ctx)
+        if service_op is not None:
+            span_op = service_op
 
-        with capture_internal_exceptions():
-            attributes.update(service_ext.get_request_attributes(ctx))
+        attributes.update(service_ext.get_request_attributes(ctx))
 
         with capture_internal_exceptions():
             service_span_name = service_ext.get_span_name(ctx, attributes)

@@ -14,6 +14,7 @@ if TYPE_CHECKING:
 
     from sentry_sdk._types import Attributes
     from sentry_sdk.integrations.boto3._context import AwsCallContext
+    from sentry_sdk.traces import Span
 
 # secret-arn ends with name, a hyphen and six random chars (`…:secret:db-password-AbCdEf`).
 # https://docs.aws.amazon.com/secretsmanager/latest/userguide/troubleshoot.html#ARN_secretnamehyphen
@@ -53,15 +54,19 @@ class _SecretsManagerExtension(_ServiceExtension):
 
         return attributes
 
-    def get_response_attributes(
-        self, ctx: "AwsCallContext", response: "Any"
-    ) -> "Attributes":
+    def on_success_response(
+        self, ctx: "AwsCallContext", response: "Any", span: "Span"
+    ) -> None:
         # the response's full `ARN` and exact `Name` override the request's values,
         # which stay when the response has neither, e.g. failed calls.
-        return _extract_attributes(
-            response,
-            (
-                ("ARN", SPANDATA.AWS_SECRETSMANAGER_SECRET_ARN),
-                ("Name", SPANDATA.AWS_SECRETSMANAGER_SECRET_NAME),
-            ),
+        span.set_attributes(
+            _extract_attributes(
+                response,
+                (
+                    ("ARN", SPANDATA.AWS_SECRETSMANAGER_SECRET_ARN),
+                    ("Name", SPANDATA.AWS_SECRETSMANAGER_SECRET_NAME),
+                ),
+            )
         )
+
+        span.end()

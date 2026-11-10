@@ -1,12 +1,16 @@
 from typing import TYPE_CHECKING
 
+from sentry_sdk.integrations.boto3._instrumentation import _instrument_streaming_body
 from sentry_sdk.integrations.boto3._services.base import _ServiceExtension
 from sentry_sdk.integrations.boto3._utils import _get_aws_arn_attributes
 from sentry_sdk.utils import capture_internal_exceptions
 
 if TYPE_CHECKING:
+    from typing import Any
+
     from sentry_sdk._types import Attributes
     from sentry_sdk.integrations.boto3._context import AwsCallContext
+    from sentry_sdk.traces import Span
 
 
 class _LambdaExtension(_ServiceExtension):
@@ -20,3 +24,14 @@ class _LambdaExtension(_ServiceExtension):
                 )
             )
         return attributes
+
+    def on_success_response(
+        self, ctx: "AwsCallContext", response: "Any", span: "Span"
+    ) -> None:
+        streaming_body_instrumented = False
+        with capture_internal_exceptions():
+            streaming_body_instrumented = _instrument_streaming_body(span, response)
+
+        # `StreamingBody`s finish their span when consumed or closed.
+        if not streaming_body_instrumented:
+            span.end()

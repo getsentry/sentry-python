@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.boto3._services.base import _ServiceExtension
 from sentry_sdk.integrations.boto3._utils import _get_aws_arn_attributes
+from sentry_sdk.traces import SpanStatus
 from sentry_sdk.utils import capture_internal_exceptions
 
 if TYPE_CHECKING:
@@ -10,6 +11,7 @@ if TYPE_CHECKING:
 
     from sentry_sdk._types import Attributes
     from sentry_sdk.integrations.boto3._context import AwsCallContext
+    from sentry_sdk.traces import Span
 
 
 class _KinesisExtension(_ServiceExtension):
@@ -40,21 +42,24 @@ class _KinesisExtension(_ServiceExtension):
 
         return attributes
 
-    def get_response_attributes(
-        self, ctx: "AwsCallContext", response: "Any"
-    ) -> "Attributes":
+    def on_success_response(
+        self, ctx: "AwsCallContext", response: "Any", span: "Span"
+    ) -> None:
         # `PutRecords` returns `200 OK` even when records fail.
         # https://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecords.html
         if ctx.operation_name != "PutRecords" or not response.get("FailedRecordCount"):
-            return {}
+            span.end()
+            return
 
         error_codes = {
             record["ErrorCode"]
             for record in response["Records"]
             if "ErrorCode" in record
         }
-        return {
-            SPANDATA.ERROR_TYPE: error_codes.pop()
-            if len(error_codes) == 1
-            else "aws_batch_partial_failure"
-        }
+        span.set_attribute(
+            SPANDATA.ERROR_TYPE,
+            error_codes.pop() if len(error_codes) == 1 else "aws_batch_partial_failure",
+        )
+        span.status = SpanStatus.ERROR
+
+        span.end()
