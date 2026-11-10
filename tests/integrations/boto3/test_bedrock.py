@@ -73,11 +73,11 @@ def test_converse(
         assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "aws.bedrock"
         assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
         assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
-
         assert (
             span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL]
             == "anthropic.claude-3-sonnet-20240229-v1:0"
         )
+
         assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 1024
         assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
         assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
@@ -263,11 +263,11 @@ def test_converse_stream(
         assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "aws.bedrock"
         assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
         assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
-
         assert (
             span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL]
             == "anthropic.claude-3-sonnet-20240229-v1:0"
         )
+
         assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 1024
         assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
         assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
