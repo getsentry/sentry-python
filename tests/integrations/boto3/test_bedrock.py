@@ -61,6 +61,11 @@ def test_converse(
             client.converse(
                 modelId="anthropic.claude-3-sonnet-20240229-v1:0",
                 messages=[{"role": "user", "content": [{"text": "Hi"}]}],
+                inferenceConfig={
+                    "maxTokens": 1024,
+                    "temperature": 0.7,
+                    "topP": 0.9,
+                },
             )
 
         sentry_sdk.flush()
@@ -74,6 +79,14 @@ def test_converse(
         assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "aws.bedrock"
         assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
         assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
+        assert (
+            span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL]
+            == "anthropic.claude-3-sonnet-20240229-v1:0"
+        )
+
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 1024
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
     else:
         events = capture_events()
 
@@ -81,6 +94,11 @@ def test_converse(
             client.converse(
                 modelId="anthropic.claude-3-sonnet-20240229-v1:0",
                 messages=[{"role": "user", "content": [{"text": "Hi"}]}],
+                inferenceConfig={
+                    "maxTokens": 1024,
+                    "temperature": 0.7,
+                    "topP": 0.9,
+                },
             )
 
         (transaction,) = events
@@ -89,6 +107,14 @@ def test_converse(
         assert span["data"][SPANDATA.GEN_AI_PROVIDER_NAME] == "aws.bedrock"
         assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
         assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
+        assert (
+            span["data"][SPANDATA.GEN_AI_REQUEST_MODEL]
+            == "anthropic.claude-3-sonnet-20240229-v1:0"
+        )
+
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 1024
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
@@ -133,6 +159,11 @@ def test_converse_error(
             client.converse(
                 modelId="anthropic.claude-3-sonnet-20240229-v1:0",
                 messages=[{"role": "user", "content": [{"text": "Hi"}]}],
+                inferenceConfig={
+                    "maxTokens": 1024,
+                    "temperature": 0.7,
+                    "topP": 0.9,
+                },
             )
 
         sentry_sdk.flush()
@@ -145,6 +176,14 @@ def test_converse_error(
 
         assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "aws.bedrock"
         assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+        assert (
+            span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL]
+            == "anthropic.claude-3-sonnet-20240229-v1:0"
+        )
+
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 1024
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
 
         assert span["attributes"][SPANDATA.ERROR_TYPE] == "AccessDeniedException"
         assert span["attributes"][SPANDATA.HTTP_STATUS_CODE] == 403
@@ -158,6 +197,11 @@ def test_converse_error(
             client.converse(
                 modelId="anthropic.claude-3-sonnet-20240229-v1:0",
                 messages=[{"role": "user", "content": [{"text": "Hi"}]}],
+                inferenceConfig={
+                    "maxTokens": 1024,
+                    "temperature": 0.7,
+                    "topP": 0.9,
+                },
             )
 
         (transaction,) = events
@@ -165,6 +209,14 @@ def test_converse_error(
 
         assert span["data"][SPANDATA.GEN_AI_PROVIDER_NAME] == "aws.bedrock"
         assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+        assert (
+            span["data"][SPANDATA.GEN_AI_REQUEST_MODEL]
+            == "anthropic.claude-3-sonnet-20240229-v1:0"
+        )
+
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 1024
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
 
         assert span["data"][SPANDATA.ERROR_TYPE] == "AccessDeniedException"
         assert span["data"][SPANDATA.HTTP_STATUS_CODE] == 403
@@ -296,6 +348,11 @@ def test_converse_stream(
             client.converse_stream(
                 modelId="anthropic.claude-3-sonnet-20240229-v1:0",
                 messages=[{"role": "user", "content": [{"text": "Hi"}]}],
+                inferenceConfig={
+                    "maxTokens": 1024,
+                    "temperature": 0.7,
+                    "topP": 0.9,
+                },
             )
 
         sentry_sdk.flush()
@@ -309,6 +366,14 @@ def test_converse_stream(
         assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "aws.bedrock"
         assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
         assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+        assert (
+            span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL]
+            == "anthropic.claude-3-sonnet-20240229-v1:0"
+        )
+
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 1024
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
     else:
         events = capture_events()
 
@@ -316,6 +381,11 @@ def test_converse_stream(
             client.converse_stream(
                 modelId="anthropic.claude-3-sonnet-20240229-v1:0",
                 messages=[{"role": "user", "content": [{"text": "Hi"}]}],
+                inferenceConfig={
+                    "maxTokens": 1024,
+                    "temperature": 0.7,
+                    "topP": 0.9,
+                },
             )
 
         (transaction,) = events
@@ -324,6 +394,14 @@ def test_converse_stream(
         assert span["data"][SPANDATA.GEN_AI_PROVIDER_NAME] == "aws.bedrock"
         assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
         assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+        assert (
+            span["data"][SPANDATA.GEN_AI_REQUEST_MODEL]
+            == "anthropic.claude-3-sonnet-20240229-v1:0"
+        )
+
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 1024
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
@@ -368,6 +446,11 @@ def test_converse_stream_error(
             client.converse_stream(
                 modelId="anthropic.claude-3-sonnet-20240229-v1:0",
                 messages=[{"role": "user", "content": [{"text": "Hi"}]}],
+                inferenceConfig={
+                    "maxTokens": 1024,
+                    "temperature": 0.7,
+                    "topP": 0.9,
+                },
             )
 
         sentry_sdk.flush()
@@ -381,6 +464,14 @@ def test_converse_stream_error(
         assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "aws.bedrock"
         assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
         assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+        assert (
+            span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL]
+            == "anthropic.claude-3-sonnet-20240229-v1:0"
+        )
+
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 1024
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
 
         assert span["attributes"][SPANDATA.ERROR_TYPE] == "AccessDeniedException"
         assert span["attributes"][SPANDATA.HTTP_STATUS_CODE] == 403
@@ -394,6 +485,11 @@ def test_converse_stream_error(
             client.converse_stream(
                 modelId="anthropic.claude-3-sonnet-20240229-v1:0",
                 messages=[{"role": "user", "content": [{"text": "Hi"}]}],
+                inferenceConfig={
+                    "maxTokens": 1024,
+                    "temperature": 0.7,
+                    "topP": 0.9,
+                },
             )
 
         (transaction,) = events
@@ -402,6 +498,14 @@ def test_converse_stream_error(
         assert span["data"][SPANDATA.GEN_AI_PROVIDER_NAME] == "aws.bedrock"
         assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
         assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+        assert (
+            span["data"][SPANDATA.GEN_AI_REQUEST_MODEL]
+            == "anthropic.claude-3-sonnet-20240229-v1:0"
+        )
+
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 1024
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
 
         assert span["data"][SPANDATA.ERROR_TYPE] == "AccessDeniedException"
         assert span["data"][SPANDATA.HTTP_STATUS_CODE] == 403
