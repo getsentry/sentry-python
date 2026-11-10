@@ -27,7 +27,6 @@ if TYPE_CHECKING:
 
 try:
     from botocore.client import BaseClient
-    from botocore.exceptions import ClientError
 except ImportError:
     raise DidNotEnable("botocore not installed")
 
@@ -121,21 +120,11 @@ def _patch_botocore_client() -> None:
                 try:
                     parsed = orig_make_api_call(self, operation_name, api_params)
                 except BaseException as error:
-                    if service_ext is not None and isinstance(error, ClientError):
-                        with capture_internal_exceptions():
-                            attributes.update(
-                                service_ext.get_response_attributes(ctx, error.response)
-                            )
                     with capture_internal_exceptions():
                         attributes.update(_get_error_attributes(error))
                     with capture_internal_exceptions():
                         _set_span_attributes(span, attributes)
                     raise
-                if service_ext is not None:
-                    with capture_internal_exceptions():
-                        attributes.update(
-                            service_ext.get_response_attributes(ctx, parsed)
-                        )
                 with capture_internal_exceptions():
                     attributes.update(_get_response_attributes(parsed))
                 with capture_internal_exceptions():
@@ -143,6 +132,10 @@ def _patch_botocore_client() -> None:
         except BaseException as error:
             _finish_span(span, error)
             raise
+
+        if service_ext is not None:
+            service_ext.on_success_response(ctx, parsed, span)
+            return parsed
 
         streaming_body_instrumented = False
         with capture_internal_exceptions():
