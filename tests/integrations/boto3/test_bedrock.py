@@ -22,10 +22,15 @@ pytestmark = pytest.mark.skipif(
 
 @pytest.fixture
 def converse_response():
+    usage = {"inputTokens": 10, "outputTokens": 20, "totalTokens": 30}
+    if BOTOCORE_VERSION >= Version("1.37.24"):
+        usage["cacheReadInputTokens"] = 80
+        usage["cacheWriteInputTokens"] = 20
+
     return {
         "output": {"message": {"role": "assistant", "content": [{"text": "Hello"}]}},
         "stopReason": "end_turn",
-        "usage": {"inputTokens": 50, "outputTokens": 30, "totalTokens": 80},
+        "usage": usage,
         "metrics": {"latencyMs": 500},
     }
 
@@ -87,6 +92,15 @@ def test_converse(
         assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 1024
         assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
         assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
+
+        assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
+        assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
+        if BOTOCORE_VERSION < Version("1.37.24"):
+            assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+            return
+        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 110
+        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 80
+        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 20
     else:
         events = capture_events()
 
@@ -115,6 +129,15 @@ def test_converse(
         assert span["data"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 1024
         assert span["data"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
         assert span["data"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
+
+        assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
+        assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
+        if BOTOCORE_VERSION < Version("1.37.24"):
+            assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+            return
+        assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 110
+        assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 80
+        assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 20
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
