@@ -33,8 +33,10 @@ def _transform_tool_definitions(
                 tool_definition["name"] = tool_spec["name"]
             if "description" in tool_spec:
                 tool_definition["description"] = tool_spec["description"]
-            if "inputSchema" in tool_spec and "json" in tool_spec["inputSchema"]:
-                tool_definition["parameters"] = tool_spec["inputSchema"]["json"]
+
+            input_schema = tool_spec.get("inputSchema")
+            if isinstance(input_schema, dict) and "json" in input_schema:
+                tool_definition["parameters"] = input_schema["json"]
 
             result.append(tool_definition)
             continue
