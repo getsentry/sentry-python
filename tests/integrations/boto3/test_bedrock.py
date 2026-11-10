@@ -77,11 +77,12 @@ def test_converse(
         assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "aws.bedrock"
         assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
         assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
         if BOTOCORE_VERSION < Version("1.37.24"):
+            assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
             return
+        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 110
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 80
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 20
     else:
@@ -99,11 +100,12 @@ def test_converse(
         assert span["data"][SPANDATA.GEN_AI_PROVIDER_NAME] == "aws.bedrock"
         assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
         assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
-        assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
         assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
         assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
         if BOTOCORE_VERSION < Version("1.37.24"):
+            assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
             return
+        assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 110
         assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 80
         assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 20
 

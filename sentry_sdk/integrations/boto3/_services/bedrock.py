@@ -45,20 +45,25 @@ class _BedrockExtension(_ServiceExtension):
             return {}
 
         usage = cast("ConverseResponseTypeDef", response)["usage"]
+
+        input_tokens = usage["inputTokens"]
         attributes: "Attributes" = {
-            SPANDATA.GEN_AI_USAGE_INPUT_TOKENS: usage["inputTokens"],
             SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS: usage["outputTokens"],
             SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS: usage["totalTokens"],
         }
 
         cache_read_tokens = usage.get("cacheReadInputTokens")
         if cache_read_tokens is not None:
+            input_tokens += cache_read_tokens
             attributes[SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] = cache_read_tokens
 
         cache_write_tokens = usage.get("cacheWriteInputTokens")
         if cache_write_tokens is not None:
+            input_tokens += cache_write_tokens
             attributes[SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] = (
                 cache_write_tokens
             )
+
+        attributes[SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] = input_tokens
 
         return attributes
