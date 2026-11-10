@@ -762,6 +762,15 @@ def test_query_source(
             raise AssertionError("No db span found")
 
 
+def _async_bridge_or_skip():
+    # Not skipped when greenlet is missing: from 1.4 on, the test environments
+    # must install it, and greenlet_spawn fails loudly without it.
+    greenlet_spawn = getattr(sqlalchemy.util, "greenlet_spawn", None)
+    if greenlet_spawn is None:
+        pytest.skip("SQLAlchemy has no asyncio support before 1.4")
+    return greenlet_spawn
+
+
 def _select_one_sources(run_query, span_streaming, capture_events, capture_items):
     if span_streaming:
         items = capture_items("span")
@@ -792,11 +801,7 @@ def test_query_source_through_async_bridge(
     capture_items,
     span_streaming,
 ):
-    pytest.importorskip("greenlet")
-    greenlet_spawn = getattr(sqlalchemy.util, "greenlet_spawn", None)
-    if greenlet_spawn is None:
-        pytest.skip("SQLAlchemy has no asyncio support before 1.4")
-
+    greenlet_spawn = _async_bridge_or_skip()
     sentry_init(
         integrations=[SqlalchemyIntegration()],
         traces_sample_rate=1.0,
@@ -830,7 +835,9 @@ def test_query_source_through_async_bridge(
 def test_query_source_not_taken_from_unrelated_greenlet_parent(
     sentry_init, capture_events
 ):
-    greenlet = pytest.importorskip("greenlet")
+    _async_bridge_or_skip()
+    import greenlet
+
     sentry_init(
         integrations=[SqlalchemyIntegration()],
         traces_sample_rate=1.0,
