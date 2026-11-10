@@ -6,6 +6,7 @@ from sentry_sdk.integrations.boto3._utils import (
     _extract_attributes,
     _get_aws_arn_attributes,
 )
+from sentry_sdk.traces import SpanStatus
 from sentry_sdk.utils import capture_internal_exceptions
 
 if TYPE_CHECKING:
@@ -14,6 +15,7 @@ if TYPE_CHECKING:
     from sentry_sdk._types import Attributes
     from sentry_sdk.integrations.boto3._context import AwsCallContext
     from sentry_sdk.integrations.boto3._utils import _AttributeSpec
+    from sentry_sdk.traces import Span
 
 # set on both request and response if available.
 _ARN_ATTRIBUTES: "Sequence[_AttributeSpec]" = (
@@ -66,17 +68,20 @@ class _StepFunctionsExtension(_ServiceExtension):
 
         return attributes
 
-    def get_response_attributes(
-        self, ctx: "AwsCallContext", response: "Any"
-    ) -> "Attributes":
+    def on_success_response(
+        self, ctx: "AwsCallContext", response: "Any", span: "Span"
+    ) -> None:
         attributes = _extract_attributes(response, _ARN_ATTRIBUTES)
 
         # `StartSyncExecution` returns `200 OK` even for failed/timed out executions.
         # https://docs.aws.amazon.com/step-functions/latest/apireference/API_StartSyncExecution.html
         if ctx.operation_name == "StartSyncExecution":
             if response.get("status") == "FAILED":
+                span.status = SpanStatus.ERROR
                 attributes[SPANDATA.ERROR_TYPE] = "stepfunctions_execution_failed"
             elif response.get("status") == "TIMED_OUT":
+                span.status = SpanStatus.ERROR
                 attributes[SPANDATA.ERROR_TYPE] = "stepfunctions_execution_timed_out"
 
-        return attributes
+        span.set_attributes(attributes)
+        span.end()

@@ -8,8 +8,11 @@ from sentry_sdk.integrations.boto3._utils import _get_aws_arn_attributes
 from sentry_sdk.utils import capture_internal_exceptions
 
 if TYPE_CHECKING:
+    from typing import Any
+
     from sentry_sdk._types import Attributes
     from sentry_sdk.integrations.boto3._context import AwsCallContext
+    from sentry_sdk.traces import Span
 
 
 class _SQSExtension(_ServiceExtension):
@@ -35,3 +38,8 @@ class _SQSExtension(_ServiceExtension):
             if re.fullmatch(r"^[0-9]{12}$", account_id):
                 attributes[SPANDATA.CLOUD_ACCOUNT_ID] = account_id
         return attributes
+
+    def on_success_response(
+        self, ctx: "AwsCallContext", response: "Any", span: "Span"
+    ) -> None:
+        span.end()
