@@ -46,7 +46,7 @@ def _finish_span(
     span = stream._span
     del stream._span
 
-    if should_be_treated_as_error(exc_type, exc_val):
+    if exc_type is not None and should_be_treated_as_error(exc_type, exc_val):
         if isinstance(span, StreamedSpan):
             span.status = SpanStatus.ERROR
         else:
