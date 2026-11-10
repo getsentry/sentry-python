@@ -126,6 +126,7 @@ class monitor:  # noqa: N801
             with self:
                 return await fn(*args, **kwargs)
 
+        inner._sentry_monitored = True  # type: ignore[attr-defined]
         return inner
 
     def _sync_wrapper(self, fn: "Callable[P, R]") -> "Callable[P, R]":
@@ -134,4 +135,5 @@ class monitor:  # noqa: N801
             with self:
                 return fn(*args, **kwargs)
 
+        inner._sentry_monitored = True  # type: ignore[attr-defined]
         return inner

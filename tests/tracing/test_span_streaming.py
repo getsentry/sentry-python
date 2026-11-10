@@ -1049,12 +1049,7 @@ def test_outgoing_traceparent_and_baggage_incoming_trace(
         baggage_items = dict(tuple(item.split("=")) for item in baggage.split(","))
 
         # As we've received incoming baggage, we shouldn't modify it ourselves
-        # and should propagate it as-is. However, in the case where our
-        # effective sample rate overrides the parent sample rate, we update the
-        # sample rate in the baggage as a consequence of updating the sample rate
-        # in the DSC.
-        if traces_sample_rate is not None:
-            incoming_baggage["sentry-sample_rate"] = str(float(parent_sampled))
+        # and should propagate it as-is
 
         assert baggage_items == incoming_baggage
 
@@ -1099,12 +1094,9 @@ def test_outgoing_traceparent_and_baggage_inconsistent_incoming_trace(
         span_id = span.span_id
         assert traceparent == f"{trace_id}-{span_id}-0"
 
-        # We shouldn't be updating incoming baggage, but in the case where our
-        # effective sample rate overrides the parent sample rate, we do this as
-        # a consequence of updating the sample rate in the DSC.
+        # We shouldn't be updating incoming baggage
         baggage = sentry_sdk.get_baggage()
         baggage_items = dict(tuple(item.split("=")) for item in baggage.split(","))
-        incoming_baggage["sentry-sample_rate"] = "0.0"
         assert baggage_items == incoming_baggage
 
 
