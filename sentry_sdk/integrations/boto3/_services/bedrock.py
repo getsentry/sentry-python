@@ -129,6 +129,9 @@ def _patch_event_stream() -> None:
         """
         Closes the AI Client Span unless `sentry_patched_iter()` closes the span first.
         """
+        if not hasattr(self, "_span"):
+            return original_close(self)
+
         try:
             original_close(self)
         except BaseException:
