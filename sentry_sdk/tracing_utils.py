@@ -294,11 +294,14 @@ def _should_be_included(
 
 def _caller_frames(frame: "Optional[FrameType]") -> "Iterator[FrameType]":
     """
-    Yields ``frame`` and the frames that called it. When the current
-    greenlet's frames run out, continues into those of its parent greenlet,
-    where they were suspended to switch to it. Async SQLAlchemy runs the
-    driver, and so the cursor events that create query spans, inside such a
-    greenlet, started from the coroutine that awaited the query.
+    Yields ``frame`` and the frames that called it.
+
+    Async SQLAlchemy runs the sync driver, and so the cursor events that
+    create query spans, in a greenlet it spawns from the coroutine awaiting
+    the query. That greenlet's own frames end at the bridge, so when the
+    current greenlet is SQLAlchemy's bridge, the walk continues into the
+    frames of its parent, which is suspended in the awaiting caller. Any other
+    greenlet's parent need not be its caller, so its frames are not followed.
     """
     while frame is not None:
         yield frame
@@ -309,7 +312,12 @@ def _caller_frames(frame: "Optional[FrameType]") -> "Iterator[FrameType]":
         return
 
     try:
-        parent = greenlet.getcurrent().parent
+        current = greenlet.getcurrent()
+        # SQLAlchemy marks its bridge greenlet with this attribute and checks
+        # for it itself.
+        if not getattr(current, "__sqlalchemy_greenlet_provider__", False):
+            return
+        parent = current.parent
         frame = parent.gr_frame if parent is not None else None
     except Exception:
         return
