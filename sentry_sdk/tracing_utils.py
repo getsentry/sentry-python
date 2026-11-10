@@ -292,6 +292,17 @@ def _should_be_included(
     )
 
 
+def _is_sqlalchemy_async_bridge(current: "Any") -> bool:
+    # SQLAlchemy marks its bridge greenlet with this attribute and checks for
+    # it itself, from 1.4.53 and 2.0.31. Earlier releases check the class.
+    if getattr(current, "__sqlalchemy_greenlet_provider__", False):
+        return True
+    cls = type(current)
+    return cls.__name__ == "_AsyncIoGreenlet" and cls.__module__.startswith(
+        "sqlalchemy."
+    )
+
+
 def _caller_frames(frame: "Optional[FrameType]") -> "Iterator[FrameType]":
     """
     Yields ``frame`` and the frames that called it.
@@ -313,9 +324,7 @@ def _caller_frames(frame: "Optional[FrameType]") -> "Iterator[FrameType]":
 
     try:
         current = greenlet.getcurrent()
-        # SQLAlchemy marks its bridge greenlet with this attribute and checks
-        # for it itself.
-        if not getattr(current, "__sqlalchemy_greenlet_provider__", False):
+        if not _is_sqlalchemy_async_bridge(current):
             return
         parent = current.parent
         frame = parent.gr_frame if parent is not None else None
