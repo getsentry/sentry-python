@@ -7,12 +7,14 @@ from sentry_sdk.integrations.boto3._utils import (
     _get_aws_arn_attributes,
     _get_batch_error_type,
 )
+from sentry_sdk.traces import SpanStatus
 
 if TYPE_CHECKING:
     from typing import Any, Optional
 
     from sentry_sdk._types import Attributes
     from sentry_sdk.integrations.boto3._context import AwsCallContext
+    from sentry_sdk.traces import Span
 
 _PUBLISH_OPERATIONS = ("Publish", "PublishBatch")
 
@@ -97,19 +99,18 @@ class _SNSExtension(_ServiceExtension):
         attributes.update(_get_aws_arn_attributes(arns, ("sns",)))
         return attributes
 
-    def get_response_attributes(
-        self, ctx: "AwsCallContext", response: "Any"
-    ) -> "Attributes":
+    def on_success_response(
+        self, ctx: "AwsCallContext", response: "Any", span: "Span"
+    ) -> None:
         attributes: "Attributes" = {}
-
-        # `ClientError` response holds no results.
-        if "Error" in response:
-            return attributes
 
         if ctx.operation_name == "Publish":
             attributes[SPANDATA.MESSAGING_MESSAGE_ID] = response["MessageId"]
 
         error_type = _get_batch_error_type(response)
         if error_type is not None:
+            span.status = SpanStatus.ERROR
             attributes[SPANDATA.ERROR_TYPE] = error_type
-        return attributes
+
+        span.set_attributes(attributes)
+        span.end()

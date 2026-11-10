@@ -1012,7 +1012,12 @@ class Scope:
                 self,
             )
 
-            if sample_rate is not None:
+            keep_incoming_sample_rate = (
+                propagation_context.parent_sampled is not None
+                and not callable(self.get_client().options.get("traces_sampler"))
+            )
+
+            if sample_rate is not None and not keep_incoming_sample_rate:
                 self._update_sample_rate(sample_rate)
 
             if sampled is False or sampled is None:

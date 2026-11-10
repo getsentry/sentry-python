@@ -1,10 +1,11 @@
 import sys
 import time
-from datetime import timedelta, timezone
+from functools import wraps
 
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.crons import monitor
+from sentry_sdk.crons.utils import _get_timezone_name
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.integrations.logging import ignore_logger_for_events
 from sentry_sdk.traces import SegmentNameSource
@@ -174,6 +175,7 @@ def _make_event_processor(
 
 
 def _wrap_coroutine(name: str, coroutine: "WorkerCoroutine") -> "WorkerCoroutine":
+    @wraps(coroutine)
     async def _sentry_coroutine(
         ctx: "Dict[Any, Any]", *args: "Any", **kwargs: "Any"
     ) -> "Any":
@@ -278,6 +280,9 @@ def _monitor_cron_job(
         return
     cron_job._sentry_monitored = True
 
+    if getattr(cron_job.coroutine, "_sentry_monitored", False):
+        return
+
     # arq names cron jobs "cron:<function name>" by default.
     monitor_slug = cron_job.name
     if monitor_slug.startswith("cron:"):
@@ -345,7 +350,7 @@ def _get_crontab(cron_job: "CronJob") -> "Optional[str]":
     return " ".join(fields)  # type: ignore[arg-type]
 
 
-def _get_timezone_name(worker: "Worker") -> "Optional[str]":
+def _get_worker_timezone_name(worker: "Worker") -> "Optional[str]":
     tz = getattr(worker, "timezone", None)
     if tz is None:
         # Before arq 0.25, cron jobs ran in naive local time.
@@ -353,27 +358,15 @@ def _get_timezone_name(worker: "Worker") -> "Optional[str]":
             return "UTC"
         return None
 
-    # zoneinfo and pytz
-    name = getattr(tz, "key", None) or getattr(tz, "zone", None)
-    if isinstance(name, str):
-        return name
-
     # arq defaults to the system's fixed UTC offset at startup.
-    if isinstance(tz, timezone):
-        offset = tz.utcoffset(None)
-        if offset % timedelta(hours=1):
-            return None
-        hours = offset // timedelta(hours=1)
-        return "Etc/GMT%+d" % -hours if hours else "UTC"
-
-    return None
+    return _get_timezone_name(tz)
 
 
 def _get_monitor_config(
     cron_job: "CronJob", worker: "Worker"
 ) -> "Optional[MonitorConfig]":
     crontab = _get_crontab(cron_job)
-    timezone_name = _get_timezone_name(worker)
+    timezone_name = _get_worker_timezone_name(worker)
     if crontab is None or timezone_name is None:
         return None
     return {
