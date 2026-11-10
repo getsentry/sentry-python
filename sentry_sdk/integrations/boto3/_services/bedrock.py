@@ -28,11 +28,17 @@ class _BedrockExtension(_ServiceExtension):
         if ctx.operation_name != "Converse" and ctx.operation_name != "ConverseStream":
             return {}
 
-        return {
+        attributes: "Attributes" = {
             SPANDATA.GEN_AI_PROVIDER_NAME: "aws.bedrock",
             SPANDATA.GEN_AI_OPERATION_NAME: "chat",
             SPANDATA.GEN_AI_RESPONSE_STREAMING: ctx.operation_name == "ConverseStream",
         }
+
+        model_id = ctx.params.get("modelId")
+        if model_id is not None:
+            attributes[SPANDATA.GEN_AI_REQUEST_MODEL] = model_id
+
+        return attributes
 
     def get_response_attributes(
         self,
