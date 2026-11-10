@@ -1,20 +1,27 @@
 import sys
-from contextlib import contextmanager
 from typing import TYPE_CHECKING, cast
 
 from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.integrations.boto3._services.base import _ServiceExtension
 from sentry_sdk.traces import SpanStatus, StreamedSpan
 from sentry_sdk.tracing import SPANSTATUS
-from sentry_sdk.utils import capture_internal_exceptions, reraise
+from sentry_sdk.utils import (
+    capture_internal_exceptions,
+    reraise,
+    should_be_treated_as_error,
+)
+
+try:
+    from botocore.eventstream import EventStream
+except ImportError:
+    raise DidNotEnable("botocore is not installed")
 
 if TYPE_CHECKING:
     from typing import Any, Iterator, Optional, Union
 
-    from botocore.eventstream import EventStream
     from mypy_boto3_bedrock_runtime.type_defs import (
         ConverseResponseTypeDef,
-        ConverseStreamOutputTypeDef,
         ConverseStreamResponseTypeDef,
     )
 
@@ -23,31 +30,113 @@ if TYPE_CHECKING:
     from sentry_sdk.tracing import Span
 
 
-@contextmanager
-def _stream_span_context(span: "Union[Span, StreamedSpan]"):
+def _finish_span(
+    stream: "EventStream[Any]",
+    exc_type: "Optional[type[BaseException]]",
+    exc_val: "Optional[BaseException]",
+    exc_tb: "Optional[Any]",
+) -> None:
     """
-    Closes the provided span and set the span's status on exit.
+    Finishes the span attached to the stream.
+    Is a no-op if the stream has no span set, i.e., when the span has already been finished.
     """
-    end_span = span.end if isinstance(span, StreamedSpan) else span.finish
+    if not hasattr(stream, "_span"):
+        return
 
-    try:
-        yield
-    except GeneratorExit:  # Raised when close() is called on the stream.
-        exc_info = sys.exc_info()
-        with capture_internal_exceptions():
-            end_span()
-        reraise(*exc_info)
-    except BaseException:
-        exc_info = sys.exc_info()
-        with capture_internal_exceptions():
-            if isinstance(span, StreamedSpan):
-                span.status = SpanStatus.ERROR
-            else:
-                span.status = SPANSTATUS.INTERNAL_ERROR
-            end_span()
-        reraise(*exc_info)
+    span = stream._span
+    del stream._span
+
+    if should_be_treated_as_error(exc_type, exc_val):
+        if isinstance(span, StreamedSpan):
+            span.status = SpanStatus.ERROR
+        else:
+            span.status = SPANSTATUS.INTERNAL_ERROR
+
+    if isinstance(span, StreamedSpan):
+        span.end()
     else:
-        end_span()
+        span.finish()
+
+
+def _patch_event_stream() -> None:
+    original_iter = EventStream.__iter__
+    original_close = EventStream.close
+
+    def sentry_patched_iter(
+        self: "EventStream[Any]",
+    ) -> "Iterator[Any]":
+        """
+        Sets information received while iterating the response stream on the AI Client Span.
+        Responsible for closing the AI Client Span unless the span has already been closed in the close() patch.
+        """
+        span = getattr(self, "_span", None)
+        if span is None:
+            yield from original_iter(self)
+            return
+
+        set_on_span = (
+            span.set_attribute if isinstance(span, StreamedSpan) else span.set_data
+        )
+
+        try:
+            for event in original_iter(self):
+                if "metadata" not in event:
+                    yield event
+                    continue
+
+                usage = event["metadata"]["usage"]
+
+                input_tokens = usage["inputTokens"]
+                set_on_span(SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS, usage["outputTokens"])
+                set_on_span(SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, usage["totalTokens"])
+
+                cache_read_tokens = usage.get("cacheReadInputTokens")
+                if cache_read_tokens is not None:
+                    input_tokens += cache_read_tokens
+                    set_on_span(
+                        SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED, cache_read_tokens
+                    )
+
+                cache_write_tokens = usage.get("cacheWriteInputTokens")
+                if cache_write_tokens is not None:
+                    input_tokens += cache_write_tokens
+                    set_on_span(
+                        SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE,
+                        cache_write_tokens,
+                    )
+
+                set_on_span(
+                    SPANDATA.GEN_AI_USAGE_INPUT_TOKENS,
+                    input_tokens,
+                )
+
+                yield event
+        except GeneratorExit:
+            raise  # Leave span open since underlying stream is not necessarily closed.
+        except BaseException:
+            exc_info = sys.exc_info()
+            with capture_internal_exceptions():
+                _finish_span(self, *exc_info)
+            reraise(*exc_info)
+
+        _finish_span(self, None, None, None)
+
+    def sentry_patched_close(self: "EventStream[Any]") -> None:
+        """
+        Closes the AI Client Span unless `sentry_patched_iter()` closes the span first.
+        """
+        try:
+            original_close(self)
+        except BaseException:
+            exc_info = sys.exc_info()
+            with capture_internal_exceptions():
+                _finish_span(self, *exc_info)
+            reraise(*exc_info)
+
+        _finish_span(self, None, None, None)
+
+    EventStream.__iter__ = sentry_patched_iter  # type: ignore[method-assign]
+    EventStream.close = sentry_patched_close  # type: ignore[method-assign]
 
 
 class _BedrockExtension(_ServiceExtension):
@@ -115,43 +204,13 @@ class _BedrockExtension(_ServiceExtension):
             span.finish()
             return
 
-        if ctx.operation_name != "ConverseStream":
+        if ctx.operation_name == "ConverseStream":
+            stream = cast("ConverseStreamResponseTypeDef", response)["stream"]
+            stream._span = span  # type: ignore[attr-defined]
             return
 
-        stream = cast("ConverseStreamResponseTypeDef", response)["stream"]
-        response["stream"] = _wrap_converse_stream(stream, span)
+        if isinstance(span, StreamedSpan):
+            span.end()
+            return
 
-
-def _wrap_converse_stream(
-    stream: "EventStream[ConverseStreamOutputTypeDef]",
-    span: "Union[Span, StreamedSpan]",
-) -> "Iterator[ConverseStreamOutputTypeDef]":
-    set_on_span = (
-        span.set_attribute if isinstance(span, StreamedSpan) else span.set_data
-    )
-
-    with _stream_span_context(span):
-        for event in stream:
-            if "metadata" not in event:
-                yield event
-                continue
-
-            usage = event["metadata"]["usage"]
-
-            set_on_span(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, usage["inputTokens"])
-            set_on_span(SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS, usage["outputTokens"])
-            set_on_span(SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, usage["totalTokens"])
-
-            cache_read_tokens = usage.get("cacheReadInputTokens")
-            if cache_read_tokens is not None:
-                set_on_span(
-                    SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED, cache_read_tokens
-                )
-
-            cache_write_tokens = usage.get("cacheWriteInputTokens")
-            if cache_write_tokens is not None:
-                set_on_span(
-                    SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE, cache_write_tokens
-                )
-
-            yield event
+        span.finish()

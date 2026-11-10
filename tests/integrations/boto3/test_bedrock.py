@@ -1,10 +1,15 @@
+import io
 from unittest.mock import Mock
 
 import boto3
 import botocore
+import botocore.session
 import pytest
+import urllib3
+from botocore.eventstream import EventStream
 from botocore.exceptions import ClientError, EventStreamError
 from botocore.loaders import Loader
+from botocore.parsers import EventStreamJSONParser
 from botocore.stub import Stubber
 from packaging.version import Version
 
@@ -15,6 +20,7 @@ from sentry_sdk.integrations.boto3 import Boto3Integration
 BOTOCORE_VERSION = Version(botocore.__version__)
 
 BEFORE_CALL_EVENT = "before-call.bedrock-runtime.ConverseStream"
+
 
 pytestmark = pytest.mark.skipif(
     "bedrock-runtime" not in Loader().list_available_services("service-2"),
@@ -44,13 +50,64 @@ def converse_stream_response():
         usage["cacheReadInputTokens"] = 80
         usage["cacheWriteInputTokens"] = 20
 
-    return {
-        "stream": [
+    output_shape = (
+        botocore.session.get_session()
+        .get_service_model("bedrock-runtime")
+        .operation_model("ConverseStream")
+        .output_shape
+    )
+    raw_stream = urllib3.HTTPResponse(body=io.BytesIO(b""), preload_content=False)
+    stream = EventStream(
+        raw_stream, output_shape, EventStreamJSONParser(), "ConverseStream"
+    )
+    stream._event_generator = iter(
+        [
             {"messageStart": {"role": "assistant"}},
             {"contentBlockDelta": {"contentBlockIndex": 0, "delta": {"text": "Hello"}}},
             {"messageStop": {"stopReason": "end_turn"}},
             {"metadata": {"usage": usage, "metrics": {"latencyMs": 500}}},
-        ],
+        ]
+    )
+    stream._parse_event = lambda event: event
+
+    return {
+        "stream": stream,
+        "ResponseMetadata": {
+            "RequestId": "test-id",
+            "HTTPStatusCode": 200,
+            "HTTPHeaders": {},
+            "RetryAttempts": 0,
+        },
+    }
+
+
+@pytest.fixture
+def converse_stream_error_response():
+    error = EventStreamError(
+        {"Error": {"Code": "throttlingException", "Message": "Rate exceeded"}},
+        "ConverseStream",
+    )
+
+    def error_events():
+        yield {"messageStart": {"role": "assistant"}}
+        yield {"contentBlockDelta": {"contentBlockIndex": 0, "delta": {"text": "Hi"}}}
+        raise error
+
+    output_shape = (
+        botocore.session.get_session()
+        .get_service_model("bedrock-runtime")
+        .operation_model("ConverseStream")
+        .output_shape
+    )
+    raw_stream = urllib3.HTTPResponse(body=io.BytesIO(b""), preload_content=False)
+    stream = EventStream(
+        raw_stream, output_shape, EventStreamJSONParser(), "ConverseStream"
+    )
+    stream._event_generator = error_events()
+    stream._parse_event = lambda event: event
+
+    return {
+        "stream": stream,
         "ResponseMetadata": {
             "RequestId": "test-id",
             "HTTPStatusCode": 200,
@@ -253,7 +310,7 @@ def test_converse_stream(
                 modelId="anthropic.claude-3-sonnet-20240229-v1:0",
                 messages=[{"role": "user", "content": [{"text": "Hi"}]}],
             )
-            for _event in response["stream"]:
+            for _ in response["stream"]:
                 pass
 
         sentry_sdk.flush()
@@ -267,11 +324,12 @@ def test_converse_stream(
         assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "aws.bedrock"
         assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
         assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
         if BOTOCORE_VERSION < Version("1.37.24"):
+            assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
             return
+        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 110
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 80
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 20
     else:
@@ -282,7 +340,7 @@ def test_converse_stream(
                 modelId="anthropic.claude-3-sonnet-20240229-v1:0",
                 messages=[{"role": "user", "content": [{"text": "Hi"}]}],
             )
-            for _event in response["stream"]:
+            for _ in response["stream"]:
                 pass
 
         (transaction,) = events
@@ -291,11 +349,12 @@ def test_converse_stream(
         assert span["data"][SPANDATA.GEN_AI_PROVIDER_NAME] == "aws.bedrock"
         assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
         assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
-        assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
         assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
         assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
         if BOTOCORE_VERSION < Version("1.37.24"):
+            assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
             return
+        assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 110
         assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 80
         assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 20
 
@@ -303,7 +362,12 @@ def test_converse_stream(
 @pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_converse_stream_error_during_iteration(
-    sentry_init, capture_items, capture_events, span_streaming, stream_gen_ai_spans
+    sentry_init,
+    capture_items,
+    capture_events,
+    span_streaming,
+    stream_gen_ai_spans,
+    converse_stream_error_response,
 ):
     sentry_init(
         traces_sample_rate=1.0,
@@ -316,30 +380,10 @@ def test_converse_stream_error_during_iteration(
         aws_access_key_id="-", aws_secret_access_key="-", region_name="us-east-1"
     )
     client = session.client("bedrock-runtime")
-
-    error = EventStreamError(
-        {"Error": {"Code": "throttlingException", "Message": "Rate exceeded"}},
-        "ConverseStream",
-    )
-
-    def error_stream():
-        yield {"messageStart": {"role": "assistant"}}
-        yield {"contentBlockDelta": {"contentBlockIndex": 0, "delta": {"text": "Hi"}}}
-        raise error
-
-    response = {
-        "stream": error_stream(),
-        "ResponseMetadata": {
-            "RequestId": "test-id",
-            "HTTPStatusCode": 200,
-            "HTTPHeaders": {},
-            "RetryAttempts": 0,
-        },
-    }
-
     mock_http = Mock(status_code=200)
     client.meta.events.register(
-        BEFORE_CALL_EVENT, lambda **kwargs: (mock_http, response)
+        BEFORE_CALL_EVENT,
+        lambda **kwargs: (mock_http, converse_stream_error_response),
     )
 
     if span_streaming or stream_gen_ai_spans:
