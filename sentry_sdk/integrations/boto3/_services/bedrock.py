@@ -1,8 +1,10 @@
 import json
 from typing import TYPE_CHECKING
 
+import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.boto3._services.base import _ServiceExtension
+from sentry_sdk.utils import has_data_collection_enabled
 
 if TYPE_CHECKING:
     from typing import Any, Optional
@@ -95,6 +97,11 @@ class _BedrockExtension(_ServiceExtension):
             top_p = inference_config.get("topP")
             if top_p is not None:
                 attributes[SPANDATA.GEN_AI_REQUEST_TOP_P] = top_p
+
+        client_options = sentry_sdk.get_client().options
+        if has_data_collection_enabled(client_options):
+            if not client_options["data_collection"]["gen_ai"]["inputs"]:
+                return attributes
 
         tool_config = ctx.params.get("toolConfig")
         if not isinstance(tool_config, dict):

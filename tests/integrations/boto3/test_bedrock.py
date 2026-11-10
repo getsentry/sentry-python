@@ -225,22 +225,33 @@ def test_converse_error(
         assert span["status"] == "internal_error"
 
 
+@pytest.mark.parametrize("data_collection", [True, False])
 @pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_converse_tool_definitions(
     sentry_init,
     capture_items,
     capture_events,
+    data_collection,
     span_streaming,
     stream_gen_ai_spans,
     converse_response,
 ):
-    sentry_init(
-        traces_sample_rate=1.0,
-        integrations=[Boto3Integration()],
-        stream_gen_ai_spans=stream_gen_ai_spans,
-        trace_lifecycle="stream" if span_streaming else "static",
-    )
+    if data_collection:
+        sentry_init(
+            traces_sample_rate=1.0,
+            integrations=[Boto3Integration()],
+            data_collection={"gen_ai": {"inputs": True}},
+            stream_gen_ai_spans=stream_gen_ai_spans,
+            trace_lifecycle="stream" if span_streaming else "static",
+        )
+    else:
+        sentry_init(
+            traces_sample_rate=1.0,
+            integrations=[Boto3Integration()],
+            stream_gen_ai_spans=stream_gen_ai_spans,
+            trace_lifecycle="stream" if span_streaming else "static",
+        )
 
     tools: list = [
         {
@@ -514,21 +525,32 @@ def test_converse_stream_error(
         assert span["status"] == "internal_error"
 
 
+@pytest.mark.parametrize("data_collection", [True, False])
 @pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_converse_stream_tool_definitions(
     sentry_init,
     capture_items,
     capture_events,
+    data_collection,
     span_streaming,
     stream_gen_ai_spans,
 ):
-    sentry_init(
-        traces_sample_rate=1.0,
-        integrations=[Boto3Integration()],
-        stream_gen_ai_spans=stream_gen_ai_spans,
-        trace_lifecycle="stream" if span_streaming else "static",
-    )
+    if data_collection:
+        sentry_init(
+            traces_sample_rate=1.0,
+            integrations=[Boto3Integration()],
+            data_collection={"gen_ai": {"inputs": True}},
+            stream_gen_ai_spans=stream_gen_ai_spans,
+            trace_lifecycle="stream" if span_streaming else "static",
+        )
+    else:
+        sentry_init(
+            traces_sample_rate=1.0,
+            integrations=[Boto3Integration()],
+            stream_gen_ai_spans=stream_gen_ai_spans,
+            trace_lifecycle="stream" if span_streaming else "static",
+        )
 
     tools: list = [
         {
