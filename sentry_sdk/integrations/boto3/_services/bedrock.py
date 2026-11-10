@@ -34,6 +34,10 @@ class _BedrockExtension(_ServiceExtension):
             SPANDATA.GEN_AI_RESPONSE_STREAMING: ctx.operation_name == "ConverseStream",
         }
 
+        model_id = ctx.params.get("modelId")
+        if model_id is not None:
+            attributes[SPANDATA.GEN_AI_REQUEST_MODEL] = model_id
+
         inference_config = ctx.params.get("inferenceConfig")
 
         if not isinstance(inference_config, dict):
