@@ -1,4 +1,5 @@
 import io
+import json
 from unittest.mock import Mock
 
 import boto3
@@ -18,9 +19,6 @@ from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.boto3 import Boto3Integration
 
 BOTOCORE_VERSION = Version(botocore.__version__)
-
-BEFORE_CALL_EVENT = "before-call.bedrock-runtime.ConverseStream"
-
 
 pytestmark = pytest.mark.skipif(
     "bedrock-runtime" not in Loader().list_available_services("service-2"),
@@ -148,6 +146,11 @@ def test_converse(
             client.converse(
                 modelId="anthropic.claude-3-sonnet-20240229-v1:0",
                 messages=[{"role": "user", "content": [{"text": "Hi"}]}],
+                inferenceConfig={
+                    "maxTokens": 1024,
+                    "temperature": 0.7,
+                    "topP": 0.9,
+                },
             )
 
         sentry_sdk.flush()
@@ -161,6 +164,15 @@ def test_converse(
         assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "aws.bedrock"
         assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
         assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
+        assert (
+            span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL]
+            == "anthropic.claude-3-sonnet-20240229-v1:0"
+        )
+
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 1024
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
+
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
         if BOTOCORE_VERSION < Version("1.37.24"):
@@ -176,6 +188,11 @@ def test_converse(
             client.converse(
                 modelId="anthropic.claude-3-sonnet-20240229-v1:0",
                 messages=[{"role": "user", "content": [{"text": "Hi"}]}],
+                inferenceConfig={
+                    "maxTokens": 1024,
+                    "temperature": 0.7,
+                    "topP": 0.9,
+                },
             )
 
         (transaction,) = events
@@ -184,6 +201,15 @@ def test_converse(
         assert span["data"][SPANDATA.GEN_AI_PROVIDER_NAME] == "aws.bedrock"
         assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
         assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
+        assert (
+            span["data"][SPANDATA.GEN_AI_REQUEST_MODEL]
+            == "anthropic.claude-3-sonnet-20240229-v1:0"
+        )
+
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 1024
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
+
         assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
         assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
         if BOTOCORE_VERSION < Version("1.37.24"):
@@ -236,6 +262,11 @@ def test_converse_error(
             client.converse(
                 modelId="anthropic.claude-3-sonnet-20240229-v1:0",
                 messages=[{"role": "user", "content": [{"text": "Hi"}]}],
+                inferenceConfig={
+                    "maxTokens": 1024,
+                    "temperature": 0.7,
+                    "topP": 0.9,
+                },
             )
 
         sentry_sdk.flush()
@@ -248,6 +279,14 @@ def test_converse_error(
 
         assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "aws.bedrock"
         assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+        assert (
+            span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL]
+            == "anthropic.claude-3-sonnet-20240229-v1:0"
+        )
+
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 1024
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
 
         assert span["attributes"][SPANDATA.ERROR_TYPE] == "AccessDeniedException"
         assert span["attributes"][SPANDATA.HTTP_STATUS_CODE] == 403
@@ -261,6 +300,11 @@ def test_converse_error(
             client.converse(
                 modelId="anthropic.claude-3-sonnet-20240229-v1:0",
                 messages=[{"role": "user", "content": [{"text": "Hi"}]}],
+                inferenceConfig={
+                    "maxTokens": 1024,
+                    "temperature": 0.7,
+                    "topP": 0.9,
+                },
             )
 
         (transaction,) = events
@@ -268,12 +312,128 @@ def test_converse_error(
 
         assert span["data"][SPANDATA.GEN_AI_PROVIDER_NAME] == "aws.bedrock"
         assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+        assert (
+            span["data"][SPANDATA.GEN_AI_REQUEST_MODEL]
+            == "anthropic.claude-3-sonnet-20240229-v1:0"
+        )
+
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 1024
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
 
         assert span["data"][SPANDATA.ERROR_TYPE] == "AccessDeniedException"
         assert span["data"][SPANDATA.HTTP_STATUS_CODE] == 403
         assert span["data"][SPANDATA.AWS_REQUEST_ID] == "test-id"
         assert span["data"][SPANDATA.HTTP_REQUEST_RESEND_COUNT] == 1
         assert span["status"] == "internal_error"
+
+
+@pytest.mark.parametrize("data_collection", [True, False])
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+def test_converse_tool_definitions(
+    sentry_init,
+    capture_items,
+    capture_events,
+    data_collection,
+    span_streaming,
+    stream_gen_ai_spans,
+    converse_response,
+):
+    if data_collection:
+        sentry_init(
+            traces_sample_rate=1.0,
+            integrations=[Boto3Integration()],
+            data_collection={"gen_ai": {"inputs": True}},
+            stream_gen_ai_spans=stream_gen_ai_spans,
+            trace_lifecycle="stream" if span_streaming else "static",
+        )
+    else:
+        sentry_init(
+            traces_sample_rate=1.0,
+            integrations=[Boto3Integration()],
+            stream_gen_ai_spans=stream_gen_ai_spans,
+            trace_lifecycle="stream" if span_streaming else "static",
+        )
+
+    tools: list = [
+        {
+            "toolSpec": {
+                "name": "get_weather",
+                "description": "Get the current weather in a given location",
+                "inputSchema": {
+                    "json": {
+                        "type": "object",
+                        "properties": {"location": {"type": "string"}},
+                        "required": ["location"],
+                    }
+                },
+            }
+        },
+    ]
+    expected_tool_definitions = [
+        {
+            "type": "function",
+            "name": "get_weather",
+            "description": "Get the current weather in a given location",
+            "parameters": {
+                "type": "object",
+                "properties": {"location": {"type": "string"}},
+                "required": ["location"],
+            },
+        },
+    ]
+
+    if BOTOCORE_VERSION >= Version("1.40.62"):
+        tools.append({"systemTool": {"name": "web_search"}})
+        expected_tool_definitions.append({"type": "web_search"})
+
+    session = boto3.Session(
+        aws_access_key_id="-", aws_secret_access_key="-", region_name="us-east-1"
+    )
+    client = session.client("bedrock-runtime")
+    stubber = Stubber(client)
+    stubber.add_response("converse", converse_response)
+
+    if span_streaming or stream_gen_ai_spans:
+        items = capture_items("span")
+
+        with stubber, sentry_sdk.start_transaction(name="parent"):
+            client.converse(
+                modelId="anthropic.claude-3-sonnet-20240229-v1:0",
+                messages=[{"role": "user", "content": [{"text": "Hi"}]}],
+                toolConfig={"tools": tools},
+            )
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items]
+        (span,) = (
+            span
+            for span in spans
+            if span["attributes"].get("sentry.op") == OP.GEN_AI_CHAT
+        )
+
+        assert (
+            json.loads(span["attributes"][SPANDATA.GEN_AI_TOOL_DEFINITIONS])
+            == expected_tool_definitions
+        )
+    else:
+        events = capture_events()
+
+        with stubber, sentry_sdk.start_transaction(name="parent"):
+            client.converse(
+                modelId="anthropic.claude-3-sonnet-20240229-v1:0",
+                messages=[{"role": "user", "content": [{"text": "Hi"}]}],
+                toolConfig={"tools": tools},
+            )
+
+        (transaction,) = events
+        (span,) = transaction["spans"]
+
+        assert (
+            json.loads(span["data"][SPANDATA.GEN_AI_TOOL_DEFINITIONS])
+            == expected_tool_definitions
+        )
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
@@ -299,7 +459,8 @@ def test_converse_stream(
     client = session.client("bedrock-runtime")
     mock_http = Mock(status_code=200)
     client.meta.events.register(
-        BEFORE_CALL_EVENT, lambda **kwargs: (mock_http, converse_stream_response)
+        "before-call.bedrock-runtime.ConverseStream",
+        lambda **kwargs: (mock_http, converse_stream_response),
     )
 
     if span_streaming or stream_gen_ai_spans:
@@ -309,6 +470,11 @@ def test_converse_stream(
             response = client.converse_stream(
                 modelId="anthropic.claude-3-sonnet-20240229-v1:0",
                 messages=[{"role": "user", "content": [{"text": "Hi"}]}],
+                inferenceConfig={
+                    "maxTokens": 1024,
+                    "temperature": 0.7,
+                    "topP": 0.9,
+                },
             )
             for _ in response["stream"]:
                 pass
@@ -324,6 +490,15 @@ def test_converse_stream(
         assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "aws.bedrock"
         assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
         assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+        assert (
+            span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL]
+            == "anthropic.claude-3-sonnet-20240229-v1:0"
+        )
+
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 1024
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
+
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
         if BOTOCORE_VERSION < Version("1.37.24"):
@@ -339,6 +514,11 @@ def test_converse_stream(
             response = client.converse_stream(
                 modelId="anthropic.claude-3-sonnet-20240229-v1:0",
                 messages=[{"role": "user", "content": [{"text": "Hi"}]}],
+                inferenceConfig={
+                    "maxTokens": 1024,
+                    "temperature": 0.7,
+                    "topP": 0.9,
+                },
             )
             for _ in response["stream"]:
                 pass
@@ -349,6 +529,15 @@ def test_converse_stream(
         assert span["data"][SPANDATA.GEN_AI_PROVIDER_NAME] == "aws.bedrock"
         assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
         assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+        assert (
+            span["data"][SPANDATA.GEN_AI_REQUEST_MODEL]
+            == "anthropic.claude-3-sonnet-20240229-v1:0"
+        )
+
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 1024
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
+
         assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
         assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
         if BOTOCORE_VERSION < Version("1.37.24"):
@@ -382,7 +571,7 @@ def test_converse_stream_error_during_iteration(
     client = session.client("bedrock-runtime")
     mock_http = Mock(status_code=200)
     client.meta.events.register(
-        BEFORE_CALL_EVENT,
+        "before-call.bedrock-runtime.ConverseStream",
         lambda **kwargs: (mock_http, converse_stream_error_response),
     )
 
@@ -473,6 +662,11 @@ def test_converse_stream_error(
             client.converse_stream(
                 modelId="anthropic.claude-3-sonnet-20240229-v1:0",
                 messages=[{"role": "user", "content": [{"text": "Hi"}]}],
+                inferenceConfig={
+                    "maxTokens": 1024,
+                    "temperature": 0.7,
+                    "topP": 0.9,
+                },
             )
 
         sentry_sdk.flush()
@@ -486,6 +680,14 @@ def test_converse_stream_error(
         assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "aws.bedrock"
         assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
         assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+        assert (
+            span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL]
+            == "anthropic.claude-3-sonnet-20240229-v1:0"
+        )
+
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 1024
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
 
         assert span["attributes"][SPANDATA.ERROR_TYPE] == "AccessDeniedException"
         assert span["attributes"][SPANDATA.HTTP_STATUS_CODE] == 403
@@ -499,6 +701,11 @@ def test_converse_stream_error(
             client.converse_stream(
                 modelId="anthropic.claude-3-sonnet-20240229-v1:0",
                 messages=[{"role": "user", "content": [{"text": "Hi"}]}],
+                inferenceConfig={
+                    "maxTokens": 1024,
+                    "temperature": 0.7,
+                    "topP": 0.9,
+                },
             )
 
         (transaction,) = events
@@ -507,9 +714,132 @@ def test_converse_stream_error(
         assert span["data"][SPANDATA.GEN_AI_PROVIDER_NAME] == "aws.bedrock"
         assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
         assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+        assert (
+            span["data"][SPANDATA.GEN_AI_REQUEST_MODEL]
+            == "anthropic.claude-3-sonnet-20240229-v1:0"
+        )
+
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 1024
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
 
         assert span["data"][SPANDATA.ERROR_TYPE] == "AccessDeniedException"
         assert span["data"][SPANDATA.HTTP_STATUS_CODE] == 403
         assert span["data"][SPANDATA.AWS_REQUEST_ID] == "test-id"
         assert span["data"][SPANDATA.HTTP_REQUEST_RESEND_COUNT] == 1
         assert span["status"] == "internal_error"
+
+
+@pytest.mark.parametrize("data_collection", [True, False])
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+def test_converse_stream_tool_definitions(
+    sentry_init,
+    capture_items,
+    capture_events,
+    data_collection,
+    span_streaming,
+    stream_gen_ai_spans,
+    converse_stream_response,
+):
+    if data_collection:
+        sentry_init(
+            traces_sample_rate=1.0,
+            integrations=[Boto3Integration()],
+            data_collection={"gen_ai": {"inputs": True}},
+            stream_gen_ai_spans=stream_gen_ai_spans,
+            trace_lifecycle="stream" if span_streaming else "static",
+        )
+    else:
+        sentry_init(
+            traces_sample_rate=1.0,
+            integrations=[Boto3Integration()],
+            stream_gen_ai_spans=stream_gen_ai_spans,
+            trace_lifecycle="stream" if span_streaming else "static",
+        )
+
+    tools: list = [
+        {
+            "toolSpec": {
+                "name": "get_weather",
+                "description": "Get the current weather in a given location",
+                "inputSchema": {
+                    "json": {
+                        "type": "object",
+                        "properties": {"location": {"type": "string"}},
+                        "required": ["location"],
+                    }
+                },
+            }
+        },
+    ]
+    expected_tool_definitions = [
+        {
+            "type": "function",
+            "name": "get_weather",
+            "description": "Get the current weather in a given location",
+            "parameters": {
+                "type": "object",
+                "properties": {"location": {"type": "string"}},
+                "required": ["location"],
+            },
+        },
+    ]
+
+    if BOTOCORE_VERSION >= Version("1.40.62"):
+        tools.append({"systemTool": {"name": "web_search"}})
+        expected_tool_definitions.append({"type": "web_search"})
+
+    session = boto3.Session(
+        aws_access_key_id="-", aws_secret_access_key="-", region_name="us-east-1"
+    )
+    client = session.client("bedrock-runtime")
+    mock_http = Mock(status_code=200)
+    client.meta.events.register(
+        "before-call.bedrock-runtime.ConverseStream",
+        lambda **kwargs: (mock_http, converse_stream_response),
+    )
+
+    if span_streaming or stream_gen_ai_spans:
+        items = capture_items("span")
+
+        with sentry_sdk.start_transaction(name="parent"):
+            response = client.converse_stream(
+                modelId="anthropic.claude-3-sonnet-20240229-v1:0",
+                messages=[{"role": "user", "content": [{"text": "Hi"}]}],
+                toolConfig={"tools": tools},
+            )
+            for _ in response["stream"]:
+                pass
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items]
+        (span,) = (
+            span
+            for span in spans
+            if span["attributes"].get("sentry.op") == OP.GEN_AI_CHAT
+        )
+
+        assert (
+            json.loads(span["attributes"][SPANDATA.GEN_AI_TOOL_DEFINITIONS])
+            == expected_tool_definitions
+        )
+    else:
+        events = capture_events()
+
+        with sentry_sdk.start_transaction(name="parent"):
+            response = client.converse_stream(
+                modelId="anthropic.claude-3-sonnet-20240229-v1:0",
+                messages=[{"role": "user", "content": [{"text": "Hi"}]}],
+                toolConfig={"tools": tools},
+            )
+            for _ in response["stream"]:
+                pass
+
+        (transaction,) = events
+        (span,) = transaction["spans"]
+
+        assert (
+            json.loads(span["data"][SPANDATA.GEN_AI_TOOL_DEFINITIONS])
+            == expected_tool_definitions
+        )
