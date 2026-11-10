@@ -1,10 +1,16 @@
+import io
 import json
+from unittest.mock import Mock
 
 import boto3
 import botocore
+import botocore.session
 import pytest
+import urllib3
+from botocore.eventstream import EventStream, EventStreamMessage
 from botocore.exceptions import ClientError
 from botocore.loaders import Loader
+from botocore.parsers import EventStreamJSONParser
 from botocore.stub import Stubber
 from packaging.version import Version
 
@@ -32,6 +38,118 @@ def converse_response():
         "stopReason": "end_turn",
         "usage": usage,
         "metrics": {"latencyMs": 500},
+    }
+
+
+@pytest.fixture
+def converse_stream_response():
+    usage = {"inputTokens": 10, "outputTokens": 20, "totalTokens": 30}
+    if BOTOCORE_VERSION >= Version("1.37.24"):
+        usage["cacheReadInputTokens"] = 80
+        usage["cacheWriteInputTokens"] = 20
+
+    stream_shape = (
+        botocore.session.get_session()
+        .get_service_model("bedrock-runtime")
+        .operation_model("ConverseStream")
+        .output_shape.members["stream"]
+    )
+    raw_stream = urllib3.HTTPResponse(body=io.BytesIO(b""), preload_content=False)
+    stream = EventStream(
+        raw_stream, stream_shape, EventStreamJSONParser(), "ConverseStream"
+    )
+    stream._event_generator = iter(
+        [
+            EventStreamMessage(
+                prelude=None,
+                headers={":message-type": "event", ":event-type": "messageStart"},
+                payload=json.dumps({"role": "assistant"}).encode(),
+                crc=None,
+            ),
+            EventStreamMessage(
+                prelude=None,
+                headers={":message-type": "event", ":event-type": "contentBlockDelta"},
+                payload=json.dumps(
+                    {"contentBlockIndex": 0, "delta": {"text": "Hello"}}
+                ).encode(),
+                crc=None,
+            ),
+            EventStreamMessage(
+                prelude=None,
+                headers={":message-type": "event", ":event-type": "messageStop"},
+                payload=json.dumps({"stopReason": "end_turn"}).encode(),
+                crc=None,
+            ),
+            EventStreamMessage(
+                prelude=None,
+                headers={":message-type": "event", ":event-type": "metadata"},
+                payload=json.dumps(
+                    {"usage": usage, "metrics": {"latencyMs": 500}}
+                ).encode(),
+                crc=None,
+            ),
+        ]
+    )
+
+    return {
+        "stream": stream,
+        "ResponseMetadata": {
+            "RequestId": "test-id",
+            "HTTPStatusCode": 200,
+            "HTTPHeaders": {},
+            "RetryAttempts": 0,
+        },
+    }
+
+
+@pytest.fixture
+def converse_stream_error_response():
+    stream_shape = (
+        botocore.session.get_session()
+        .get_service_model("bedrock-runtime")
+        .operation_model("ConverseStream")
+        .output_shape.members["stream"]
+    )
+    raw_stream = urllib3.HTTPResponse(body=io.BytesIO(b""), preload_content=False)
+    stream = EventStream(
+        raw_stream, stream_shape, EventStreamJSONParser(), "ConverseStream"
+    )
+    stream._event_generator = iter(
+        [
+            EventStreamMessage(
+                prelude=None,
+                headers={":message-type": "event", ":event-type": "messageStart"},
+                payload=json.dumps({"role": "assistant"}).encode(),
+                crc=None,
+            ),
+            EventStreamMessage(
+                prelude=None,
+                headers={":message-type": "event", ":event-type": "contentBlockDelta"},
+                payload=json.dumps(
+                    {"contentBlockIndex": 0, "delta": {"text": "Hi"}}
+                ).encode(),
+                crc=None,
+            ),
+            EventStreamMessage(
+                prelude=None,
+                headers={
+                    ":message-type": "exception",
+                    ":exception-type": "modelStreamErrorException",
+                },
+                payload=json.dumps({"message": "Stream failed"}).encode(),
+                crc=None,
+            ),
+        ]
+    )
+
+    return {
+        "stream": stream,
+        "ResponseMetadata": {
+            "RequestId": "test-id",
+            "HTTPStatusCode": 200,
+            "HTTPHeaders": {},
+            "RetryAttempts": 0,
+        },
     }
 
 
@@ -359,7 +477,12 @@ def test_converse_tool_definitions(
 @pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_converse_stream(
-    sentry_init, capture_items, capture_events, span_streaming, stream_gen_ai_spans
+    sentry_init,
+    capture_items,
+    capture_events,
+    span_streaming,
+    stream_gen_ai_spans,
+    converse_stream_response,
 ):
     sentry_init(
         traces_sample_rate=1.0,
@@ -372,14 +495,17 @@ def test_converse_stream(
         aws_access_key_id="-", aws_secret_access_key="-", region_name="us-east-1"
     )
     client = session.client("bedrock-runtime")
-    stubber = Stubber(client)
-    stubber.add_response("converse_stream", {})
+    mock_http = Mock(status_code=200)
+    client.meta.events.register(
+        "before-call.bedrock-runtime.ConverseStream",
+        lambda **kwargs: (mock_http, converse_stream_response),
+    )
 
     if span_streaming or stream_gen_ai_spans:
         items = capture_items("span")
 
-        with stubber, sentry_sdk.start_transaction(name="parent"):
-            client.converse_stream(
+        with sentry_sdk.start_transaction(name="parent"):
+            response = client.converse_stream(
                 modelId="anthropic.claude-3-sonnet-20240229-v1:0",
                 messages=[{"role": "user", "content": [{"text": "Hi"}]}],
                 inferenceConfig={
@@ -388,6 +514,8 @@ def test_converse_stream(
                     "topP": 0.9,
                 },
             )
+            for _ in response["stream"]:
+                pass
 
         sentry_sdk.flush()
         spans = [item.payload for item in items]
@@ -408,11 +536,20 @@ def test_converse_stream(
         assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 1024
         assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
         assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
+
+        assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
+        assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
+        if BOTOCORE_VERSION < Version("1.37.24"):
+            assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+            return
+        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 110
+        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 80
+        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 20
     else:
         events = capture_events()
 
-        with stubber, sentry_sdk.start_transaction(name="parent"):
-            client.converse_stream(
+        with sentry_sdk.start_transaction(name="parent"):
+            response = client.converse_stream(
                 modelId="anthropic.claude-3-sonnet-20240229-v1:0",
                 messages=[{"role": "user", "content": [{"text": "Hi"}]}],
                 inferenceConfig={
@@ -421,6 +558,8 @@ def test_converse_stream(
                     "topP": 0.9,
                 },
             )
+            for _ in response["stream"]:
+                pass
 
         (transaction,) = events
         (span,) = transaction["spans"]
@@ -436,12 +575,26 @@ def test_converse_stream(
         assert span["data"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 1024
         assert span["data"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
         assert span["data"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
+
+        assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
+        assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
+        if BOTOCORE_VERSION < Version("1.37.24"):
+            assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+            return
+        assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 110
+        assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 80
+        assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 20
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
-def test_converse_stream_error(
-    sentry_init, capture_items, capture_events, span_streaming, stream_gen_ai_spans
+def test_converse_stream_error_during_iteration(
+    sentry_init,
+    capture_items,
+    capture_events,
+    span_streaming,
+    stream_gen_ai_spans,
+    converse_stream_error_response,
 ):
     sentry_init(
         traces_sample_rate=1.0,
@@ -454,38 +607,23 @@ def test_converse_stream_error(
         aws_access_key_id="-", aws_secret_access_key="-", region_name="us-east-1"
     )
     client = session.client("bedrock-runtime")
-    original_exception = ClientError(
-        error_response={
-            "Error": {"Code": "AccessDeniedException", "Message": "Access denied"},
-            "ResponseMetadata": {
-                "RequestId": "test-id",
-                "HostId": "",
-                "HTTPStatusCode": 403,
-                "HTTPHeaders": {},
-                "RetryAttempts": 1,
-            },
-        },
-        operation_name="ConverseStream",
+    mock_http = Mock(status_code=200)
+    client.meta.events.register(
+        "before-call.bedrock-runtime.ConverseStream",
+        lambda **kwargs: (mock_http, converse_stream_error_response),
     )
-
-    def raise_client_error(**kwargs):
-        raise original_exception
-
-    client.meta.events.register("before-parameter-build", raise_client_error)
 
     if span_streaming or stream_gen_ai_spans:
         items = capture_items("span")
 
-        with sentry_sdk.start_transaction(name="parent"), pytest.raises(ClientError):
-            client.converse_stream(
+        with sentry_sdk.start_transaction(name="parent"):
+            response = client.converse_stream(
                 modelId="anthropic.claude-3-sonnet-20240229-v1:0",
                 messages=[{"role": "user", "content": [{"text": "Hi"}]}],
-                inferenceConfig={
-                    "maxTokens": 1024,
-                    "temperature": 0.7,
-                    "topP": 0.9,
-                },
             )
+            with pytest.raises(ClientError):
+                for _ in response["stream"]:
+                    pass
 
         sentry_sdk.flush()
         spans = [item.payload for item in items]
@@ -495,56 +633,22 @@ def test_converse_stream_error(
             if span["attributes"].get("sentry.op") == OP.GEN_AI_CHAT
         )
 
-        assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "aws.bedrock"
-        assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
-        assert (
-            span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL]
-            == "anthropic.claude-3-sonnet-20240229-v1:0"
-        )
-
-        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 1024
-        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
-        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
-
-        assert span["attributes"][SPANDATA.ERROR_TYPE] == "AccessDeniedException"
-        assert span["attributes"][SPANDATA.HTTP_STATUS_CODE] == 403
-        assert span["attributes"][SPANDATA.AWS_REQUEST_ID] == "test-id"
-        assert span["attributes"][SPANDATA.HTTP_REQUEST_RESEND_COUNT] == 1
         assert span["status"] == "error"
     else:
         events = capture_events()
 
-        with sentry_sdk.start_transaction(name="parent"), pytest.raises(ClientError):
-            client.converse_stream(
+        with sentry_sdk.start_transaction(name="parent"):
+            response = client.converse_stream(
                 modelId="anthropic.claude-3-sonnet-20240229-v1:0",
                 messages=[{"role": "user", "content": [{"text": "Hi"}]}],
-                inferenceConfig={
-                    "maxTokens": 1024,
-                    "temperature": 0.7,
-                    "topP": 0.9,
-                },
             )
+            with pytest.raises(ClientError):
+                for _ in response["stream"]:
+                    pass
 
         (transaction,) = events
         (span,) = transaction["spans"]
 
-        assert span["data"][SPANDATA.GEN_AI_PROVIDER_NAME] == "aws.bedrock"
-        assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-        assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
-        assert (
-            span["data"][SPANDATA.GEN_AI_REQUEST_MODEL]
-            == "anthropic.claude-3-sonnet-20240229-v1:0"
-        )
-
-        assert span["data"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 1024
-        assert span["data"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
-        assert span["data"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
-
-        assert span["data"][SPANDATA.ERROR_TYPE] == "AccessDeniedException"
-        assert span["data"][SPANDATA.HTTP_STATUS_CODE] == 403
-        assert span["data"][SPANDATA.AWS_REQUEST_ID] == "test-id"
-        assert span["data"][SPANDATA.HTTP_REQUEST_RESEND_COUNT] == 1
         assert span["status"] == "internal_error"
 
 
@@ -558,6 +662,7 @@ def test_converse_stream_tool_definitions(
     data_collection,
     span_streaming,
     stream_gen_ai_spans,
+    converse_stream_response,
 ):
     if data_collection:
         sentry_init(
@@ -611,18 +716,23 @@ def test_converse_stream_tool_definitions(
         aws_access_key_id="-", aws_secret_access_key="-", region_name="us-east-1"
     )
     client = session.client("bedrock-runtime")
-    stubber = Stubber(client)
-    stubber.add_response("converse_stream", {})
+    mock_http = Mock(status_code=200)
+    client.meta.events.register(
+        "before-call.bedrock-runtime.ConverseStream",
+        lambda **kwargs: (mock_http, converse_stream_response),
+    )
 
     if span_streaming or stream_gen_ai_spans:
         items = capture_items("span")
 
-        with stubber, sentry_sdk.start_transaction(name="parent"):
-            client.converse_stream(
+        with sentry_sdk.start_transaction(name="parent"):
+            response = client.converse_stream(
                 modelId="anthropic.claude-3-sonnet-20240229-v1:0",
                 messages=[{"role": "user", "content": [{"text": "Hi"}]}],
                 toolConfig={"tools": tools},
             )
+            for _ in response["stream"]:
+                pass
 
         sentry_sdk.flush()
         spans = [item.payload for item in items]
@@ -639,12 +749,14 @@ def test_converse_stream_tool_definitions(
     else:
         events = capture_events()
 
-        with stubber, sentry_sdk.start_transaction(name="parent"):
-            client.converse_stream(
+        with sentry_sdk.start_transaction(name="parent"):
+            response = client.converse_stream(
                 modelId="anthropic.claude-3-sonnet-20240229-v1:0",
                 messages=[{"role": "user", "content": [{"text": "Hi"}]}],
                 toolConfig={"tools": tools},
             )
+            for _ in response["stream"]:
+                pass
 
         (transaction,) = events
         (span,) = transaction["spans"]

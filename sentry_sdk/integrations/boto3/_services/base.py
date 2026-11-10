@@ -1,10 +1,12 @@
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any, Optional
+    from typing import Any, Optional, Union
 
     from sentry_sdk._types import Attributes
     from sentry_sdk.integrations.boto3._context import AwsCallContext
+    from sentry_sdk.traces import StreamedSpan
+    from sentry_sdk.tracing import Span
 
 
 class _ServiceExtension:
@@ -30,8 +32,11 @@ class _ServiceExtension:
         """Return request attributes to add before the AWS request is made."""
         return {}
 
-    def get_response_attributes(
-        self, ctx: "AwsCallContext", response: "Any"
-    ) -> "Attributes":
-        """Return response attributes to add after the AWS request is made."""
-        return {}
+    def on_success_response(
+        self,
+        ctx: "AwsCallContext",
+        response: "Any",
+        span: "Union[Span, StreamedSpan]",
+    ) -> None:
+        """Hook that fires after a successful response. Responsible for closing the span."""
+        return None
