@@ -22,7 +22,7 @@ def get_file_text(file_name):
 
 setup(
     name="sentry-sdk",
-    version="3.0.0b2",
+    version="3.0.0b4",
     author="Sentry Team and Contributors",
     author_email="hello@sentry.io",
     url="https://github.com/getsentry/sentry-python",

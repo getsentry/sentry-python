@@ -10,6 +10,7 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 - The `@trace` decorator doesn't accept a `template` parameter anymore.
 - The option `attach_stacktrace` is now `True` by default, meaning the SDK will attach stack traces to messages.
 - `add_attachment` no longer accepts an `add_to_transactions` argument.
+- Cron check-ins no longer go through `before_send`. Use the new `before_send_check_in` option to modify or drop check-ins before they're sent.
 - If a `before_breadcrumb` callback, an event processor, or an error processor raises an exception, the breadcrumb or event is now dropped. Previously, the SDK would log the exception and continue processing the unmodified breadcrumb or event.
 - The top-level manual tracing API is now wired to span streaming tracing:
   - `sentry_sdk.start_transaction` doesn't exist anymore. Use `sentry_sdk.start_span` instead.
@@ -51,6 +52,19 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 - Whether the MCP integration records tool arguments, tool results, and prompt contents is now controlled by `data_collection`'s new `mcp` setting (`{"inputs": bool, "outputs": bool}`, both `True` by default) instead of the `gen_ai` setting.
 - With `handled_tool_call_exceptions=True` (the default), the Pydantic AI integration now reports an error for every failed tool argument validation attempt, including retries. Previously, only one error was reported per tool call.
 - The Pydantic AI integration no longer sets the `gen_ai.response.streaming` span attribute.
+- The `OTLPIntegration` no longer sets up a propagator by default: `setup_propagator` now defaults to `False`. Distributed tracing now uses the propagators configured in OpenTelemetry (by default, W3C `traceparent` and `baggage`) instead of Sentry's `sentry-trace` and `baggage` headers. To get the old behavior back, set `OTLPIntegration(setup_propagator=True)`. To propagate both W3C and Sentry headers, set up the `SentryOTLPPropagator` manually instead:
+
+  ```python
+  from opentelemetry.propagate import set_global_textmap
+  from opentelemetry.propagators.composite import CompositePropagator
+  from opentelemetry.trace.propagation.tracecontext import TraceContextTextMapPropagator
+
+  from sentry_sdk.integrations.otlp import SentryOTLPPropagator
+
+  set_global_textmap(
+      CompositePropagator([TraceContextTextMapPropagator(), SentryOTLPPropagator()])
+  )
+  ```
 
 #### Span operation consolidation
 
@@ -193,8 +207,7 @@ Additionally, the OpenAI integration now sets `gen_ai.operation.name` to `chat` 
 - Dropped support for Huey below 2.0.
 - Dropped support for Litestar below 2.0.
 - Dropped support for PySpark below 3.0.
-- Dropped support for redis-py below 4.2.
-- Dropped support for the deprecated `redis-py-cluster` package (`rediscluster`). Use redis-py's built-in cluster support (`redis.cluster.RedisCluster`) instead, which the `RedisIntegration` instruments.
+- Dropped support for redis-py below 3.4.1.
 - Dropped support for Pydantic AI below 1.76.
 - Dropped support for OpenAI Agents below 0.10.3.
 - Dropped support for MCP below 2.0.
@@ -287,7 +300,7 @@ Additionally, the OpenAI integration now sets `gen_ai.operation.name` to `chat` 
 - `Scope.iter_headers` was removed.
 - `Scope.start_transaction`, `Scope.start_streamed_span`, and `Scope.continue_trace` were removed. Use the top-level `sentry_sdk.start_span` and `sentry_sdk.continue_trace` instead.
 - The `SPANSTATUS`, `SPANTEMPLATE`, and `INSTRUMENTER` constants were removed from `sentry_sdk.consts`.
-- The SDK won't set any tags on its own anymore.
+- The SDK won't set any tags on its own anymore. As a consequence, events passed to `before_send` (and other event processors) will not have a `"tags"` key unless tags were set explicitly (e.g. via `sentry_sdk.set_tag`) or by an integration. If you access `event["tags"]` directly, use `event.get("tags", {})` or `event.setdefault("tags", {})` instead.
 
 ## Migration
 

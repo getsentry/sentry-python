@@ -16,7 +16,6 @@ class AwsCallContext:
     __slots__ = (
         "service_name",
         "service_id",
-        "service_id_hyphenized",
         "operation_name",
         "region_name",
         "endpoint_url",
@@ -28,7 +27,6 @@ class AwsCallContext:
         self.params: "Dict[str, Any]" = dict(params)
         self.service_name: "Optional[str]" = None
         self.service_id: "Optional[str]" = None
-        self.service_id_hyphenized: "Optional[str]" = None
         self.region_name: "Optional[str]" = None
         self.endpoint_url: "Optional[str]" = None
 
@@ -40,7 +38,6 @@ class AwsCallContext:
             service_id = service_model.service_id
             # modeled AWS service identity used in span names with whitespace stripped, e.g. `API Gateway` => `APIGateway`.
             self.service_id = "".join(str(service_id).split())
-            self.service_id_hyphenized = service_id.hyphenize()
 
         with capture_internal_exceptions():
             self.region_name = client.meta.region_name
