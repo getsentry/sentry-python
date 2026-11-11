@@ -1389,6 +1389,41 @@ def test_request_body_already_read(
     assert "data" not in event["request"]
 
 
+@pytest.mark.parametrize(
+    "route, expected_data",
+    [
+        (
+            "sensitive_post_parameters",
+            {"name": "Jane", "credit_card_number": "[Filtered]"},
+        ),
+        (
+            "sensitive_post_parameters_all",
+            {"name": "[Filtered]", "credit_card_number": "[Filtered]"},
+        ),
+        (
+            "rest_framework_sensitive_post_parameters",
+            {"name": "Jane", "credit_card_number": "[Filtered]"},
+        ),
+    ],
+)
+def test_sensitive_post_parameters(
+    sentry_init, client, capture_events, route, expected_data
+):
+    if route == "rest_framework_sensitive_post_parameters":
+        pytest.importorskip("rest_framework")
+
+    sentry_init(integrations=[DjangoIntegration()])
+    events = capture_events()
+
+    client.post(
+        reverse(route),
+        data={"name": "Jane", "credit_card_number": "4111111111111111"},
+    )
+
+    (event,) = events
+    assert event["request"]["data"] == expected_data
+
+
 @pytest.mark.parametrize("span_streaming", [True, False])
 def test_template_tracing_meta(
     sentry_init,

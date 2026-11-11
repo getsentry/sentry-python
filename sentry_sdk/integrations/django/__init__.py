@@ -807,9 +807,24 @@ class DjangoRequestExtractor(RequestExtractor):
 
     def parsed_body(self) -> "Optional[Dict[str, Any]]":
         try:
-            return self.request.data
+            data = self.request.data
         except Exception:
-            return RequestExtractor.parsed_body(self)
+            data = RequestExtractor.parsed_body(self)
+
+        # Set by Django's `sensitive_post_parameters` decorator
+        sensitive_post_parameters = getattr(
+            self.request, "sensitive_post_parameters", None
+        )
+        if sensitive_post_parameters and isinstance(data, dict):
+            if sensitive_post_parameters == "__ALL__":
+                sensitive_post_parameters = data.keys()
+
+            data = {
+                k: SENSITIVE_DATA_SUBSTITUTE if k in sensitive_post_parameters else v
+                for k, v in data.items()
+            }
+
+        return data
 
 
 def _set_user_info(request: "WSGIRequest", event: "Event") -> None:

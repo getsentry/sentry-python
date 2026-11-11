@@ -23,6 +23,7 @@ except ImportError:
         return url("^{}$".format(path), *args, **kwargs)
 
 
+from django.views.decorators.debug import sensitive_post_parameters
 from django_helpers import views as helper_views
 
 from . import views
@@ -60,6 +61,16 @@ urlpatterns = [
         name="sentryclass_csrf",
     ),
     path("post-echo", views.post_echo, name="post_echo"),
+    path(
+        "sensitive-post-parameters",
+        sensitive_post_parameters("credit_card_number")(views.message),
+        name="sensitive_post_parameters",
+    ),
+    path(
+        "sensitive-post-parameters-all",
+        sensitive_post_parameters()(views.message),
+        name="sensitive_post_parameters_all",
+    ),
     path("template-exc", views.template_exc, name="template_exc"),
     path("template-test", views.template_test, name="template_test"),
     path("template-test2", views.template_test2, name="template_test2"),
@@ -152,6 +163,13 @@ try:
             "rest-framework-read-body-and-exc",
             views.rest_framework_read_body_and_exc,
             name="rest_framework_read_body_and_exc",
+        )
+    )
+    urlpatterns.append(
+        path(
+            "rest-framework-sensitive-post-parameters",
+            sensitive_post_parameters("credit_card_number")(views.rest_framework_exc),
+            name="rest_framework_sensitive_post_parameters",
         )
     )
     urlpatterns.append(
