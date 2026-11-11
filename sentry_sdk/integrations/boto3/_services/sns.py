@@ -6,12 +6,13 @@ from sentry_sdk.integrations.boto3._services.base import _ServiceExtension
 from sentry_sdk.integrations.boto3._utils import (
     _get_aws_arn_attributes,
     _get_batch_error_type,
+    _inject_message_attributes,
 )
 from sentry_sdk.traces import SpanStatus
 from sentry_sdk.utils import capture_internal_exceptions
 
 if TYPE_CHECKING:
-    from typing import Any, Optional
+    from typing import Any, Dict, Optional
 
     from sentry_sdk._types import Attributes
     from sentry_sdk.integrations.boto3._context import AwsCallContext
@@ -129,3 +130,13 @@ class _SNSExtension(_ServiceExtension):
 
         span.set_attributes(attributes)
         span.end()
+
+    def get_request_params(
+        self, ctx: "AwsCallContext", span: "Optional[Span]"
+    ) -> "Optional[Dict[str, Any]]":
+        if ctx.operation_name not in _PUBLISH_OPERATIONS:
+            return None
+
+        return _inject_message_attributes(
+            ctx, span, "Message", "PublishBatchRequestEntries"
+        )

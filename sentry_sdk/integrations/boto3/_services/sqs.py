@@ -1,3 +1,4 @@
+import json
 import re
 from typing import TYPE_CHECKING
 from urllib.parse import unquote, urlsplit
@@ -7,14 +8,21 @@ from sentry_sdk.integrations.boto3._services.base import _ServiceExtension
 from sentry_sdk.integrations.boto3._utils import (
     _get_aws_arn_attributes,
     _get_batch_error_type,
+    _inject_message_attributes,
 )
-from sentry_sdk.traces import SpanStatus
+from sentry_sdk.traces import (
+    BAGGAGE_HEADER_NAME,
+    SENTRY_TRACE_HEADER_NAME,
+    NoOpSpan,
+    SpanStatus,
+)
+from sentry_sdk.tracing_utils import extract_sentrytrace_data
 from sentry_sdk.utils import capture_internal_exceptions
 
 if TYPE_CHECKING:
-    from typing import Any, Optional
+    from typing import Any, Dict, Optional, Tuple
 
-    from sentry_sdk._types import Attributes
+    from sentry_sdk._types import Attributes, SpanLink
     from sentry_sdk.integrations.boto3._context import AwsCallContext
     from sentry_sdk.traces import Span
 
@@ -26,6 +34,44 @@ _MESSAGING_OPERATIONS = {
     "DeleteMessage": (OP.QUEUE_SETTLE, "settle"),
     "DeleteMessageBatch": (OP.QUEUE_SETTLE, "settle"),
 }
+
+
+def _message_link(message: "Dict[str, Any]") -> "Optional[SpanLink]":
+    # message was sent straight to SQS, or through SNS with raw message delivery on.
+    sentry_trace = (
+        message.get("MessageAttributes", {})
+        .get(SENTRY_TRACE_HEADER_NAME, {})
+        .get("StringValue")
+    )
+
+    # SNS wraps the message and its attributes in a JSON envelope when raw message delivery is off.
+    # https://docs.aws.amazon.com/sns/latest/dg/sns-large-payload-raw-message-delivery.html
+    body = message.get("Body", "")
+    if sentry_trace is None and f'"{SENTRY_TRACE_HEADER_NAME}"' in body:
+        try:
+            envelope = json.loads(body)
+        except ValueError:
+            envelope = None
+        if isinstance(envelope, dict) and envelope.get("Type") == "Notification":
+            sentry_trace = (
+                envelope.get("MessageAttributes", {})
+                .get(SENTRY_TRACE_HEADER_NAME, {})
+                .get("Value")
+            )
+
+    data = extract_sentrytrace_data(sentry_trace)
+    if data is None or not data["trace_id"] or not data["parent_span_id"]:
+        return None
+
+    link: "SpanLink" = {
+        "trace_id": str(data["trace_id"]),
+        "span_id": str(data["parent_span_id"]),
+        # Sentry drops other link attributes for now; add `messaging.message.id` in the future.
+        "attributes": {SPANDATA.SENTRY_LINK_TYPE: "message_origin"},
+    }
+    if data["parent_sampled"] is not None:
+        link["sampled"] = bool(data["parent_sampled"])
+    return link
 
 
 class _SQSExtension(_ServiceExtension):
@@ -124,5 +170,45 @@ class _SQSExtension(_ServiceExtension):
                 span.status = SpanStatus.ERROR
                 attributes[SPANDATA.ERROR_TYPE] = error_type
 
+        if ctx.operation_name == "ReceiveMessage":
+            with capture_internal_exceptions():
+                # one link per producer context; batch entries of one send share it.
+                links: "Dict[Tuple[str, str], SpanLink]" = {}
+                for message in response.get("Messages", ()):
+                    # returns a link to the producer context a received message carries, if valid.
+                    link = _message_link(message)
+                    if link is not None:
+                        links.setdefault((link["trace_id"], link["span_id"]), link)
+                span.add_links(list(links.values()))
+
         span.set_attributes(attributes)
         span.end()
+
+    def get_request_params(
+        self, ctx: "AwsCallContext", span: "Optional[Span]"
+    ) -> "Optional[Dict[str, Any]]":
+        if ctx.operation_name in ("SendMessage", "SendMessageBatch"):
+            return _inject_message_attributes(ctx, span, "MessageBody", "Entries")
+
+        # only request the carrier when the receive span can record links.
+        if (
+            ctx.operation_name != "ReceiveMessage"
+            or span is None
+            or isinstance(span, NoOpSpan)
+        ):
+            return None
+
+        # SQS only returns the message attributes named in `MessageAttributeNames`.
+        # https://docs.aws.amazon.com/AWSSimpleQueueService/latest/APIReference/API_ReceiveMessage.html
+        names = ctx.params.get("MessageAttributeNames", [])
+        missing = [
+            name
+            for name in (SENTRY_TRACE_HEADER_NAME, BAGGAGE_HEADER_NAME)
+            if name not in names
+        ]
+        # `All` and `.*` already return every attribute, including ours.
+        if not missing or "All" in names or ".*" in names:
+            return None
+
+        # append ours to the caller's names, in a copy of their params.
+        return {**ctx.params, "MessageAttributeNames": [*names, *missing]}
