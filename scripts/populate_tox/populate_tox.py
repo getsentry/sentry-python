@@ -1330,6 +1330,11 @@ def main() -> dict[str, list]:
 
     write_tox_file(packages)
 
+    # Unused cache entries are only pruned on full runs. With --only/--skip,
+    # skipped integrations don't touch (most of) their cache entries, so pruning
+    # would wipe them.
+    prune_cache = not (only_update or skip_update)
+
     # Sort the release cache file
     releases = []
     with open(RELEASES_CACHE_FILE) as releases_cache:
@@ -1338,7 +1343,8 @@ def main() -> dict[str, list]:
     with open(RELEASES_CACHE_FILE, "w") as releases_cache:
         for release in releases:
             if (
-                CACHE[_normalize_name(release["info"]["name"])][
+                not prune_cache
+                or CACHE[_normalize_name(release["info"]["name"])][
                     release["info"]["version"]
                 ]["_accessed"]
                 is True
@@ -1353,7 +1359,8 @@ def main() -> dict[str, list]:
     with open(DEPENDENCIES_CACHE_FILE, "w") as releases_cache:
         for release in releases:
             if (
-                DEPENDENCIES_CACHE[release["python_version"]][
+                not prune_cache
+                or DEPENDENCIES_CACHE[release["python_version"]][
                     release["install_targets_hash"]
                 ]["_accessed"]
                 is True
