@@ -1320,3 +1320,168 @@ def test_converse_stream_input_attributes(
             json.loads(span["data"][SPANDATA.GEN_AI_INPUT_MESSAGES])
             == expected_input_messages
         )
+
+
+@pytest.mark.parametrize("data_collection", [True, False])
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+def test_converse_stream_output_attributes(
+    sentry_init,
+    capture_items,
+    capture_events,
+    data_collection,
+    span_streaming,
+    stream_gen_ai_spans,
+    converse_stream_response,
+):
+    if data_collection:
+        sentry_init(
+            traces_sample_rate=1.0,
+            integrations=[Boto3Integration()],
+            data_collection={"gen_ai": {"outputs": True}},
+            stream_gen_ai_spans=stream_gen_ai_spans,
+            trace_lifecycle="stream" if span_streaming else "static",
+        )
+    else:
+        sentry_init(
+            traces_sample_rate=1.0,
+            integrations=[Boto3Integration()],
+            send_default_pii=True,
+            stream_gen_ai_spans=stream_gen_ai_spans,
+            trace_lifecycle="stream" if span_streaming else "static",
+        )
+
+    events = [
+        ("messageStart", {"role": "assistant"}),
+        (
+            "contentBlockDelta",
+            {
+                "contentBlockIndex": 0,
+                "delta": {"reasoningContent": {"text": "The user wants "}},
+            },
+        ),
+        (
+            "contentBlockDelta",
+            {
+                "contentBlockIndex": 0,
+                "delta": {"reasoningContent": {"text": "the weather."}},
+            },
+        ),
+        (
+            "contentBlockDelta",
+            {
+                "contentBlockIndex": 0,
+                "delta": {"reasoningContent": {"signature": "sig"}},
+            },
+        ),
+        ("contentBlockStop", {"contentBlockIndex": 0}),
+        (
+            "contentBlockDelta",
+            {"contentBlockIndex": 1, "delta": {"text": "Let me "}},
+        ),
+        (
+            "contentBlockDelta",
+            {"contentBlockIndex": 1, "delta": {"text": "check."}},
+        ),
+        ("contentBlockStop", {"contentBlockIndex": 1}),
+        (
+            "contentBlockStart",
+            {
+                "contentBlockIndex": 2,
+                "start": {"toolUse": {"toolUseId": "tool-1", "name": "get_weather"}},
+            },
+        ),
+        (
+            "contentBlockDelta",
+            {"contentBlockIndex": 2, "delta": {"toolUse": {"input": '{"city": '}}},
+        ),
+        (
+            "contentBlockDelta",
+            {"contentBlockIndex": 2, "delta": {"toolUse": {"input": '"Paris"}'}}},
+        ),
+        ("contentBlockStop", {"contentBlockIndex": 2}),
+        ("messageStop", {"stopReason": "tool_use"}),
+        (
+            "metadata",
+            {
+                "usage": {"inputTokens": 10, "outputTokens": 20, "totalTokens": 30},
+                "metrics": {"latencyMs": 500},
+            },
+        ),
+    ]
+    converse_stream_response["stream"]._event_generator = iter(
+        EventStreamMessage(
+            prelude=None,
+            headers={":message-type": "event", ":event-type": event_type},
+            payload=json.dumps(payload).encode(),
+            crc=None,
+        )
+        for event_type, payload in events
+    )
+
+    expected_output_messages = [
+        {
+            "role": "assistant",
+            "parts": [
+                {"type": "reasoning", "content": "The user wants the weather."},
+                {"type": "text", "content": "Let me check."},
+                {
+                    "type": "tool_call",
+                    "name": "get_weather",
+                    "arguments": {"city": "Paris"},
+                },
+            ],
+        }
+    ]
+
+    session = boto3.Session(
+        aws_access_key_id="-", aws_secret_access_key="-", region_name="us-east-1"
+    )
+    client = session.client("bedrock-runtime")
+    mock_http = Mock(status_code=200)
+    client.meta.events.register(
+        "before-call.bedrock-runtime.ConverseStream",
+        lambda **kwargs: (mock_http, converse_stream_response),
+    )
+
+    if span_streaming or stream_gen_ai_spans:
+        items = capture_items("span")
+
+        with sentry_sdk.start_transaction(name="parent"):
+            response = client.converse_stream(
+                modelId="anthropic.claude-3-sonnet-20240229-v1:0",
+                messages=[{"role": "user", "content": [{"text": "Hi"}]}],
+            )
+            for _ in response["stream"]:
+                pass
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items]
+        (span,) = (
+            span
+            for span in spans
+            if span["attributes"].get("sentry.op") == OP.GEN_AI_CHAT
+        )
+
+        assert (
+            json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES])
+            == expected_output_messages
+        )
+    else:
+        events = capture_events()
+
+        with sentry_sdk.start_transaction(name="parent"):
+            response = client.converse_stream(
+                modelId="anthropic.claude-3-sonnet-20240229-v1:0",
+                messages=[{"role": "user", "content": [{"text": "Hi"}]}],
+            )
+            for _ in response["stream"]:
+                pass
+
+        (transaction,) = events
+        (span,) = transaction["spans"]
+
+        assert (
+            json.loads(span["data"][SPANDATA.GEN_AI_OUTPUT_MESSAGES])
+            == expected_output_messages
+        )

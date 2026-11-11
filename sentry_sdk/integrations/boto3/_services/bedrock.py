@@ -93,37 +93,132 @@ def _patch_event_stream() -> None:
             span.set_attribute if isinstance(span, StreamedSpan) else span.set_data
         )
 
+        role: "Optional[str]" = None
+        content_blocks: "dict[int, dict[str, Any]]" = {}
+
         try:
             for event in original_iter(self):
-                if "metadata" not in event:
+                if "metadata" in event:
+                    usage = event["metadata"]["usage"]
+
+                    input_tokens = usage["inputTokens"]
+                    set_on_span(
+                        SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS, usage["outputTokens"]
+                    )
+                    set_on_span(
+                        SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, usage["totalTokens"]
+                    )
+
+                    cache_read_tokens = usage.get("cacheReadInputTokens")
+                    if cache_read_tokens is not None:
+                        input_tokens += cache_read_tokens
+                        set_on_span(
+                            SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED, cache_read_tokens
+                        )
+
+                    cache_write_tokens = usage.get("cacheWriteInputTokens")
+                    if cache_write_tokens is not None:
+                        input_tokens += cache_write_tokens
+                        set_on_span(
+                            SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE,
+                            cache_write_tokens,
+                        )
+
+                    set_on_span(
+                        SPANDATA.GEN_AI_USAGE_INPUT_TOKENS,
+                        input_tokens,
+                    )
+
                     yield event
                     continue
 
-                usage = event["metadata"]["usage"]
+                client = sentry_sdk.get_client()
+                if (
+                    not has_data_collection_enabled(client.options)
+                    or not client.options["data_collection"]["gen_ai"]["outputs"]
+                ) and (
+                    has_data_collection_enabled(client.options)
+                    or not should_send_default_pii()
+                ):
+                    yield event
+                    continue
 
-                input_tokens = usage["inputTokens"]
-                set_on_span(SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS, usage["outputTokens"])
-                set_on_span(SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, usage["totalTokens"])
+                if "messageStart" in event:
+                    role = event["messageStart"]["role"]
 
-                cache_read_tokens = usage.get("cacheReadInputTokens")
-                if cache_read_tokens is not None:
-                    input_tokens += cache_read_tokens
+                    yield event
+                    continue
+
+                if "contentBlockStart" in event:
+                    block_start = event["contentBlockStart"]
+                    tool_use = block_start["start"].get("toolUse")
+                    if tool_use is not None:
+                        tool_use_block: "dict[str, Any]" = {"input": ""}
+                        if "name" in tool_use:
+                            tool_use_block["name"] = tool_use["name"]
+                        content_blocks[block_start["contentBlockIndex"]] = {
+                            "toolUse": tool_use_block
+                        }
+
+                    yield event
+                    continue
+
+                if "contentBlockDelta" in event:
+                    index = event["contentBlockDelta"]["contentBlockIndex"]
+                    delta = event["contentBlockDelta"]["delta"]
+
+                    if "text" in delta:
+                        block = content_blocks.setdefault(index, {"text": ""})
+                        block["text"] += delta["text"]
+                    elif "toolUse" in delta:
+                        block = content_blocks.setdefault(
+                            index, {"toolUse": {"input": ""}}
+                        )
+                        block["toolUse"]["input"] += delta["toolUse"]["input"]
+                    elif "reasoningContent" in delta:
+                        block = content_blocks.setdefault(
+                            index, {"reasoningContent": {}}
+                        )
+                        reasoning_text = delta["reasoningContent"].get("text")
+                        if reasoning_text is not None:
+                            block["reasoningContent"].setdefault(
+                                "reasoningText", {"text": ""}
+                            )["text"] += reasoning_text
+
+                    yield event
+                    continue
+
+                if "messageStop" in event and role is not None:
+                    for block in content_blocks.values():
+                        if "toolUse" not in block:
+                            continue
+                        # Tool input is streamed as a JSON string; non-streaming responses contain the parsed object.
+                        try:
+                            block["toolUse"]["input"] = json.loads(
+                                block["toolUse"]["input"]
+                            )
+                        except ValueError:
+                            pass
+
                     set_on_span(
-                        SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED, cache_read_tokens
+                        SPANDATA.GEN_AI_OUTPUT_MESSAGES,
+                        json.dumps(
+                            _transform_messages(
+                                [
+                                    {
+                                        "role": role,
+                                        "content": [
+                                            content_blocks[index]
+                                            for index in sorted(content_blocks)
+                                        ],
+                                    }
+                                ]
+                            )
+                        ),
                     )
 
-                cache_write_tokens = usage.get("cacheWriteInputTokens")
-                if cache_write_tokens is not None:
-                    input_tokens += cache_write_tokens
-                    set_on_span(
-                        SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE,
-                        cache_write_tokens,
-                    )
-
-                set_on_span(
-                    SPANDATA.GEN_AI_USAGE_INPUT_TOKENS,
-                    input_tokens,
-                )
+                    yield event
+                    continue
 
                 yield event
         except GeneratorExit:
