@@ -107,19 +107,22 @@ class _SQSExtension(_ServiceExtension):
     ) -> None:
         attributes: "Attributes" = {}
 
-        if ctx.operation_name == "SendMessage":
-            attributes[SPANDATA.MESSAGING_MESSAGE_ID] = response["MessageId"]
-        elif ctx.operation_name == "ReceiveMessage":
-            # `Messages` is left out when no message was received.
-            messages = response.get("Messages", ())
-            attributes[SPANDATA.MESSAGING_BATCH_MESSAGE_COUNT] = len(messages)
-            if len(messages) == 1:
-                attributes[SPANDATA.MESSAGING_MESSAGE_ID] = messages[0]["MessageId"]
+        # the call already succeeded; an unexpected response shape, e.g. from a
+        # `Stubber` or an SQS-compatible service, must only lose these attributes.
+        with capture_internal_exceptions():
+            if ctx.operation_name == "SendMessage" and "MessageId" in response:
+                attributes[SPANDATA.MESSAGING_MESSAGE_ID] = response["MessageId"]
+            elif ctx.operation_name == "ReceiveMessage":
+                # `Messages` is left out when no message was received.
+                messages = response.get("Messages", ())
+                attributes[SPANDATA.MESSAGING_BATCH_MESSAGE_COUNT] = len(messages)
+                if len(messages) == 1 and "MessageId" in messages[0]:
+                    attributes[SPANDATA.MESSAGING_MESSAGE_ID] = messages[0]["MessageId"]
 
-        error_type = _get_batch_error_type(response)
-        if error_type is not None:
-            span.status = SpanStatus.ERROR
-            attributes[SPANDATA.ERROR_TYPE] = error_type
+            error_type = _get_batch_error_type(response)
+            if error_type is not None:
+                span.status = SpanStatus.ERROR
+                attributes[SPANDATA.ERROR_TYPE] = error_type
 
         span.set_attributes(attributes)
         span.end()
