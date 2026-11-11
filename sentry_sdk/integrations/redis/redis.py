@@ -25,7 +25,6 @@ def _get_redis_command_args(command: "Any") -> "Sequence[Any]":
 
 
 def _patch_redis() -> None:
-    import redis.asyncio
     from redis import Redis, client
 
     patch_redis_client(
@@ -40,14 +39,20 @@ def _patch_redis() -> None:
         set_db_data_fn=_set_db_data,
     )
 
-    patch_redis_async_client(
-        redis.asyncio.client.Redis,
-        is_cluster=False,
-        set_db_data_fn=_set_db_data,
-    )
-    patch_redis_async_pipeline(
-        redis.asyncio.client.Pipeline,
-        False,
-        _get_redis_command_args,
-        set_db_data_fn=_set_db_data,
-    )
+    # redis.asyncio was added in redis-py 4.2
+    try:
+        import redis.asyncio
+    except ImportError:
+        pass
+    else:
+        patch_redis_async_client(
+            redis.asyncio.client.Redis,
+            is_cluster=False,
+            set_db_data_fn=_set_db_data,
+        )
+        patch_redis_async_pipeline(
+            redis.asyncio.client.Pipeline,
+            False,
+            _get_redis_command_args,
+            set_db_data_fn=_set_db_data,
+        )

@@ -118,7 +118,7 @@ def test_continue_trace(sentry_init, capture_items, parent_sampled, sample_rate)
         assert not baggage.mutable
 
         if parent_sampled is not None:
-            expected_sample_rate = str(float(parent_sampled))
+            expected_sample_rate = parent_sample_rate
         else:
             if sample_rate is None:
                 expected_sample_rate = parent_sample_rate
@@ -168,7 +168,7 @@ def test_continue_trace(sentry_init, capture_items, parent_sampled, sample_rate)
         )
 
         if parent_sampled is not None:
-            expected_sample_rate = str(float(parent_sampled))
+            expected_sample_rate = parent_sample_rate
         else:
             if sample_rate is None:
                 expected_sample_rate = parent_sample_rate

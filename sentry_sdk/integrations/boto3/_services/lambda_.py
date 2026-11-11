@@ -9,6 +9,7 @@ from sentry_sdk.integrations.boto3._utils import (
     _get_propagation_headers,
 )
 from sentry_sdk.integrations.boto3.consts import CLOUD_PROVIDER
+from sentry_sdk.traces import SpanStatus
 from sentry_sdk.utils import capture_internal_exceptions
 
 if TYPE_CHECKING:
@@ -56,21 +57,6 @@ class _LambdaExtension(_ServiceExtension):
 
         return attributes
 
-    def get_response_attributes(
-        self, ctx: "AwsCallContext", response: "Any"
-    ) -> "Attributes":
-        attributes: "Attributes" = {}
-
-        if "UUID" in response:
-            attributes[SPANDATA.AWS_LAMBDA_RESOURCE_MAPPING_ID] = response["UUID"]
-
-        # `Invoke` returns `200 OK` when the function fails; reading it would leave
-        # the caller with an empty body.
-        if "FunctionError" in response:
-            attributes[SPANDATA.ERROR_TYPE] = "lambda_function_error"
-
-        return attributes
-
     def get_request_params(
         self, ctx: "AwsCallContext", span: "Optional[Span]"
     ) -> "Optional[Dict[str, Any]]":
@@ -107,7 +93,23 @@ class _LambdaExtension(_ServiceExtension):
 
         return {**ctx.params, "ClientContext": encoded}
 
-    def has_streaming_response(self, ctx: "AwsCallContext") -> bool:
+    def on_success_response(
+        self, ctx: "AwsCallContext", response: "Any", span: "Span"
+    ) -> None:
+        attributes: "Attributes" = {}
+
+        if "UUID" in response:
+            attributes[SPANDATA.AWS_LAMBDA_RESOURCE_MAPPING_ID] = response["UUID"]
+
+        # `Invoke` returns `200 OK` when the function fails; reading it would leave
+        # the caller with an empty body.
+        if "FunctionError" in response:
+            attributes[SPANDATA.ERROR_TYPE] = "lambda_function_error"
+
+        span.set_attributes(attributes)
+        if SPANDATA.ERROR_TYPE in attributes:
+            span.status = SpanStatus.ERROR
+
         # `Invoke`'s `Payload` is a `StreamingBody`, but span
         # shouldn't be kept open until the caller reads it.
-        return ctx.operation_name != "Invoke"
+        span.end()

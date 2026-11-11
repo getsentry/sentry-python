@@ -181,7 +181,7 @@ def test_perform_job_raises(monkeypatch, sentry_init, capture_envelopes):
     monkeypatch.setattr(worker, "handle_execution_ended", handle_execution_ended)
 
     with pytest.raises(ConnectionError):
-        worker.perform_job(job, queue)
+        worker.execute_job(job, queue)
 
     in_progress, error = _check_ins(envelopes)
     assert in_progress["status"] == "in_progress"
