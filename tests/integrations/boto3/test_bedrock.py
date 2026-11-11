@@ -155,6 +155,10 @@ def converse_stream_error_response():
 
 @pytest.fixture
 def content_block_messages():
+    """
+    A list of messages exercising all types of content blocks from the Bedrock API
+    which the SDK transforms, and the corresponding transformed messages.
+    """
     messages = [
         {"role": "user", "content": [{"text": "What is the weather in Paris?"}]},
         {
