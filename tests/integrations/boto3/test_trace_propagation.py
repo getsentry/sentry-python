@@ -403,3 +403,65 @@ def test_message_attributes_round_trip(sentry_init, capture_items, service):
     assert link["trace_id"] == publish_span["trace_id"]
     assert link["span_id"] == publish_span["span_id"]
     assert link["sampled"] is True
+
+
+@pytest.mark.parametrize(
+    "service,method,params,response",
+    [
+        pytest.param(
+            "sqs",
+            "send_message",
+            {
+                "QueueUrl": "https://sqs.eu-north-1.amazonaws.com/123456789012/orders",
+                "MessageBody": "hi",
+            },
+            {"MessageId": "1"},
+            id="sqs-send",
+        ),
+        pytest.param(
+            "sqs",
+            "receive_message",
+            {"QueueUrl": "https://sqs.eu-north-1.amazonaws.com/123456789012/orders"},
+            {},
+            id="sqs-receive",
+        ),
+        pytest.param(
+            "sns",
+            "publish",
+            {"TopicArn": "arn:aws:sns:eu-north-1:123456789012:alerts", "Message": "hi"},
+            {"MessageId": "1"},
+            id="sns-publish",
+        ),
+        pytest.param(
+            "lambda",
+            "invoke",
+            {"FunctionName": "billing"},
+            {"StatusCode": 200},
+            id="lambda-invoke",
+        ),
+    ],
+)
+def test_propagate_traces_disabled(
+    sentry_init, capture_items, service, method, params, response
+):
+    """`propagate_traces=False` sends the caller's params unchanged."""
+    sentry_init(
+        traces_sample_rate=1.0,
+        integrations=[Boto3Integration(propagate_traces=False)],
+    )
+    client = boto3.client(  # type: ignore[attr-defined]
+        service,
+        region_name="eu-north-1",
+        aws_access_key_id="-",
+        aws_secret_access_key="-",
+    )
+
+    with Stubber(client) as stubber:
+        # the stubber fails the call when the sent params differ from these.
+        stubber.add_response(method, response, copy.deepcopy(params))
+        spans = capture_spans_by_op(
+            lambda: getattr(client, method)(**params), capture_items
+        )
+
+    # the call is still instrumented.
+    assert sum(map(len, spans.values())) == 1
