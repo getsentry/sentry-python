@@ -93,37 +93,241 @@ def _patch_event_stream() -> None:
             span.set_attribute if isinstance(span, StreamedSpan) else span.set_data
         )
 
+        role: "Optional[str]" = None
+        parts: "dict[int, Union[TextPart, ReasoningPart, ToolCallPart, ToolCallResponsePart, UriPart, BlobPart]]" = {}
+
         try:
             for event in original_iter(self):
-                if "metadata" not in event:
+                if "metadata" in event:
+                    usage = event["metadata"]["usage"]
+
+                    input_tokens = usage["inputTokens"]
+                    set_on_span(
+                        SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS, usage["outputTokens"]
+                    )
+                    set_on_span(
+                        SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, usage["totalTokens"]
+                    )
+
+                    cache_read_tokens = usage.get("cacheReadInputTokens")
+                    if cache_read_tokens is not None:
+                        input_tokens += cache_read_tokens
+                        set_on_span(
+                            SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED, cache_read_tokens
+                        )
+
+                    cache_write_tokens = usage.get("cacheWriteInputTokens")
+                    if cache_write_tokens is not None:
+                        input_tokens += cache_write_tokens
+                        set_on_span(
+                            SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE,
+                            cache_write_tokens,
+                        )
+
+                    set_on_span(
+                        SPANDATA.GEN_AI_USAGE_INPUT_TOKENS,
+                        input_tokens,
+                    )
+
                     yield event
                     continue
 
-                usage = event["metadata"]["usage"]
+                client = sentry_sdk.get_client()
+                if (
+                    not has_data_collection_enabled(client.options)
+                    or not client.options["data_collection"]["gen_ai"]["outputs"]
+                ) and (
+                    has_data_collection_enabled(client.options)
+                    or not should_send_default_pii()
+                ):
+                    yield event
+                    continue
 
-                input_tokens = usage["inputTokens"]
-                set_on_span(SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS, usage["outputTokens"])
-                set_on_span(SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, usage["totalTokens"])
+                if "messageStart" in event:
+                    role = event["messageStart"]["role"]
 
-                cache_read_tokens = usage.get("cacheReadInputTokens")
-                if cache_read_tokens is not None:
-                    input_tokens += cache_read_tokens
+                    yield event
+                    continue
+
+                if "messageStop" in event and role is not None:
                     set_on_span(
-                        SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED, cache_read_tokens
+                        SPANDATA.GEN_AI_OUTPUT_MESSAGES,
+                        json.dumps(
+                            [
+                                {
+                                    "role": role,
+                                    "parts": [parts[index] for index in sorted(parts)],
+                                }
+                            ]
+                        ),
                     )
 
-                cache_write_tokens = usage.get("cacheWriteInputTokens")
-                if cache_write_tokens is not None:
-                    input_tokens += cache_write_tokens
-                    set_on_span(
-                        SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE,
-                        cache_write_tokens,
+                    yield event
+                    continue
+
+                if (
+                    "contentBlockStart" in event
+                    and "toolUse" in event["contentBlockStart"]["start"]
+                ):
+                    tool_call_part: "ToolCallPart" = {
+                        "type": "tool_call",
+                        "name": event["contentBlockStart"]["start"]["toolUse"]["name"],
+                    }
+                    parts[event["contentBlockStart"]["contentBlockIndex"]] = (
+                        tool_call_part
                     )
 
-                set_on_span(
-                    SPANDATA.GEN_AI_USAGE_INPUT_TOKENS,
-                    input_tokens,
-                )
+                    yield event
+                    continue
+
+                if (
+                    "contentBlockStart" in event
+                    and "toolResult" in event["contentBlockStart"]["start"]
+                ):
+                    tool_call_response_part: "ToolCallResponsePart" = {
+                        "type": "tool_call_response",
+                    }
+                    parts[event["contentBlockStart"]["contentBlockIndex"]] = (
+                        tool_call_response_part
+                    )
+
+                    yield event
+                    continue
+
+                if "contentBlockDelta" not in event:
+                    yield event
+                    continue
+
+                index = event["contentBlockDelta"]["contentBlockIndex"]
+                delta = event["contentBlockDelta"]["delta"]
+
+                if "text" in delta and index not in parts:
+                    parts[index] = {"type": "text", "content": delta["text"]}
+
+                    yield event
+                    continue
+
+                if "text" in delta:
+                    cast("TextPart", parts[index])["content"] += delta["text"]
+
+                    yield event
+                    continue
+
+                if "toolUse" in delta and index not in parts:
+                    parts[index] = {
+                        "type": "tool_call",
+                        "arguments": delta["toolUse"]["input"],
+                    }
+
+                    yield event
+                    continue
+
+                if "toolUse" in delta and "arguments" in parts[index]:
+                    cast("ToolCallPart", parts[index])["arguments"] += delta["toolUse"][
+                        "input"
+                    ]
+
+                    yield event
+                    continue
+
+                if "toolUse" in delta:
+                    cast("ToolCallPart", parts[index])["arguments"] = delta["toolUse"][
+                        "input"
+                    ]
+
+                    yield event
+                    continue
+
+                if "toolResult" in delta and index not in parts:
+                    parts[index] = {
+                        "type": "tool_call_response",
+                        "response": [
+                            item
+                            for item in delta["toolResult"]
+                            if "json" in item or "text" in item
+                        ],
+                    }
+
+                    yield event
+                    continue
+
+                if "toolResult" in delta and "response" in parts[index]:
+                    cast("ToolCallResponsePart", parts[index])["response"] += [
+                        item
+                        for item in delta["toolResult"]
+                        if "json" in item or "text" in item
+                    ]
+
+                    yield event
+                    continue
+
+                if "toolResult" in delta:
+                    cast("ToolCallResponsePart", parts[index])["response"] = [
+                        item
+                        for item in delta["toolResult"]
+                        if "json" in item or "text" in item
+                    ]
+
+                    yield event
+                    continue
+
+                if "reasoningContent" in delta and index not in parts:
+                    parts[index] = {"type": "reasoning"}
+
+                    if "text" in delta["reasoningContent"]:
+                        cast("ReasoningPart", parts[index])["content"] = delta[
+                            "reasoningContent"
+                        ]["text"]
+
+                    yield event
+                    continue
+
+                if (
+                    "reasoningContent" in delta
+                    and "text" in delta["reasoningContent"]
+                    and "content" in parts[index]
+                ):
+                    cast("ReasoningPart", parts[index])["content"] += delta[
+                        "reasoningContent"
+                    ]["text"]
+
+                    yield event
+                    continue
+
+                if "reasoningContent" in delta and "text" in delta["reasoningContent"]:
+                    cast("ReasoningPart", parts[index])["content"] = delta[
+                        "reasoningContent"
+                    ]["text"]
+
+                    yield event
+                    continue
+
+                if (
+                    "image" in delta
+                    and "source" in delta["image"]
+                    and "s3Location" in delta["image"]["source"]
+                ):
+                    parts[index] = {
+                        "type": "uri",
+                        "modality": "image",
+                        "uri": delta["image"]["source"]["s3Location"]["uri"],
+                    }
+
+                    yield event
+                    continue
+
+                if (
+                    "image" in delta
+                    and "source" in delta["image"]
+                    and "bytes" in delta["image"]["source"]
+                ):
+                    parts[index] = {
+                        "type": "blob",
+                        "modality": "image",
+                    }
+
+                    yield event
+                    continue
 
                 yield event
         except GeneratorExit:
