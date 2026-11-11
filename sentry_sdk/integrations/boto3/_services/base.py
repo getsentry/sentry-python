@@ -11,9 +11,7 @@ if TYPE_CHECKING:
 class _ServiceExtension:
     """
     Optional hooks for adding service-specific behavior to AWS client
-    span; non-overridden methods keep the generic instrumentation.
-    Services without a registered extension in `_SERVICE_EXTENSIONS` use this
-    class as is, i.e. the generic instrumentation.
+    span. Non-overridden methods keep the generic instrumentation.
     """
 
     __slots__ = ()
