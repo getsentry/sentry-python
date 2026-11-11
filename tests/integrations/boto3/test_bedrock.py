@@ -1,5 +1,7 @@
+import base64
 import io
 import json
+from typing import Any
 from unittest.mock import Mock
 
 import boto3
@@ -1355,56 +1357,153 @@ def test_converse_stream_output_attributes(
             trace_lifecycle="stream" if span_streaming else "static",
         )
 
-    events = [
+    stream_events: "list[tuple[str, dict[str, Any]]]" = [
         ("messageStart", {"role": "assistant"}),
         (
             "contentBlockDelta",
-            {
-                "contentBlockIndex": 0,
-                "delta": {"reasoningContent": {"text": "The user wants "}},
-            },
+            {"contentBlockIndex": 0, "delta": {"text": "What is the weather "}},
         ),
         (
             "contentBlockDelta",
-            {
-                "contentBlockIndex": 0,
-                "delta": {"reasoningContent": {"text": "the weather."}},
-            },
-        ),
-        (
-            "contentBlockDelta",
-            {
-                "contentBlockIndex": 0,
-                "delta": {"reasoningContent": {"signature": "sig"}},
-            },
+            {"contentBlockIndex": 0, "delta": {"text": "in Paris?"}},
         ),
         ("contentBlockStop", {"contentBlockIndex": 0}),
         (
-            "contentBlockDelta",
-            {"contentBlockIndex": 1, "delta": {"text": "Let me "}},
-        ),
-        (
-            "contentBlockDelta",
-            {"contentBlockIndex": 1, "delta": {"text": "check."}},
-        ),
-        ("contentBlockStop", {"contentBlockIndex": 1}),
-        (
             "contentBlockStart",
             {
-                "contentBlockIndex": 2,
-                "start": {"toolUse": {"toolUseId": "tool-1", "name": "get_weather"}},
+                "contentBlockIndex": 1,
+                "start": {"toolUse": {"toolUseId": "tooluse_1", "name": "get_weather"}},
             },
         ),
         (
             "contentBlockDelta",
-            {"contentBlockIndex": 2, "delta": {"toolUse": {"input": '{"city": '}}},
+            {"contentBlockIndex": 1, "delta": {"toolUse": {"input": '{"location": '}}},
         ),
         (
             "contentBlockDelta",
-            {"contentBlockIndex": 2, "delta": {"toolUse": {"input": '"Paris"}'}}},
+            {"contentBlockIndex": 1, "delta": {"toolUse": {"input": '"Paris"}'}}},
         ),
-        ("contentBlockStop", {"contentBlockIndex": 2}),
-        ("messageStop", {"stopReason": "tool_use"}),
+        ("contentBlockStop", {"contentBlockIndex": 1}),
+    ]
+    expected_parts: "list[dict[str, Any]]" = [
+        {"type": "text", "content": "What is the weather in Paris?"},
+        {
+            "type": "tool_call",
+            "name": "get_weather",
+            "arguments": '{"location": "Paris"}',
+        },
+    ]
+
+    if BOTOCORE_VERSION >= Version("1.37.0"):
+        stream_events += [
+            (
+                "contentBlockDelta",
+                {
+                    "contentBlockIndex": 2,
+                    "delta": {"reasoningContent": {"text": "The user wants "}},
+                },
+            ),
+            (
+                "contentBlockDelta",
+                {
+                    "contentBlockIndex": 2,
+                    "delta": {"reasoningContent": {"text": "the weather in Paris."}},
+                },
+            ),
+            (
+                "contentBlockDelta",
+                {
+                    "contentBlockIndex": 2,
+                    "delta": {"reasoningContent": {"signature": "signature"}},
+                },
+            ),
+            ("contentBlockStop", {"contentBlockIndex": 2}),
+        ]
+        expected_parts.append(
+            {"type": "reasoning", "content": "The user wants the weather in Paris."}
+        )
+
+    if BOTOCORE_VERSION >= Version("1.42.1"):
+        stream_events += [
+            (
+                "contentBlockStart",
+                {
+                    "contentBlockIndex": 3,
+                    "start": {
+                        "toolResult": {"toolUseId": "tooluse_1", "status": "success"}
+                    },
+                },
+            ),
+            (
+                "contentBlockDelta",
+                {
+                    "contentBlockIndex": 3,
+                    "delta": {
+                        "toolResult": [{"json": {"temperature": 18, "unit": "celsius"}}]
+                    },
+                },
+            ),
+            (
+                "contentBlockDelta",
+                {
+                    "contentBlockIndex": 3,
+                    "delta": {"toolResult": [{"text": "Partly cloudy"}]},
+                },
+            ),
+            ("contentBlockStop", {"contentBlockIndex": 3}),
+            (
+                "contentBlockStart",
+                {"contentBlockIndex": 4, "start": {"image": {"format": "png"}}},
+            ),
+            (
+                "contentBlockDelta",
+                {
+                    "contentBlockIndex": 4,
+                    "delta": {
+                        "image": {
+                            "source": {"bytes": base64.b64encode(b"image").decode()}
+                        }
+                    },
+                },
+            ),
+            ("contentBlockStop", {"contentBlockIndex": 4}),
+            (
+                "contentBlockStart",
+                {"contentBlockIndex": 5, "start": {"image": {"format": "png"}}},
+            ),
+            (
+                "contentBlockDelta",
+                {
+                    "contentBlockIndex": 5,
+                    "delta": {
+                        "image": {
+                            "source": {
+                                "s3Location": {"uri": "s3://my-bucket/images/photo.png"}
+                            }
+                        }
+                    },
+                },
+            ),
+            ("contentBlockStop", {"contentBlockIndex": 5}),
+        ]
+        expected_parts += [
+            {
+                "type": "tool_call_response",
+                "response": [
+                    {"json": {"temperature": 18, "unit": "celsius"}},
+                    {"text": "Partly cloudy"},
+                ],
+            },
+            {"type": "blob", "modality": "image"},
+            {
+                "type": "uri",
+                "modality": "image",
+                "uri": "s3://my-bucket/images/photo.png",
+            },
+        ]
+
+    stream_events += [
+        ("messageStop", {"stopReason": "end_turn"}),
         (
             "metadata",
             {
@@ -1413,6 +1512,7 @@ def test_converse_stream_output_attributes(
             },
         ),
     ]
+
     converse_stream_response["stream"]._event_generator = iter(
         EventStreamMessage(
             prelude=None,
@@ -1420,23 +1520,8 @@ def test_converse_stream_output_attributes(
             payload=json.dumps(payload).encode(),
             crc=None,
         )
-        for event_type, payload in events
+        for event_type, payload in stream_events
     )
-
-    expected_output_messages = [
-        {
-            "role": "assistant",
-            "parts": [
-                {"type": "reasoning", "content": "The user wants the weather."},
-                {"type": "text", "content": "Let me check."},
-                {
-                    "type": "tool_call",
-                    "name": "get_weather",
-                    "arguments": {"city": "Paris"},
-                },
-            ],
-        }
-    ]
 
     session = boto3.Session(
         aws_access_key_id="-", aws_secret_access_key="-", region_name="us-east-1"
@@ -1467,10 +1552,9 @@ def test_converse_stream_output_attributes(
             if span["attributes"].get("sentry.op") == OP.GEN_AI_CHAT
         )
 
-        assert (
-            json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES])
-            == expected_output_messages
-        )
+        assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+            {"role": "assistant", "parts": expected_parts}
+        ]
     else:
         events = capture_events()
 
@@ -1485,7 +1569,6 @@ def test_converse_stream_output_attributes(
         (transaction,) = events
         (span,) = transaction["spans"]
 
-        assert (
-            json.loads(span["data"][SPANDATA.GEN_AI_OUTPUT_MESSAGES])
-            == expected_output_messages
-        )
+        assert json.loads(span["data"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+            {"role": "assistant", "parts": expected_parts}
+        ]

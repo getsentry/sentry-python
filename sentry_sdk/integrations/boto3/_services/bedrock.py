@@ -94,7 +94,7 @@ def _patch_event_stream() -> None:
         )
 
         role: "Optional[str]" = None
-        content_blocks: "dict[int, dict[str, Any]]" = {}
+        parts: "dict[int, Union[TextPart, ReasoningPart, ToolCallPart, ToolCallResponsePart, UriPart, BlobPart]]" = {}
 
         try:
             for event in original_iter(self):
@@ -132,6 +132,10 @@ def _patch_event_stream() -> None:
                     yield event
                     continue
 
+                if "messageStop" in event:
+                    finish_reasons: "list[str]" = [event["messageStop"]["stopReason"]]
+                    set_on_span(SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS, finish_reasons)
+
                 client = sentry_sdk.get_client()
                 if (
                     not has_data_collection_enabled(client.options)
@@ -149,77 +153,182 @@ def _patch_event_stream() -> None:
                     yield event
                     continue
 
-                if "contentBlockStart" in event:
-                    block_start = event["contentBlockStart"]
-                    tool_use = block_start["start"].get("toolUse")
-                    if tool_use is not None:
-                        tool_use_block: "dict[str, Any]" = {"input": ""}
-                        if "name" in tool_use:
-                            tool_use_block["name"] = tool_use["name"]
-                        content_blocks[block_start["contentBlockIndex"]] = {
-                            "toolUse": tool_use_block
-                        }
-
-                    yield event
-                    continue
-
-                if "contentBlockDelta" in event:
-                    index = event["contentBlockDelta"]["contentBlockIndex"]
-                    delta = event["contentBlockDelta"]["delta"]
-
-                    if "text" in delta:
-                        block = content_blocks.setdefault(index, {"text": ""})
-                        block["text"] += delta["text"]
-                    elif "toolUse" in delta:
-                        block = content_blocks.setdefault(
-                            index, {"toolUse": {"input": ""}}
-                        )
-                        block["toolUse"]["input"] += delta["toolUse"]["input"]
-                    elif "reasoningContent" in delta:
-                        block = content_blocks.setdefault(
-                            index, {"reasoningContent": {}}
-                        )
-                        reasoning_text = delta["reasoningContent"].get("text")
-                        if reasoning_text is not None:
-                            block["reasoningContent"].setdefault(
-                                "reasoningText", {"text": ""}
-                            )["text"] += reasoning_text
-
-                    yield event
-                    continue
-
-                if "messageStop" in event:
-                    finish_reasons: "list[str]" = [event["messageStop"]["stopReason"]]
-                    set_on_span(SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS, finish_reasons)
-
                 if "messageStop" in event and role is not None:
-                    for block in content_blocks.values():
-                        if "toolUse" not in block:
-                            continue
-                        # Tool input is streamed as a JSON string; non-streaming responses contain the parsed object.
-                        try:
-                            block["toolUse"]["input"] = json.loads(
-                                block["toolUse"]["input"]
-                            )
-                        except ValueError:
-                            pass
-
                     set_on_span(
                         SPANDATA.GEN_AI_OUTPUT_MESSAGES,
                         json.dumps(
-                            _transform_messages(
-                                [
-                                    {
-                                        "role": role,
-                                        "content": [
-                                            content_blocks[index]
-                                            for index in sorted(content_blocks)
-                                        ],
-                                    }
-                                ]
-                            )
+                            [
+                                {
+                                    "role": role,
+                                    "parts": [parts[index] for index in sorted(parts)],
+                                }
+                            ]
                         ),
                     )
+
+                    yield event
+                    continue
+
+                if (
+                    "contentBlockStart" in event
+                    and "toolUse" in event["contentBlockStart"]["start"]
+                ):
+                    tool_call_part: "ToolCallPart" = {
+                        "type": "tool_call",
+                        "name": event["contentBlockStart"]["start"]["toolUse"]["name"],
+                    }
+                    parts[event["contentBlockStart"]["contentBlockIndex"]] = (
+                        tool_call_part
+                    )
+
+                    yield event
+                    continue
+
+                if (
+                    "contentBlockStart" in event
+                    and "toolResult" in event["contentBlockStart"]["start"]
+                ):
+                    tool_call_response_part: "ToolCallResponsePart" = {
+                        "type": "tool_call_response",
+                    }
+                    parts[event["contentBlockStart"]["contentBlockIndex"]] = (
+                        tool_call_response_part
+                    )
+
+                    yield event
+                    continue
+
+                if "contentBlockDelta" not in event:
+                    yield event
+                    continue
+
+                index = event["contentBlockDelta"]["contentBlockIndex"]
+                delta = event["contentBlockDelta"]["delta"]
+
+                if "text" in delta and index not in parts:
+                    parts[index] = {"type": "text", "content": delta["text"]}
+
+                    yield event
+                    continue
+
+                if "text" in delta:
+                    cast("TextPart", parts[index])["content"] += delta["text"]
+
+                    yield event
+                    continue
+
+                if "toolUse" in delta and index not in parts:
+                    parts[index] = {
+                        "type": "tool_call",
+                        "arguments": delta["toolUse"]["input"],
+                    }
+
+                    yield event
+                    continue
+
+                if "toolUse" in delta and "arguments" in parts[index]:
+                    cast("ToolCallPart", parts[index])["arguments"] += delta["toolUse"][
+                        "input"
+                    ]
+
+                    yield event
+                    continue
+
+                if "toolUse" in delta:
+                    cast("ToolCallPart", parts[index])["arguments"] = delta["toolUse"][
+                        "input"
+                    ]
+
+                    yield event
+                    continue
+
+                if "toolResult" in delta and index not in parts:
+                    parts[index] = {
+                        "type": "tool_call_response",
+                        "response": [
+                            item
+                            for item in delta["toolResult"]
+                            if "json" in item or "text" in item
+                        ],
+                    }
+
+                    yield event
+                    continue
+
+                if "toolResult" in delta and "response" in parts[index]:
+                    cast("ToolCallResponsePart", parts[index])["response"] += [
+                        item
+                        for item in delta["toolResult"]
+                        if "json" in item or "text" in item
+                    ]
+
+                    yield event
+                    continue
+
+                if "toolResult" in delta:
+                    cast("ToolCallResponsePart", parts[index])["response"] = [
+                        item
+                        for item in delta["toolResult"]
+                        if "json" in item or "text" in item
+                    ]
+
+                    yield event
+                    continue
+
+                if "reasoningContent" in delta and index not in parts:
+                    parts[index] = {"type": "reasoning"}
+
+                    if "text" in delta["reasoningContent"]:
+                        cast("ReasoningPart", parts[index])["content"] = delta[
+                            "reasoningContent"
+                        ]["text"]
+
+                    yield event
+                    continue
+
+                if (
+                    "reasoningContent" in delta
+                    and "text" in delta["reasoningContent"]
+                    and "content" in parts[index]
+                ):
+                    cast("ReasoningPart", parts[index])["content"] += delta[
+                        "reasoningContent"
+                    ]["text"]
+
+                    yield event
+                    continue
+
+                if "reasoningContent" in delta and "text" in delta["reasoningContent"]:
+                    cast("ReasoningPart", parts[index])["content"] = delta[
+                        "reasoningContent"
+                    ]["text"]
+
+                    yield event
+                    continue
+
+                if (
+                    "image" in delta
+                    and "source" in delta["image"]
+                    and "s3Location" in delta["image"]["source"]
+                ):
+                    parts[index] = {
+                        "type": "uri",
+                        "modality": "image",
+                        "uri": delta["image"]["source"]["s3Location"]["uri"],
+                    }
+
+                    yield event
+                    continue
+
+                if (
+                    "image" in delta
+                    and "source" in delta["image"]
+                    and "bytes" in delta["image"]["source"]
+                ):
+                    parts[index] = {
+                        "type": "blob",
+                        "modality": "image",
+                    }
 
                     yield event
                     continue
