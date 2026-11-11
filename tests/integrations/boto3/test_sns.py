@@ -266,6 +266,8 @@ def test_publish_without_destination(client_factory, capture_items):
 def test_publish_with_invalid_params(client_factory, capture_items, method, params):
     client = client_factory("sns")
 
+    require_botocore_model_fields(client, method)
+
     def call():
         with pytest.raises(ParamValidationError):
             getattr(client, method)(**params)
