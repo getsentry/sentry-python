@@ -1,6 +1,6 @@
 ---
 name: sdk-review
-description: Review sentry-python changes for violations of Sentry SDK contracts: host-app safety, data-collection gates, supported versions, public API, and Python-specific rules.
+description: "Review sentry-python changes for violations of Sentry SDK contracts: host-app safety, data-collection gates, supported versions, public API, and Python-specific rules."
 allowed-tools: Read Grep Glob
 ---
 Review only the changed code. Report a finding only if you can point to the exact line and show how it breaks a user's app, build or data. If unsure, do not report. Generic logic bugs belong to `code-review`; this skill only covers SDK contracts.
