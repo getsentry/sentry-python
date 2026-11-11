@@ -455,6 +455,7 @@ TEST_SUITE_CONFIG = {
     },
     "redis": {
         "package": "redis",
+        "include": "!=8.2.0b1",
         "deps": {
             "*": ["fakeredis!=1.7.4", "pytest<8.0.0"],
             ">=4.0,<5.0": ["fakeredis<2.31.0"],
