@@ -30,7 +30,17 @@ if TYPE_CHECKING:
         ConverseStreamResponseTypeDef,
     )
 
-    from sentry_sdk._types import Attributes, TextPart, ToolDefinition
+    from sentry_sdk._types import (
+        Attributes,
+        BlobPart,
+        InputMessage,
+        ReasoningPart,
+        TextPart,
+        ToolCallPart,
+        ToolCallResponsePart,
+        ToolDefinition,
+        UriPart,
+    )
     from sentry_sdk.integrations.boto3._context import AwsCallContext
     from sentry_sdk.tracing import Span
 
@@ -160,6 +170,193 @@ def _transform_system_instructions(
     return instruction_text_parts
 
 
+def _transform_messages(
+    input_messages: "Union[list[dict[str, Any]], tuple[dict[str, Any], ...]]",
+) -> "list[InputMessage]":
+    """
+    Unlike other providers, AWS declares that input and output messages use the same message type.
+    For this reason, the same transform is used for user and assistant messages.
+    """
+    messages: "list[InputMessage]" = []
+    for message in input_messages:
+        if not isinstance(message, dict):
+            continue
+
+        content = message.get("content")
+        if not isinstance(content, (list, tuple)) or "role" not in message:
+            continue
+
+        parts: "list[Union[TextPart, ReasoningPart, ToolCallPart, ToolCallResponsePart, UriPart, BlobPart]]" = []
+        for block in content:
+            if not isinstance(block, dict):
+                continue
+
+            if "text" in block:
+                parts.append({"type": "text", "content": block["text"]})
+                continue
+
+            tool_use = block.get("toolUse")
+            if tool_use is not None:
+                tool_call_part: "ToolCallPart" = {"type": "tool_call"}
+
+                if not isinstance(tool_use, dict):
+                    parts.append(tool_call_part)
+                    continue
+
+                if "name" in tool_use:
+                    tool_call_part["name"] = tool_use["name"]
+                if "input" in tool_use:
+                    tool_call_part["arguments"] = tool_use["input"]
+                parts.append(tool_call_part)
+                continue
+
+            tool_result = block.get("toolResult")
+            if tool_result is not None:
+                tool_call_response_part: "ToolCallResponsePart" = {
+                    "type": "tool_call_response",
+                }
+
+                if (
+                    not isinstance(tool_result, dict)
+                    or "content" not in tool_result
+                    or not isinstance(tool_result["content"], (list, tuple))
+                ):
+                    parts.append(tool_call_response_part)
+                    continue
+
+                tool_call_response_part["response"] = [
+                    item
+                    for item in tool_result["content"]
+                    if isinstance(item, dict) and ("json" in item or "text" in item)
+                ]
+                parts.append(tool_call_response_part)
+                continue
+
+            reasoning_content = block.get("reasoningContent")
+            if reasoning_content is not None:
+                reasoning_part: "ReasoningPart" = {"type": "reasoning"}
+
+                if (
+                    not isinstance(reasoning_content, dict)
+                    or "reasoningText" not in reasoning_content
+                    or not isinstance(reasoning_content["reasoningText"], dict)
+                    or "text" not in reasoning_content["reasoningText"]
+                ):
+                    parts.append(reasoning_part)
+                    continue
+
+                reasoning_part["content"] = reasoning_content["reasoningText"]["text"]
+                parts.append(reasoning_part)
+                continue
+
+            image = block.get("image")
+            if (
+                isinstance(image, dict)
+                and isinstance(image.get("source"), dict)
+                and "s3Location" in image["source"]
+            ):
+                uri_part: "UriPart" = {
+                    "type": "uri",
+                    "modality": "image",
+                }
+                s3_location = image["source"]["s3Location"]
+                if not isinstance(s3_location, dict) or "uri" not in s3_location:
+                    parts.append(uri_part)
+                    continue
+
+                uri_part["uri"] = s3_location["uri"]
+                parts.append(uri_part)
+                continue
+            elif (
+                isinstance(image, dict)
+                and isinstance(image.get("source"), dict)
+                and "bytes" in image["source"]
+            ):
+                parts.append({"type": "blob", "modality": "image"})
+                continue
+
+            video = block.get("video")
+            if (
+                isinstance(video, dict)
+                and isinstance(video.get("source"), dict)
+                and "s3Location" in video["source"]
+            ):
+                uri_part = {
+                    "type": "uri",
+                    "modality": "video",
+                }
+                s3_location = video["source"]["s3Location"]
+                if not isinstance(s3_location, dict) or "uri" not in s3_location:
+                    parts.append(uri_part)
+                    continue
+
+                uri_part["uri"] = s3_location["uri"]
+                parts.append(uri_part)
+                continue
+            elif (
+                isinstance(video, dict)
+                and isinstance(video.get("source"), dict)
+                and "bytes" in video["source"]
+            ):
+                parts.append({"type": "blob", "modality": "video"})
+                continue
+
+            audio = block.get("audio")
+            if (
+                isinstance(audio, dict)
+                and isinstance(audio.get("source"), dict)
+                and "s3Location" in audio["source"]
+            ):
+                uri_part = {
+                    "type": "uri",
+                    "modality": "audio",
+                }
+                s3_location = audio["source"]["s3Location"]
+                if not isinstance(s3_location, dict) or "uri" not in s3_location:
+                    parts.append(uri_part)
+                    continue
+
+                uri_part["uri"] = s3_location["uri"]
+                parts.append(uri_part)
+                continue
+            elif (
+                isinstance(audio, dict)
+                and isinstance(audio.get("source"), dict)
+                and "bytes" in audio["source"]
+            ):
+                parts.append({"type": "blob", "modality": "audio"})
+                continue
+
+            document = block.get("document")
+            if (
+                not isinstance(document, dict)
+                or "source" not in document
+                or not isinstance(document["source"], dict)
+            ):
+                continue
+
+            if "s3Location" in document["source"]:
+                uri_part = {
+                    "type": "uri",
+                    "modality": "document",
+                }
+                s3_location = document["source"]["s3Location"]
+                if not isinstance(s3_location, dict) or "uri" not in s3_location:
+                    parts.append(uri_part)
+                    continue
+
+                uri_part["uri"] = s3_location["uri"]
+                parts.append(uri_part)
+                continue
+
+            if "bytes" in document["source"]:
+                parts.append({"type": "blob", "modality": "document"})
+                continue
+
+        messages.append({"role": message["role"], "parts": parts})
+    return messages
+
+
 def _transform_tool_definitions(
     tools: "list[dict[str, Any]]",
 ) -> "list[ToolDefinition]":
@@ -256,6 +453,14 @@ class _BedrockExtension(_ServiceExtension):
         ) and isinstance(system_instructions, (list, tuple)):
             attributes[SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS] = json.dumps(
                 _transform_system_instructions(system_instructions)
+            )
+
+        input_messages = ctx.params.get("messages")
+        if (
+            has_data_collection_enabled(client_options) or should_send_default_pii()
+        ) and isinstance(input_messages, (list, tuple)):
+            attributes[SPANDATA.GEN_AI_INPUT_MESSAGES] = json.dumps(
+                _transform_messages(input_messages)
             )
 
         tool_config = ctx.params.get("toolConfig")
