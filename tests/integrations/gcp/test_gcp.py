@@ -382,7 +382,7 @@ def test_traces_sampler_gets_correct_values_in_sampling_context(
 
 def test_error_has_new_trace_context_performance_enabled(run_cloud_function):
     """
-    Check if an 'trace' context is added to errros and transactions when performance monitoring is enabled.
+    Check if a 'trace' context is added to errors and transactions when performance monitoring is enabled.
     """
     envelope_items, _, _ = run_cloud_function(
         dedent(
@@ -423,7 +423,7 @@ def test_error_has_new_trace_context_performance_enabled(run_cloud_function):
 
 def test_error_has_new_trace_context_performance_disabled(run_cloud_function):
     """
-    Check if an 'trace' context is added to errros and transactions when performance monitoring is disabled.
+    Check if a 'trace' context is added to errors and transactions when performance monitoring is disabled.
     """
     envelope_items, _, _ = run_cloud_function(
         dedent(
@@ -461,7 +461,7 @@ def test_error_has_new_trace_context_performance_disabled(run_cloud_function):
 
 def test_error_has_existing_trace_context_performance_enabled(run_cloud_function):
     """
-    Check if an 'trace' context is added to errros and transactions
+    Check if a 'trace' context is added to errors and transactions
     from the incoming 'sentry-trace' header when performance monitoring is enabled.
     """
     trace_id = "471a43a4192642f0b136d5159a501701"
@@ -514,7 +514,7 @@ def test_error_has_existing_trace_context_performance_enabled(run_cloud_function
 
 def test_error_has_existing_trace_context_performance_disabled(run_cloud_function):
     """
-    Check if an 'trace' context is added to errros and transactions
+    Check if a 'trace' context is added to errors and transactions
     from the incoming 'sentry-trace' header when performance monitoring is disabled.
     """
     trace_id = "471a43a4192642f0b136d5159a501701"

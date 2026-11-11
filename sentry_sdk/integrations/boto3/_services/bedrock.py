@@ -157,48 +157,6 @@ def _patch_event_stream() -> None:
     EventStream.close = sentry_patched_close  # type: ignore[method-assign]
 
 
-def _transform_tool_definitions(
-    tools: "list[dict[str, Any]]",
-) -> "list[ToolDefinition]":
-    """
-    Transform tool definitions to the schema used by the "gen_ai.tool.definitions" attribute.
-    """
-    result: "list[ToolDefinition]" = []
-    for tool in tools:
-        if not isinstance(tool, dict):
-            continue
-
-        if "toolSpec" in tool:
-            tool_definition: "ToolDefinition" = {"type": "function"}
-            tool_spec = tool["toolSpec"]
-            if not isinstance(tool_spec, dict):
-                result.append(tool_definition)
-                continue
-
-            if "name" in tool_spec:
-                tool_definition["name"] = tool_spec["name"]
-            if "description" in tool_spec:
-                tool_definition["description"] = tool_spec["description"]
-
-            input_schema = tool_spec.get("inputSchema")
-            if isinstance(input_schema, dict) and "json" in input_schema:
-                tool_definition["parameters"] = input_schema["json"]
-
-            result.append(tool_definition)
-            continue
-
-        if "systemTool" not in tool:
-            continue
-
-        system_tool = tool["systemTool"]
-        if not isinstance(system_tool, dict) or "name" not in system_tool:
-            continue
-
-        result.append({"type": system_tool["name"]})
-
-    return result
-
-
 def _transform_system_instructions(
     system_instructions: "Union[list[dict[str, Any]], tuple[dict[str, Any], ...]]",
 ) -> "list[TextPart]":
@@ -399,6 +357,48 @@ def _transform_messages(
     return messages
 
 
+def _transform_tool_definitions(
+    tools: "list[dict[str, Any]]",
+) -> "list[ToolDefinition]":
+    """
+    Transform tool definitions to the schema used by the "gen_ai.tool.definitions" attribute.
+    """
+    result: "list[ToolDefinition]" = []
+    for tool in tools:
+        if not isinstance(tool, dict):
+            continue
+
+        if "toolSpec" in tool:
+            tool_definition: "ToolDefinition" = {"type": "function"}
+            tool_spec = tool["toolSpec"]
+            if not isinstance(tool_spec, dict):
+                result.append(tool_definition)
+                continue
+
+            if "name" in tool_spec:
+                tool_definition["name"] = tool_spec["name"]
+            if "description" in tool_spec:
+                tool_definition["description"] = tool_spec["description"]
+
+            input_schema = tool_spec.get("inputSchema")
+            if isinstance(input_schema, dict) and "json" in input_schema:
+                tool_definition["parameters"] = input_schema["json"]
+
+            result.append(tool_definition)
+            continue
+
+        if "systemTool" not in tool:
+            continue
+
+        system_tool = tool["systemTool"]
+        if not isinstance(system_tool, dict) or "name" not in system_tool:
+            continue
+
+        result.append({"type": system_tool["name"]})
+
+    return result
+
+
 class _BedrockExtension(_ServiceExtension):
     __slots__ = ()
     skip_if_no_active_span = False
@@ -447,20 +447,20 @@ class _BedrockExtension(_ServiceExtension):
             if not client_options["data_collection"]["gen_ai"]["inputs"]:
                 return attributes
 
-        input_messages = ctx.params.get("messages")
-        if (
-            has_data_collection_enabled(client_options) or should_send_default_pii()
-        ) and isinstance(input_messages, (list, tuple)):
-            attributes[SPANDATA.GEN_AI_INPUT_MESSAGES] = json.dumps(
-                _transform_messages(input_messages)
-            )
-
         system_instructions = ctx.params.get("system")
         if (
             has_data_collection_enabled(client_options) or should_send_default_pii()
         ) and isinstance(system_instructions, (list, tuple)):
             attributes[SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS] = json.dumps(
                 _transform_system_instructions(system_instructions)
+            )
+
+        input_messages = ctx.params.get("messages")
+        if (
+            has_data_collection_enabled(client_options) or should_send_default_pii()
+        ) and isinstance(input_messages, (list, tuple)):
+            attributes[SPANDATA.GEN_AI_INPUT_MESSAGES] = json.dumps(
+                _transform_messages(input_messages)
             )
 
         tool_config = ctx.params.get("toolConfig")

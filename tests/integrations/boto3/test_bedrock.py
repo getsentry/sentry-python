@@ -153,6 +153,268 @@ def converse_stream_error_response():
     }
 
 
+@pytest.fixture
+def content_block_messages():
+    messages = [
+        {"role": "user", "content": [{"text": "What is the weather in Paris?"}]},
+        {
+            "role": "user",
+            "content": [{"image": {"format": "png", "source": {"bytes": b"image"}}}],
+        },
+        {
+            "role": "assistant",
+            "content": [
+                {
+                    "toolUse": {
+                        "toolUseId": "tooluse_1",
+                        "name": "get_weather",
+                        "input": {"location": "Paris"},
+                    }
+                }
+            ],
+        },
+        {
+            "role": "user",
+            "content": [
+                {
+                    "toolResult": {
+                        "toolUseId": "tooluse_1",
+                        "content": [
+                            {"json": {"temperature": 18, "unit": "celsius"}},
+                            {"text": "Partly cloudy"},
+                        ],
+                        "status": "success",
+                    }
+                }
+            ],
+        },
+    ]
+
+    expected_input_messages = [
+        {
+            "role": "user",
+            "parts": [{"type": "text", "content": "What is the weather in Paris?"}],
+        },
+        {"role": "user", "parts": [{"type": "blob", "modality": "image"}]},
+        {
+            "role": "assistant",
+            "parts": [
+                {
+                    "type": "tool_call",
+                    "name": "get_weather",
+                    "arguments": {"location": "Paris"},
+                }
+            ],
+        },
+        {
+            "role": "user",
+            "parts": [
+                {
+                    "type": "tool_call_response",
+                    "response": [
+                        {"json": {"temperature": 18, "unit": "celsius"}},
+                        {"text": "Partly cloudy"},
+                    ],
+                }
+            ],
+        },
+    ]
+
+    if BOTOCORE_VERSION >= Version("1.34.131"):
+        messages.append(
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "document": {
+                            "format": "pdf",
+                            "name": "report",
+                            "source": {"bytes": b"document"},
+                        }
+                    }
+                ],
+            }
+        )
+        expected_input_messages.append(
+            {"role": "user", "parts": [{"type": "blob", "modality": "document"}]}
+        )
+
+    if BOTOCORE_VERSION >= Version("1.35.74"):
+        messages.extend(
+            [
+                {
+                    "role": "user",
+                    "content": [
+                        {"video": {"format": "mp4", "source": {"bytes": b"video"}}}
+                    ],
+                },
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "video": {
+                                "format": "mp4",
+                                "source": {
+                                    "s3Location": {
+                                        "uri": "s3://my-bucket/videos/clip.mp4"
+                                    }
+                                },
+                            }
+                        }
+                    ],
+                },
+            ]
+        )
+        expected_input_messages.extend(
+            [
+                {"role": "user", "parts": [{"type": "blob", "modality": "video"}]},
+                {
+                    "role": "user",
+                    "parts": [
+                        {
+                            "type": "uri",
+                            "modality": "video",
+                            "uri": "s3://my-bucket/videos/clip.mp4",
+                        }
+                    ],
+                },
+            ]
+        )
+
+    if BOTOCORE_VERSION >= Version("1.37.0"):
+        messages.append(
+            {
+                "role": "assistant",
+                "content": [
+                    {
+                        "reasoningContent": {
+                            "reasoningText": {
+                                "text": "The user wants the weather in Paris.",
+                                "signature": "signature",
+                            }
+                        }
+                    }
+                ],
+            }
+        )
+        expected_input_messages.append(
+            {
+                "role": "assistant",
+                "parts": [
+                    {
+                        "type": "reasoning",
+                        "content": "The user wants the weather in Paris.",
+                    }
+                ],
+            }
+        )
+
+    if BOTOCORE_VERSION >= Version("1.38.3"):
+        messages.extend(
+            [
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "image": {
+                                "format": "png",
+                                "source": {
+                                    "s3Location": {
+                                        "uri": "s3://my-bucket/images/photo.png"
+                                    }
+                                },
+                            }
+                        }
+                    ],
+                },
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "document": {
+                                "format": "pdf",
+                                "name": "manual",
+                                "source": {
+                                    "s3Location": {
+                                        "uri": "s3://my-bucket/documents/manual.pdf"
+                                    }
+                                },
+                            }
+                        }
+                    ],
+                },
+            ]
+        )
+        expected_input_messages.extend(
+            [
+                {
+                    "role": "user",
+                    "parts": [
+                        {
+                            "type": "uri",
+                            "modality": "image",
+                            "uri": "s3://my-bucket/images/photo.png",
+                        }
+                    ],
+                },
+                {
+                    "role": "user",
+                    "parts": [
+                        {
+                            "type": "uri",
+                            "modality": "document",
+                            "uri": "s3://my-bucket/documents/manual.pdf",
+                        }
+                    ],
+                },
+            ]
+        )
+
+    if BOTOCORE_VERSION >= Version("1.42.1"):
+        messages.extend(
+            [
+                {
+                    "role": "user",
+                    "content": [
+                        {"audio": {"format": "mp3", "source": {"bytes": b"audio"}}}
+                    ],
+                },
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "audio": {
+                                "format": "mp3",
+                                "source": {
+                                    "s3Location": {
+                                        "uri": "s3://my-bucket/audio/question.mp3"
+                                    }
+                                },
+                            }
+                        }
+                    ],
+                },
+            ]
+        )
+        expected_input_messages.extend(
+            [
+                {"role": "user", "parts": [{"type": "blob", "modality": "audio"}]},
+                {
+                    "role": "user",
+                    "parts": [
+                        {
+                            "type": "uri",
+                            "modality": "audio",
+                            "uri": "s3://my-bucket/audio/question.mp3",
+                        }
+                    ],
+                },
+            ]
+        )
+
+    return messages, expected_input_messages
+
+
 @pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_converse(
@@ -485,6 +747,7 @@ def test_converse_input_attributes(
     span_streaming,
     stream_gen_ai_spans,
     converse_response,
+    content_block_messages,
 ):
     if data_collection:
         sentry_init(
@@ -503,262 +766,7 @@ def test_converse_input_attributes(
             trace_lifecycle="stream" if span_streaming else "static",
         )
 
-    messages = [
-        {"role": "user", "content": [{"text": "What is the weather in Paris?"}]},
-        {
-            "role": "user",
-            "content": [{"image": {"format": "png", "source": {"bytes": b"image"}}}],
-        },
-        {
-            "role": "assistant",
-            "content": [
-                {
-                    "toolUse": {
-                        "toolUseId": "tooluse_1",
-                        "name": "get_weather",
-                        "input": {"location": "Paris"},
-                    }
-                }
-            ],
-        },
-        {
-            "role": "user",
-            "content": [
-                {
-                    "toolResult": {
-                        "toolUseId": "tooluse_1",
-                        "content": [
-                            {"json": {"temperature": 18, "unit": "celsius"}},
-                            {"text": "Partly cloudy"},
-                        ],
-                        "status": "success",
-                    }
-                }
-            ],
-        },
-    ]
-
-    expected_input_messages = [
-        {
-            "role": "user",
-            "parts": [{"type": "text", "content": "What is the weather in Paris?"}],
-        },
-        {"role": "user", "parts": [{"type": "blob", "modality": "image"}]},
-        {
-            "role": "assistant",
-            "parts": [
-                {
-                    "type": "tool_call",
-                    "name": "get_weather",
-                    "arguments": {"location": "Paris"},
-                }
-            ],
-        },
-        {
-            "role": "user",
-            "parts": [
-                {
-                    "type": "tool_call_response",
-                    "response": [
-                        {"json": {"temperature": 18, "unit": "celsius"}},
-                        {"text": "Partly cloudy"},
-                    ],
-                }
-            ],
-        },
-    ]
-
-    if BOTOCORE_VERSION >= Version("1.34.131"):
-        messages.append(
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "document": {
-                            "format": "pdf",
-                            "name": "report",
-                            "source": {"bytes": b"document"},
-                        }
-                    }
-                ],
-            }
-        )
-        expected_input_messages.append(
-            {"role": "user", "parts": [{"type": "blob", "modality": "document"}]}
-        )
-
-    if BOTOCORE_VERSION >= Version("1.35.74"):
-        messages.extend(
-            [
-                {
-                    "role": "user",
-                    "content": [
-                        {"video": {"format": "mp4", "source": {"bytes": b"video"}}}
-                    ],
-                },
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "video": {
-                                "format": "mp4",
-                                "source": {
-                                    "s3Location": {
-                                        "uri": "s3://my-bucket/videos/clip.mp4"
-                                    }
-                                },
-                            }
-                        }
-                    ],
-                },
-            ]
-        )
-        expected_input_messages.extend(
-            [
-                {"role": "user", "parts": [{"type": "blob", "modality": "video"}]},
-                {
-                    "role": "user",
-                    "parts": [
-                        {
-                            "type": "uri",
-                            "modality": "video",
-                            "uri": "s3://my-bucket/videos/clip.mp4",
-                        }
-                    ],
-                },
-            ]
-        )
-
-    if BOTOCORE_VERSION >= Version("1.37.0"):
-        messages.append(
-            {
-                "role": "assistant",
-                "content": [
-                    {
-                        "reasoningContent": {
-                            "reasoningText": {
-                                "text": "The user wants the weather in Paris.",
-                                "signature": "signature",
-                            }
-                        }
-                    }
-                ],
-            }
-        )
-        expected_input_messages.append(
-            {
-                "role": "assistant",
-                "parts": [
-                    {
-                        "type": "reasoning",
-                        "content": "The user wants the weather in Paris.",
-                    }
-                ],
-            }
-        )
-
-    if BOTOCORE_VERSION >= Version("1.38.3"):
-        messages.extend(
-            [
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "image": {
-                                "format": "png",
-                                "source": {
-                                    "s3Location": {
-                                        "uri": "s3://my-bucket/images/photo.png"
-                                    }
-                                },
-                            }
-                        }
-                    ],
-                },
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "document": {
-                                "format": "pdf",
-                                "name": "manual",
-                                "source": {
-                                    "s3Location": {
-                                        "uri": "s3://my-bucket/documents/manual.pdf"
-                                    }
-                                },
-                            }
-                        }
-                    ],
-                },
-            ]
-        )
-        expected_input_messages.extend(
-            [
-                {
-                    "role": "user",
-                    "parts": [
-                        {
-                            "type": "uri",
-                            "modality": "image",
-                            "uri": "s3://my-bucket/images/photo.png",
-                        }
-                    ],
-                },
-                {
-                    "role": "user",
-                    "parts": [
-                        {
-                            "type": "uri",
-                            "modality": "document",
-                            "uri": "s3://my-bucket/documents/manual.pdf",
-                        }
-                    ],
-                },
-            ]
-        )
-
-    if BOTOCORE_VERSION >= Version("1.42.1"):
-        messages.extend(
-            [
-                {
-                    "role": "user",
-                    "content": [
-                        {"audio": {"format": "mp3", "source": {"bytes": b"audio"}}}
-                    ],
-                },
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "audio": {
-                                "format": "mp3",
-                                "source": {
-                                    "s3Location": {
-                                        "uri": "s3://my-bucket/audio/question.mp3"
-                                    }
-                                },
-                            }
-                        }
-                    ],
-                },
-            ]
-        )
-        expected_input_messages.extend(
-            [
-                {"role": "user", "parts": [{"type": "blob", "modality": "audio"}]},
-                {
-                    "role": "user",
-                    "parts": [
-                        {
-                            "type": "uri",
-                            "modality": "audio",
-                            "uri": "s3://my-bucket/audio/question.mp3",
-                        }
-                    ],
-                },
-            ]
-        )
+    messages, expected_input_messages = content_block_messages
 
     session = boto3.Session(
         aws_access_key_id="-", aws_secret_access_key="-", region_name="us-east-1"
@@ -1126,6 +1134,7 @@ def test_converse_stream_input_attributes(
     span_streaming,
     stream_gen_ai_spans,
     converse_stream_response,
+    content_block_messages,
 ):
     if data_collection:
         sentry_init(
@@ -1144,262 +1153,7 @@ def test_converse_stream_input_attributes(
             trace_lifecycle="stream" if span_streaming else "static",
         )
 
-    messages = [
-        {"role": "user", "content": [{"text": "What is the weather in Paris?"}]},
-        {
-            "role": "user",
-            "content": [{"image": {"format": "png", "source": {"bytes": b"image"}}}],
-        },
-        {
-            "role": "assistant",
-            "content": [
-                {
-                    "toolUse": {
-                        "toolUseId": "tooluse_1",
-                        "name": "get_weather",
-                        "input": {"location": "Paris"},
-                    }
-                }
-            ],
-        },
-        {
-            "role": "user",
-            "content": [
-                {
-                    "toolResult": {
-                        "toolUseId": "tooluse_1",
-                        "content": [
-                            {"json": {"temperature": 18, "unit": "celsius"}},
-                            {"text": "Partly cloudy"},
-                        ],
-                        "status": "success",
-                    }
-                }
-            ],
-        },
-    ]
-
-    expected_input_messages = [
-        {
-            "role": "user",
-            "parts": [{"type": "text", "content": "What is the weather in Paris?"}],
-        },
-        {"role": "user", "parts": [{"type": "blob", "modality": "image"}]},
-        {
-            "role": "assistant",
-            "parts": [
-                {
-                    "type": "tool_call",
-                    "name": "get_weather",
-                    "arguments": {"location": "Paris"},
-                }
-            ],
-        },
-        {
-            "role": "user",
-            "parts": [
-                {
-                    "type": "tool_call_response",
-                    "response": [
-                        {"json": {"temperature": 18, "unit": "celsius"}},
-                        {"text": "Partly cloudy"},
-                    ],
-                }
-            ],
-        },
-    ]
-
-    if BOTOCORE_VERSION >= Version("1.34.131"):
-        messages.append(
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "document": {
-                            "format": "pdf",
-                            "name": "report",
-                            "source": {"bytes": b"document"},
-                        }
-                    }
-                ],
-            }
-        )
-        expected_input_messages.append(
-            {"role": "user", "parts": [{"type": "blob", "modality": "document"}]}
-        )
-
-    if BOTOCORE_VERSION >= Version("1.35.74"):
-        messages.extend(
-            [
-                {
-                    "role": "user",
-                    "content": [
-                        {"video": {"format": "mp4", "source": {"bytes": b"video"}}}
-                    ],
-                },
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "video": {
-                                "format": "mp4",
-                                "source": {
-                                    "s3Location": {
-                                        "uri": "s3://my-bucket/videos/clip.mp4"
-                                    }
-                                },
-                            }
-                        }
-                    ],
-                },
-            ]
-        )
-        expected_input_messages.extend(
-            [
-                {"role": "user", "parts": [{"type": "blob", "modality": "video"}]},
-                {
-                    "role": "user",
-                    "parts": [
-                        {
-                            "type": "uri",
-                            "modality": "video",
-                            "uri": "s3://my-bucket/videos/clip.mp4",
-                        }
-                    ],
-                },
-            ]
-        )
-
-    if BOTOCORE_VERSION >= Version("1.37.0"):
-        messages.append(
-            {
-                "role": "assistant",
-                "content": [
-                    {
-                        "reasoningContent": {
-                            "reasoningText": {
-                                "text": "The user wants the weather in Paris.",
-                                "signature": "signature",
-                            }
-                        }
-                    }
-                ],
-            }
-        )
-        expected_input_messages.append(
-            {
-                "role": "assistant",
-                "parts": [
-                    {
-                        "type": "reasoning",
-                        "content": "The user wants the weather in Paris.",
-                    }
-                ],
-            }
-        )
-
-    if BOTOCORE_VERSION >= Version("1.38.3"):
-        messages.extend(
-            [
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "image": {
-                                "format": "png",
-                                "source": {
-                                    "s3Location": {
-                                        "uri": "s3://my-bucket/images/photo.png"
-                                    }
-                                },
-                            }
-                        }
-                    ],
-                },
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "document": {
-                                "format": "pdf",
-                                "name": "manual",
-                                "source": {
-                                    "s3Location": {
-                                        "uri": "s3://my-bucket/documents/manual.pdf"
-                                    }
-                                },
-                            }
-                        }
-                    ],
-                },
-            ]
-        )
-        expected_input_messages.extend(
-            [
-                {
-                    "role": "user",
-                    "parts": [
-                        {
-                            "type": "uri",
-                            "modality": "image",
-                            "uri": "s3://my-bucket/images/photo.png",
-                        }
-                    ],
-                },
-                {
-                    "role": "user",
-                    "parts": [
-                        {
-                            "type": "uri",
-                            "modality": "document",
-                            "uri": "s3://my-bucket/documents/manual.pdf",
-                        }
-                    ],
-                },
-            ]
-        )
-
-    if BOTOCORE_VERSION >= Version("1.42.1"):
-        messages.extend(
-            [
-                {
-                    "role": "user",
-                    "content": [
-                        {"audio": {"format": "mp3", "source": {"bytes": b"audio"}}}
-                    ],
-                },
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "audio": {
-                                "format": "mp3",
-                                "source": {
-                                    "s3Location": {
-                                        "uri": "s3://my-bucket/audio/question.mp3"
-                                    }
-                                },
-                            }
-                        }
-                    ],
-                },
-            ]
-        )
-        expected_input_messages.extend(
-            [
-                {"role": "user", "parts": [{"type": "blob", "modality": "audio"}]},
-                {
-                    "role": "user",
-                    "parts": [
-                        {
-                            "type": "uri",
-                            "modality": "audio",
-                            "uri": "s3://my-bucket/audio/question.mp3",
-                        }
-                    ],
-                },
-            ]
-        )
+    messages, expected_input_messages = content_block_messages
 
     session = boto3.Session(
         aws_access_key_id="-", aws_secret_access_key="-", region_name="us-east-1"
