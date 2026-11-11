@@ -474,6 +474,89 @@ def test_converse_tool_definitions(
         )
 
 
+@pytest.mark.parametrize("data_collection", [True, False])
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+def test_converse_input_attributes(
+    sentry_init,
+    capture_items,
+    capture_events,
+    data_collection,
+    span_streaming,
+    stream_gen_ai_spans,
+    converse_response,
+):
+    if data_collection:
+        sentry_init(
+            traces_sample_rate=1.0,
+            integrations=[Boto3Integration()],
+            data_collection={"gen_ai": {"inputs": True}},
+            stream_gen_ai_spans=stream_gen_ai_spans,
+            trace_lifecycle="stream" if span_streaming else "static",
+        )
+    else:
+        sentry_init(
+            traces_sample_rate=1.0,
+            integrations=[Boto3Integration()],
+            send_default_pii=True,
+            stream_gen_ai_spans=stream_gen_ai_spans,
+            trace_lifecycle="stream" if span_streaming else "static",
+        )
+
+    session = boto3.Session(
+        aws_access_key_id="-", aws_secret_access_key="-", region_name="us-east-1"
+    )
+    client = session.client("bedrock-runtime")
+    stubber = Stubber(client)
+    stubber.add_response("converse", converse_response)
+
+    if span_streaming or stream_gen_ai_spans:
+        items = capture_items("span")
+
+        with stubber, sentry_sdk.start_transaction(name="parent"):
+            client.converse(
+                modelId="anthropic.claude-3-sonnet-20240229-v1:0",
+                messages=[{"role": "user", "content": [{"text": "Hi"}]}],
+                system=[
+                    {"text": "You are a helpful assistant."},
+                    {"text": "Be concise and clear."},
+                ],
+            )
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items]
+        (span,) = (
+            span
+            for span in spans
+            if span["attributes"].get("sentry.op") == OP.GEN_AI_CHAT
+        )
+
+        assert json.loads(span["attributes"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]) == [
+            {"type": "text", "content": "You are a helpful assistant."},
+            {"type": "text", "content": "Be concise and clear."},
+        ]
+    else:
+        events = capture_events()
+
+        with stubber, sentry_sdk.start_transaction(name="parent"):
+            client.converse(
+                modelId="anthropic.claude-3-sonnet-20240229-v1:0",
+                messages=[{"role": "user", "content": [{"text": "Hi"}]}],
+                system=[
+                    {"text": "You are a helpful assistant."},
+                    {"text": "Be concise and clear."},
+                ],
+            )
+
+        (transaction,) = events
+        (span,) = transaction["spans"]
+
+        assert json.loads(span["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]) == [
+            {"type": "text", "content": "You are a helpful assistant."},
+            {"type": "text", "content": "Be concise and clear."},
+        ]
+
+
 @pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_converse_stream(
@@ -765,3 +848,93 @@ def test_converse_stream_tool_definitions(
             json.loads(span["data"][SPANDATA.GEN_AI_TOOL_DEFINITIONS])
             == expected_tool_definitions
         )
+
+
+@pytest.mark.parametrize("data_collection", [True, False])
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+def test_converse_stream_input_attributes(
+    sentry_init,
+    capture_items,
+    capture_events,
+    data_collection,
+    span_streaming,
+    stream_gen_ai_spans,
+    converse_stream_response,
+):
+    if data_collection:
+        sentry_init(
+            traces_sample_rate=1.0,
+            integrations=[Boto3Integration()],
+            data_collection={"gen_ai": {"inputs": True}},
+            stream_gen_ai_spans=stream_gen_ai_spans,
+            trace_lifecycle="stream" if span_streaming else "static",
+        )
+    else:
+        sentry_init(
+            traces_sample_rate=1.0,
+            integrations=[Boto3Integration()],
+            send_default_pii=True,
+            stream_gen_ai_spans=stream_gen_ai_spans,
+            trace_lifecycle="stream" if span_streaming else "static",
+        )
+
+    session = boto3.Session(
+        aws_access_key_id="-", aws_secret_access_key="-", region_name="us-east-1"
+    )
+    client = session.client("bedrock-runtime")
+    mock_http = Mock(status_code=200)
+    client.meta.events.register(
+        "before-call.bedrock-runtime.ConverseStream",
+        lambda **kwargs: (mock_http, converse_stream_response),
+    )
+
+    if span_streaming or stream_gen_ai_spans:
+        items = capture_items("span")
+
+        with sentry_sdk.start_transaction(name="parent"):
+            response = client.converse_stream(
+                modelId="anthropic.claude-3-sonnet-20240229-v1:0",
+                messages=[{"role": "user", "content": [{"text": "Hi"}]}],
+                system=[
+                    {"text": "You are a helpful assistant."},
+                    {"text": "Be concise and clear."},
+                ],
+            )
+            for _ in response["stream"]:
+                pass
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items]
+        (span,) = (
+            span
+            for span in spans
+            if span["attributes"].get("sentry.op") == OP.GEN_AI_CHAT
+        )
+
+        assert json.loads(span["attributes"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]) == [
+            {"type": "text", "content": "You are a helpful assistant."},
+            {"type": "text", "content": "Be concise and clear."},
+        ]
+    else:
+        events = capture_events()
+
+        with sentry_sdk.start_transaction(name="parent"):
+            response = client.converse_stream(
+                modelId="anthropic.claude-3-sonnet-20240229-v1:0",
+                messages=[{"role": "user", "content": [{"text": "Hi"}]}],
+                system=[
+                    {"text": "You are a helpful assistant."},
+                    {"text": "Be concise and clear."},
+                ],
+            )
+            for _ in response["stream"]:
+                pass
+
+        (transaction,) = events
+        (span,) = transaction["spans"]
+
+        assert json.loads(span["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]) == [
+            {"type": "text", "content": "You are a helpful assistant."},
+            {"type": "text", "content": "Be concise and clear."},
+        ]

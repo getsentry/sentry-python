@@ -6,6 +6,7 @@ import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.integrations.boto3._services.base import _ServiceExtension
+from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import SpanStatus, StreamedSpan
 from sentry_sdk.tracing import SPANSTATUS
 from sentry_sdk.utils import (
@@ -29,7 +30,7 @@ if TYPE_CHECKING:
         ConverseStreamResponseTypeDef,
     )
 
-    from sentry_sdk._types import Attributes, ToolDefinition
+    from sentry_sdk._types import Attributes, TextPart, ToolDefinition
     from sentry_sdk.integrations.boto3._context import AwsCallContext
     from sentry_sdk.tracing import Span
 
@@ -188,6 +189,19 @@ def _transform_tool_definitions(
     return result
 
 
+def _transform_system_instructions(
+    system_instructions: "Union[list[dict[str, Any]], tuple[dict[str, Any], ...]]",
+) -> "list[TextPart]":
+    instruction_text_parts: "list[TextPart]" = []
+    for block in system_instructions:
+        if not isinstance(block, dict) or "text" not in block:
+            continue
+
+        instruction_text_parts.append({"type": "text", "content": block["text"]})
+
+    return instruction_text_parts
+
+
 class _BedrockExtension(_ServiceExtension):
     __slots__ = ()
     skip_if_no_active_span = False
@@ -235,6 +249,14 @@ class _BedrockExtension(_ServiceExtension):
         if has_data_collection_enabled(client_options):
             if not client_options["data_collection"]["gen_ai"]["inputs"]:
                 return attributes
+
+        system_instructions = ctx.params.get("system")
+        if (
+            has_data_collection_enabled(client_options) or should_send_default_pii()
+        ) and isinstance(system_instructions, (list, tuple)):
+            attributes[SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS] = json.dumps(
+                _transform_system_instructions(system_instructions)
+            )
 
         tool_config = ctx.params.get("toolConfig")
         if not isinstance(tool_config, dict):
