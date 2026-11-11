@@ -1,10 +1,13 @@
+import copy
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from threading import Thread
 from urllib.parse import parse_qs, urlparse
 
 import boto3
+import pytest
 from botocore.auth import SIGNED_HEADERS_BLACKLIST
 from botocore.config import Config
+from botocore.stub import Stubber
 
 import sentry_sdk
 from sentry_sdk.integrations.boto3 import Boto3Integration
@@ -13,6 +16,7 @@ from sentry_sdk.utils import (
     _get_aws_sigv4_signed_headers_from_authorization_header,
     _get_aws_sigv4_signed_headers_from_url_query_string,
 )
+from tests.integrations.boto3.helpers import capture_spans_by_op
 
 # botocore 1.43.115+ never signs `baggage`.
 BOTOCORE_SIGNS_BAGGAGE = "baggage" not in SIGNED_HEADERS_BLACKLIST
@@ -207,3 +211,65 @@ def test_presigned_urls_do_not_require_sentry_headers(sentry_init):
     # presigned URL query must not contain `sentry-trace` or `baggage`.
     assert "sentry-trace" not in url
     assert "baggage" not in url
+
+
+@pytest.mark.parametrize(
+    "service,method,params,response",
+    [
+        pytest.param(
+            "sqs",
+            "send_message",
+            {
+                "QueueUrl": "https://sqs.eu-north-1.amazonaws.com/123456789012/orders",
+                "MessageBody": "hi",
+            },
+            {"MessageId": "1"},
+            id="sqs-send",
+        ),
+        pytest.param(
+            "sqs",
+            "receive_message",
+            {"QueueUrl": "https://sqs.eu-north-1.amazonaws.com/123456789012/orders"},
+            {},
+            id="sqs-receive",
+        ),
+        pytest.param(
+            "sns",
+            "publish",
+            {"TopicArn": "arn:aws:sns:eu-north-1:123456789012:alerts", "Message": "hi"},
+            {"MessageId": "1"},
+            id="sns-publish",
+        ),
+        pytest.param(
+            "lambda",
+            "invoke",
+            {"FunctionName": "billing"},
+            {"StatusCode": 200},
+            id="lambda-invoke",
+        ),
+    ],
+)
+def test_propagate_traces_disabled(
+    sentry_init, capture_items, service, method, params, response
+):
+    """`propagate_traces=False` sends the caller's params unchanged."""
+    sentry_init(
+        traces_sample_rate=1.0,
+        integrations=[Boto3Integration(propagate_traces=False)],
+    )
+    client = boto3.client(  # type: ignore[attr-defined]
+        service,
+        region_name="eu-north-1",
+        aws_access_key_id="-",
+        aws_secret_access_key="-",
+    )
+
+    with Stubber(client) as stubber:
+        # the stubber fails the call when the sent params differ from these.
+        stubber.add_response(method, response, copy.deepcopy(params))
+        spans = capture_spans_by_op(
+            lambda: getattr(client, method)(**params), capture_items
+        )
+
+    # the call is still instrumented.
+    assert sum(map(len, spans.values())) == 1
