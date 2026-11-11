@@ -1,5 +1,5 @@
 import pytest
-from botocore.exceptions import ClientError
+from botocore.exceptions import ClientError, ParamValidationError
 from botocore.stub import Stubber
 
 from sentry_sdk.consts import OP, SPANDATA
@@ -242,6 +242,42 @@ def test_publish_without_destination(client_factory, capture_items):
     (span,) = spans[OP.QUEUE_PUBLISH]
     assert span["name"] == "send sns.eu-north-1.amazonaws.com:443"
     assert SPANDATA.MESSAGING_DESTINATION_NAME not in span["attributes"]
+
+
+@pytest.mark.tests_internal_exceptions
+@pytest.mark.parametrize(
+    "method,params",
+    [
+        pytest.param(
+            "publish",
+            {"TargetArn": 123, "Message": "hi"},
+            id="non-string-target-arn",
+        ),
+        pytest.param(
+            "publish_batch",
+            {
+                "TopicArn": "arn:aws:sns:eu-north-1:123456789012:alerts",
+                "PublishBatchRequestEntries": None,
+            },
+            id="non-list-batch-entries",
+        ),
+    ],
+)
+def test_publish_with_invalid_params(client_factory, capture_items, method, params):
+    client = client_factory("sns")
+
+    def call():
+        with pytest.raises(ParamValidationError):
+            getattr(client, method)(**params)
+
+    spans = capture_spans_by_op(call, capture_items)
+
+    (span,) = spans[OP.QUEUE_PUBLISH]
+    assert span["status"] == "error"
+    attributes = span["attributes"]
+    assert attributes[SPANDATA.MESSAGING_SYSTEM] == "aws.sns"
+    assert SPANDATA.MESSAGING_BATCH_MESSAGE_COUNT not in attributes
+    assert attributes[SPANDATA.ERROR_TYPE] == "botocore.exceptions.ParamValidationError"
 
 
 @pytest.mark.parametrize(
