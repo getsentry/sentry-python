@@ -147,6 +147,19 @@ def _patch_event_stream() -> None:
     EventStream.close = sentry_patched_close  # type: ignore[method-assign]
 
 
+def _transform_system_instructions(
+    system_instructions: "Union[list[dict[str, Any]], tuple[dict[str, Any], ...]]",
+) -> "list[TextPart]":
+    instruction_text_parts: "list[TextPart]" = []
+    for block in system_instructions:
+        if not isinstance(block, dict) or "text" not in block:
+            continue
+
+        instruction_text_parts.append({"type": "text", "content": block["text"]})
+
+    return instruction_text_parts
+
+
 def _transform_tool_definitions(
     tools: "list[dict[str, Any]]",
 ) -> "list[ToolDefinition]":
@@ -187,19 +200,6 @@ def _transform_tool_definitions(
         result.append({"type": system_tool["name"]})
 
     return result
-
-
-def _transform_system_instructions(
-    system_instructions: "Union[list[dict[str, Any]], tuple[dict[str, Any], ...]]",
-) -> "list[TextPart]":
-    instruction_text_parts: "list[TextPart]" = []
-    for block in system_instructions:
-        if not isinstance(block, dict) or "text" not in block:
-            continue
-
-        instruction_text_parts.append({"type": "text", "content": block["text"]})
-
-    return instruction_text_parts
 
 
 class _BedrockExtension(_ServiceExtension):
