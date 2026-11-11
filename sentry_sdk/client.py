@@ -539,7 +539,7 @@ class _Client(BaseClient):
     the client options as keyword arguments and optionally the DSN as first
     argument.
 
-    Alias of :py:class:`sentry_sdk.Client`. (Was created for better intelisense support)
+    Alias of :py:class:`sentry_sdk.Client`. (Was created for better IntelliSense support)
     """
 
     def __init__(self, *args: "Any", **kwargs: "Any") -> None:
