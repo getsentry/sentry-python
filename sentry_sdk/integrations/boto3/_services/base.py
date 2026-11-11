@@ -11,25 +11,24 @@ if TYPE_CHECKING:
 class _ServiceExtension:
     """
     Optional hooks for adding service-specific behavior to AWS client
-    span; non-overridden methods keep the generic instrumentation.
-    Services without a registered extension in `_SERVICE_EXTENSIONS` use this
-    class as is, i.e. the generic instrumentation.
+    span. Non-overridden methods keep the generic instrumentation.
     """
 
     __slots__ = ()
+    skip_if_no_active_span = True
 
     def get_span_op(self, ctx: "AwsCallContext") -> "Optional[str]":
         """Return an optional `sentry.op` override, or `None` to keep the default."""
         return None
 
+    def get_span_name(
+        self, ctx: "AwsCallContext", attributes: "Attributes"
+    ) -> "Optional[str]":
+        """Return an optional span name override, or `None` to keep the default."""
+        return None
+
     def get_request_attributes(self, ctx: "AwsCallContext") -> "Attributes":
         """Return request attributes to add before the AWS request is made."""
-        return {}
-
-    def get_response_attributes(
-        self, ctx: "AwsCallContext", response: "Any"
-    ) -> "Attributes":
-        """Return response attributes to add after the AWS request is made."""
         return {}
 
     def get_request_params(
@@ -41,9 +40,11 @@ class _ServiceExtension:
         """
         return None
 
-    def has_streaming_response(self, ctx: "AwsCallContext") -> bool:
-        """
-        Return whether a `StreamingBody` response is read over time, so the span ends
-        when it's read or closed, or `False` to end it with the call.
-        """
-        return True
+    def on_success_response(
+        self,
+        ctx: "AwsCallContext",
+        response: "Any",
+        span: "Span",
+    ) -> None:
+        """Hook that fires after a successful response. Responsible for closing the span."""
+        return None

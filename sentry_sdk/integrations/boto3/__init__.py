@@ -1,5 +1,6 @@
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.integrations.boto3._client import _patch_botocore_client
+from sentry_sdk.integrations.boto3._services.bedrock import _patch_event_stream
 from sentry_sdk.integrations.boto3.consts import IDENTIFIER, ORIGIN
 from sentry_sdk.utils import parse_version
 
@@ -13,9 +14,15 @@ class Boto3Integration(Integration):
     identifier = IDENTIFIER
     origin = ORIGIN
 
+    def __init__(self, propagate_traces: bool = True) -> None:
+        # add trace data to request params, e.g. SQS/SNS message attributes or
+        # Lambda `ClientContext`, so the receiving side can continue the trace.
+        self.propagate_traces = propagate_traces
+
     @staticmethod
     def setup_once() -> None:
         version = parse_version(BOTOCORE_VERSION)
         _check_minimum_version(Boto3Integration, version, "botocore")
 
         _patch_botocore_client()
+        _patch_event_stream()

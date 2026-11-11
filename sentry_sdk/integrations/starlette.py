@@ -212,16 +212,6 @@ def _enable_span_for_middleware(
     return middleware_class
 
 
-def _serialize_request_body_data(data: "Any") -> str:
-    # data may be a JSON-serializable value, an AnnotatedValue, or a dict with AnnotatedValue values
-    def _default(value: "Any") -> "Any":
-        if isinstance(value, AnnotatedValue):
-            return value.value
-        return str(value)
-
-    return json.dumps(data, default=_default)
-
-
 @ensure_integration_enabled(StarletteIntegration)
 def _capture_exception(exception: BaseException, handled: "Any" = False) -> None:
     event, hint = event_from_exception(
@@ -298,8 +288,8 @@ def patch_exception_middleware(middleware_class: "Any") -> None:
             # Also add the user (that was eventually set by be Authentication middle
             # that was called before this middleware). This is done because the authentication
             # middleware sets the user in the scope and then (in the same function)
-            # calls this exception middelware. In case there is no exception (or no handler
-            # for the type of exception occuring) then the exception bubbles up and setting the
+            # calls this exception middleware. In case there is no exception (or no handler
+            # for the type of exception occurring) then the exception bubbles up and setting the
             # user information into the sentry scope is done in auth middleware and the
             # ASGI middleware will then send everything to Sentry and this is fine.
             # But if there is an exception happening that the exception middleware here

@@ -1,8 +1,7 @@
 from contextlib import contextmanager
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import sentry_sdk
-from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.integrations.boto3._context import AwsCallContext
 from sentry_sdk.integrations.boto3._instrumentation import (
@@ -14,21 +13,32 @@ from sentry_sdk.integrations.boto3._instrumentation import (
     _sentry_request_created,
     _start_client_span,
 )
-from sentry_sdk.integrations.boto3._services.registry import (
-    _resolve_service,
+from sentry_sdk.integrations.boto3._services.bedrock import _BedrockExtension
+from sentry_sdk.integrations.boto3._services.dynamodb import _DynamoDBExtension
+from sentry_sdk.integrations.boto3._services.kinesis import _KinesisExtension
+from sentry_sdk.integrations.boto3._services.lambda_ import _LambdaExtension
+from sentry_sdk.integrations.boto3._services.s3 import _S3Extension
+from sentry_sdk.integrations.boto3._services.secretsmanager import (
+    _SecretsManagerExtension,
+)
+from sentry_sdk.integrations.boto3._services.sns import _SNSExtension
+from sentry_sdk.integrations.boto3._services.sqs import _SQSExtension
+from sentry_sdk.integrations.boto3._services.stepfunctions import (
+    _StepFunctionsExtension,
 )
 from sentry_sdk.integrations.boto3.consts import IDENTIFIER
-from sentry_sdk.traces import NoOpSpan, Span, SpanStatus
+from sentry_sdk.traces import NoOpSpan, Span
 from sentry_sdk.utils import capture_internal_exceptions
 
 if TYPE_CHECKING:
     from typing import Any, Dict, Iterator, Optional
 
     from sentry_sdk._types import Attributes
+    from sentry_sdk.integrations.boto3 import Boto3Integration
+    from sentry_sdk.integrations.boto3._services.base import _ServiceExtension
 
 try:
     from botocore.client import BaseClient
-    from botocore.exceptions import ClientError
 except ImportError:
     raise DidNotEnable("botocore not installed")
 
@@ -84,8 +94,11 @@ def _patch_botocore_client() -> None:
         https://github.com/boto/botocore/blob/358f8eec8c76201bb1a7a35644abcbc9036de7ed/botocore/client.py
         https://opentelemetry.io/docs/specs/semconv/rpc/rpc-spans/#rpc-client-span
         """
-        client = sentry_sdk.get_client()
-        if client.get_integration(IDENTIFIER) is None:
+        integration = cast(
+            "Optional[Boto3Integration]",
+            sentry_sdk.get_client().get_integration(IDENTIFIER),
+        )
+        if integration is None:
             return orig_make_api_call(self, operation_name, api_params)
 
         span: "Optional[Span]" = None
@@ -94,9 +107,29 @@ def _patch_botocore_client() -> None:
             with capture_internal_exceptions():
                 # add optional metadata to the context, e.g. service-name, region-name, etc.
                 ctx.add_metadata(self)
-            service_ext = _resolve_service(ctx.service_name)
+
+            service_ext: "Optional[_ServiceExtension]" = None
+            if ctx.service_name == "bedrock-runtime":
+                service_ext = _BedrockExtension()
+            elif ctx.service_name == "dynamodb":
+                service_ext = _DynamoDBExtension()
+            elif ctx.service_name == "kinesis":
+                service_ext = _KinesisExtension()
+            elif ctx.service_name == "lambda":
+                service_ext = _LambdaExtension()
+            elif ctx.service_name == "s3":
+                service_ext = _S3Extension()
+            elif ctx.service_name == "secretsmanager":
+                service_ext = _SecretsManagerExtension()
+            elif ctx.service_name == "sns":
+                service_ext = _SNSExtension()
+            elif ctx.service_name == "sqs":
+                service_ext = _SQSExtension()
+            elif ctx.service_name == "stepfunctions":
+                service_ext = _StepFunctionsExtension()
+
             span = _start_client_span(ctx, service_ext)
-            with capture_internal_exceptions():
+            if service_ext is not None and integration.propagate_traces:
                 # override the request params for e.g. trace propagation.
                 api_params = service_ext.get_request_params(ctx, span) or api_params
 
@@ -110,38 +143,30 @@ def _patch_botocore_client() -> None:
                 try:
                     parsed = orig_make_api_call(self, operation_name, api_params)
                 except BaseException as error:
-                    if isinstance(error, ClientError):
-                        with capture_internal_exceptions():
-                            attributes.update(
-                                service_ext.get_response_attributes(ctx, error.response)
-                            )
                     with capture_internal_exceptions():
                         attributes.update(_get_error_attributes(error))
                     with capture_internal_exceptions():
                         span.set_attributes(attributes)
                     raise
                 with capture_internal_exceptions():
-                    attributes.update(service_ext.get_response_attributes(ctx, parsed))
-                with capture_internal_exceptions():
                     attributes.update(_get_response_attributes(parsed))
                 with capture_internal_exceptions():
                     span.set_attributes(attributes)
-                    # a service extension reports a failure that didn't raise, i.e. one
-                    # in a successful response, with `error.type`.
-                    if SPANDATA.ERROR_TYPE in attributes:
-                        span.status = SpanStatus.ERROR
         except BaseException as error:
             _finish_span(span, error)
             raise
 
+        if service_ext is not None:
+            service_ext.on_success_response(ctx, parsed, span)
+            return parsed
+
         streaming_body_instrumented = False
         with capture_internal_exceptions():
-            if service_ext.has_streaming_response(ctx):
-                streaming_body_instrumented = _instrument_streaming_body(span, parsed)
+            streaming_body_instrumented = _instrument_streaming_body(span, parsed)
 
         # `StreamingBody`s finish their span when consumed or closed.
         if not streaming_body_instrumented:
-            _finish_span(span)
+            span.end()
         return parsed
 
     BaseClient.__init__ = sentry_patched_init  # type: ignore

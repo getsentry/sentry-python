@@ -4,6 +4,7 @@ from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_ve
 from sentry_sdk.integrations.redis.rb import _patch_rb
 from sentry_sdk.integrations.redis.redis import _patch_redis
 from sentry_sdk.integrations.redis.redis_cluster import _patch_redis_cluster
+from sentry_sdk.integrations.redis.redis_py_cluster_legacy import _patch_rediscluster
 from sentry_sdk.utils import parse_version
 
 if TYPE_CHECKING:
@@ -32,3 +33,4 @@ class RedisIntegration(Integration):
         _patch_redis()
         _patch_redis_cluster()
         _patch_rb()
+        _patch_rediscluster()

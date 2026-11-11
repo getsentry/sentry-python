@@ -3,6 +3,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 
 from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.integrations.boto3._instrumentation import _instrument_streaming_body
 from sentry_sdk.integrations.boto3._services.base import _ServiceExtension
 from sentry_sdk.integrations.boto3._utils import (
     _extract_attributes,
@@ -18,6 +19,7 @@ if TYPE_CHECKING:
     from sentry_sdk.integrations.boto3._utils import (
         _AttributeSpec,
     )
+    from sentry_sdk.traces import Span
 
 # s3 object apis get `object.*` ops, every other s3 api, e.g. `ListBuckets`, keeps the default `rpc`.
 # https://github.com/getsentry/sentry-conventions/blob/main/model/op/object.json
@@ -111,9 +113,9 @@ class _S3Extension(_ServiceExtension):
 
         return attributes
 
-    def get_response_attributes(
-        self, ctx: "AwsCallContext", response: "Any"
-    ) -> "Attributes":
+    def on_success_response(
+        self, ctx: "AwsCallContext", response: "Any", span: "Span"
+    ) -> None:
         attributes: "Attributes" = {}
 
         if (
@@ -137,4 +139,12 @@ class _S3Extension(_ServiceExtension):
             # an un-ranged `HEAD` has no body, so `ContentLength` is the file size.
             attributes[SPANDATA.FILE_SIZE] = response["ContentLength"]
 
-        return attributes
+        span.set_attributes(attributes)
+
+        streaming_body_instrumented = False
+        with capture_internal_exceptions():
+            streaming_body_instrumented = _instrument_streaming_body(span, response)
+
+        # `StreamingBody`s finish their span when consumed or closed.
+        if not streaming_body_instrumented:
+            span.end()
