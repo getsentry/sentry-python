@@ -250,7 +250,7 @@ class _Client(BaseClient):
     the client options as keyword arguments and optionally the DSN as first
     argument.
 
-    Alias of :py:class:`sentry_sdk.Client`. (Was created for better intelisense support)
+    Alias of :py:class:`sentry_sdk.Client`. (Was created for better IntelliSense support)
     """
 
     def __init__(self, *args: "Any", **kwargs: "Any") -> None:
@@ -547,7 +547,13 @@ class _Client(BaseClient):
                 ),
             )
 
-        before_send = self.options["before_send"]
+        if is_checkin:
+            before_send = self.options["before_send_check_in"]
+            data_category: "EventDataCategory" = "monitor"
+        else:
+            before_send = self.options["before_send"]
+            data_category = "error"
+
         if before_send is not None and event is not None:
             new_event = None
             exception_raised_in_before_send = False
@@ -565,7 +571,9 @@ class _Client(BaseClient):
                         if exception_raised_in_before_send
                         else "before_send"
                     )
-                    self.transport.record_lost_event(reason, data_category="error")
+                    self.transport.record_lost_event(
+                        reason, data_category=data_category
+                    )
 
             event = new_event
 

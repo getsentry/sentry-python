@@ -212,7 +212,7 @@ def fetch_package_dependencies(
     print(f"  Resolving dependencies: {package}=={version} on Python {python_version}")
 
     # Removing non-report output with -qqq may be brittle, but avoids file I/O.
-    # Currently -qqq supresses all non-report output that would break json.loads().
+    # Currently -qqq suppresses all non-report output that would break json.loads().
     result = subprocess.run(
         [
             "uv",
@@ -1042,36 +1042,6 @@ def _transform_target_python_versions(
         return updated
 
 
-def get_file_hash() -> str:
-    """Calculate a hash of the tox.ini file."""
-    hasher = hashlib.md5()
-
-    with open(TOX_FILE, "rb") as f:
-        buf = f.read()
-        hasher.update(buf)
-
-    return hasher.hexdigest()
-
-
-def get_last_updated() -> Optional[datetime]:
-    repo_root = subprocess.run(
-        ["git", "rev-parse", "--show-toplevel"],
-        capture_output=True,
-        text=True,
-    ).stdout.strip()
-    tox_ini_path = Path(repo_root) / "tox.ini"
-
-    timestamp = subprocess.run(
-        ["git", "log", "-1", "--pretty=%ct", str(tox_ini_path)],
-        capture_output=True,
-        text=True,
-    ).stdout.strip()
-
-    timestamp = datetime.fromtimestamp(int(timestamp), timezone.utc)
-    print(f"Last committed tox.ini update: {timestamp}")
-    return timestamp
-
-
 def _normalize_name(package: str) -> str:
     # From https://peps.python.org/pep-0503/#normalized-names
     # but normalizing to underscores instead of hyphens since tox-formatted packages
@@ -1357,6 +1327,11 @@ def main() -> dict[str, list]:
 
     write_tox_file(packages)
 
+    # Unused cache entries are only pruned on full runs. With --only/--skip,
+    # skipped integrations don't touch (most of) their cache entries, so pruning
+    # would wipe them.
+    prune_cache = not (only_update or skip_update)
+
     # Sort the release cache file
     releases = []
     with open(RELEASES_CACHE_FILE) as releases_cache:
@@ -1365,7 +1340,8 @@ def main() -> dict[str, list]:
     with open(RELEASES_CACHE_FILE, "w") as releases_cache:
         for release in releases:
             if (
-                CACHE[_normalize_name(release["info"]["name"])][
+                not prune_cache
+                or CACHE[_normalize_name(release["info"]["name"])][
                     release["info"]["version"]
                 ]["_accessed"]
                 is True
@@ -1380,7 +1356,8 @@ def main() -> dict[str, list]:
     with open(DEPENDENCIES_CACHE_FILE, "w") as releases_cache:
         for release in releases:
             if (
-                DEPENDENCIES_CACHE[release["python_version"]][
+                not prune_cache
+                or DEPENDENCIES_CACHE[release["python_version"]][
                     release["install_targets_hash"]
                 ]["_accessed"]
                 is True

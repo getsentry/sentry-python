@@ -4,7 +4,7 @@ This is a small script to split a tox.ini config file into multiple GitHub actio
 This way each group of frameworks defined in tox.ini will get its own GitHub actions configuration file
 which allows them to be run in parallel in GitHub actions.
 
-This will generate/update several configuration files, that need to be commited to Git afterwards.
+This will generate/update several configuration files, that need to be committed to Git afterwards.
 Whenever tox.ini is changed, this script needs to be run.
 
 Usage:
@@ -110,6 +110,7 @@ GROUPS = {
         "clickhouse_driver",
         "pymongo",
         "redis",
+        "redis_py_cluster_legacy",
         "sqlalchemy",
     ],
     "Flags": [

@@ -548,7 +548,7 @@ def test_continuous_profiler_auto_start_and_stop_unsampled(
         ),
     ],
 )
-def test_continuous_profiler_manual_start_and_stop_noop_when_using_trace_lifecyle(
+def test_continuous_profiler_manual_start_and_stop_noop_when_using_trace_lifecycle(
     sentry_init,
     mode,
     class_name,

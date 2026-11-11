@@ -238,8 +238,8 @@ class OTLPIntegration(Integration):
         Set to False to setup the TracerProvider manually.
     :param collector_url: URL of your own OpenTelemetry collector, defaults to None.
         When set, the exporter will send traces to this URL instead of the Sentry OTLP endpoint derived from the DSN.
-    :param setup_propagator: Automatically configure the Sentry Propagator for Distributed Tracing, defaults to True.
-        Set to False to configure propagators manually or to disable propagation.
+    :param setup_propagator: Replace the global OpenTelemetry propagator with the Sentry Propagator, defaults to False.
+        By default, the propagators configured in OpenTelemetry are used for Distributed Tracing.
     :param capture_exceptions: Intercept and capture exceptions on the OpenTelemetry Span in Sentry as well, defaults to False.
         Set to True to turn on capturing but be aware that since Sentry captures most exceptions, duplicate exceptions might be dropped by DedupeIntegration in many cases.
     """
@@ -250,7 +250,7 @@ class OTLPIntegration(Integration):
         self,
         setup_otlp_traces_exporter: bool = True,
         collector_url: "Optional[str]" = None,
-        setup_propagator: bool = True,
+        setup_propagator: bool = False,
         capture_exceptions: bool = False,
     ) -> None:
         self.setup_otlp_traces_exporter = setup_otlp_traces_exporter

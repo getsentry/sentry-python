@@ -440,11 +440,17 @@ TEST_SUITE_CONFIG = {
     },
     "redis": {
         "package": "redis",
+        "include": "!=8.2.0b1",
         "deps": {
             "*": ["fakeredis!=1.7.4", "pytest<8.0.0", "pytest-asyncio"],
             ">=4.0,<5.0": ["fakeredis<2.31.0"],
             "py3.7,py3.8": ["fakeredis<2.26.0"],
         },
+    },
+    "redis_py_cluster_legacy": {
+        "package": "redis-py-cluster",
+        "include": ">=2.1",
+        "num_versions": 2,
     },
     "requests": {
         "package": "requests",

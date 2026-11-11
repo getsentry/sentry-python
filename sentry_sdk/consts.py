@@ -483,6 +483,18 @@ class SPANDATA:
     Example: "db-password"
     """
 
+    AWS_SQS_QUEUE_URL = "aws.sqs.queue.url"
+    """
+    The URL of the AWS SQS queue the request refers to.
+    Example: "https://sqs.us-east-1.amazonaws.com/123456789012/orders"
+    """
+
+    AWS_SNS_TOPIC_ARN = "aws.sns.topic.arn"
+    """
+    The ARN of the AWS SNS topic the request refers to.
+    Example: "arn:aws:sns:us-east-1:123456789012:alerts"
+    """
+
     CACHE_HIT = "cache.hit"
     """
     A boolean indicating whether the requested data was found in the cache.
@@ -1126,6 +1138,18 @@ class SPANDATA:
     Number of retries/attempts to process a message.
     """
 
+    MESSAGING_OPERATION_NAME = "messaging.operation.name"
+    """
+    The system-specific name of the messaging operation.
+    Example: "publish"
+    """
+
+    MESSAGING_OPERATION_TYPE = "messaging.operation.type"
+    """
+    The type of the messaging operation: `create`, `send`, `receive`, `process` or `settle`.
+    Example: "send"
+    """
+
     MESSAGING_SYSTEM = "messaging.system"
     """
     The messaging system's name, e.g. `kafka`, `aws_sqs`
@@ -1406,6 +1430,12 @@ class SPANDATA:
     Example: "client", "server", "producer", "consumer", "internal"
     """
 
+    SENTRY_LINK_TYPE = "sentry.link.type"
+    """
+    Set on a span link. Describes the relationship between the span and the linked span.
+    Example: "message_origin"
+    """
+
     SENTRY_OP = "sentry.op"
     """
     The operation of a span.
@@ -1525,6 +1555,8 @@ class OP:
     OBJECT_UPLOAD_PART = "object.upload_part"
     QUEUE_PROCESS = "queue.process"
     QUEUE_PUBLISH = "queue.publish"
+    QUEUE_RECEIVE = "queue.receive"
+    QUEUE_SETTLE = "queue.settle"
     QUEUE_SUBMIT_ARQ = "queue.submit.arq"
     QUEUE_TASK_ARQ = "queue.task.arq"
     QUEUE_SUBMIT_CELERY = "queue.submit.celery"
@@ -1617,6 +1649,7 @@ class ClientConstructor:
         before_send_log: "Optional[Callable[[Log, Hint], Optional[Log]]]" = None,
         before_send_metric: "Optional[Callable[[Metric, Hint], Optional[Metric]]]" = None,
         before_send_span: "Optional[Callable[[SpanJSON, Hint], Optional[SpanJSON]]]" = None,
+        before_send_check_in: "Optional[EventProcessor]" = None,
         org_id: "Optional[str]" = None,
         strict_trace_continuation: bool = False,
     ) -> None:
@@ -2004,6 +2037,10 @@ class ClientConstructor:
             Modifications to the span's attributes and name will be retained. Unlike ``before_send_log``
             and ``before_send_metric``, spans cannot be dropped by returning None.
 
+        :param before_send_check_in: An optional function to modify or filter out cron check-ins before they're
+            sent to Sentry. Check-ins don't go through `before_send`. Any modifications to the check-in in this
+            function will be retained. If the function returns None, the check-in will not be sent to Sentry.
+
         :param ignore_spans: A sequence of span-matching rules. Matching spans are ignored.
 
         :param _experiments: Dictionary of experimental, opt-in features that are not yet stable.
@@ -2030,4 +2067,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "3.0.0b2"
+VERSION = "3.0.0b4"
