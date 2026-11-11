@@ -964,6 +964,8 @@ def test_trigger(lambda_client, test_environment, aws_event, trigger):
                     _sqs_record("471a43a4192642f0b136d5159a501701-6e8f22c393e68f19-1"),
                     _sqs_record("0f4c2a5b8d9e4f1a2b3c4d5e6f7a8b9c-1a2b3c4d5e6f7a8b-0"),
                     _sqs_record(),
+                    # incomplete context: not linked.
+                    _sqs_record("-1"),
                 ]
             },
             "aws_sqs",

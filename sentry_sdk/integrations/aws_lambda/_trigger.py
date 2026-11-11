@@ -141,7 +141,11 @@ def _get_producer_links(records: "list[Any]") -> "list[SpanLink]":
     for record in records:
         with capture_internal_exceptions():
             producer = extract_sentrytrace_data(_get_producer_trace(record))
-            if producer is None:
+            if (
+                producer is None
+                or not producer["trace_id"]
+                or not producer["parent_span_id"]
+            ):
                 continue
 
             trace_id = str(producer["trace_id"])
