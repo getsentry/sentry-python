@@ -188,6 +188,10 @@ def _patch_event_stream() -> None:
                     yield event
                     continue
 
+                if "messageStop" in event:
+                    finish_reasons: "list[str]" = [event["messageStop"]["stopReason"]]
+                    set_on_span(SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS, finish_reasons)
+
                 if "messageStop" in event and role is not None:
                     for block in content_blocks.values():
                         if "toolUse" not in block:
