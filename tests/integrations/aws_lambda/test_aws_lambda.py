@@ -135,6 +135,21 @@ def test_init_error(lambda_client, test_environment):
     assert segment_spans[0]["name"] == "InitError"
 
 
+@pytest.mark.parametrize("function_name", ["PathHandler", "AbsolutePathHandler"])
+def test_path_handler_loaded_once(lambda_client, test_environment, function_name):
+    num_invocations = [
+        json.loads(
+            lambda_client.invoke(FunctionName=function_name, Payload=json.dumps({}))[
+                "Payload"
+            ].read()
+        )["num_invocations"]
+        for _ in range(2)
+    ]
+    # Sentry layer should load the function's module once (on cold start or whenever
+    # the module is reloaded), not on every warm invocation.
+    assert num_invocations == [1, 2]
+
+
 def test_timeout_error_scope_modified(lambda_client, test_environment):
     lambda_client.invoke(
         FunctionName="TimeoutErrorScopeModified",

@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any, Optional
+    from typing import Any, Dict, Optional
 
     from sentry_sdk._types import Attributes
     from sentry_sdk.integrations.boto3._context import AwsCallContext
@@ -11,9 +11,7 @@ if TYPE_CHECKING:
 class _ServiceExtension:
     """
     Optional hooks for adding service-specific behavior to AWS client
-    span; non-overridden methods keep the generic instrumentation.
-    Services without a registered extension in `_SERVICE_EXTENSIONS` continue
-    to use the generic instrumentation.
+    span. Non-overridden methods keep the generic instrumentation.
     """
 
     __slots__ = ()
@@ -32,6 +30,15 @@ class _ServiceExtension:
     def get_request_attributes(self, ctx: "AwsCallContext") -> "Attributes":
         """Return request attributes to add before the AWS request is made."""
         return {}
+
+    def get_request_params(
+        self, ctx: "AwsCallContext", span: "Optional[Span]"
+    ) -> "Optional[Dict[str, Any]]":
+        """
+        Return params to send instead of `ctx.params`, e.g. with trace propagation added,
+        or `None` to send them unchanged; must not mutate `ctx.params`.
+        """
+        return None
 
     def on_success_response(
         self,

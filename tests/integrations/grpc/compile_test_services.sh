@@ -12,4 +12,4 @@ python -m grpc_tools.protoc \
     --grpc_python_out=$TARGET_PATH/ \
     $TARGET_PATH/protos/grpc_test_service.proto
 
-echo Code generation successfull
+echo Code generation successful

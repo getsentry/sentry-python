@@ -125,6 +125,9 @@ def _patch_botocore_client() -> None:
                 service_ext = _StepFunctionsExtension()
 
             span = _start_client_span(ctx, service_ext)
+            if service_ext is not None:
+                # override the request params for e.g. trace propagation.
+                api_params = service_ext.get_request_params(ctx, span) or api_params
 
         if span is None:
             return orig_make_api_call(self, operation_name, api_params)
