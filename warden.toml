@@ -32,6 +32,7 @@ reportOn = "medium"
 
 [[skills]]
 name = "code-review"
+ignorePaths = ["uv.lock", ".github/workflows/test-integrations-*.yml"]
 incremental = true
 
 [[skills.triggers]]
