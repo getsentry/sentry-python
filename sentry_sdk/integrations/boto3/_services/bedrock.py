@@ -23,7 +23,7 @@ except ImportError:
 
 
 if TYPE_CHECKING:
-    from typing import Any, Iterator, Optional, Union
+    from typing import Any, Iterator, Mapping, Optional, Union
 
     from mypy_boto3_bedrock_runtime.type_defs import (
         ConverseResponseTypeDef,
@@ -171,7 +171,7 @@ def _transform_system_instructions(
 
 
 def _transform_messages(
-    input_messages: "Union[list[dict[str, Any]], tuple[dict[str, Any], ...]]",
+    input_messages: "Union[list[Mapping[str, Any]], tuple[Mapping[str, Any], ...]]",
 ) -> "list[InputMessage]":
     """
     Unlike other providers, AWS declares that input and output messages use the same message type.
