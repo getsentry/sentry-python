@@ -28,7 +28,10 @@ LAMBDA_FUNCTION_TIMEOUT = 10
 SAM_PORT = 3001
 
 # functions whose handler is a path instead of `index.handler`.
-INITIAL_HANDLERS = {"PathHandler": "app/index.handler"}
+INITIAL_HANDLERS = {
+    "PathHandler": "app/index.handler",
+    "AbsolutePathHandler": "/var/task/app/index.handler",
+}
 
 PYTHON_VERSION = f"python{sys.version_info.major}.{sys.version_info.minor}"
 

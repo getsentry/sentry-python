@@ -201,10 +201,11 @@ def test_init_error(lambda_client, test_environment):
     assert transaction_event["transaction"] == "InitError"
 
 
-def test_path_handler_loaded_once(lambda_client, test_environment):
+@pytest.mark.parametrize("function_name", ["PathHandler", "AbsolutePathHandler"])
+def test_path_handler_loaded_once(lambda_client, test_environment, function_name):
     num_invocations = [
         json.loads(
-            lambda_client.invoke(FunctionName="PathHandler", Payload=json.dumps({}))[
+            lambda_client.invoke(FunctionName=function_name, Payload=json.dumps({}))[
                 "Payload"
             ].read()
         )["num_invocations"]

@@ -38,6 +38,12 @@ class AWSLambdaModuleLoader:
         """
         Method that extracts and loads lambda function module from module_path
         """
+        # the handler used to be loaded from a file path, so keep accepting
+        # `./dir/file` and absolute `<task root>/dir/file` by making them relative
+        # to the task root, which is on `sys.path`.
+        task_root = os.environ.get("LAMBDA_TASK_ROOT", os.getcwd())
+        module_path = os.path.relpath(os.path.join(task_root, module_path), task_root)
+
         # like the Lambda runtime: `dir/file` is the module `dir.file`, which `sys.modules`
         # keeps, so its code only runs on the first invocation.
         # https://github.com/aws/aws-lambda-python-runtime-interface-client/blob/fa2462d93d11da632aad8f8bfb07a3e060438150/awslambdaric/bootstrap.py#L53
