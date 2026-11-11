@@ -1295,6 +1295,24 @@ def test_package_version_is_none():
     assert package_version("non_existent_package") is None
 
 
+@pytest.mark.skipif(sys.version_info < (3, 8), reason="requires importlib.metadata")
+def test_package_version_installed_package():
+    from importlib import metadata
+
+    assert package_version("pytest") == parse_version(metadata.version("pytest"))
+
+
+@pytest.mark.skipif(sys.version_info < (3, 8), reason="requires importlib.metadata")
+def test_package_version_does_not_scan_all_installed_packages(monkeypatch):
+    def _fail():
+        raise AssertionError("package_version must not scan all installed packages")
+
+    monkeypatch.setattr("sentry_sdk.utils._get_installed_modules", _fail)
+
+    assert package_version("pytest") is not None
+    assert package_version("non_existent_package") is None
+
+
 @pytest.mark.parametrize(
     "kwargs, expected",
     [

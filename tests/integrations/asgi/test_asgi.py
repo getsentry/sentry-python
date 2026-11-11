@@ -613,7 +613,7 @@ def test_get_ip():
     ip = _get_ip(scope)
     assert ip == "127.0.0.1"
 
-    # x-forwarded-for header overides the ip from client
+    # x-forwarded-for header overrides the ip from client
     headers = [
         (b"x-forwarded-for", b"8.8.8.8"),
     ]
@@ -624,7 +624,7 @@ def test_get_ip():
     ip = _get_ip(scope)
     assert ip == "8.8.8.8"
 
-    # x-real-for header overides the ip from client
+    # x-real-for header overrides the ip from client
     headers = [
         (b"x-real-ip", b"10.10.10.10"),
     ]

@@ -100,6 +100,15 @@ def test_request_attributes(
             id="single",
         ),
         pytest.param(
+            "send_message",
+            {"MessageBody": "hi"},
+            {},
+            None,
+            None,
+            None,
+            id="single-without-message-id",
+        ),
+        pytest.param(
             "send_message_batch",
             {"Entries": _BATCH_ENTRIES},
             {
@@ -200,6 +209,12 @@ def test_send_message(
             1,
             "1",
             id="single-message",
+        ),
+        pytest.param(
+            {"Messages": [{"Body": "hi"}]},
+            1,
+            None,
+            id="single-message-without-message-id",
         ),
         pytest.param(
             {

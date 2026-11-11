@@ -2,6 +2,7 @@ from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk.consts import SPANDATA
+from sentry_sdk.traces import NoOpSpan
 from sentry_sdk.tracing_utils import should_propagate_trace
 
 if TYPE_CHECKING:
@@ -68,6 +69,24 @@ def _get_batch_error_type(response: "Any") -> "Optional[str]":
     return None
 
 
+def _get_propagation_headers(
+    ctx: "AwsCallContext", span: "Optional[Span]"
+) -> "Dict[str, str]":
+    """Return the `sentry-trace` and `baggage` headers a call propagates to its consumer."""
+    if ctx.endpoint_url is None or not should_propagate_trace(
+        sentry_sdk.get_client(), ctx.endpoint_url
+    ):
+        return {}
+
+    # `NoOpSpan` is never sent, use scope's span instead.
+    if isinstance(span, NoOpSpan):
+        span = None
+
+    return dict(
+        sentry_sdk.get_current_scope().iter_trace_propagation_headers(span=span)
+    )
+
+
 def _inject_message_attributes(
     ctx: "AwsCallContext", span: "Optional[Span]", body_key: str, entries_key: str
 ) -> "Optional[Dict[str, Any]]":
@@ -75,16 +94,9 @@ def _inject_message_attributes(
     Return a copy of `ctx.params` with `sentry-trace` and `baggage` added in
     string message attributes, or to each batch entry with room for them.
     """
-    if ctx.endpoint_url is None or not should_propagate_trace(
-        sentry_sdk.get_client(), ctx.endpoint_url
-    ):
-        return None
-
     carrier = {
         name: {"DataType": "String", "StringValue": value}
-        for name, value in sentry_sdk.get_current_scope().iter_trace_propagation_headers(
-            span=span
-        )
+        for name, value in _get_propagation_headers(ctx, span).items()
     }
     if not carrier:
         return None

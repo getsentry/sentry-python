@@ -1,6 +1,9 @@
+import re
+from datetime import timedelta, timezone
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from datetime import tzinfo
     from typing import Optional, Tuple
 
     from sentry_sdk._types import MonitorConfigSchedule, MonitorConfigScheduleUnit
@@ -26,4 +29,27 @@ def _get_interval_schedule(seconds: float) -> "Optional[MonitorConfigSchedule]":
                 "value": int(seconds // unit_seconds),
                 "unit": unit,
             }
+    return None
+
+
+# IANA zone names start with an uppercase letter. This rejects names like
+# "local" or "localtime" that tzlocal can give a zone.
+_IANA_TIMEZONE_NAME = re.compile(r"[A-Z][A-Za-z0-9._+-]*(?:/[A-Za-z0-9._+-]+)*")
+
+
+def _get_timezone_name(tz: "tzinfo") -> "Optional[str]":
+    """
+    Return the IANA name of the timezone, or None if it has none.
+    """
+    name = getattr(tz, "key", None) or getattr(tz, "zone", None)
+    if isinstance(name, str):
+        return name if _IANA_TIMEZONE_NAME.fullmatch(name) else None
+
+    if isinstance(tz, timezone):
+        offset = tz.utcoffset(None)
+        if offset % timedelta(hours=1):
+            return None
+        hours = offset // timedelta(hours=1)
+        return "Etc/GMT%+d" % -hours if hours else "UTC"
+
     return None

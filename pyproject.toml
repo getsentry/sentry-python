@@ -82,6 +82,7 @@ typing = [
     "openai-agents>=0.22.0",
     "mistralai>=2.10.1",
     "typesafe-sdk>=0.7.5",
+    "mypy-boto3-bedrock-runtime>=1.43.62",
 ]
 test = [
     "dataclasses ; python_full_version < '3.7'",

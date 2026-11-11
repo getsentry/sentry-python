@@ -8,6 +8,8 @@ from sentry_sdk.integrations.boto3._utils import (
     _get_batch_error_type,
     _inject_message_attributes,
 )
+from sentry_sdk.traces import SpanStatus
+from sentry_sdk.utils import capture_internal_exceptions
 
 if TYPE_CHECKING:
     from typing import Any, Dict, Optional
@@ -43,24 +45,31 @@ class _SNSExtension(_ServiceExtension):
     def get_request_attributes(self, ctx: "AwsCallContext") -> "Attributes":
         attributes: "Attributes" = {}
 
-        # `TargetArn` can be either a topic or a platform endpoint; a topic ARN should
-        # never contain ":endpoint/".
+        # botocore validates params after this hook, so a malformed value must only
+        # lose the attributes read from it, not the span.
         target_arn = ctx.params.get("TargetArn")
         endpoint_arn = ctx.params.get("EndpointArn")
-        if target_arn and ":endpoint/" in target_arn:
-            endpoint_arn, target_arn = target_arn, None
+        topic_arn = None
+        with capture_internal_exceptions():
+            # `TargetArn` can be either a topic or a platform endpoint; a topic ARN
+            # should never contain ":endpoint/".
+            if target_arn and ":endpoint/" in target_arn:
+                endpoint_arn, target_arn = target_arn, None
 
-        # `TopicArn` and `ResourceArn` are always topic ARNs.
-        topic_arn = (
-            ctx.params.get("TopicArn") or ctx.params.get("ResourceArn") or target_arn
-        )
+            # `TopicArn` and `ResourceArn` are always topic ARNs.
+            topic_arn = (
+                ctx.params.get("TopicArn")
+                or ctx.params.get("ResourceArn")
+                or target_arn
+            )
 
-        if topic_arn:
-            attributes[SPANDATA.AWS_SNS_TOPIC_ARN] = topic_arn
-            # `arn:aws:sns:eu-north-1:123456789012:alerts` -> `alerts`
-            attributes[SPANDATA.MESSAGING_DESTINATION_NAME] = topic_arn.split(":")[-1]
-        elif ctx.operation_name == "CreateTopic":
-            attributes[SPANDATA.MESSAGING_DESTINATION_NAME] = ctx.params["Name"]
+            if topic_arn:
+                attributes[SPANDATA.AWS_SNS_TOPIC_ARN] = topic_arn
+                # `arn:aws:sns:eu-north-1:123456789012:alerts` -> `alerts`
+                topic_name = topic_arn.split(":")[-1]
+                attributes[SPANDATA.MESSAGING_DESTINATION_NAME] = topic_name
+            elif ctx.operation_name == "CreateTopic" and "Name" in ctx.params:
+                attributes[SPANDATA.MESSAGING_DESTINATION_NAME] = ctx.params["Name"]
 
         if ctx.operation_name in _PUBLISH_OPERATIONS:
             attributes.update(
@@ -75,46 +84,52 @@ class _SNSExtension(_ServiceExtension):
             # phone numbers and device endpoints are PII.
             if "PhoneNumber" in ctx.params or endpoint_arn:
                 attributes[SPANDATA.MESSAGING_DESTINATION_NAME] = "[Filtered]"
-            if ctx.operation_name == "PublishBatch":
-                attributes[SPANDATA.MESSAGING_BATCH_MESSAGE_COUNT] = len(
-                    ctx.params["PublishBatchRequestEntries"]
-                )
+            if "PublishBatchRequestEntries" in ctx.params:
+                with capture_internal_exceptions():
+                    attributes[SPANDATA.MESSAGING_BATCH_MESSAGE_COUNT] = len(
+                        ctx.params["PublishBatchRequestEntries"]
+                    )
 
-        # endpoints and subscriptions identify a single device or subscriber.
-        subscription_arn = ctx.params.get("SubscriptionArn")
-        if not sentry_sdk.get_client().options["data_collection"]["user_info"]:
-            if endpoint_arn:
-                endpoint_arn = endpoint_arn.rsplit("/", 1)[0].replace(
-                    ":endpoint/", ":app/", 1
-                )
-            if subscription_arn:
-                subscription_arn = subscription_arn.rsplit(":", 1)[0]
+        # if scrubbing fails, drop all ARN attributes rather than send a raw
+        # endpoint or subscription ARN.
+        with capture_internal_exceptions():
+            # endpoints and subscriptions identify a single device or subscriber.
+            subscription_arn = ctx.params.get("SubscriptionArn")
+            if not sentry_sdk.get_client().options["data_collection"]["user_info"]:
+                if endpoint_arn:
+                    endpoint_arn = endpoint_arn.rsplit("/", 1)[0].replace(
+                        ":endpoint/", ":app/", 1
+                    )
+                if subscription_arn:
+                    subscription_arn = subscription_arn.rsplit(":", 1)[0]
 
-        arns = (
-            ctx.params.get("PlatformApplicationArn"),
-            topic_arn,
-            endpoint_arn,
-            subscription_arn,
-        )
-        attributes.update(_get_aws_arn_attributes(arns, ("sns",)))
+            arns = (
+                ctx.params.get("PlatformApplicationArn"),
+                topic_arn,
+                endpoint_arn,
+                subscription_arn,
+            )
+            attributes.update(_get_aws_arn_attributes(arns, ("sns",)))
         return attributes
 
-    def get_response_attributes(
-        self, ctx: "AwsCallContext", response: "Any"
-    ) -> "Attributes":
+    def on_success_response(
+        self, ctx: "AwsCallContext", response: "Any", span: "Span"
+    ) -> None:
         attributes: "Attributes" = {}
 
-        # `ClientError` response holds no results.
-        if "Error" in response:
-            return attributes
+        # the call already succeeded; an unexpected response shape, e.g. from a
+        # `Stubber` or an SNS-compatible service, must only lose these attributes.
+        with capture_internal_exceptions():
+            if ctx.operation_name == "Publish" and "MessageId" in response:
+                attributes[SPANDATA.MESSAGING_MESSAGE_ID] = response["MessageId"]
 
-        if ctx.operation_name == "Publish":
-            attributes[SPANDATA.MESSAGING_MESSAGE_ID] = response["MessageId"]
+            error_type = _get_batch_error_type(response)
+            if error_type is not None:
+                span.status = SpanStatus.ERROR
+                attributes[SPANDATA.ERROR_TYPE] = error_type
 
-        error_type = _get_batch_error_type(response)
-        if error_type is not None:
-            attributes[SPANDATA.ERROR_TYPE] = error_type
-        return attributes
+        span.set_attributes(attributes)
+        span.end()
 
     def get_request_params(
         self, ctx: "AwsCallContext", span: "Optional[Span]"

@@ -43,8 +43,8 @@ def main():
         scan_file(module_path)
 
     raise_from_none_count = {
-        file: len(occurences)
-        for file, occurences in RaiseFromNoneVisitor.line_numbers.items()
+        file: len(occurrences)
+        for file, occurrences in RaiseFromNoneVisitor.line_numbers.items()
     }
     if raise_from_none_count:
         exc = Exception("Detected unexpected raise ... from None.")

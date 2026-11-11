@@ -10,12 +10,17 @@ from sentry_sdk.integrations.boto3._utils import (
     _get_batch_error_type,
     _inject_message_attributes,
 )
-from sentry_sdk.traces import BAGGAGE_HEADER_NAME, SENTRY_TRACE_HEADER_NAME, NoOpSpan
+from sentry_sdk.traces import (
+    BAGGAGE_HEADER_NAME,
+    SENTRY_TRACE_HEADER_NAME,
+    NoOpSpan,
+    SpanStatus,
+)
 from sentry_sdk.tracing_utils import extract_sentrytrace_data
 from sentry_sdk.utils import capture_internal_exceptions
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, List, Optional, Tuple
+    from typing import Any, Dict, Optional, Tuple
 
     from sentry_sdk._types import Attributes, SpanLink
     from sentry_sdk.integrations.boto3._context import AwsCallContext
@@ -143,43 +148,41 @@ class _SQSExtension(_ServiceExtension):
                     )
         return attributes
 
-    def get_response_attributes(
-        self, ctx: "AwsCallContext", response: "Any"
-    ) -> "Attributes":
+    def on_success_response(
+        self, ctx: "AwsCallContext", response: "Any", span: "Span"
+    ) -> None:
         attributes: "Attributes" = {}
 
-        # `ClientError` response holds no results.
-        if "Error" in response:
-            return attributes
+        # the call already succeeded; an unexpected response shape, e.g. from a
+        # `Stubber` or an SQS-compatible service, must only lose these attributes.
+        with capture_internal_exceptions():
+            if ctx.operation_name == "SendMessage" and "MessageId" in response:
+                attributes[SPANDATA.MESSAGING_MESSAGE_ID] = response["MessageId"]
+            elif ctx.operation_name == "ReceiveMessage":
+                # `Messages` is left out when no message was received.
+                messages = response.get("Messages", ())
+                attributes[SPANDATA.MESSAGING_BATCH_MESSAGE_COUNT] = len(messages)
+                if len(messages) == 1 and "MessageId" in messages[0]:
+                    attributes[SPANDATA.MESSAGING_MESSAGE_ID] = messages[0]["MessageId"]
 
-        if ctx.operation_name == "SendMessage":
-            attributes[SPANDATA.MESSAGING_MESSAGE_ID] = response["MessageId"]
-        elif ctx.operation_name == "ReceiveMessage":
-            # `Messages` is left out when no message was received.
-            messages = response.get("Messages", ())
-            attributes[SPANDATA.MESSAGING_BATCH_MESSAGE_COUNT] = len(messages)
-            if len(messages) == 1:
-                attributes[SPANDATA.MESSAGING_MESSAGE_ID] = messages[0]["MessageId"]
+            error_type = _get_batch_error_type(response)
+            if error_type is not None:
+                span.status = SpanStatus.ERROR
+                attributes[SPANDATA.ERROR_TYPE] = error_type
 
-        error_type = _get_batch_error_type(response)
-        if error_type is not None:
-            attributes[SPANDATA.ERROR_TYPE] = error_type
-        return attributes
+        if ctx.operation_name == "ReceiveMessage":
+            with capture_internal_exceptions():
+                # one link per producer context; batch entries of one send share it.
+                links: "Dict[Tuple[str, str], SpanLink]" = {}
+                for message in response.get("Messages", ()):
+                    # returns a link to the producer context a received message carries, if valid.
+                    link = _message_link(message)
+                    if link is not None:
+                        links.setdefault((link["trace_id"], link["span_id"]), link)
+                span.add_links(list(links.values()))
 
-    def get_response_links(
-        self, ctx: "AwsCallContext", response: "Any"
-    ) -> "List[SpanLink]":
-        if ctx.operation_name != "ReceiveMessage":
-            return []
-
-        # one link per producer context; batch entries of one send share it.
-        links: "Dict[Tuple[str, str], SpanLink]" = {}
-        for message in response.get("Messages", ()):
-            # returns a link to the producer context a received message carries, if valid.
-            link = _message_link(message)
-            if link is not None:
-                links.setdefault((link["trace_id"], link["span_id"]), link)
-        return list(links.values())
+        span.set_attributes(attributes)
+        span.end()
 
     def get_request_params(
         self, ctx: "AwsCallContext", span: "Optional[Span]"

@@ -57,7 +57,7 @@ _VALID_SPAN_STATUSES = frozenset(e.value for e in SpanStatus)
 
 
 # The source of a segment name, see
-# https://getsentry.github.io/sentry-conventions/attributes/sentry/#sentry-segment-name-source
+# https://conventions.sentry.dev/attributes/sentry/#sentry-segment-name-source
 class SegmentNameSource(str, Enum):
     COMPONENT = "component"
     CUSTOM = "custom"

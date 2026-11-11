@@ -47,11 +47,24 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 - The `RustTracingIntegration` no longer includes the values of tracing fields if `send_default_pii` is enabled. Pass `include_tracing_fields=True` to the integration to include them.
 - Whether the Dramatiq integration attaches message bodies to events is now controlled by `data_collection`'s `queues` setting instead of `http_bodies`.
 - The Celery integration no longer sets the status of task spans to error when a task raises a control flow exception (`Retry`, `Ignore`, or `Reject`).
-- The boto3 integration now names spans `<ServiceID>.<Operation>` (for example, `S3.GetObject` or `DynamoDB.GetItem`), following OpenTelemetry semantic conventions. Previously, spans were named `aws.<service-id>.<Operation>` (for example, `aws.s3.GetObject`). Its spans, including the span for reading a streamed response body, now also have the origin `auto.aws.boto3` instead of `auto.http.boto3`. Update any alerts, dashboards, or `ignore_spans` rules that match on the old names or origin.
+- The boto3 integration now names spans `<ServiceID>.<Operation>` (for example, `S3.GetObject` or `DynamoDB.GetItem`), following OpenTelemetry semantic conventions. Previously, spans were named `aws.<service-id>.<Operation>` (for example, `aws.s3.GetObject`). Its spans, including the span for reading a streamed response body, now also have the origin `auto.aws.boto3` instead of `auto.http.boto3`. SQS and SNS messaging calls are the exception: SQS `SendMessage` and `SendMessageBatch` are named `send <queue name>`, `ReceiveMessage` is named `receive <queue name>`, and `DeleteMessage` and `DeleteMessageBatch` are named `settle <queue name>`; SNS `Publish` and `PublishBatch` are named `send <topic name>`. Update any alerts, dashboards, or `ignore_spans` rules that match on the old names or origin.
 - Enabling an AI agent integration (LangChain, OpenAI Agents, or Pydantic AI) no longer disables the OpenAI, Anthropic, and Google GenAI integrations. Instead, those integrations don't create chat spans for requests made from within an agent framework's chat span, but still create other spans, such as embedding spans. The LangChain integration no longer instruments embeddings directly; embedding spans are now created by the integration of the underlying client library.
 - Whether the MCP integration records tool arguments, tool results, and prompt contents is now controlled by `data_collection`'s new `mcp` setting (`{"inputs": bool, "outputs": bool}`, both `True` by default) instead of the `gen_ai` setting.
 - With `handled_tool_call_exceptions=True` (the default), the Pydantic AI integration now reports an error for every failed tool argument validation attempt, including retries. Previously, only one error was reported per tool call.
 - The Pydantic AI integration no longer sets the `gen_ai.response.streaming` span attribute.
+- The `OTLPIntegration` no longer sets up a propagator by default: `setup_propagator` now defaults to `False`. Distributed tracing now uses the propagators configured in OpenTelemetry (by default, W3C `traceparent` and `baggage`) instead of Sentry's `sentry-trace` and `baggage` headers. To get the old behavior back, set `OTLPIntegration(setup_propagator=True)`. To propagate both W3C and Sentry headers, set up the `SentryOTLPPropagator` manually instead:
+
+  ```python
+  from opentelemetry.propagate import set_global_textmap
+  from opentelemetry.propagators.composite import CompositePropagator
+  from opentelemetry.trace.propagation.tracecontext import TraceContextTextMapPropagator
+
+  from sentry_sdk.integrations.otlp import SentryOTLPPropagator
+
+  set_global_textmap(
+      CompositePropagator([TraceContextTextMapPropagator(), SentryOTLPPropagator()])
+  )
+  ```
 
 #### Span operation consolidation
 
@@ -64,7 +77,7 @@ Span ops are now a smaller, framework-neutral set.
 - The Django integration now emits `view.render` instead of `view.response.render`, `view` instead of `view.authenticate`, and `function` instead of `event.django`.
 - The Django, Starlette, Starlite, and Litestar integrations now emit `middleware` instead of `middleware.django`, `middleware.starlette`, `middleware.starlette.receive`, `middleware.starlette.send`, `middleware.starlite`, `middleware.starlite.receive`, `middleware.starlite.send`, `middleware.litestar`, `middleware.litestar.receive`, and `middleware.litestar.send`.
 - The ARQ, Celery, Django, Dramatiq, Huey, RQ, and Ray integrations now emit `queue.publish` and `queue.process` instead of `queue.submit.arq`, `queue.task.arq`, `queue.submit.celery`, `queue.task.celery`, `queue.submit.django`, `queue.task.dramatiq`, `queue.submit.huey`, `queue.task.huey`, `queue.task.rq`, `queue.submit.ray`, and `queue.task.ray`.
-- The Boto3 integration now emits `rpc` instead of `http.client` for AWS API calls.
+- The Boto3 integration now emits `rpc` instead of `http.client` for AWS API calls. SQS messaging calls emit `queue.publish` (`SendMessage`, `SendMessageBatch`), `queue.receive` (`ReceiveMessage`), and `queue.settle` (`DeleteMessage`, `DeleteMessageBatch`) instead, and SNS `Publish` and `PublishBatch` emit `queue.publish`.
 
 #### GenAI span attributes
 
