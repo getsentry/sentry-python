@@ -510,9 +510,9 @@ TEST_SUITE_CONFIG = {
     "sqlalchemy": {
         "package": "sqlalchemy",
         "deps": {
-            # Needed to test the asyncio extension, which only 1.4 installs
-            # greenlet for
-            ">=2.0": ["greenlet"],
+            # Needed to test the asyncio extension. SQLAlchemy 1.4 installs
+            # greenlet only on some platforms, 2.x only with an extra.
+            ">=1.4": ["greenlet"],
         },
         "python": {
             "<1.4": "<3.10",
