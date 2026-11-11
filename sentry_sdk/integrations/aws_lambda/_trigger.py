@@ -150,7 +150,11 @@ def _get_producer_links(records: "list[Any]") -> "list[SpanLink]":
                 continue
             linked.add((trace_id, span_id))
 
-            link: "SpanLink" = {"trace_id": trace_id, "span_id": span_id}
+            link: "SpanLink" = {
+                "trace_id": trace_id,
+                "span_id": span_id,
+                "attributes": {SPANDATA.SENTRY_LINK_TYPE: "message_origin"},
+            }
             if producer["parent_sampled"] is not None:
                 link["sampled"] = bool(producer["parent_sampled"])
             links.append(link)

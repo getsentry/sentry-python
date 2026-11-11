@@ -24,6 +24,9 @@ from .utils import SAM_PORT, LocalLambdaStack, SentryServerForTesting
 DOCKER_NETWORK_NAME = "lambda-test-network"
 SAM_TEMPLATE_FILE = "sam.template.yaml"
 SAM_SHUTDOWN_TIMEOUT = 10
+MESSAGE_ORIGIN_LINK = {
+    SPANDATA.SENTRY_LINK_TYPE: {"value": "message_origin", "type": "string"}
+}
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -969,11 +972,13 @@ def test_trigger(lambda_client, test_environment, aws_event, trigger):
                 {
                     "trace_id": "471a43a4192642f0b136d5159a501701",
                     "span_id": "6e8f22c393e68f19",
+                    "attributes": MESSAGE_ORIGIN_LINK,
                     "sampled": True,
                 },
                 {
                     "trace_id": "0f4c2a5b8d9e4f1a2b3c4d5e6f7a8b9c",
                     "span_id": "1a2b3c4d5e6f7a8b",
+                    "attributes": MESSAGE_ORIGIN_LINK,
                     "sampled": False,
                 },
             ],
@@ -991,6 +996,7 @@ def test_trigger(lambda_client, test_environment, aws_event, trigger):
                 {
                     "trace_id": "471a43a4192642f0b136d5159a501701",
                     "span_id": "6e8f22c393e68f19",
+                    "attributes": MESSAGE_ORIGIN_LINK,
                     "sampled": True,
                 }
             ],
@@ -1015,6 +1021,7 @@ def test_trigger(lambda_client, test_environment, aws_event, trigger):
                 {
                     "trace_id": "471a43a4192642f0b136d5159a501701",
                     "span_id": "6e8f22c393e68f19",
+                    "attributes": MESSAGE_ORIGIN_LINK,
                     "sampled": True,
                 }
             ],
