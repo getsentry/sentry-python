@@ -83,6 +83,17 @@ def test_request_attributes(
         ),
         pytest.param(
             "publish",
+            {"TopicArn": "arn:aws:sns:eu-north-1:123456789012:alerts", "Message": "hi"},
+            {},
+            "alerts",
+            "arn:aws:sns:eu-north-1:123456789012:alerts",
+            None,
+            None,
+            None,
+            id="topic-without-message-id",
+        ),
+        pytest.param(
+            "publish",
             {
                 "TargetArn": "arn:aws:sns:eu-north-1:123456789012:alerts",
                 "Message": "hi",

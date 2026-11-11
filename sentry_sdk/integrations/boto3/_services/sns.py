@@ -8,6 +8,7 @@ from sentry_sdk.integrations.boto3._utils import (
     _get_batch_error_type,
 )
 from sentry_sdk.traces import SpanStatus
+from sentry_sdk.utils import capture_internal_exceptions
 
 if TYPE_CHECKING:
     from typing import Any, Optional
@@ -104,13 +105,16 @@ class _SNSExtension(_ServiceExtension):
     ) -> None:
         attributes: "Attributes" = {}
 
-        if ctx.operation_name == "Publish":
-            attributes[SPANDATA.MESSAGING_MESSAGE_ID] = response["MessageId"]
+        # the call already succeeded; an unexpected response shape, e.g. from a
+        # `Stubber` or an SNS-compatible service, must only lose these attributes.
+        with capture_internal_exceptions():
+            if ctx.operation_name == "Publish" and "MessageId" in response:
+                attributes[SPANDATA.MESSAGING_MESSAGE_ID] = response["MessageId"]
 
-        error_type = _get_batch_error_type(response)
-        if error_type is not None:
-            span.status = SpanStatus.ERROR
-            attributes[SPANDATA.ERROR_TYPE] = error_type
+            error_type = _get_batch_error_type(response)
+            if error_type is not None:
+                span.status = SpanStatus.ERROR
+                attributes[SPANDATA.ERROR_TYPE] = error_type
 
         span.set_attributes(attributes)
         span.end()
