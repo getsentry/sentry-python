@@ -215,7 +215,7 @@ def fetch_package_dependencies(
     print(f"  Resolving dependencies: {package}=={version} on Python {python_version}")
 
     # Removing non-report output with -qqq may be brittle, but avoids file I/O.
-    # Currently -qqq supresses all non-report output that would break json.loads().
+    # Currently -qqq suppresses all non-report output that would break json.loads().
     result = subprocess.run(
         [
             "uv",
