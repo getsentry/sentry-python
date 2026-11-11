@@ -512,6 +512,9 @@ class _BedrockExtension(_ServiceExtension):
 
             set_on_span(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, input_tokens)
 
+            finish_reasons: "list[str]" = [response["stopReason"]]
+            set_on_span(SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS, finish_reasons)
+
             client = sentry_sdk.get_client()
             if "message" in response["output"] and (
                 (
