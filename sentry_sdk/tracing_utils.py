@@ -292,6 +292,50 @@ def _should_be_included(
     )
 
 
+def _is_sqlalchemy_async_bridge(current: "Any") -> bool:
+    # SQLAlchemy marks its bridge greenlet with this attribute and checks for
+    # it itself, from 1.4.53 and 2.0.31. Earlier releases check the class.
+    if getattr(current, "__sqlalchemy_greenlet_provider__", False):
+        return True
+    cls = type(current)
+    return cls.__name__ == "_AsyncIoGreenlet" and cls.__module__.startswith(
+        "sqlalchemy."
+    )
+
+
+def _caller_frames(frame: "Optional[FrameType]") -> "Iterator[FrameType]":
+    """
+    Yields ``frame`` and the frames that called it.
+
+    Async SQLAlchemy runs the sync driver, and so the cursor events that
+    create query spans, in a greenlet it spawns from the coroutine awaiting
+    the query. That greenlet's own frames end at the bridge, so when the
+    current greenlet is SQLAlchemy's bridge, the walk continues into the
+    frames of its parent, which is suspended in the awaiting caller. Any other
+    greenlet's parent need not be its caller, so its frames are not followed.
+    """
+    while frame is not None:
+        yield frame
+        frame = frame.f_back
+
+    greenlet = sys.modules.get("greenlet")
+    if greenlet is None:
+        return
+
+    try:
+        current = greenlet.getcurrent()
+        if not _is_sqlalchemy_async_bridge(current):
+            return
+        parent = current.parent
+        frame = parent.gr_frame if parent is not None else None
+    except Exception:
+        return
+
+    while frame is not None:
+        yield frame
+        frame = frame.f_back
+
+
 def add_source(
     span: "Union[sentry_sdk.tracing.Span, sentry_sdk.traces.StreamedSpan]",
     project_root: "Optional[str]",
@@ -302,8 +346,8 @@ def add_source(
     Adds OTel compatible source code information to the span
     """
     # Find the correct frame
-    frame: "Union[FrameType, None]" = sys._getframe()
-    while frame is not None:
+    frame: "Union[FrameType, None]" = None
+    for frame in _caller_frames(sys._getframe()):
         abs_path = _get_frame_module_abs_path(frame)
 
         try:
@@ -325,8 +369,6 @@ def add_source(
         )
         if should_be_included:
             break
-
-        frame = frame.f_back
     else:
         frame = None
 

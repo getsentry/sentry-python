@@ -1,8 +1,10 @@
+import asyncio
 import os
 from datetime import datetime
 from unittest import mock
 
 import pytest
+import sqlalchemy.util
 from sqlalchemy import Column, ForeignKey, Integer, String, create_engine, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.declarative import declarative_base
@@ -758,6 +760,66 @@ def test_query_source(
                 break
         else:
             raise AssertionError("No db span found")
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_query_source_through_async_bridge(
+    sentry_init,
+    capture_events,
+    capture_items,
+    span_streaming,
+):
+    # Not skipped when greenlet is missing: from 1.4 on, the test environments
+    # install it, and greenlet_spawn fails loudly without it.
+    greenlet_spawn = getattr(sqlalchemy.util, "greenlet_spawn", None)
+    if greenlet_spawn is None:
+        pytest.skip("SQLAlchemy has no asyncio support before 1.4")
+
+    sentry_init(
+        integrations=[SqlalchemyIntegration()],
+        traces_sample_rate=1.0,
+        enable_db_query_source=True,
+        db_query_source_threshold_ms=0,
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
+    engine = create_engine("sqlite:///:memory:")
+
+    async def query_from_coroutine():
+        with engine.connect() as connection:
+            # As SQLAlchemy's asyncio extension does, run the sync call in
+            # SQLAlchemy's bridge greenlet, whose own frames hold no
+            # application code.
+            await greenlet_spawn(connection.execute, text("SELECT 1"))
+
+    def run_query():
+        loop = asyncio.new_event_loop()
+        try:
+            loop.run_until_complete(query_from_coroutine())
+        finally:
+            loop.close()
+
+    if span_streaming:
+        items = capture_items("span")
+        with sentry_sdk.traces.start_span(name="custom parent"):
+            run_query()
+        sentry_sdk.flush()
+        sources = [
+            item.payload["attributes"].get(SPANDATA.CODE_FUNCTION)
+            for item in items
+            if item.payload["name"] == "SELECT 1"
+        ]
+    else:
+        events = capture_events()
+        with start_transaction(name="test_transaction", sampled=True):
+            run_query()
+        (event,) = events
+        sources = [
+            span["data"].get(SPANDATA.CODE_FUNCTION)
+            for span in event["spans"]
+            if span.get("description") == "SELECT 1"
+        ]
+
+    assert sources == ["query_from_coroutine"]
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
