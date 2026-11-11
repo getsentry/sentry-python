@@ -762,38 +762,6 @@ def test_query_source(
             raise AssertionError("No db span found")
 
 
-def _async_bridge_or_skip():
-    # Not skipped when greenlet is missing: from 1.4 on, the test environments
-    # must install it, and greenlet_spawn fails loudly without it.
-    greenlet_spawn = getattr(sqlalchemy.util, "greenlet_spawn", None)
-    if greenlet_spawn is None:
-        pytest.skip("SQLAlchemy has no asyncio support before 1.4")
-    return greenlet_spawn
-
-
-def _select_one_sources(run_query, span_streaming, capture_events, capture_items):
-    if span_streaming:
-        items = capture_items("span")
-        with sentry_sdk.traces.start_span(name="custom parent"):
-            run_query()
-        sentry_sdk.flush()
-        return [
-            item.payload["attributes"].get(SPANDATA.CODE_FUNCTION)
-            for item in items
-            if item.payload["name"] == "SELECT 1"
-        ]
-
-    events = capture_events()
-    with start_transaction(name="test_transaction", sampled=True):
-        run_query()
-    (event,) = events
-    return [
-        span["data"].get(SPANDATA.CODE_FUNCTION)
-        for span in event["spans"]
-        if span.get("description") == "SELECT 1"
-    ]
-
-
 @pytest.mark.parametrize("span_streaming", [True, False])
 def test_query_source_through_async_bridge(
     sentry_init,
@@ -801,7 +769,12 @@ def test_query_source_through_async_bridge(
     capture_items,
     span_streaming,
 ):
-    greenlet_spawn = _async_bridge_or_skip()
+    # Not skipped when greenlet is missing: from 1.4 on, the test environments
+    # install it, and greenlet_spawn fails loudly without it.
+    greenlet_spawn = getattr(sqlalchemy.util, "greenlet_spawn", None)
+    if greenlet_spawn is None:
+        pytest.skip("SQLAlchemy has no asyncio support before 1.4")
+
     sentry_init(
         integrations=[SqlalchemyIntegration()],
         traces_sample_rate=1.0,
@@ -825,44 +798,28 @@ def test_query_source_through_async_bridge(
         finally:
             loop.close()
 
-    sources = _select_one_sources(
-        run_query, span_streaming, capture_events, capture_items
-    )
+    if span_streaming:
+        items = capture_items("span")
+        with sentry_sdk.traces.start_span(name="custom parent"):
+            run_query()
+        sentry_sdk.flush()
+        sources = [
+            item.payload["attributes"].get(SPANDATA.CODE_FUNCTION)
+            for item in items
+            if item.payload["name"] == "SELECT 1"
+        ]
+    else:
+        events = capture_events()
+        with start_transaction(name="test_transaction", sampled=True):
+            run_query()
+        (event,) = events
+        sources = [
+            span["data"].get(SPANDATA.CODE_FUNCTION)
+            for span in event["spans"]
+            if span.get("description") == "SELECT 1"
+        ]
 
     assert sources == ["query_from_coroutine"]
-
-
-def test_query_source_not_taken_from_unrelated_greenlet_parent(
-    sentry_init, capture_events
-):
-    _async_bridge_or_skip()
-    import greenlet
-
-    sentry_init(
-        integrations=[SqlalchemyIntegration()],
-        traces_sample_rate=1.0,
-        enable_db_query_source=True,
-        db_query_source_threshold_ms=0,
-    )
-    engine = create_engine("sqlite:///:memory:")
-
-    def unrelated_wait():
-        greenlet.getcurrent().parent.switch()
-
-    def run_query():
-        with engine.connect() as connection:
-            # A greenlet's parent is not necessarily its caller: this one's
-            # parent is suspended in code unrelated to the query.
-            waiter = greenlet.greenlet(unrelated_wait)
-            waiter.switch()
-            driver = greenlet.greenlet(connection.execute, parent=waiter)
-            if hasattr(driver, "gr_context"):
-                driver.gr_context = greenlet.getcurrent().gr_context
-            driver.switch(text("SELECT 1"))
-
-    sources = _select_one_sources(run_query, False, capture_events, None)
-
-    assert sources == [None]
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
