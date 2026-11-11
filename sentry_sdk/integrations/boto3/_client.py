@@ -1,5 +1,5 @@
 from contextlib import contextmanager
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import sentry_sdk
 from sentry_sdk.integrations import DidNotEnable
@@ -34,6 +34,7 @@ if TYPE_CHECKING:
     from typing import Any, Dict, Iterator, Optional
 
     from sentry_sdk._types import Attributes
+    from sentry_sdk.integrations.boto3 import Boto3Integration
     from sentry_sdk.integrations.boto3._services.base import _ServiceExtension
 
 try:
@@ -93,8 +94,11 @@ def _patch_botocore_client() -> None:
         https://github.com/boto/botocore/blob/358f8eec8c76201bb1a7a35644abcbc9036de7ed/botocore/client.py
         https://opentelemetry.io/docs/specs/semconv/rpc/rpc-spans/#rpc-client-span
         """
-        client = sentry_sdk.get_client()
-        if client.get_integration(IDENTIFIER) is None:
+        integration = cast(
+            "Optional[Boto3Integration]",
+            sentry_sdk.get_client().get_integration(IDENTIFIER),
+        )
+        if integration is None:
             return orig_make_api_call(self, operation_name, api_params)
 
         span: "Optional[Span]" = None
@@ -125,7 +129,7 @@ def _patch_botocore_client() -> None:
                 service_ext = _StepFunctionsExtension()
 
             span = _start_client_span(ctx, service_ext)
-            if service_ext is not None:
+            if service_ext is not None and integration.propagate_traces:
                 # override the request params for e.g. trace propagation.
                 api_params = service_ext.get_request_params(ctx, span) or api_params
 

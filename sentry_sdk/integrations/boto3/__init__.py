@@ -14,6 +14,11 @@ class Boto3Integration(Integration):
     identifier = IDENTIFIER
     origin = ORIGIN
 
+    def __init__(self, propagate_traces: bool = True) -> None:
+        # add trace data to request params, e.g. SQS/SNS message attributes or
+        # Lambda `ClientContext`, so the receiving side can continue the trace.
+        self.propagate_traces = propagate_traces
+
     @staticmethod
     def setup_once() -> None:
         version = parse_version(BOTOCORE_VERSION)

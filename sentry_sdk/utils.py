@@ -1237,7 +1237,7 @@ def strip_string(
 def parse_version(version: str) -> "Optional[Tuple[int, ...]]":
     """
     Parses a version string into a tuple of integers.
-    This uses the parsing loging from PEP 440:
+    This uses the parsing logic from PEP 440:
     https://peps.python.org/pep-0440/#appendix-b-parsing-version-strings-with-regular-expressions
     """
     VERSION_PATTERN = r"""  # noqa: N806
@@ -1463,7 +1463,7 @@ ParsedUrl = namedtuple("ParsedUrl", ["url", "query", "fragment"])
 def parse_url(url: str, sanitize: bool = True) -> "ParsedUrl":
     """
     Splits a URL into a url (including path), query and fragment. If sanitize is True, the query
-    parameters will be sanitized to remove sensitive data. The autority (username and password)
+    parameters will be sanitized to remove sensitive data. The authority (username and password)
     in the URL will always be removed.
     """
     parsed_url = sanitize_url(

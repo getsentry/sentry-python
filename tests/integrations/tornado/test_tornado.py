@@ -699,7 +699,7 @@ def test_error_has_existing_trace_context_performance_enabled(
     tornado_testcase, sentry_init, capture_items
 ):
     """
-    Check if an 'trace' context is added to events
+    Check if a 'trace' context is added to events
     from the incoming 'sentry-trace' header when performance monitoring is enabled.
     """
     sentry_init(
@@ -739,7 +739,7 @@ def test_error_has_existing_trace_context_performance_disabled(
     tornado_testcase, sentry_init, capture_events
 ):
     """
-    Check if an 'trace' context is added to events
+    Check if a 'trace' context is added to events
     from the incoming 'sentry-trace' header when performance monitoring is disabled.
     """
     sentry_init(

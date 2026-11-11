@@ -21,7 +21,7 @@ def _get_receiver_name(receiver: "Callable[..., Any]") -> str:
         name = receiver.__name__
     elif hasattr(
         receiver, "func"
-    ):  # certain functions (like partials) dont have a name
+    ):  # certain functions (like partials) don't have a name
         if hasattr(receiver, "func") and hasattr(receiver.func, "__name__"):
             name = "partial(<function " + receiver.func.__name__ + ">)"
 
