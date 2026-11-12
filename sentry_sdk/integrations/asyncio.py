@@ -4,11 +4,13 @@ import sys
 import sentry_sdk
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations import DidNotEnable, Integration
+from sentry_sdk.scope import Scope, ScopeType, _current_scope, use_scope
 from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing import Span
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.transport import AsyncHttpTransport
 from sentry_sdk.utils import (
+    HAS_REAL_CONTEXTVARS,
     event_from_exception,
     is_internal_task,
     logger,
@@ -142,6 +144,21 @@ def patch_asyncio() -> None:
                     orig_task_factory, loop, coro, **kwargs
                 )
 
+            # Fork the current scope when the task is created rather than when
+            # it first runs, so the task's span isn't parented to whatever span
+            # is current by then.
+            context = kwargs.get("context")
+            if context is None or not HAS_REAL_CONTEXTVARS:
+                current_scope = sentry_sdk.get_current_scope()
+            else:
+                # Unlike Context.run(), Context.get() also works on a context
+                # that is already entered
+                current_scope = context.get(_current_scope)
+                if current_scope is None:
+                    current_scope = Scope(ty=ScopeType.CURRENT)
+
+            forked_current_scope = current_scope.fork()
+
             @_wrap_coroutine(coro)
             async def _task_with_sentry_span_creation() -> "Any":
                 result = None
@@ -152,7 +169,7 @@ def patch_asyncio() -> None:
                 span_ctx: "Optional[Union[StreamedSpan, Span]]" = None
                 is_span_streaming_enabled = has_span_streaming_enabled(client.options)
 
-                with sentry_sdk.isolation_scope():
+                with sentry_sdk.isolation_scope(), use_scope(forked_current_scope):
                     if task_spans:
                         if is_span_streaming_enabled:
                             if sentry_sdk.traces.get_current_span() is not None:

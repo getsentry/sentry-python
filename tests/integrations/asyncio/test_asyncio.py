@@ -15,9 +15,10 @@ from sentry_sdk.integrations.asyncio import (
     enable_asyncio_integration,
     patch_asyncio,
 )
+from sentry_sdk.scope import Scope, ScopeType, _current_scope
 
 try:
-    from contextvars import Context, ContextVar
+    from contextvars import Context, ContextVar, copy_context
 except ImportError:
     pass  # All tests will be skipped with incompatible versions
 
@@ -839,6 +840,412 @@ async def test_internal_tasks_not_wrapped(
         assert len(internal_spans) == 0, (
             f"Internal task should NOT have been traced. All spans: {[s.get('description') for s in transaction.get('spans', [])]}"
         )
+
+
+parametrize_eager = pytest.mark.parametrize(
+    "eager",
+    [
+        False,
+        pytest.param(
+            True,
+            marks=pytest.mark.skipif(
+                sys.version_info < (3, 12),
+                reason="Eager task factories were introduced in Python 3.12",
+            ),
+        ),
+    ],
+)
+
+
+def run_in_patched_loop(main, eager=False):
+    """
+    Runs main() in a new event loop patched by the AsyncioIntegration. With
+    eager=True, the loop has an eager task factory when it gets patched.
+    """
+
+    async def runner():
+        if eager:
+            asyncio.get_running_loop().set_task_factory(asyncio.eager_task_factory)
+        # The integration is only set up once per process, so patch this loop
+        patch_asyncio()
+        return await main()
+
+    loop = asyncio.new_event_loop()
+    try:
+        return loop.run_until_complete(runner())
+    finally:
+        loop.close()
+
+
+def start_root_span(span_streaming, name):
+    if span_streaming:
+        return sentry_sdk.traces.start_span(name=name)
+    return sentry_sdk.start_transaction(name=name)
+
+
+def start_child_span(span_streaming, name):
+    if span_streaming:
+        return sentry_sdk.traces.start_span(name=name)
+    return sentry_sdk.start_span(op=name, name=name)
+
+
+def get_current_span_name(span_streaming):
+    if span_streaming:
+        return sentry_sdk.traces.get_current_span().name
+    return sentry_sdk.get_current_span().description
+
+
+def get_spans_by_name(span_streaming, items, events):
+    if span_streaming:
+        return {item.payload["name"]: item.payload for item in items}
+
+    (event,) = events
+    spans = {span["description"]: span for span in event["spans"]}
+    spans[event["transaction"]] = event["contexts"]["trace"]
+    return spans
+
+
+@minimum_python_38
+@parametrize_eager
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_task_span_parent_is_span_current_at_create_task(
+    sentry_init, capture_events, capture_items, span_streaming, eager
+):
+    sentry_init(
+        integrations=[AsyncioIntegration()],
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
+    items = capture_items("span")
+    events = capture_events()
+
+    async def child():
+        await asyncio.sleep(0)
+        with start_child_span(span_streaming, "inner"):
+            await asyncio.sleep(0)
+
+    async def main():
+        with start_root_span(span_streaming, "request"):
+            with start_child_span(span_streaming, "handler"):
+                task = asyncio.create_task(child())
+
+                with start_child_span(span_streaming, "db.query"):
+                    await asyncio.sleep(0)
+                    # The task's spans don't become current in the creator
+                    span_name_during_task = get_current_span_name(span_streaming)
+                    await task
+
+        return span_name_during_task
+
+    span_name_during_task = run_in_patched_loop(main, eager=eager)
+    sentry_sdk.flush()
+
+    assert span_name_during_task == "db.query"
+
+    spans = get_spans_by_name(span_streaming, items, events)
+    assert spans[child.__qualname__]["parent_span_id"] == spans["handler"]["span_id"]
+    assert spans["inner"]["parent_span_id"] == spans[child.__qualname__]["span_id"]
+
+
+@minimum_python_38
+@parametrize_eager
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_task_span_parent_ended_before_task_runs(
+    sentry_init, capture_events, capture_items, span_streaming, eager
+):
+    sentry_init(
+        integrations=[AsyncioIntegration()],
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
+    items = capture_items("span")
+    events = capture_events()
+
+    async def child():
+        await asyncio.sleep(0)
+        with start_child_span(span_streaming, "inner"):
+            pass
+
+    async def main():
+        with start_root_span(span_streaming, "request"):
+            with start_child_span(span_streaming, "handler"):
+                task = asyncio.create_task(child())
+
+            await task
+
+    run_in_patched_loop(main, eager=eager)
+    sentry_sdk.flush()
+
+    spans = get_spans_by_name(span_streaming, items, events)
+    assert spans[child.__qualname__]["parent_span_id"] == spans["handler"]["span_id"]
+    assert spans["inner"]["parent_span_id"] == spans[child.__qualname__]["span_id"]
+
+
+@minimum_python_38
+@parametrize_eager
+def test_task_span_created_when_segment_ended_before_task_runs(
+    sentry_init, capture_items, eager
+):
+    sentry_init(
+        integrations=[AsyncioIntegration()],
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+    )
+    items = capture_items("span")
+
+    async def child():
+        await asyncio.sleep(0)
+        with sentry_sdk.traces.start_span(name="inner"):
+            pass
+
+    async def main():
+        with sentry_sdk.traces.start_span(name="handler"):
+            task = asyncio.create_task(child())
+
+        await task
+
+    run_in_patched_loop(main, eager=eager)
+    sentry_sdk.flush()
+
+    spans = get_spans_by_name(True, items, None)
+    assert set(spans) == {"handler", child.__qualname__, "inner"}
+    assert spans[child.__qualname__]["parent_span_id"] == spans["handler"]["span_id"]
+    assert spans["inner"]["parent_span_id"] == spans[child.__qualname__]["span_id"]
+    assert [name for name, span in spans.items() if span["is_segment"]] == ["handler"]
+    assert len({span["trace_id"] for span in spans.values()}) == 1
+
+
+@minimum_python_38
+@parametrize_eager
+def test_task_current_scope_forked_at_create_task(sentry_init, capture_events, eager):
+    sentry_init(integrations=[AsyncioIntegration()])
+    events = capture_events()
+
+    async def handle(job_id):
+        await asyncio.sleep(0)
+        sentry_sdk.capture_message(f"job {job_id}")
+
+    async def main():
+        with sentry_sdk.isolation_scope():
+            tasks = []
+            for job_id in ("1", "2", "3"):
+                sentry_sdk.get_current_scope().set_tag("job_id", job_id)
+                tasks.append(asyncio.create_task(handle(job_id)))
+
+            await asyncio.gather(*tasks)
+
+    run_in_patched_loop(main, eager=eager)
+
+    assert sorted((event["message"], event["tags"]["job_id"]) for event in events) == [
+        ("job 1", "1"),
+        ("job 2", "2"),
+        ("job 3", "3"),
+    ]
+
+
+@minimum_python_38
+@parametrize_eager
+def test_task_isolation_scope_forked_when_task_runs(sentry_init, capture_events, eager):
+    sentry_init(integrations=[AsyncioIntegration()])
+    events = capture_events()
+
+    async def capture():
+        sentry_sdk.capture_message("task")
+
+    async def main():
+        with sentry_sdk.isolation_scope():
+            sentry_sdk.set_tag("isolation_tag", "before")
+            task = asyncio.create_task(capture())
+            sentry_sdk.set_tag("isolation_tag", "after")
+            await task
+
+    run_in_patched_loop(main, eager=eager)
+
+    # The isolation scope is still forked when the task first runs, which is
+    # when create_task() is called for eager tasks
+    (event,) = events
+    assert event["tags"] == {"isolation_tag": "before" if eager else "after"}
+
+
+@minimum_python_38
+@parametrize_eager
+def test_task_scope_changes_do_not_leak(sentry_init, capture_events, eager):
+    sentry_init(integrations=[AsyncioIntegration()])
+    events = capture_events()
+
+    async def child(name):
+        sentry_sdk.set_tag("isolation_tag", name)
+        sentry_sdk.get_current_scope().set_tag("current_tag", name)
+        await asyncio.sleep(0)
+        sentry_sdk.capture_message(name)
+
+    async def main():
+        with sentry_sdk.isolation_scope():
+            await asyncio.gather(
+                asyncio.create_task(child("child 1")),
+                asyncio.create_task(child("child 2")),
+            )
+            sentry_sdk.capture_message("creator")
+
+    run_in_patched_loop(main, eager=eager)
+
+    tags = {event["message"]: event.get("tags", {}) for event in events}
+    assert tags == {
+        "child 1": {"isolation_tag": "child 1", "current_tag": "child 1"},
+        "child 2": {"isolation_tag": "child 2", "current_tag": "child 2"},
+        "creator": {},
+    }
+
+
+@minimum_python_311
+@parametrize_eager
+def test_task_current_scope_forked_from_explicit_context(
+    sentry_init, capture_events, eager
+):
+    sentry_init(integrations=[AsyncioIntegration()])
+    events = capture_events()
+
+    async def capture():
+        await asyncio.sleep(0)
+        sentry_sdk.capture_message("task")
+
+    def set_tags(value):
+        sentry_sdk.set_tag("isolation_source", value)
+        sentry_sdk.get_current_scope().set_tag("current_source", value)
+
+    async def main():
+        with sentry_sdk.isolation_scope() as isolation_scope:
+            set_tags("context")
+            current_scope = sentry_sdk.get_current_scope()
+            context = copy_context()
+
+        with sentry_sdk.isolation_scope():
+            set_tags("caller")
+            task = asyncio.create_task(capture(), context=context)
+            isolation_scope.set_tag("isolation_source", "changed")
+            current_scope.set_tag("current_source", "changed")
+            await task
+
+    run_in_patched_loop(main, eager=eager)
+
+    # Only the current scope is forked at create_task(), the isolation scope
+    # is still forked when the task first runs
+    (event,) = events
+    assert event["tags"] == {
+        "isolation_source": "context" if eager else "changed",
+        "current_source": "context",
+    }
+
+
+@minimum_python_311
+@parametrize_eager
+@pytest.mark.parametrize("has_current_scope", [True, False])
+def test_task_current_scope_forked_from_partial_explicit_context(
+    sentry_init, capture_events, has_current_scope, eager
+):
+    sentry_init(integrations=[AsyncioIntegration()])
+    events = capture_events()
+
+    async def capture():
+        await asyncio.sleep(0)
+        sentry_sdk.capture_message("task")
+
+    async def main():
+        sentry_sdk.get_current_scope().set_tag("source", "caller")
+
+        scope = Scope(ty=ScopeType.CURRENT)
+        scope.set_tag("source", "context")
+        context = Context()
+        if has_current_scope:
+            context.run(_current_scope.set, scope)
+
+        task = asyncio.create_task(capture(), context=context)
+        scope.set_tag("source", "changed")
+        await task
+
+    run_in_patched_loop(main, eager=eager)
+
+    (event,) = events
+    if has_current_scope:
+        assert event["tags"] == {"source": "context"}
+    else:
+        assert "tags" not in event
+
+
+@minimum_python_311
+def test_task_current_scope_forked_from_entered_context(sentry_init, capture_events):
+    sentry_init(integrations=[AsyncioIntegration()])
+    events = capture_events()
+
+    async def capture():
+        await asyncio.sleep(0)
+        sentry_sdk.capture_message("task")
+
+    async def main():
+        with sentry_sdk.isolation_scope():
+            current_scope = sentry_sdk.get_current_scope()
+            current_scope.set_tag("source", "context")
+            context = copy_context()
+
+        # The context is entered while create_task() is called with it. Eager
+        # tasks can't be started in an entered context, with or without Sentry.
+        task = context.run(asyncio.create_task, capture(), context=context)
+        current_scope.set_tag("source", "changed")
+        await task
+
+    run_in_patched_loop(main)
+
+    (event,) = events
+    assert event["tags"] == {"source": "context"}
+
+
+@minimum_python_38
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_task_cancelled_before_first_run(
+    sentry_init, capture_events, capture_items, span_streaming
+):
+    sentry_init(
+        integrations=[AsyncioIntegration()],
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
+    items = capture_items("span")
+    events = capture_events()
+
+    async def child():
+        sentry_sdk.set_tag("from_task", "yes")
+
+    async def main():
+        with start_root_span(span_streaming, "request"):
+            with start_child_span(span_streaming, "handler"):
+                coro = child()
+                task = asyncio.create_task(coro)
+                task.cancel()
+
+                with pytest.raises(asyncio.CancelledError):
+                    await task
+                # The task never started, so close the coroutine to avoid an
+                # unawaited coroutine warning
+                coro.close()
+
+                span_name_after_task = get_current_span_name(span_streaming)
+
+            sentry_sdk.capture_message("creator")
+
+        return span_name_after_task
+
+    span_name_after_task = run_in_patched_loop(main)
+    sentry_sdk.flush()
+
+    assert span_name_after_task == "handler"
+
+    spans = get_spans_by_name(
+        span_streaming, items, [e for e in events if e.get("type") == "transaction"]
+    )
+    assert set(spans) == {"request", "handler"}
+
+    (message_event,) = [e for e in events if e.get("type") != "transaction"]
+    assert "from_task" not in message_event.get("tags", {})
 
 
 @minimum_python_38
