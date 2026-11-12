@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 
 # `faas.trigger` of each `eventSource` of `Records` or of a top-level `eventSource`.
 # https://docs.aws.amazon.com/lambda/latest/dg/lambda-services.html
-_TRIGGERS: "dict[Optional[str], str]" = {
+_TRIGGERS = {
     "aws:sqs": "pubsub",
     "aws:sns": "pubsub",
     "aws:kinesis": "pubsub",
@@ -55,11 +55,6 @@ _EVENTBRIDGE_KEYS = frozenset(
 )
 
 
-def _get_records_source(records: "list[Any]") -> "Optional[str]":
-    """The records' `eventSource`, one per event; SNS spells it `EventSource`."""
-    return records[0].get("eventSource") or records[0].get("EventSource")
-
-
 def _is_appsync_event(aws_event: "Any") -> bool:
     # https://docs.aws.amazon.com/appsync/latest/devguide/resolver-context-reference-js.html
     return (
@@ -96,7 +91,9 @@ def _get_trigger(aws_event: "Any") -> str:
         # CloudFront and Lambda@Edge records have no `eventSource`.
         if "cf" in records[0]:
             return "http"
-        return _TRIGGERS.get(_get_records_source(records), "other")
+        # SNS spells it `EventSource`.
+        source = records[0].get("eventSource") or records[0].get("EventSource")
+        return _TRIGGERS.get(source, "other")
 
     if _EVENTBRIDGE_KEYS <= aws_event.keys():
         if (
@@ -106,7 +103,7 @@ def _get_trigger(aws_event: "Any") -> str:
             return "timer"
         return "pubsub"
 
-    return _TRIGGERS.get(aws_event.get("eventSource"), "other")
+    return _TRIGGERS.get(aws_event.get("eventSource", ""), "other")
 
 
 def _get_producer_trace(record: "dict[str, Any]") -> "Optional[str]":
@@ -176,7 +173,8 @@ def _start_process_span(aws_event: "Any") -> "ContextManager[Any]":
     if not records:
         return nullcontext()
 
-    event_source = _get_records_source(records)
+    # SNS spells it `EventSource`.
+    event_source = records[0].get("eventSource") or records[0].get("EventSource")
     if event_source not in _MESSAGING_SYSTEMS:
         return nullcontext()
 
