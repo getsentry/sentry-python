@@ -63,7 +63,6 @@ def invoke_agent_span(
     system_texts = []
 
     if agent:
-        # Check for system_prompt
         system_prompts = getattr(agent, "_system_prompts", None) or []
         for prompt in system_prompts:
             if isinstance(prompt, str):
@@ -101,7 +100,6 @@ def invoke_agent_span(
                 }
             )
         elif isinstance(user_prompt, list):
-            # Handle list of user content
             content = []
             for item in user_prompt:
                 if isinstance(item, str):
@@ -138,7 +136,6 @@ def update_invoke_agent_span(
     if not span or not result:
         return
 
-    # Extract output from result
     output = getattr(result, "output", None)
 
     # Set response text if prompts are enabled
