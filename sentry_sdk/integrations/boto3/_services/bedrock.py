@@ -63,8 +63,6 @@ def _finish_span(
     if not hasattr(stream, "_span"):
         return
 
-    stream = cast("_PatchedEventStream", stream)
-
     span = stream._span
     del stream._span
 
