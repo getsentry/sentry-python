@@ -68,8 +68,14 @@ def _get_producer_links(aws_event: "Any") -> "list[SpanLink]":
             # https://docs.aws.amazon.com/sns/latest/dg/sns-large-payload-raw-message-delivery.html
             body = record.get("body", "")
             if sentry_trace is None and f'"{SENTRY_TRACE_HEADER_NAME}"' in body:
-                envelope = json.loads(body)
-                if envelope.get("Type") == "Notification":
+                try:
+                    envelope = json.loads(body)
+                except ValueError:
+                    envelope = None
+                if (
+                    isinstance(envelope, dict)
+                    and envelope.get("Type") == "Notification"
+                ):
                     sentry_trace = (
                         envelope.get("MessageAttributes", {})
                         .get(SENTRY_TRACE_HEADER_NAME, {})

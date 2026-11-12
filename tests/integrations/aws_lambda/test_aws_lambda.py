@@ -918,6 +918,8 @@ def _sns_notification(sentry_trace):
                     _sqs_record(),
                     # incomplete context: not linked.
                     _sqs_record("-1"),
+                    # a body that isn't JSON: skipped, other links kept.
+                    _sqs_record(body='not json: "sentry-trace"'),
                 ]
             },
             [
