@@ -65,8 +65,10 @@ def _wrap_handler(handler: "F") -> "F":
 
         if isinstance(aws_event, list) and len(aws_event) >= 1:
             request_data = aws_event[0]
+            batch_size = len(aws_event)
         else:
             request_data = aws_event
+            batch_size = 1
 
         if not isinstance(request_data, dict):
             # If we're not dealing with a dictionary, we won't be able to get
@@ -159,6 +161,7 @@ def _wrap_handler(handler: "F") -> "F":
                 SPANDATA.SENTRY_SEGMENT_NAME_SOURCE: SegmentNameSource.COMPONENT,
                 SPANDATA.CLOUD_PROVIDER: CLOUD_PROVIDER,
                 SPANDATA.CLOUD_PLATFORM: CLOUD_PLATFORM,
+                SPANDATA.MESSAGING_BATCH_MESSAGE_COUNT: batch_size,
                 **header_attributes,
                 **additional_attributes,
             }
