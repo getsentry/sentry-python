@@ -13,6 +13,7 @@ from sentry_sdk.integrations.aws_lambda._request import (
     _get_user_from_event,
     _make_request_event_processor,
 )
+from sentry_sdk.integrations.aws_lambda._trigger import _get_trigger
 from sentry_sdk.integrations.aws_lambda.consts import (
     CLOUD_PLATFORM,
     CLOUD_PROVIDER,
@@ -230,6 +231,9 @@ def _wrap_handler(handler: "F") -> "F":
                 **header_attributes,
                 **additional_attributes,
             }
+
+            with capture_internal_exceptions():
+                attributes[SPANDATA.FAAS_TRIGGER] = _get_trigger(aws_event)
 
             with capture_internal_exceptions():
                 invoked_function_arn = aws_context.invoked_function_arn

@@ -25,6 +25,32 @@ DOCKER_NETWORK_NAME = "lambda-test-network"
 SAM_TEMPLATE_FILE = "sam.template.yaml"
 SAM_SHUTDOWN_TIMEOUT = 10
 
+SQS_RECORD = {
+    "messageId": "059f36b4-87a3-44ab-83d2-661975830a7d",
+    "body": "{}",
+    "eventSource": "aws:sqs",
+    "eventSourceARN": "arn:aws:sqs:us-east-1:012345678912:orders",
+}
+SNS_RECORD = {
+    "EventSource": "aws:sns",
+    "Sns": {"TopicArn": "arn:aws:sns:us-east-1:012345678912:alerts"},
+}
+APPSYNC_EVENT = {
+    "arguments": {"id": "1"},
+    "info": {"fieldName": "getOrder", "parentTypeName": "Query"},
+}
+EVENTBRIDGE_EVENT = {
+    "version": "0",
+    "id": "53dc4d37-cffa-4f76-80c9-8b7d4a4d2eaa",
+    "detail-type": "Object Created",
+    "source": "aws.s3",
+    "account": "012345678912",
+    "time": "2026-10-26T12:00:00Z",
+    "region": "us-east-1",
+    "resources": [],
+    "detail": {},
+}
+
 
 @pytest.fixture(scope="session", autouse=True)
 def test_environment():
@@ -767,6 +793,7 @@ def test_no_error(lambda_client, test_environment):
     assert _get_span_attr(attrs, SPANDATA.AWS_LOG_STREAM_NAMES) == [
         LATEST_FUNCTION_VERSION
     ]
+    assert _get_span_attr(attrs, SPANDATA.FAAS_TRIGGER) == "other"
 
 
 def test_error(lambda_client, test_environment):
@@ -820,6 +847,73 @@ def test_error(lambda_client, test_environment):
     assert _get_span_attr(attrs, SPANDATA.AWS_LOG_STREAM_NAMES) == [
         LATEST_FUNCTION_VERSION
     ]
+    assert _get_span_attr(attrs, SPANDATA.FAAS_TRIGGER) == "other"
+
+
+@pytest.mark.parametrize(
+    "aws_event,trigger",
+    [
+        pytest.param(
+            {"httpMethod": "GET", "path": "/", "requestContext": {"stage": "prod"}},
+            "http",
+            id="api-gateway-rest",
+        ),
+        pytest.param(
+            {
+                "version": "2.0",
+                "routeKey": "GET /",
+                "requestContext": {"http": {"method": "GET"}},
+            },
+            "http",
+            id="api-gateway-http",
+        ),
+        pytest.param(
+            {"Records": [{"cf": {"request": {"uri": "/"}}}]},
+            "http",
+            id="cloudfront",
+        ),
+        pytest.param(APPSYNC_EVENT, "http", id="appsync"),
+        pytest.param([APPSYNC_EVENT, APPSYNC_EVENT], "http", id="appsync-batch"),
+        pytest.param({"Records": [SQS_RECORD, SQS_RECORD]}, "pubsub", id="sqs"),
+        pytest.param({"Records": [SNS_RECORD]}, "pubsub", id="sns"),
+        pytest.param(
+            {"eventSource": "aws:kafka", "records": {"orders-0": [{}]}},
+            "pubsub",
+            id="msk",
+        ),
+        pytest.param(
+            EVENTBRIDGE_EVENT,
+            "pubsub",
+            id="eventbridge",
+        ),
+        pytest.param(
+            {
+                **EVENTBRIDGE_EVENT,
+                "source": "aws.events",
+                "detail-type": "Scheduled Event",
+            },
+            "timer",
+            id="eventbridge-schedule",
+        ),
+        pytest.param({"Records": [{"eventSource": "aws:s3"}]}, "datasource", id="s3"),
+        pytest.param(
+            [{"good dog": "Maisey"}, {"good dog": "Charlie"}],
+            "other",
+            id="list",
+        ),
+    ],
+)
+def test_trigger(lambda_client, test_environment, aws_event, trigger):
+    lambda_client.invoke(
+        FunctionName="BasicOkSpanStreaming",
+        Payload=json.dumps(aws_event),
+    )
+
+    (segment_span,) = [
+        s for s in test_environment["server"].span_items if s["is_segment"]
+    ]
+    attrs = segment_span["attributes"]
+    assert _get_span_attr(attrs, SPANDATA.FAAS_TRIGGER) == trigger
 
 
 def test_trace_continuation(lambda_client, test_environment):
