@@ -759,12 +759,9 @@ class _BedrockExtension(_ServiceExtension):
             return
 
         if ctx.operation_name == "ConverseStream":
-            stream = cast(
-                "_PatchedEventStream",
-                cast("ConverseStreamResponseTypeDef", response)["stream"],
-            )
-            stream._span = span
-            stream._request_start_time = self.request_start_time
+            stream = cast("ConverseStreamResponseTypeDef", response)["stream"]
+            stream._span = span  # type: ignore[attr-defined]
+            stream._request_start_time = self.request_start_time  # type: ignore[attr-defined]
             return
 
         if isinstance(span, StreamedSpan):
