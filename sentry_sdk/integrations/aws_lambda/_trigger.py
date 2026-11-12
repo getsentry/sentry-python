@@ -1,14 +1,7 @@
-from contextlib import nullcontext
 from typing import TYPE_CHECKING
 
-import sentry_sdk
-from sentry_sdk.consts import OP, SPANDATA
-from sentry_sdk.integrations.aws_lambda.consts import ORIGIN
-
 if TYPE_CHECKING:
-    from typing import Any, ContextManager
-
-    from sentry_sdk._types import SpanLink
+    from typing import Any
 
 # `faas.trigger` of each `eventSource` of `Records` or of a top-level `eventSource`.
 # https://docs.aws.amazon.com/lambda/latest/dg/lambda-services.html
@@ -27,9 +20,6 @@ _TRIGGERS = {
     "aws:dynamodb": "datasource",
     "aws:docdb": "datasource",
 }
-
-# `messaging.system` of the messaging event sources that get a `queue.process` span.
-_MESSAGING_SYSTEMS = {"aws:sqs": "aws_sqs", "aws:sns": "aws.sns"}
 
 # https://docs.aws.amazon.com/eventbridge/latest/ref/overiew-event-structure.html
 _EVENTBRIDGE_KEYS = frozenset(
@@ -96,42 +86,3 @@ def _get_trigger(aws_event: "Any") -> str:
         return "pubsub"
 
     return _TRIGGERS.get(aws_event.get("eventSource", ""), "other")
-
-
-def _start_process_span(
-    aws_event: "Any", links: "list[SpanLink]"
-) -> "ContextManager[Any]":
-    """A `queue.process` span around the handler for an SQS or SNS delivery, linked to its producers."""
-    records = aws_event.get("Records") if isinstance(aws_event, dict) else None
-    if not records:
-        return nullcontext()
-
-    # SNS spells it `EventSource`.
-    event_source = records[0].get("eventSource") or records[0].get("EventSource")
-    if event_source not in _MESSAGING_SYSTEMS:
-        return nullcontext()
-
-    # one queue or topic per event: `arn:aws:sqs:<region>:<account>:<queue>`.
-    arn = (
-        records[0]["eventSourceARN"]
-        if event_source == "aws:sqs"
-        else records[0]["Sns"]["TopicArn"]
-    )
-    destination = arn.split(":")[5]
-
-    return sentry_sdk.start_span(
-        name=f"process {destination}",
-        attributes={
-            SPANDATA.SENTRY_OP: OP.QUEUE_PROCESS,
-            SPANDATA.SENTRY_ORIGIN: ORIGIN,
-            SPANDATA.SENTRY_KIND: "consumer",
-            SPANDATA.MESSAGING_SYSTEM: _MESSAGING_SYSTEMS[event_source],
-            SPANDATA.MESSAGING_OPERATION_TYPE: "process",
-            SPANDATA.MESSAGING_OPERATION_NAME: "process",
-            SPANDATA.MESSAGING_DESTINATION_NAME: destination,
-            SPANDATA.MESSAGING_BATCH_MESSAGE_COUNT: len(records),
-        },
-        # OTel links a consumer's process span to each message's creation context.
-        # https://opentelemetry.io/docs/specs/semconv/messaging/messaging-spans/
-        links=links,
-    )
