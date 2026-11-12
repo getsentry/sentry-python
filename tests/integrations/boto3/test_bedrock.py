@@ -1,5 +1,7 @@
+import base64
 import io
 import json
+from typing import Any
 from unittest.mock import Mock
 
 import boto3
@@ -1320,3 +1322,249 @@ def test_converse_stream_input_attributes(
             json.loads(span["data"][SPANDATA.GEN_AI_INPUT_MESSAGES])
             == expected_input_messages
         )
+
+
+@pytest.mark.parametrize("data_collection", [True, False])
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+def test_converse_stream_output_attributes(
+    sentry_init,
+    capture_items,
+    capture_events,
+    data_collection,
+    span_streaming,
+    stream_gen_ai_spans,
+    converse_stream_response,
+):
+    if data_collection:
+        sentry_init(
+            traces_sample_rate=1.0,
+            integrations=[Boto3Integration()],
+            data_collection={"gen_ai": {"outputs": True}},
+            stream_gen_ai_spans=stream_gen_ai_spans,
+            trace_lifecycle="stream" if span_streaming else "static",
+        )
+    else:
+        sentry_init(
+            traces_sample_rate=1.0,
+            integrations=[Boto3Integration()],
+            send_default_pii=True,
+            stream_gen_ai_spans=stream_gen_ai_spans,
+            trace_lifecycle="stream" if span_streaming else "static",
+        )
+
+    stream_events: "list[tuple[str, dict[str, Any]]]" = [
+        ("messageStart", {"role": "assistant"}),
+        (
+            "contentBlockDelta",
+            {"contentBlockIndex": 0, "delta": {"text": "What is the weather "}},
+        ),
+        (
+            "contentBlockDelta",
+            {"contentBlockIndex": 0, "delta": {"text": "in Paris?"}},
+        ),
+        ("contentBlockStop", {"contentBlockIndex": 0}),
+        (
+            "contentBlockStart",
+            {
+                "contentBlockIndex": 1,
+                "start": {"toolUse": {"toolUseId": "tooluse_1", "name": "get_weather"}},
+            },
+        ),
+        (
+            "contentBlockDelta",
+            {"contentBlockIndex": 1, "delta": {"toolUse": {"input": '{"location": '}}},
+        ),
+        (
+            "contentBlockDelta",
+            {"contentBlockIndex": 1, "delta": {"toolUse": {"input": '"Paris"}'}}},
+        ),
+        ("contentBlockStop", {"contentBlockIndex": 1}),
+    ]
+    expected_parts: "list[dict[str, Any]]" = [
+        {"type": "text", "content": "What is the weather in Paris?"},
+        {
+            "type": "tool_call",
+            "name": "get_weather",
+            "arguments": '{"location": "Paris"}',
+        },
+    ]
+
+    if BOTOCORE_VERSION >= Version("1.37.0"):
+        stream_events += [
+            (
+                "contentBlockDelta",
+                {
+                    "contentBlockIndex": 2,
+                    "delta": {"reasoningContent": {"text": "The user wants "}},
+                },
+            ),
+            (
+                "contentBlockDelta",
+                {
+                    "contentBlockIndex": 2,
+                    "delta": {"reasoningContent": {"text": "the weather in Paris."}},
+                },
+            ),
+            (
+                "contentBlockDelta",
+                {
+                    "contentBlockIndex": 2,
+                    "delta": {"reasoningContent": {"signature": "signature"}},
+                },
+            ),
+            ("contentBlockStop", {"contentBlockIndex": 2}),
+        ]
+        expected_parts.append(
+            {"type": "reasoning", "content": "The user wants the weather in Paris."}
+        )
+
+    if BOTOCORE_VERSION >= Version("1.42.1"):
+        stream_events += [
+            (
+                "contentBlockStart",
+                {
+                    "contentBlockIndex": 3,
+                    "start": {
+                        "toolResult": {"toolUseId": "tooluse_1", "status": "success"}
+                    },
+                },
+            ),
+            (
+                "contentBlockDelta",
+                {
+                    "contentBlockIndex": 3,
+                    "delta": {
+                        "toolResult": [{"json": {"temperature": 18, "unit": "celsius"}}]
+                    },
+                },
+            ),
+            (
+                "contentBlockDelta",
+                {
+                    "contentBlockIndex": 3,
+                    "delta": {"toolResult": [{"text": "Partly cloudy"}]},
+                },
+            ),
+            ("contentBlockStop", {"contentBlockIndex": 3}),
+            (
+                "contentBlockStart",
+                {"contentBlockIndex": 4, "start": {"image": {"format": "png"}}},
+            ),
+            (
+                "contentBlockDelta",
+                {
+                    "contentBlockIndex": 4,
+                    "delta": {
+                        "image": {
+                            "source": {"bytes": base64.b64encode(b"image").decode()}
+                        }
+                    },
+                },
+            ),
+            ("contentBlockStop", {"contentBlockIndex": 4}),
+            (
+                "contentBlockStart",
+                {"contentBlockIndex": 5, "start": {"image": {"format": "png"}}},
+            ),
+            (
+                "contentBlockDelta",
+                {
+                    "contentBlockIndex": 5,
+                    "delta": {
+                        "image": {
+                            "source": {
+                                "s3Location": {"uri": "s3://my-bucket/images/photo.png"}
+                            }
+                        }
+                    },
+                },
+            ),
+            ("contentBlockStop", {"contentBlockIndex": 5}),
+        ]
+        expected_parts += [
+            {
+                "type": "tool_call_response",
+                "response": [
+                    {"json": {"temperature": 18, "unit": "celsius"}},
+                    {"text": "Partly cloudy"},
+                ],
+            },
+            {"type": "blob", "modality": "image"},
+            {
+                "type": "uri",
+                "modality": "image",
+                "uri": "s3://my-bucket/images/photo.png",
+            },
+        ]
+
+    stream_events += [
+        ("messageStop", {"stopReason": "end_turn"}),
+        (
+            "metadata",
+            {
+                "usage": {"inputTokens": 10, "outputTokens": 20, "totalTokens": 30},
+                "metrics": {"latencyMs": 500},
+            },
+        ),
+    ]
+
+    converse_stream_response["stream"]._event_generator = iter(
+        EventStreamMessage(
+            prelude=None,
+            headers={":message-type": "event", ":event-type": event_type},
+            payload=json.dumps(payload).encode(),
+            crc=None,
+        )
+        for event_type, payload in stream_events
+    )
+
+    session = boto3.Session(
+        aws_access_key_id="-", aws_secret_access_key="-", region_name="us-east-1"
+    )
+    client = session.client("bedrock-runtime")
+    mock_http = Mock(status_code=200)
+    client.meta.events.register(
+        "before-call.bedrock-runtime.ConverseStream",
+        lambda **kwargs: (mock_http, converse_stream_response),
+    )
+
+    if span_streaming or stream_gen_ai_spans:
+        items = capture_items("span")
+
+        with sentry_sdk.start_transaction(name="parent"):
+            response = client.converse_stream(
+                modelId="anthropic.claude-3-sonnet-20240229-v1:0",
+                messages=[{"role": "user", "content": [{"text": "Hi"}]}],
+            )
+            for _ in response["stream"]:
+                pass
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items]
+        (span,) = (
+            span
+            for span in spans
+            if span["attributes"].get("sentry.op") == OP.GEN_AI_CHAT
+        )
+
+        assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+            {"role": "assistant", "parts": expected_parts}
+        ]
+    else:
+        events = capture_events()
+
+        with sentry_sdk.start_transaction(name="parent"):
+            response = client.converse_stream(
+                modelId="anthropic.claude-3-sonnet-20240229-v1:0",
+                messages=[{"role": "user", "content": [{"text": "Hi"}]}],
+            )
+            for _ in response["stream"]:
+                pass
+
+        (transaction,) = events
+        (span,) = transaction["spans"]
+
+        assert json.loads(span["data"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+            {"role": "assistant", "parts": expected_parts}
+        ]
