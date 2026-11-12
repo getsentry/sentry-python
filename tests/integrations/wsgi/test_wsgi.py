@@ -890,20 +890,31 @@ def test_request_headers_legacy_no_pii_redacts_sensitive(
             "/",
             headers={
                 "X-Forwarded-For": "1.2.3.4",
+                "X-Real-IP": "1.2.3.5",
+                "CF-Connecting-IP": "1.2.3.6",
+                "True-Client-IP": "1.2.3.7",
+                "Forwarded": "for=1.2.3.8",
+                "X-Client-IP": "1.2.3.9",
                 "X-Custom-Header": "passthrough",
             },
         )
 
     (event,) = events
 
-    assert event["request"]["headers"]["X-Forwarded-For"] == ""
-    assert event["request"]["headers"]["X-Custom-Header"] == "passthrough"
+    for header in (
+        "X-Forwarded-For",
+        "X-Real-Ip",
+        "Cf-Connecting-Ip",
+        "True-Client-Ip",
+        "Forwarded",
+        "X-Client-Ip",
+    ):
+        assert event["request"]["headers"][header] == ""
+        assert event["_meta"]["request"]["headers"][header] == {
+            "": {"rem": [["!config", "x"]]}
+        }
 
-    # The emptied value is accompanied by a `_meta` annotation marking it as
-    # removed, confirming the substitution came from the AnnotatedValue path.
-    assert event["_meta"]["request"]["headers"]["X-Forwarded-For"] == {
-        "": {"rem": [["!config", "x"]]}
-    }
+    assert event["request"]["headers"]["X-Custom-Header"] == "passthrough"
 
 
 def test_request_headers_data_collection_off_collects_no_headers(
