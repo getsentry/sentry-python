@@ -866,6 +866,14 @@ def test_streaming_generate_content(
         assert (
             chat_span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "gemini-1.5-flash"
         )
+        assert (
+            chat_span["attributes"][SPANDATA.GEN_AI_RESPONSE_ID]
+            == "response-id-stream-123"
+        )
+        assert (
+            chat_span["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL]
+            == "gemini-1.5-flash"
+        )
     else:
         events = capture_events()
 
@@ -916,6 +924,10 @@ def test_streaming_generate_content(
 
         # Verify model name
         assert chat_span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "gemini-1.5-flash"
+        assert (
+            chat_span["data"][SPANDATA.GEN_AI_RESPONSE_ID] == "response-id-stream-123"
+        )
+        assert chat_span["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "gemini-1.5-flash"
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
