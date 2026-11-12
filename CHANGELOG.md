@@ -6,6 +6,23 @@
 
 #### Bedrock
 
+- **Support for Amazon Bedrock's Converse and ConverseStream APIs**
+
+  The Boto3 integration is enabled automatically when `boto3` is installed. To configure it explicitly:
+
+```python
+import sentry_sdk
+from sentry_sdk.integrations.boto3 import Boto3Integration
+
+sentry_sdk.init(
+    dsn="...",
+    traces_sample_rate=1.0,
+    integrations=[
+        Boto3Integration(),
+    ]
+)
+```
+
 - Set `gen_ai.response.time_to_first_chunk` by @alexander-alderman-webb in [#8255](https://github.com/getsentry/sentry-python/pull/8255)
 - Record `gen_ai.response.finish_reasons` for streamed responses by @alexander-alderman-webb in [#8252](https://github.com/getsentry/sentry-python/pull/8252)
 - Set `gen_ai.output.messages` for streamed responses by @alexander-alderman-webb in [#8251](https://github.com/getsentry/sentry-python/pull/8251)
