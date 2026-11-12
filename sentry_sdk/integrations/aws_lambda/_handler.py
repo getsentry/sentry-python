@@ -44,7 +44,7 @@ MILLIS_TO_SECONDS = 1000.0
 MAX_PRODUCER_LINKS = 128
 
 
-def _get_producer_links(aws_event: "Any") -> "list[SpanLink]":
+def _get_producer_links(aws_event: "Any", trace_id: str) -> "list[SpanLink]":
     """Links to the spans that sent the SQS or SNS messages this invocation got."""
     records: "list[Any]" = []
     if isinstance(aws_event, dict):
@@ -87,6 +87,9 @@ def _get_producer_links(aws_event: "Any") -> "list[SpanLink]":
 
         data = extract_sentrytrace_data(sentry_trace)
         if data is None or not data["trace_id"] or not data["parent_span_id"]:
+            continue
+        # the invocation continues this trace, so a link would point into its own trace.
+        if data["trace_id"] == trace_id:
             continue
 
         link: "SpanLink" = {
@@ -253,11 +256,6 @@ def _wrap_handler(handler: "F") -> "F":
                     }
                 )
 
-            # SQS and SNS messages link to their producers; they never parent the invocation.
-            producer_links: "list[SpanLink]" = []
-            with capture_internal_exceptions():
-                producer_links = _get_producer_links(aws_event)
-
             # a synchronous `Invoke` passes the invoking span in `ClientContext`; it wins over
             # event headers, which a forwarded HTTP event keeps from further upstream.
             # https://docs.aws.amazon.com/lambda/latest/dg/python-context.html
@@ -267,6 +265,17 @@ def _wrap_handler(handler: "F") -> "F":
                 sentry_sdk.continue_trace(custom)
             else:
                 sentry_sdk.continue_trace(headers)
+
+            # SQS and SNS messages link to their producers; they never parent the invocation.
+            producer_links: "list[SpanLink]" = []
+            with capture_internal_exceptions():
+                producer_links = _get_producer_links(
+                    aws_event,
+                    sentry_sdk.get_current_scope()
+                    .get_active_propagation_context()
+                    .trace_id,
+                )
+
             Scope.set_custom_sampling_context(sampling_context)
             with sentry_sdk.start_span(
                 name=function_name,

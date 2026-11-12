@@ -918,6 +918,8 @@ def _sns_notification(sentry_trace):
                     _sqs_record(),
                     # incomplete context: not linked.
                     _sqs_record("-1"),
+                    # no sampling decision: linked without `sampled`.
+                    _sqs_record("5c6d7e8f9a0b4c1d8e2f3a4b5c6d7e8f-2b3c4d5e6f7a8b9c"),
                     # a body that isn't JSON: skipped, other links kept.
                     _sqs_record(body='not json: "sentry-trace"'),
                 ]
@@ -934,6 +936,11 @@ def _sns_notification(sentry_trace):
                     "span_id": "1a2b3c4d5e6f7a8b",
                     "attributes": MESSAGE_ORIGIN_LINK,
                     "sampled": False,
+                },
+                {
+                    "trace_id": "5c6d7e8f9a0b4c1d8e2f3a4b5c6d7e8f",
+                    "span_id": "2b3c4d5e6f7a8b9c",
+                    "attributes": MESSAGE_ORIGIN_LINK,
                 },
             ],
             id="sqs",
@@ -1020,6 +1027,11 @@ def test_trace_continuation_from_client_context(
                 "sentry-trace": "471a43a4192642f0b136d5159a501701-6e8f22c393e68f19-1"
             }
         },
+        "Records": [
+            # a producer in the continued trace: not linked, it's already in the trace.
+            _sqs_record("471a43a4192642f0b136d5159a501701-1a2b3c4d5e6f7a8b-1"),
+            _sqs_record("5c6d7e8f9a0b4c1d8e2f3a4b5c6d7e8f-2b3c4d5e6f7a8b9c-1"),
+        ],
     }
 
     lambda_client.invoke(FunctionName="ClientContextTrace", Payload=json.dumps(payload))
@@ -1029,6 +1041,14 @@ def test_trace_continuation_from_client_context(
     ]
     assert segment_span["trace_id"] == "471a43a4192642f0b136d5159a501701"
     assert segment_span["parent_span_id"] == "6e8f22c393e68f19"
+    assert segment_span["links"] == [
+        {
+            "trace_id": "5c6d7e8f9a0b4c1d8e2f3a4b5c6d7e8f",
+            "span_id": "2b3c4d5e6f7a8b9c",
+            "attributes": MESSAGE_ORIGIN_LINK,
+            "sampled": True,
+        }
+    ]
 
 
 def test_request_attributes(lambda_client, test_environment):
