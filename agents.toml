@@ -1,6 +1,4 @@
 version = 1
-# Managed skills are gitignored; collaborators must run 'dotagents install'.
-gitignore = false
 
 [trust]
 allow_all = true
