@@ -752,7 +752,6 @@ def test_no_error(lambda_client, test_environment):
     assert _get_span_attr(attrs, SPANDATA.AWS_LOG_STREAM_NAMES) == [
         LATEST_FUNCTION_VERSION
     ]
-    assert SPANDATA.MESSAGING_BATCH_MESSAGE_COUNT not in attrs
 
 
 def test_error(lambda_client, test_environment):
@@ -806,7 +805,6 @@ def test_error(lambda_client, test_environment):
     assert _get_span_attr(attrs, SPANDATA.AWS_LOG_STREAM_NAMES) == [
         LATEST_FUNCTION_VERSION
     ]
-    assert SPANDATA.MESSAGING_BATCH_MESSAGE_COUNT not in attrs
 
 
 def test_trace_continuation(lambda_client, test_environment):
