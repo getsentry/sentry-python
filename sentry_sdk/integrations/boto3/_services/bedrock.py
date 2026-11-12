@@ -23,7 +23,7 @@ except ImportError:
 
 
 if TYPE_CHECKING:
-    from typing import Any, Iterator, Optional, Union
+    from typing import Any, Iterator, Mapping, Optional, Union
 
     from mypy_boto3_bedrock_runtime.type_defs import (
         ConverseResponseTypeDef,
@@ -171,7 +171,7 @@ def _transform_system_instructions(
 
 
 def _transform_messages(
-    input_messages: "Union[list[dict[str, Any]], tuple[dict[str, Any], ...]]",
+    input_messages: "Union[list[Mapping[str, Any]], tuple[Mapping[str, Any], ...]]",
 ) -> "list[InputMessage]":
     """
     Unlike other providers, AWS declares that input and output messages use the same message type.
@@ -488,7 +488,8 @@ class _BedrockExtension(_ServiceExtension):
         )
 
         if ctx.operation_name == "Converse":
-            usage = cast("ConverseResponseTypeDef", response)["usage"]
+            response = cast("ConverseResponseTypeDef", response)
+            usage = response["usage"]
 
             set_on_span(SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS, usage["outputTokens"])
             set_on_span(SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, usage["totalTokens"])
@@ -510,6 +511,22 @@ class _BedrockExtension(_ServiceExtension):
                 )
 
             set_on_span(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, input_tokens)
+
+            client = sentry_sdk.get_client()
+            if "message" in response["output"] and (
+                (
+                    has_data_collection_enabled(client.options)
+                    and client.options["data_collection"]["gen_ai"]["outputs"]
+                )
+                or (
+                    not has_data_collection_enabled(client.options)
+                    and should_send_default_pii()
+                )
+            ):
+                set_on_span(
+                    SPANDATA.GEN_AI_OUTPUT_MESSAGES,
+                    json.dumps(_transform_messages([response["output"]["message"]])),
+                )
 
             if isinstance(span, StreamedSpan):
                 span.end()
