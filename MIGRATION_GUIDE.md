@@ -332,12 +332,16 @@ sentry_sdk.init(
         "http_headers": {
             "request": {
                 "mode": "denylist",
-                "terms": ["forwarded", "-ip", "remote-", "via", "-user"]
+                "terms": ["forwarded", "-ip", "remote-", "via", "-user"],
             },
         },
-        "cookies": { "mode": "denylist", "terms": ["forwarded", "-ip", "remote-", "via", "-user"] },
+        "cookies": {
+            "mode": "denylist",
+            "terms": ["forwarded", "-ip", "remote-", "via", "-user"],
+        },
         "url_query_params": {
-            "mode": "denylist", "terms": ["forwarded", "-ip", "remote-", "via", "-user"],
+            "mode": "denylist",
+            "terms": ["forwarded", "-ip", "remote-", "via", "-user"],
         },
     },
 )
