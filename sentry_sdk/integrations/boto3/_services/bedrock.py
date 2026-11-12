@@ -142,7 +142,7 @@ def _patch_event_stream() -> None:
 
                 if start_time is not None and "contentBlockDelta" in event:
                     set_on_span(
-                        SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN,
+                        SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_CHUNK,
                         time.perf_counter() - start_time,
                     )
                     start_time = None
