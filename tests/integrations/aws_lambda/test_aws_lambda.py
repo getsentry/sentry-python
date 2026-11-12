@@ -916,6 +916,81 @@ def test_trigger(lambda_client, test_environment, aws_event, trigger):
     assert _get_span_attr(attrs, SPANDATA.FAAS_TRIGGER) == trigger
 
 
+@pytest.mark.parametrize(
+    "aws_event,system,destination",
+    [
+        pytest.param(
+            {"Records": [SQS_RECORD, SQS_RECORD]}, "aws_sqs", "orders", id="sqs"
+        ),
+        pytest.param({"Records": [SNS_RECORD]}, "aws.sns", "alerts", id="sns"),
+    ],
+)
+def test_messaging_process_span(
+    lambda_client, test_environment, aws_event, system, destination
+):
+    lambda_client.invoke(
+        FunctionName="BasicOkSpanStreaming",
+        Payload=json.dumps(aws_event),
+    )
+
+    span_items = test_environment["server"].span_items
+    (segment_span,) = [s for s in span_items if s["is_segment"]]
+    (process_span,) = [
+        s
+        for s in span_items
+        if _get_span_attr(s["attributes"], SPANDATA.SENTRY_OP) == OP.QUEUE_PROCESS
+    ]
+    assert process_span["parent_span_id"] == segment_span["span_id"]
+    assert process_span["trace_id"] == segment_span["trace_id"]
+    assert process_span["name"] == f"process {destination}"
+
+    attrs = process_span["attributes"]
+    assert _get_span_attr(attrs, SPANDATA.SENTRY_KIND) == "consumer"
+    assert _get_span_attr(attrs, SPANDATA.MESSAGING_SYSTEM) == system
+    assert _get_span_attr(attrs, SPANDATA.MESSAGING_OPERATION_TYPE) == "process"
+    assert _get_span_attr(attrs, SPANDATA.MESSAGING_OPERATION_NAME) == "process"
+    assert _get_span_attr(attrs, SPANDATA.MESSAGING_DESTINATION_NAME) == destination
+    assert _get_span_attr(attrs, SPANDATA.MESSAGING_BATCH_MESSAGE_COUNT) == len(
+        aws_event["Records"]
+    )
+
+
+def test_no_process_span_without_messages(lambda_client, test_environment):
+    lambda_client.invoke(
+        FunctionName="BasicOkSpanStreaming",
+        Payload=json.dumps({"Records": [{"eventSource": "aws:kinesis"}]}),
+    )
+
+    (span,) = test_environment["server"].span_items
+    assert span["is_segment"]
+
+
+def test_process_span_error(lambda_client, test_environment):
+    response = lambda_client.invoke(
+        FunctionName="RaiseErrorSpanStreaming",
+        Payload=json.dumps({"Records": [SQS_RECORD]}),
+    )
+
+    # the handler's exception still reaches the Lambda runtime.
+    assert json.loads(response["Payload"].read())["errorMessage"] == "Oh!"
+
+    (error_event,) = test_environment["server"].envelopes
+    (exception,) = error_event["exception"]["values"]
+    assert exception["value"] == "Oh!"
+    assert not exception["mechanism"]["handled"]
+
+    span_items = test_environment["server"].span_items
+    (segment_span,) = [s for s in span_items if s["is_segment"]]
+    (process_span,) = [
+        s
+        for s in span_items
+        if _get_span_attr(s["attributes"], SPANDATA.SENTRY_OP) == OP.QUEUE_PROCESS
+    ]
+    assert process_span["parent_span_id"] == segment_span["span_id"]
+    assert process_span["status"] == "error"
+    assert segment_span["status"] == "error"
+
+
 def test_trace_continuation(lambda_client, test_environment):
     trace_id = "471a43a4192642f0b136d5159a501701"
     parent_span_id = "6e8f22c393e68f19"
@@ -1085,12 +1160,17 @@ def test_producer_links(lambda_client, test_environment, aws_event, links):
         Payload=json.dumps(aws_event),
     )
 
-    (segment_span,) = [
-        s for s in test_environment["server"].span_items if s["is_segment"]
+    span_items = test_environment["server"].span_items
+    (segment_span,) = [s for s in span_items if s["is_segment"]]
+    (process_span,) = [
+        s
+        for s in span_items
+        if _get_span_attr(s["attributes"], SPANDATA.SENTRY_OP) == OP.QUEUE_PROCESS
     ]
-    # messages are linked, never the parent of the invocation.
+    # messages are linked from the process span, never the parent of the invocation.
     assert "parent_span_id" not in segment_span
-    assert segment_span["links"] == links
+    assert "links" not in segment_span
+    assert process_span["links"] == links
 
 
 @pytest.mark.parametrize(
@@ -1124,12 +1204,16 @@ def test_trace_continuation_from_client_context(
 
     lambda_client.invoke(FunctionName="ClientContextTrace", Payload=json.dumps(payload))
 
-    (segment_span,) = [
-        s for s in test_environment["server"].span_items if s["is_segment"]
+    span_items = test_environment["server"].span_items
+    (segment_span,) = [s for s in span_items if s["is_segment"]]
+    (process_span,) = [
+        s
+        for s in span_items
+        if _get_span_attr(s["attributes"], SPANDATA.SENTRY_OP) == OP.QUEUE_PROCESS
     ]
     assert segment_span["trace_id"] == "471a43a4192642f0b136d5159a501701"
     assert segment_span["parent_span_id"] == "6e8f22c393e68f19"
-    assert segment_span["links"] == [
+    assert process_span["links"] == [
         {
             "trace_id": "5c6d7e8f9a0b4c1d8e2f3a4b5c6d7e8f",
             "span_id": "2b3c4d5e6f7a8b9c",

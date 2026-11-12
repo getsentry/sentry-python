@@ -1,6 +1,7 @@
 import functools
 import json
 import sys
+from contextlib import nullcontext
 from os import environ
 from typing import TYPE_CHECKING
 from urllib.parse import urlencode
@@ -32,7 +33,7 @@ from sentry_sdk.utils import (
 )
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Mapping, TypeVar
+    from typing import Any, Callable, ContextManager, Mapping, TypeVar
 
     from sentry_sdk._types import Attributes, SpanLink
 
@@ -43,6 +44,8 @@ MILLIS_TO_SECONDS = 1000.0
 # OTel's default link limit; Lambda delivers up to 10,000 SQS messages at once.
 # https://opentelemetry.io/docs/specs/otel/trace/sdk/#span-limits
 MAX_PRODUCER_LINKS = 128
+# `messaging.system` of the messaging event sources that get a `queue.process` span.
+MESSAGING_SYSTEMS = {"aws:sqs": "aws_sqs", "aws:sns": "aws.sns"}
 
 
 def _get_producer_links(aws_event: "Any", trace_id: str) -> "list[SpanLink]":
@@ -267,7 +270,8 @@ def _wrap_handler(handler: "F") -> "F":
             else:
                 sentry_sdk.continue_trace(headers)
 
-            # SQS and SNS messages link to their producers; they never parent the invocation.
+            # SQS and SNS messages link to their producers from the `queue.process` span;
+            # they never parent the invocation.
             producer_links: "list[SpanLink]" = []
             with capture_internal_exceptions():
                 producer_links = _get_producer_links(
@@ -282,10 +286,52 @@ def _wrap_handler(handler: "F") -> "F":
                 name=function_name,
                 parent_span=None,
                 attributes=attributes,
-                links=producer_links,
             ):
                 try:
-                    return handler(aws_event, aws_context, *args, **kwargs)
+                    # a `queue.process` span around the handler for an SQS or SNS delivery.
+                    process_span: "ContextManager[Any]" = nullcontext()
+                    with capture_internal_exceptions():
+                        records: "list[Any]" = []
+                        if isinstance(aws_event, dict):
+                            records = aws_event.get("Records") or []
+
+                        event_source = None
+                        if records:
+                            # SNS spells it `EventSource`.
+                            event_source = records[0].get("eventSource") or records[
+                                0
+                            ].get("EventSource")
+
+                        if event_source in MESSAGING_SYSTEMS:
+                            # one queue or topic per event: `arn:aws:sqs:<region>:<account>:<queue>`.
+                            arn = (
+                                records[0]["eventSourceARN"]
+                                if event_source == "aws:sqs"
+                                else records[0]["Sns"]["TopicArn"]
+                            )
+                            destination = arn.split(":")[5]
+                            process_span = sentry_sdk.start_span(
+                                name=f"process {destination}",
+                                attributes={
+                                    SPANDATA.SENTRY_OP: OP.QUEUE_PROCESS,
+                                    SPANDATA.SENTRY_ORIGIN: ORIGIN,
+                                    SPANDATA.SENTRY_KIND: "consumer",
+                                    SPANDATA.MESSAGING_SYSTEM: MESSAGING_SYSTEMS[
+                                        event_source
+                                    ],
+                                    SPANDATA.MESSAGING_OPERATION_TYPE: "process",
+                                    SPANDATA.MESSAGING_OPERATION_NAME: "process",
+                                    SPANDATA.MESSAGING_DESTINATION_NAME: destination,
+                                    SPANDATA.MESSAGING_BATCH_MESSAGE_COUNT: len(
+                                        records
+                                    ),
+                                },
+                                # OTel links a consumer's process span to each message's creation context.
+                                # https://opentelemetry.io/docs/specs/semconv/messaging/messaging-spans/
+                                links=producer_links,
+                            )
+                    with process_span:
+                        return handler(aws_event, aws_context, *args, **kwargs)
                 except Exception:
                     exc_info = sys.exc_info()
                     sentry_event, hint = event_from_exception(
