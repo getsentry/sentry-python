@@ -102,7 +102,7 @@ def _get_producer_links(aws_event: "Any", trace_id: str) -> "list[SpanLink]":
         # a batch send gives many messages the same producer span.
         if link not in links:
             links.append(link)
-        if len(links) == MAX_PRODUCER_LINKS:
+        if len(links) >= MAX_PRODUCER_LINKS:
             break
 
     return links
