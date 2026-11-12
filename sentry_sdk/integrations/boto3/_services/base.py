@@ -17,8 +17,11 @@ class _ServiceExtension:
     to use the generic instrumentation.
     """
 
-    __slots__ = ()
+    __slots__ = "request_start_time"
     skip_if_no_active_span = True
+
+    def __init__(self) -> None:
+        self.request_start_time: "Optional[float]" = None
 
     def get_span_op(self, ctx: "AwsCallContext") -> "Optional[str]":
         """Return an optional `sentry.op` override, or `None` to keep the default."""

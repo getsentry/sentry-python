@@ -1,5 +1,6 @@
 import json
 import sys
+import time
 from typing import TYPE_CHECKING, cast
 
 import sentry_sdk
@@ -44,6 +45,10 @@ if TYPE_CHECKING:
     from sentry_sdk.integrations.boto3._context import AwsCallContext
     from sentry_sdk.tracing import Span
 
+    class _PatchedEventStream(EventStream[Any]):
+        _span: "Union[Span, StreamedSpan]"
+        _request_start_time: "Optional[float]"
+
 
 def _finish_span(
     stream: "EventStream[Any]",
@@ -57,6 +62,8 @@ def _finish_span(
     """
     if not hasattr(stream, "_span"):
         return
+
+    stream = cast("_PatchedEventStream", stream)
 
     span = stream._span
     del stream._span
@@ -89,6 +96,8 @@ def _patch_event_stream() -> None:
             yield from original_iter(self)
             return
 
+        self = cast("_PatchedEventStream", self)
+
         set_on_span = (
             span.set_attribute if isinstance(span, StreamedSpan) else span.set_data
         )
@@ -97,6 +106,7 @@ def _patch_event_stream() -> None:
         parts: "dict[int, Union[TextPart, ReasoningPart, ToolCallPart, ToolCallResponsePart, UriPart, BlobPart]]" = {}
 
         try:
+            start_time: "Optional[float]" = self._request_start_time
             for event in original_iter(self):
                 if "metadata" in event:
                     usage = event["metadata"]["usage"]
@@ -131,6 +141,13 @@ def _patch_event_stream() -> None:
 
                     yield event
                     continue
+
+                if start_time is not None and "contentBlockDelta" in event:
+                    set_on_span(
+                        SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN,
+                        time.perf_counter() - start_time,
+                    )
+                    start_time = None
 
                 if "messageStop" in event:
                     finish_reasons: "list[str]" = [event["messageStop"]["stopReason"]]
@@ -608,8 +625,11 @@ def _transform_tool_definitions(
 
 
 class _BedrockExtension(_ServiceExtension):
-    __slots__ = ()
+    __slots__ = "request_start_time"
     skip_if_no_active_span = False
+
+    def __init__(self) -> None:
+        self.request_start_time: "Optional[float]" = None
 
     def get_span_op(self, ctx: "AwsCallContext") -> "Optional[str]":
         if ctx.operation_name != "Converse" and ctx.operation_name != "ConverseStream":
@@ -747,8 +767,12 @@ class _BedrockExtension(_ServiceExtension):
             return
 
         if ctx.operation_name == "ConverseStream":
-            stream = cast("ConverseStreamResponseTypeDef", response)["stream"]
-            stream._span = span  # type: ignore[attr-defined]
+            stream = cast(
+                "_PatchedEventStream",
+                cast("ConverseStreamResponseTypeDef", response)["stream"],
+            )
+            stream._span = span
+            stream._request_start_time = self.request_start_time
             return
 
         if isinstance(span, StreamedSpan):
