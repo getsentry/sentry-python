@@ -255,7 +255,15 @@ def _wrap_handler(handler: "F") -> "F":
             with capture_internal_exceptions():
                 producer_links = _get_producer_links(aws_event)
 
-            sentry_sdk.continue_trace(headers)
+            # a synchronous `Invoke` passes the invoking span in `ClientContext`; it wins over
+            # event headers, which a forwarded HTTP event keeps from further upstream.
+            # https://docs.aws.amazon.com/lambda/latest/dg/python-context.html
+            client_context = getattr(aws_context, "client_context", None)
+            custom = getattr(client_context, "custom", None)
+            if custom and SENTRY_TRACE_HEADER_NAME in custom:
+                sentry_sdk.continue_trace(custom)
+            else:
+                sentry_sdk.continue_trace(headers)
             Scope.set_custom_sampling_context(sampling_context)
             with sentry_sdk.start_span(
                 name=function_name,
