@@ -23,7 +23,9 @@ _TRIGGERS: "dict[Optional[str], str]" = {
     "aws:ses": "pubsub",
     "aws:kafka": "pubsub",
     "SelfManagedKafka": "pubsub",
+    # ActiveMQ: the Lambda docs show `aws:mq`, real deliveries use `aws:amq`.
     "aws:mq": "pubsub",
+    "aws:amq": "pubsub",
     "aws:rmq": "pubsub",
     "aws:s3": "datasource",
     "aws:dynamodb": "datasource",
