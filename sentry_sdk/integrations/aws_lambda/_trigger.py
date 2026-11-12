@@ -1,11 +1,11 @@
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any, Optional
+    from typing import Any
 
 # `faas.trigger` of each `eventSource` of `Records` or of a top-level `eventSource`.
 # https://docs.aws.amazon.com/lambda/latest/dg/lambda-services.html
-_TRIGGERS: "dict[Optional[str], str]" = {
+_TRIGGERS = {
     "aws:sqs": "pubsub",
     "aws:sns": "pubsub",
     "aws:kinesis": "pubsub",
@@ -35,11 +35,6 @@ _EVENTBRIDGE_KEYS = frozenset(
         "detail",
     )
 )
-
-
-def _get_records_source(records: "list[Any]") -> "Optional[str]":
-    """The records' `eventSource`, one per event; SNS spells it `EventSource`."""
-    return records[0].get("eventSource") or records[0].get("EventSource")
 
 
 def _is_appsync_event(aws_event: "Any") -> bool:
@@ -78,7 +73,9 @@ def _get_trigger(aws_event: "Any") -> str:
         # CloudFront and Lambda@Edge records have no `eventSource`.
         if "cf" in records[0]:
             return "http"
-        return _TRIGGERS.get(_get_records_source(records), "other")
+        # SNS spells it `EventSource`.
+        source = records[0].get("eventSource") or records[0].get("EventSource")
+        return _TRIGGERS.get(source, "other")
 
     if _EVENTBRIDGE_KEYS <= aws_event.keys():
         if (
@@ -88,4 +85,4 @@ def _get_trigger(aws_event: "Any") -> str:
             return "timer"
         return "pubsub"
 
-    return _TRIGGERS.get(aws_event.get("eventSource"), "other")
+    return _TRIGGERS.get(aws_event.get("eventSource", ""), "other")
