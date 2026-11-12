@@ -1,18 +1,12 @@
-import json
 from contextlib import nullcontext
 from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.aws_lambda.consts import ORIGIN
-from sentry_sdk.traces import SENTRY_TRACE_HEADER_NAME
-from sentry_sdk.tracing_utils import extract_sentrytrace_data
-from sentry_sdk.utils import capture_internal_exceptions
 
 if TYPE_CHECKING:
-    from typing import Any, ContextManager, Optional
-
-    from sentry_sdk._types import SpanLink
+    from typing import Any, ContextManager
 
 # `faas.trigger` of each `eventSource` of `Records` or of a top-level `eventSource`.
 # https://docs.aws.amazon.com/lambda/latest/dg/lambda-services.html
@@ -32,12 +26,8 @@ _TRIGGERS = {
     "aws:docdb": "datasource",
 }
 
-# `messaging.system` of the event sources whose producers can propagate a trace.
+# `messaging.system` of the messaging event sources that get a `queue.process` span.
 _MESSAGING_SYSTEMS = {"aws:sqs": "aws_sqs", "aws:sns": "aws.sns"}
-
-# OTel's default limit; Lambda delivers up to 10,000 SQS messages at once.
-# https://opentelemetry.io/docs/specs/otel/trace/sdk/#span-limits
-_MAX_PRODUCER_LINKS = 128
 
 # https://docs.aws.amazon.com/eventbridge/latest/ref/overiew-event-structure.html
 _EVENTBRIDGE_KEYS = frozenset(
@@ -106,72 +96,6 @@ def _get_trigger(aws_event: "Any") -> str:
     return _TRIGGERS.get(aws_event.get("eventSource", ""), "other")
 
 
-def _get_producer_trace(record: "dict[str, Any]") -> "Optional[str]":
-    """The `sentry-trace` the producer put in a record's message attributes."""
-    # https://docs.aws.amazon.com/lambda/latest/dg/with-sns.html
-    if record.get("EventSource") == "aws:sns":
-        attribute = (
-            record["Sns"].get("MessageAttributes", {}).get(SENTRY_TRACE_HEADER_NAME, {})
-        )
-        return attribute.get("Value")
-
-    # https://docs.aws.amazon.com/lambda/latest/dg/with-sqs.html
-    attribute = record.get("messageAttributes", {}).get(SENTRY_TRACE_HEADER_NAME)
-    if attribute is not None:
-        return attribute.get("stringValue")
-
-    # without raw message delivery, an SNS subscription delivers the notification,
-    # with its message attributes, as the body.
-    # https://docs.aws.amazon.com/sns/latest/dg/sns-sqs-as-subscriber.html
-    body = record.get("body", "")
-    if '"TopicArn"' not in body:
-        return None
-    try:
-        notification = json.loads(body)
-    except ValueError:
-        return None
-    if not isinstance(notification, dict) or notification.get("Type") != "Notification":
-        return None
-    attribute = notification.get("MessageAttributes", {}).get(
-        SENTRY_TRACE_HEADER_NAME, {}
-    )
-    return attribute.get("Value")
-
-
-def _get_producer_links(records: "list[Any]") -> "list[SpanLink]":
-    """One link per distinct producer context; messages never parent the invocation."""
-    links: "list[SpanLink]" = []
-    linked = set()
-    for record in records:
-        with capture_internal_exceptions():
-            producer = extract_sentrytrace_data(_get_producer_trace(record))
-            if (
-                producer is None
-                or not producer["trace_id"]
-                or not producer["parent_span_id"]
-            ):
-                continue
-
-            trace_id = str(producer["trace_id"])
-            span_id = str(producer["parent_span_id"])
-            if (trace_id, span_id) in linked:
-                continue
-            linked.add((trace_id, span_id))
-
-            link: "SpanLink" = {
-                "trace_id": trace_id,
-                "span_id": span_id,
-                "attributes": {SPANDATA.SENTRY_LINK_TYPE: "message_origin"},
-            }
-            if producer["parent_sampled"] is not None:
-                link["sampled"] = bool(producer["parent_sampled"])
-            links.append(link)
-            if len(links) == _MAX_PRODUCER_LINKS:
-                break
-
-    return links
-
-
 def _start_process_span(aws_event: "Any") -> "ContextManager[Any]":
     """A `queue.process` span around the handler for an SQS or SNS delivery."""
     records = aws_event.get("Records") if isinstance(aws_event, dict) else None
@@ -203,5 +127,4 @@ def _start_process_span(aws_event: "Any") -> "ContextManager[Any]":
             SPANDATA.MESSAGING_DESTINATION_NAME: destination,
             SPANDATA.MESSAGING_BATCH_MESSAGE_COUNT: len(records),
         },
-        links=_get_producer_links(records),
     )
