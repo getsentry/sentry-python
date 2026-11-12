@@ -28,6 +28,32 @@ MESSAGE_ORIGIN_LINK = {
     SPANDATA.SENTRY_LINK_TYPE: {"value": "message_origin", "type": "string"}
 }
 
+SQS_RECORD = {
+    "messageId": "059f36b4-87a3-44ab-83d2-661975830a7d",
+    "body": "{}",
+    "eventSource": "aws:sqs",
+    "eventSourceARN": "arn:aws:sqs:us-east-1:012345678912:orders",
+}
+SNS_RECORD = {
+    "EventSource": "aws:sns",
+    "Sns": {"TopicArn": "arn:aws:sns:us-east-1:012345678912:alerts"},
+}
+APPSYNC_EVENT = {
+    "arguments": {"id": "1"},
+    "info": {"fieldName": "getOrder", "parentTypeName": "Query"},
+}
+EVENTBRIDGE_EVENT = {
+    "version": "0",
+    "id": "53dc4d37-cffa-4f76-80c9-8b7d4a4d2eaa",
+    "detail-type": "Object Created",
+    "source": "aws.s3",
+    "account": "012345678912",
+    "time": "2026-10-26T12:00:00Z",
+    "region": "us-east-1",
+    "resources": [],
+    "detail": {},
+}
+
 
 @pytest.fixture(scope="session", autouse=True)
 def test_environment():
@@ -864,27 +890,6 @@ def _sns_record(sentry_trace=None):
     return record
 
 
-def _appsync_event():
-    return {
-        "arguments": {"id": "1"},
-        "info": {"fieldName": "getOrder", "parentTypeName": "Query"},
-    }
-
-
-def _eventbridge_event(source, detail_type):
-    return {
-        "version": "0",
-        "id": "53dc4d37-cffa-4f76-80c9-8b7d4a4d2eaa",
-        "detail-type": detail_type,
-        "source": source,
-        "account": "012345678912",
-        "time": "2026-10-26T12:00:00Z",
-        "region": "us-east-1",
-        "resources": [],
-        "detail": {},
-    }
-
-
 @pytest.mark.parametrize(
     "aws_event,trigger",
     [
@@ -907,22 +912,26 @@ def _eventbridge_event(source, detail_type):
             "http",
             id="cloudfront",
         ),
-        pytest.param(_appsync_event(), "http", id="appsync"),
-        pytest.param([_appsync_event(), _appsync_event()], "http", id="appsync-batch"),
-        pytest.param({"Records": [_sqs_record(), _sqs_record()]}, "pubsub", id="sqs"),
-        pytest.param({"Records": [_sns_record()]}, "pubsub", id="sns"),
+        pytest.param(APPSYNC_EVENT, "http", id="appsync"),
+        pytest.param([APPSYNC_EVENT, APPSYNC_EVENT], "http", id="appsync-batch"),
+        pytest.param({"Records": [SQS_RECORD, SQS_RECORD]}, "pubsub", id="sqs"),
+        pytest.param({"Records": [SNS_RECORD]}, "pubsub", id="sns"),
         pytest.param(
             {"eventSource": "aws:kafka", "records": {"orders-0": [{}]}},
             "pubsub",
             id="msk",
         ),
         pytest.param(
-            _eventbridge_event("aws.s3", "Object Created"),
+            EVENTBRIDGE_EVENT,
             "pubsub",
             id="eventbridge",
         ),
         pytest.param(
-            _eventbridge_event("aws.events", "Scheduled Event"),
+            {
+                **EVENTBRIDGE_EVENT,
+                "source": "aws.events",
+                "detail-type": "Scheduled Event",
+            },
             "timer",
             id="eventbridge-schedule",
         ),
