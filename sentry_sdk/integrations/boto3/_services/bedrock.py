@@ -132,6 +132,10 @@ def _patch_event_stream() -> None:
                     yield event
                     continue
 
+                if "messageStop" in event:
+                    finish_reasons: "list[str]" = [event["messageStop"]["stopReason"]]
+                    set_on_span(SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS, finish_reasons)
+
                 client = sentry_sdk.get_client()
                 if (
                     not has_data_collection_enabled(client.options)

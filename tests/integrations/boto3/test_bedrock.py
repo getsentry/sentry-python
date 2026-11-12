@@ -992,6 +992,9 @@ def test_converse_stream(
         assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 1024
         assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
         assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
+        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == [
+            "end_turn"
+        ]
 
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
@@ -1031,6 +1034,7 @@ def test_converse_stream(
         assert span["data"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 1024
         assert span["data"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
         assert span["data"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
+        assert span["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["end_turn"]
 
         assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
         assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
