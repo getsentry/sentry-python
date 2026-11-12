@@ -1,4 +1,5 @@
 import functools
+import json
 import sys
 from os import environ
 from typing import TYPE_CHECKING
@@ -20,7 +21,8 @@ from sentry_sdk.integrations.aws_lambda.consts import (
     ORIGIN,
 )
 from sentry_sdk.scope import Scope
-from sentry_sdk.traces import SegmentNameSource
+from sentry_sdk.traces import SENTRY_TRACE_HEADER_NAME, SegmentNameSource
+from sentry_sdk.tracing_utils import extract_sentrytrace_data
 from sentry_sdk.utils import (
     TimeoutThread,
     capture_internal_exceptions,
@@ -31,12 +33,67 @@ from sentry_sdk.utils import (
 if TYPE_CHECKING:
     from typing import Any, Callable, Mapping, TypeVar
 
-    from sentry_sdk._types import Attributes
+    from sentry_sdk._types import Attributes, SpanLink
 
     F = TypeVar("F", bound=Callable[..., Any])
 
 TIMEOUT_WARNING_BUFFER = 1500
 MILLIS_TO_SECONDS = 1000.0
+# OTel's default link limit; Lambda delivers up to 10,000 SQS messages at once.
+# https://opentelemetry.io/docs/specs/otel/trace/sdk/#span-limits
+MAX_PRODUCER_LINKS = 128
+
+
+def _get_producer_links(aws_event: "Any") -> "list[SpanLink]":
+    """Links to the spans that sent the SQS or SNS messages this invocation got."""
+    records = aws_event.get("Records") if isinstance(aws_event, dict) else None
+    links: "list[SpanLink]" = []
+    for record in records or ():
+        if "Sns" in record:
+            # https://docs.aws.amazon.com/lambda/latest/dg/with-sns.html
+            sentry_trace = (
+                record["Sns"]
+                .get("MessageAttributes", {})
+                .get(SENTRY_TRACE_HEADER_NAME, {})
+                .get("Value")
+            )
+        else:
+            # https://docs.aws.amazon.com/lambda/latest/dg/with-sqs.html
+            sentry_trace = (
+                record.get("messageAttributes", {})
+                .get(SENTRY_TRACE_HEADER_NAME, {})
+                .get("stringValue")
+            )
+            # SNS wraps the message and its attributes in a JSON envelope when raw message delivery is off.
+            # https://docs.aws.amazon.com/sns/latest/dg/sns-large-payload-raw-message-delivery.html
+            body = record.get("body", "")
+            if sentry_trace is None and f'"{SENTRY_TRACE_HEADER_NAME}"' in body:
+                envelope = json.loads(body)
+                if envelope.get("Type") == "Notification":
+                    sentry_trace = (
+                        envelope.get("MessageAttributes", {})
+                        .get(SENTRY_TRACE_HEADER_NAME, {})
+                        .get("Value")
+                    )
+
+        data = extract_sentrytrace_data(sentry_trace)
+        if data is None or not data["trace_id"] or not data["parent_span_id"]:
+            continue
+
+        link: "SpanLink" = {
+            "trace_id": str(data["trace_id"]),
+            "span_id": str(data["parent_span_id"]),
+            "attributes": {SPANDATA.SENTRY_LINK_TYPE: "message_origin"},
+        }
+        if data["parent_sampled"] is not None:
+            link["sampled"] = bool(data["parent_sampled"])
+        # a batch send gives many messages the same producer span.
+        if link not in links:
+            links.append(link)
+        if len(links) == MAX_PRODUCER_LINKS:
+            break
+
+    return links
 
 
 def _wrap_handler(handler: "F") -> "F":
@@ -187,12 +244,18 @@ def _wrap_handler(handler: "F") -> "F":
                     }
                 )
 
+            # SQS and SNS messages link to their producers; they never parent the invocation.
+            producer_links: "list[SpanLink]" = []
+            with capture_internal_exceptions():
+                producer_links = _get_producer_links(aws_event)
+
             sentry_sdk.continue_trace(headers)
             Scope.set_custom_sampling_context(sampling_context)
             with sentry_sdk.start_span(
                 name=function_name,
                 parent_span=None,
                 attributes=attributes,
+                links=producer_links,
             ):
                 try:
                     return handler(aws_event, aws_context, *args, **kwargs)
