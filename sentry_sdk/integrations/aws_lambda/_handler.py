@@ -46,9 +46,12 @@ MAX_PRODUCER_LINKS = 128
 
 def _get_producer_links(aws_event: "Any") -> "list[SpanLink]":
     """Links to the spans that sent the SQS or SNS messages this invocation got."""
-    records = aws_event.get("Records") if isinstance(aws_event, dict) else None
+    records: "list[Any]" = []
+    if isinstance(aws_event, dict):
+        records = aws_event.get("Records") or []
+
     links: "list[SpanLink]" = []
-    for record in records or ():
+    for record in records:
         if "Sns" in record:
             # https://docs.aws.amazon.com/lambda/latest/dg/with-sns.html
             sentry_trace = (
