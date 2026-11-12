@@ -123,14 +123,19 @@ def _get_producer_trace(record: "dict[str, Any]") -> "Optional[str]":
     # without raw message delivery, an SNS subscription delivers the notification,
     # with its message attributes, as the body.
     # https://docs.aws.amazon.com/sns/latest/dg/sns-sqs-as-subscriber.html
-    if '"TopicArn"' in record["body"]:
-        notification = json.loads(record["body"])
-        attribute = notification.get("MessageAttributes", {}).get(
-            SENTRY_TRACE_HEADER_NAME, {}
-        )
-        return attribute.get("Value")
-
-    return None
+    body = record.get("body", "")
+    if '"TopicArn"' not in body:
+        return None
+    try:
+        notification = json.loads(body)
+    except ValueError:
+        return None
+    if not isinstance(notification, dict) or notification.get("Type") != "Notification":
+        return None
+    attribute = notification.get("MessageAttributes", {}).get(
+        SENTRY_TRACE_HEADER_NAME, {}
+    )
+    return attribute.get("Value")
 
 
 def _get_producer_links(records: "list[Any]") -> "list[SpanLink]":
