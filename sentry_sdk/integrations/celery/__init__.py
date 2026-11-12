@@ -241,8 +241,9 @@ def _update_celery_task_headers(
             if combined_baggage:
                 updated_headers["headers"][BAGGAGE_HEADER_NAME] = combined_baggage
 
-            # Add the Sentry options potentially added in `sentry_apply_entry`
-            # to the headers (done when auto-instrumenting Celery Beat tasks)
+            # Add the Sentry options potentially added in
+            # `_apply_crons_data_to_schedule_entry` to the headers (done when
+            # auto-instrumenting Celery Beat tasks)
             for key, value in updated_headers.items():
                 if key.startswith("sentry-"):
                     updated_headers["headers"][key] = value
