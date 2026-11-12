@@ -8,6 +8,8 @@ from sentry_sdk.integrations.aws_lambda.consts import ORIGIN
 if TYPE_CHECKING:
     from typing import Any, ContextManager
 
+    from sentry_sdk._types import SpanLink
+
 # `faas.trigger` of each `eventSource` of `Records` or of a top-level `eventSource`.
 # https://docs.aws.amazon.com/lambda/latest/dg/lambda-services.html
 _TRIGGERS = {
@@ -96,8 +98,10 @@ def _get_trigger(aws_event: "Any") -> str:
     return _TRIGGERS.get(aws_event.get("eventSource", ""), "other")
 
 
-def _start_process_span(aws_event: "Any") -> "ContextManager[Any]":
-    """A `queue.process` span around the handler for an SQS or SNS delivery."""
+def _start_process_span(
+    aws_event: "Any", links: "list[SpanLink]"
+) -> "ContextManager[Any]":
+    """A `queue.process` span around the handler for an SQS or SNS delivery, linked to its producers."""
     records = aws_event.get("Records") if isinstance(aws_event, dict) else None
     if not records:
         return nullcontext()
@@ -127,4 +131,7 @@ def _start_process_span(aws_event: "Any") -> "ContextManager[Any]":
             SPANDATA.MESSAGING_DESTINATION_NAME: destination,
             SPANDATA.MESSAGING_BATCH_MESSAGE_COUNT: len(records),
         },
+        # OTel links a consumer's process span to each message's creation context.
+        # https://opentelemetry.io/docs/specs/semconv/messaging/messaging-spans/
+        links=links,
     )

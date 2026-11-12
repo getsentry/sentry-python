@@ -271,7 +271,8 @@ def _wrap_handler(handler: "F") -> "F":
             else:
                 sentry_sdk.continue_trace(headers)
 
-            # SQS and SNS messages link to their producers; they never parent the invocation.
+            # SQS and SNS messages link to their producers from the `queue.process` span;
+            # they never parent the invocation.
             producer_links: "list[SpanLink]" = []
             with capture_internal_exceptions():
                 producer_links = _get_producer_links(
@@ -286,12 +287,11 @@ def _wrap_handler(handler: "F") -> "F":
                 name=function_name,
                 parent_span=None,
                 attributes=attributes,
-                links=producer_links,
             ):
                 try:
                     process_span: "ContextManager[Any]" = nullcontext()
                     with capture_internal_exceptions():
-                        process_span = _start_process_span(aws_event)
+                        process_span = _start_process_span(aws_event, producer_links)
                     with process_span:
                         return handler(aws_event, aws_context, *args, **kwargs)
                 except Exception:

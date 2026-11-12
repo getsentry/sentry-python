@@ -943,8 +943,6 @@ def test_messaging_process_span(
     assert process_span["parent_span_id"] == segment_span["span_id"]
     assert process_span["trace_id"] == segment_span["trace_id"]
     assert process_span["name"] == f"process {destination}"
-    # producer links stay on the invocation span, see `test_producer_links`.
-    assert "links" not in process_span
 
     attrs = process_span["attributes"]
     assert _get_span_attr(attrs, SPANDATA.SENTRY_KIND) == "consumer"
@@ -1162,12 +1160,17 @@ def test_producer_links(lambda_client, test_environment, aws_event, links):
         Payload=json.dumps(aws_event),
     )
 
-    (segment_span,) = [
-        s for s in test_environment["server"].span_items if s["is_segment"]
+    span_items = test_environment["server"].span_items
+    (segment_span,) = [s for s in span_items if s["is_segment"]]
+    (process_span,) = [
+        s
+        for s in span_items
+        if _get_span_attr(s["attributes"], SPANDATA.SENTRY_OP) == OP.QUEUE_PROCESS
     ]
-    # messages are linked, never the parent of the invocation.
+    # messages are linked from the process span, never the parent of the invocation.
     assert "parent_span_id" not in segment_span
-    assert segment_span["links"] == links
+    assert "links" not in segment_span
+    assert process_span["links"] == links
 
 
 @pytest.mark.parametrize(
@@ -1201,12 +1204,16 @@ def test_trace_continuation_from_client_context(
 
     lambda_client.invoke(FunctionName="ClientContextTrace", Payload=json.dumps(payload))
 
-    (segment_span,) = [
-        s for s in test_environment["server"].span_items if s["is_segment"]
+    span_items = test_environment["server"].span_items
+    (segment_span,) = [s for s in span_items if s["is_segment"]]
+    (process_span,) = [
+        s
+        for s in span_items
+        if _get_span_attr(s["attributes"], SPANDATA.SENTRY_OP) == OP.QUEUE_PROCESS
     ]
     assert segment_span["trace_id"] == "471a43a4192642f0b136d5159a501701"
     assert segment_span["parent_span_id"] == "6e8f22c393e68f19"
-    assert segment_span["links"] == [
+    assert process_span["links"] == [
         {
             "trace_id": "5c6d7e8f9a0b4c1d8e2f3a4b5c6d7e8f",
             "span_id": "2b3c4d5e6f7a8b9c",
