@@ -1,4 +1,3 @@
-import math
 import re
 import threading
 import weakref
@@ -254,12 +253,6 @@ def _get_monitor_config(trigger: "BaseTrigger") -> "Optional[MonitorConfig]":
     # Sentry schedules have no end, so finite triggers would alert as missed.
     if trigger.end_date is not None:
         return None
-
-    # Jitter delays runs by up to that many seconds; add it to Sentry's
-    # default 1 minute margin.
-    jitter = getattr(trigger, "jitter", None)
-    if jitter:
-        monitor_config["checkin_margin"] = 1 + math.ceil(jitter / 60)
 
     return monitor_config
 
