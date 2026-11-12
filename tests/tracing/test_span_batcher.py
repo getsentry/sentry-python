@@ -1,5 +1,6 @@
 import os
 import sys
+import threading
 import time
 from unittest import mock
 
@@ -477,6 +478,42 @@ def test_trace_bucket_flushes_when_segment_ends(
     assert len(items) == 2
     assert items[0].payload["name"] == "child"
     assert items[1].payload["name"] == "segment span"
+
+
+def test_pending_traces_flush_in_segment_finish_order(
+    sentry_init, capture_envelopes, monkeypatch
+):
+    """Traces whose segments finish before the flusher wakes are sent in finish order."""
+    monkeypatch.setattr(SpanBatcher, "FLUSH_WAIT_TIME", 100000)
+
+    # Hold the flusher thread back until every segment below has finished, so
+    # all traces are pending when it runs.
+    flusher_may_run = threading.Event()
+    original_flush_loop = SpanBatcher._flush_loop
+
+    def delayed_flush_loop(self):
+        flusher_may_run.wait()
+        original_flush_loop(self)
+
+    monkeypatch.setattr(SpanBatcher, "_flush_loop", delayed_flush_loop)
+
+    sentry_init(traces_sample_rate=1.0, trace_lifecycle="stream")
+    envelopes = capture_envelopes()
+
+    finished_trace_ids = []
+    for i in range(10):
+        sentry_sdk.traces.new_trace()
+        with sentry_sdk.traces.start_span(name=f"segment {i}") as segment:
+            with sentry_sdk.traces.start_span(name="child"):
+                pass
+        finished_trace_ids.append(segment.trace_id)
+
+    flusher_may_run.set()
+    time.sleep(0.1)
+
+    assert [
+        envelope.headers["trace"]["trace_id"] for envelope in envelopes
+    ] == finished_trace_ids
 
 
 @pytest.mark.skipif(

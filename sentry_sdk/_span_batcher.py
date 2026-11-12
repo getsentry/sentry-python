@@ -57,7 +57,9 @@ class SpanBatcher(Batcher["SpanJSON"]):
 
         self._last_full_flush: float = time.monotonic()  # drives time-based flushes
         self._flush_event = threading.Event()
-        self._pending_flush: set[str] = set()  # buckets to be flushed
+        # Buckets to be flushed, in the order they became ready. A dict, not a
+        # set, so that traces are sent in the order their segments finished.
+        self._pending_flush: dict[str, None] = {}
 
         self._flusher: "Optional[threading.Thread]" = None
         self._flusher_pid: "Optional[int]" = None
@@ -83,7 +85,7 @@ class SpanBatcher(Batcher["SpanJSON"]):
 
         self._last_full_flush = time.monotonic()
         self._flush_event = threading.Event()
-        self._pending_flush = set()
+        self._pending_flush = {}
 
         self._flusher = None
         self._flusher_pid = None
@@ -143,7 +145,7 @@ class SpanBatcher(Batcher["SpanJSON"]):
                     or self._running_size[span["trace_id"]]
                     >= self.MAX_BYTES_BEFORE_FLUSH
                 ):
-                    self._pending_flush.add(span["trace_id"])
+                    self._pending_flush[span["trace_id"]] = None
                     notify = True
                 else:
                     notify = False
