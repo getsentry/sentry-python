@@ -174,12 +174,12 @@ def test_timeout_error_scope_modified(lambda_client, test_environment):
 
 
 @pytest.mark.parametrize(
-    "aws_event, has_request_data, batch_size",
+    "aws_event, has_request_data",
     [
-        (b"1231", False, 1),
-        (b"11.21", False, 1),
-        (b'"Good dog!"', False, 1),
-        (b"true", False, 1),
+        (b"1231", False),
+        (b"11.21", False),
+        (b'"Good dog!"', False),
+        (b"true", False),
         (
             b"""
             [
@@ -190,7 +190,6 @@ def test_timeout_error_scope_modified(lambda_client, test_environment):
             ]
             """,
             False,
-            4,
         ),
         (
             b"""
@@ -222,9 +221,8 @@ def test_timeout_error_scope_modified(lambda_client, test_environment):
             ]
             """,
             True,
-            2,
         ),
-        (b"[]", False, 1),
+        (b"[]", False),
     ],
     ids=[
         "event as integer",
@@ -236,9 +234,7 @@ def test_timeout_error_scope_modified(lambda_client, test_environment):
         "event as empty list",
     ],
 )
-def test_non_dict_event(
-    lambda_client, test_environment, aws_event, has_request_data, batch_size
-):
+def test_non_dict_event(lambda_client, test_environment, aws_event, has_request_data):
     lambda_client.invoke(
         FunctionName="BasicException",
         Payload=aws_event,
@@ -772,7 +768,6 @@ def test_no_error(lambda_client, test_environment):
         LATEST_FUNCTION_VERSION
     ]
     assert _get_span_attr(attrs, SPANDATA.FAAS_TRIGGER) == "other"
-    assert _get_span_attr(attrs, SPANDATA.MESSAGING_BATCH_MESSAGE_COUNT) == 1
 
 
 def test_error(lambda_client, test_environment):
@@ -827,7 +822,6 @@ def test_error(lambda_client, test_environment):
         LATEST_FUNCTION_VERSION
     ]
     assert _get_span_attr(attrs, SPANDATA.FAAS_TRIGGER) == "other"
-    assert _get_span_attr(attrs, SPANDATA.MESSAGING_BATCH_MESSAGE_COUNT) == 1
 
 
 def _sqs_record():
@@ -971,6 +965,141 @@ def test_trace_continuation(lambda_client, test_environment):
     assert SPANDATA.FAAS_INVOCATION_ID in attrs
 
 
+MESSAGE_ORIGIN_LINK = {
+    SPANDATA.SENTRY_LINK_TYPE: {"value": "message_origin", "type": "string"}
+}
+
+
+def _sqs_record(sentry_trace=None, body="{}"):
+    record = {
+        "messageId": "059f36b4-87a3-44ab-83d2-661975830a7d",
+        "body": body,
+        "messageAttributes": {},
+        "eventSource": "aws:sqs",
+        "eventSourceARN": "arn:aws:sqs:us-east-1:012345678912:orders",
+    }
+    if sentry_trace is not None:
+        record["messageAttributes"]["sentry-trace"] = {
+            "stringValue": sentry_trace,
+            "stringListValues": [],
+            "binaryListValues": [],
+            "dataType": "String",
+        }
+    return record
+
+
+def _sns_notification(sentry_trace):
+    return {
+        "Type": "Notification",
+        "MessageId": "95df01b4-ee98-5cb9-9903-4c221d41eb5e",
+        "TopicArn": "arn:aws:sns:us-east-1:012345678912:alerts",
+        "Message": "{}",
+        "MessageAttributes": {
+            "sentry-trace": {"Type": "String", "Value": sentry_trace}
+        },
+    }
+
+
+@pytest.mark.parametrize(
+    "aws_event,links",
+    [
+        pytest.param(
+            {
+                "Records": [
+                    _sqs_record("471a43a4192642f0b136d5159a501701-6e8f22c393e68f19-1"),
+                    # the same producer span: linked once.
+                    _sqs_record("471a43a4192642f0b136d5159a501701-6e8f22c393e68f19-1"),
+                    _sqs_record("0f4c2a5b8d9e4f1a2b3c4d5e6f7a8b9c-1a2b3c4d5e6f7a8b-0"),
+                    _sqs_record(),
+                    # incomplete context: not linked.
+                    _sqs_record("-1"),
+                    # no sampling decision: linked without `sampled`.
+                    _sqs_record("5c6d7e8f9a0b4c1d8e2f3a4b5c6d7e8f-2b3c4d5e6f7a8b9c"),
+                    # a body that isn't JSON: skipped, other links kept.
+                    _sqs_record(body='not json: "sentry-trace"'),
+                ]
+            },
+            [
+                {
+                    "trace_id": "471a43a4192642f0b136d5159a501701",
+                    "span_id": "6e8f22c393e68f19",
+                    "attributes": MESSAGE_ORIGIN_LINK,
+                    "sampled": True,
+                },
+                {
+                    "trace_id": "0f4c2a5b8d9e4f1a2b3c4d5e6f7a8b9c",
+                    "span_id": "1a2b3c4d5e6f7a8b",
+                    "attributes": MESSAGE_ORIGIN_LINK,
+                    "sampled": False,
+                },
+                {
+                    "trace_id": "5c6d7e8f9a0b4c1d8e2f3a4b5c6d7e8f",
+                    "span_id": "2b3c4d5e6f7a8b9c",
+                    "attributes": MESSAGE_ORIGIN_LINK,
+                },
+            ],
+            id="sqs",
+        ),
+        pytest.param(
+            {
+                "Records": [
+                    {
+                        "EventSource": "aws:sns",
+                        "Sns": _sns_notification(
+                            "471a43a4192642f0b136d5159a501701-6e8f22c393e68f19-1"
+                        ),
+                    }
+                ]
+            },
+            [
+                {
+                    "trace_id": "471a43a4192642f0b136d5159a501701",
+                    "span_id": "6e8f22c393e68f19",
+                    "attributes": MESSAGE_ORIGIN_LINK,
+                    "sampled": True,
+                }
+            ],
+            id="sns",
+        ),
+        pytest.param(
+            {
+                "Records": [
+                    # SNS to SQS without raw message delivery.
+                    _sqs_record(
+                        body=json.dumps(
+                            _sns_notification(
+                                "471a43a4192642f0b136d5159a501701-6e8f22c393e68f19-1"
+                            )
+                        )
+                    )
+                ]
+            },
+            [
+                {
+                    "trace_id": "471a43a4192642f0b136d5159a501701",
+                    "span_id": "6e8f22c393e68f19",
+                    "attributes": MESSAGE_ORIGIN_LINK,
+                    "sampled": True,
+                }
+            ],
+            id="sns-to-sqs",
+        ),
+    ],
+)
+def test_producer_links(lambda_client, test_environment, aws_event, links):
+    lambda_client.invoke(
+        FunctionName="BasicOkSpanStreaming",
+        Payload=json.dumps(aws_event),
+    )
+
+    (segment_span,) = [
+        s for s in test_environment["server"].span_items if s["is_segment"]
+    ]
+    # messages are linked, never the parent of the invocation.
+    assert "parent_span_id" not in segment_span
+    assert segment_span["links"] == links
+
+
 @pytest.mark.parametrize(
     "headers",
     [
@@ -993,6 +1122,11 @@ def test_trace_continuation_from_client_context(
                 "sentry-trace": "471a43a4192642f0b136d5159a501701-6e8f22c393e68f19-1"
             }
         },
+        "Records": [
+            # a producer in the continued trace: not linked, it's already in the trace.
+            _sqs_record("471a43a4192642f0b136d5159a501701-1a2b3c4d5e6f7a8b-1"),
+            _sqs_record("5c6d7e8f9a0b4c1d8e2f3a4b5c6d7e8f-2b3c4d5e6f7a8b9c-1"),
+        ],
     }
 
     lambda_client.invoke(FunctionName="ClientContextTrace", Payload=json.dumps(payload))
@@ -1002,6 +1136,14 @@ def test_trace_continuation_from_client_context(
     ]
     assert segment_span["trace_id"] == "471a43a4192642f0b136d5159a501701"
     assert segment_span["parent_span_id"] == "6e8f22c393e68f19"
+    assert segment_span["links"] == [
+        {
+            "trace_id": "5c6d7e8f9a0b4c1d8e2f3a4b5c6d7e8f",
+            "span_id": "2b3c4d5e6f7a8b9c",
+            "attributes": MESSAGE_ORIGIN_LINK,
+            "sampled": True,
+        }
+    ]
 
 
 def test_request_attributes(lambda_client, test_environment):
