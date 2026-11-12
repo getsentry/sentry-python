@@ -775,7 +775,7 @@ def test_no_error(lambda_client, test_environment):
         LATEST_FUNCTION_VERSION
     ]
     assert _get_span_attr(attrs, SPANDATA.FAAS_TRIGGER) == "other"
-    assert SPANDATA.MESSAGING_BATCH_MESSAGE_COUNT not in attrs
+    assert _get_span_attr(attrs, SPANDATA.MESSAGING_BATCH_MESSAGE_COUNT) == 1
 
 
 def test_error(lambda_client, test_environment):
@@ -830,7 +830,7 @@ def test_error(lambda_client, test_environment):
         LATEST_FUNCTION_VERSION
     ]
     assert _get_span_attr(attrs, SPANDATA.FAAS_TRIGGER) == "other"
-    assert SPANDATA.MESSAGING_BATCH_MESSAGE_COUNT not in attrs
+    assert _get_span_attr(attrs, SPANDATA.MESSAGING_BATCH_MESSAGE_COUNT) == 1
 
 
 def _sqs_record(sentry_trace=None):
