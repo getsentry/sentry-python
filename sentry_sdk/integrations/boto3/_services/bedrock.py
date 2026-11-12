@@ -173,13 +173,10 @@ def _patch_event_stream() -> None:
                     "contentBlockStart" in event
                     and "toolUse" in event["contentBlockStart"]["start"]
                 ):
-                    tool_call_part: "ToolCallPart" = {
+                    parts[event["contentBlockStart"]["contentBlockIndex"]] = {
                         "type": "tool_call",
                         "name": event["contentBlockStart"]["start"]["toolUse"]["name"],
                     }
-                    parts[event["contentBlockStart"]["contentBlockIndex"]] = (
-                        tool_call_part
-                    )
 
                     yield event
                     continue
@@ -188,12 +185,9 @@ def _patch_event_stream() -> None:
                     "contentBlockStart" in event
                     and "toolResult" in event["contentBlockStart"]["start"]
                 ):
-                    tool_call_response_part: "ToolCallResponsePart" = {
+                    parts[event["contentBlockStart"]["contentBlockIndex"]] = {
                         "type": "tool_call_response",
                     }
-                    parts[event["contentBlockStart"]["contentBlockIndex"]] = (
-                        tool_call_response_part
-                    )
 
                     yield event
                     continue
