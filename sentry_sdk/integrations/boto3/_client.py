@@ -1,3 +1,4 @@
+import time
 from contextlib import contextmanager
 from typing import TYPE_CHECKING
 
@@ -116,6 +117,8 @@ def _patch_botocore_client() -> None:
 
         attributes: "Attributes" = {}
         try:
+            if service_ext is not None:
+                service_ext.request_start_time = time.perf_counter()
             with span_ctx:
                 try:
                     parsed = orig_make_api_call(self, operation_name, api_params)
