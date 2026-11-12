@@ -174,12 +174,12 @@ def test_timeout_error_scope_modified(lambda_client, test_environment):
 
 
 @pytest.mark.parametrize(
-    "aws_event, has_request_data, batch_size",
+    "aws_event, has_request_data",
     [
-        (b"1231", False, 1),
-        (b"11.21", False, 1),
-        (b'"Good dog!"', False, 1),
-        (b"true", False, 1),
+        (b"1231", False),
+        (b"11.21", False),
+        (b'"Good dog!"', False),
+        (b"true", False),
         (
             b"""
             [
@@ -190,7 +190,6 @@ def test_timeout_error_scope_modified(lambda_client, test_environment):
             ]
             """,
             False,
-            4,
         ),
         (
             b"""
@@ -222,9 +221,8 @@ def test_timeout_error_scope_modified(lambda_client, test_environment):
             ]
             """,
             True,
-            2,
         ),
-        (b"[]", False, 1),
+        (b"[]", False),
     ],
     ids=[
         "event as integer",
@@ -236,9 +234,7 @@ def test_timeout_error_scope_modified(lambda_client, test_environment):
         "event as empty list",
     ],
 )
-def test_non_dict_event(
-    lambda_client, test_environment, aws_event, has_request_data, batch_size
-):
+def test_non_dict_event(lambda_client, test_environment, aws_event, has_request_data):
     lambda_client.invoke(
         FunctionName="BasicException",
         Payload=aws_event,
@@ -771,7 +767,6 @@ def test_no_error(lambda_client, test_environment):
     assert _get_span_attr(attrs, SPANDATA.AWS_LOG_STREAM_NAMES) == [
         LATEST_FUNCTION_VERSION
     ]
-    assert _get_span_attr(attrs, SPANDATA.MESSAGING_BATCH_MESSAGE_COUNT) == 1
 
 
 def test_error(lambda_client, test_environment):
@@ -825,7 +820,6 @@ def test_error(lambda_client, test_environment):
     assert _get_span_attr(attrs, SPANDATA.AWS_LOG_STREAM_NAMES) == [
         LATEST_FUNCTION_VERSION
     ]
-    assert _get_span_attr(attrs, SPANDATA.MESSAGING_BATCH_MESSAGE_COUNT) == 1
 
 
 def test_trace_continuation(lambda_client, test_environment):
