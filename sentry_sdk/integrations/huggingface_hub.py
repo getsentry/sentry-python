@@ -87,7 +87,7 @@ def _wrap_huggingface_task(f: "Callable[..., Any]", op: str) -> "Callable[..., A
                 prompt = args[1]
 
         if prompt is None:
-            # invalid call, dont instrument, let it return error
+            # invalid call, don't instrument, let it return error
             return f(*args, **kwargs)
 
         hf_client = args[0]

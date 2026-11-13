@@ -64,6 +64,12 @@ try:
 except ImportError:
     raise DidNotEnable("Anthropic not installed")
 
+try:
+    from anthropic.types import ThinkingBlock, ThinkingDelta
+except ImportError:
+    ThinkingBlock = None  # type: ignore[assignment,misc]
+    ThinkingDelta = None  # type: ignore[assignment,misc]
+
 if TYPE_CHECKING:
     from typing import (
         Any,
@@ -85,15 +91,15 @@ if TYPE_CHECKING:
         ToolUnionParam,
     )
 
-    from sentry_sdk._types import TextPart
+    from sentry_sdk._types import ReasoningPart, TextPart
 
-    class _PatchedRawMessageStream(Stream[RawMessageStreamEvent]):
+    class _PatchedRawMessageStream(Stream[Any]):
         _span: Union[Span, StreamedSpan]
         _integration: "AnthropicIntegration"
 
         _model: Optional[ModelParam]
         _usage: "_RecordedUsage"
-        _content_blocks: list[Any]
+        _content_blocks: "list[dict[str, Any]]"
         _response_id: Optional[str]
         _finish_reason: Optional[str]
 
@@ -103,17 +109,17 @@ if TYPE_CHECKING:
 
         _model: Optional[ModelParam]
         _usage: "_RecordedUsage"
-        _content_blocks: list[Any]
+        _content_blocks: "list[dict[str, Any]]"
         _response_id: Optional[str]
         _finish_reason: Optional[str]
 
-    class _PatchedRawAsyncMessageStream(AsyncStream[RawMessageStreamEvent]):
+    class _PatchedRawAsyncMessageStream(AsyncStream[Any]):
         _span: Union[Span, StreamedSpan]
         _integration: "AnthropicIntegration"
 
         _model: Optional[ModelParam]
         _usage: "_RecordedUsage"
-        _content_blocks: list[Any]
+        _content_blocks: "list[dict[str, Any]]"
         _response_id: Optional[str]
         _finish_reason: Optional[str]
 
@@ -123,7 +129,7 @@ if TYPE_CHECKING:
 
         _model: Optional[ModelParam]
         _usage: "_RecordedUsage"
-        _content_blocks: list[Any]
+        _content_blocks: "list[dict[str, Any]]"
         _response_id: Optional[str]
         _finish_reason: Optional[str]
 
@@ -220,6 +226,7 @@ class _StreamSpanContext:
 class AnthropicIntegration(Integration):
     identifier = "anthropic"
     origin = f"auto.ai.{identifier}"
+    _version: "Union[tuple[int, ...], None]" = None
 
     def __init__(self: "AnthropicIntegration", include_prompts: bool = True) -> None:
         self.include_prompts = include_prompts
@@ -228,6 +235,7 @@ class AnthropicIntegration(Integration):
     def setup_once() -> None:
         version = package_version("anthropic")
         _check_minimum_version(AnthropicIntegration, version)
+        AnthropicIntegration._version = version
 
         """
         client.messages.create(stream=True) can return an instance of the Stream class, which implements the iterator protocol.
@@ -271,6 +279,46 @@ class AnthropicIntegration(Integration):
         # AsyncMessageStream inherits from AsyncStream, so patching Stream is sufficient on these versions.
         if not issubclass(AsyncMessageStream, AsyncStream):
             AsyncMessageStream.close = _wrap_async_close(AsyncMessageStream.close)  # type: ignore[method-assign]
+
+        try:
+            from functools import cached_property
+        except ImportError:
+            return
+
+        # In newer anthropic SDK versions, _iterator is a cached_property instead of being eagerly assigned in __init__.
+        # This is good for us, since we do a global patch instead of patching _iterator on every instance.
+        # We also should apply a global patch to keep the cached "_iterator" lazy.
+        if isinstance(Stream.__dict__.get("_iterator"), cached_property):
+            _original_stream_iterator = Stream._iterator.func  # type: ignore[attr-defined]
+
+            def _sentry_patched_stream_iterator(self: "Stream[Any]") -> "Any":
+                iterator = _original_stream_iterator(self)
+                if not hasattr(self, "_span"):
+                    return iterator
+                return _wrap_synchronous_message_iterator(
+                    cast("_PatchedRawMessageStream", self), iterator
+                )
+
+            patched = cached_property(_sentry_patched_stream_iterator)
+            patched.__set_name__(Stream, "_iterator")
+            Stream._iterator = patched  # type: ignore[assignment,method-assign]
+
+        if isinstance(AsyncStream.__dict__.get("_iterator"), cached_property):
+            _original_async_stream_iterator = AsyncStream._iterator.func  # type: ignore[attr-defined]
+
+            def _sentry_patched_async_stream_iterator(
+                self: "AsyncStream[Any]",
+            ) -> "Any":
+                iterator = _original_async_stream_iterator(self)
+                if not hasattr(self, "_span"):
+                    return iterator
+                return _wrap_asynchronous_message_iterator(
+                    cast("_PatchedRawAsyncMessageStream", self), iterator
+                )
+
+            patched = cached_property(_sentry_patched_async_stream_iterator)
+            patched.__set_name__(AsyncStream, "_iterator")
+            AsyncStream._iterator = patched  # type: ignore[assignment,method-assign]
 
 
 def _capture_exception(exc: "Any") -> None:
@@ -323,22 +371,32 @@ def _collect_ai_data(
     event: "MessageStreamEvent",
     model: "str | None",
     usage: "_RecordedUsage",
-    content_blocks: "list[str]",
+    content_blocks: "list[dict[str, Any]]",
     response_id: "str | None" = None,
     finish_reason: "str | None" = None,
-) -> "tuple[str | None, _RecordedUsage, list[str], str | None, str | None]":
+) -> "tuple[str | None, _RecordedUsage, list[dict[str, Any]], str | None, str | None]":
     """
     Collect model information, token usage, and collect content blocks from the AI streaming response.
     """
     with capture_internal_exceptions():
         if hasattr(event, "type"):
             if event.type == "content_block_start":
-                pass
+                if ThinkingBlock is not None and isinstance(
+                    event.content_block, ThinkingBlock
+                ):
+                    content_blocks.append({"type": "thinking", "thinking": ""})
+                elif event.content_block.type in ("text", "tool_use"):
+                    content_blocks.append({"type": "text", "text": ""})
+                else:
+                    content_blocks.append({"type": event.content_block.type})
             elif event.type == "content_block_delta":
-                if hasattr(event.delta, "text"):
-                    content_blocks.append(event.delta.text)
+                block = content_blocks[event.index]
+                if ThinkingDelta is not None and isinstance(event.delta, ThinkingDelta):
+                    block["thinking"] += event.delta.thinking
+                elif hasattr(event.delta, "text"):
+                    block["text"] += event.delta.text
                 elif hasattr(event.delta, "partial_json"):
-                    content_blocks.append(event.delta.partial_json)
+                    block["text"] += event.delta.partial_json
             elif event.type == "content_block_stop":
                 pass
 
@@ -665,7 +723,7 @@ def _set_output_data(
     output_tokens: "int | None",
     cache_read_input_tokens: "int | None",
     cache_write_input_tokens: "int | None",
-    content_blocks: "list[Any]",
+    content_blocks: "list[dict[str, Any]]",
     response_id: "str | None" = None,
     finish_reason: "str | None" = None,
 ) -> None:
@@ -689,28 +747,31 @@ def _set_output_data(
         record_outputs = True
 
     if record_outputs:
-        output_messages: "dict[str, list[Any]]" = {
-            "response": [],
-            "tool": [],
-        }
+        parts: "list[Union[TextPart, ReasoningPart]]" = []
+        tool_calls = []
 
         for output in content_blocks:
             if output["type"] == "text":
-                output_messages["response"].append(output["text"])
+                parts.append({"type": "text", "content": output["text"]})
+            elif output["type"] == "thinking":
+                parts.append({"type": "reasoning", "content": output["thinking"]})
             elif output["type"] == "tool_use":
-                output_messages["tool"].append(output)
+                tool_calls.append(output)
 
-        if len(output_messages["tool"]) > 0:
+        if len(tool_calls) > 0:
             set_data_normalized(
                 span,
                 SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
-                output_messages["tool"],
+                tool_calls,
                 unpack=False,
             )
 
-        if len(output_messages["response"]) > 0:
+        if len(parts) > 0:
             set_data_normalized(
-                span, SPANDATA.GEN_AI_RESPONSE_TEXT, output_messages["response"]
+                span,
+                SPANDATA.GEN_AI_OUTPUT_MESSAGES,
+                [{"role": "assistant", "parts": parts}],
+                unpack=False,
             )
 
     if input_tokens is not None:
@@ -783,10 +844,19 @@ def _sentry_patched_create_sync(f: "Any", *args: "Any", **kwargs: "Any") -> "Any
         result._integration = integration  # type: ignore[attr-defined]
 
         _initialize_data_accumulation_state(result)
-        result._iterator = _wrap_synchronous_message_iterator(
-            cast("_PatchedRawMessageStream", result),
-            result._iterator,
-        )
+        # New versions use global patch since _iterator was changed to a cached property.
+        if (
+            AnthropicIntegration._version is not None
+            and AnthropicIntegration._version
+            < (
+                1,
+                14,
+            )
+        ):
+            result._iterator = _wrap_synchronous_message_iterator(  # type: ignore[misc]
+                cast("_PatchedRawMessageStream", result),
+                result._iterator,
+            )
 
         return result
 
@@ -881,10 +951,19 @@ async def _sentry_patched_create_async(
         result._integration = integration  # type: ignore[attr-defined]
 
         _initialize_data_accumulation_state(result)
-        result._iterator = _wrap_asynchronous_message_iterator(
-            cast("_PatchedRawAsyncMessageStream", result),
-            result._iterator,
-        )
+        # New versions use global patch since _iterator was changed to a cached property.
+        if (
+            AnthropicIntegration._version is not None
+            and AnthropicIntegration._version
+            < (
+                1,
+                14,
+            )
+        ):
+            result._iterator = _wrap_asynchronous_message_iterator(  # type: ignore[misc]
+                cast("_PatchedRawAsyncMessageStream", result),
+                result._iterator,
+            )
 
         return result
 
@@ -979,7 +1058,7 @@ def _set_streaming_output_data(
     integration: "AnthropicIntegration",
     model: "Optional[str]",
     usage: "_RecordedUsage",
-    content_blocks: "list[str]",
+    content_blocks: "list[dict[str, Any]]",
     response_id: "Optional[str]",
     finish_reason: "Optional[str]",
 ) -> None:
@@ -1002,7 +1081,7 @@ def _set_streaming_output_data(
         output_tokens=usage.output_tokens,
         cache_read_input_tokens=usage.cache_read_input_tokens,
         cache_write_input_tokens=usage.cache_write_input_tokens,
-        content_blocks=[{"text": "".join(content_blocks), "type": "text"}],
+        content_blocks=content_blocks,
         response_id=response_id,
         finish_reason=finish_reason,
     )
@@ -1147,7 +1226,7 @@ def _wrap_message_stream_manager_enter(f: "Any") -> "Any":
 
         _initialize_data_accumulation_state(stream)
         stream._iterator = _wrap_synchronous_message_iterator(
-            stream,
+            cast("_PatchedMessageStream", stream),
             stream._iterator,
         )
 
@@ -1260,7 +1339,7 @@ def _wrap_async_message_stream_manager_aenter(f: "Any") -> "Any":
 
         _initialize_data_accumulation_state(stream)
         stream._iterator = _wrap_asynchronous_message_iterator(
-            stream,
+            cast("_PatchedAsyncMessageStream", stream),
             stream._iterator,
         )
 

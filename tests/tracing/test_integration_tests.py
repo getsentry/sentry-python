@@ -189,7 +189,7 @@ def test_continue_trace(sentry_init, capture_envelopes, parent_sampled, sample_r
         )
 
         if parent_sampled is not None:
-            expected_sample_rate = str(float(parent_sampled))
+            expected_sample_rate = "0.01337"
         else:
             expected_sample_rate = str(sample_rate)
 
@@ -262,7 +262,7 @@ def test_continue_trace_span_streaming(
         assert not baggage.mutable
 
         if parent_sampled is not None:
-            expected_sample_rate = str(float(parent_sampled))
+            expected_sample_rate = parent_sample_rate
         else:
             if sample_rate is None:
                 expected_sample_rate = parent_sample_rate
@@ -312,7 +312,7 @@ def test_continue_trace_span_streaming(
         )
 
         if parent_sampled is not None:
-            expected_sample_rate = str(float(parent_sampled))
+            expected_sample_rate = parent_sample_rate
         else:
             if sample_rate is None:
                 expected_sample_rate = parent_sample_rate

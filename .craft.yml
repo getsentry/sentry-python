@@ -1,4 +1,4 @@
-minVersion: 2.28.0
+minVersion: 3.9.0
 preReleaseCommand: bash scripts/bump-version.sh
 targets:
   - name: pypi

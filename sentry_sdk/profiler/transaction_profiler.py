@@ -582,7 +582,7 @@ class Scheduler(ABC):
             """
             # no profiles taking place, so we can stop early
             if not self.new_profiles and not self.active_profiles:
-                # make sure to clear the cache if we're not profiling so we dont
+                # make sure to clear the cache if we're not profiling so we don't
                 # keep a reference to the last stack of frames around
                 return
 

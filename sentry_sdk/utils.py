@@ -28,6 +28,11 @@ except ImportError:
     # Python 3.10 and below
     BaseExceptionGroup = None  # type: ignore
 
+try:
+    from importlib import metadata as importlib_metadata
+except ImportError:
+    importlib_metadata = None  # type: ignore[assignment]
+
 from typing import TYPE_CHECKING
 
 import sentry_sdk
@@ -914,10 +919,10 @@ def exceptions_from_error(
     parent_id = exception_id
     exception_id += 1
 
-    should_supress_context = (
+    should_suppress_context = (
         hasattr(exc_value, "__suppress_context__") and exc_value.__suppress_context__  # type: ignore
     )
-    if should_supress_context:
+    if should_suppress_context:
         # Add direct cause.
         # The field `__cause__` is set when raised with the exception (using the `from` keyword).
         exception_has_cause = (
@@ -1306,7 +1311,7 @@ def strip_string(
 def parse_version(version: str) -> "Optional[Tuple[int, ...]]":
     """
     Parses a version string into a tuple of integers.
-    This uses the parsing loging from PEP 440:
+    This uses the parsing logic from PEP 440:
     https://peps.python.org/pep-0440/#appendix-b-parsing-version-strings-with-regular-expressions
     """
     VERSION_PATTERN = r"""  # noqa: N806
@@ -1673,7 +1678,7 @@ ParsedUrl = namedtuple("ParsedUrl", ["url", "query", "fragment"])
 def parse_url(url: str, sanitize: bool = True) -> "ParsedUrl":
     """
     Splits a URL into a url (including path), query and fragment. If sanitize is True, the query
-    parameters will be sanitized to remove sensitive data. The autority (username and password)
+    parameters will be sanitized to remove sensitive data. The authority (username and password)
     in the URL will always be removed.
     """
     parsed_url = sanitize_url(
@@ -1840,6 +1845,14 @@ def package_version(package: str) -> "Optional[Tuple[int, ...]]":
     normalized_package = _normalize_module_name(
         _replace_hyphens_dots_and_underscores_with_dashes(package)
     )
+
+    if importlib_metadata is not None:
+        # Look up the single distribution instead of scanning (and parsing
+        # the metadata of) every installed package on each call.
+        try:
+            return parse_version(importlib_metadata.version(normalized_package))
+        except importlib_metadata.PackageNotFoundError:
+            return None
 
     installed_packages = {
         _replace_hyphens_dots_and_underscores_with_dashes(module): v

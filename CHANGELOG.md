@@ -1,5 +1,125 @@
 # Changelog
 
+## 2.75.0
+
+### New Features ✨
+
+#### Bedrock
+
+- **Support for Amazon Bedrock's Converse and ConverseStream APIs**
+
+  The Boto3 integration is enabled automatically when `boto3` is installed. To configure it explicitly:
+
+```python
+import sentry_sdk
+from sentry_sdk.integrations.boto3 import Boto3Integration
+
+sentry_sdk.init(
+    dsn="...",
+    traces_sample_rate=1.0,
+    integrations=[
+        Boto3Integration(),
+    ]
+)
+```
+
+- Set `gen_ai.response.time_to_first_chunk` by @alexander-alderman-webb in [#8255](https://github.com/getsentry/sentry-python/pull/8255)
+- Record `gen_ai.response.finish_reasons` for streamed responses by @alexander-alderman-webb in [#8252](https://github.com/getsentry/sentry-python/pull/8252)
+- Set `gen_ai.output.messages` for streamed responses by @alexander-alderman-webb in [#8251](https://github.com/getsentry/sentry-python/pull/8251)
+- Set `gen_ai.response.finish_reasons` for non-streaming responses by @alexander-alderman-webb in [#8250](https://github.com/getsentry/sentry-python/pull/8250)
+- Set `gen_ai.output.messages` for non-streaming responses by @alexander-alderman-webb in [#8249](https://github.com/getsentry/sentry-python/pull/8249)
+- Set `gen_ai.input.messages` attribute by @alexander-alderman-webb in [#8242](https://github.com/getsentry/sentry-python/pull/8242)
+- Set `gen_ai.system_instructions` attribute by @alexander-alderman-webb in [#8239](https://github.com/getsentry/sentry-python/pull/8239)
+- Set token attributes for streamed responses by @alexander-alderman-webb in [#8235](https://github.com/getsentry/sentry-python/pull/8235)
+- Set token attributes for non-streaming responses by @alexander-alderman-webb in [#8234](https://github.com/getsentry/sentry-python/pull/8234)
+- Set `gen_ai.tool.definitions` attribute by @alexander-alderman-webb in [#8233](https://github.com/getsentry/sentry-python/pull/8233)
+- Record `inferenceConfig` parameters by @alexander-alderman-webb in [#8232](https://github.com/getsentry/sentry-python/pull/8232)
+- Set `gen_ai.request.model` attribute by @alexander-alderman-webb in [#8231](https://github.com/getsentry/sentry-python/pull/8231)
+- Add extension skeleton by @alexander-alderman-webb in [#8226](https://github.com/getsentry/sentry-python/pull/8226)
+
+#### Other
+
+- (crons) Mark @monitor jobs so scheduler integrations skip them by @wedamija in [#8198](https://github.com/getsentry/sentry-python/pull/8198)
+
+### Bug Fixes 🐛
+
+- (aws-lambda) Load path-style handlers once instead of on every invocation by @pabloDeputter and @sentrivana with @sentry-junior in [#8134](https://github.com/getsentry/sentry-python/pull/8134)
+- (gql) Remove credentials and query values from the transport URL by @Mohil-Ahuja in [#8227](https://github.com/getsentry/sentry-python/pull/8227)
+- (toxgen) Preserve caches on `--only` and `--skip` by @sentrivana in [#8240](https://github.com/getsentry/sentry-python/pull/8240)
+- (utils) Look up package versions without scanning all installed packages by @Shellghostt in [#8215](https://github.com/getsentry/sentry-python/pull/8215)
+
+### Documentation 📚
+
+- (celery) Fix stale comment referencing removed `sentry_apply_entry` by @sentry-junior in [#8253](https://github.com/getsentry/sentry-python/pull/8253)
+- Point Sentry Conventions links to conventions.sentry.dev by @cleptric and @claude in [#8200](https://github.com/getsentry/sentry-python/pull/8200)
+
+### Internal Changes 🔧
+
+#### Warden
+
+- Add sdk-review skill and run built-in code-review by @dingsdax with @sentry-junior in [#8247](https://github.com/getsentry/sentry-python/pull/8247)
+- Remove find-bugs, already covered by code-review by @dcramer with @sentry-junior in [#8204](https://github.com/getsentry/sentry-python/pull/8204)
+- Enable incremental review by @Jeffreyhung with @sentry-junior in [#8199](https://github.com/getsentry/sentry-python/pull/8199)
+
+#### Other
+
+- (deps) Lock file maintenance by @renovate in [#8217](https://github.com/getsentry/sentry-python/pull/8217)
+- (profiling) Remove unused ContinuousScheduler.pause stub by @sentry-junior in [#8224](https://github.com/getsentry/sentry-python/pull/8224)
+- Fix typos by @sentrivana with @sentry-junior in [#8241](https://github.com/getsentry/sentry-python/pull/8241)
+- 🤖 Update test matrix with new releases (11/09) by @sentrivana with @github-actions in [#8218](https://github.com/getsentry/sentry-python/pull/8218)
+
+## 2.74.0
+
+### New Features ✨
+
+#### Anthropic
+
+- Record reasoning parts in streaming output by @alexander-alderman-webb in [#8193](https://github.com/getsentry/sentry-python/pull/8193)
+- Record reasoning parts in nonstreaming output by @alexander-alderman-webb in [#8192](https://github.com/getsentry/sentry-python/pull/8192)
+
+#### Other
+
+- (typesafe) Handle inline images by @alexander-alderman-webb in [#8164](https://github.com/getsentry/sentry-python/pull/8164)
+
+### Bug Fixes 🐛
+
+#### Anthropic
+
+- Preserve cached `_iterator` property by @alexander-alderman-webb in [#8163](https://github.com/getsentry/sentry-python/pull/8163)
+- Stop unpacking output arrays by @alexander-alderman-webb in [#8160](https://github.com/getsentry/sentry-python/pull/8160)
+
+#### Other
+
+- (aiohttp) Leave existing `baggage` header alone if it has existin… by @pabloDeputter in [#8116](https://github.com/getsentry/sentry-python/pull/8116)
+- (boto3) Adapt to botocore no longer signing baggage by @sentrivana in [#8113](https://github.com/getsentry/sentry-python/pull/8113)
+- (ci) Restrict pytest because of incompatibilities by @sentrivana in [#8140](https://github.com/getsentry/sentry-python/pull/8140)
+- (falcon) Handle integer HTTP statuses by @jap and @sentrivana in [#8139](https://github.com/getsentry/sentry-python/pull/8139)
+- (sampling) Respect incoming sample rate if not explicitly overridden by @sentrivana in [#8185](https://github.com/getsentry/sentry-python/pull/8185)
+- (tracing) Drop trailing comma when serializing baggage without third-party items by @alphasafal and @pabloDeputter in [#8119](https://github.com/getsentry/sentry-python/pull/8119)
+- (wsgi) Stop overwriting `server.address` by @alexander-alderman-webb in [#8171](https://github.com/getsentry/sentry-python/pull/8171)
+
+### Internal Changes 🔧
+
+#### Deps
+
+- Lock file maintenance by @renovate in [#8055](https://github.com/getsentry/sentry-python/pull/8055)
+- Bump grpcio to 1.84.1 by @geoffg-sentry with @sentry-junior in [#8136](https://github.com/getsentry/sentry-python/pull/8136)
+- Bump uv to 0.13.5 by @geoffg-sentry with @sentry-junior in [#8135](https://github.com/getsentry/sentry-python/pull/8135)
+- Bump brotli to 1.2.1 by @geoffg-sentry with @sentry-junior in [#8122](https://github.com/getsentry/sentry-python/pull/8122)
+
+#### Other
+
+- (mcp) Remove unused select_mcp_transactions fixture by @sentrivana with @sentry-junior in [#8150](https://github.com/getsentry/sentry-python/pull/8150)
+- (release) Bump craft to 3.9.0 and update config by @BYK with @sentry-junior in [#8181](https://github.com/getsentry/sentry-python/pull/8181)
+- (sessions) Remove unused TERMINAL_SESSION_STATES constant by @sentrivana with @sentry-junior in [#8151](https://github.com/getsentry/sentry-python/pull/8151)
+- (starlette) Remove unused \_serialize_request_body_data helper by @sentry-junior in [#8146](https://github.com/getsentry/sentry-python/pull/8146)
+- (toxgen) Remove unused `get_file_hash()` and `get_last_updated()` helpers by @sentry-junior in [#8173](https://github.com/getsentry/sentry-python/pull/8173)
+- (tracing) Remove unused base64_stripped regex by @sentry-junior in [#8148](https://github.com/getsentry/sentry-python/pull/8148)
+- (utils) Remove unused to_timestamp helper and epoch constant by @sentry-junior in [#8147](https://github.com/getsentry/sentry-python/pull/8147)
+- 🤖 Update test matrix with new releases (11/02) by @sentrivana with @github-actions in [#8172](https://github.com/getsentry/sentry-python/pull/8172)
+- Upgrade `sphinx` and remove `packaging` upper bound by @alexander-alderman-webb in [#8183](https://github.com/getsentry/sentry-python/pull/8183)
+- Update test matrix with new releases (27/10) by @alexander-alderman-webb in [#8126](https://github.com/getsentry/sentry-python/pull/8126)
+
 ## 2.73.0
 
 ### New Features ✨
