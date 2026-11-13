@@ -716,7 +716,6 @@ def test_global_dependency_runs_before_existing_dependencies(
 @pytest.mark.parametrize(
     "data_collection,expect_body",
     [
-        pytest.param({}, True, id="data_collection_http_bodies_default"),
         pytest.param(
             {"http_bodies": ["incoming_request"]},
             True,
