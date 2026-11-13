@@ -1,5 +1,7 @@
+import base64
 import io
 import json
+from typing import Any
 from unittest.mock import Mock
 
 import boto3
@@ -153,6 +155,272 @@ def converse_stream_error_response():
     }
 
 
+@pytest.fixture
+def content_block_messages():
+    """
+    A list of messages exercising all types of content blocks from the Bedrock API
+    which the SDK transforms, and the corresponding transformed messages.
+    """
+    messages = [
+        {"role": "user", "content": [{"text": "What is the weather in Paris?"}]},
+        {
+            "role": "user",
+            "content": [{"image": {"format": "png", "source": {"bytes": b"image"}}}],
+        },
+        {
+            "role": "assistant",
+            "content": [
+                {
+                    "toolUse": {
+                        "toolUseId": "tooluse_1",
+                        "name": "get_weather",
+                        "input": {"location": "Paris"},
+                    }
+                }
+            ],
+        },
+        {
+            "role": "user",
+            "content": [
+                {
+                    "toolResult": {
+                        "toolUseId": "tooluse_1",
+                        "content": [
+                            {"json": {"temperature": 18, "unit": "celsius"}},
+                            {"text": "Partly cloudy"},
+                        ],
+                        "status": "success",
+                    }
+                }
+            ],
+        },
+    ]
+
+    expected_input_messages = [
+        {
+            "role": "user",
+            "parts": [{"type": "text", "content": "What is the weather in Paris?"}],
+        },
+        {"role": "user", "parts": [{"type": "blob", "modality": "image"}]},
+        {
+            "role": "assistant",
+            "parts": [
+                {
+                    "type": "tool_call",
+                    "name": "get_weather",
+                    "arguments": {"location": "Paris"},
+                }
+            ],
+        },
+        {
+            "role": "user",
+            "parts": [
+                {
+                    "type": "tool_call_response",
+                    "response": [
+                        {"json": {"temperature": 18, "unit": "celsius"}},
+                        {"text": "Partly cloudy"},
+                    ],
+                }
+            ],
+        },
+    ]
+
+    if BOTOCORE_VERSION >= Version("1.34.131"):
+        messages.append(
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "document": {
+                            "format": "pdf",
+                            "name": "report",
+                            "source": {"bytes": b"document"},
+                        }
+                    }
+                ],
+            }
+        )
+        expected_input_messages.append(
+            {"role": "user", "parts": [{"type": "blob", "modality": "document"}]}
+        )
+
+    if BOTOCORE_VERSION >= Version("1.35.74"):
+        messages.extend(
+            [
+                {
+                    "role": "user",
+                    "content": [
+                        {"video": {"format": "mp4", "source": {"bytes": b"video"}}}
+                    ],
+                },
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "video": {
+                                "format": "mp4",
+                                "source": {
+                                    "s3Location": {
+                                        "uri": "s3://my-bucket/videos/clip.mp4"
+                                    }
+                                },
+                            }
+                        }
+                    ],
+                },
+            ]
+        )
+        expected_input_messages.extend(
+            [
+                {"role": "user", "parts": [{"type": "blob", "modality": "video"}]},
+                {
+                    "role": "user",
+                    "parts": [
+                        {
+                            "type": "uri",
+                            "modality": "video",
+                            "uri": "s3://my-bucket/videos/clip.mp4",
+                        }
+                    ],
+                },
+            ]
+        )
+
+    if BOTOCORE_VERSION >= Version("1.37.0"):
+        messages.append(
+            {
+                "role": "assistant",
+                "content": [
+                    {
+                        "reasoningContent": {
+                            "reasoningText": {
+                                "text": "The user wants the weather in Paris.",
+                                "signature": "signature",
+                            }
+                        }
+                    }
+                ],
+            }
+        )
+        expected_input_messages.append(
+            {
+                "role": "assistant",
+                "parts": [
+                    {
+                        "type": "reasoning",
+                        "content": "The user wants the weather in Paris.",
+                    }
+                ],
+            }
+        )
+
+    if BOTOCORE_VERSION >= Version("1.38.3"):
+        messages.extend(
+            [
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "image": {
+                                "format": "png",
+                                "source": {
+                                    "s3Location": {
+                                        "uri": "s3://my-bucket/images/photo.png"
+                                    }
+                                },
+                            }
+                        }
+                    ],
+                },
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "document": {
+                                "format": "pdf",
+                                "name": "manual",
+                                "source": {
+                                    "s3Location": {
+                                        "uri": "s3://my-bucket/documents/manual.pdf"
+                                    }
+                                },
+                            }
+                        }
+                    ],
+                },
+            ]
+        )
+        expected_input_messages.extend(
+            [
+                {
+                    "role": "user",
+                    "parts": [
+                        {
+                            "type": "uri",
+                            "modality": "image",
+                            "uri": "s3://my-bucket/images/photo.png",
+                        }
+                    ],
+                },
+                {
+                    "role": "user",
+                    "parts": [
+                        {
+                            "type": "uri",
+                            "modality": "document",
+                            "uri": "s3://my-bucket/documents/manual.pdf",
+                        }
+                    ],
+                },
+            ]
+        )
+
+    if BOTOCORE_VERSION >= Version("1.42.1"):
+        messages.extend(
+            [
+                {
+                    "role": "user",
+                    "content": [
+                        {"audio": {"format": "mp3", "source": {"bytes": b"audio"}}}
+                    ],
+                },
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "audio": {
+                                "format": "mp3",
+                                "source": {
+                                    "s3Location": {
+                                        "uri": "s3://my-bucket/audio/question.mp3"
+                                    }
+                                },
+                            }
+                        }
+                    ],
+                },
+            ]
+        )
+        expected_input_messages.extend(
+            [
+                {"role": "user", "parts": [{"type": "blob", "modality": "audio"}]},
+                {
+                    "role": "user",
+                    "parts": [
+                        {
+                            "type": "uri",
+                            "modality": "audio",
+                            "uri": "s3://my-bucket/audio/question.mp3",
+                        }
+                    ],
+                },
+            ]
+        )
+
+    return messages, expected_input_messages
+
+
 def test_converse(
     sentry_init,
     capture_items,
@@ -200,6 +468,7 @@ def test_converse(
     assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 1024
     assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
     assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
+    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["end_turn"]
 
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
@@ -351,6 +620,108 @@ def test_converse_tool_definitions(
     )
 
 
+def test_converse_input_attributes(
+    sentry_init,
+    capture_items,
+    converse_response,
+    content_block_messages,
+):
+    sentry_init(
+        traces_sample_rate=1.0,
+        integrations=[Boto3Integration()],
+        data_collection={"gen_ai": {"inputs": True}},
+    )
+
+    messages, expected_input_messages = content_block_messages
+
+    session = boto3.Session(
+        aws_access_key_id="-", aws_secret_access_key="-", region_name="us-east-1"
+    )
+    client = session.client("bedrock-runtime")
+    stubber = Stubber(client)
+    stubber.add_response("converse", converse_response)
+
+    items = capture_items("span")
+
+    with stubber:
+        client.converse(
+            modelId="anthropic.claude-3-sonnet-20240229-v1:0",
+            messages=messages,
+            system=[
+                {"text": "You are a helpful assistant."},
+                {"text": "Be concise and clear."},
+            ],
+        )
+
+    sentry_sdk.flush()
+    spans = [item.payload for item in items]
+    (span,) = (
+        span for span in spans if span["attributes"].get("sentry.op") == OP.GEN_AI_CHAT
+    )
+
+    assert json.loads(span["attributes"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]) == [
+        {"type": "text", "content": "You are a helpful assistant."},
+        {"type": "text", "content": "Be concise and clear."},
+    ]
+    assert (
+        json.loads(span["attributes"][SPANDATA.GEN_AI_INPUT_MESSAGES])
+        == expected_input_messages
+    )
+
+
+def test_converse_output_attributes(
+    sentry_init,
+    capture_items,
+    converse_response,
+    content_block_messages,
+):
+    sentry_init(
+        traces_sample_rate=1.0,
+        integrations=[Boto3Integration()],
+        data_collection={"gen_ai": {"outputs": True}},
+    )
+
+    messages, expected_messages = content_block_messages
+    converse_response["output"]["message"] = {
+        "role": "assistant",
+        "content": [block for message in messages for block in message["content"]],
+    }
+    expected_output_messages = [
+        {
+            "role": "assistant",
+            "parts": [
+                part for message in expected_messages for part in message["parts"]
+            ],
+        }
+    ]
+
+    session = boto3.Session(
+        aws_access_key_id="-", aws_secret_access_key="-", region_name="us-east-1"
+    )
+    client = session.client("bedrock-runtime")
+    stubber = Stubber(client)
+    stubber.add_response("converse", converse_response)
+
+    items = capture_items("span")
+
+    with stubber:
+        client.converse(
+            modelId="anthropic.claude-3-sonnet-20240229-v1:0",
+            messages=[{"role": "user", "content": [{"text": "Hi"}]}],
+        )
+
+    sentry_sdk.flush()
+    spans = [item.payload for item in items]
+    (span,) = (
+        span for span in spans if span["attributes"].get("sentry.op") == OP.GEN_AI_CHAT
+    )
+
+    assert (
+        json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES])
+        == expected_output_messages
+    )
+
+
 def test_converse_stream(
     sentry_init,
     capture_items,
@@ -402,6 +773,8 @@ def test_converse_stream(
     assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 1024
     assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
     assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
+    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["end_turn"]
+    assert SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_CHUNK in span["attributes"]
 
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
@@ -526,3 +899,263 @@ def test_converse_stream_tool_definitions(
         json.loads(span["attributes"][SPANDATA.GEN_AI_TOOL_DEFINITIONS])
         == expected_tool_definitions
     )
+
+
+def test_converse_stream_input_attributes(
+    sentry_init,
+    capture_items,
+    converse_stream_response,
+    content_block_messages,
+):
+    sentry_init(
+        traces_sample_rate=1.0,
+        integrations=[Boto3Integration()],
+        data_collection={"gen_ai": {"inputs": True}},
+    )
+
+    messages, expected_input_messages = content_block_messages
+
+    session = boto3.Session(
+        aws_access_key_id="-", aws_secret_access_key="-", region_name="us-east-1"
+    )
+    client = session.client("bedrock-runtime")
+    mock_http = Mock(status_code=200)
+    client.meta.events.register(
+        "before-call.bedrock-runtime.ConverseStream",
+        lambda **kwargs: (mock_http, converse_stream_response),
+    )
+
+    items = capture_items("span")
+
+    response = client.converse_stream(
+        modelId="anthropic.claude-3-sonnet-20240229-v1:0",
+        messages=messages,
+        system=[
+            {"text": "You are a helpful assistant."},
+            {"text": "Be concise and clear."},
+        ],
+    )
+    for _ in response["stream"]:
+        pass
+
+    sentry_sdk.flush()
+    spans = [item.payload for item in items]
+    (span,) = (
+        span for span in spans if span["attributes"].get("sentry.op") == OP.GEN_AI_CHAT
+    )
+
+    assert json.loads(span["attributes"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]) == [
+        {"type": "text", "content": "You are a helpful assistant."},
+        {"type": "text", "content": "Be concise and clear."},
+    ]
+    assert (
+        json.loads(span["attributes"][SPANDATA.GEN_AI_INPUT_MESSAGES])
+        == expected_input_messages
+    )
+
+
+def test_converse_stream_output_attributes(
+    sentry_init,
+    capture_items,
+    converse_stream_response,
+):
+    sentry_init(
+        traces_sample_rate=1.0,
+        integrations=[Boto3Integration()],
+        data_collection={"gen_ai": {"outputs": True}},
+    )
+
+    stream_events: "list[tuple[str, dict[str, Any]]]" = [
+        ("messageStart", {"role": "assistant"}),
+        (
+            "contentBlockDelta",
+            {"contentBlockIndex": 0, "delta": {"text": "What is the weather "}},
+        ),
+        (
+            "contentBlockDelta",
+            {"contentBlockIndex": 0, "delta": {"text": "in Paris?"}},
+        ),
+        ("contentBlockStop", {"contentBlockIndex": 0}),
+        (
+            "contentBlockStart",
+            {
+                "contentBlockIndex": 1,
+                "start": {"toolUse": {"toolUseId": "tooluse_1", "name": "get_weather"}},
+            },
+        ),
+        (
+            "contentBlockDelta",
+            {"contentBlockIndex": 1, "delta": {"toolUse": {"input": '{"location": '}}},
+        ),
+        (
+            "contentBlockDelta",
+            {"contentBlockIndex": 1, "delta": {"toolUse": {"input": '"Paris"}'}}},
+        ),
+        ("contentBlockStop", {"contentBlockIndex": 1}),
+    ]
+    expected_parts: "list[dict[str, Any]]" = [
+        {"type": "text", "content": "What is the weather in Paris?"},
+        {
+            "type": "tool_call",
+            "name": "get_weather",
+            "arguments": '{"location": "Paris"}',
+        },
+    ]
+
+    if BOTOCORE_VERSION >= Version("1.37.0"):
+        stream_events += [
+            (
+                "contentBlockDelta",
+                {
+                    "contentBlockIndex": 2,
+                    "delta": {"reasoningContent": {"text": "The user wants "}},
+                },
+            ),
+            (
+                "contentBlockDelta",
+                {
+                    "contentBlockIndex": 2,
+                    "delta": {"reasoningContent": {"text": "the weather in Paris."}},
+                },
+            ),
+            (
+                "contentBlockDelta",
+                {
+                    "contentBlockIndex": 2,
+                    "delta": {"reasoningContent": {"signature": "signature"}},
+                },
+            ),
+            ("contentBlockStop", {"contentBlockIndex": 2}),
+        ]
+        expected_parts.append(
+            {"type": "reasoning", "content": "The user wants the weather in Paris."}
+        )
+
+    if BOTOCORE_VERSION >= Version("1.42.1"):
+        stream_events += [
+            (
+                "contentBlockStart",
+                {
+                    "contentBlockIndex": 3,
+                    "start": {
+                        "toolResult": {"toolUseId": "tooluse_1", "status": "success"}
+                    },
+                },
+            ),
+            (
+                "contentBlockDelta",
+                {
+                    "contentBlockIndex": 3,
+                    "delta": {
+                        "toolResult": [{"json": {"temperature": 18, "unit": "celsius"}}]
+                    },
+                },
+            ),
+            (
+                "contentBlockDelta",
+                {
+                    "contentBlockIndex": 3,
+                    "delta": {"toolResult": [{"text": "Partly cloudy"}]},
+                },
+            ),
+            ("contentBlockStop", {"contentBlockIndex": 3}),
+            (
+                "contentBlockStart",
+                {"contentBlockIndex": 4, "start": {"image": {"format": "png"}}},
+            ),
+            (
+                "contentBlockDelta",
+                {
+                    "contentBlockIndex": 4,
+                    "delta": {
+                        "image": {
+                            "source": {"bytes": base64.b64encode(b"image").decode()}
+                        }
+                    },
+                },
+            ),
+            ("contentBlockStop", {"contentBlockIndex": 4}),
+            (
+                "contentBlockStart",
+                {"contentBlockIndex": 5, "start": {"image": {"format": "png"}}},
+            ),
+            (
+                "contentBlockDelta",
+                {
+                    "contentBlockIndex": 5,
+                    "delta": {
+                        "image": {
+                            "source": {
+                                "s3Location": {"uri": "s3://my-bucket/images/photo.png"}
+                            }
+                        }
+                    },
+                },
+            ),
+            ("contentBlockStop", {"contentBlockIndex": 5}),
+        ]
+        expected_parts += [
+            {
+                "type": "tool_call_response",
+                "response": [
+                    {"json": {"temperature": 18, "unit": "celsius"}},
+                    {"text": "Partly cloudy"},
+                ],
+            },
+            {"type": "blob", "modality": "image"},
+            {
+                "type": "uri",
+                "modality": "image",
+                "uri": "s3://my-bucket/images/photo.png",
+            },
+        ]
+
+    stream_events += [
+        ("messageStop", {"stopReason": "end_turn"}),
+        (
+            "metadata",
+            {
+                "usage": {"inputTokens": 10, "outputTokens": 20, "totalTokens": 30},
+                "metrics": {"latencyMs": 500},
+            },
+        ),
+    ]
+
+    converse_stream_response["stream"]._event_generator = iter(
+        EventStreamMessage(
+            prelude=None,
+            headers={":message-type": "event", ":event-type": event_type},
+            payload=json.dumps(payload).encode(),
+            crc=None,
+        )
+        for event_type, payload in stream_events
+    )
+
+    session = boto3.Session(
+        aws_access_key_id="-", aws_secret_access_key="-", region_name="us-east-1"
+    )
+    client = session.client("bedrock-runtime")
+    mock_http = Mock(status_code=200)
+    client.meta.events.register(
+        "before-call.bedrock-runtime.ConverseStream",
+        lambda **kwargs: (mock_http, converse_stream_response),
+    )
+
+    items = capture_items("span")
+
+    response = client.converse_stream(
+        modelId="anthropic.claude-3-sonnet-20240229-v1:0",
+        messages=[{"role": "user", "content": [{"text": "Hi"}]}],
+    )
+    for _ in response["stream"]:
+        pass
+
+    sentry_sdk.flush()
+    spans = [item.payload for item in items]
+    (span,) = (
+        span for span in spans if span["attributes"].get("sentry.op") == OP.GEN_AI_CHAT
+    )
+
+    assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+        {"role": "assistant", "parts": expected_parts}
+    ]

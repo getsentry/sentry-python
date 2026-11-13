@@ -1,3 +1,4 @@
+import time
 from contextlib import contextmanager
 from typing import TYPE_CHECKING, cast
 
@@ -139,6 +140,8 @@ def _patch_botocore_client() -> None:
         # activate without finishing; a streaming response may outlive the call.
         attributes: "Attributes" = {}
         try:
+            if service_ext is not None:
+                service_ext.request_start_time = time.perf_counter()
             with _activate_client_span(span):
                 try:
                     parsed = orig_make_api_call(self, operation_name, api_params)
