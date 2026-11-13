@@ -715,21 +715,18 @@ def test_global_dependency_runs_before_existing_dependencies(
 
 @pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize(
-    "data_collection,send_default_pii,expect_body",
+    "data_collection,expect_body",
     [
-        pytest.param(None, True, True, id="legacy_pii_enabled"),
-        pytest.param(None, False, False, id="legacy_pii_disabled"),
-        pytest.param(
-            {"http_bodies": []},
-            True,
-            False,
-            id="data_collection_wins_over_send_default_pii",
-        ),
+        pytest.param({}, True, id="data_collection_http_bodies_default"),
         pytest.param(
             {"http_bodies": ["incoming_request"]},
-            False,
             True,
-            id="data_collection_allows_request_body",
+            id="data_collection_http_bodies_incoming_request",
+        ),
+        pytest.param(
+            {"http_bodies": []},
+            False,
+            id="data_collection_http_bodies_empty",
         ),
     ],
 )
@@ -739,20 +736,15 @@ def test_global_dependency_captures_request_data(
     capture_items,
     span_streaming,
     data_collection,
-    send_default_pii,
     expect_body,
 ):
-    init_kwargs = {
-        "auto_enabling_integrations": False,
-        "integrations": [StarletteIntegration(), FastApiIntegration()],
-        "traces_sample_rate": 1.0,
-        "trace_lifecycle": "stream" if span_streaming else "static",
-        "data_collection": data_collection,
-    }
-    if send_default_pii is not None:
-        init_kwargs["send_default_pii"] = send_default_pii
-
-    sentry_init(**init_kwargs)
+    sentry_init(
+        auto_enabling_integrations=False,
+        integrations=[StarletteIntegration(), FastApiIntegration()],
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream" if span_streaming else "static",
+        data_collection=data_collection,
+    )
 
     app = FastAPI()
 
