@@ -38,7 +38,9 @@ from sentry_sdk.integrations.langgraph import (  # noqa: E402
     LanggraphIntegration,
     _parse_langgraph_messages,
     _wrap_pregel_ainvoke,
+    _wrap_pregel_astream,
     _wrap_pregel_invoke,
+    _wrap_pregel_stream,
     _wrap_state_graph_compile,
 )
 
@@ -2655,3 +2657,133 @@ def test_state_graph_compile_gates_available_tools_only_when_data_collection_con
         assert SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS not in data
 
     assert data[SPANDATA.GEN_AI_AGENT_NAME] == "test_graph"
+
+
+class MockStreamingPregel:
+    """Like Pregel: invoke() and ainvoke() consume stream() and astream()."""
+
+    def __init__(self, name="stream_graph"):
+        self.name = name
+        self.stream_closed = False
+
+    def _chunks(self, state):
+        # stream_mode="values" yields the full state after each step
+        return [
+            state,
+            {
+                "messages": state["messages"]
+                + [MockMessage("Streamed response", name="assistant")]
+            },
+        ]
+
+    def stream(self, state, config=None):
+        try:
+            yield from self._chunks(state)
+        finally:
+            self.stream_closed = True
+
+    async def astream(self, state, config=None):
+        try:
+            for chunk in self._chunks(state):
+                yield chunk
+        finally:
+            self.stream_closed = True
+
+    def invoke(self, state, config=None):
+        latest = None
+        for chunk in self.stream(state, config):
+            latest = chunk
+        return latest
+
+    async def ainvoke(self, state, config=None):
+        latest = None
+        async for chunk in self.astream(state, config):
+            latest = chunk
+        return latest
+
+
+MockStreamingPregel.stream = _wrap_pregel_stream(MockStreamingPregel.stream)
+MockStreamingPregel.astream = _wrap_pregel_astream(MockStreamingPregel.astream)
+MockStreamingPregel.invoke = _wrap_pregel_invoke(MockStreamingPregel.invoke)
+MockStreamingPregel.ainvoke = _wrap_pregel_ainvoke(MockStreamingPregel.ainvoke)
+
+
+def _run_graph(graph, method, state, stop_after=None):
+    """Run graph.<method>() in a transaction, consuming at most stop_after chunks."""
+
+    async def run_async():
+        with start_transaction():
+            if method == "ainvoke":
+                await graph.ainvoke(state)
+                return
+            stream = graph.astream(state)
+            seen = 0
+            async for _ in stream:
+                seen += 1
+                if seen == stop_after:
+                    break
+            await stream.aclose()
+
+    if method in ("ainvoke", "astream"):
+        asyncio.run(run_async())
+        return
+
+    with start_transaction():
+        if method == "invoke":
+            graph.invoke(state)
+            return
+        stream = graph.stream(state)
+        seen = 0
+        for _ in stream:
+            seen += 1
+            if seen == stop_after:
+                break
+        stream.close()
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("method", ["stream", "astream", "invoke", "ainvoke"])
+def test_pregel_stream_and_invoke_create_one_invoke_agent_span(
+    sentry_init, capture_events, capture_items, method, span_streaming
+):
+    sentry_init(
+        integrations=[LanggraphIntegration()],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+        stream_gen_ai_spans=span_streaming,
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
+    captured = capture_items("span") if span_streaming else capture_events()
+
+    graph = MockStreamingPregel("stream_graph")
+    _run_graph(graph, method, {"messages": [MockMessage("Hi", name="user")]})
+
+    # _invoke_span_data asserts there's exactly one invoke_agent span
+    data = _invoke_span_data(captured, span_streaming)
+    assert data[SPANDATA.GEN_AI_AGENT_NAME] == "stream_graph"
+    assert data[SPANDATA.GEN_AI_OPERATION_NAME] == "invoke_agent"
+    assert SPANDATA.GEN_AI_REQUEST_MESSAGES in data
+    assert data[SPANDATA.GEN_AI_RESPONSE_TEXT] == "Streamed response"
+
+
+@pytest.mark.parametrize("method", ["stream", "astream"])
+def test_pregel_stream_closed_early(sentry_init, capture_events, method):
+    sentry_init(
+        integrations=[LanggraphIntegration()],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+        stream_gen_ai_spans=False,
+    )
+    events = capture_events()
+
+    graph = MockStreamingPregel("stream_graph")
+    _run_graph(
+        graph, method, {"messages": [MockMessage("Hi", name="user")]}, stop_after=1
+    )
+
+    assert graph.stream_closed
+    (tx,) = events
+    (span,) = [s for s in tx["spans"] if s["op"] == OP.GEN_AI_INVOKE_AGENT]
+    # Stopping early isn't an error
+    assert span.get("status") != "internal_error"
+    assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
