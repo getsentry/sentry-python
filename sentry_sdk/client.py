@@ -393,6 +393,18 @@ def _get_options(*args: "Optional[str]", **kwargs: "Any") -> "Dict[str, Any]":
             stacklevel=2,
         )
 
+    # The SDK logger only writes when debug is on, and this has to reach people who
+    # never turn it on.
+    if rv["traces_sample_rate"] == 0 and rv["traces_sampler"] is None:
+        warnings.warn(
+            "traces_sample_rate is 0, so this service starts no traces and Sentry "
+            "gets no performance data from it. To send traces, set traces_sample_rate "
+            "above 0, for example 1.0 in development and 0.1 in production. If 0 is "
+            "what you want (for example, to only continue traces sampled upstream), "
+            "you can hide this warning with warnings.filterwarnings.",
+            stacklevel=2,
+        )
+
     if rv["trace_ignore_status_codes"] and has_span_streaming_enabled(rv):
         warnings.warn(
             "The `trace_ignore_status_codes` parameter is ignored in span streaming mode.",

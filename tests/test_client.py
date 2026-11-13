@@ -1507,6 +1507,29 @@ def test_continuous_profiling_does_not_warn(sentry_init):
     assert profiling_warnings == []
 
 
+@pytest.mark.parametrize("traces_sample_rate", [0, 0.0])
+def test_zero_traces_sample_rate_warns(sentry_init, traces_sample_rate):
+    with pytest.warns(UserWarning, match="traces_sample_rate is 0"):
+        sentry_init(traces_sample_rate=traces_sample_rate)
+
+
+@pytest.mark.parametrize(
+    "options",
+    [
+        {"traces_sample_rate": 0, "traces_sampler": lambda _: 1.0},
+        {"traces_sample_rate": 0.1},
+        {"traces_sample_rate": None},
+        {},
+    ],
+)
+def test_zero_traces_sample_rate_does_not_warn(sentry_init, options):
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        sentry_init(**options)
+
+    assert [w for w in caught if "traces_sample_rate is 0" in str(w.message)] == []
+
+
 def test_ignore_spans_warns_without_streaming(sentry_init):
     with pytest.warns(UserWarning, match=r"`ignore_spans` parameter only works"):
         sentry_init(ignore_spans=["/health"], trace_lifecycle="static")
