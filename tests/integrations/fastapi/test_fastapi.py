@@ -609,13 +609,15 @@ def test_active_thread_id(sentry_init, capture_envelopes, teardown_profiling, en
         assert str(data["active"]) == trace_context["data"]["thread.id"]
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 def test_active_thread_id_with_prefixed_router(
-    sentry_init, capture_envelopes
+    sentry_init, capture_envelopes, capture_items, span_streaming
 ):
     sentry_init(
         auto_enabling_integrations=False,
         integrations=[StarletteIntegration(), FastApiIntegration()],
         traces_sample_rate=1.0,
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     app = FastAPI()
@@ -627,20 +629,33 @@ def test_active_thread_id_with_prefixed_router(
 
     app.include_router(router, prefix="/api")
 
-    envelopes = capture_envelopes()
+    if span_streaming:
+        items = capture_items("span")
+    else:
+        envelopes = capture_envelopes()
+
     response = TestClient(app).get("/api/sync")
 
     assert response.status_code == 200
-    assert len(envelopes) == 1
 
-    transaction = next(
-        item.payload.json
-        for item in envelopes[0].items
-        if item.type == "transaction"
-    )
-    assert (
-        response.json()["active"] == transaction["contexts"]["trace"]["data"]["thread.id"]
-    )
+    if span_streaming:
+        sentry_sdk.flush()
+        segments = [item.payload for item in items if item.payload.get("is_segment")]
+        assert len(segments) == 1
+        assert (
+            response.json()["active"]
+            == segments[0]["attributes"]["thread.id"]
+        )
+    else:
+        transaction = next(
+            item.payload.json
+            for item in envelopes[0].items
+            if item.type == "transaction"
+        )
+        assert (
+            response.json()["active"]
+            == transaction["contexts"]["trace"]["data"]["thread.id"]
+        )
 
 
 def test_global_dependency_preserves_existing_dependencies(sentry_init):
@@ -664,17 +679,26 @@ def test_global_dependency_preserves_existing_dependencies(sentry_init):
     assert calls == [True]
 
 
-def test_global_dependency_runs_before_existing_dependencies(sentry_init):
-    seen_transaction_names = []
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_global_dependency_runs_before_existing_dependencies(
+    sentry_init, span_streaming
+):
+    seen_names = []
 
     def custom_dependency():
-        transaction = sentry_sdk.get_current_scope().transaction
-        seen_transaction_names.append(transaction.name if transaction else None)
+        scope = sentry_sdk.get_current_scope()
+        if span_streaming:
+            current_span = scope.span
+            seen_names.append(current_span.name if current_span else None)
+        else:
+            transaction = scope.transaction
+            seen_names.append(transaction.name if transaction else None)
 
     sentry_init(
         auto_enabling_integrations=False,
         integrations=[StarletteIntegration(), FastApiIntegration()],
         traces_sample_rate=1.0,
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     app = FastAPI(dependencies=[Depends(custom_dependency)])
@@ -686,15 +710,49 @@ def test_global_dependency_runs_before_existing_dependencies(sentry_init):
     response = TestClient(app).get("/items/123")
 
     assert response.status_code == 200
-    assert seen_transaction_names == ["/items/{item_id}"]
+    assert seen_names == ["/items/{item_id}"]
 
 
-def test_global_dependency_captures_request_data(sentry_init, capture_events):
-    sentry_init(
-        auto_enabling_integrations=False,
-        integrations=[StarletteIntegration(), FastApiIntegration()],
-        send_default_pii=True,
-    )
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize(
+    "data_collection,send_default_pii,expect_body",
+    [
+        pytest.param(None, True, True, id="legacy_pii_enabled"),
+        pytest.param(None, False, False, id="legacy_pii_disabled"),
+        pytest.param(
+            {"http_bodies": []},
+            True,
+            False,
+            id="data_collection_wins_over_send_default_pii",
+        ),
+        pytest.param(
+            {"http_bodies": ["incoming_request"]},
+            False,
+            True,
+            id="data_collection_allows_request_body",
+        ),
+    ],
+)
+def test_global_dependency_captures_request_data(
+    sentry_init,
+    capture_events,
+    capture_items,
+    span_streaming,
+    data_collection,
+    send_default_pii,
+    expect_body,
+):
+    init_kwargs = {
+        "auto_enabling_integrations": False,
+        "integrations": [StarletteIntegration(), FastApiIntegration()],
+        "traces_sample_rate": 1.0,
+        "trace_lifecycle": "stream" if span_streaming else "static",
+        "data_collection": data_collection,
+    }
+    if send_default_pii is not None:
+        init_kwargs["send_default_pii"] = send_default_pii
+
+    sentry_init(**init_kwargs)
 
     app = FastAPI()
 
@@ -703,13 +761,42 @@ def test_global_dependency_captures_request_data(sentry_init, capture_events):
         capture_message("request body captured")
         return {"message": "ok"}
 
-    events = capture_events()
+    if span_streaming:
+        items = capture_items("event", "span")
+    else:
+        events = capture_events()
 
     response = TestClient(app).post("/message", json=BODY_JSON)
 
     assert response.status_code == 200
-    (event,) = events
-    assert event["request"]["data"] == BODY_JSON
+
+    if span_streaming:
+        event = next(item.payload for item in items if item.type == "event")
+        sentry_sdk.flush()
+        server_span = next(
+            item.payload
+            for item in items
+            if item.type == "span"
+            and item.payload["attributes"]["sentry.op"] == "http.server"
+        )
+
+        if expect_body:
+            assert event["request"]["data"] == BODY_JSON
+            assert (
+                json.loads(
+                    server_span["attributes"][SPANDATA.HTTP_REQUEST_BODY_DATA]
+                )
+                == BODY_JSON
+            )
+        else:
+            assert "data" not in event["request"]
+            assert SPANDATA.HTTP_REQUEST_BODY_DATA not in server_span["attributes"]
+    else:
+        (event,) = events
+        if expect_body:
+            assert event["request"]["data"] == BODY_JSON
+        else:
+            assert "data" not in event["request"]
 
 
 def test_global_dependency_request_processors_are_isolated(sentry_init, capture_events):
