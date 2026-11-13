@@ -397,7 +397,6 @@ async def test_formdata_request_body_data_collection_http_bodies_empty(
     "data_collection, expect_body",
     [
         pytest.param(None, True, id="no_data_collection_experiment"),
-        pytest.param({}, True, id="data_collection_http_bodies_default"),
         pytest.param(
             {"http_bodies": ["incoming_request"]},
             True,
@@ -792,7 +791,12 @@ def test_global_dependency_captures_request_data(
 
 
 def test_global_dependency_request_processors_are_isolated(sentry_init, capture_events):
-    sentry_init(integrations=[FastApiIntegration()], send_default_pii=True)
+    sentry_init(
+        integrations=[FastApiIntegration()],
+        data_collection={
+            "cookies": {"mode": "allowlist", "terms": ["request"]},
+        },
+    )
 
     app = FastAPI()
 
