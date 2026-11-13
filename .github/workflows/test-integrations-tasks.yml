@@ -53,6 +53,10 @@ jobs:
       - name: Setup Test Env
         run: |
           uv sync
+      - name: Test apscheduler
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-apscheduler"
       - name: Test arq
         run: |
           set -x # print commands that are executed
