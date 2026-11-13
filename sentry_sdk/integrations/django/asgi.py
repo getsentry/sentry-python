@@ -16,13 +16,10 @@ from django.core.handlers.wsgi import WSGIRequest
 import sentry_sdk
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
-from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.traces import StreamedSpan
-from sentry_sdk.tracing_utils import has_span_streaming_enabled
+from sentry_sdk.traces import Span
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
-    has_data_collection_enabled,
 )
 
 if TYPE_CHECKING:
@@ -72,11 +69,7 @@ def _make_asgi_request_event_processor(request: "ASGIRequest") -> "EventProcesso
             DjangoRequestExtractor(request).extract_into_event(event)
 
         client_options = sentry_sdk.get_client().options
-        if has_data_collection_enabled(client_options):
-            if client_options["data_collection"]["user_info"]:
-                with capture_internal_exceptions():
-                    _set_user_info(request, event)
-        elif should_send_default_pii():
+        if client_options["data_collection"]["user_info"]:
             with capture_internal_exceptions():
                 _set_user_info(request, event)
 
@@ -99,7 +92,6 @@ def patch_django_asgi_handler_impl(cls: "Any") -> None:
 
         middleware = SentryAsgiMiddleware(
             old_app.__get__(self, cls),
-            unsafe_context_data=True,
             span_origin=DjangoIntegration.origin,
             http_methods_to_capture=integration.http_methods_to_capture,
         )._run_asgi3
@@ -154,7 +146,6 @@ def patch_channels_asgi_handler_impl(cls: "Any") -> None:
 
             middleware = SentryAsgiMiddleware(
                 lambda _scope: old_app.__get__(self, cls),
-                unsafe_context_data=True,
                 span_origin=DjangoIntegration.origin,
                 http_methods_to_capture=integration.http_methods_to_capture,
             )
@@ -177,43 +168,26 @@ def wrap_async_view(callback: "Any") -> "Any":
         request: "Any", *args: "Any", **kwargs: "Any"
     ) -> "Any":
         client = sentry_sdk.get_client()
-        span_streaming = has_span_streaming_enabled(client.options)
-        current_scope = sentry_sdk.get_current_scope()
-        if span_streaming:
-            current_span = current_scope.streamed_span
-            if type(current_span) is StreamedSpan:
-                segment = current_span._segment
-                segment._update_active_thread()
-        else:
-            if current_scope.transaction is not None:
-                current_scope.transaction.update_active_thread()
-
-        sentry_scope = sentry_sdk.get_isolation_scope()
-        if sentry_scope.profile is not None:
-            sentry_scope.profile.update_active_thread_id()
+        current_span = sentry_sdk.get_current_span()
+        if type(current_span) is Span:
+            segment = current_span._segment
+            segment._update_active_thread()
 
         integration = client.get_integration(DjangoIntegration)
         if not integration or not integration.middleware_spans:
             return await callback(request, *args, **kwargs)
 
-        if span_streaming:
-            if sentry_sdk.traces.get_current_span() is None:
-                return await callback(request, *args, **kwargs)
-            with sentry_sdk.traces.start_span(
-                name=request.resolver_match.view_name,
-                attributes={
-                    "sentry.op": OP.VIEW_RENDER,
-                    "sentry.origin": DjangoIntegration.origin,
-                },
-            ):
-                return await callback(request, *args, **kwargs)
-        else:
-            with sentry_sdk.start_span(
-                op=OP.VIEW_RENDER,
-                name=request.resolver_match.view_name,
-                origin=DjangoIntegration.origin,
-            ):
-                return await callback(request, *args, **kwargs)
+        if current_span is None:
+            return await callback(request, *args, **kwargs)
+
+        with sentry_sdk.start_span(
+            name=request.resolver_match.view_name,
+            attributes={
+                "sentry.op": OP.VIEW_RENDER,
+                "sentry.origin": DjangoIntegration.origin,
+            },
+        ):
+            return await callback(request, *args, **kwargs)
 
     return sentry_wrapped_callback
 

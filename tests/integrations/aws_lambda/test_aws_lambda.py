@@ -2,7 +2,6 @@ import json
 import subprocess
 import tempfile
 import time
-from unittest import mock
 
 import boto3
 import docker
@@ -10,11 +9,47 @@ import pytest
 import yaml
 from aws_cdk import App
 
+from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.integrations.aws_lambda.consts import (
+    CLOUD_PLATFORM,
+    CLOUD_PROVIDER,
+    IDENTIFIER,
+    LATEST_FUNCTION_VERSION,
+    ORIGIN,
+)
+from sentry_sdk.traces import SegmentNameSource
+
 from .utils import SAM_PORT, LocalLambdaStack, SentryServerForTesting
 
 DOCKER_NETWORK_NAME = "lambda-test-network"
 SAM_TEMPLATE_FILE = "sam.template.yaml"
 SAM_SHUTDOWN_TIMEOUT = 10
+
+SQS_RECORD = {
+    "messageId": "059f36b4-87a3-44ab-83d2-661975830a7d",
+    "body": "{}",
+    "eventSource": "aws:sqs",
+    "eventSourceARN": "arn:aws:sqs:us-east-1:012345678912:orders",
+}
+SNS_RECORD = {
+    "EventSource": "aws:sns",
+    "Sns": {"TopicArn": "arn:aws:sns:us-east-1:012345678912:alerts"},
+}
+APPSYNC_EVENT = {
+    "arguments": {"id": "1"},
+    "info": {"fieldName": "getOrder", "parentTypeName": "Query"},
+}
+EVENTBRIDGE_EVENT = {
+    "version": "0",
+    "id": "53dc4d37-cffa-4f76-80c9-8b7d4a4d2eaa",
+    "detail-type": "Object Created",
+    "source": "aws.s3",
+    "account": "012345678912",
+    "time": "2026-10-26T12:00:00Z",
+    "region": "us-east-1",
+    "resources": [],
+    "detail": {},
+}
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -107,98 +142,23 @@ def lambda_client():
     )
 
 
-def test_basic_no_exception(lambda_client, test_environment):
-    lambda_client.invoke(
-        FunctionName="BasicOk",
-        Payload=json.dumps({}),
-    )
-    envelopes = test_environment["server"].envelopes
-
-    (transaction_event,) = envelopes
-
-    assert transaction_event["type"] == "transaction"
-    assert transaction_event["transaction"] == "BasicOk"
-    assert transaction_event["sdk"]["name"] == "sentry.python.aws_lambda"
-    assert transaction_event["tags"] == {"aws_region": "us-east-1"}
-
-    assert transaction_event["extra"]["cloudwatch logs"] == {
-        "log_group": mock.ANY,
-        "log_stream": mock.ANY,
-        "url": mock.ANY,
-    }
-    assert transaction_event["extra"]["lambda"] == {
-        "aws_request_id": mock.ANY,
-        "execution_duration_in_millis": mock.ANY,
-        "function_name": "BasicOk",
-        "function_version": "$LATEST",
-        "invoked_function_arn": "arn:aws:lambda:us-east-1:012345678912:function:BasicOk",
-        "remaining_time_in_millis": mock.ANY,
-    }
-    assert transaction_event["contexts"]["trace"] == {
-        "op": "function.aws",
-        "description": mock.ANY,
-        "span_id": mock.ANY,
-        "parent_span_id": mock.ANY,
-        "trace_id": mock.ANY,
-        "origin": "auto.function.aws_lambda",
-        "data": mock.ANY,
-    }
-
-
-def test_basic_exception(lambda_client, test_environment):
-    lambda_client.invoke(
-        FunctionName="BasicException",
-        Payload=json.dumps({}),
-    )
-    envelopes = test_environment["server"].envelopes
-
-    # The second envelope we ignore.
-    # It is the transaction that we test in test_basic_no_exception.
-    (error_event, _) = envelopes
-
-    assert error_event["level"] == "error"
-    assert error_event["exception"]["values"][0]["type"] == "RuntimeError"
-    assert error_event["exception"]["values"][0]["value"] == "Oh!"
-    assert error_event["sdk"]["name"] == "sentry.python.aws_lambda"
-
-    assert error_event["tags"] == {"aws_region": "us-east-1"}
-    assert error_event["extra"]["cloudwatch logs"] == {
-        "log_group": mock.ANY,
-        "log_stream": mock.ANY,
-        "url": mock.ANY,
-    }
-    assert error_event["extra"]["lambda"] == {
-        "aws_request_id": mock.ANY,
-        "execution_duration_in_millis": mock.ANY,
-        "function_name": "BasicException",
-        "function_version": "$LATEST",
-        "invoked_function_arn": "arn:aws:lambda:us-east-1:012345678912:function:BasicException",
-        "remaining_time_in_millis": mock.ANY,
-    }
-    assert error_event["contexts"]["trace"] == {
-        "op": "function.aws",
-        "description": mock.ANY,
-        "span_id": mock.ANY,
-        "parent_span_id": mock.ANY,
-        "trace_id": mock.ANY,
-        "origin": "auto.function.aws_lambda",
-        "data": mock.ANY,
-    }
-
-
 def test_init_error(lambda_client, test_environment):
     lambda_client.invoke(
         FunctionName="InitError",
         Payload=json.dumps({}),
     )
     envelopes = test_environment["server"].envelopes
+    span_items = test_environment["server"].span_items
 
-    (error_event, transaction_event) = envelopes
+    (error_event,) = envelopes
 
     assert (
         error_event["exception"]["values"][0]["value"] == "name 'func' is not defined"
     )
-    assert transaction_event["transaction"] == "InitError"
+
+    segment_spans = [s for s in span_items if s.get("is_segment")]
+    assert len(segment_spans) == 1
+    assert segment_spans[0]["name"] == "InitError"
 
 
 @pytest.mark.parametrize("function_name", ["PathHandler", "AbsolutePathHandler"])
@@ -233,21 +193,19 @@ def test_timeout_error_scope_modified(lambda_client, test_environment):
     (exception,) = error_event["exception"]["values"]
     assert not exception["mechanism"]["handled"]
     assert exception["type"] == "ServerlessTimeoutWarning"
-    assert exception["value"].startswith(
-        "WARNING : Function is expected to get timed out. Configured timeout duration ="
-    )
+    assert exception["value"] == "WARNING: Function is about to time out."
     assert exception["mechanism"]["type"] == "threading"
 
     assert error_event["tags"]["custom_tag"] == "custom_value"
 
 
 @pytest.mark.parametrize(
-    "aws_event, has_request_data, batch_size",
+    "aws_event, has_request_data",
     [
-        (b"1231", False, 1),
-        (b"11.21", False, 1),
-        (b'"Good dog!"', False, 1),
-        (b"true", False, 1),
+        (b"1231", False),
+        (b"11.21", False),
+        (b'"Good dog!"', False),
+        (b"true", False),
         (
             b"""
             [
@@ -258,7 +216,6 @@ def test_timeout_error_scope_modified(lambda_client, test_environment):
             ]
             """,
             False,
-            4,
         ),
         (
             b"""
@@ -290,9 +247,8 @@ def test_timeout_error_scope_modified(lambda_client, test_environment):
             ]
             """,
             True,
-            2,
         ),
-        (b"[]", False, 1),
+        (b"[]", False),
     ],
     ids=[
         "event as integer",
@@ -304,28 +260,22 @@ def test_timeout_error_scope_modified(lambda_client, test_environment):
         "event as empty list",
     ],
 )
-def test_non_dict_event(
-    lambda_client, test_environment, aws_event, has_request_data, batch_size
-):
+def test_non_dict_event(lambda_client, test_environment, aws_event, has_request_data):
     lambda_client.invoke(
         FunctionName="BasicException",
         Payload=aws_event,
     )
     envelopes = test_environment["server"].envelopes
+    span_items = test_environment["server"].span_items
 
-    (error_event, transaction_event) = envelopes
-
-    assert transaction_event["type"] == "transaction"
-    assert transaction_event["transaction"] == "BasicException"
-    assert transaction_event["sdk"]["name"] == "sentry.python.aws_lambda"
-    assert transaction_event["contexts"]["trace"]["status"] == "internal_error"
+    (error_event,) = envelopes
 
     assert error_event["level"] == "error"
     assert error_event["transaction"] == "BasicException"
     assert error_event["sdk"]["name"] == "sentry.python.aws_lambda"
     assert error_event["exception"]["values"][0]["type"] == "RuntimeError"
     assert error_event["exception"]["values"][0]["value"] == "Oh!"
-    assert error_event["exception"]["values"][0]["mechanism"]["type"] == "aws_lambda"
+    assert error_event["exception"]["values"][0]["mechanism"]["type"] == IDENTIFIER
 
     if has_request_data:
         request_data = {
@@ -340,16 +290,14 @@ def test_non_dict_event(
         request_data = {"url": "awslambda:///BasicException"}
 
     assert error_event["request"] == request_data
-    assert transaction_event["request"] == request_data
 
-    if batch_size > 1:
-        assert error_event["tags"]["batch_size"] == batch_size
-        assert error_event["tags"]["batch_request"] is True
-        assert transaction_event["tags"]["batch_size"] == batch_size
-        assert transaction_event["tags"]["batch_request"] is True
+    segment_spans = [s for s in span_items if s.get("is_segment")]
+    assert len(segment_spans) == 1
+    assert segment_spans[0]["name"] == "BasicException"
+    assert segment_spans[0]["status"] == "error"
 
 
-def test_request_data_with_send_default_pii_false(lambda_client, test_environment):
+def test_request_data_with_default_data_collection(lambda_client, test_environment):
     payload = b"""
         {
           "resource": "/asd",
@@ -382,88 +330,14 @@ def test_request_data_with_send_default_pii_false(lambda_client, test_environmen
         FunctionName="BasicOk",
         Payload=payload,
     )
-    envelopes = test_environment["server"].envelopes
+    span_items = test_environment["server"].span_items
 
-    (transaction_event,) = envelopes
+    segment_spans = [s for s in span_items if s.get("is_segment")]
+    assert len(segment_spans) == 1
+    attrs = segment_spans[0]["attributes"]
 
-    assert transaction_event["request"] == {
-        "headers": {
-            "Host": "iwsz2c7uwi.execute-api.us-east-1.amazonaws.com",
-            "User-Agent": "custom",
-            # X-Forwarded-Proto is not sensitive and passes through.
-            "X-Forwarded-Proto": "https",
-            # With send_default_pii=False, _filter_headers substitutes the
-            # SENSITIVE_HEADERS (Authorization, Cookie); the EventScrubber
-            # also scrubs them. Both end up as "[Filtered]".
-            "Authorization": "[Filtered]",
-            "Cookie": "[Filtered]",
-        },
-        "method": "GET",
-        "query_string": {"bonkers": "true"},
-        "url": "https://iwsz2c7uwi.execute-api.us-east-1.amazonaws.com/asd",
-    }
-
-
-def test_request_data_with_send_default_pii_true(lambda_client, test_environment):
-    payload = b"""
-        {
-          "resource": "/asd",
-          "path": "/asd",
-          "httpMethod": "GET",
-          "headers": {
-            "Host": "iwsz2c7uwi.execute-api.us-east-1.amazonaws.com",
-            "User-Agent": "custom",
-            "X-Forwarded-Proto": "https",
-            "Authorization": "Bearer secret-token",
-            "Cookie": "sessionid=secret"
-          },
-          "queryStringParameters": {
-            "bonkers": "true"
-          },
-          "pathParameters": null,
-          "stageVariables": null,
-          "requestContext": {
-            "identity": {
-                "sourceIp": "213.47.147.207",
-                "userArn": "42"
-            }
-          },
-          "body": null,
-          "isBase64Encoded": false
-        }
-    """
-
-    lambda_client.invoke(
-        FunctionName="BasicOkSendDefaultPii",
-        Payload=payload,
-    )
-    envelopes = test_environment["server"].envelopes
-
-    (transaction_event,) = envelopes
-
-    assert transaction_event["request"] == {
-        "headers": {
-            "Host": "iwsz2c7uwi.execute-api.us-east-1.amazonaws.com",
-            "User-Agent": "custom",
-            "X-Forwarded-Proto": "https",
-            # With send_default_pii=True (and no data_collection config),
-            # _filter_headers passes headers through untouched. Authorization
-            # and Cookie are still scrubbed to "[Filtered]" by the always-on
-            # EventScrubber (DEFAULT_DENYLIST), independent of PII settings.
-            "Authorization": "[Filtered]",
-            "Cookie": "[Filtered]",
-        },
-        "method": "GET",
-        "query_string": {"bonkers": "true"},
-        "url": "https://iwsz2c7uwi.execute-api.us-east-1.amazonaws.com/asd",
-        "data": None,
-    }
-
-    # Legacy send_default_pii=True attaches the user identity.
-    assert transaction_event["user"] == {
-        "id": "42",
-        "ip_address": "213.47.147.207",
-    }
+    assert _get_span_attr(attrs, SPANDATA.HTTP_REQUEST_METHOD) == "GET"
+    assert _get_span_attr(attrs, SPANDATA.URL_QUERY) == "bonkers=true"
 
 
 USER_INFO_PAYLOAD = b"""
@@ -498,26 +372,13 @@ def test_user_info_with_data_collection_user_info_on(lambda_client, test_environ
         FunctionName="BasicOkDataCollectionUserInfoOn",
         Payload=USER_INFO_PAYLOAD,
     )
-    envelopes = test_environment["server"].envelopes
+    span_items = test_environment["server"].span_items
 
-    (transaction_event,) = envelopes
+    segment_spans = [s for s in span_items if s.get("is_segment")]
+    assert len(segment_spans) == 1
+    attrs = segment_spans[0]["attributes"]
 
-    assert transaction_event["user"] == {
-        "id": "42",
-        "ip_address": "213.47.147.207",
-    }
-
-
-def test_user_info_with_data_collection_user_info_off(lambda_client, test_environment):
-    lambda_client.invoke(
-        FunctionName="BasicOkDataCollectionUserInfoOff",
-        Payload=USER_INFO_PAYLOAD,
-    )
-    envelopes = test_environment["server"].envelopes
-
-    (transaction_event,) = envelopes
-
-    assert "user" not in transaction_event
+    assert _get_span_attr(attrs, SPANDATA.USER_ID) == "42"
 
 
 def test_request_data_with_data_collection_allowlist(lambda_client, test_environment):
@@ -554,29 +415,35 @@ def test_request_data_with_data_collection_allowlist(lambda_client, test_environ
         FunctionName="BasicOkDataCollectionAllowlist",
         Payload=payload,
     )
-    envelopes = test_environment["server"].envelopes
+    span_items = test_environment["server"].span_items
 
-    (transaction_event,) = envelopes
+    segment_spans = [s for s in span_items if s.get("is_segment")]
+    assert len(segment_spans) == 1
+    attrs = segment_spans[0]["attributes"]
 
-    assert transaction_event["request"] == {
-        "headers": {
-            # Allowlisted, non-sensitive headers pass through.
-            "User-Agent": "custom",
-            "X-Allow-Me": "yes",
-            # Not allowlisted -> substituted.
-            "Host": "[Filtered]",
-            "X-Forwarded-Proto": "[Filtered]",
-            # Allowlisted but sensitive -> still filtered; an allowlist entry
-            # cannot override the built-in sensitive denylist.
-            "Authorization": "[Filtered]",
-            # Not allowlisted, and cookies are always substituted.
-            "Cookie": "[Filtered]",
-        },
-        "method": "GET",
-        "query_string": {"bonkers": "true"},
-        "url": "https://iwsz2c7uwi.execute-api.us-east-1.amazonaws.com/asd",
-        "data": '{"toy": "tennisball"}',
-    }
+    assert _get_span_attr(attrs, SPANDATA.HTTP_REQUEST_METHOD) == "GET"
+    # Allowlisted, non-sensitive headers pass through.
+    assert _get_span_attr(attrs, f"{SPANDATA.HTTP_REQUEST_HEADER}.user-agent") == [
+        "custom"
+    ]
+    assert _get_span_attr(attrs, f"{SPANDATA.HTTP_REQUEST_HEADER}.x-allow-me") == [
+        "yes"
+    ]
+    # Not allowlisted -> filtered.
+    assert _get_span_attr(attrs, f"{SPANDATA.HTTP_REQUEST_HEADER}.host") == [
+        "[Filtered]"
+    ]
+    assert _get_span_attr(
+        attrs, f"{SPANDATA.HTTP_REQUEST_HEADER}.x-forwarded-proto"
+    ) == ["[Filtered]"]
+    # Allowlisted but sensitive -> still filtered.
+    assert _get_span_attr(attrs, f"{SPANDATA.HTTP_REQUEST_HEADER}.authorization") == [
+        "[Filtered]"
+    ]
+    # Not allowlisted, and cookies are always filtered.
+    assert _get_span_attr(attrs, f"{SPANDATA.HTTP_REQUEST_HEADER}.cookie") == [
+        "[Filtered]"
+    ]
 
 
 def test_request_data_with_data_collection_denylist(lambda_client, test_environment):
@@ -613,28 +480,35 @@ def test_request_data_with_data_collection_denylist(lambda_client, test_environm
         FunctionName="BasicOkDataCollectionDenylist",
         Payload=payload,
     )
-    envelopes = test_environment["server"].envelopes
+    span_items = test_environment["server"].span_items
 
-    (transaction_event,) = envelopes
+    segment_spans = [s for s in span_items if s.get("is_segment")]
+    assert len(segment_spans) == 1
+    attrs = segment_spans[0]["attributes"]
 
-    assert transaction_event["request"] == {
-        "headers": {
-            # Not denied by any term -> pass through.
-            "Host": "iwsz2c7uwi.execute-api.us-east-1.amazonaws.com",
-            "X-Custom": "keep-me",
-            # Denied by custom terms.
-            "User-Agent": "[Filtered]",
-            "X-Forwarded-Proto": "[Filtered]",
-            # Denied by the built-in sensitive denylist.
-            "Authorization": "[Filtered]",
-            # Cookies are always substituted.
-            "Cookie": "[Filtered]",
-        },
-        "method": "GET",
-        "query_string": {"bonkers": "true"},
-        "url": "https://iwsz2c7uwi.execute-api.us-east-1.amazonaws.com/asd",
-        "data": '{"toy": "tennisball"}',
-    }
+    assert _get_span_attr(attrs, SPANDATA.HTTP_REQUEST_METHOD) == "GET"
+    # Not denied by any term -> pass through.
+    assert _get_span_attr(attrs, f"{SPANDATA.HTTP_REQUEST_HEADER}.host") == [
+        "iwsz2c7uwi.execute-api.us-east-1.amazonaws.com"
+    ]
+    assert _get_span_attr(attrs, f"{SPANDATA.HTTP_REQUEST_HEADER}.x-custom") == [
+        "keep-me"
+    ]
+    # Denied by custom terms.
+    assert _get_span_attr(attrs, f"{SPANDATA.HTTP_REQUEST_HEADER}.user-agent") == [
+        "[Filtered]"
+    ]
+    assert _get_span_attr(
+        attrs, f"{SPANDATA.HTTP_REQUEST_HEADER}.x-forwarded-proto"
+    ) == ["[Filtered]"]
+    # Denied by the built-in sensitive denylist.
+    assert _get_span_attr(attrs, f"{SPANDATA.HTTP_REQUEST_HEADER}.authorization") == [
+        "[Filtered]"
+    ]
+    # Cookies are always filtered.
+    assert _get_span_attr(attrs, f"{SPANDATA.HTTP_REQUEST_HEADER}.cookie") == [
+        "[Filtered]"
+    ]
 
 
 def test_request_data_with_data_collection_off(lambda_client, test_environment):
@@ -670,66 +544,18 @@ def test_request_data_with_data_collection_off(lambda_client, test_environment):
         FunctionName="BasicOkDataCollectionOff",
         Payload=payload,
     )
-    envelopes = test_environment["server"].envelopes
+    span_items = test_environment["server"].span_items
 
-    (transaction_event,) = envelopes
+    segment_spans = [s for s in span_items if s.get("is_segment")]
+    assert len(segment_spans) == 1
+    attrs = segment_spans[0]["attributes"]
 
-    assert transaction_event["request"] == {
-        # With request headers collection turned off, no headers are collected.
-        "headers": {},
-        "method": "GET",
-        "query_string": {"bonkers": "true"},
-        "url": "https://iwsz2c7uwi.execute-api.us-east-1.amazonaws.com/asd",
-        "data": '{"toy": "tennisball"}',
-    }
-
-
-def test_url_query_params_with_data_collection_denylist(
-    lambda_client, test_environment
-):
-    payload = b"""
-        {
-          "resource": "/asd",
-          "path": "/asd",
-          "httpMethod": "GET",
-          "headers": {
-            "Host": "iwsz2c7uwi.execute-api.us-east-1.amazonaws.com",
-            "X-Forwarded-Proto": "https"
-          },
-          "queryStringParameters": {
-            "page": "2",
-            "tracking": "campaign",
-            "token": "secret-token"
-          },
-          "pathParameters": null,
-          "stageVariables": null,
-          "requestContext": {
-            "identity": {
-              "sourceIp": "213.47.147.207",
-              "userArn": "42"
-            }
-          },
-          "body": null,
-          "isBase64Encoded": false
-        }
-    """
-
-    lambda_client.invoke(
-        FunctionName="BasicOkDataCollectionUrlQueryDenylist",
-        Payload=payload,
-    )
-    envelopes = test_environment["server"].envelopes
-
-    (transaction_event,) = envelopes
-
-    assert transaction_event["request"]["query_string"] == {
-        # Not denied by any term -> pass through.
-        "page": "2",
-        # Denied by custom terms.
-        "tracking": "[Filtered]",
-        # Denied by the built-in sensitive denylist.
-        "token": "[Filtered]",
-    }
+    assert _get_span_attr(attrs, SPANDATA.HTTP_REQUEST_METHOD) == "GET"
+    # With request headers collection turned off, no header attributes are collected.
+    header_attrs = [
+        k for k in attrs if k.startswith(f"{SPANDATA.HTTP_REQUEST_HEADER}.")
+    ]
+    assert header_attrs == []
 
 
 def test_url_query_params_with_data_collection_allowlist(
@@ -766,19 +592,19 @@ def test_url_query_params_with_data_collection_allowlist(
         FunctionName="BasicOkDataCollectionUrlQueryAllowlist",
         Payload=payload,
     )
-    envelopes = test_environment["server"].envelopes
+    span_items = test_environment["server"].span_items
 
-    (transaction_event,) = envelopes
+    segment_spans = [s for s in span_items if s.get("is_segment")]
+    assert len(segment_spans) == 1
+    attrs = segment_spans[0]["attributes"]
 
-    assert transaction_event["request"]["query_string"] == {
-        # Allowlisted, non-sensitive -> pass through.
-        "page": "2",
-        # Not allowlisted -> substituted.
-        "tracking": "[Filtered]",
-        # Allowlisted but sensitive -> still filtered; an allowlist entry
-        # cannot override the built-in sensitive denylist.
-        "token": "[Filtered]",
-    }
+    # Allowlisted, non-sensitive -> pass through.
+    # Not allowlisted -> substituted.
+    # Allowlisted but sensitive -> still filtered.
+    assert (
+        _get_span_attr(attrs, SPANDATA.URL_QUERY)
+        == "page=2&tracking=%5BFiltered%5D&token=%5BFiltered%5D"
+    )
 
 
 def test_url_query_params_with_data_collection_off(lambda_client, test_environment):
@@ -812,41 +638,14 @@ def test_url_query_params_with_data_collection_off(lambda_client, test_environme
         FunctionName="BasicOkDataCollectionUrlQueryOff",
         Payload=payload,
     )
-    envelopes = test_environment["server"].envelopes
+    span_items = test_environment["server"].span_items
 
-    (transaction_event,) = envelopes
+    segment_spans = [s for s in span_items if s.get("is_segment")]
+    assert len(segment_spans) == 1
+    attrs = segment_spans[0]["attributes"]
 
     # With url_query_params collection turned off, no query string is collected.
-    assert "query_string" not in transaction_event["request"]
-
-
-def test_trace_continuation(lambda_client, test_environment):
-    trace_id = "471a43a4192642f0b136d5159a501701"
-    parent_span_id = "6e8f22c393e68f19"
-    parent_sampled = 1
-    sentry_trace_header = "{}-{}-{}".format(trace_id, parent_span_id, parent_sampled)
-
-    # We simulate here AWS Api Gateway's behavior of passing HTTP headers
-    # as the `headers` dict in the event passed to the Lambda function.
-    payload = {
-        "headers": {
-            "sentry-trace": sentry_trace_header,
-        }
-    }
-
-    lambda_client.invoke(
-        FunctionName="BasicException",
-        Payload=json.dumps(payload),
-    )
-    envelopes = test_environment["server"].envelopes
-
-    (error_event, transaction_event) = envelopes
-
-    assert (
-        error_event["contexts"]["trace"]["trace_id"]
-        == transaction_event["contexts"]["trace"]["trace_id"]
-        == "471a43a4192642f0b136d5159a501701"
-    )
+    assert SPANDATA.URL_QUERY not in attrs
 
 
 @pytest.mark.parametrize(
@@ -873,7 +672,7 @@ def test_headers(lambda_client, test_environment, payload):
     )
     envelopes = test_environment["server"].envelopes
 
-    (error_event, _) = envelopes
+    (error_event,) = envelopes
 
     assert error_event["level"] == "error"
     assert error_event["exception"]["values"][0]["type"] == "RuntimeError"
@@ -885,12 +684,12 @@ def test_span_origin(lambda_client, test_environment):
         FunctionName="BasicOk",
         Payload=json.dumps({}),
     )
-    envelopes = test_environment["server"].envelopes
+    span_items = test_environment["server"].span_items
 
-    (transaction_event,) = envelopes
-
+    segment_spans = [s for s in span_items if s.get("is_segment")]
+    assert len(segment_spans) == 1
     assert (
-        transaction_event["contexts"]["trace"]["origin"] == "auto.function.aws_lambda"
+        _get_span_attr(segment_spans[0]["attributes"], SPANDATA.SENTRY_ORIGIN) == ORIGIN
     )
 
 
@@ -925,22 +724,18 @@ def test_error_has_new_trace_context(
         Payload=json.dumps({}),
     )
     envelopes = test_environment["server"].envelopes
+    span_items = test_environment["server"].span_items
 
-    if lambda_function_name == "RaiseErrorPerformanceEnabled":
-        (error_event, transaction_event) = envelopes
-    else:
-        (error_event,) = envelopes
-        transaction_event = None
+    (error_event,) = envelopes
 
     assert "trace" in error_event["contexts"]
     assert "trace_id" in error_event["contexts"]["trace"]
 
-    if transaction_event:
-        assert "trace" in transaction_event["contexts"]
-        assert "trace_id" in transaction_event["contexts"]["trace"]
+    if lambda_function_name == "RaiseErrorPerformanceEnabled":
+        segment_spans = [s for s in span_items if s.get("is_segment")]
+        assert len(segment_spans) == 1
         assert (
-            error_event["contexts"]["trace"]["trace_id"]
-            == transaction_event["contexts"]["trace"]["trace_id"]
+            error_event["contexts"]["trace"]["trace_id"] == segment_spans[0]["trace_id"]
         )
 
 
@@ -952,7 +747,7 @@ def _get_span_attr(attrs, key):
     return val
 
 
-def test_span_streaming_no_error(lambda_client, test_environment):
+def test_no_error(lambda_client, test_environment):
     lambda_client.invoke(
         FunctionName="BasicOkSpanStreaming",
         Payload=json.dumps({}),
@@ -970,31 +765,38 @@ def test_span_streaming_no_error(lambda_client, test_environment):
 
     attrs = segment_span["attributes"]
 
-    assert _get_span_attr(attrs, "sentry.op") == "function.aws"
-    assert _get_span_attr(attrs, "sentry.origin") == "auto.function.aws_lambda"
-    assert _get_span_attr(attrs, "sentry.segment.name.source") == "component"
-    assert _get_span_attr(attrs, "cloud.provider") == "aws"
-    assert _get_span_attr(attrs, "cloud.platform") == "aws_lambda"
+    assert _get_span_attr(attrs, SPANDATA.SENTRY_OP) == OP.FUNCTION_AWS
+    assert _get_span_attr(attrs, SPANDATA.SENTRY_ORIGIN) == ORIGIN
+    assert _get_span_attr(attrs, SPANDATA.SENTRY_KIND) == "server"
     assert (
-        _get_span_attr(attrs, "cloud.resource_id")
+        _get_span_attr(attrs, SPANDATA.SENTRY_SEGMENT_NAME_SOURCE)
+        == SegmentNameSource.COMPONENT
+    )
+    assert _get_span_attr(attrs, SPANDATA.CLOUD_PROVIDER) == CLOUD_PROVIDER
+    assert _get_span_attr(attrs, SPANDATA.CLOUD_PLATFORM) == CLOUD_PLATFORM
+    assert _get_span_attr(attrs, SPANDATA.CLOUD_ACCOUNT_ID) == "012345678912"
+    assert _get_span_attr(attrs, SPANDATA.CLOUD_REGION) == "us-east-1"
+    assert (
+        _get_span_attr(attrs, SPANDATA.CLOUD_RESOURCE_ID)
         == "arn:aws:lambda:us-east-1:012345678912:function:BasicOkSpanStreaming"
     )
-    assert _get_span_attr(attrs, "cloud.region") == "us-east-1"
-    assert _get_span_attr(attrs, "faas.name") == "BasicOkSpanStreaming"
-    assert _get_span_attr(attrs, "faas.version") == "$LATEST"
-    assert "faas.invocation_id" in attrs
+    assert _get_span_attr(attrs, SPANDATA.FAAS_NAME) == "BasicOkSpanStreaming"
+    assert _get_span_attr(attrs, SPANDATA.FAAS_VERSION) == LATEST_FUNCTION_VERSION
+    assert SPANDATA.FAAS_INVOCATION_ID in attrs
     assert (
-        _get_span_attr(attrs, "aws.lambda.invoked_arn")
+        _get_span_attr(attrs, SPANDATA.AWS_LAMBDA_INVOKED_ARN)
         == "arn:aws:lambda:us-east-1:012345678912:function:BasicOkSpanStreaming"
     )
-    assert _get_span_attr(attrs, "aws.log.group.names") == [
+    assert _get_span_attr(attrs, SPANDATA.AWS_LOG_GROUP_NAMES) == [
         "aws/lambda/BasicOkSpanStreaming"
     ]
-    assert _get_span_attr(attrs, "aws.log.stream.names") == ["$LATEST"]
-    assert _get_span_attr(attrs, "messaging.batch.message_count") == 1
+    assert _get_span_attr(attrs, SPANDATA.AWS_LOG_STREAM_NAMES) == [
+        LATEST_FUNCTION_VERSION
+    ]
+    assert _get_span_attr(attrs, SPANDATA.FAAS_TRIGGER) == "other"
 
 
-def test_span_streaming_error(lambda_client, test_environment):
+def test_error(lambda_client, test_environment):
     lambda_client.invoke(
         FunctionName="RaiseErrorSpanStreaming",
         Payload=json.dumps({}),
@@ -1008,7 +810,7 @@ def test_span_streaming_error(lambda_client, test_environment):
     (exception,) = error_event["exception"]["values"]
     assert exception["type"] == "Exception"
     assert exception["value"] == "Oh!"
-    assert exception["mechanism"]["type"] == "aws_lambda"
+    assert exception["mechanism"]["type"] == IDENTIFIER
     assert not exception["mechanism"]["handled"]
 
     segment_spans = [s for s in span_items if s["is_segment"]]
@@ -1020,35 +822,180 @@ def test_span_streaming_error(lambda_client, test_environment):
 
     attrs = segment_span["attributes"]
 
-    assert _get_span_attr(attrs, "sentry.op") == "function.aws"
-    assert _get_span_attr(attrs, "sentry.origin") == "auto.function.aws_lambda"
-    assert _get_span_attr(attrs, "sentry.segment.name.source") == "component"
-    assert _get_span_attr(attrs, "cloud.provider") == "aws"
-    assert _get_span_attr(attrs, "cloud.platform") == "aws_lambda"
+    assert _get_span_attr(attrs, SPANDATA.SENTRY_OP) == OP.FUNCTION_AWS
+    assert _get_span_attr(attrs, SPANDATA.SENTRY_ORIGIN) == ORIGIN
     assert (
-        _get_span_attr(attrs, "cloud.resource_id")
-        == "arn:aws:lambda:us-east-1:012345678912:function:RaiseErrorSpanStreaming"
+        _get_span_attr(attrs, SPANDATA.SENTRY_SEGMENT_NAME_SOURCE)
+        == SegmentNameSource.COMPONENT
     )
-    assert _get_span_attr(attrs, "cloud.region") == "us-east-1"
-    assert _get_span_attr(attrs, "faas.name") == "RaiseErrorSpanStreaming"
-    assert _get_span_attr(attrs, "faas.version") == "$LATEST"
-    assert "faas.invocation_id" in attrs
+    assert _get_span_attr(attrs, SPANDATA.CLOUD_PROVIDER) == CLOUD_PROVIDER
+    assert _get_span_attr(attrs, SPANDATA.CLOUD_PLATFORM) == CLOUD_PLATFORM
+    assert _get_span_attr(attrs, SPANDATA.FAAS_NAME) == "RaiseErrorSpanStreaming"
     assert (
-        _get_span_attr(attrs, "aws.lambda.invoked_arn")
-        == "arn:aws:lambda:us-east-1:012345678912:function:RaiseErrorSpanStreaming"
+        _get_span_attr(attrs, SPANDATA.CLOUD_RESOURCE_ID)
+        == "arn:aws:lambda:us-east-1:012345678912:function:RaiseErrorSpanStreaming:5"
     )
-    assert _get_span_attr(attrs, "aws.log.group.names") == [
+    assert _get_span_attr(attrs, SPANDATA.FAAS_VERSION) == "5"
+    assert SPANDATA.FAAS_INVOCATION_ID in attrs
+    assert (
+        _get_span_attr(attrs, SPANDATA.AWS_LAMBDA_INVOKED_ARN)
+        == "arn:aws:lambda:us-east-1:012345678912:function:RaiseErrorSpanStreaming:5"
+    )
+    assert _get_span_attr(attrs, SPANDATA.AWS_LOG_GROUP_NAMES) == [
         "aws/lambda/RaiseErrorSpanStreaming"
     ]
-    assert _get_span_attr(attrs, "aws.log.stream.names") == ["$LATEST"]
-    assert _get_span_attr(attrs, "messaging.batch.message_count") == 1
+    assert _get_span_attr(attrs, SPANDATA.AWS_LOG_STREAM_NAMES) == [
+        LATEST_FUNCTION_VERSION
+    ]
+    assert _get_span_attr(attrs, SPANDATA.FAAS_TRIGGER) == "other"
 
 
-def test_span_streaming_trace_continuation(lambda_client, test_environment):
+@pytest.mark.parametrize(
+    "aws_event,trigger",
+    [
+        pytest.param(
+            {"httpMethod": "GET", "path": "/", "requestContext": {"stage": "prod"}},
+            "http",
+            id="api-gateway-rest",
+        ),
+        pytest.param(
+            {
+                "version": "2.0",
+                "routeKey": "GET /",
+                "requestContext": {"http": {"method": "GET"}},
+            },
+            "http",
+            id="api-gateway-http",
+        ),
+        pytest.param(
+            {"Records": [{"cf": {"request": {"uri": "/"}}}]},
+            "http",
+            id="cloudfront",
+        ),
+        pytest.param(APPSYNC_EVENT, "http", id="appsync"),
+        pytest.param([APPSYNC_EVENT, APPSYNC_EVENT], "http", id="appsync-batch"),
+        pytest.param({"Records": [SQS_RECORD, SQS_RECORD]}, "pubsub", id="sqs"),
+        pytest.param({"Records": [SNS_RECORD]}, "pubsub", id="sns"),
+        pytest.param(
+            {"eventSource": "aws:kafka", "records": {"orders-0": [{}]}},
+            "pubsub",
+            id="msk",
+        ),
+        pytest.param(
+            EVENTBRIDGE_EVENT,
+            "pubsub",
+            id="eventbridge",
+        ),
+        pytest.param(
+            {
+                **EVENTBRIDGE_EVENT,
+                "source": "aws.events",
+                "detail-type": "Scheduled Event",
+            },
+            "timer",
+            id="eventbridge-schedule",
+        ),
+        pytest.param({"Records": [{"eventSource": "aws:s3"}]}, "datasource", id="s3"),
+        pytest.param(
+            [{"good dog": "Maisey"}, {"good dog": "Charlie"}],
+            "other",
+            id="list",
+        ),
+    ],
+)
+def test_trigger(lambda_client, test_environment, aws_event, trigger):
+    lambda_client.invoke(
+        FunctionName="BasicOkSpanStreaming",
+        Payload=json.dumps(aws_event),
+    )
+
+    (segment_span,) = [
+        s for s in test_environment["server"].span_items if s["is_segment"]
+    ]
+    attrs = segment_span["attributes"]
+    assert _get_span_attr(attrs, SPANDATA.FAAS_TRIGGER) == trigger
+
+
+@pytest.mark.parametrize(
+    "aws_event,system,destination",
+    [
+        pytest.param(
+            {"Records": [SQS_RECORD, SQS_RECORD]}, "aws_sqs", "orders", id="sqs"
+        ),
+        pytest.param({"Records": [SNS_RECORD]}, "aws.sns", "alerts", id="sns"),
+    ],
+)
+def test_messaging_process_span(
+    lambda_client, test_environment, aws_event, system, destination
+):
+    lambda_client.invoke(
+        FunctionName="BasicOkSpanStreaming",
+        Payload=json.dumps(aws_event),
+    )
+
+    span_items = test_environment["server"].span_items
+    (segment_span,) = [s for s in span_items if s["is_segment"]]
+    (process_span,) = [
+        s
+        for s in span_items
+        if _get_span_attr(s["attributes"], SPANDATA.SENTRY_OP) == OP.QUEUE_PROCESS
+    ]
+    assert process_span["parent_span_id"] == segment_span["span_id"]
+    assert process_span["trace_id"] == segment_span["trace_id"]
+    assert process_span["name"] == f"process {destination}"
+
+    attrs = process_span["attributes"]
+    assert _get_span_attr(attrs, SPANDATA.SENTRY_KIND) == "consumer"
+    assert _get_span_attr(attrs, SPANDATA.MESSAGING_SYSTEM) == system
+    assert _get_span_attr(attrs, SPANDATA.MESSAGING_OPERATION_TYPE) == "process"
+    assert _get_span_attr(attrs, SPANDATA.MESSAGING_OPERATION_NAME) == "process"
+    assert _get_span_attr(attrs, SPANDATA.MESSAGING_DESTINATION_NAME) == destination
+    assert _get_span_attr(attrs, SPANDATA.MESSAGING_BATCH_MESSAGE_COUNT) == len(
+        aws_event["Records"]
+    )
+
+
+def test_no_process_span_without_messages(lambda_client, test_environment):
+    lambda_client.invoke(
+        FunctionName="BasicOkSpanStreaming",
+        Payload=json.dumps({"Records": [{"eventSource": "aws:kinesis"}]}),
+    )
+
+    (span,) = test_environment["server"].span_items
+    assert span["is_segment"]
+
+
+def test_process_span_error(lambda_client, test_environment):
+    response = lambda_client.invoke(
+        FunctionName="RaiseErrorSpanStreaming",
+        Payload=json.dumps({"Records": [SQS_RECORD]}),
+    )
+
+    # the handler's exception still reaches the Lambda runtime.
+    assert json.loads(response["Payload"].read())["errorMessage"] == "Oh!"
+
+    (error_event,) = test_environment["server"].envelopes
+    (exception,) = error_event["exception"]["values"]
+    assert exception["value"] == "Oh!"
+    assert not exception["mechanism"]["handled"]
+
+    span_items = test_environment["server"].span_items
+    (segment_span,) = [s for s in span_items if s["is_segment"]]
+    (process_span,) = [
+        s
+        for s in span_items
+        if _get_span_attr(s["attributes"], SPANDATA.SENTRY_OP) == OP.QUEUE_PROCESS
+    ]
+    assert process_span["parent_span_id"] == segment_span["span_id"]
+    assert process_span["status"] == "error"
+    assert segment_span["status"] == "error"
+
+
+def test_trace_continuation(lambda_client, test_environment):
     trace_id = "471a43a4192642f0b136d5159a501701"
     parent_span_id = "6e8f22c393e68f19"
     parent_sampled = 1
-    sentry_trace_header = "{}-{}-{}".format(trace_id, parent_span_id, parent_sampled)
+    sentry_trace_header = f"{trace_id}-{parent_span_id}-{parent_sampled}"
 
     payload = {
         "headers": {
@@ -1073,18 +1020,210 @@ def test_span_streaming_trace_continuation(lambda_client, test_environment):
     assert segment_span["trace_id"] == trace_id
     assert segment_span["name"] == "RaiseErrorSpanStreaming"
     attrs = segment_span["attributes"]
-    assert _get_span_attr(attrs, "sentry.op") == "function.aws"
-    assert _get_span_attr(attrs, "sentry.origin") == "auto.function.aws_lambda"
-    assert _get_span_attr(attrs, "sentry.segment.name.source") == "component"
-    assert _get_span_attr(attrs, "cloud.provider") == "aws"
-    assert _get_span_attr(attrs, "cloud.platform") == "aws_lambda"
-    assert _get_span_attr(attrs, "cloud.region") == "us-east-1"
-    assert _get_span_attr(attrs, "faas.name") == "RaiseErrorSpanStreaming"
-    assert _get_span_attr(attrs, "faas.version") == "$LATEST"
-    assert "faas.invocation_id" in attrs
+    assert _get_span_attr(attrs, SPANDATA.SENTRY_OP) == OP.FUNCTION_AWS
+    assert _get_span_attr(attrs, SPANDATA.SENTRY_ORIGIN) == ORIGIN
+    assert (
+        _get_span_attr(attrs, SPANDATA.SENTRY_SEGMENT_NAME_SOURCE)
+        == SegmentNameSource.COMPONENT
+    )
+    assert _get_span_attr(attrs, SPANDATA.CLOUD_PROVIDER) == CLOUD_PROVIDER
+    assert _get_span_attr(attrs, SPANDATA.CLOUD_PLATFORM) == CLOUD_PLATFORM
+    assert _get_span_attr(attrs, SPANDATA.FAAS_NAME) == "RaiseErrorSpanStreaming"
+    assert _get_span_attr(attrs, SPANDATA.FAAS_VERSION) == "5"
+    assert SPANDATA.FAAS_INVOCATION_ID in attrs
 
 
-def test_span_streaming_request_attributes(lambda_client, test_environment):
+MESSAGE_ORIGIN_LINK = {
+    SPANDATA.SENTRY_LINK_TYPE: {"value": "message_origin", "type": "string"}
+}
+
+
+def _sqs_record(sentry_trace=None, body="{}"):
+    record = {
+        "messageId": "059f36b4-87a3-44ab-83d2-661975830a7d",
+        "body": body,
+        "messageAttributes": {},
+        "eventSource": "aws:sqs",
+        "eventSourceARN": "arn:aws:sqs:us-east-1:012345678912:orders",
+    }
+    if sentry_trace is not None:
+        record["messageAttributes"]["sentry-trace"] = {
+            "stringValue": sentry_trace,
+            "stringListValues": [],
+            "binaryListValues": [],
+            "dataType": "String",
+        }
+    return record
+
+
+def _sns_notification(sentry_trace):
+    return {
+        "Type": "Notification",
+        "MessageId": "95df01b4-ee98-5cb9-9903-4c221d41eb5e",
+        "TopicArn": "arn:aws:sns:us-east-1:012345678912:alerts",
+        "Message": "{}",
+        "MessageAttributes": {
+            "sentry-trace": {"Type": "String", "Value": sentry_trace}
+        },
+    }
+
+
+@pytest.mark.parametrize(
+    "aws_event,links",
+    [
+        pytest.param(
+            {
+                "Records": [
+                    _sqs_record("471a43a4192642f0b136d5159a501701-6e8f22c393e68f19-1"),
+                    # the same producer span: linked once.
+                    _sqs_record("471a43a4192642f0b136d5159a501701-6e8f22c393e68f19-1"),
+                    _sqs_record("0f4c2a5b8d9e4f1a2b3c4d5e6f7a8b9c-1a2b3c4d5e6f7a8b-0"),
+                    _sqs_record(),
+                    # incomplete context: not linked.
+                    _sqs_record("-1"),
+                    # no sampling decision: linked without `sampled`.
+                    _sqs_record("5c6d7e8f9a0b4c1d8e2f3a4b5c6d7e8f-2b3c4d5e6f7a8b9c"),
+                    # a body that isn't JSON: skipped, other links kept.
+                    _sqs_record(body='not json: "sentry-trace"'),
+                ]
+            },
+            [
+                {
+                    "trace_id": "471a43a4192642f0b136d5159a501701",
+                    "span_id": "6e8f22c393e68f19",
+                    "attributes": MESSAGE_ORIGIN_LINK,
+                    "sampled": True,
+                },
+                {
+                    "trace_id": "0f4c2a5b8d9e4f1a2b3c4d5e6f7a8b9c",
+                    "span_id": "1a2b3c4d5e6f7a8b",
+                    "attributes": MESSAGE_ORIGIN_LINK,
+                    "sampled": False,
+                },
+                {
+                    "trace_id": "5c6d7e8f9a0b4c1d8e2f3a4b5c6d7e8f",
+                    "span_id": "2b3c4d5e6f7a8b9c",
+                    "attributes": MESSAGE_ORIGIN_LINK,
+                },
+            ],
+            id="sqs",
+        ),
+        pytest.param(
+            {
+                "Records": [
+                    {
+                        "EventSource": "aws:sns",
+                        "Sns": _sns_notification(
+                            "471a43a4192642f0b136d5159a501701-6e8f22c393e68f19-1"
+                        ),
+                    }
+                ]
+            },
+            [
+                {
+                    "trace_id": "471a43a4192642f0b136d5159a501701",
+                    "span_id": "6e8f22c393e68f19",
+                    "attributes": MESSAGE_ORIGIN_LINK,
+                    "sampled": True,
+                }
+            ],
+            id="sns",
+        ),
+        pytest.param(
+            {
+                "Records": [
+                    # SNS to SQS without raw message delivery.
+                    _sqs_record(
+                        body=json.dumps(
+                            _sns_notification(
+                                "471a43a4192642f0b136d5159a501701-6e8f22c393e68f19-1"
+                            )
+                        )
+                    )
+                ]
+            },
+            [
+                {
+                    "trace_id": "471a43a4192642f0b136d5159a501701",
+                    "span_id": "6e8f22c393e68f19",
+                    "attributes": MESSAGE_ORIGIN_LINK,
+                    "sampled": True,
+                }
+            ],
+            id="sns-to-sqs",
+        ),
+    ],
+)
+def test_producer_links(lambda_client, test_environment, aws_event, links):
+    lambda_client.invoke(
+        FunctionName="BasicOkSpanStreaming",
+        Payload=json.dumps(aws_event),
+    )
+
+    span_items = test_environment["server"].span_items
+    (segment_span,) = [s for s in span_items if s["is_segment"]]
+    (process_span,) = [
+        s
+        for s in span_items
+        if _get_span_attr(s["attributes"], SPANDATA.SENTRY_OP) == OP.QUEUE_PROCESS
+    ]
+    # messages are linked from the process span, never the parent of the invocation.
+    assert "parent_span_id" not in segment_span
+    assert "links" not in segment_span
+    assert process_span["links"] == links
+
+
+@pytest.mark.parametrize(
+    "headers",
+    [
+        pytest.param({}, id="client-context"),
+        # `ClientContext` wins over event headers.
+        pytest.param(
+            {"sentry-trace": "0f4c2a5b8d9e4f1a2b3c4d5e6f7a8b9c-1a2b3c4d5e6f7a8b-1"},
+            id="client-context-and-event-headers",
+        ),
+    ],
+)
+def test_trace_continuation_from_client_context(
+    lambda_client, test_environment, headers
+):
+    payload = {
+        "headers": headers,
+        # `ClientContextTrace` passes it to the runtime as the invocation's `ClientContext`.
+        "client_context": {
+            "custom": {
+                "sentry-trace": "471a43a4192642f0b136d5159a501701-6e8f22c393e68f19-1"
+            }
+        },
+        "Records": [
+            # a producer in the continued trace: not linked, it's already in the trace.
+            _sqs_record("471a43a4192642f0b136d5159a501701-1a2b3c4d5e6f7a8b-1"),
+            _sqs_record("5c6d7e8f9a0b4c1d8e2f3a4b5c6d7e8f-2b3c4d5e6f7a8b9c-1"),
+        ],
+    }
+
+    lambda_client.invoke(FunctionName="ClientContextTrace", Payload=json.dumps(payload))
+
+    span_items = test_environment["server"].span_items
+    (segment_span,) = [s for s in span_items if s["is_segment"]]
+    (process_span,) = [
+        s
+        for s in span_items
+        if _get_span_attr(s["attributes"], SPANDATA.SENTRY_OP) == OP.QUEUE_PROCESS
+    ]
+    assert segment_span["trace_id"] == "471a43a4192642f0b136d5159a501701"
+    assert segment_span["parent_span_id"] == "6e8f22c393e68f19"
+    assert process_span["links"] == [
+        {
+            "trace_id": "5c6d7e8f9a0b4c1d8e2f3a4b5c6d7e8f",
+            "span_id": "2b3c4d5e6f7a8b9c",
+            "attributes": MESSAGE_ORIGIN_LINK,
+            "sampled": True,
+        }
+    ]
+
+
+def test_request_attributes(lambda_client, test_environment):
     payload = {
         "headers": {
             "Content-Type": "application/json",
@@ -1092,51 +1231,6 @@ def test_span_streaming_request_attributes(lambda_client, test_environment):
         },
         "httpMethod": "POST",
         "queryStringParameters": {"foo": "bar", "a-complicated-value": "a=b&c=d"},
-        "path": "/test",
-    }
-
-    lambda_client.invoke(
-        FunctionName="BasicOkSpanStreamingPii",
-        Payload=json.dumps(payload),
-    )
-    span_items = test_environment["server"].span_items
-
-    segment_spans = [s for s in span_items if s["is_segment"]]
-    assert len(segment_spans) == 1
-    segment_span = segment_spans[0]
-    attrs = segment_span["attributes"]
-
-    assert _get_span_attr(attrs, "http.request.method") == "POST"
-    assert (
-        _get_span_attr(attrs, "url.query")
-        == "foo=bar&a-complicated-value=a%3Db%26c%3Dd"
-    )
-    assert (
-        _get_span_attr(attrs, "http.request.header.content-type") == "application/json"
-    )
-    assert _get_span_attr(attrs, "http.request.header.accept") == "text/html"
-    assert _get_span_attr(attrs, "faas.name") == "BasicOkSpanStreamingPii"
-    assert _get_span_attr(attrs, "cloud.provider") == "aws"
-    assert _get_span_attr(attrs, "cloud.platform") == "aws_lambda"
-    assert _get_span_attr(attrs, "cloud.region") == "us-east-1"
-    assert _get_span_attr(attrs, "faas.version") == "$LATEST"
-    assert "faas.invocation_id" in attrs
-    assert _get_span_attr(attrs, "aws.log.group.names") == [
-        "aws/lambda/BasicOkSpanStreamingPii"
-    ]
-    assert _get_span_attr(attrs, "aws.log.stream.names") == ["$LATEST"]
-
-
-def test_span_streaming_url_query_params_with_data_collection(
-    lambda_client, test_environment
-):
-    payload = {
-        "httpMethod": "GET",
-        "queryStringParameters": {
-            "page": "2",
-            "tracking": "campaign",
-            "token": "secret-token",
-        },
         "path": "/test",
     }
 
@@ -1151,75 +1245,73 @@ def test_span_streaming_url_query_params_with_data_collection(
     segment_span = segment_spans[0]
     attrs = segment_span["attributes"]
 
+    assert _get_span_attr(attrs, SPANDATA.HTTP_REQUEST_METHOD) == "POST"
+    assert (
+        _get_span_attr(attrs, SPANDATA.URL_QUERY)
+        == "foo=bar&a-complicated-value=a%3Db%26c%3Dd"
+    )
+    assert _get_span_attr(attrs, f"{SPANDATA.HTTP_REQUEST_HEADER}.content-type") == [
+        "application/json"
+    ]
+    assert _get_span_attr(attrs, f"{SPANDATA.HTTP_REQUEST_HEADER}.accept") == [
+        "text/html"
+    ]
+    assert (
+        _get_span_attr(attrs, SPANDATA.FAAS_NAME)
+        == "BasicOkSpanStreamingDataCollection"
+    )
+    assert _get_span_attr(attrs, SPANDATA.CLOUD_PROVIDER) == CLOUD_PROVIDER
+    assert _get_span_attr(attrs, SPANDATA.CLOUD_PLATFORM) == CLOUD_PLATFORM
+    assert (
+        _get_span_attr(attrs, SPANDATA.AWS_LAMBDA_INVOKED_ARN)
+        == "arn:aws:lambda:us-east-1:012345678912:function:BasicOkSpanStreamingDataCollection:prod"
+    )
+    assert (
+        _get_span_attr(attrs, SPANDATA.CLOUD_RESOURCE_ID)
+        == "arn:aws:lambda:us-east-1:012345678912:function:BasicOkSpanStreamingDataCollection:5"
+    )
+    assert _get_span_attr(attrs, SPANDATA.FAAS_VERSION) == "5"
+    assert SPANDATA.FAAS_INVOCATION_ID in attrs
+    assert _get_span_attr(attrs, SPANDATA.AWS_LOG_GROUP_NAMES) == [
+        "aws/lambda/BasicOkSpanStreamingDataCollection"
+    ]
+    assert _get_span_attr(attrs, SPANDATA.AWS_LOG_STREAM_NAMES) == [
+        LATEST_FUNCTION_VERSION
+    ]
+
+
+def test_url_query_params_with_data_collection(lambda_client, test_environment):
+    server = test_environment["server"]
+    payload = {
+        "httpMethod": "GET",
+        "queryStringParameters": {
+            "page": "2",
+            "tracking": "campaign",
+            "token": "secret-token",
+        },
+        "path": "/test",
+    }
+
+    lambda_client.invoke(
+        FunctionName="BasicOkSpanStreamingDataCollection",
+        Payload=json.dumps(payload),
+    )
+    span_items = server.span_items
+
+    segment_spans = [s for s in span_items if s["is_segment"]]
+    assert len(segment_spans) == 1
+    segment_span = segment_spans[0]
+    attrs = segment_span["attributes"]
+
     # "page" passes through; "tracking" is denied by a custom term and "token"
     # by the built-in sensitive denylist.
     assert (
-        _get_span_attr(attrs, "url.query")
+        _get_span_attr(attrs, SPANDATA.URL_QUERY)
         == "page=2&tracking=%5BFiltered%5D&token=%5BFiltered%5D"
     )
 
 
-def test_span_streaming_user_info_with_send_default_pii(
-    lambda_client, test_environment
-):
-    payload = b"""
-        {
-          "resource": "/asd",
-          "path": "/asd",
-          "httpMethod": "GET",
-          "headers": {
-            "Host": "iwsz2c7uwi.execute-api.us-east-1.amazonaws.com",
-            "User-Agent": "custom",
-            "X-Forwarded-Proto": "https"
-          },
-          "queryStringParameters": {
-            "bonkers": "true"
-          },
-          "pathParameters": null,
-          "stageVariables": null,
-          "requestContext": {
-            "identity": {
-                "sourceIp": "213.47.147.207",
-                "userArn": "42"
-            }
-          },
-          "body": null,
-          "isBase64Encoded": false
-        }
-    """
-
-    lambda_client.invoke(
-        FunctionName="BasicOkSpanStreamingPii",
-        Payload=payload,
-    )
-    span_items = test_environment["server"].span_items
-
-    segment_spans = [s for s in span_items if s.get("is_segment")]
-    assert len(segment_spans) == 1
-    attrs = segment_spans[0]["attributes"]
-
-    assert _get_span_attr(attrs, "user.id") == "42"
-
-
-def test_span_streaming_user_info_with_data_collection_user_info_on(
-    lambda_client, test_environment
-):
-    lambda_client.invoke(
-        FunctionName="BasicOkSpanStreamingDataCollectionUserInfoOn",
-        Payload=USER_INFO_PAYLOAD,
-    )
-    span_items = test_environment["server"].span_items
-
-    segment_spans = [s for s in span_items if s.get("is_segment")]
-    assert len(segment_spans) == 1
-    attrs = segment_spans[0]["attributes"]
-
-    assert _get_span_attr(attrs, "user.id") == "42"
-
-
-def test_span_streaming_user_info_with_data_collection_user_info_off(
-    lambda_client, test_environment
-):
+def test_user_info_with_data_collection_user_info_off(lambda_client, test_environment):
     lambda_client.invoke(
         FunctionName="BasicOkSpanStreamingDataCollectionUserInfoOff",
         Payload=USER_INFO_PAYLOAD,
@@ -1230,7 +1322,7 @@ def test_span_streaming_user_info_with_data_collection_user_info_off(
     assert len(segment_spans) == 1
     attrs = segment_spans[0]["attributes"]
 
-    assert "user.id" not in attrs
+    assert SPANDATA.USER_ID not in attrs
 
 
 @pytest.mark.parametrize(
@@ -1243,7 +1335,7 @@ def test_error_has_existing_trace_context(
     trace_id = "471a43a4192642f0b136d5159a501701"
     parent_span_id = "6e8f22c393e68f19"
     parent_sampled = 1
-    sentry_trace_header = "{}-{}-{}".format(trace_id, parent_span_id, parent_sampled)
+    sentry_trace_header = f"{trace_id}-{parent_span_id}-{parent_sampled}"
 
     # We simulate here AWS Api Gateway's behavior of passing HTTP headers
     # as the `headers` dict in the event passed to the Lambda function.
@@ -1258,12 +1350,9 @@ def test_error_has_existing_trace_context(
         Payload=json.dumps(payload),
     )
     envelopes = test_environment["server"].envelopes
+    span_items = test_environment["server"].span_items
 
-    if lambda_function_name == "RaiseErrorPerformanceEnabled":
-        (error_event, transaction_event) = envelopes
-    else:
-        (error_event,) = envelopes
-        transaction_event = None
+    (error_event,) = envelopes
 
     assert "trace" in error_event["contexts"]
     assert "trace_id" in error_event["contexts"]["trace"]
@@ -1272,10 +1361,7 @@ def test_error_has_existing_trace_context(
         == "471a43a4192642f0b136d5159a501701"
     )
 
-    if transaction_event:
-        assert "trace" in transaction_event["contexts"]
-        assert "trace_id" in transaction_event["contexts"]["trace"]
-        assert (
-            transaction_event["contexts"]["trace"]["trace_id"]
-            == "471a43a4192642f0b136d5159a501701"
-        )
+    if lambda_function_name == "RaiseErrorPerformanceEnabled":
+        segment_spans = [s for s in span_items if s.get("is_segment")]
+        assert len(segment_spans) == 1
+        assert segment_spans[0]["trace_id"] == "471a43a4192642f0b136d5159a501701"

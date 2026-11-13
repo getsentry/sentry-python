@@ -52,10 +52,11 @@ def test_safe_repr_non_printable(prefix, character):
     assert character not in safe_repr(string.encode("utf-8"))
 
 
-def test_abs_path():
+def test_abs_path(sentry_init):
     """Check if abs_path is actually an absolute path. This can happen either
     with eval/exec like here, or when the file in the frame is relative to
     __main__"""
+    sentry_init()
 
     code = compile("1/0", "test.py", "exec")
     try:

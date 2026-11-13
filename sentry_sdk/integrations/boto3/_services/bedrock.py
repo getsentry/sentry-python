@@ -7,12 +7,9 @@ import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.integrations.boto3._services.base import _ServiceExtension
-from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import SpanStatus, StreamedSpan
-from sentry_sdk.tracing import SPANSTATUS
 from sentry_sdk.utils import (
     capture_internal_exceptions,
-    has_data_collection_enabled,
     reraise,
     should_be_treated_as_error,
 )
@@ -43,10 +40,9 @@ if TYPE_CHECKING:
         UriPart,
     )
     from sentry_sdk.integrations.boto3._context import AwsCallContext
-    from sentry_sdk.tracing import Span
 
     class _PatchedEventStream(EventStream[Any]):
-        _span: "Union[Span, StreamedSpan]"
+        _span: "StreamedSpan"
         _request_start_time: "Optional[float]"
 
 
@@ -67,15 +63,9 @@ def _finish_span(
     del stream._span
 
     if exc_type is not None and should_be_treated_as_error(exc_type, exc_val):
-        if isinstance(span, StreamedSpan):
-            span.status = SpanStatus.ERROR
-        else:
-            span.status = SPANSTATUS.INTERNAL_ERROR
+        span.status = SpanStatus.ERROR
 
-    if isinstance(span, StreamedSpan):
-        span.end()
-    else:
-        span.finish()
+    span.end()
 
 
 def _patch_event_stream() -> None:
@@ -96,10 +86,6 @@ def _patch_event_stream() -> None:
 
         self = cast("_PatchedEventStream", self)
 
-        set_on_span = (
-            span.set_attribute if isinstance(span, StreamedSpan) else span.set_data
-        )
-
         role: "Optional[str]" = None
         parts: "dict[int, Union[TextPart, ReasoningPart, ToolCallPart, ToolCallResponsePart, UriPart, BlobPart]]" = {}
 
@@ -110,29 +96,29 @@ def _patch_event_stream() -> None:
                     usage = event["metadata"]["usage"]
 
                     input_tokens = usage["inputTokens"]
-                    set_on_span(
+                    span.set_attribute(
                         SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS, usage["outputTokens"]
                     )
-                    set_on_span(
+                    span.set_attribute(
                         SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, usage["totalTokens"]
                     )
 
                     cache_read_tokens = usage.get("cacheReadInputTokens")
                     if cache_read_tokens is not None:
                         input_tokens += cache_read_tokens
-                        set_on_span(
+                        span.set_attribute(
                             SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED, cache_read_tokens
                         )
 
                     cache_write_tokens = usage.get("cacheWriteInputTokens")
                     if cache_write_tokens is not None:
                         input_tokens += cache_write_tokens
-                        set_on_span(
+                        span.set_attribute(
                             SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE,
                             cache_write_tokens,
                         )
 
-                    set_on_span(
+                    span.set_attribute(
                         SPANDATA.GEN_AI_USAGE_INPUT_TOKENS,
                         input_tokens,
                     )
@@ -141,7 +127,7 @@ def _patch_event_stream() -> None:
                     continue
 
                 if start_time is not None and "contentBlockDelta" in event:
-                    set_on_span(
+                    span.set_attribute(
                         SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_CHUNK,
                         time.perf_counter() - start_time,
                     )
@@ -149,16 +135,13 @@ def _patch_event_stream() -> None:
 
                 if "messageStop" in event:
                     finish_reasons: "list[str]" = [event["messageStop"]["stopReason"]]
-                    set_on_span(SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS, finish_reasons)
+                    span.set_attribute(
+                        SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS, finish_reasons
+                    )
 
-                client = sentry_sdk.get_client()
-                if (
-                    not has_data_collection_enabled(client.options)
-                    or not client.options["data_collection"]["gen_ai"]["outputs"]
-                ) and (
-                    has_data_collection_enabled(client.options)
-                    or not should_send_default_pii()
-                ):
+                if not sentry_sdk.get_client().options["data_collection"]["gen_ai"][
+                    "outputs"
+                ]:
                     yield event
                     continue
 
@@ -169,7 +152,7 @@ def _patch_event_stream() -> None:
                     continue
 
                 if "messageStop" in event and role is not None:
-                    set_on_span(
+                    span.set_attribute(
                         SPANDATA.GEN_AI_OUTPUT_MESSAGES,
                         json.dumps(
                             [
@@ -617,11 +600,8 @@ def _transform_tool_definitions(
 
 
 class _BedrockExtension(_ServiceExtension):
-    __slots__ = "request_start_time"
+    __slots__ = ()
     skip_if_no_active_span = False
-
-    def __init__(self) -> None:
-        self.request_start_time: "Optional[float]" = None
 
     def get_span_op(self, ctx: "AwsCallContext") -> "Optional[str]":
         if ctx.operation_name != "Converse" and ctx.operation_name != "ConverseStream":
@@ -663,22 +643,17 @@ class _BedrockExtension(_ServiceExtension):
                 attributes[SPANDATA.GEN_AI_REQUEST_TOP_P] = top_p
 
         client_options = sentry_sdk.get_client().options
-        if has_data_collection_enabled(client_options):
-            if not client_options["data_collection"]["gen_ai"]["inputs"]:
-                return attributes
+        if not client_options["data_collection"]["gen_ai"]["inputs"]:
+            return attributes
 
         system_instructions = ctx.params.get("system")
-        if (
-            has_data_collection_enabled(client_options) or should_send_default_pii()
-        ) and isinstance(system_instructions, (list, tuple)):
+        if isinstance(system_instructions, (list, tuple)):
             attributes[SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS] = json.dumps(
                 _transform_system_instructions(system_instructions)
             )
 
         input_messages = ctx.params.get("messages")
-        if (
-            has_data_collection_enabled(client_options) or should_send_default_pii()
-        ) and isinstance(input_messages, (list, tuple)):
+        if isinstance(input_messages, (list, tuple)):
             attributes[SPANDATA.GEN_AI_INPUT_MESSAGES] = json.dumps(
                 _transform_messages(input_messages)
             )
@@ -701,61 +676,50 @@ class _BedrockExtension(_ServiceExtension):
         self,
         ctx: "AwsCallContext",
         response: "Any",
-        span: "Union[Span, StreamedSpan]",
+        span: "StreamedSpan",
     ) -> None:
-        set_on_span = (
-            span.set_attribute if isinstance(span, StreamedSpan) else span.set_data
-        )
-
         if ctx.operation_name == "Converse":
             response = cast("ConverseResponseTypeDef", response)
             usage = response["usage"]
 
-            set_on_span(SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS, usage["outputTokens"])
-            set_on_span(SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, usage["totalTokens"])
+            span.set_attribute(
+                SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS, usage["outputTokens"]
+            )
+            span.set_attribute(SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, usage["totalTokens"])
 
             input_tokens = usage["inputTokens"]
 
             cache_read_tokens = usage.get("cacheReadInputTokens")
             if cache_read_tokens is not None:
                 input_tokens += cache_read_tokens
-                set_on_span(
+                span.set_attribute(
                     SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED, cache_read_tokens
                 )
 
             cache_write_tokens = usage.get("cacheWriteInputTokens")
             if cache_write_tokens is not None:
                 input_tokens += cache_write_tokens
-                set_on_span(
+                span.set_attribute(
                     SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE, cache_write_tokens
                 )
 
-            set_on_span(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, input_tokens)
+            span.set_attribute(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, input_tokens)
 
             finish_reasons: "list[str]" = [response["stopReason"]]
-            set_on_span(SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS, finish_reasons)
+            span.set_attribute(SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS, finish_reasons)
 
-            client = sentry_sdk.get_client()
-            if "message" in response["output"] and (
-                (
-                    has_data_collection_enabled(client.options)
-                    and client.options["data_collection"]["gen_ai"]["outputs"]
-                )
-                or (
-                    not has_data_collection_enabled(client.options)
-                    and should_send_default_pii()
-                )
+            if (
+                "message" in response["output"]
+                and sentry_sdk.get_client().options["data_collection"]["gen_ai"][
+                    "outputs"
+                ]
             ):
-                set_on_span(
+                span.set_attribute(
                     SPANDATA.GEN_AI_OUTPUT_MESSAGES,
                     json.dumps(_transform_messages([response["output"]["message"]])),
                 )
 
-            if isinstance(span, StreamedSpan):
-                span.end()
-                return
-
-            span.finish()
+            span.end()
             return
 
         if ctx.operation_name == "ConverseStream":
@@ -764,8 +728,4 @@ class _BedrockExtension(_ServiceExtension):
             stream._request_start_time = self.request_start_time  # type: ignore[attr-defined]
             return
 
-        if isinstance(span, StreamedSpan):
-            span.end()
-            return
-
-        span.finish()
+        span.end()
