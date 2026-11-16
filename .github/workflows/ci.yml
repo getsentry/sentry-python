@@ -34,6 +34,9 @@ jobs:
       - name: Ruff format
         run: uv run ruff format --check tests sentry_sdk
 
+      - name: Typos
+        run: uv run typos --hidden
+
       - name: Find raise from None
         run: uv run python scripts/find_raise_from_none.py
 
