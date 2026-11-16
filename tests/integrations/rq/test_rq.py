@@ -500,7 +500,7 @@ def test_traces_sampler_gets_correct_values_in_sampling_context(
     sentry_init,
     DictionaryContaining,
     ObjectDescribedBy,
-    span_streaming,  # noqa:N803
+    span_streaming,
 ):
     traces_sampler = mock.Mock(return_value=True)
     sentry_init(
