@@ -142,21 +142,21 @@ class MockTextContent:
         self.text = text
 
 
+@pytest.mark.skipif(IS_MCP_V2, reason="Server decorator patching is MCP v1 only")
 def test_integration_patches_server(sentry_init):
     """Test that MCPIntegration patches the Server class"""
-    if not IS_MCP_V2:
-        original_call_tool = Server.call_tool
-        original_get_prompt = Server.get_prompt
-        original_read_resource = Server.read_resource
+    original_call_tool = Server.call_tool
+    original_get_prompt = Server.get_prompt
+    original_read_resource = Server.read_resource
 
-        sentry_init(
-            integrations=[MCPIntegration()],
-            traces_sample_rate=1.0,
-        )
+    sentry_init(
+        integrations=[MCPIntegration()],
+        traces_sample_rate=1.0,
+    )
 
-        assert Server.call_tool is not original_call_tool
-        assert Server.get_prompt is not original_get_prompt
-        assert Server.read_resource is not original_read_resource
+    assert Server.call_tool is not original_call_tool
+    assert Server.get_prompt is not original_get_prompt
+    assert Server.read_resource is not original_read_resource
 
 
 @pytest.mark.asyncio

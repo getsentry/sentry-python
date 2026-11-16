@@ -666,8 +666,7 @@ def test_stream_stream(sentry_init):
     # Use the provided channel
     stub = gRPCTestServiceStub(channel)
     response_iterator = stub.TestStreamStream(iter((gRPCTestMessage(text="test"),)))
-    for response in response_iterator:
-        assert response.text == "test"
+    assert [response.text for response in response_iterator] == ["test"]
 
     _tear_down(server=server)
 
