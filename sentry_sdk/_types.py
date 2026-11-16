@@ -373,6 +373,12 @@ if TYPE_CHECKING:
 
     MetricProcessor = Callable[[Metric, Hint], Optional[Metric]]
 
+    MetricWindowSamplingOptions = TypedDict(
+        "MetricWindowSamplingOptions",
+        {"sample_per_second": float},
+        total=False,
+    )
+
     SpanJSON = TypedDict(
         "SpanJSON",
         {
