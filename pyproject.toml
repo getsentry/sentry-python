@@ -299,6 +299,7 @@ select = [
     "W",   # pycodestyle warnings (same as flake8 default)
     "F",   # Pyflakes (same as flake8 default)
     "I",
+    "T20",     # print() and pprint() calls
     "RUF100",  # Unused noqa directive
 ]
 
@@ -312,6 +313,10 @@ ignore = [
     # Additional ignores for codebase compatibility
     "E721", # Use isinstance instead of type() == - existing pattern in this codebase
 ]
+
+[tool.ruff.lint.per-file-ignores]
+"scripts/**" = ["T20"]
+"tests/**" = ["T20"]
 
 [tool.ruff.format]
 # ruff format already excludes the same files as specified in extend-exclude
