@@ -396,7 +396,7 @@ def test_errors_not_reported_twice(
 
     client = get_client()
 
-    with pytest.raises(ZeroDivisionError):
+    with pytest.raises(ZeroDivisionError):  # noqa: PT012
         try:
             client.get("/")
         except ZeroDivisionError as e:

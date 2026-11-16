@@ -357,7 +357,7 @@ async def test_has_trace_if_performance_enabled(
     )
     app = SentryAsgiMiddleware(asgi3_app_with_error_and_msg)
 
-    with pytest.raises(ZeroDivisionError):
+    with pytest.raises(ZeroDivisionError):  # noqa: PT012
         async with TestClient(app) as client:
             if span_streaming:
                 items = capture_items("event", "span")
@@ -418,7 +418,7 @@ async def test_has_trace_if_performance_disabled(
     sentry_init()
     app = SentryAsgiMiddleware(asgi3_app_with_error_and_msg)
 
-    with pytest.raises(ZeroDivisionError):
+    with pytest.raises(ZeroDivisionError):  # noqa: PT012
         async with TestClient(app) as client:
             events = capture_events()
             await client.get("/")
@@ -453,7 +453,7 @@ async def test_trace_from_headers_if_performance_enabled(
     trace_id = "582b43a4192642f0b136d5159a501701"
     sentry_trace_header = "{}-{}-{}".format(trace_id, "6e8f22c393e68f19", 1)
 
-    with pytest.raises(ZeroDivisionError):
+    with pytest.raises(ZeroDivisionError):  # noqa: PT012
         async with TestClient(app) as client:
             if span_streaming:
                 items = capture_items("event", "span")
@@ -513,7 +513,7 @@ async def test_trace_from_headers_if_performance_disabled(
     trace_id = "582b43a4192642f0b136d5159a501701"
     sentry_trace_header = "{}-{}-{}".format(trace_id, "6e8f22c393e68f19", 1)
 
-    with pytest.raises(ZeroDivisionError):
+    with pytest.raises(ZeroDivisionError):  # noqa: PT012
         async with TestClient(app) as client:
             events = capture_events()
             await client.get("/", headers={"sentry-trace": sentry_trace_header})
@@ -552,7 +552,7 @@ async def test_websocket(
 
     request_url = "/ws"
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError):  # noqa: PT012
         client = TestClient(asgi3_ws_app)
         if span_streaming:
             items = capture_items("event", "span")
@@ -609,7 +609,7 @@ async def test_auto_session_tracking_with_aggregates(
         "endpoint": asgi3_app,
         "client": ("127.0.0.1", 60457),
     }
-    with pytest.raises(ZeroDivisionError):
+    with pytest.raises(ZeroDivisionError):  # noqa: PT012
         envelopes = capture_envelopes()
         async with TestClient(app, scope=scope) as client:
             scope["route"] = "/some/fine/url"

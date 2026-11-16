@@ -917,7 +917,7 @@ def test_tracing_error(sentry_init, capture_events, capture_items, app, span_str
     def error():
         1 / 0
 
-    with pytest.raises(ZeroDivisionError):
+    with pytest.raises(ZeroDivisionError):  # noqa: PT012
         with app.test_client() as client:
             response = client.get("/error")
             assert response.status_code == 500
@@ -960,7 +960,7 @@ def test_error_has_trace_context_if_tracing_disabled(sentry_init, capture_events
     def error():
         1 / 0
 
-    with pytest.raises(ZeroDivisionError):
+    with pytest.raises(ZeroDivisionError):  # noqa: PT012
         with app.test_client() as client:
             response = client.get("/error")
             assert response.status_code == 500

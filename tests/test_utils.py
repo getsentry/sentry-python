@@ -913,12 +913,12 @@ def test_is_sentry_url_no_client():
     ],
 )
 def test_get_error_message(error, expected_result):
-    with pytest.raises(BaseException) as exc_value:
+    with pytest.raises(BaseException) as exc_value:  # noqa: PT012
         exc_value.message = error
         raise Exception
     assert get_error_message(exc_value) == expected_result(exc_value)
 
-    with pytest.raises(BaseException) as exc_value:
+    with pytest.raises(BaseException) as exc_value:  # noqa: PT012
         exc_value.detail = error
         raise Exception
     assert get_error_message(exc_value) == expected_result(exc_value)

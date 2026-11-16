@@ -1324,7 +1324,7 @@ def test_http_timeout(
     if span_streaming:
         items = capture_items("span")
 
-        with pytest.raises(TimeoutError):
+        with pytest.raises(TimeoutError):  # noqa: PT012
             with sentry_sdk.traces.start_span(
                 name="name",
                 attributes={
@@ -1344,7 +1344,7 @@ def test_http_timeout(
     else:
         envelopes = capture_envelopes()
 
-        with pytest.raises(TimeoutError):
+        with pytest.raises(TimeoutError):  # noqa: PT012
             with start_transaction(op="op", name="name"):
                 conn = HTTPConnection("localhost", port=PORT)
                 conn.request("GET", "/bla")

@@ -4994,7 +4994,7 @@ async def test_run_streamed_error_handling(
 
             items = capture_items("event", "span")
 
-            with pytest.raises(Exception, match="Model Error"):
+            with pytest.raises(Exception, match="Model Error"):  # noqa: PT012
                 result = agents.Runner.run_streamed(
                     test_agent, "Test input", run_config=test_run_config
                 )
@@ -5034,7 +5034,7 @@ async def test_run_streamed_error_handling(
 
             items = capture_items("event", "span", "transaction")
 
-            with pytest.raises(Exception, match="Model Error"):
+            with pytest.raises(Exception, match="Model Error"):  # noqa: PT012
                 result = agents.Runner.run_streamed(
                     test_agent, "Test input", run_config=test_run_config
                 )
@@ -5074,7 +5074,7 @@ async def test_run_streamed_error_handling(
             )
             events = capture_events()
 
-            with pytest.raises(Exception, match="Model Error"):
+            with pytest.raises(Exception, match="Model Error"):  # noqa: PT012
                 result = agents.Runner.run_streamed(
                     test_agent, "Test input", run_config=test_run_config
                 )

@@ -139,7 +139,7 @@ def test_transactions(
                 session.query(Person).first()
 
             for _ in range(2):
-                with pytest.raises(IntegrityError):
+                with pytest.raises(IntegrityError):  # noqa: PT012
                     with session.begin_nested():
                         session.add(Person(id=1, name="bob"))
                         session.add(Person(id=1, name="bob"))
@@ -185,7 +185,7 @@ def test_transactions(
                 session.query(Person).first()
 
             for _ in range(2):
-                with pytest.raises(IntegrityError):
+                with pytest.raises(IntegrityError):  # noqa: PT012
                     with session.begin_nested():
                         session.add(Person(id=1, name="bob"))
                         session.add(Person(id=1, name="bob"))
@@ -270,7 +270,7 @@ def test_transactions_no_engine_url(
                 session.query(Person).first()
 
             for _ in range(2):
-                with pytest.raises(IntegrityError):
+                with pytest.raises(IntegrityError):  # noqa: PT012
                     with session.begin_nested():
                         session.add(Person(id=1, name="bob"))
                         session.add(Person(id=1, name="bob"))
@@ -297,7 +297,7 @@ def test_transactions_no_engine_url(
                 session.query(Person).first()
 
             for _ in range(2):
-                with pytest.raises(IntegrityError):
+                with pytest.raises(IntegrityError):  # noqa: PT012
                     with session.begin_nested():
                         session.add(Person(id=1, name="bob"))
                         session.add(Person(id=1, name="bob"))
