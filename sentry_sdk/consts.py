@@ -1,3 +1,4 @@
+import inspect
 import itertools
 from enum import Enum
 from typing import TYPE_CHECKING
@@ -1910,8 +1911,6 @@ class ClientConstructor:
 
 
 def _get_default_options() -> "dict[str, Any]":
-    import inspect
-
     a = inspect.getfullargspec(ClientConstructor.__init__)
     defaults = a.defaults or ()
     kwonlydefaults = a.kwonlydefaults or {}

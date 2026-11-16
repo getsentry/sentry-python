@@ -37,7 +37,10 @@ if TYPE_CHECKING:
 
 
 try:
-    from celery import __version__ as CELERY_VERSION  # type: ignore
+    import celery.app.trace as trace  # type: ignore
+    from billiard.pool import Worker  # type: ignore
+    from celery import Celery
+    from celery import __version__ as CELERY_VERSION
     from celery.app.task import Task  # type: ignore
     from celery.app.trace import task_has_custom
     from celery.exceptions import (  # type: ignore
@@ -497,8 +500,6 @@ def _wrap_task_call(task: "Any", f: "F") -> "F":
 
 
 def _patch_build_tracer() -> None:
-    import celery.app.trace as trace  # type: ignore
-
     original_build_tracer = trace.build_tracer
 
     def sentry_build_tracer(
@@ -527,16 +528,12 @@ def _patch_task_apply_async() -> None:
 
 
 def _patch_celery_send_task() -> None:
-    from celery import Celery
-
     Celery.send_task = _wrap_task_run(Celery.send_task)
 
 
 def _patch_worker_exit() -> None:
     # Need to flush queue before worker shutdown because a crashing worker will
     # call os._exit
-    from billiard.pool import Worker  # type: ignore
-
     original_workloop = Worker.workloop
 
     def sentry_workloop(*args: "Any", **kwargs: "Any") -> "Any":

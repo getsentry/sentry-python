@@ -32,7 +32,7 @@ class BeamIntegration(Integration):
 
     @staticmethod
     def setup_once() -> None:
-        from apache_beam.transforms.core import DoFn, ParDo  # type: ignore
+        from apache_beam.transforms.core import DoFn, ParDo  # type: ignore  # noqa: PLC0415
 
         ignore_logger("root")
         ignore_logger("bundle_processor.create")
@@ -94,11 +94,11 @@ def _wrap_inspect_call(cls: "Any", func_name: "Any") -> "Any":
         # getfullargspec is deprecated in more recent beam versions and get_function_args_defaults
         # (which uses Signatures internally) should be used instead.
         try:
-            from apache_beam.transforms.core import get_function_args_defaults
+            from apache_beam.transforms.core import get_function_args_defaults  # noqa: PLC0415
 
             return get_function_args_defaults(process_func)
         except ImportError:
-            from apache_beam.typehints.decorators import getfullargspec  # type: ignore
+            from apache_beam.typehints.decorators import getfullargspec  # type: ignore  # noqa: PLC0415
 
             return getfullargspec(process_func)
 

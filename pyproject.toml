@@ -302,6 +302,7 @@ select = [
     "I",
     "T20",     # print() and pprint() calls
     "PT011",   # pytest.raises() too broad
+    "PLC0415", # Import not at the top level of the file
     "RUF100",  # Unused noqa directive
 ]
 
@@ -318,7 +319,7 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "scripts/**" = ["T20"]
-"tests/**" = ["T20"]
+"tests/**" = ["T20", "PLC0415"]
 
 [tool.ruff.format]
 # ruff format already excludes the same files as specified in extend-exclude

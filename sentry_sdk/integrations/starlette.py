@@ -740,13 +740,13 @@ def patch_templates() -> None:
     # (markupsafe is a dependency of Jinja2)
     # In this case we do not need to patch the Jinja2Templates class
     try:
-        from markupsafe import Markup
+        from markupsafe import Markup  # noqa: PLC0415
     except ImportError:
         return  # Nothing to do
 
     # https://github.com/Kludex/starlette/commit/96479daca2e4bd8157f68d914fd162aa94eff73a
     try:
-        from starlette.templating import Jinja2Templates
+        from starlette.templating import Jinja2Templates  # noqa: PLC0415
     except ImportError:
         return
 

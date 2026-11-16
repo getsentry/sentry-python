@@ -85,7 +85,7 @@ def _patch_execute_tool_call() -> None:
                         exc_info = sys.exc_info()
                         with capture_internal_exceptions():
                             # Avoid circular import due to multi-file integration structure
-                            from sentry_sdk.integrations.pydantic_ai import (
+                            from sentry_sdk.integrations.pydantic_ai import (  # noqa: PLC0415
                                 PydanticAIIntegration,
                             )
 
@@ -158,7 +158,7 @@ def _patch_call_tool() -> None:
                         exc_info = sys.exc_info()
                         with capture_internal_exceptions():
                             # Avoid circular import due to multi-file integration structure
-                            from sentry_sdk.integrations.pydantic_ai import (
+                            from sentry_sdk.integrations.pydantic_ai import (  # noqa: PLC0415
                                 PydanticAIIntegration,
                             )
 

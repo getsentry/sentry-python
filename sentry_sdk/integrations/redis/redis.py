@@ -45,11 +45,11 @@ def _patch_redis(StrictRedis: "Any", client: "Any") -> None:
         )
 
     try:
-        import redis.asyncio
+        import redis.asyncio  # noqa: PLC0415
     except ImportError:
         pass
     else:
-        from sentry_sdk.integrations.redis._async_common import (
+        from sentry_sdk.integrations.redis._async_common import (  # noqa: PLC0415
             patch_redis_async_client,
             patch_redis_async_pipeline,
         )
