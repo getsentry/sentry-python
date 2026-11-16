@@ -25,6 +25,7 @@ from sentry_sdk import (
     start_transaction,
 )
 from sentry_sdk._compat import PY38
+from sentry_sdk.client import CODING_AGENT_ENV_VARS, SETUP_CHECKLIST_PATH
 from sentry_sdk.consts import DEFAULT_MAX_BREADCRUMBS
 from sentry_sdk.integrations.asyncio import AsyncioIntegration
 from sentry_sdk.integrations.executing import ExecutingIntegration
@@ -1507,27 +1508,82 @@ def test_continuous_profiling_does_not_warn(sentry_init):
     assert profiling_warnings == []
 
 
-@pytest.mark.parametrize("traces_sample_rate", [0, 0.0])
-def test_zero_traces_sample_rate_warns(sentry_init, traces_sample_rate):
-    with pytest.warns(UserWarning, match="traces_sample_rate is 0"):
-        sentry_init(traces_sample_rate=traces_sample_rate)
+AGENT_HINT_DSN = "https://public@sentry.example.com/1"
+
+
+@pytest.fixture
+def coding_agent_hint(monkeypatch, capsys):
+    for name in ("CI", "SENTRY_AGENT_HINTS", "AI_AGENT", *CODING_AGENT_ENV_VARS):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setattr(sentry_sdk.client, "_coding_agent_hint_shown", False)
+    registered = []
+    monkeypatch.setattr(sentry_sdk.client.atexit, "register", registered.append)
+
+    def printed_at_exit():
+        for hook in registered:
+            hook()
+        return capsys.readouterr().err
+
+    monkeypatch.printed_at_exit = printed_at_exit
+    return monkeypatch
 
 
 @pytest.mark.parametrize(
-    "options",
+    "env, options",
     [
-        {"traces_sample_rate": 0, "traces_sampler": lambda _: 1.0},
-        {"traces_sample_rate": 0.1},
-        {"traces_sample_rate": None},
-        {},
+        ({"AI_AGENT": "claude-code"}, {"traces_sample_rate": 0}),
+        ({"CLAUDECODE": "1"}, {}),
+        ({"CODEX_THREAD_ID": "abc"}, {"traces_sample_rate": 0.0}),
+        ({"CODEX_SANDBOX": "seatbelt"}, {"traces_sample_rate": 0.1}),
+        ({"CLAUDECODE": "1"}, {"enable_logs": True}),
     ],
 )
-def test_zero_traces_sample_rate_does_not_warn(sentry_init, options):
-    with warnings.catch_warnings(record=True) as caught:
-        warnings.simplefilter("always")
-        sentry_init(**options)
+def test_coding_agent_hint(sentry_init, coding_agent_hint, env, options):
+    for name, value in env.items():
+        coding_agent_hint.setenv(name, value)
 
-    assert [w for w in caught if "traces_sample_rate is 0" in str(w.message)] == []
+    sentry_init(dsn=AGENT_HINT_DSN, **options)
+
+    assert SETUP_CHECKLIST_PATH in coding_agent_hint.printed_at_exit()
+
+
+@pytest.mark.parametrize(
+    "env, options",
+    [
+        ({}, {"traces_sample_rate": 0}),
+        ({"AI_AGENT": "claude-code"}, {"traces_sample_rate": 0.1, "enable_logs": True}),
+        (
+            {"AI_AGENT": "claude-code"},
+            {"traces_sampler": lambda _: 1.0, "enable_logs": True},
+        ),
+        ({"AI_AGENT": "claude-code"}, {"agent_setup_complete": True}),
+        ({"AI_AGENT": "0"}, {"traces_sample_rate": 0}),
+        ({"AI_AGENT": "claude-code", "CI": "true"}, {"traces_sample_rate": 0}),
+        ({"CLAUDECODE": "1", "SENTRY_AGENT_HINTS": "0"}, {"traces_sample_rate": 0}),
+        ({"AI_AGENT": "claude-code"}, {"dsn": None, "traces_sample_rate": 0}),
+    ],
+)
+def test_coding_agent_hint_not_shown(sentry_init, coding_agent_hint, env, options):
+    for name, value in env.items():
+        coding_agent_hint.setenv(name, value)
+
+    sentry_init(**{"dsn": AGENT_HINT_DSN, **options})
+
+    assert "[sentry]" not in coding_agent_hint.printed_at_exit()
+
+
+def test_coding_agent_hint_shown_once(sentry_init, coding_agent_hint):
+    coding_agent_hint.setenv("AI_AGENT", "claude-code")
+
+    sentry_init(dsn=AGENT_HINT_DSN, traces_sample_rate=0)
+    sentry_init(dsn=AGENT_HINT_DSN, traces_sample_rate=0)
+
+    assert coding_agent_hint.printed_at_exit().count(SETUP_CHECKLIST_PATH) == 1
+
+
+def test_setup_checklist_ships_with_the_package():
+    with open(SETUP_CHECKLIST_PATH) as f:
+        assert "agent_setup_complete=True" in f.read()
 
 
 def test_ignore_spans_warns_without_streaming(sentry_init):

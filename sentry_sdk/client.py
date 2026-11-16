@@ -1,3 +1,4 @@
+import atexit
 import json
 import os
 import platform
@@ -95,6 +96,20 @@ if TYPE_CHECKING:
     I = TypeVar("I", bound=Integration)  # noqa: E741
 
 _client_init_debug = ContextVar("client_init_debug")
+
+SETUP_CHECKLIST_PATH = os.path.join(os.path.dirname(__file__), "SETUP_CHECKLIST.md")
+
+# Set by coding agents in the commands they run. AI_AGENT is the cross-tool
+# convention; the rest cover agents that don't set it.
+CODING_AGENT_ENV_VARS = (
+    "CLAUDECODE",
+    "CODEX_THREAD_ID",
+    "CODEX_SANDBOX",
+    "CURSOR_AGENT",
+    "GEMINI_CLI",
+)
+
+_coding_agent_hint_shown = False
 
 
 SDK_INFO: "SDKInfo" = {
@@ -301,6 +316,50 @@ def _split_gen_ai_spans(
     return non_gen_ai_spans, gen_ai_spans
 
 
+def _running_under_coding_agent() -> bool:
+    if os.environ.get("CI"):
+        return False
+    if env_to_bool(os.environ.get("SENTRY_AGENT_HINTS"), strict=True) is False:
+        return False
+
+    ai_agent = os.environ.get("AI_AGENT")
+    if ai_agent:
+        return env_to_bool(ai_agent, strict=True) is not False
+
+    return any(os.environ.get(name) for name in CODING_AGENT_ENV_VARS)
+
+
+def _write_coding_agent_hint() -> None:
+    sys.stdout.flush()
+    sys.stderr.write(
+        "[sentry] If you're setting up Sentry, it is strongly recommended to check "
+        "your setup against Sentry's official setup checklist, included in the "
+        f"sentry-sdk package you installed: {SETUP_CHECKLIST_PATH} "
+        "(hide with SENTRY_AGENT_HINTS=0)\n"
+    )
+    sys.stderr.flush()
+
+
+def _show_coding_agent_hint(options: "Dict[str, Any]") -> None:
+    """Point a coding agent at the setup checklist when tracing or logs are off."""
+    global _coding_agent_hint_shown
+
+    rate = options["traces_sample_rate"]
+    tracing_on = options["traces_sampler"] is not None or rate not in (0, None)
+    if (
+        _coding_agent_hint_shown
+        or not options["dsn"]
+        or options["agent_setup_complete"]
+        or (tracing_on and options["enable_logs"])
+        or not _running_under_coding_agent()
+    ):
+        return
+
+    _coding_agent_hint_shown = True
+    # Agents often cut a command's output with `| tail`, so the hint goes last.
+    atexit.register(_write_coding_agent_hint)
+
+
 def _get_options(*args: "Optional[str]", **kwargs: "Any") -> "Dict[str, Any]":
     if args and (isinstance(args[0], (bytes, str)) or args[0] is None):
         dsn: "Optional[str]" = args[0]
@@ -390,18 +449,6 @@ def _get_options(*args: "Optional[str]", **kwargs: "Any") -> "Dict[str, Any]":
         warnings.warn(
             "The `enable_tracing` parameter is deprecated. Please use `traces_sample_rate` instead.",
             DeprecationWarning,
-            stacklevel=2,
-        )
-
-    # The SDK logger only writes when debug is on, and this has to reach people who
-    # never turn it on.
-    if rv["traces_sample_rate"] == 0 and rv["traces_sampler"] is None:
-        warnings.warn(
-            "traces_sample_rate is 0, so this service starts no traces and Sentry "
-            "gets no performance data from it. To send traces, set traces_sample_rate "
-            "above 0, for example 1.0 in development and 0.1 in production. If 0 is "
-            "what you want (for example, to only continue traces sampled upstream), "
-            "you can hide this warning with warnings.filterwarnings.",
             stacklevel=2,
         )
 
@@ -556,6 +603,9 @@ class _Client(BaseClient):
 
     def __init__(self, *args: "Any", **kwargs: "Any") -> None:
         super(_Client, self).__init__(options=get_options(*args, **kwargs))
+
+        with capture_internal_exceptions():
+            _show_coding_agent_hint(self.options)
         self._init_impl()
 
     def __getstate__(self) -> "Any":
