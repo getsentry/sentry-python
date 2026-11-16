@@ -211,6 +211,35 @@ def _parse_rate_limits(
             continue
 
 
+class _RateLimits:
+    """Deadlines until which each data category is rate limited.
+
+    The ``None`` category holds the limit for all categories. ``update`` is the only
+    write operation, and it keeps the later of the stored and the new deadline, so a
+    shorter rate limit never replaces a longer one, as the rate limiting spec requires:
+    https://develop.sentry.dev/sdk/foundations/transport/rate-limiting/#stage-2-determine-rate-limits
+    """
+
+    __slots__ = ("__deadlines",)
+
+    def __init__(self) -> None:
+        self.__deadlines: "Dict[Optional[str], datetime]" = {}
+
+    def update(self, category: "Optional[str]", until: datetime) -> None:
+        """Extend the limit for ``category`` to ``until``, unless it already ends later."""
+        current = self.__deadlines.get(category)
+        if current is None or until > current:
+            self.__deadlines[category] = until
+
+    def is_active(self, category: "Optional[str]") -> bool:
+        until = self.__deadlines.get(category)
+        return until is not None and until > datetime.now(timezone.utc)
+
+    def any_active(self) -> bool:
+        now = datetime.now(timezone.utc)
+        return any(until > now for until in self.__deadlines.values())
+
+
 class HttpTransportCore(Transport):
     """Shared base class for sync and async transports."""
 
@@ -224,7 +253,7 @@ class HttpTransportCore(Transport):
         self.options: "Dict[str, Any]" = options
         self._worker = self._create_worker(options)
         self._auth = self.parsed_dsn.to_auth("sentry.python/%s" % VERSION)
-        self._disabled_until: "Dict[Optional[EventDataCategory], datetime]" = {}
+        self._disabled_until = _RateLimits()
         # We only use this Retry() class for the `get_retry_after` method it exposes
         self._retry = urllib3.util.Retry()
         self._discarded_events: "DefaultDict[Tuple[EventDataCategory, str], int]" = (
@@ -343,7 +372,8 @@ class HttpTransportCore(Transport):
         header = self._get_header_value(response, "x-sentry-rate-limits")
         if header:
             logger.warning("Rate-limited via x-sentry-rate-limits")
-            self._disabled_until.update(_parse_rate_limits(header))
+            for category, until in _parse_rate_limits(header):
+                self._disabled_until.update(category, until)
 
         # old sentries only communicate global rate limit hits via the
         # retry-after header on 429.  This header can also be emitted on new
@@ -356,8 +386,8 @@ class HttpTransportCore(Transport):
                 if retry_after_value is not None
                 else None
             ) or 60
-            self._disabled_until[None] = datetime.now(timezone.utc) + timedelta(
-                seconds=retry_after
+            self._disabled_until.update(
+                None, datetime.now(timezone.utc) + timedelta(seconds=retry_after)
             )
 
     def _handle_request_error(
@@ -463,16 +493,11 @@ class HttpTransportCore(Transport):
         )
 
     def _check_disabled(self, category: str) -> bool:
-        def _disabled(bucket: "Any") -> bool:
-            ts = self._disabled_until.get(bucket)
-            return ts is not None and ts > datetime.now(timezone.utc)
-
-        return _disabled(category) or _disabled(None)
+        rate_limits = self._disabled_until
+        return rate_limits.is_active(category) or rate_limits.is_active(None)
 
     def _is_rate_limited(self: "Self") -> bool:
-        return any(
-            ts > datetime.now(timezone.utc) for ts in self._disabled_until.values()
-        )
+        return self._disabled_until.any_active()
 
     def _is_worker_full(self: "Self") -> bool:
         return self._worker.full()
