@@ -55,7 +55,7 @@ def patch_views() -> None:
         if integration is None:
             return callback
 
-        if iscoroutinefunction(callback):
+        if iscoroutinefunction(callback):  # type: ignore[deprecated]  # version-guarded
             return wrap_async_view(callback)
 
         return _wrap_sync_view(callback)

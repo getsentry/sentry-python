@@ -19,7 +19,7 @@ try:
     from opentelemetry.context import get_value
     from opentelemetry.sdk.trace import ReadableSpan as OTelSpan
     from opentelemetry.sdk.trace import SpanProcessor
-    from opentelemetry.semconv.trace import SpanAttributes
+    from opentelemetry.semconv.trace import SpanAttributes  # type: ignore[deprecated]  # replacements use renamed attributes
     from opentelemetry.trace import (
         SpanKind,
         format_span_id,

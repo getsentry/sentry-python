@@ -491,7 +491,7 @@ def _is_async_callable(obj: "Any") -> bool:
     while isinstance(obj, functools.partial):
         obj = obj.func
 
-    return iscoroutinefunction(obj) or (
+    return iscoroutinefunction(obj) or (  # type: ignore[deprecated]  # version-guarded
         callable(obj) and iscoroutinefunction(obj.__call__)  # type: ignore[operator]
     )
 

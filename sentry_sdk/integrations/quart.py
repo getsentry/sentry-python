@@ -119,7 +119,7 @@ def patch_scaffold_route() -> None:
         old_decorator = old_route(*args, **kwargs)
 
         def decorator(old_func: "Any") -> "Any":
-            if inspect.isfunction(old_func) and not iscoroutinefunction(old_func):
+            if inspect.isfunction(old_func) and not iscoroutinefunction(old_func):  # type: ignore[deprecated]  # version-guarded
 
                 @wraps(old_func)
                 @ensure_integration_enabled(QuartIntegration, old_func)

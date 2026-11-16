@@ -241,7 +241,7 @@ def _asgi_middleware_mixin_factory(
             a thread is not consumed during a whole request.
             Taken from django.utils.deprecation::MiddlewareMixin._async_check
             """
-            if iscoroutinefunction(self.get_response):
+            if iscoroutinefunction(self.get_response):  # type: ignore[deprecated]  # version-guarded
                 markcoroutinefunction(self)
 
         def async_route_check(self) -> bool:
@@ -249,7 +249,7 @@ def _asgi_middleware_mixin_factory(
             Function that checks if we are in async mode,
             and if we are forwards the handling of requests to __acall__
             """
-            return iscoroutinefunction(self.get_response)
+            return iscoroutinefunction(self.get_response)  # type: ignore[deprecated]  # version-guarded
 
         async def __acall__(self, *args: "Any", **kwargs: "Any") -> "Any":
             f = self._acall_method

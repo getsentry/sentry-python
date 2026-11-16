@@ -182,7 +182,7 @@ def patch_get_request_handler() -> None:
         if (
             dependant
             and dependant.call is not None
-            and not iscoroutinefunction(dependant.call)
+            and not iscoroutinefunction(dependant.call)  # type: ignore[deprecated]  # version-guarded
         ):
             dependant.call = _wrap_sync_handler(dependant.call)
 

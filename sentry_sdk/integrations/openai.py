@@ -759,7 +759,7 @@ def _set_common_output_data(
             if record_outputs:
                 for output in response.output:
                     if output.type == "function_call":
-                        output_messages["tool"].append(output.dict())
+                        output_messages["tool"].append(output.model_dump())
                     elif output.type == "message":
                         for output_message in output.content:
                             try:
@@ -767,7 +767,7 @@ def _set_common_output_data(
                             except AttributeError:
                                 # Unknown output message type, just return the json
                                 output_messages["response"].append(
-                                    output_message.dict()
+                                    output_message.model_dump()
                                 )
 
                 if len(output_messages["tool"]) > 0:
@@ -790,14 +790,16 @@ def _set_common_output_data(
         ):
             for output in response.output:
                 if output.type == "function_call":
-                    output_messages["tool"].append(output.dict())
+                    output_messages["tool"].append(output.model_dump())
                 elif output.type == "message":
                     for output_message in output.content:
                         try:
                             output_messages["response"].append(output_message.text)  # type: ignore[union-attr]
                         except AttributeError:
                             # Unknown output message type, just return the json
-                            output_messages["response"].append(output_message.dict())
+                            output_messages["response"].append(
+                                output_message.model_dump()
+                            )
 
             if len(output_messages["tool"]) > 0:
                 set_data_normalized(

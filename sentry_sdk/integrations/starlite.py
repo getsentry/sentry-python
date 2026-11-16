@@ -306,7 +306,7 @@ def retrieve_user_from_scope(scope: "StarliteScope") -> "Optional[dict[str, Any]
     if isinstance(scope_user, dict):
         return scope_user
     if isinstance(scope_user, BaseModel):
-        return scope_user.dict()
+        return scope_user.dict()  # type: ignore[deprecated]  # Starlite requires pydantic<2
     if hasattr(scope_user, "asdict"):  # dataclasses
         return scope_user.asdict()
 

@@ -95,10 +95,10 @@ def _looks_like_asgi3(app: "Any") -> bool:
     if inspect.isclass(app):
         return hasattr(app, "__await__")
     elif inspect.isfunction(app):
-        return iscoroutinefunction(app)
+        return iscoroutinefunction(app)  # type: ignore[deprecated]  # version-guarded
     else:
         call = getattr(app, "__call__", None)  # noqa
-        return iscoroutinefunction(call)
+        return iscoroutinefunction(call)  # type: ignore[deprecated]  # version-guarded
 
 
 class SentryAsgiMiddleware:
