@@ -49,7 +49,7 @@ class ThreadingIntegration(Integration):
         old_start = Thread.start
 
         try:
-            from django import VERSION as django_version  # noqa: N811
+            from django import VERSION as django_version
         except ImportError:
             django_version = None
 

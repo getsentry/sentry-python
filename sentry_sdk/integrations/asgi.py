@@ -97,7 +97,7 @@ def _looks_like_asgi3(app: "Any") -> bool:
     elif inspect.isfunction(app):
         return iscoroutinefunction(app)  # type: ignore[deprecated]  # version-guarded
     else:
-        call = getattr(app, "__call__", None)  # noqa
+        call = getattr(app, "__call__", None)
         return iscoroutinefunction(call)  # type: ignore[deprecated]  # version-guarded
 
 

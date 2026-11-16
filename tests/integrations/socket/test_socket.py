@@ -29,7 +29,7 @@ def test_getaddrinfo_trace(sentry_init, capture_events, capture_items, span_stre
 
         assert dns_span["attributes"]["sentry.op"] == "socket.dns"
         assert dns_span["attributes"]["sentry.origin"] == "auto.socket.socket"
-        assert dns_span["name"] == f"localhost:{PORT}"  # noqa: E231
+        assert dns_span["name"] == f"localhost:{PORT}"
         assert dns_span["attributes"]["server.address"] == "localhost"
         assert dns_span["attributes"]["server.port"] == PORT
     else:
@@ -42,7 +42,7 @@ def test_getaddrinfo_trace(sentry_init, capture_events, capture_items, span_stre
         (span,) = event["spans"]
 
         assert span["op"] == "socket.dns"
-        assert span["description"] == f"localhost:{PORT}"  # noqa: E231
+        assert span["description"] == f"localhost:{PORT}"
         assert span["data"] == ApproxDict(
             {
                 "host": "localhost",
@@ -75,12 +75,12 @@ def test_create_connection_trace(
         dns_span, connect_span, _root = spans
 
         assert connect_span["attributes"]["sentry.op"] == "socket.connection"
-        assert connect_span["name"] == f"localhost:{PORT}"  # noqa: E231
+        assert connect_span["name"] == f"localhost:{PORT}"
         assert connect_span["attributes"]["server.address"] == "localhost"
         assert connect_span["attributes"]["server.port"] == PORT
 
         assert dns_span["attributes"]["sentry.op"] == "socket.dns"
-        assert dns_span["name"] == f"localhost:{PORT}"  # noqa: E231
+        assert dns_span["name"] == f"localhost:{PORT}"
         assert dns_span["attributes"]["server.address"] == "localhost"
         assert dns_span["attributes"]["server.port"] == PORT
     else:
@@ -94,7 +94,7 @@ def test_create_connection_trace(
         # as getaddrinfo gets called in create_connection it should also contain a dns span
 
         assert connect_span["op"] == "socket.connection"
-        assert connect_span["description"] == f"localhost:{PORT}"  # noqa: E231
+        assert connect_span["description"] == f"localhost:{PORT}"
         assert connect_span["data"] == ApproxDict(
             {
                 "address": ["localhost", PORT],
@@ -104,7 +104,7 @@ def test_create_connection_trace(
         )
 
         assert dns_span["op"] == "socket.dns"
-        assert dns_span["description"] == f"localhost:{PORT}"  # noqa: E231
+        assert dns_span["description"] == f"localhost:{PORT}"
         assert dns_span["data"] == ApproxDict(
             {
                 "host": "localhost",

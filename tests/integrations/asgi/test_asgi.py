@@ -279,7 +279,7 @@ async def test_capture_transaction_with_error(
     asgi3_app_with_error,
     capture_events,
     capture_items,
-    DictionaryContaining,  # noqa: N803
+    DictionaryContaining,
     span_streaming,
 ):
     sentry_init(
