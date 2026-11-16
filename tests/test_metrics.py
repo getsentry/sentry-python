@@ -663,3 +663,110 @@ def test_metrics_batcher_lock_reset_in_child_after_fork(sentry_init):
     original_lock.release()
     _, status = os.waitpid(pid, 0)
     assert os.WIFEXITED(status) and os.WEXITSTATUS(status) == 0
+
+
+def _lost(calls, reason, data_category="trace_metric"):
+    return sum(q for (r, c, _, q) in calls if r == reason and c == data_category)
+
+
+def test_metrics_window_sampling_off_by_default(sentry_init, capture_items):
+    sentry_init()
+    items = capture_items("trace_metric")
+
+    for _ in range(100):
+        sentry_sdk.metrics.count("test.counter", 1, sample_per_second=1)
+
+    get_client().flush()
+    metrics = [item.payload for item in items]
+
+    assert len(metrics) == 100
+    assert all("sentry.client_sample_rate" not in m["attributes"] for m in metrics)
+
+
+def test_metrics_window_sampling(
+    sentry_init, capture_items, capture_record_lost_event_calls
+):
+    sentry_init(_experiments={"metrics_window_sampling": True})
+    items = capture_items("trace_metric")
+    lost = capture_record_lost_event_calls()
+
+    # 10/s over the 5s flush window keeps 50 per name.
+    for _ in range(200):
+        sentry_sdk.metrics.count("test.hot", 2)
+    for _ in range(3):
+        sentry_sdk.metrics.count("test.cold", 1)
+    for _ in range(200):
+        sentry_sdk.metrics.count("test.override", 1, sample_per_second=20)
+    for _ in range(100):
+        sentry_sdk.metrics.count(
+            "test.presampled", 1, attributes={"sentry.client_sample_rate": 0.5}
+        )
+
+    get_client().flush()
+    metrics = [item.payload for item in items]
+
+    def by_name(name):
+        return [m for m in metrics if m["name"] == name]
+
+    hot = by_name("test.hot")
+    assert len(hot) == 50
+    assert all(m["attributes"]["sentry.client_sample_rate"] == 0.25 for m in hot)
+    # Counts still extrapolate to the real total
+    assert sum(
+        m["value"] / m["attributes"]["sentry.client_sample_rate"] for m in hot
+    ) == pytest.approx(400)
+
+    cold = by_name("test.cold")
+    assert len(cold) == 3
+    assert all("sentry.client_sample_rate" not in m["attributes"] for m in cold)
+
+    override = by_name("test.override")
+    assert len(override) == 100
+    assert all(m["attributes"]["sentry.client_sample_rate"] == 0.5 for m in override)
+    assert all("_sample_per_second" not in m for m in override)
+
+    presampled = by_name("test.presampled")
+    assert len(presampled) == 50
+    assert all(m["attributes"]["sentry.client_sample_rate"] == 0.25 for m in presampled)
+
+    assert _lost(lost, "sample_rate") == 150 + 100 + 50
+    assert _lost(lost, "sample_rate", "trace_metric_byte") > 0
+    assert _lost(lost, "backpressure") == 0
+
+
+def test_metrics_window_sampling_back_pressure(
+    sentry_init, capture_items, capture_record_lost_event_calls, monkeypatch
+):
+    sentry_init(_experiments={"metrics_window_sampling": True})
+    items = capture_items("trace_metric")
+    lost = capture_record_lost_event_calls()
+
+    batcher = get_client().metrics_batcher
+    monkeypatch.setattr(batcher, "MAX_BEFORE_FLUSH", 100)
+    # Flush only when the test says so, to keep windows deterministic.
+    monkeypatch.setattr(batcher._flush_event, "set", lambda: None)
+
+    def emit(names):
+        del items[:]
+        del lost[:]
+        for name in range(names):
+            for _ in range(100):
+                sentry_sdk.metrics.count(f"test.{name}", 1)
+        get_client().flush()
+        return [item.payload for item in items]
+
+    # 10 names * 50 hits the flush cap of 100: nothing is pushed down yet.
+    assert len(emit(10)) == 500
+    assert _lost(lost, "backpressure") == 0
+
+    # Next window every name is halved to 25.
+    metrics = emit(10)
+    assert len(metrics) == 250
+    assert all(m["attributes"]["sentry.client_sample_rate"] == 0.25 for m in metrics)
+    assert _lost(lost, "sample_rate") == 500
+    assert _lost(lost, "backpressure") == 250
+
+    # Halved again to 12, which stays under the cap, so the window after
+    # recovers to 25.
+    assert len(emit(1)) == 12
+    assert len(emit(1)) == 25

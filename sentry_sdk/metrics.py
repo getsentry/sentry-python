@@ -2,6 +2,7 @@ import time
 from typing import TYPE_CHECKING, Any, Optional
 
 import sentry_sdk
+from sentry_sdk._metrics_batcher import SAMPLE_PER_SECOND_KEY
 from sentry_sdk.utils import format_attribute
 
 if TYPE_CHECKING:
@@ -14,6 +15,7 @@ def _capture_metric(
     value: float,
     unit: "Optional[str]" = None,
     attributes: "Optional[Attributes]" = None,
+    sample_per_second: "Optional[float]" = None,
 ) -> None:
     attrs: "Attributes" = {}
 
@@ -32,6 +34,10 @@ def _capture_metric(
         "attributes": attrs,
     }
 
+    if sample_per_second is not None:
+        # Only used by the experimental `metrics_window_sampling` option.
+        metric[SAMPLE_PER_SECOND_KEY] = sample_per_second  # type: ignore[literal-required]
+
     sentry_sdk.get_current_scope()._capture_metric(metric)
 
 
@@ -40,8 +46,9 @@ def count(
     value: float,
     unit: "Optional[str]" = None,
     attributes: "Optional[dict[str, Any]]" = None,
+    sample_per_second: "Optional[float]" = None,
 ) -> None:
-    _capture_metric(name, "counter", value, unit, attributes)
+    _capture_metric(name, "counter", value, unit, attributes, sample_per_second)
 
 
 def gauge(
@@ -49,8 +56,9 @@ def gauge(
     value: float,
     unit: "Optional[str]" = None,
     attributes: "Optional[dict[str, Any]]" = None,
+    sample_per_second: "Optional[float]" = None,
 ) -> None:
-    _capture_metric(name, "gauge", value, unit, attributes)
+    _capture_metric(name, "gauge", value, unit, attributes, sample_per_second)
 
 
 def distribution(
@@ -58,5 +66,6 @@ def distribution(
     value: float,
     unit: "Optional[str]" = None,
     attributes: "Optional[dict[str, Any]]" = None,
+    sample_per_second: "Optional[float]" = None,
 ) -> None:
-    _capture_metric(name, "distribution", value, unit, attributes)
+    _capture_metric(name, "distribution", value, unit, attributes, sample_per_second)

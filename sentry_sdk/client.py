@@ -691,6 +691,9 @@ class _Client(BaseClient):
             self.metrics_batcher = MetricsBatcher(
                 capture_func=_capture_envelope,
                 record_lost_func=_record_lost_event,
+                window_sampling=self.options["_experiments"].get(
+                    "metrics_window_sampling"
+                ),
             )
 
             self.span_batcher = None

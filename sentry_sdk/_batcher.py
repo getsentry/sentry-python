@@ -124,11 +124,7 @@ class Batcher(Generic[T]):
                 return None
 
             with self._lock:
-                dropped = len(self._buffer) >= self.MAX_BEFORE_DROP
-                if not dropped:
-                    self._buffer.append(item)
-                    if len(self._buffer) >= self.MAX_BEFORE_FLUSH:
-                        self._flush_event.set()
+                dropped = not self._add_locked(item)
 
             # Record the loss outside of the lock, since this might involve
             # serializing the item to report lost bytes
@@ -136,6 +132,17 @@ class Batcher(Generic[T]):
                 self._record_lost(item)
         finally:
             self._active.flag = False
+
+    def _add_locked(self, item: "T") -> bool:
+        """Append an item to the buffer. Called with the lock held. Returns
+        False if the buffer is full and the item was dropped."""
+        if len(self._buffer) >= self.MAX_BEFORE_DROP:
+            return False
+
+        self._buffer.append(item)
+        if len(self._buffer) >= self.MAX_BEFORE_FLUSH:
+            self._flush_event.set()
+        return True
 
     def kill(self) -> None:
         if self._flusher is None:
