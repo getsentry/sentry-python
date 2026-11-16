@@ -3,7 +3,6 @@
 [default]
 extend-ignore-re = [
     "baGGage",           # tests that header matching ignores case
-    "need_code_loation", # old method name quoted in MIGRATION_GUIDE.md
     "deprecat\\(",       # regex prefix in .github/release.yml
 ]
 
