@@ -984,8 +984,8 @@ def _get_request_data(
     )
     tools = tools if tools and len(tools) > 0 else None
 
+    agent_name = None
     try:
-        agent_name = None
         if len(args) > 1:
             agent_name = args[1].get("run_name")
         if agent_name is None:

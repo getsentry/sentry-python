@@ -291,6 +291,7 @@ async def _tool_handler_wrapper(
 
     original_kwargs = original_kwargs or {}
 
+    handler_name = "unknown"
     if original_args:
         handler_name = original_args[0]
     elif original_kwargs.get("name"):
@@ -521,6 +522,7 @@ async def _prompt_handler_wrapper(
 
     original_kwargs = original_kwargs or {}
 
+    handler_name = "unknown"
     if original_args:
         handler_name = original_args[0]
     elif original_kwargs.get("name"):
