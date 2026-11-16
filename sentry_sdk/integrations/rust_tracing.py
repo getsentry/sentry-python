@@ -200,7 +200,7 @@ class RustTracingLayer:
         if message is not None:
             sentry_span_name = message
         elif module_path is not None and name is not None:
-            sentry_span_name = f"{module_path}::{name}"  # noqa: E231
+            sentry_span_name = f"{module_path}::{name}"
         elif name is not None:
             sentry_span_name = name
         else:

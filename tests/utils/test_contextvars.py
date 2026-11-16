@@ -12,7 +12,7 @@ def _run_contextvar_threaded_test():
     # decided upon gevent on import.
     from sentry_sdk import utils
 
-    _, ContextVar = utils._get_contextvars()  # noqa: N806
+    _, ContextVar = utils._get_contextvars()
 
     ts = []
 

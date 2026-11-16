@@ -723,7 +723,7 @@ class PropagationContext:
             )
             return
 
-        self.baggage.sentry_items["sample_rand"] = f"{sample_rand:.6f}"  # noqa: E231
+        self.baggage.sentry_items["sample_rand"] = f"{sample_rand:.6f}"
 
     def _sample_rand(self) -> "Optional[str]":
         """Convenience method to get the sample_rand value from the baggage."""
@@ -859,7 +859,7 @@ class Baggage:
         options = client.options or {}
 
         sentry_items["trace_id"] = transaction.trace_id
-        sentry_items["sample_rand"] = f"{transaction._sample_rand:.6f}"  # noqa: E231
+        sentry_items["sample_rand"] = f"{transaction._sample_rand:.6f}"
 
         if options.get("environment"):
             sentry_items["environment"] = options["environment"]

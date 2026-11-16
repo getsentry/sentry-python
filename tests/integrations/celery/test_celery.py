@@ -573,7 +573,7 @@ def test_redis_backend_trace_propagation(init_celery, capture_events_forksafe):
         # Curious: Cannot use delay() here or py2.7-celery-4.2 crashes
         res = dummy_task.apply_async()
 
-    with pytest.raises(Exception):  # noqa: B017
+    with pytest.raises(Exception):
         # Celery 4.1 raises a gibberish exception
         res.wait()
 
@@ -653,7 +653,7 @@ def test_traces_sampler_gets_task_info_in_sampling_context(
     span_streaming,
     init_celery,
     celery_invocation,
-    DictionaryContaining,  # noqa:N803
+    DictionaryContaining,
 ):
     traces_sampler = mock.Mock(return_value=1.0)
     celery = init_celery(
@@ -1000,7 +1000,7 @@ def test_messaging_system(
     )
 
     # Does not need to be a real URL, since we use always eager
-    celery.conf.broker_url = f"{system}://example.com"  # noqa: E231
+    celery.conf.broker_url = f"{system}://example.com"
 
     @celery.task()
     def task(): ...
@@ -1036,7 +1036,7 @@ def test_producer_span_data(
         traces_sample_rate=1.0,
         trace_lifecycle="stream" if span_streaming else "static",
     )
-    celery = Celery(__name__, broker=f"{system}://example.com")  # noqa: E231
+    celery = Celery(__name__, broker=f"{system}://example.com")
 
     @celery.task()
     def task(): ...
@@ -1111,7 +1111,7 @@ def tests_span_origin_consumer(
         traces_sample_rate=1.0,
         trace_lifecycle="stream" if span_streaming else "static",
     )
-    celery.conf.broker_url = "redis://example.com"  # noqa: E231
+    celery.conf.broker_url = "redis://example.com"
 
     @celery.task()
     def task(): ...
@@ -1151,7 +1151,7 @@ def tests_span_origin_producer(
         traces_sample_rate=1.0,
         trace_lifecycle="stream" if span_streaming else "static",
     )
-    celery = Celery(__name__, broker="redis://example.com")  # noqa: E231
+    celery = Celery(__name__, broker="redis://example.com")
 
     @celery.task()
     def task(): ...
@@ -1202,7 +1202,7 @@ def test_send_task_wrapped(
         traces_sample_rate=1.0,
         trace_lifecycle="stream" if span_streaming else "static",
     )
-    celery = Celery(__name__, broker="redis://example.com")  # noqa: E231
+    celery = Celery(__name__, broker="redis://example.com")
 
     if span_streaming:
         items = capture_items("span")
