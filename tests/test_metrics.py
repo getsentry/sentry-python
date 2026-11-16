@@ -770,3 +770,76 @@ def test_metrics_window_sampling_back_pressure(
     # recovers to 25.
     assert len(emit(1)) == 12
     assert len(emit(1)) == 25
+
+
+@pytest.mark.parametrize("c_first", [True, False])
+def test_metrics_window_sampling_stratify_by(sentry_init, capture_items, c_first):
+    sentry_init(_experiments={"metrics_window_sampling": True})
+    items = capture_items("trace_metric")
+
+    def emit(job_type, n):
+        for _ in range(n):
+            # 2/s over the 5s flush window keeps 10 for the name.
+            sentry_sdk.metrics.count(
+                "test.jobs",
+                1,
+                attributes={"job_type": job_type},
+                sample_per_second=2,
+                stratify_by=["job_type"],
+            )
+
+    order = [("c", 1000), ("a", 2), ("b", 2)]
+    for job_type, n in order if c_first else reversed(order):
+        emit(job_type, n)
+
+    get_client().flush()
+    metrics = [item.payload for item in items]
+    assert all("_stratify_by" not in m for m in metrics)
+
+    def by_job_type(job_type):
+        return [m for m in metrics if m["attributes"]["job_type"] == job_type]
+
+    # Small strata keep everything, the rest of the allowance goes to "c".
+    for job_type in ("a", "b"):
+        kept = by_job_type(job_type)
+        assert len(kept) == 2
+        assert all("sentry.client_sample_rate" not in m["attributes"] for m in kept)
+
+    c = by_job_type("c")
+    assert len(c) == 6
+    assert all(
+        m["attributes"]["sentry.client_sample_rate"] == pytest.approx(0.006) for m in c
+    )
+    assert sum(
+        1 / m["attributes"].get("sentry.client_sample_rate", 1) for m in metrics
+    ) == pytest.approx(1004)
+
+
+def test_metrics_window_sampling_stratify_by_cap(sentry_init, capture_items):
+    sentry_init(_experiments={"metrics_window_sampling": True})
+    items = capture_items("trace_metric")
+
+    # 20 job types, but the name only keeps 10: 9 get their own stratum and
+    # the rest share one.
+    for i in range(20):
+        for _ in range(10):
+            sentry_sdk.metrics.count(
+                "test.jobs",
+                1,
+                attributes={"job_type": str(i)},
+                sample_per_second=2,
+                stratify_by=["job_type"],
+            )
+
+    get_client().flush()
+    metrics = [item.payload for item in items]
+
+    rates = {
+        m["attributes"]["job_type"]: m["attributes"]["sentry.client_sample_rate"]
+        for m in metrics
+    }
+    assert len(metrics) == len(rates) == 10
+    for i in range(9):
+        assert rates.pop(str(i)) == pytest.approx(1 / 10)
+    # One metric left for the 110 that share the "other" stratum.
+    assert list(rates.values()) == [pytest.approx(1 / 110)]
