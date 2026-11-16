@@ -30,7 +30,7 @@ def _generate_default_integrations_iterator(
         with_auto_enabling_integrations: bool,
     ) -> "Iterator[Type[Integration]]":
         """Returns an iterator of the default integration classes:"""
-        from importlib import import_module
+        from importlib import import_module  # noqa: PLC0415
 
         if with_auto_enabling_integrations:
             all_import_strings = integrations + auto_enabling_integrations
@@ -315,7 +315,7 @@ def _check_minimum_version(
             return
 
 
-class DidNotEnable(Exception):  # noqa: N818
+class DidNotEnable(Exception):
     """
     The integration could not be enabled due to a trivial user error like
     `flask` not being installed for the `FlaskIntegration`.

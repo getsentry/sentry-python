@@ -340,12 +340,12 @@ def test_errors_in_ray_tasks(sentry_init, span_streaming):
             with sentry_sdk.traces.start_span(
                 name="ray test parent", attributes={"sentry.op": "task"}
             ):
-                with pytest.raises(ZeroDivisionError):
+                with pytest.raises(ZeroDivisionError):  # noqa: PT012
                     future = example_task.remote()
                     ray.get(future)
         else:
             with sentry_sdk.start_transaction(op="task", name="ray test transaction"):
-                with pytest.raises(ZeroDivisionError):
+                with pytest.raises(ZeroDivisionError):  # noqa: PT012
                     future = example_task.remote()
                     ray.get(future)
 
@@ -530,13 +530,13 @@ def test_errors_in_ray_actors(sentry_init, span_streaming):
             with sentry_sdk.traces.start_span(
                 name="ray test parent", attributes={"sentry.op": "task"}
             ):
-                with pytest.raises(ZeroDivisionError):
+                with pytest.raises(ZeroDivisionError):  # noqa: PT012
                     counter = Counter.remote()
                     future = counter.increment.remote()
                     ray.get(future)
         else:
             with sentry_sdk.start_transaction(op="task", name="ray test transaction"):
-                with pytest.raises(ZeroDivisionError):
+                with pytest.raises(ZeroDivisionError):  # noqa: PT012
                     counter = Counter.remote()
                     future = counter.increment.remote()
                     ray.get(future)

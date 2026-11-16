@@ -796,7 +796,7 @@ def test_sql_psycopg2_placeholders(
     items = capture_items("event")
     sentry_sdk.get_isolation_scope().clear_breadcrumbs()
 
-    with pytest.raises(DataError):
+    with pytest.raises(DataError):  # noqa: PT012
         names = ["foo", "bar"]
         identifiers = [psycopg2.sql.Identifier(name) for name in names]
         placeholders = [

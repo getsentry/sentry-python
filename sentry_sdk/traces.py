@@ -174,7 +174,7 @@ def start_span(
     :return: The span that has been started.
     :rtype: StreamedSpan
     """
-    from sentry_sdk.tracing_utils import has_span_streaming_enabled
+    from sentry_sdk.tracing_utils import has_span_streaming_enabled  # noqa: PLC0415
 
     client = sentry_sdk.get_client()
     if client.is_active() and not has_span_streaming_enabled(client.options):
@@ -864,7 +864,7 @@ def trace(
             # Function implementation
             pass
     """
-    from sentry_sdk.tracing_utils import (
+    from sentry_sdk.tracing_utils import (  # noqa: PLC0415
         create_streaming_span_decorator,
     )
 

@@ -2074,7 +2074,7 @@ def test_streaming_create_message_api_error(
     if span_streaming:
         items = capture_items("transaction", "span")
 
-        with pytest.raises(APIStatusError), mock.patch.object(
+        with pytest.raises(APIStatusError), mock.patch.object(  # noqa: PT012
             client._client,
             "send",
             return_value=response,
@@ -2121,7 +2121,7 @@ def test_streaming_create_message_api_error(
     elif stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
-        with pytest.raises(APIStatusError), mock.patch.object(
+        with pytest.raises(APIStatusError), mock.patch.object(  # noqa: PT012
             client._client,
             "send",
             return_value=response,
@@ -2169,7 +2169,7 @@ def test_streaming_create_message_api_error(
     else:
         events = capture_events()
 
-        with pytest.raises(APIStatusError), mock.patch.object(
+        with pytest.raises(APIStatusError), mock.patch.object(  # noqa: PT012
             client._client,
             "send",
             return_value=response,
@@ -3617,7 +3617,7 @@ async def test_streaming_create_message_async_api_error(
     if span_streaming:
         items = capture_items("transaction", "span")
 
-        with pytest.raises(APIStatusError), mock.patch.object(
+        with pytest.raises(APIStatusError), mock.patch.object(  # noqa: PT012
             client._client,
             "send",
             return_value=response,
@@ -3664,7 +3664,7 @@ async def test_streaming_create_message_async_api_error(
     elif stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
-        with pytest.raises(APIStatusError), mock.patch.object(
+        with pytest.raises(APIStatusError), mock.patch.object(  # noqa: PT012
             client._client,
             "send",
             return_value=response,
@@ -3713,7 +3713,7 @@ async def test_streaming_create_message_async_api_error(
     else:
         events = capture_events()
 
-        with pytest.raises(APIStatusError), mock.patch.object(
+        with pytest.raises(APIStatusError), mock.patch.object(  # noqa: PT012
             client._client,
             "send",
             return_value=response,
@@ -4206,7 +4206,7 @@ async def test_stream_messages_async_api_error(
     if span_streaming:
         items = capture_items("transaction", "span")
 
-        with pytest.raises(APIStatusError), mock.patch.object(
+        with pytest.raises(APIStatusError), mock.patch.object(  # noqa: PT012
             client._client,
             "send",
             return_value=response,
@@ -4253,7 +4253,7 @@ async def test_stream_messages_async_api_error(
     elif stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
-        with pytest.raises(APIStatusError), mock.patch.object(
+        with pytest.raises(APIStatusError), mock.patch.object(  # noqa: PT012
             client._client,
             "send",
             return_value=response,
@@ -4299,7 +4299,7 @@ async def test_stream_messages_async_api_error(
     else:
         events = capture_events()
 
-        with pytest.raises(APIStatusError), mock.patch.object(
+        with pytest.raises(APIStatusError), mock.patch.object(  # noqa: PT012
             client._client,
             "send",
             return_value=response,

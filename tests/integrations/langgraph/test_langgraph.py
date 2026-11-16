@@ -34,7 +34,7 @@ def mock_langgraph_imports():
 
 mock_state_graph, mock_pregel = mock_langgraph_imports()
 
-from sentry_sdk.integrations.langgraph import (  # noqa: E402
+from sentry_sdk.integrations.langgraph import (
     LanggraphIntegration,
     _parse_langgraph_messages,
     _wrap_pregel_ainvoke,
@@ -614,7 +614,7 @@ def test_pregel_invoke_error(
     if span_streaming or stream_gen_ai_spans:
         items = capture_items("span")
 
-        with start_transaction(), pytest.raises(
+        with start_transaction(), pytest.raises(  # noqa: PT012
             Exception, match="Graph execution failed"
         ):
             wrapped_invoke = _wrap_pregel_invoke(original_invoke)
@@ -634,7 +634,7 @@ def test_pregel_invoke_error(
     else:
         events = capture_events()
 
-        with start_transaction(), pytest.raises(
+        with start_transaction(), pytest.raises(  # noqa: PT012
             Exception, match="Graph execution failed"
         ):
             wrapped_invoke = _wrap_pregel_invoke(original_invoke)
@@ -676,7 +676,7 @@ def test_pregel_ainvoke_error(
         raise Exception("Async graph execution failed")
 
     async def run_error_test():
-        with start_transaction(), pytest.raises(
+        with start_transaction(), pytest.raises(  # noqa: PT012
             Exception, match="Async graph execution failed"
         ):
             wrapped_ainvoke = _wrap_pregel_ainvoke(original_ainvoke)

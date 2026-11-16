@@ -153,7 +153,7 @@ def test_crumb_capture_client_error(sentry_init, capture_events, status_code, le
     sentry_init(integrations=[StdlibIntegration()], send_default_pii=True)
     events = capture_events()
 
-    url = f"http://localhost:{PORT}/status/{status_code}"  # noqa:E231
+    url = f"http://localhost:{PORT}/status/{status_code}"
     try:
         urlopen(url)
     except HTTPError:
@@ -204,7 +204,7 @@ def test_crumb_capture_client_error_span_streaming(
     )
     events = capture_events()
 
-    url = f"http://localhost:{PORT}/status/{status_code}"  # noqa:E231
+    url = f"http://localhost:{PORT}/status/{status_code}"
     try:
         urlopen(url)
     except HTTPError:
@@ -356,7 +356,7 @@ def test_httplib_misuse(sentry_init, capture_events, request):
 
     conn.request("GET", "/200")
 
-    with pytest.raises(Exception):  # noqa: B017
+    with pytest.raises(Exception):  # noqa: PT011
         # This raises an exception, because we didn't call `getresponse` for
         # the previous request yet.
         #
@@ -1324,7 +1324,7 @@ def test_http_timeout(
     if span_streaming:
         items = capture_items("span")
 
-        with pytest.raises(TimeoutError):
+        with pytest.raises(TimeoutError):  # noqa: PT012
             with sentry_sdk.traces.start_span(
                 name="name",
                 attributes={
@@ -1340,11 +1340,11 @@ def test_http_timeout(
         assert len(spans) == 2
         span = spans[0]
         assert span["attributes"]["sentry.op"] == "http.client"
-        assert span["name"] == f"GET http://localhost:{PORT}/bla"  # noqa: E231
+        assert span["name"] == f"GET http://localhost:{PORT}/bla"
     else:
         envelopes = capture_envelopes()
 
-        with pytest.raises(TimeoutError):
+        with pytest.raises(TimeoutError):  # noqa: PT012
             with start_transaction(op="op", name="name"):
                 conn = HTTPConnection("localhost", port=PORT)
                 conn.request("GET", "/bla")
@@ -1356,7 +1356,7 @@ def test_http_timeout(
 
         span = transaction["spans"][0]
         assert span["op"] == "http.client"
-        assert span["description"] == f"GET http://localhost:{PORT}/bla"  # noqa: E231
+        assert span["description"] == f"GET http://localhost:{PORT}/bla"
 
 
 @pytest.mark.parametrize("tunnel_port", [8080, None])
@@ -1691,6 +1691,4 @@ def test_crumb_url_query_data_collection_span_streaming(
         assert crumb["data"][SPANDATA.URL_FULL] == f"{base_url}#frag"
     else:
         assert crumb["data"][SPANDATA.URL_QUERY] == expected_query
-        assert (
-            crumb["data"][SPANDATA.URL_FULL] == f"{base_url}?{expected_query}#frag"  # noqa: E231
-        )
+        assert crumb["data"][SPANDATA.URL_FULL] == f"{base_url}?{expected_query}#frag"

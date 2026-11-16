@@ -175,7 +175,7 @@ class GRPCIntegration(Integration):
 
     @staticmethod
     def setup_once() -> None:
-        import grpc
+        import grpc  # noqa: PLC0415
 
         grpc.insecure_channel = _wrap_channel_sync(grpc.insecure_channel)
         grpc.secure_channel = _wrap_channel_sync(grpc.secure_channel)

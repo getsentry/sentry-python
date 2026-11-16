@@ -32,7 +32,7 @@ def test_orm_queries(
         },
     )
 
-    Base = declarative_base()  # noqa: N806
+    Base = declarative_base()
 
     class Person(Base):
         __tablename__ = "person"
@@ -53,7 +53,7 @@ def test_orm_queries(
     )
     Base.metadata.create_all(engine)
 
-    Session = sessionmaker(bind=engine)  # noqa: N806
+    Session = sessionmaker(bind=engine)
     session = Session()
 
     bob = Person(name="Bob")
@@ -108,7 +108,7 @@ def test_transactions(
         traces_sample_rate=1.0,
     )
 
-    Base = declarative_base()  # noqa: N806
+    Base = declarative_base()
 
     class Person(Base):
         __tablename__ = "person"
@@ -129,7 +129,7 @@ def test_transactions(
     )
     Base.metadata.create_all(engine)
 
-    Session = sessionmaker(bind=engine)  # noqa: N806
+    Session = sessionmaker(bind=engine)
     session = Session()
 
     if span_streaming:
@@ -139,7 +139,7 @@ def test_transactions(
                 session.query(Person).first()
 
             for _ in range(2):
-                with pytest.raises(IntegrityError):
+                with pytest.raises(IntegrityError):  # noqa: PT012
                     with session.begin_nested():
                         session.add(Person(id=1, name="bob"))
                         session.add(Person(id=1, name="bob"))
@@ -185,7 +185,7 @@ def test_transactions(
                 session.query(Person).first()
 
             for _ in range(2):
-                with pytest.raises(IntegrityError):
+                with pytest.raises(IntegrityError):  # noqa: PT012
                     with session.begin_nested():
                         session.add(Person(id=1, name="bob"))
                         session.add(Person(id=1, name="bob"))
@@ -238,7 +238,7 @@ def test_transactions_no_engine_url(
         traces_sample_rate=1.0,
     )
 
-    Base = declarative_base()  # noqa: N806
+    Base = declarative_base()
 
     class Person(Base):
         __tablename__ = "person"
@@ -260,7 +260,7 @@ def test_transactions_no_engine_url(
     engine.url = None
     Base.metadata.create_all(engine)
 
-    Session = sessionmaker(bind=engine)  # noqa: N806
+    Session = sessionmaker(bind=engine)
     session = Session()
 
     if span_streaming:
@@ -270,7 +270,7 @@ def test_transactions_no_engine_url(
                 session.query(Person).first()
 
             for _ in range(2):
-                with pytest.raises(IntegrityError):
+                with pytest.raises(IntegrityError):  # noqa: PT012
                     with session.begin_nested():
                         session.add(Person(id=1, name="bob"))
                         session.add(Person(id=1, name="bob"))
@@ -297,7 +297,7 @@ def test_transactions_no_engine_url(
                 session.query(Person).first()
 
             for _ in range(2):
-                with pytest.raises(IntegrityError):
+                with pytest.raises(IntegrityError):  # noqa: PT012
                     with session.begin_nested():
                         session.add(Person(id=1, name="bob"))
                         session.add(Person(id=1, name="bob"))
@@ -458,7 +458,7 @@ def test_query_source_disabled(
         items = capture_items("span")
 
         with sentry_sdk.traces.start_span(name="custom parent"):
-            Base = declarative_base()  # noqa: N806
+            Base = declarative_base()
 
             class Person(Base):
                 __tablename__ = "person"
@@ -470,7 +470,7 @@ def test_query_source_disabled(
             )
             Base.metadata.create_all(engine)
 
-            Session = sessionmaker(bind=engine)  # noqa: N806
+            Session = sessionmaker(bind=engine)
             session = Session()
 
             bob = Person(name="Bob")
@@ -498,7 +498,7 @@ def test_query_source_disabled(
         events = capture_events()
 
         with start_transaction(name="test_transaction", sampled=True):
-            Base = declarative_base()  # noqa: N806
+            Base = declarative_base()
 
             class Person(Base):
                 __tablename__ = "person"
@@ -510,7 +510,7 @@ def test_query_source_disabled(
             )
             Base.metadata.create_all(engine)
 
-            Session = sessionmaker(bind=engine)  # noqa: N806
+            Session = sessionmaker(bind=engine)
             session = Session()
 
             bob = Person(name="Bob")
@@ -560,7 +560,7 @@ def test_query_source_enabled(
         items = capture_items("span")
 
         with sentry_sdk.traces.start_span(name="custom parent"):
-            Base = declarative_base()  # noqa: N806
+            Base = declarative_base()
 
             class Person(Base):
                 __tablename__ = "person"
@@ -572,7 +572,7 @@ def test_query_source_enabled(
             )
             Base.metadata.create_all(engine)
 
-            Session = sessionmaker(bind=engine)  # noqa: N806
+            Session = sessionmaker(bind=engine)
             session = Session()
 
             bob = Person(name="Bob")
@@ -599,7 +599,7 @@ def test_query_source_enabled(
         events = capture_events()
 
         with start_transaction(name="test_transaction", sampled=True):
-            Base = declarative_base()  # noqa: N806
+            Base = declarative_base()
 
             class Person(Base):
                 __tablename__ = "person"
@@ -611,7 +611,7 @@ def test_query_source_enabled(
             )
             Base.metadata.create_all(engine)
 
-            Session = sessionmaker(bind=engine)  # noqa: N806
+            Session = sessionmaker(bind=engine)
             session = Session()
 
             bob = Person(name="Bob")
@@ -654,7 +654,7 @@ def test_query_source(
         items = capture_items("span")
 
         with sentry_sdk.traces.start_span(name="custom parent"):
-            Base = declarative_base()  # noqa: N806
+            Base = declarative_base()
 
             class Person(Base):
                 __tablename__ = "person"
@@ -666,7 +666,7 @@ def test_query_source(
             )
             Base.metadata.create_all(engine)
 
-            Session = sessionmaker(bind=engine)  # noqa: N806
+            Session = sessionmaker(bind=engine)
             session = Session()
 
             bob = Person(name="Bob")
@@ -708,7 +708,7 @@ def test_query_source(
         events = capture_events()
 
         with start_transaction(name="test_transaction", sampled=True):
-            Base = declarative_base()  # noqa: N806
+            Base = declarative_base()
 
             class Person(Base):
                 __tablename__ = "person"
@@ -720,7 +720,7 @@ def test_query_source(
             )
             Base.metadata.create_all(engine)
 
-            Session = sessionmaker(bind=engine)  # noqa: N806
+            Session = sessionmaker(bind=engine)
             session = Session()
 
             bob = Person(name="Bob")
@@ -786,7 +786,7 @@ def test_query_source_with_module_in_search_path(
     if span_streaming:
         items = capture_items("span")
         with sentry_sdk.traces.start_span(name="custom parent"):
-            Base = declarative_base()  # noqa: N806
+            Base = declarative_base()
 
             class Person(Base):
                 __tablename__ = "person"
@@ -798,7 +798,7 @@ def test_query_source_with_module_in_search_path(
             )
             Base.metadata.create_all(engine)
 
-            Session = sessionmaker(bind=engine)  # noqa: N806
+            Session = sessionmaker(bind=engine)
             session = Session()
 
             bob = Person(name="Bob")
@@ -844,7 +844,7 @@ def test_query_source_with_module_in_search_path(
     else:
         events = capture_events()
         with start_transaction(name="test_transaction", sampled=True):
-            Base = declarative_base()  # noqa: N806
+            Base = declarative_base()
 
             class Person(Base):
                 __tablename__ = "person"
@@ -856,7 +856,7 @@ def test_query_source_with_module_in_search_path(
             )
             Base.metadata.create_all(engine)
 
-            Session = sessionmaker(bind=engine)  # noqa: N806
+            Session = sessionmaker(bind=engine)
             session = Session()
 
             bob = Person(name="Bob")
@@ -914,7 +914,7 @@ def test_no_query_source_if_duration_too_short(
         items = capture_items("span")
 
         with sentry_sdk.traces.start_span(name="custom parent"):
-            Base = declarative_base()  # noqa: N806
+            Base = declarative_base()
 
             class Person(Base):
                 __tablename__ = "person"
@@ -926,13 +926,13 @@ def test_no_query_source_if_duration_too_short(
             )
             Base.metadata.create_all(engine)
 
-            Session = sessionmaker(bind=engine)  # noqa: N806
+            Session = sessionmaker(bind=engine)
             session = Session()
 
             bob = Person(name="Bob")
             session.add(bob)
 
-            class fake_record_sql_queries:  # noqa: N801
+            class fake_record_sql_queries:
                 def __init__(self, *args, **kwargs):
                     self._ctx_mgr = record_sql_queries(*args, **kwargs)
 
@@ -972,7 +972,7 @@ def test_no_query_source_if_duration_too_short(
         events = capture_events()
 
         with start_transaction(name="test_transaction", sampled=True):
-            Base = declarative_base()  # noqa: N806
+            Base = declarative_base()
 
             class Person(Base):
                 __tablename__ = "person"
@@ -984,13 +984,13 @@ def test_no_query_source_if_duration_too_short(
             )
             Base.metadata.create_all(engine)
 
-            Session = sessionmaker(bind=engine)  # noqa: N806
+            Session = sessionmaker(bind=engine)
             session = Session()
 
             bob = Person(name="Bob")
             session.add(bob)
 
-            class fake_record_sql_queries:  # noqa: N801
+            class fake_record_sql_queries:
                 def __init__(self, *args, **kwargs):
                     self._ctx_mgr = record_sql_queries(*args, **kwargs)
 
@@ -1045,7 +1045,7 @@ def test_query_source_if_duration_over_threshold(
         items = capture_items("span")
 
         with sentry_sdk.traces.start_span(name="custom parent"):
-            Base = declarative_base()  # noqa: N806
+            Base = declarative_base()
 
             class Person(Base):
                 __tablename__ = "person"
@@ -1057,13 +1057,13 @@ def test_query_source_if_duration_over_threshold(
             )
             Base.metadata.create_all(engine)
 
-            Session = sessionmaker(bind=engine)  # noqa: N806
+            Session = sessionmaker(bind=engine)
             session = Session()
 
             bob = Person(name="Bob")
             session.add(bob)
 
-            class fake_record_sql_queries:  # noqa: N801
+            class fake_record_sql_queries:
                 def __init__(self, *args, **kwargs):
                     self._ctx_mgr = record_sql_queries(*args, **kwargs)
 
@@ -1120,7 +1120,7 @@ def test_query_source_if_duration_over_threshold(
         events = capture_events()
 
         with start_transaction(name="test_transaction", sampled=True):
-            Base = declarative_base()  # noqa: N806
+            Base = declarative_base()
 
             class Person(Base):
                 __tablename__ = "person"
@@ -1132,13 +1132,13 @@ def test_query_source_if_duration_over_threshold(
             )
             Base.metadata.create_all(engine)
 
-            Session = sessionmaker(bind=engine)  # noqa: N806
+            Session = sessionmaker(bind=engine)
             session = Session()
 
             bob = Person(name="Bob")
             session.add(bob)
 
-            class fake_record_sql_queries:  # noqa: N801
+            class fake_record_sql_queries:
                 def __init__(self, *args, **kwargs):
                     self._ctx_mgr = record_sql_queries(*args, **kwargs)
 

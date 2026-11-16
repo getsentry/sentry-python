@@ -98,7 +98,7 @@ def test_sentry_listener_on_job_start(sentry_listener):
     with patch.object(listener, "_add_breadcrumb") as mock_add_breadcrumb:
 
         class MockJobStart:
-            def jobId(self):  # noqa: N802
+            def jobId(self):
                 return "sample-job-id-start"
 
         mock_job_start = MockJobStart()
@@ -119,14 +119,14 @@ def test_sentry_listener_on_job_end(sentry_listener, job_result, level):
     with patch.object(listener, "_add_breadcrumb") as mock_add_breadcrumb:
 
         class MockJobResult:
-            def toString(self):  # noqa: N802
+            def toString(self):
                 return job_result
 
         class MockJobEnd:
-            def jobId(self):  # noqa: N802
+            def jobId(self):
                 return "sample-job-id-end"
 
-            def jobResult(self):  # noqa: N802
+            def jobResult(self):
                 result = MockJobResult()
                 return result
 
@@ -146,17 +146,17 @@ def test_sentry_listener_on_stage_submitted(sentry_listener):
     with patch.object(listener, "_add_breadcrumb") as mock_add_breadcrumb:
 
         class StageInfo:
-            def stageId(self):  # noqa: N802
+            def stageId(self):
                 return "sample-stage-id-submit"
 
             def name(self):
                 return "run-job"
 
-            def attemptId(self):  # noqa: N802
+            def attemptId(self):
                 return 14
 
         class MockStageSubmitted:
-            def stageInfo(self):  # noqa: N802
+            def stageInfo(self):
                 stageinf = StageInfo()
                 return stageinf
 
@@ -177,17 +177,17 @@ def test_sentry_listener_on_stage_submitted_no_attempt_id(sentry_listener):
     with patch.object(listener, "_add_breadcrumb") as mock_add_breadcrumb:
 
         class StageInfo:
-            def stageId(self):  # noqa: N802
+            def stageId(self):
                 return "sample-stage-id-submit"
 
             def name(self):
                 return "run-job"
 
-            def attemptNumber(self):  # noqa: N802
+            def attemptNumber(self):
                 return 14
 
         class MockStageSubmitted:
-            def stageInfo(self):  # noqa: N802
+            def stageInfo(self):
                 stageinf = StageInfo()
                 return stageinf
 
@@ -208,14 +208,14 @@ def test_sentry_listener_on_stage_submitted_no_attempt_id_or_number(sentry_liste
     with patch.object(listener, "_add_breadcrumb") as mock_add_breadcrumb:
 
         class StageInfo:
-            def stageId(self):  # noqa: N802
+            def stageId(self):
                 return "sample-stage-id-submit"
 
             def name(self):
                 return "run-job"
 
         class MockStageSubmitted:
-            def stageInfo(self):  # noqa: N802
+            def stageInfo(self):
                 stageinf = StageInfo()
                 return stageinf
 
@@ -246,20 +246,20 @@ def get_mock_stage_completed():
                     raise Py4JJavaError("msg", JavaException())
 
         class StageInfo:
-            def stageId(self):  # noqa: N802
+            def stageId(self):
                 return "sample-stage-id-submit"
 
             def name(self):
                 return "run-job"
 
-            def attemptId(self):  # noqa: N802
+            def attemptId(self):
                 return 14
 
-            def failureReason(self):  # noqa: N802
+            def failureReason(self):
                 return FailureReason()
 
         class MockStageCompleted:
-            def stageInfo(self):  # noqa: N802
+            def stageInfo(self):
                 return StageInfo()
 
         return MockStageCompleted()

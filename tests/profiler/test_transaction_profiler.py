@@ -62,7 +62,7 @@ def experimental_options(mode=None, sample_rate=None):
     ],
 )
 def test_profiler_invalid_mode(mode, make_options, teardown_profiling):
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError):  # noqa: PT011
         setup_profiler(make_options(mode))
 
 
@@ -822,7 +822,7 @@ sample_stacks = [
 )
 @mock.patch("sentry_sdk.profiler.transaction_profiler.MAX_PROFILE_DURATION_NS", 5)
 def test_profile_processing(
-    DictionaryContaining,  # noqa: N803
+    DictionaryContaining,
     samples,
     expected,
 ):

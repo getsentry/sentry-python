@@ -721,7 +721,7 @@ def test_good_sysexit_doesnt_fail_transaction(
 
     with start_transaction(name="hi") as transaction:
         transaction.set_status(SPANSTATUS.OK)
-        with pytest.raises(SystemExit):
+        with pytest.raises(SystemExit):  # noqa: PT012
             with start_span(op="foo", name="foodesc"):
                 if exception_value is not False:
                     sys.exit(exception_value)
@@ -746,7 +746,7 @@ def test_good_sysexit_doesnt_fail_segment_span_streaming(
     items = capture_items()
 
     with sentry_sdk.traces.start_span(name="hi"):
-        with pytest.raises(SystemExit):
+        with pytest.raises(SystemExit):  # noqa: PT012
             with sentry_sdk.traces.start_span(name="foo"):
                 if exception_value is not False:
                     sys.exit(exception_value)

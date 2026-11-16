@@ -281,7 +281,7 @@ class AnthropicIntegration(Integration):
             AsyncMessageStream.close = _wrap_async_close(AsyncMessageStream.close)  # type: ignore[method-assign]
 
         try:
-            from functools import cached_property
+            from functools import cached_property  # noqa: PLC0415
         except ImportError:
             return
 
