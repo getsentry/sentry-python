@@ -15,3 +15,9 @@ repos:
         language: system
         types_or: [python, pyi]
         require_serial: true
+    -   id: typos
+        name: typos
+        entry: uv run typos --force-exclude
+        language: system
+        types: [text]
+        require_serial: true

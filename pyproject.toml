@@ -12,6 +12,7 @@ dev = [
     "coverage[toml]",
     "pre-commit",
     "ruff",
+    "typos",
 ]
 
 toxgen = [
