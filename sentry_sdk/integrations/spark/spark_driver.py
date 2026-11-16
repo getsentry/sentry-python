@@ -25,7 +25,7 @@ def _set_app_properties() -> None:
     Set properties in driver that propagate to worker processes, allowing for workers to have access to those properties.
     This allows worker integration to have access to app_name and application_id.
     """
-    from pyspark import SparkContext
+    from pyspark import SparkContext  # noqa: PLC0415
 
     spark_context = SparkContext._active_spark_context
     if spark_context:
@@ -43,7 +43,7 @@ def _start_sentry_listener(sc: "SparkContext") -> None:
     """
     Start java gateway server to add custom `SparkListener`
     """
-    from pyspark.java_gateway import ensure_callback_server_started
+    from pyspark.java_gateway import ensure_callback_server_started  # noqa: PLC0415
 
     gw = sc._gateway
     ensure_callback_server_started(gw)
@@ -92,7 +92,7 @@ def _activate_integration(sc: "SparkContext") -> None:
 
 
 def _patch_spark_context_init() -> None:
-    from pyspark import SparkContext
+    from pyspark import SparkContext  # noqa: PLC0415
 
     spark_context_init = SparkContext._do_init
 
@@ -108,7 +108,7 @@ def _patch_spark_context_init() -> None:
 
 
 def _setup_sentry_tracing() -> None:
-    from pyspark import SparkContext
+    from pyspark import SparkContext  # noqa: PLC0415
 
     if SparkContext._active_spark_context is not None:
         _activate_integration(SparkContext._active_spark_context)
@@ -241,7 +241,7 @@ class SentryListener(SparkListener):
         _set_app_properties()
 
     def onStageCompleted(self, stageCompleted: "Any") -> None:  # noqa: N802,N803
-        from py4j.protocol import Py4JJavaError  # type: ignore
+        from py4j.protocol import Py4JJavaError  # type: ignore  # noqa: PLC0415
 
         stage_info = stageCompleted.stageInfo()
         message = ""

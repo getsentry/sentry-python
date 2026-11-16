@@ -69,7 +69,7 @@ class PyramidIntegration(Integration):
 
     @staticmethod
     def setup_once() -> None:
-        from pyramid import router
+        from pyramid import router  # noqa: PLC0415
 
         old_call_view = router._call_view
 

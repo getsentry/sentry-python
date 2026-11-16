@@ -1912,7 +1912,7 @@ class ClientConstructor:
 
 
 def _get_default_options() -> "dict[str, Any]":
-    import inspect
+    import inspect  # noqa: PLC0415
 
     a = inspect.getfullargspec(ClientConstructor.__init__)
     defaults = a.defaults or ()

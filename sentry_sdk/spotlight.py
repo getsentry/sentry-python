@@ -118,7 +118,7 @@ try:
         def __init__(self: "Self", get_response: "Callable[..., HttpResponse]") -> None:
             super().__init__(get_response)
 
-            import sentry_sdk.api
+            import sentry_sdk.api  # noqa: PLC0415
 
             self.sentry_sdk = sentry_sdk.api
 

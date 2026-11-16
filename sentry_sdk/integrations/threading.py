@@ -49,12 +49,12 @@ class ThreadingIntegration(Integration):
         old_start = Thread.start
 
         try:
-            from django import VERSION as django_version  # noqa: N811
+            from django import VERSION as django_version  # noqa: N811, PLC0415
         except ImportError:
             django_version = None
 
         try:
-            import channels  # type: ignore[import-untyped]
+            import channels  # type: ignore[import-untyped]  # noqa: PLC0415
 
             channels_version = channels.__version__
         except (ImportError, AttributeError):

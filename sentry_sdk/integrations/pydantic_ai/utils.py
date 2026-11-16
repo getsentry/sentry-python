@@ -63,7 +63,7 @@ def _should_send_prompts_legacy() -> bool:
     if not should_send_default_pii():
         return False
 
-    from . import PydanticAIIntegration
+    from . import PydanticAIIntegration  # noqa: PLC0415
 
     # Get the integration instance from the client
     integration = sentry_sdk.get_client().get_integration(PydanticAIIntegration)

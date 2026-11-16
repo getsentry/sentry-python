@@ -1466,7 +1466,7 @@ def trace(
             # Function implementation
             pass
     """
-    from sentry_sdk.tracing_utils import create_span_decorator
+    from sentry_sdk.tracing_utils import create_span_decorator  # noqa: PLC0415
 
     decorator = create_span_decorator(
         op=op,

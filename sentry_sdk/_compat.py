@@ -35,11 +35,11 @@ def check_uwsgi_thread_support() -> bool:
     #    --py-call-uwsgi-fork-hooks to force uWSGI to run regular cpython
     #    after-fork hooks that take care of cleaning up stale thread data.
     try:
-        from uwsgi import opt  # type: ignore
+        from uwsgi import opt  # type: ignore  # noqa: PLC0415
     except ImportError:
         return True
 
-    from sentry_sdk.consts import FALSE_VALUES
+    from sentry_sdk.consts import FALSE_VALUES  # noqa: PLC0415
 
     def enabled(option: str) -> bool:
         value = opt.get(option, False)
@@ -61,7 +61,7 @@ def check_uwsgi_thread_support() -> bool:
     lazy_mode = enabled("lazy-apps") or enabled("lazy")
 
     if lazy_mode and not threads_enabled:
-        from warnings import warn
+        from warnings import warn  # noqa: PLC0415
 
         warn(
             Warning(
@@ -75,7 +75,7 @@ def check_uwsgi_thread_support() -> bool:
         return False
 
     elif not lazy_mode and (not threads_enabled or not fork_hooks_on):
-        from warnings import warn
+        from warnings import warn  # noqa: PLC0415
 
         warn(
             Warning(

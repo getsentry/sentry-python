@@ -497,7 +497,7 @@ def _wrap_task_call(task: "Any", f: "F") -> "F":
 
 
 def _patch_build_tracer() -> None:
-    import celery.app.trace as trace  # type: ignore
+    import celery.app.trace as trace  # type: ignore  # noqa: PLC0415
 
     original_build_tracer = trace.build_tracer
 
@@ -527,7 +527,7 @@ def _patch_task_apply_async() -> None:
 
 
 def _patch_celery_send_task() -> None:
-    from celery import Celery
+    from celery import Celery  # noqa: PLC0415
 
     Celery.send_task = _wrap_task_run(Celery.send_task)
 
@@ -535,7 +535,7 @@ def _patch_celery_send_task() -> None:
 def _patch_worker_exit() -> None:
     # Need to flush queue before worker shutdown because a crashing worker will
     # call os._exit
-    from billiard.pool import Worker  # type: ignore
+    from billiard.pool import Worker  # type: ignore  # noqa: PLC0415
 
     original_workloop = Worker.workloop
 

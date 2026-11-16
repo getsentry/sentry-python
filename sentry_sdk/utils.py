@@ -592,7 +592,7 @@ def serialize_frame(
     max_value_length: "Optional[int]" = None,
     custom_repr: "Optional[Callable[..., Optional[str]]]" = None,
 ) -> "Dict[str, Any]":
-    from sentry_sdk.serializer import serialize
+    from sentry_sdk.serializer import serialize  # noqa: PLC0415
 
     f_code = getattr(frame, "f_code", None)
     if not f_code:
@@ -1364,8 +1364,8 @@ def _is_contextvars_broken() -> bool:
     Returns whether gevent/eventlet have patched the stdlib in a way where thread locals are now more "correct" than contextvars.
     """
     try:
-        import gevent
-        from gevent.monkey import is_object_patched
+        import gevent  # noqa: PLC0415
+        from gevent.monkey import is_object_patched  # noqa: PLC0415
 
         # Get the MAJOR and MINOR version numbers of Gevent
         version_tuple = tuple(
@@ -1391,8 +1391,8 @@ def _is_contextvars_broken() -> bool:
         pass
 
     try:
-        import greenlet
-        from eventlet.patcher import is_monkey_patched  # type: ignore
+        import greenlet  # noqa: PLC0415
+        from eventlet.patcher import is_monkey_patched  # type: ignore  # noqa: PLC0415
 
         greenlet_version = parse_version(greenlet.__version__)
 
@@ -1454,7 +1454,7 @@ def _get_contextvars() -> "Tuple[bool, type]":
             # `aiocontextvars` is absolutely required for functional
             # contextvars on Python 3.6.
             try:
-                from aiocontextvars import ContextVar
+                from aiocontextvars import ContextVar  # noqa: PLC0415
 
                 return True, ContextVar
             except ImportError:
@@ -1462,7 +1462,7 @@ def _get_contextvars() -> "Tuple[bool, type]":
         else:
             # On Python 3.7 contextvars are functional.
             try:
-                from contextvars import ContextVar
+                from contextvars import ContextVar  # noqa: PLC0415
 
                 return True, ContextVar
             except ImportError:
@@ -1470,7 +1470,7 @@ def _get_contextvars() -> "Tuple[bool, type]":
 
     # Fall back to basic thread-local usage.
 
-    from threading import local
+    from threading import local  # noqa: PLC0415
 
     return False, _make_threadlocal_contextvars(local)
 
@@ -1799,7 +1799,7 @@ def is_sentry_url(client: "sentry_sdk.client.BaseClient", url: str) -> bool:
 
 def _generate_installed_modules() -> "Iterator[Tuple[str, str]]":
     try:
-        from importlib import metadata
+        from importlib import metadata  # noqa: PLC0415
 
         yielded = set()
         for dist in metadata.distributions():
@@ -1817,7 +1817,7 @@ def _generate_installed_modules() -> "Iterator[Tuple[str, str]]":
     except ImportError:
         # < py3.8
         try:
-            import pkg_resources
+            import pkg_resources  # noqa: PLC0415
         except ImportError:
             return
 

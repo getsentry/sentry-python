@@ -301,6 +301,7 @@ select = [
     "I",
     # Note: B and N rules are NOT enabled by default in flake8
     # They were only active through the plugins, which may not have been fully enabled
+    "PLC0415", # Import not at the top level of the file
 ]
 
 # Use ONLY the same ignores as the original flake8 config + compatibility for this codebase
@@ -316,6 +317,9 @@ ignore = [
     # Additional ignores for codebase compatibility
     "E721", # Use isinstance instead of type() == - existing pattern in this codebase
 ]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["PLC0415"]
 
 [tool.ruff.format]
 # ruff format already excludes the same files as specified in extend-exclude

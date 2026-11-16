@@ -38,7 +38,7 @@ else:
 
 
 def patch_django_middlewares() -> None:
-    from django.core.handlers import base
+    from django.core.handlers import base  # noqa: PLC0415
 
     old_import_string = base.import_string
 
@@ -65,7 +65,7 @@ def patch_django_middlewares() -> None:
 
 
 def _wrap_middleware(middleware: "Any", middleware_name: str) -> "Any":
-    from sentry_sdk.integrations.django import DjangoIntegration
+    from sentry_sdk.integrations.django import DjangoIntegration  # noqa: PLC0415
 
     def _check_middleware_span(
         old_method: "Callable[..., Any]",

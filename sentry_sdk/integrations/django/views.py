@@ -13,10 +13,10 @@ from sentry_sdk.integrations.django.asgi import iscoroutinefunction, wrap_async_
 
 
 def patch_views() -> None:
-    from django.core.handlers.base import BaseHandler
-    from django.template.response import SimpleTemplateResponse
+    from django.core.handlers.base import BaseHandler  # noqa: PLC0415
+    from django.template.response import SimpleTemplateResponse  # noqa: PLC0415
 
-    from sentry_sdk.integrations.django import DjangoIntegration
+    from sentry_sdk.integrations.django import DjangoIntegration  # noqa: PLC0415
 
     old_make_view_atomic = BaseHandler.make_view_atomic
     old_render = SimpleTemplateResponse.render
@@ -65,7 +65,7 @@ def patch_views() -> None:
 
 
 def _wrap_sync_view(callback: "Any") -> "Any":
-    from sentry_sdk.integrations.django import DjangoIntegration
+    from sentry_sdk.integrations.django import DjangoIntegration  # noqa: PLC0415
 
     @functools.wraps(callback)
     def sentry_wrapped_callback(request: "Any", *args: "Any", **kwargs: "Any") -> "Any":

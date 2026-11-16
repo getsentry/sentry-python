@@ -653,7 +653,7 @@ class _Client(BaseClient):
 
             # Setup Spotlight before creating batchers so _capture_envelope can use it.
             # setup_spotlight handles all config/env var resolution per the SDK spec.
-            from sentry_sdk.spotlight import setup_spotlight
+            from sentry_sdk.spotlight import setup_spotlight  # noqa: PLC0415
 
             self.spotlight = setup_spotlight(self.options)
             if self.spotlight is not None and not self.options["dsn"]:
