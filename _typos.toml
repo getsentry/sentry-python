@@ -9,7 +9,6 @@ extend-ignore-re = [
 [default.extend-words]
 GAE = "GAE"                 # Google App Engine
 certifi = "certifi"         # package name
-unparseable = "unparseable"
 # Chunked strings and key prefixes in tests
 abl = "abl"
 hel = "hel"

@@ -376,7 +376,7 @@ async def test_transaction_style(
 
 @pytest.mark.tests_internal_exceptions
 @pytest.mark.asyncio
-async def test_tracing_unparseable_url(sentry_init, aiohttp_client, capture_events):
+async def test_tracing_unparsable_url(sentry_init, aiohttp_client, capture_events):
     sentry_init(integrations=[AioHttpIntegration()], traces_sample_rate=1.0)
 
     async def hello(request):
@@ -400,7 +400,7 @@ async def test_tracing_unparseable_url(sentry_init, aiohttp_client, capture_even
     assert event["type"] == "transaction"
     assert (
         event["transaction"]
-        == "tests.integrations.aiohttp.test_aiohttp.test_tracing_unparseable_url.<locals>.hello"
+        == "tests.integrations.aiohttp.test_aiohttp.test_tracing_unparsable_url.<locals>.hello"
     )
 
 
