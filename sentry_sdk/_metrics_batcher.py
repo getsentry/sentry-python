@@ -1,11 +1,13 @@
+import math
 import random
+import time
 from typing import TYPE_CHECKING
 
 from sentry_sdk._batcher import Batcher
-from sentry_sdk.utils import capture_internal_exceptions, serialize_attribute
+from sentry_sdk.utils import capture_internal_exceptions, logger, serialize_attribute
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Dict, Hashable, List, Optional, Tuple, Union
+    from typing import Any, Callable, Dict, Hashable, List, Optional, Set, Tuple, Union
 
     from sentry_sdk._types import Attributes, Metric, MetricWindowSamplingOptions
     from sentry_sdk.envelope import Envelope
@@ -15,11 +17,6 @@ DEFAULT_SAMPLE_PER_SECOND = 10
 # Lowest factor that back pressure can scale every allowance down to.
 MIN_PRESSURE = 0.01
 
-# Private key set by `sentry_sdk.metrics` when the caller passes
-# `sample_per_second`. It is never serialized (see `_to_transport_format`).
-SAMPLE_PER_SECOND_KEY = "_sample_per_second"
-# Same, for `stratify_by`.
-STRATIFY_BY_KEY = "_stratify_by"
 CLIENT_SAMPLE_RATE_ATTRIBUTE = "sentry.client_sample_rate"
 
 # Stratum for attribute values past a name's stratum cap.
@@ -66,7 +63,17 @@ class MetricsBatcher(Batcher["Metric"]):
     kept. At flush, kept metrics get `sentry.client_sample_rate = kept / seen`
     (multiplied into any rate the caller set) so counts extrapolate.
 
-    With `stratify_by=[attribute keys]`, the name's allowance is split between
+    Options: `sample_per_second` (default for every name),
+    `sample_per_second_by_name` (`{name: rate}`) and `stratify_by`
+    (`{name: [attribute keys]}`).
+
+    Windows can end early (the buffer reaching `MAX_BEFORE_FLUSH`, or a manual
+    `flush()`), so at flush each name's allowance is scaled down to the time
+    the window actually ran, and a random subset of the reservoir is kept.
+    A random subset of a uniform sample is still uniform, so `kept / seen`
+    stays correct. Every name, and every stratum, keeps at least one metric.
+
+    With `stratify_by`, the name's allowance is split between
     the strata (distinct values of those attributes) by water-filling: small
     strata keep every metric, the rest of the allowance goes to the big ones,
     and each stratum gets its own `kept / seen` rate. A new metric in a stratum
@@ -81,8 +88,9 @@ class MetricsBatcher(Batcher["Metric"]):
     Metrics dropped because of a lowered allowance are reported as
     `backpressure`, the rest as `sample_rate`.
 
-    The buffer itself is unchanged: metrics are appended or replaced in place,
-    and the per-name state is cleared with the buffer on every flush.
+    The buffer itself is unchanged: metrics are appended or replaced in place
+    while the window is open, trimmed ones are filtered out at flush, and the
+    per-name state is cleared with the buffer on every flush.
     """
 
     MAX_BEFORE_FLUSH = 1000
@@ -100,11 +108,23 @@ class MetricsBatcher(Batcher["Metric"]):
         window_sampling: "Union[bool, MetricWindowSamplingOptions, None]" = None,
     ) -> None:
         self._sample_per_second: "Optional[float]" = None
+        self._sample_per_second_by_name: "Dict[str, float]" = {}
+        self._stratify_by: "Dict[str, Tuple[str, ...]]" = {}
         if window_sampling:
             options = {} if window_sampling is True else window_sampling
-            self._sample_per_second = options.get(
-                "sample_per_second", DEFAULT_SAMPLE_PER_SECOND
+            self._sample_per_second = _valid_rate(
+                options.get("sample_per_second", DEFAULT_SAMPLE_PER_SECOND)
             )
+            if self._sample_per_second is None:
+                self._sample_per_second = DEFAULT_SAMPLE_PER_SECOND
+            for name, value in (options.get("sample_per_second_by_name") or {}).items():
+                rate = _valid_rate(value)
+                if rate is not None:
+                    self._sample_per_second_by_name[name] = rate
+            for name, keys in (options.get("stratify_by") or {}).items():
+                self._stratify_by[name] = (
+                    (keys,) if isinstance(keys, str) else tuple(keys)
+                )
 
         self._reset_window_state()
         super().__init__(capture_func, record_lost_func)
@@ -117,6 +137,7 @@ class MetricsBatcher(Batcher["Metric"]):
         self._windows: "Dict[str, _NameWindow]" = {}
         self._pressure = 1.0
         self._hit_flush_cap = False
+        self._window_start = time.monotonic()
         # (sample item, sample_rate drops, backpressure drops) per name,
         # recorded after the flush releases the lock.
         self._pending_lost: "List[Tuple[Metric, int, int]]" = []
@@ -128,16 +149,14 @@ class MetricsBatcher(Batcher["Metric"]):
         name = item["name"]
         window = self._windows.get(name)
         if window is None:
-            per_second = self._sample_per_second
-            try:
-                per_second = float(item.get(SAMPLE_PER_SECOND_KEY, per_second))  # type: ignore[arg-type]
-            except (TypeError, ValueError):
-                pass
+            per_second = self._sample_per_second_by_name.get(
+                name, self._sample_per_second
+            )
             base_allowance = max(1, int(per_second * self.FLUSH_WAIT_TIME))
             window = _NameWindow(
                 base_allowance,
                 max(1, int(base_allowance * self._pressure)),
-                tuple(item.get(STRATIFY_BY_KEY) or ()),  # type: ignore[arg-type]
+                self._stratify_by.get(name, ()),
             )
 
         key = _stratum_key(item["attributes"], window.stratify_by)
@@ -187,7 +206,19 @@ class MetricsBatcher(Batcher["Metric"]):
         super()._add_to_envelope(envelope)
 
     def _close_window(self) -> None:
+        now = time.monotonic()
+        scale = min((now - self._window_start) / self.FLUSH_WAIT_TIME, 1.0)
+        dropped: "Set[int]" = set()
+
         for window in self._windows.values():
+            # What the name gets for the time this window ran.
+            wanted = min(window.seen, max(1, int(window.base_allowance * scale)))
+            allowed = max(1, int(window.allowance * scale))
+            if window.kept > allowed:
+                _trim(window, allowed, dropped)
+                # The one per stratum minimum can keep more than wanted.
+                wanted = max(wanted, window.kept)
+
             if window.seen <= window.kept:
                 continue
 
@@ -203,7 +234,6 @@ class MetricsBatcher(Batcher["Metric"]):
                     )
 
             sample = next(s for s in window.strata.values() if s.indices)
-            wanted = min(window.seen, window.base_allowance)
             self._pending_lost.append(
                 (
                     self._buffer[sample.indices[0]],
@@ -219,9 +249,17 @@ class MetricsBatcher(Batcher["Metric"]):
 
         self._hit_flush_cap = False
         self._windows = {}
+        self._window_start = now
+
+        if dropped:
+            self._buffer[:] = [
+                item for i, item in enumerate(self._buffer) if i not in dropped
+            ]
 
     def _flush(self) -> "Optional[Envelope]":
         envelope = super()._flush()
+        if self._sample_per_second is None:
+            return envelope
 
         with self._lock:
             pending, self._pending_lost = self._pending_lost, []
@@ -290,3 +328,36 @@ def _stratum_key(
         tuple(v) if isinstance(v, list) else v
         for v in (attributes.get(k) for k in stratify_by)
     )
+
+
+def _valid_rate(value: "Any") -> "Optional[float]":
+    try:
+        rate = float(value)
+    except (TypeError, ValueError):
+        rate = math.nan
+
+    if math.isfinite(rate) and rate > 0:
+        return rate
+
+    logger.warning("[Metrics] Ignoring invalid metrics_window_sampling rate: %r", value)
+    return None
+
+
+def _trim(window: "_NameWindow", allowed: int, dropped: "Set[int]") -> None:
+    """Shrink a window to `allowed` metrics, split between its strata by
+    water-filling over what each one kept. Each stratum keeps a random subset
+    of its reservoir, at least one metric. Dropped buffer positions are added
+    to `dropped`."""
+    strata = sorted(
+        (s for s in window.strata.values() if s.indices), key=lambda s: len(s.indices)
+    )
+    remaining = max(allowed, len(strata))
+    window.kept = 0
+    for i, stratum in enumerate(strata):
+        target = max(1, min(len(stratum.indices), remaining // (len(strata) - i)))
+        remaining -= target
+        if target < len(stratum.indices):
+            keep = random.sample(stratum.indices, target)
+            dropped.update(set(stratum.indices) - set(keep))
+            stratum.indices = keep
+        window.kept += target

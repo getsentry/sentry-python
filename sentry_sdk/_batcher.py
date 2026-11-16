@@ -123,8 +123,10 @@ class Batcher(Generic[T]):
             if not self._ensure_thread() or self._flusher is None:
                 return None
 
+            dropped = False
             with self._lock:
-                dropped = not self._add_locked(item)
+                with capture_internal_exceptions():
+                    dropped = not self._add_locked(item)
 
             # Record the loss outside of the lock, since this might involve
             # serializing the item to report lost bytes

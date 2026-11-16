@@ -1,5 +1,6 @@
 import os
 import sys
+import time
 from unittest import mock
 
 import pytest
@@ -669,12 +670,19 @@ def _lost(calls, reason, data_category="trace_metric"):
     return sum(q for (r, c, _, q) in calls if r == reason and c == data_category)
 
 
+def _flush_window(seconds=5.0):
+    # Flush as if the sampling window had been open for `seconds`. The default
+    # is a full window, as when the flush timer fires.
+    get_client().metrics_batcher._window_start = time.monotonic() - seconds
+    get_client().flush()
+
+
 def test_metrics_window_sampling_off_by_default(sentry_init, capture_items):
     sentry_init()
     items = capture_items("trace_metric")
 
     for _ in range(100):
-        sentry_sdk.metrics.count("test.counter", 1, sample_per_second=1)
+        sentry_sdk.metrics.count("test.counter", 1)
 
     get_client().flush()
     metrics = [item.payload for item in items]
@@ -686,7 +694,13 @@ def test_metrics_window_sampling_off_by_default(sentry_init, capture_items):
 def test_metrics_window_sampling(
     sentry_init, capture_items, capture_record_lost_event_calls
 ):
-    sentry_init(_experiments={"metrics_window_sampling": True})
+    sentry_init(
+        _experiments={
+            "metrics_window_sampling": {
+                "sample_per_second_by_name": {"test.override": 20}
+            }
+        }
+    )
     items = capture_items("trace_metric")
     lost = capture_record_lost_event_calls()
 
@@ -696,13 +710,13 @@ def test_metrics_window_sampling(
     for _ in range(3):
         sentry_sdk.metrics.count("test.cold", 1)
     for _ in range(200):
-        sentry_sdk.metrics.count("test.override", 1, sample_per_second=20)
+        sentry_sdk.metrics.count("test.override", 1)
     for _ in range(100):
         sentry_sdk.metrics.count(
             "test.presampled", 1, attributes={"sentry.client_sample_rate": 0.5}
         )
 
-    get_client().flush()
+    _flush_window()
     metrics = [item.payload for item in items]
 
     def by_name(name):
@@ -723,7 +737,6 @@ def test_metrics_window_sampling(
     override = by_name("test.override")
     assert len(override) == 100
     assert all(m["attributes"]["sentry.client_sample_rate"] == 0.5 for m in override)
-    assert all("_sample_per_second" not in m for m in override)
 
     presampled = by_name("test.presampled")
     assert len(presampled) == 50
@@ -731,6 +744,62 @@ def test_metrics_window_sampling(
 
     assert _lost(lost, "sample_rate") == 150 + 100 + 50
     assert _lost(lost, "sample_rate", "trace_metric_byte") > 0
+    assert _lost(lost, "backpressure") == 0
+
+
+@pytest.mark.parametrize("rate", [float("inf"), float("nan"), 0, -1, "fast"])
+def test_metrics_window_sampling_invalid_rate(sentry_init, capture_items, rate):
+    sentry_init(
+        _experiments={
+            "metrics_window_sampling": {
+                "sample_per_second": rate,
+                "sample_per_second_by_name": {"test.counter": rate},
+            }
+        }
+    )
+    items = capture_items("trace_metric")
+
+    for _ in range(100):
+        sentry_sdk.metrics.count("test.counter", 1)
+
+    _flush_window()
+
+    # Falls back to the default of 10/s.
+    assert len(items) == 50
+
+
+def test_metrics_window_sampling_early_flush(
+    sentry_init, capture_items, capture_record_lost_event_calls
+):
+    sentry_init(
+        _experiments={"metrics_window_sampling": {"stratify_by": {"test.jobs": "job"}}}
+    )
+    items = capture_items("trace_metric")
+    lost = capture_record_lost_event_calls()
+
+    for _ in range(200):
+        sentry_sdk.metrics.count("test.counter", 1)
+    for job in ("a", "b", "c"):
+        sentry_sdk.metrics.count("test.jobs", 1, attributes={"job": job})
+    for _ in range(100):
+        sentry_sdk.metrics.count("test.jobs", 1, attributes={"job": "c"})
+
+    # A window that ended after 1s keeps 10/s * 1s, not the full 50.
+    _flush_window(1.0)
+    metrics = [item.payload for item in items]
+
+    counter = [m for m in metrics if m["name"] == "test.counter"]
+    assert len(counter) == 10
+    assert all(m["attributes"]["sentry.client_sample_rate"] == 0.05 for m in counter)
+
+    # Strata are trimmed by water-filling too, and the rates stay exact.
+    jobs = [m for m in metrics if m["name"] == "test.jobs"]
+    assert sorted(m["attributes"]["job"] for m in jobs) == ["a", "b"] + ["c"] * 8
+    assert sum(
+        1 / m["attributes"].get("sentry.client_sample_rate", 1) for m in jobs
+    ) == pytest.approx(103)
+
+    assert _lost(lost, "sample_rate") == 190 + 93
     assert _lost(lost, "backpressure") == 0
 
 
@@ -752,7 +821,7 @@ def test_metrics_window_sampling_back_pressure(
         for name in range(names):
             for _ in range(100):
                 sentry_sdk.metrics.count(f"test.{name}", 1)
-        get_client().flush()
+        _flush_window()
         return [item.payload for item in items]
 
     # 10 names * 50 hits the flush cap of 100: nothing is pushed down yet.
@@ -774,27 +843,24 @@ def test_metrics_window_sampling_back_pressure(
 
 @pytest.mark.parametrize("c_first", [True, False])
 def test_metrics_window_sampling_stratify_by(sentry_init, capture_items, c_first):
-    sentry_init(_experiments={"metrics_window_sampling": True})
+    # 2/s over the 5s flush window keeps 10 for the name.
+    sentry_init(
+        _experiments={
+            "metrics_window_sampling": {
+                "sample_per_second": 2,
+                "stratify_by": {"test.jobs": ["job_type"]},
+            }
+        }
+    )
     items = capture_items("trace_metric")
-
-    def emit(job_type, n):
-        for _ in range(n):
-            # 2/s over the 5s flush window keeps 10 for the name.
-            sentry_sdk.metrics.count(
-                "test.jobs",
-                1,
-                attributes={"job_type": job_type},
-                sample_per_second=2,
-                stratify_by=["job_type"],
-            )
 
     order = [("c", 1000), ("a", 2), ("b", 2)]
     for job_type, n in order if c_first else reversed(order):
-        emit(job_type, n)
+        for _ in range(n):
+            sentry_sdk.metrics.count("test.jobs", 1, attributes={"job_type": job_type})
 
-    get_client().flush()
+    _flush_window()
     metrics = [item.payload for item in items]
-    assert all("_stratify_by" not in m for m in metrics)
 
     def by_job_type(job_type):
         return [m for m in metrics if m["attributes"]["job_type"] == job_type]
@@ -816,22 +882,23 @@ def test_metrics_window_sampling_stratify_by(sentry_init, capture_items, c_first
 
 
 def test_metrics_window_sampling_stratify_by_cap(sentry_init, capture_items):
-    sentry_init(_experiments={"metrics_window_sampling": True})
+    sentry_init(
+        _experiments={
+            "metrics_window_sampling": {
+                "sample_per_second": 2,
+                "stratify_by": {"test.jobs": ["job_type"]},
+            }
+        }
+    )
     items = capture_items("trace_metric")
 
     # 20 job types, but the name only keeps 10: 9 get their own stratum and
     # the rest share one.
     for i in range(20):
         for _ in range(10):
-            sentry_sdk.metrics.count(
-                "test.jobs",
-                1,
-                attributes={"job_type": str(i)},
-                sample_per_second=2,
-                stratify_by=["job_type"],
-            )
+            sentry_sdk.metrics.count("test.jobs", 1, attributes={"job_type": str(i)})
 
-    get_client().flush()
+    _flush_window()
     metrics = [item.payload for item in items]
 
     rates = {

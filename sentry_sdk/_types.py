@@ -377,9 +377,12 @@ if TYPE_CHECKING:
         "MetricWindowSamplingOptions",
         {
             # Max metrics kept per metric name per second, per process,
-            # applied per flush window. Overridable per call with
-            # `sample_per_second=`.
+            # applied per flush window.
             "sample_per_second": float,
+            # Overrides of `sample_per_second` for specific metric names.
+            "sample_per_second_by_name": Dict[str, float],
+            # Attribute keys to stratify by, per metric name.
+            "stratify_by": Dict[str, List[str]],
         },
         total=False,
     )
