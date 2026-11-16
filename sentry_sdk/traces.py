@@ -530,7 +530,7 @@ class StreamedSpan:
         return traceparent
 
     def _to_baggage(self) -> "Optional[Baggage]":
-        if self._segment:
+        if self._segment is not None:
             return self._segment._get_baggage()
         return None
 
@@ -547,7 +547,7 @@ class StreamedSpan:
         return self._baggage
 
     def _iter_headers(self) -> "Iterator[tuple[str, str]]":
-        if not self._segment:
+        if self._segment is None:
             return
 
         yield SENTRY_TRACE_HEADER_NAME, self._to_traceparent()
@@ -710,7 +710,7 @@ class NoOpStreamedSpan(StreamedSpan):
                     quantity=1,
                 )
 
-        if self._scope and hasattr(self, "_previous_span_on_scope"):
+        if self._scope is not None and hasattr(self, "_previous_span_on_scope"):
             with capture_internal_exceptions():
                 old_span = self._previous_span_on_scope
                 del self._previous_span_on_scope

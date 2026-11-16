@@ -191,7 +191,7 @@ class Batcher(Generic[T]):
         with capture_internal_exceptions():
             envelope_item = self._to_envelope_item([item])
 
-        if envelope_item:
+        if envelope_item is not None:
             self._record_lost_func(
                 reason="queue_overflow",
                 data_category=self.CLIENT_REPORT_TYPE,

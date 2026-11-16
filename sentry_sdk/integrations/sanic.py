@@ -201,7 +201,8 @@ async def _context_enter(request: "Request") -> None:
         integration = client.get_integration(SanicIntegration)
         if (
             isinstance(integration, SanicIntegration)
-            and integration._unsampled_statuses
+            # Any user-provided Container is accepted; it may not implement __len__
+            and integration._unsampled_statuses  # type: ignore[truthy-bool]
         ):
             warnings.warn(
                 "The `unsampled_statuses` option of SanicIntegration has no effect when span streaming is enabled.",

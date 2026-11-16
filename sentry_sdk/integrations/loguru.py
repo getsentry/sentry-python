@@ -180,7 +180,7 @@ def loguru_sentry_logs_handler(message: "Message") -> None:
     attrs: "dict[str, Any]" = {"sentry.origin": "auto.log.loguru"}
 
     project_root = client.options["project_root"]
-    if record.get("file"):
+    if record.get("file") is not None:
         if project_root is not None and record["file"].path.startswith(project_root):
             attrs["code.file.path"] = record["file"].path[len(project_root) + 1 :]
         else:
@@ -192,11 +192,11 @@ def loguru_sentry_logs_handler(message: "Message") -> None:
     if record.get("function"):
         attrs["code.function.name"] = record["function"]
 
-    if record.get("thread"):
+    if record.get("thread") is not None:
         attrs["thread.name"] = record["thread"].name
         attrs["thread.id"] = record["thread"].id
 
-    if record.get("process"):
+    if record.get("process") is not None:
         attrs["process.pid"] = record["process"].id
         attrs["process.executable.name"] = record["process"].name
 

@@ -118,7 +118,7 @@ class SentryPropagator(TextMapPropagator):
 
         if sentry_span.containing_transaction:
             baggage = sentry_span.containing_transaction.get_baggage()
-            if baggage:
+            if baggage is not None:
                 baggage_data = baggage.serialize()
                 if baggage_data:
                     setter.set(carrier, BAGGAGE_HEADER_NAME, baggage_data)

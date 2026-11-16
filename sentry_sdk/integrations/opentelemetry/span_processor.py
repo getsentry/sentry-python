@@ -58,7 +58,7 @@ def link_trace_context_to_error_event(
         return event
 
     otel_span = get_current_span()
-    if not otel_span:
+    if otel_span is None:
         return event
 
     ctx = otel_span.get_span_context()

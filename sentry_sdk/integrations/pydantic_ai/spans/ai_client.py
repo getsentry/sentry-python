@@ -350,7 +350,7 @@ def update_ai_client_span(
     model_response: "Optional[ModelResponse]",
 ) -> None:
     """Update the AI client span with response data."""
-    if not span:
+    if span is None:
         return
 
     # Set usage data if available

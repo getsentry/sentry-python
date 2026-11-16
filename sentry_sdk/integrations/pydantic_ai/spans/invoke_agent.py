@@ -157,7 +157,7 @@ def update_invoke_agent_span(
     result: "Any",
 ) -> None:
     """Update and close the invoke agent span."""
-    if not span or not result:
+    if span is None or not result:
         return
 
     # Extract output from result

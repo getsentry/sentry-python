@@ -471,11 +471,7 @@ def patch_asgi_app(root_path_in_path: "_RootPathInPath") -> None:
             mechanism_type=StarletteIntegration.identifier,
             transaction_style=integration.transaction_style,
             span_origin=StarletteIntegration.origin,
-            http_methods_to_capture=(
-                integration.http_methods_to_capture
-                if integration
-                else DEFAULT_HTTP_METHODS_TO_CAPTURE
-            ),
+            http_methods_to_capture=integration.http_methods_to_capture,
             asgi_version=3,
             root_path_in_path=root_path_in_path,
         )

@@ -104,11 +104,7 @@ class FlaskIntegration(Integration):
             middleware = SentryWsgiMiddleware(
                 lambda *a, **kw: old_app(self, *a, **kw),
                 span_origin=FlaskIntegration.origin,
-                http_methods_to_capture=(
-                    integration.http_methods_to_capture
-                    if integration
-                    else DEFAULT_HTTP_METHODS_TO_CAPTURE
-                ),
+                http_methods_to_capture=integration.http_methods_to_capture,
             )
             return middleware(environ, start_response)
 
