@@ -379,7 +379,7 @@ def _transform_system_instructions(
 ) -> "list[TextPart]":
     instruction_text_parts: "list[TextPart]" = []
     for block in system_instructions:
-        if not isinstance(block, dict) or "text" not in block:
+        if not isinstance(block, dict) or "text" not in block:  # type: ignore[redundant-expr]  # user input may not match the annotation
             continue
 
         instruction_text_parts.append({"type": "text", "content": block["text"]})

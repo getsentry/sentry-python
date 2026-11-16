@@ -234,7 +234,7 @@ def _filter_headers(
         )
 
         for key in filtered:
-            if isinstance(key, str) and key.lower() in ("cookie", "set-cookie"):
+            if isinstance(key, str) and key.lower() in ("cookie", "set-cookie"):  # type: ignore[redundant-expr]  # headers may have non-str keys at runtime
                 filtered[key] = SENSITIVE_DATA_SUBSTITUTE
 
         return filtered

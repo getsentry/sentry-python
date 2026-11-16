@@ -206,7 +206,7 @@ def _get_system_instructions(messages: "List[List[BaseMessage]]") -> "List[str]"
                     if isinstance(item, str):
                         system_instructions.append(item)
 
-                    elif isinstance(item, dict) and item.get("type") == "text":
+                    elif isinstance(item, dict) and item.get("type") == "text":  # type: ignore[redundant-expr]  # user input may not match the annotation
                         instruction = item.get("text")
                         if isinstance(instruction, str):
                             system_instructions.append(instruction)

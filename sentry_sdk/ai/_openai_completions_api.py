@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 def _is_system_instruction(
     message: "ChatCompletionMessageParam",
 ) -> "TypeGuard[ChatCompletionSystemMessageParam]":
-    return isinstance(message, dict) and message.get("role") == "system"
+    return isinstance(message, dict) and message.get("role") == "system"  # type: ignore[redundant-expr]  # user input may not match the annotation
 
 
 def _get_system_instructions(
@@ -42,7 +42,7 @@ def _get_text_items(
 
     text_items: "list[str]" = []
     for part in content:
-        if isinstance(part, dict) and part.get("type") == "text":
+        if isinstance(part, dict) and part.get("type") == "text":  # type: ignore[redundant-expr]  # user input may not match the annotation
             text = cast("ChatCompletionContentPartTextParam", part).get("text", None)
             if text is not None:
                 text_items.append(text)
@@ -82,7 +82,7 @@ def _transform_tool_definitions(
 
     tool_definitions = []
     for tool in tools:
-        if not isinstance(tool, dict) or "type" not in tool:
+        if not isinstance(tool, dict) or "type" not in tool:  # type: ignore[redundant-expr]  # user input may not match the annotation
             continue
 
         if tool["type"] == "function":

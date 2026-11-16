@@ -65,7 +65,7 @@ class StdlibIntegration(Integration):
             client = sentry_sdk.get_client()
             if client.get_integration(StdlibIntegration) is not None:
                 contexts = event.setdefault("contexts", {})
-                if isinstance(contexts, dict) and "runtime" not in contexts:
+                if isinstance(contexts, dict) and "runtime" not in contexts:  # type: ignore[redundant-expr]  # contexts may have been set to a non-dict by the user
                     contexts["runtime"] = _RUNTIME_CONTEXT
 
             return event
@@ -280,7 +280,7 @@ def _install_httplib() -> None:
             return real_putrequest(self, method, url, *args, **kwargs)
 
         real_url = url
-        if real_url is None or not real_url.startswith(("http://", "https://")):
+        if real_url is None or not real_url.startswith(("http://", "https://")):  # type: ignore[redundant-expr]  # defensive against unexpected url values
             real_url = "%s://%s%s%s" % (
                 default_port == 443 and "https" or "http",
                 host,
@@ -460,7 +460,7 @@ def _install_httplib() -> None:
             # read() might be called multiple times to consume a single body,
             # so we can't just end the span when read() is done. Instead,
             # try to figure out whether the response body has been fully read.
-            if span and (self.fp is None or self.closed):
+            if span and (self.fp is None or self.closed):  # type: ignore[redundant-expr]  # fp is set to None once the response is closed
                 self._sentrysdk_span = None  # type: ignore[attr-defined]
                 _complete_span(span)
 

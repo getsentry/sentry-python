@@ -598,7 +598,7 @@ def _set_completions_api_input_data(
         return
 
     # dict special case following https://github.com/openai/openai-python/blob/3e0c05b84a2056870abf3bd6a5e7849020209cc3/src/openai/_utils/_transform.py#L194-L197
-    if not isinstance(messages, Iterable) or isinstance(messages, dict):
+    if not isinstance(messages, Iterable) or isinstance(messages, dict):  # type: ignore[redundant-expr]  # user input may not match the annotation
         return
 
     messages = list(messages)
@@ -677,7 +677,7 @@ def _set_embeddings_input_data(
         return
 
     # dict special case following https://github.com/openai/openai-python/blob/3e0c05b84a2056870abf3bd6a5e7849020209cc3/src/openai/_utils/_transform.py#L194-L197
-    if not isinstance(messages, Iterable) or isinstance(messages, dict):
+    if not isinstance(messages, Iterable) or isinstance(messages, dict):  # type: ignore[redundant-expr]  # user input may not match the annotation
         return
 
     messages_copy = list(messages)

@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 def _is_system_instruction(
     message: "ResponseInputItemParam",
 ) -> "TypeGuard[Union[EasyInputMessageParam, Message]]":
-    if not isinstance(message, dict) or not message.get("role") == "system":
+    if not isinstance(message, dict) or not message.get("role") == "system":  # type: ignore[redundant-expr]  # user input may not match the annotation
         return False
 
     return "type" not in message or message["type"] == "message"
@@ -54,7 +54,7 @@ def _transform_system_instructions(
             continue
 
         for part in content:
-            if not isinstance(part, dict) or part.get("type") != "input_text":
+            if not isinstance(part, dict) or part.get("type") != "input_text":  # type: ignore[redundant-expr]  # user input may not match the annotation
                 continue
 
             text = cast("ResponseInputTextParam", part).get("text", None)
@@ -74,7 +74,7 @@ def _transform_tool_definitions(tools: "Iterable[ToolParam]") -> "list[ToolDefin
 
     tool_definitions = []
     for tool in tools:
-        if not isinstance(tool, dict) or "type" not in tool:
+        if not isinstance(tool, dict) or "type" not in tool:  # type: ignore[redundant-expr]  # user input may not match the annotation
             continue
 
         if tool["type"] == "function":
@@ -88,7 +88,7 @@ def _transform_tool_definitions(tools: "Iterable[ToolParam]") -> "list[ToolDefin
             if "description" in tool and tool["description"] is not None:
                 tool_definition["description"] = tool["description"]
 
-            if "parameters" in tool and tool["parameters"] is not None:
+            if "parameters" in tool and tool["parameters"] is not None:  # type: ignore[redundant-expr]  # user input may not match the annotation
                 tool_definition["parameters"] = tool["parameters"]
 
             tool_definitions.append(tool_definition)

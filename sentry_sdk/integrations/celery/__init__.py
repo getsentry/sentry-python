@@ -223,7 +223,7 @@ def _update_celery_task_headers(
                             combined.third_party_items,
                             incoming.third_party_items,
                         ]
-                        if x is not None and x != ""
+                        if x != ""
                     ]
                 )
                 combined_baggage = combined.serialize(include_third_party=True)

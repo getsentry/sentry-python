@@ -141,7 +141,7 @@ def _apply_key_value_collection_filtering(
 
     # denylist behaviour
     for key, value in items.items():
-        if isinstance(key, str) and _is_sensitive_key(
+        if isinstance(key, str) and _is_sensitive_key(  # type: ignore[redundant-expr]  # items may have non-str keys at runtime
             key=key, extra_terms=behaviour.get("terms", [])
         ):
             result[key] = substitute

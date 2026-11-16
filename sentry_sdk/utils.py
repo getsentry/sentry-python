@@ -236,7 +236,7 @@ class CaptureInternalException:
 _CAPTURE_INTERNAL_EXCEPTION = CaptureInternalException()
 
 
-def capture_internal_exceptions() -> "ContextManager[Any]":
+def capture_internal_exceptions() -> "CaptureInternalException":
     return _CAPTURE_INTERNAL_EXCEPTION
 
 
@@ -1051,7 +1051,7 @@ def iter_event_stacktraces(event: "Event") -> "Iterator[Annotated[Dict[str, Any]
                 yield thread["stacktrace"]
     if "exception" in event:
         for exception in event["exception"].get("values") or ():
-            if isinstance(exception, dict) and "stacktrace" in exception:
+            if isinstance(exception, dict) and "stacktrace" in exception:  # type: ignore[redundant-expr]  # event data may be user-provided
                 yield exception["stacktrace"]
 
 
@@ -1293,7 +1293,7 @@ def strip_string(
     if byte_size is not None and byte_size > max_length:
         # truncate to max_length bytes, preserving code points
         truncated_value = _truncate_by_bytes(value, max_length)
-    elif text_size is not None and text_size > max_length:
+    elif text_size > max_length:
         # fallback to truncating by string length
         truncated_value = value[: max_length - 3] + "..."
     else:
@@ -1790,7 +1790,7 @@ def is_sentry_url(client: "sentry_sdk.client.BaseClient", url: str) -> bool:
     Determines whether the given URL matches the Sentry DSN.
     """
     return (
-        client is not None
+        client is not None  # type: ignore[redundant-expr]  # defensive against a missing client
         and client.transport is not None
         and client.transport.parsed_dsn is not None
         and client.transport.parsed_dsn.netloc in url
@@ -1810,7 +1810,7 @@ def _generate_installed_modules() -> "Iterator[Tuple[str, str]]":
             # https://github.com/python/importlib_metadata/issues/371
             if name is not None:
                 normalized_name = _normalize_module_name(name)
-                if dist.version is not None and normalized_name not in yielded:
+                if dist.version is not None and normalized_name not in yielded:  # type: ignore[redundant-expr]  # version can be None at runtime, see links above
                     yield normalized_name, dist.version
                     yielded.add(normalized_name)
 

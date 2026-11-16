@@ -860,6 +860,8 @@ class StarletteRequestExtractor:
             request_info["data"] = AnnotatedValue.removed_because_raw_data()
             return request_info
 
+        return None
+
     async def content_length(self: "StarletteRequestExtractor") -> "Optional[int]":
         if "content-length" in self.request.headers:
             return int(self.request.headers["content-length"])

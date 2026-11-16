@@ -272,7 +272,7 @@ def extract_contents_messages(contents: "ContentListUnion") -> "List[Dict[str, A
             if part_result is None:
                 continue
 
-            if isinstance(part_result, dict) and part_result.get("role") == "tool":
+            if part_result.get("role") == "tool":
                 tool_messages.append(part_result)
             else:
                 content_parts.append(part_result)
@@ -287,7 +287,7 @@ def extract_contents_messages(contents: "ContentListUnion") -> "List[Dict[str, A
     # Handle Part object directly
     part_result = _extract_part_content(contents)
     if part_result:
-        if isinstance(part_result, dict) and part_result.get("role") == "tool":
+        if part_result.get("role") == "tool":
             return [part_result]
         else:
             return [{"role": "user", "content": [part_result]}]

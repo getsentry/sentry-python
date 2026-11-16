@@ -949,7 +949,7 @@ class _Client(BaseClient):
         before_send = self.options["before_send"]
         if (
             before_send is not None
-            and event is not None
+            and event is not None  # type: ignore[redundant-expr]  # serialize() can return None on internal errors
             and event.get("type") != "transaction"
         ):
             new_event = None
@@ -1230,7 +1230,6 @@ class _Client(BaseClient):
                 converted_gen_ai_spans = [
                     _serialized_v1_span_to_serialized_v2_span(span, event_opt)
                     for span in gen_ai_spans
-                    if isinstance(span, dict)
                 ]
 
                 envelope.add_item(
