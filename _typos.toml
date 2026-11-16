@@ -13,9 +13,11 @@ certifi = "certifi"         # package name
 abl = "abl"
 hel = "hel"
 
+[default.extend-identifiers]
+cla7aye15I4nd = "cla7aye15I4nd"  # GitHub username in CHANGELOG.md
+
 [files]
 extend-exclude = [
     ".git/",
-    "CHANGELOG.md", # historical release notes
     "checkouts/",   # third-party submodules
 ]

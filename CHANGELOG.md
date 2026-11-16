@@ -90,7 +90,7 @@ sentry_sdk.init(
 
 #### Other
 
-- (aiohttp) Leave existing `baggage` header alone if it has existin… by @pabloDeputter in [#8116](https://github.com/getsentry/sentry-python/pull/8116)
+- (aiohttp) Leave existing `baggage` header alone if it has existing… by @pabloDeputter in [#8116](https://github.com/getsentry/sentry-python/pull/8116)
 - (boto3) Adapt to botocore no longer signing baggage by @sentrivana in [#8113](https://github.com/getsentry/sentry-python/pull/8113)
 - (ci) Restrict pytest because of incompatibilities by @sentrivana in [#8140](https://github.com/getsentry/sentry-python/pull/8140)
 - (falcon) Handle integer HTTP statuses by @jap and @sentrivana in [#8139](https://github.com/getsentry/sentry-python/pull/8139)
@@ -726,7 +726,7 @@ sentry_sdk.init(
 - Add span streaming DSC tests by @sentrivana in [#6884](https://github.com/getsentry/sentry-python/pull/6884)
 - Add streaming logs tests by @sentrivana in [#6880](https://github.com/getsentry/sentry-python/pull/6880)
 - Add streaming API tests by @sentrivana in [#6883](https://github.com/getsentry/sentry-python/pull/6883)
-- Add streaming continous profiler tests by @sentrivana in [#6879](https://github.com/getsentry/sentry-python/pull/6879)
+- Add streaming continuous profiler tests by @sentrivana in [#6879](https://github.com/getsentry/sentry-python/pull/6879)
 - Add streaming monitor test by @sentrivana in [#6882](https://github.com/getsentry/sentry-python/pull/6882)
 - Add streaming metrics test by @sentrivana in [#6881](https://github.com/getsentry/sentry-python/pull/6881)
 - Add sample_rand span streaming tests by @sentrivana in [#6781](https://github.com/getsentry/sentry-python/pull/6781)
@@ -2069,7 +2069,7 @@ option to capture individual spans per middleware layer. To record Django middle
 
 - fix(gcp): Inject scopes in TimeoutThread exception with GCP (#4959) by @alexander-alderman-webb
 - fix(aws): Inject scopes in TimeoutThread exception with AWS lambda (#4914) by @alexander-alderman-webb
-- fix(ai): add message trunction to anthropic (#4953) by @shellmayr
+- fix(ai): add message truncation to anthropic (#4953) by @shellmayr
 - fix(ai): add message truncation to langgraph (#4954) by @shellmayr
 - fix: Default breadcrumbs value for events without breadcrumbs (#4952) by @alexander-alderman-webb
 - fix(ai): add message truncation in langchain (#4950) by @shellmayr
@@ -2187,7 +2187,7 @@ Note: This is my last release. So long, and thanks for all the fish! by @antonpi
 - Feat(huggingface_hub): Update HuggingFace Hub integration (#4746) by @antonpirker
 - Feat(Anthropic): Add proper tool calling data to Anthropic integration (#4769) by @antonpirker
 - Feat(openai-agents): Add input and output to `invoke_agent` span. (#4785) by @antonpirker
-- Feat(AI): Create transaction in AI agents framworks, when no transaction is running. (#4758) by @constantinius
+- Feat(AI): Create transaction in AI agents frameworks, when no transaction is running. (#4758) by @constantinius
 - Feat(GraphQL): Support gql 4.0-style execute (#4779) by @sentrivana
 - Fix(logs): Expect `log_item` as rate limit category (#4798) by @sentrivana
 - Fix: CI for mypy, gevent (#4790) by @sentrivana
@@ -2591,7 +2591,7 @@ sentry_sdk.init(
 - Dramatiq: use set_transaction_name (#4175) by @timdrijvers
 - toxgen: Make it clearer which suites can be migrated (#4196) by @sentrivana
 - Move Litestar under toxgen (#4197) by @sentrivana
-- Added flake8 plugings to pre-commit call of flake8 (#4190) by @antonpirker
+- Added flake8 plugins to pre-commit call of flake8 (#4190) by @antonpirker
 - Deprecate Scope.user (#4194) by @sentrivana
 - Fix hanging when capturing long stacktrace (#4191) by @szokeasaurusrex
 - Fix GraphQL failures (#4208) by @sentrivana
@@ -3416,7 +3416,7 @@ This change fixes a regression in our cron monitoring feature, which caused cron
 
 ### New features
 
-- Celery integration now sends additional data to Sentry to enable new features to guage the health of your queues
+- Celery integration now sends additional data to Sentry to enable new features to gauge the health of your queues
 - Added a new integration for Cohere
 - Reintroduced the `last_event_id` function, which had been removed in 2.0.0
 
@@ -3491,7 +3491,7 @@ This change fixes a regression in our cron monitoring feature, which caused cron
   client = InferenceClient("some-model")
   ```
 
-  Check out [the Huggingface docs](https://docs.sentry.io/platforms/python/integrations/huggingface/) for details. (comming soon!)
+  Check out [the Huggingface docs](https://docs.sentry.io/platforms/python/integrations/huggingface/) for details. (coming soon!)
 
 - fix(huggingface): Reduce API cross-section for huggingface in test (#3042) by @colin-sentry
 - fix(django): Fix Django ASGI integration on Python 3.12 (#3027) by @bellini666
@@ -3544,7 +3544,7 @@ For a shorter version of what you need to do, to upgrade to Sentry SDK 2.0 see: 
 (These changes are all backwards-incompatible. **Breaking Change** (if you are just skimming for that phrase))
 
 - The Pyramid integration will not capture errors that might happen in `authenticated_userid()` in a custom `AuthenticationPolicy` class.
-- The method `need_code_loation` of the `MetricsAggregator` was renamed to `need_code_location`.
+- A typo in the name of the `MetricsAggregator` method `need_code_location` was fixed.
 - The `BackgroundWorker` thread used to process events was renamed from `raven-sentry.BackgroundWorker` to `sentry-sdk.BackgroundWorker`.
 - The `reraise` function was moved from `sentry_sdk._compat` to `sentry_sdk.utils`.
 - The `_ScopeManager` was moved from `sentry_sdk.hub` to `sentry_sdk.scope`.
@@ -3701,7 +3701,7 @@ For a shorter version of what you need to do, to upgrade to Sentry SDK 2.0 see: 
 
 ## 1.45.0
 
-This is the final 1.x release for the forseeable future. Development will continue on the 2.x release line. The first 2.x version will be available in the next few weeks.
+This is the final 1.x release for the foreseeable future. Development will continue on the 2.x release line. The first 2.x version will be available in the next few weeks.
 
 ### Various fixes & improvements
 
@@ -3854,7 +3854,7 @@ This is the final 1.x release for the forseeable future. Development will contin
 
   We added an integration for OpenAI to capture errors and also performance data when using the OpenAI Python SDK.
 
-  Useage:
+  Usage:
 
   This integrations is auto-enabling, so if you have the `openai` package in your project it will be enabled. Just initialize Sentry before you create your OpenAI client.
 
@@ -5115,7 +5115,7 @@ By: @mgaligniana (#1773)
 - Profiling: Do not send single sample profiles (#1879) by @Zylphrex
 - Profiling: Add additional test coverage for profiler (#1877) by @Zylphrex
 - Profiling: Always use builtin time.sleep (#1869) by @Zylphrex
-- Profiling: Defaul in_app decision to None (#1855) by @Zylphrex
+- Profiling: Default in_app decision to None (#1855) by @Zylphrex
 - Profiling: Remove use of threading.Event (#1864) by @Zylphrex
 - Profiling: Enable profiling on all transactions (#1797) by @Zylphrex
 - FastAPI: Fix check for Starlette in FastAPI integration (#1868) by @antonpirker
@@ -5129,7 +5129,7 @@ By: @mgaligniana (#1773)
 
 - Add `before_send_transaction` (#1840) by @antonpirker
 
-  Adds a hook (similar to `before_send`) that is called for all transaction events (performance releated data).
+  Adds a hook (similar to `before_send`) that is called for all transaction events (performance related data).
 
   Usage:
 
@@ -5478,7 +5478,7 @@ We can do better and in the future we will do our best to not break your code ag
 
 - fix: avoid sending empty Baggage header (#1507) by @intgr
 - fix: properly freeze Baggage object (#1508) by @intgr
-- docs: fix simple typo, collecter | collector (#1505) by @timgates42
+- docs: fix simple typo in collector (#1505) by @timgates42
 
 ## 1.7.2
 
@@ -5533,7 +5533,7 @@ We can do better and in the future we will do our best to not break your code ag
 
 ### Various fixes & improvements
 
-- Remove Flask version contraint (#1395) by @antonpirker
+- Remove Flask version constraint (#1395) by @antonpirker
 - Change ordering of event drop mechanisms (#1390) by @adinauer
 
 ## 1.5.9
