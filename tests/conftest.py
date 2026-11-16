@@ -57,7 +57,7 @@ except ImportError:
 import sentry_sdk
 import sentry_sdk.utils
 from sentry_sdk.envelope import Envelope, parse_json
-from sentry_sdk.integrations import (  # noqa: F401
+from sentry_sdk.integrations import (
     _DEFAULT_INTEGRATIONS,
     _installed_integrations,
     _processed_integrations,
@@ -1675,7 +1675,7 @@ def streaming_responses_tool_call_model_responses():
 
 
 class MockServerRequestHandler(BaseHTTPRequestHandler):
-    def do_GET(self):  # noqa: N802
+    def do_GET(self):
         # Process an HTTP GET request and return a response.
         # If the path ends with /status/<number>, return status code <number>.
         # Otherwise return a 200 response.

@@ -302,7 +302,7 @@ def test_performance_error(run_cloud_function):
 
 def test_traces_sampler_gets_correct_values_in_sampling_context(
     run_cloud_function,
-    DictionaryContaining,  # noqa:N803
+    DictionaryContaining,
 ):
     # TODO: There are some decent sized hacks below. For more context, see the
     # long comment in the test of the same name in the AWS integration. The

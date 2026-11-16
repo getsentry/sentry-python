@@ -73,10 +73,10 @@ if TYPE_CHECKING:
 
 KEEP_ALIVE_SOCKET_OPTIONS = []
 for option in [
-    (socket.SOL_SOCKET, lambda: getattr(socket, "SO_KEEPALIVE"), 1),  # noqa: B009
-    (socket.SOL_TCP, lambda: getattr(socket, "TCP_KEEPIDLE"), 45),  # noqa: B009
-    (socket.SOL_TCP, lambda: getattr(socket, "TCP_KEEPINTVL"), 10),  # noqa: B009
-    (socket.SOL_TCP, lambda: getattr(socket, "TCP_KEEPCNT"), 6),  # noqa: B009
+    (socket.SOL_SOCKET, lambda: getattr(socket, "SO_KEEPALIVE"), 1),
+    (socket.SOL_TCP, lambda: getattr(socket, "TCP_KEEPIDLE"), 45),
+    (socket.SOL_TCP, lambda: getattr(socket, "TCP_KEEPINTVL"), 10),
+    (socket.SOL_TCP, lambda: getattr(socket, "TCP_KEEPCNT"), 6),
 ]:
     try:
         KEEP_ALIVE_SOCKET_OPTIONS.append((option[0], option[1](), option[2]))

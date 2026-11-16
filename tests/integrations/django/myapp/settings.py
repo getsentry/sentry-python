@@ -63,7 +63,7 @@ class TestMiddleware(MiddlewareMixin):
         return response
 
 
-def TestFunctionMiddleware(get_response):  # noqa: N802
+def TestFunctionMiddleware(get_response):
     def middleware(request):
         return get_response(request)
 
