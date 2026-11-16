@@ -8,12 +8,12 @@ from sentry_sdk.utils import has_data_collection_enabled
 
 
 def test_kvcb_invalid_mode(sentry_init):
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError):  # noqa: PT011
         sentry_init(data_collection={"cookies": {"mode": "nope"}})  # type: ignore Purposely ignoring to test invalid option
 
 
 def test_stack_frame_variables_invalid_mode(sentry_init):
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError):  # noqa: PT011
         sentry_init(data_collection={"stack_frame_variables": {"mode": "nope"}})
 
 
@@ -28,7 +28,7 @@ def test_stack_frame_variables_invalid_mode(sentry_init):
     ],
 )
 def test_frame_context_lines_invalid_value(sentry_init, value):
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError):  # noqa: PT011
         sentry_init(data_collection={"frame_context_lines": value})
 
 

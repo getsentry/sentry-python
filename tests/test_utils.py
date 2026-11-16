@@ -913,12 +913,12 @@ def test_is_sentry_url_no_client():
     ],
 )
 def test_get_error_message(error, expected_result):
-    with pytest.raises(BaseException) as exc_value:
+    with pytest.raises(BaseException) as exc_value:  # noqa: PT011
         exc_value.message = error
         raise Exception
     assert get_error_message(exc_value) == expected_result(exc_value)
 
-    with pytest.raises(BaseException) as exc_value:
+    with pytest.raises(BaseException) as exc_value:  # noqa: PT011
         exc_value.detail = error
         raise Exception
     assert get_error_message(exc_value) == expected_result(exc_value)
@@ -1296,7 +1296,7 @@ def test_exc_info_from_error_dont_get_an_exc():
     class NotAnException:
         pass
 
-    with pytest.raises(ValueError) as exc:
+    with pytest.raises(ValueError) as exc:  # noqa: PT011
         exc_info_from_error(NotAnException())
 
     assert "Expected Exception object to report, got <class" in str(exc.value)

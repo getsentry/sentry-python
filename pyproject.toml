@@ -301,6 +301,7 @@ select = [
     "I",
     # Note: B and N rules are NOT enabled by default in flake8
     # They were only active through the plugins, which may not have been fully enabled
+    "PT011",   # pytest.raises() too broad
 ]
 
 # Use ONLY the same ignores as the original flake8 config + compatibility for this codebase

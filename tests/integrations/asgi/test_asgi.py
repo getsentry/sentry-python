@@ -184,7 +184,7 @@ def asgi3_app_with_span():
 
 
 def test_invalid_transaction_style(asgi3_app):
-    with pytest.raises(ValueError) as exp:
+    with pytest.raises(ValueError) as exp:  # noqa: PT011
         SentryAsgiMiddleware(asgi3_app, transaction_style="URL")
 
     assert (
@@ -552,7 +552,7 @@ async def test_websocket(
 
     request_url = "/ws"
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError):  # noqa: PT011
         client = TestClient(asgi3_ws_app)
         if span_streaming:
             items = capture_items("event", "span")

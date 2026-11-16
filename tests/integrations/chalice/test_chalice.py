@@ -117,7 +117,7 @@ def test_scheduled_event(app, lambda_context_args):
         "id": "event-id",
         "resources": ["arn:aws:events:us-west-1:120987654312:rule/my-schedule"],
     }
-    with pytest.raises(Exception) as exc_info:
+    with pytest.raises(Exception) as exc_info:  # noqa: PT011
         every_hour(lambda_event, context=context)
     assert str(exc_info.value) == "schedule event!"
 

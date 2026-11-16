@@ -165,7 +165,7 @@ def test_transaction_with_error(
     else:
         events = capture_events()
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError):  # noqa: PT011
         client.get("http://dogs.are.great/sit/stay/rollover/")
 
     sentry_sdk.flush()
@@ -300,7 +300,7 @@ def test_has_trace_if_performance_enabled(
     else:
         events = capture_events()
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError):  # noqa: PT011
         client.get("http://dogs.are.great/sit/stay/rollover/")
 
     sentry_sdk.flush()
@@ -359,7 +359,7 @@ def test_has_trace_if_performance_disabled(
     client = Client(app)
     events = capture_events()
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError):  # noqa: PT011
         client.get("http://dogs.are.great/sit/stay/rollover/")
 
     msg_event, error_event = events
@@ -397,7 +397,7 @@ def test_trace_from_headers_if_performance_enabled(
     trace_id = "582b43a4192642f0b136d5159a501701"
     sentry_trace_header = "{}-{}-{}".format(trace_id, "6e8f22c393e68f19", 1)
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError):  # noqa: PT011
         client.get(
             "http://dogs.are.great/sit/stay/rollover/",
             headers={"sentry-trace": sentry_trace_header},
@@ -444,7 +444,7 @@ def test_trace_from_headers_if_performance_disabled(
     trace_id = "582b43a4192642f0b136d5159a501701"
     sentry_trace_header = "{}-{}-{}".format(trace_id, "6e8f22c393e68f19", 1)
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError):  # noqa: PT011
         client.get(
             "http://dogs.are.great/sit/stay/rollover/",
             headers={"sentry-trace": sentry_trace_header},
