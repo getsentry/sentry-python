@@ -14,10 +14,6 @@ dev = [
     "ruff",
 ]
 
-falsegreen = [
-    "falsegreen==0.9.2",
-]
-
 toxgen = [
     "jinja2",
     "packaging",
@@ -323,11 +319,6 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 "scripts/**" = ["T20"]
 "tests/**" = ["T20"]
-
-[tool.falsegreen]
-# C1 (assert under if/for) and C13b (mock without autospec) flag patterns these
-# tests use on purpose, like branching on span_streaming
-disable = ["C1", "C13b"]
 
 [tool.ruff.format]
 # ruff format already excludes the same files as specified in extend-exclude
