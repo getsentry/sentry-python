@@ -104,7 +104,7 @@ def test_levels(
     expected_pattern = (
         r" \| "
         + r"{:9}".format(level.name.upper())
-        + r"\| tests\.integrations\.loguru\.test_loguru:test_levels:\d+ - test"
+        + r"\| tests\.integrations\.loguru\.test_loguru:test_levels:\d+ - test$"
     )
 
     breadcrumbs = sentry_sdk.get_isolation_scope()._breadcrumbs
@@ -112,7 +112,7 @@ def test_levels(
         (breadcrumb,) = breadcrumbs
         assert breadcrumb["level"] == expected_event_level
         assert breadcrumb["category"] == "tests.integrations.loguru.test_loguru"
-        assert re.fullmatch(expected_pattern, breadcrumb["message"][23:])
+        assert re.search(expected_pattern, breadcrumb["message"])
     else:
         assert not breadcrumbs
 
@@ -127,7 +127,7 @@ def test_levels(
     for event in events:
         assert event.payload["level"] == expected_event_level
         assert event.payload["logger"] == "tests.integrations.loguru.test_loguru"
-        assert re.fullmatch(expected_pattern, event.payload["logentry"]["message"][23:])
+        assert re.search(expected_pattern, event.payload["logentry"]["message"])
 
     for log in logs:
         assert log.payload["level"] == expected_log_level

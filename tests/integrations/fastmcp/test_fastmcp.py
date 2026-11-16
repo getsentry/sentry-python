@@ -13,14 +13,8 @@ Tests focus on verifying Sentry integration behavior:
 - Error capture and instrumentation
 - Request context data extraction
 - Transport detection (stdio, http, sse)
-
-All tests invoke tools/prompts/resources through the MCP Server's low-level
-request handlers (via CallToolRequest, GetPromptRequest, ReadResourceRequest)
-to properly trigger Sentry instrumentation and span creation. This ensures
-accurate testing of the integration's behavior in real MCP Server scenarios.
 """
 
-import asyncio
 import json
 import logging
 from unittest import mock
@@ -76,14 +70,6 @@ try:
 except ImportError:
     request_ctx = None
 
-# Try to import MCP types for helper functions
-try:
-    from mcp.types import CallToolRequest, GetPromptRequest, ReadResourceRequest
-except ImportError:
-    # If mcp.types not available, tests will be skipped anyway
-    CallToolRequest = None
-    GetPromptRequest = None
-    ReadResourceRequest = None
 
 # Collect available FastMCP implementations for parametrization
 fastmcp_implementations = []
@@ -96,140 +82,6 @@ if HAS_MCP_FASTMCP:
 if HAS_STANDALONE_FASTMCP:
     fastmcp_implementations.append(StandaloneFastMCP)
     fastmcp_ids.append("fastmcp")
-
-
-# Helper functions to call tools through MCP Server protocol
-def call_tool_through_mcp(mcp_instance, tool_name, arguments):
-    """
-    Call a tool through MCP Server's low-level handler.
-    This properly triggers Sentry instrumentation.
-
-    Args:
-        mcp_instance: The FastMCP instance
-        tool_name: Name of the tool to call
-        arguments: Dictionary of arguments to pass to the tool
-
-    Returns:
-        The tool result normalized to {"result": value} format
-    """
-    handler = mcp_instance._mcp_server.request_handlers[CallToolRequest]
-    request = CallToolRequest(
-        method="tools/call", params={"name": tool_name, "arguments": arguments}
-    )
-
-    result = asyncio.run(handler(request))
-
-    if hasattr(result, "root"):
-        result = result.root
-    if hasattr(result, "structuredContent") and result.structuredContent:
-        result = result.structuredContent
-    elif hasattr(result, "content"):
-        if result.content:
-            text = result.content[0].text
-            try:
-                result = json.loads(text)
-            except (json.JSONDecodeError, TypeError):
-                result = text
-        else:
-            # Empty content means None return
-            result = None
-
-    # Normalize return value to consistent format
-    # If already a dict, return as-is (tool functions return dicts directly)
-    if isinstance(result, dict):
-        return result
-
-    # Handle string "None" or "null" as actual None
-    if isinstance(result, str) and result in ("None", "null"):
-        result = None
-
-    # Wrap primitive values (int, str, bool, None) in dict format for consistency
-    return {"result": result}
-
-
-async def call_tool_through_mcp_async(mcp_instance, tool_name, arguments):
-    """Async version of call_tool_through_mcp."""
-    handler = mcp_instance._mcp_server.request_handlers[CallToolRequest]
-    request = CallToolRequest(
-        method="tools/call", params={"name": tool_name, "arguments": arguments}
-    )
-
-    result = await handler(request)
-
-    if hasattr(result, "root"):
-        result = result.root
-    if hasattr(result, "structuredContent") and result.structuredContent:
-        result = result.structuredContent
-    elif hasattr(result, "content"):
-        if result.content:
-            text = result.content[0].text
-            try:
-                result = json.loads(text)
-            except (json.JSONDecodeError, TypeError):
-                result = text
-        else:
-            # Empty content means None return
-            result = None
-
-    # Normalize return value to consistent format
-    # If already a dict, return as-is (tool functions return dicts directly)
-    if isinstance(result, dict):
-        return result
-
-    # Handle string "None" or "null" as actual None
-    if isinstance(result, str) and result in ("None", "null"):
-        result = None
-
-    # Wrap primitive values (int, str, bool, None) in dict format for consistency
-    return {"result": result}
-
-
-def call_prompt_through_mcp(mcp_instance, prompt_name, arguments=None):
-    """Call a prompt through MCP Server's low-level handler."""
-    handler = mcp_instance._mcp_server.request_handlers[GetPromptRequest]
-    request = GetPromptRequest(
-        method="prompts/get", params={"name": prompt_name, "arguments": arguments or {}}
-    )
-
-    result = asyncio.run(handler(request))
-    if hasattr(result, "root"):
-        result = result.root
-    return result
-
-
-async def call_prompt_through_mcp_async(mcp_instance, prompt_name, arguments=None):
-    """Async version of call_prompt_through_mcp."""
-    handler = mcp_instance._mcp_server.request_handlers[GetPromptRequest]
-    request = GetPromptRequest(
-        method="prompts/get", params={"name": prompt_name, "arguments": arguments or {}}
-    )
-
-    result = await handler(request)
-    if hasattr(result, "root"):
-        result = result.root
-    return result
-
-
-def call_resource_through_mcp(mcp_instance, uri):
-    """Call a resource through MCP Server's low-level handler."""
-    handler = mcp_instance._mcp_server.request_handlers[ReadResourceRequest]
-    request = ReadResourceRequest(method="resources/read", params={"uri": str(uri)})
-
-    result = asyncio.run(handler(request))
-    if hasattr(result, "root"):
-        result = result.root
-    return result
-
-
-async def call_resource_through_mcp_async(mcp_instance, uri):
-    """Async version of call_resource_through_mcp."""
-    handler = mcp_instance._mcp_server.request_handlers[ReadResourceRequest]
-    request = ReadResourceRequest(method="resources/read", params={"uri": str(uri)})
-
-    result = await handler(request)
-    if hasattr(result, "root"):
-        result = result.root
-    return result
 
 
 # Skip all tests if neither implementation is available

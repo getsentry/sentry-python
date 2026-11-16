@@ -55,6 +55,7 @@ TEST_SUITE_CONFIG = {
     },
     "beam": {
         "package": "apache-beam",
+        "include": "!=2.78.0rc4",  # incomplete upload: no Linux wheels for py3.13+
         "num_versions": 2,
         "deps": {
             "*": ["dill"],
