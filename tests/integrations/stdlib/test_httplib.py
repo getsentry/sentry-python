@@ -2,7 +2,7 @@ import datetime
 import os
 import socket
 import time
-from http.client import HTTPConnection, HTTPSConnection
+from http.client import CannotSendRequest, HTTPConnection, HTTPSConnection
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from socket import SocketIO
 from threading import Thread
@@ -356,7 +356,7 @@ def test_httplib_misuse(sentry_init, capture_events, request):
 
     conn.request("GET", "/200")
 
-    with pytest.raises(Exception):  # noqa: B017
+    with pytest.raises(CannotSendRequest):
         # This raises an exception, because we didn't call `getresponse` for
         # the previous request yet.
         #

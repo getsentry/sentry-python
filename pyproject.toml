@@ -302,6 +302,7 @@ select = [
     # Note: B and N rules are NOT enabled by default in flake8
     # They were only active through the plugins, which may not have been fully enabled
     "T20",     # print() and pprint() calls
+    "PT011",   # pytest.raises() too broad
     "PLC0415", # Import not at the top level of the file
 ]
 
