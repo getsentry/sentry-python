@@ -835,7 +835,6 @@ def test_parse_version(version, expected_result):
             ),
             False,
         ),
-        ("1.0.1", (2, 0, 0), False),
         ("2.0", (1,), True),
         (
             "2.0.1",

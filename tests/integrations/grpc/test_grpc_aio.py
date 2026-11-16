@@ -453,8 +453,7 @@ async def test_stream_stream(grpc_server_and_channel):
     # Use the provided channel
     stub = gRPCTestServiceStub(channel)
     response = stub.TestStreamStream((gRPCTestMessage(text="test"),))
-    async for r in response:
-        assert r.text == "test"
+    assert [r.text async for r in response] == ["test"]
 
 
 @pytest.mark.asyncio

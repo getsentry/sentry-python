@@ -73,9 +73,8 @@ def test_add_and_get_session():
     expected = Session()
     envelope.add_session(expected)
 
-    for item in envelope:
-        if item.type == "session":
-            assert item.payload.json == expected.to_json()
+    (item,) = [item for item in envelope if item.type == "session"]
+    assert item.payload.json == expected.to_json()
 
 
 def test_envelope_headers(sentry_init, capture_envelopes, monkeypatch):
