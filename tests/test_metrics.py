@@ -574,3 +574,92 @@ def test_metrics_batcher_lock_reset_in_child_after_fork(sentry_init):
     original_lock.release()
     _, status = os.waitpid(pid, 0)
     assert os.WIFEXITED(status) and os.WEXITSTATUS(status) == 0
+
+
+def test_metrics_window_sampling_off_by_default(sentry_init, capture_items):
+    sentry_init()
+    items = capture_items("trace_metric")
+
+    for _ in range(100):
+        sentry_sdk.metrics.count("test.counter", 1)
+
+    get_client().flush()
+    metrics = [item.payload for item in items]
+
+    assert len(metrics) == 100
+    assert all("sentry.client_sample_rate" not in m["attributes"] for m in metrics)
+
+
+def test_metrics_window_sampling(
+    sentry_init, capture_items, capture_record_lost_event_calls
+):
+    sentry_init(_experiments={"metrics_window_sampling": True})
+    items = capture_items("trace_metric")
+    lost = capture_record_lost_event_calls()
+
+    # 10/s * 5s flush interval
+    for _ in range(200):
+        sentry_sdk.metrics.count("test.hot", 2)
+    for _ in range(3):
+        sentry_sdk.metrics.count("test.cold", 1)
+    for _ in range(100):
+        sentry_sdk.metrics.count(
+            "test.presampled", 1, attributes={"sentry.client_sample_rate": 0.5}
+        )
+
+    get_client().flush()
+    metrics = [item.payload for item in items]
+
+    def by_name(name):
+        return [m for m in metrics if m["name"] == name]
+
+    hot = by_name("test.hot")
+    assert len(hot) == 50
+    assert all(m["attributes"]["sentry.client_sample_rate"] == 0.25 for m in hot)
+    assert sum(
+        m["value"] / m["attributes"]["sentry.client_sample_rate"] for m in hot
+    ) == pytest.approx(400)
+
+    cold = by_name("test.cold")
+    assert len(cold) == 3
+    assert all("sentry.client_sample_rate" not in m["attributes"] for m in cold)
+
+    presampled = by_name("test.presampled")
+    assert len(presampled) == 50
+    assert all(m["attributes"]["sentry.client_sample_rate"] == 0.25 for m in presampled)
+
+    def sampled_out(category):
+        return sum(q for (r, c, _, q) in lost if (r, c) == ("sample_rate", category))
+
+    assert sampled_out("trace_metric") == 150 + 50
+    assert sampled_out("trace_metric_byte") > 0
+
+
+@pytest.mark.parametrize(
+    "sample_per_second,kept",
+    [
+        (20, 100),
+        # invalid, falls back to the default
+        (float("inf"), 50),
+        (float("nan"), 50),
+        (0, 50),
+        (-1, 50),
+        ("fast", 50),
+    ],
+)
+def test_metrics_window_sampling_rate(
+    sentry_init, capture_items, sample_per_second, kept
+):
+    sentry_init(
+        _experiments={
+            "metrics_window_sampling": {"sample_per_second": sample_per_second}
+        }
+    )
+    items = capture_items("trace_metric")
+
+    for _ in range(200):
+        sentry_sdk.metrics.count("test.counter", 1)
+
+    get_client().flush()
+
+    assert len(items) == kept
