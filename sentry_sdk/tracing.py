@@ -1466,8 +1466,6 @@ def trace(
             # Function implementation
             pass
     """
-    from sentry_sdk.tracing_utils import create_span_decorator  # noqa: PLC0415
-
     decorator = create_span_decorator(
         op=op,
         name=name,
@@ -1487,6 +1485,7 @@ from sentry_sdk.tracing_utils import (
     Baggage,
     EnvironHeaders,
     _generate_sample_rand,
+    create_span_decorator,
     extract_sentrytrace_data,
     has_span_streaming_enabled,
     has_tracing_enabled,

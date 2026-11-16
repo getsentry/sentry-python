@@ -1,5 +1,8 @@
 import sys
 from typing import TYPE_CHECKING
+from warnings import warn
+
+from sentry_sdk.consts import FALSE_VALUES
 
 if TYPE_CHECKING:
     from typing import Any, TypeVar
@@ -39,8 +42,6 @@ def check_uwsgi_thread_support() -> bool:
     except ImportError:
         return True
 
-    from sentry_sdk.consts import FALSE_VALUES  # noqa: PLC0415
-
     def enabled(option: str) -> bool:
         value = opt.get(option, False)
         if isinstance(value, bool):
@@ -61,8 +62,6 @@ def check_uwsgi_thread_support() -> bool:
     lazy_mode = enabled("lazy-apps") or enabled("lazy")
 
     if lazy_mode and not threads_enabled:
-        from warnings import warn  # noqa: PLC0415
-
         warn(
             Warning(
                 "IMPORTANT: "
@@ -75,8 +74,6 @@ def check_uwsgi_thread_support() -> bool:
         return False
 
     elif not lazy_mode and (not threads_enabled or not fork_hooks_on):
-        from warnings import warn  # noqa: PLC0415
-
         warn(
             Warning(
                 "IMPORTANT: "

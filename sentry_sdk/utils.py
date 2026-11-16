@@ -1469,10 +1469,7 @@ def _get_contextvars() -> "Tuple[bool, type]":
                 pass
 
     # Fall back to basic thread-local usage.
-
-    from threading import local  # noqa: PLC0415
-
-    return False, _make_threadlocal_contextvars(local)
+    return False, _make_threadlocal_contextvars(threading.local)
 
 
 HAS_REAL_CONTEXTVARS, ContextVar = _get_contextvars()

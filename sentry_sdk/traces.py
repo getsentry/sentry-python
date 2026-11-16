@@ -32,7 +32,11 @@ from sentry_sdk.profiler.continuous_profiler import (
     try_autostart_continuous_profiler,
     try_profile_lifecycle_trace_start,
 )
-from sentry_sdk.tracing_utils import Baggage
+from sentry_sdk.tracing_utils import (
+    Baggage,
+    create_streaming_span_decorator,
+    has_span_streaming_enabled,
+)
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     format_attribute,
@@ -174,8 +178,6 @@ def start_span(
     :return: The span that has been started.
     :rtype: StreamedSpan
     """
-    from sentry_sdk.tracing_utils import has_span_streaming_enabled  # noqa: PLC0415
-
     client = sentry_sdk.get_client()
     if client.is_active() and not has_span_streaming_enabled(client.options):
         warnings.warn(
@@ -864,10 +866,6 @@ def trace(
             # Function implementation
             pass
     """
-    from sentry_sdk.tracing_utils import (  # noqa: PLC0415
-        create_streaming_span_decorator,
-    )
-
     decorator = create_streaming_span_decorator(
         name=name,
         attributes=attributes,

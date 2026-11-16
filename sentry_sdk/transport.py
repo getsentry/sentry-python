@@ -43,7 +43,7 @@ import certifi
 import urllib3
 
 import sentry_sdk
-from sentry_sdk.consts import EndpointType
+from sentry_sdk.consts import VERSION, EndpointType
 from sentry_sdk.envelope import Envelope, Item, PayloadRef
 from sentry_sdk.utils import (
     Dsn,
@@ -217,8 +217,6 @@ class HttpTransportCore(Transport):
     TIMEOUT = 30  # seconds
 
     def __init__(self: "Self", options: "Dict[str, Any]") -> None:
-        from sentry_sdk.consts import VERSION  # noqa: PLC0415
-
         Transport.__init__(self, options)
         assert self.parsed_dsn is not None
         self.options: "Dict[str, Any]" = options
