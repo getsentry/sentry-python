@@ -89,7 +89,7 @@ mock_sdk_info = {
     ],
 )
 def test_continuous_profiler_invalid_mode(mode, make_options, teardown_profiling):
-    with pytest.raises(ValueError):  # noqa: PT011
+    with pytest.raises(ValueError, match="Unknown continuous profiler mode: foo"):
         setup_continuous_profiler(
             make_options(mode=mode),
             mock_sdk_info,

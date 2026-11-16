@@ -662,7 +662,7 @@ def test_error_attribute_extraction_failure_does_not_replace_original_exception(
     )
 
     def invoke_failing_client_method():
-        with pytest.raises(ValueError) as exc_info:  # noqa: PT011
+        with pytest.raises(ValueError, match="parameter processing failed") as exc_info:
             client.head_object(Bucket="bucket", Key="foo")
         assert exc_info.value is original_exception
 
@@ -750,7 +750,7 @@ def test_streaming_body_read_failure_finishes_stream_span(
 
     def invoke_client_method_and_read_body():
         body = client.get_object(Bucket="bucket", Key="foo")["Body"]
-        with pytest.raises(OSError) as exc_info:  # noqa: PT011
+        with pytest.raises(OSError, match="stream read failed") as exc_info:
             body.read()
         assert exc_info.value is original_exception
 

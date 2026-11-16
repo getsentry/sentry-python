@@ -62,7 +62,7 @@ def experimental_options(mode=None, sample_rate=None):
     ],
 )
 def test_profiler_invalid_mode(mode, make_options, teardown_profiling):
-    with pytest.raises(ValueError):  # noqa: PT011
+    with pytest.raises(ValueError, match="Unknown profiler mode: foo"):
         setup_profiler(make_options(mode))
 
 
