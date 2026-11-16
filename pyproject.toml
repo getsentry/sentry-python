@@ -300,6 +300,7 @@ select = [
     "F",   # Pyflakes (same as flake8 default)
     "I",
     "T20",     # print() and pprint() calls
+    "PT011",   # pytest.raises() too broad
     "RUF100",  # Unused noqa directive
 ]
 
