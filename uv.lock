@@ -26,6 +26,7 @@ docs = [
     { name = "sphinx-autodoc-typehints", extras = ["type-comments"], specifier = ">=2.3.0" },
     { name = "typing-extensions" },
 ]
+falsegreen = [{ name = "falsegreen", specifier = "==0.9.2" }]
 test = [
     { name = "dataclasses", marker = "python_full_version < '3.7'" },
     { name = "pytest", specifier = ">=6.0.0" },
@@ -807,6 +808,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/1c/15/273a4baf8248d6d76220723c3caf039d283774b31a7c46ba686120145b76/eval_type_backport-0.4.0.tar.gz", hash = "sha256:8397d25e6524c2e67b9576bb0636be27dea2192017711220c534ec2de921e9b0", size = 10260, upload-time = "2026-06-02T13:22:06.059Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/50/a7/bb99bf5e6f78736ddb53480f2c3ff3702ffe2196a7c5e1661c03081d398e/eval_type_backport-0.4.0-py3-none-any.whl", hash = "sha256:ad5e2a8db71b6696a56eafb938b0f5a337d3217f256b8e158b469422b4772b20", size = 6432, upload-time = "2026-06-02T13:22:04.827Z" },
+]
+
+[[package]]
+name = "falsegreen"
+version = "0.9.2"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/32/39/5ba28aff8cebc5dc0227856bdb8bdb81e37deea617016bbcc5a3b022acb1/falsegreen-0.9.2.tar.gz", hash = "sha256:c4ea886c2e88f8abcdaed0f468c03159f87a320c321dec4eaab0b611c0f5e02d", size = 177191, upload-time = "2026-07-16T14:16:37.265Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/7c/84/edced8d6ad5a7d98128ca87c874997ced39251deb8444459a11b07ba367c/falsegreen-0.9.2-py3-none-any.whl", hash = "sha256:fa0f98cd8c38728da4a731fc4f649e222e668e93b34c99c7d5da2f5792464d6a", size = 74313, upload-time = "2026-07-16T14:16:35.883Z" },
 ]
 
 [[package]]
