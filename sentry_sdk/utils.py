@@ -1314,7 +1314,7 @@ def parse_version(version: str) -> "Optional[Tuple[int, ...]]":
     This uses the parsing logic from PEP 440:
     https://peps.python.org/pep-0440/#appendix-b-parsing-version-strings-with-regular-expressions
     """
-    VERSION_PATTERN = r"""  # noqa: N806
+    VERSION_PATTERN = r"""
         v?
         (?:
             (?:(?P<epoch>[0-9]+)!)?                           # epoch
