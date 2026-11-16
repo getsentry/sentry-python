@@ -36,7 +36,7 @@ def test_deterministic_sampled(sentry_init, capture_events, sample_rate, sample_
         with sentry_sdk.start_transaction() as transaction:
             assert (
                 transaction.get_baggage().sentry_items["sample_rand"]
-                == f"{sample_rand:.6f}"  # noqa: E231
+                == f"{sample_rand:.6f}"
             )
 
     # Transaction event captured if sample_rand < sample_rate, indicating that
@@ -65,7 +65,7 @@ def test_deterministic_sampled_span_streaming(
     ):
         with sentry_sdk.traces.start_span(name="span") as span:
             assert (
-                span._get_baggage().sentry_items["sample_rand"] == f"{sample_rand:.6f}"  # noqa: E231
+                span._get_baggage().sentry_items["sample_rand"] == f"{sample_rand:.6f}"
             )
 
     sentry_sdk.flush()
@@ -82,7 +82,7 @@ def test_transaction_uses_incoming_sample_rand(
     """
     Test that the transaction uses the sample_rand value from the incoming baggage.
     """
-    baggage = Baggage(sentry_items={"sample_rand": f"{sample_rand:.6f}"})  # noqa: E231
+    baggage = Baggage(sentry_items={"sample_rand": f"{sample_rand:.6f}"})
 
     sentry_init(traces_sample_rate=sample_rate)
     events = capture_events()
@@ -90,7 +90,7 @@ def test_transaction_uses_incoming_sample_rand(
     with sentry_sdk.start_transaction(baggage=baggage) as transaction:
         assert (
             transaction.get_baggage().sentry_items["sample_rand"]
-            == f"{sample_rand:.6f}"  # noqa: E231
+            == f"{sample_rand:.6f}"
         )
 
     # Transaction event captured if sample_rand < sample_rate, indicating that
@@ -119,9 +119,7 @@ def test_segment_uses_incoming_sample_rand_span_streaming(
     )
 
     with sentry_sdk.traces.start_span(name="span") as span:
-        assert (
-            span._get_baggage().sentry_items["sample_rand"] == f"{sample_rand:.6f}"  # noqa: E231
-        )
+        assert span._get_baggage().sentry_items["sample_rand"] == f"{sample_rand:.6f}"
 
     sentry_sdk.flush()
 

@@ -20,7 +20,7 @@ def _get_redis_command_args(command: "Any") -> "Sequence[Any]":
     return command[0]
 
 
-def _patch_redis(StrictRedis: "Any", client: "Any") -> None:  # noqa: N803
+def _patch_redis(StrictRedis: "Any", client: "Any") -> None:
     patch_redis_client(
         StrictRedis,
         is_cluster=False,
