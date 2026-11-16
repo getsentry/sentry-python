@@ -1796,7 +1796,7 @@ def test_streaming_chat_completion_no_prompts(
         assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
 
         try:
-            import tiktoken  # type: ignore # noqa # pylint: disable=unused-import
+            import tiktoken  # type: ignore # pylint: disable=unused-import
 
             assert span["attributes"]["gen_ai.usage.output_tokens"] == 2
             assert span["attributes"]["gen_ai.usage.input_tokens"] == 7
@@ -2497,7 +2497,7 @@ def test_streaming_chat_completion(
         assert "hello world" in span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
 
         try:
-            import tiktoken  # type: ignore # noqa # pylint: disable=unused-import
+            import tiktoken  # type: ignore # pylint: disable=unused-import
 
             assert (
                 span["attributes"]["gen_ai.usage.output_tokens"]
@@ -2708,7 +2708,7 @@ async def test_streaming_chat_completion_async_no_prompts(
         assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
 
         try:
-            import tiktoken  # type: ignore # noqa # pylint: disable=unused-import
+            import tiktoken  # type: ignore # pylint: disable=unused-import
 
             assert span["attributes"]["gen_ai.usage.output_tokens"] == 2
             assert span["attributes"]["gen_ai.usage.input_tokens"] == 7
@@ -2993,7 +2993,7 @@ async def test_streaming_chat_completion_async(
         assert "hello world" in span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
 
         try:
-            import tiktoken  # type: ignore # noqa # pylint: disable=unused-import
+            import tiktoken  # type: ignore # pylint: disable=unused-import
 
             assert (
                 span["attributes"]["gen_ai.usage.output_tokens"]

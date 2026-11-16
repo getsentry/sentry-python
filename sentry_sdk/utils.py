@@ -1314,7 +1314,7 @@ def parse_version(version: str) -> "Optional[Tuple[int, ...]]":
     This uses the parsing logic from PEP 440:
     https://peps.python.org/pep-0440/#appendix-b-parsing-version-strings-with-regular-expressions
     """
-    VERSION_PATTERN = r"""  # noqa: N806
+    VERSION_PATTERN = r"""
         v?
         (?:
             (?:(?P<epoch>[0-9]+)!)?                           # epoch
@@ -1546,7 +1546,7 @@ def transaction_from_function(func: "Callable[..., Any]") -> "Optional[str]":
 disable_capture_event = ContextVar("disable_capture_event")
 
 
-class ServerlessTimeoutWarning(Exception):  # noqa: N818
+class ServerlessTimeoutWarning(Exception):
     """Raised when a serverless method is about to reach its timeout."""
 
     pass

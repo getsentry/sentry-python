@@ -822,7 +822,7 @@ sample_stacks = [
 )
 @mock.patch("sentry_sdk.profiler.transaction_profiler.MAX_PROFILE_DURATION_NS", 5)
 def test_profile_processing(
-    DictionaryContaining,  # noqa: N803
+    DictionaryContaining,
     samples,
     expected,
 ):

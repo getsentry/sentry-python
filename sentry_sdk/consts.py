@@ -1388,10 +1388,10 @@ class ClientConstructor:
         environment: "Optional[str]" = None,
         server_name: "Optional[str]" = None,
         shutdown_timeout: float = 2,
-        integrations: "Sequence[sentry_sdk.integrations.Integration]" = [],  # noqa: B006
+        integrations: "Sequence[sentry_sdk.integrations.Integration]" = [],
         ignore_spans: "Optional[IgnoreSpansConfig]" = None,
-        in_app_include: "List[str]" = [],  # noqa: B006
-        in_app_exclude: "List[str]" = [],  # noqa: B006
+        in_app_include: "List[str]" = [],
+        in_app_exclude: "List[str]" = [],
         default_integrations: bool = True,
         dist: "Optional[str]" = None,
         transport: "Optional[Union[sentry_sdk.transport.Transport, Type[sentry_sdk.transport.Transport], Callable[[Event], None]]]" = None,
@@ -1401,7 +1401,7 @@ class ClientConstructor:
         data_collection: "Optional[DataCollectionUserOptions]" = None,
         http_proxy: "Optional[str]" = None,
         https_proxy: "Optional[str]" = None,
-        ignore_errors: "Sequence[Union[type, str]]" = [],  # noqa: B006
+        ignore_errors: "Sequence[Union[type, str]]" = [],
         max_request_body_size: str = "medium",
         socket_options: "Optional[List[Tuple[int, int, int | bytes]]]" = None,
         keep_alive: "Optional[bool]" = None,
@@ -1423,7 +1423,7 @@ class ClientConstructor:
         disabled_integrations: "Optional[Sequence[Union[sentry_sdk.integrations.Integration, type[sentry_sdk.integrations.Integration]]]]" = None,
         auto_session_tracking: bool = True,
         send_client_reports: bool = True,
-        _experiments: "Experiments" = {},  # noqa: B006
+        _experiments: "Experiments" = {},
         proxy_headers: "Optional[Dict[str, str]]" = None,
         instrumenter: "Optional[str]" = INSTRUMENTER.SENTRY,
         before_send_transaction: "Optional[TransactionProcessor]" = None,
@@ -1431,10 +1431,8 @@ class ClientConstructor:
         enable_tracing: "Optional[bool]" = None,
         include_local_variables: "Optional[bool]" = True,
         include_source_context: "Optional[bool]" = True,
-        trace_propagation_targets: "Optional[Sequence[str]]" = [  # noqa: B006
-            MATCH_ALL
-        ],
-        functions_to_trace: "Sequence[Dict[str, str]]" = [],  # noqa: B006
+        trace_propagation_targets: "Optional[Sequence[str]]" = [MATCH_ALL],
+        functions_to_trace: "Sequence[Dict[str, str]]" = [],
         event_scrubber: "Optional[sentry_sdk.scrubber.EventScrubber]" = None,
         max_value_length: "Optional[int]" = DEFAULT_MAX_VALUE_LENGTH,
         enable_backpressure_handling: bool = True,
