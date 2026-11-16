@@ -485,7 +485,7 @@ def test_accepts_valid_sample_rate(rate):
         1.231,  # wrong value
     ],
 )
-def test_warns_on_invalid_sample_rate(rate, StringContaining):  # noqa: N803
+def test_warns_on_invalid_sample_rate(rate, StringContaining):
     with mock.patch.object(logger, "warning", mock.Mock()):
         result = is_valid_sample_rate(rate, source="Testing")
         logger.warning.assert_any_call(StringContaining("Given sample rate is invalid"))

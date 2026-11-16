@@ -150,6 +150,7 @@ disallow_incomplete_defs = true
 disallow_subclassing_any = true
 disallow_untyped_decorators = true
 disallow_untyped_defs = true
+enable_error_code = ["unused-awaitable"]
 no_implicit_optional = true
 python_version = "3.11"
 strict_equality = true
@@ -303,10 +304,9 @@ select = [
     "W",   # pycodestyle warnings (same as flake8 default)
     "F",   # Pyflakes (same as flake8 default)
     "I",
-    # Note: B and N rules are NOT enabled by default in flake8
-    # They were only active through the plugins, which may not have been fully enabled
     "T20",     # print() and pprint() calls
     "PT011",   # pytest.raises() too broad
+    "RUF100",  # Unused noqa directive
 ]
 
 # Use ONLY the same ignores as the original flake8 config + compatibility for this codebase
@@ -315,9 +315,6 @@ ignore = [
     "E501", # Line too long
     "E402", # Module level import not at top of file
     "E731", # Do not assign a lambda expression, use a def
-    "B014", # Redundant exception types
-    "N812", # Lowercase imported as non-lowercase
-    "N804", # First argument of classmethod should be named cls
 
     # Additional ignores for codebase compatibility
     "E721", # Use isinstance instead of type() == - existing pattern in this codebase

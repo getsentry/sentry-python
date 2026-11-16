@@ -51,7 +51,7 @@ async def grpc_server_and_channel(sentry_init):
         await asyncio.create_task(server.start())
 
         # Create channel connected to our server
-        channel = grpc.aio.insecure_channel(f"localhost:{port}")  # noqa: E231
+        channel = grpc.aio.insecure_channel(f"localhost:{port}")
 
         return server, channel
 
@@ -88,9 +88,7 @@ async def test_noop_for_unimplemented_method(
         items = capture_items("span")
 
         try:
-            async with grpc.aio.insecure_channel(
-                f"localhost:{port}"  # noqa: E231
-            ) as channel:
+            async with grpc.aio.insecure_channel(f"localhost:{port}") as channel:
                 stub = gRPCTestServiceStub(channel)
                 with pytest.raises(grpc.RpcError) as exc:
                     await stub.TestServe(gRPCTestMessage(text="test"))
@@ -105,9 +103,7 @@ async def test_noop_for_unimplemented_method(
         events = capture_events()
 
         try:
-            async with grpc.aio.insecure_channel(
-                f"localhost:{port}"  # noqa: E231
-            ) as channel:
+            async with grpc.aio.insecure_channel(f"localhost:{port}") as channel:
                 stub = gRPCTestServiceStub(channel)
                 with pytest.raises(grpc.RpcError) as exc:
                     await stub.TestServe(gRPCTestMessage(text="test"))
@@ -538,7 +534,7 @@ class TestService(gRPCTestServiceServicer):
             super().__init__("test")
 
     @classmethod
-    async def TestServe(cls, request, context):  # noqa: N802
+    async def TestServe(cls, request, context):
         client = sentry_sdk.get_client()
         span_streaming = has_span_streaming_enabled(client.options)
 
@@ -568,16 +564,16 @@ class TestService(gRPCTestServiceServicer):
         return gRPCTestMessage(text=request.text)
 
     @classmethod
-    async def TestUnaryStream(cls, request, context):  # noqa: N802
+    async def TestUnaryStream(cls, request, context):
         for _ in range(3):
             yield gRPCTestMessage(text=request.text)
 
     @classmethod
-    async def TestStreamStream(cls, request, context):  # noqa: N802
+    async def TestStreamStream(cls, request, context):
         async for r in request:
             yield r
 
     @classmethod
-    async def TestStreamUnary(cls, request, context):  # noqa: N802
+    async def TestStreamUnary(cls, request, context):
         requests = [r async for r in request]
         return requests.pop()

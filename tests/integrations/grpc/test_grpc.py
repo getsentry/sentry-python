@@ -44,7 +44,7 @@ def _set_up(
     server.start()
 
     # Create channel connected to our server
-    channel = grpc.insecure_channel(f"localhost:{port}")  # noqa: E231
+    channel = grpc.insecure_channel(f"localhost:{port}")
 
     return server, channel
 
@@ -758,7 +758,7 @@ class TestService(gRPCTestServiceServicer):
     events = []
 
     @staticmethod
-    def TestServe(request, context):  # noqa: N802
+    def TestServe(request, context):
         client = sentry_sdk.get_client()
         span_streaming = has_span_streaming_enabled(client.options)
 
@@ -782,16 +782,16 @@ class TestService(gRPCTestServiceServicer):
         return gRPCTestMessage(text=request.text)
 
     @staticmethod
-    def TestUnaryStream(request, context):  # noqa: N802
+    def TestUnaryStream(request, context):
         for _ in range(3):
             yield gRPCTestMessage(text=request.text)
 
     @staticmethod
-    def TestStreamStream(request, context):  # noqa: N802
+    def TestStreamStream(request, context):
         for r in request:
             yield r
 
     @staticmethod
-    def TestStreamUnary(request, context):  # noqa: N802
+    def TestStreamUnary(request, context):
         requests = [r for r in request]
         return requests.pop()
