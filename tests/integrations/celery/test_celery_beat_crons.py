@@ -451,7 +451,7 @@ def test_exclude_beat_tasks_option(
 
     with mock.patch(
         "sentry_sdk.integrations.celery.beat.Scheduler", fake_scheduler
-    ) as Scheduler:  # noqa: N806
+    ) as Scheduler:
         with mock.patch(
             "sentry_sdk.integrations.celery.sentry_sdk.get_client",
             return_value=fake_client,
@@ -507,7 +507,7 @@ def test_exclude_redbeat_tasks_option(
 
     with mock.patch(
         "sentry_sdk.integrations.celery.beat.RedBeatScheduler", fake_redbeat_scheduler
-    ) as RedBeatScheduler:  # noqa: N806
+    ) as RedBeatScheduler:
         with mock.patch(
             "sentry_sdk.integrations.celery.sentry_sdk.get_client",
             return_value=fake_client,
