@@ -212,8 +212,8 @@ def extract_contents_messages(contents: "ContentListUnion") -> "List[Dict[str, A
             return messages
 
     # Handle dictionary case (ContentDict)
-    if isinstance(contents, dict):
-        role = contents.get("role", "user")
+    if isinstance(contents, dict):  # type: ignore[unreachable]  # dicts are accepted at runtime
+        role = contents.get("role", "user")  # type: ignore[unreachable]
         parts = contents.get("parts")
 
         if parts:
@@ -881,12 +881,12 @@ def _transform_system_instruction_one_level(
             return text_parts
 
         for part in parts:
-            if isinstance(part, Part) and isinstance(part.text, str):
-                text_parts.append({"type": "text", "content": part.text})
+            if isinstance(part, Part) and isinstance(part.text, str):  # type: ignore[unreachable]  # parts can hold Part objects at runtime
+                text_parts.append({"type": "text", "content": part.text})  # type: ignore[unreachable]
                 continue
 
             if not isinstance(part, dict):
-                continue
+                continue  # type: ignore[unreachable]  # defensive check on user input
 
             text = part.get("text")
             if isinstance(text, str):
@@ -975,8 +975,8 @@ def set_span_data_for_request(
         system_instructions = None
         if config and hasattr(config, "system_instruction"):
             system_instructions = config.system_instruction
-        elif isinstance(config, dict) and "system_instruction" in config:
-            system_instructions = config.get("system_instruction")
+        elif isinstance(config, dict) and "system_instruction" in config:  # type: ignore[unreachable]  # dicts are accepted at runtime
+            system_instructions = config.get("system_instruction")  # type: ignore[unreachable]
 
         if system_instructions is not None:
             set_on_span(

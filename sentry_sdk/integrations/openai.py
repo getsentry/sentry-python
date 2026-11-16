@@ -898,8 +898,8 @@ def _new_sync_chat_completion(
 
     # Attribute check to fail gracefully if the attribute is not present in future `openai` versions.
     if isinstance(response, Stream) and hasattr(response, "_iterator"):
-        messages: "Optional[Union[Iterable[ChatCompletionMessageParam], list[str]]]" = (
-            kwargs.get("messages")
+        messages: "Optional[Union[str, Iterable[ChatCompletionMessageParam], list[str]]]" = kwargs.get(
+            "messages"
         )
 
         if messages is not None and isinstance(messages, str):
@@ -984,7 +984,7 @@ async def _new_async_chat_completion(
 
     # Attribute check to fail gracefully if the attribute is not present in future `openai` versions.
     if isinstance(response, AsyncStream) and hasattr(response, "_iterator"):
-        messages: "Optional[list[str]]" = kwargs.get("messages")
+        messages: "Optional[Union[str, list[str]]]" = kwargs.get("messages")
 
         if messages is not None and isinstance(messages, str):
             messages = [messages]

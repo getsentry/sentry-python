@@ -60,7 +60,7 @@ def _convert_message_parts(messages: "List[Dict[str, Any]]") -> "List[Dict[str, 
 
     for message in messages:
         if not isinstance(message, dict):
-            continue
+            continue  # type: ignore[unreachable]  # defensive check on user input
         content = message.get("content")
         if isinstance(content, (list, tuple)):
             transformed = []

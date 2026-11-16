@@ -68,7 +68,7 @@ def _transform_tool_definitions(tools: "list[Tool]") -> "list[ToolDefinition]":
     Note: These are generated from the same OpenAPI spec as Responses API tools.
     """
     if not isinstance(tools, list):
-        return []
+        return []  # type: ignore[unreachable]  # defensive check
 
     tool_definitions: "list[ToolDefinition]" = []
     for tool in tools:

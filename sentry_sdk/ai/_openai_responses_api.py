@@ -40,18 +40,18 @@ def _transform_system_instructions(
 
     for instruction in system_instructions:
         if not isinstance(instruction, dict):
-            continue
+            continue  # type: ignore[unreachable]  # defensive check on user input
 
         content = instruction.get("content")
         if content is None:
-            continue
+            continue  # type: ignore[unreachable]  # defensive check on user input
 
         if isinstance(content, str):
             instruction_text_parts.append({"type": "text", "content": content})
             continue
 
         if not isinstance(content, Iterable):
-            continue
+            continue  # type: ignore[unreachable]  # defensive check on user input
 
         for part in content:
             if not isinstance(part, dict) or part.get("type") != "input_text":
@@ -70,12 +70,12 @@ def _transform_tool_definitions(tools: "Iterable[ToolParam]") -> "list[ToolDefin
     Includes special handling for tools where the type includes a name, description or parameters.
     """
     if not isinstance(tools, Iterable):
-        return []
+        return []  # type: ignore[unreachable]  # defensive check on user input
 
     tool_definitions = []
     for tool in tools:
         if not isinstance(tool, dict) or "type" not in tool:
-            continue
+            continue  # type: ignore[unreachable]  # defensive check on user input
 
         if tool["type"] == "function":
             tool_definition: "ToolDefinition" = {

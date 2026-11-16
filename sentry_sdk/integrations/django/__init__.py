@@ -341,7 +341,7 @@ def _patch_drf() -> None:
 
     with _DRF_PATCH_LOCK:
         if _DRF_PATCHED:
-            return
+            return  # type: ignore[unreachable]  # another thread may have set it while we waited for the lock
 
         # We set this regardless of whether the code below succeeds or fails.
         # There is no point in trying to patch again on the next request.

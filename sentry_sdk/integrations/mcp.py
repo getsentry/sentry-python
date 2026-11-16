@@ -365,7 +365,7 @@ async def _tool_handler_wrapper(
                 raise
 
             if result is None:
-                return result
+                return result  # type: ignore[unreachable]  # defensive check
 
             # Get integration to check PII settings
             integration = client.get_integration(MCPIntegration)
@@ -595,7 +595,7 @@ async def _prompt_handler_wrapper(
                 raise
 
             if result is None:
-                return result
+                return result  # type: ignore[unreachable]  # defensive check
 
             # Get integration to check PII settings
             integration = client.get_integration(MCPIntegration)
@@ -612,16 +612,16 @@ async def _prompt_handler_wrapper(
 
             # For prompts, count messages and set role/content only for single-message prompts
             try:
-                messages: "Optional[list[str]]" = None
+                messages: "Optional[list[Any]]" = None
                 message_count = 0
 
                 # Check if result has messages attribute (GetPromptResult)
                 if hasattr(result, "messages") and result.messages:
-                    messages = result.messages  # type: ignore[assignment]
-                    message_count = len(messages)  # type: ignore[arg-type]
+                    messages = result.messages
+                    message_count = len(messages)
                 # Also check if result is a dict with messages
-                elif isinstance(result, dict) and result.get("messages"):
-                    messages = result["messages"]
+                elif isinstance(result, dict) and result.get("messages"):  # type: ignore[unreachable]  # handlers can return plain dicts
+                    messages = result["messages"]  # type: ignore[unreachable]
                     message_count = len(messages)
 
                 # Always set message count if we found messages

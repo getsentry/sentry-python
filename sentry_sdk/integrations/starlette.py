@@ -860,6 +860,8 @@ class StarletteRequestExtractor:
             request_info["data"] = AnnotatedValue.removed_because_raw_data()
             return request_info
 
+        return None
+
     async def content_length(self: "StarletteRequestExtractor") -> "Optional[int]":
         if "content-length" in self.request.headers:
             return int(self.request.headers["content-length"])
@@ -871,7 +873,7 @@ class StarletteRequestExtractor:
 
     async def form(self: "StarletteRequestExtractor") -> "Any":
         if multipart is None:
-            return None
+            return None  # type: ignore[unreachable]  # python-multipart is optional
 
         # Parse the body first to get it cached, as Starlette does not cache form() as it
         # does with body() and json() https://github.com/encode/starlette/discussions/1933

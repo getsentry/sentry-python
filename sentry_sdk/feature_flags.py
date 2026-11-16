@@ -41,7 +41,7 @@ class FlagBuffer:
             ]
 
     def set(self, flag: str, result: bool) -> None:
-        if isinstance(result, FlagBuffer):
+        if isinstance(result, FlagBuffer):  # type: ignore[unreachable]  # guard against misuse
             # If someone were to insert `self` into `self` this would create a circular dependency
             # on the lock. This is of course a deadlock. However, this is far outside the expected
             # usage of this class. We guard against it here for completeness and to document this

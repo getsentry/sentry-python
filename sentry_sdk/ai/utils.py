@@ -130,7 +130,7 @@ def transform_openai_content_part(
         is not OpenAI image_url format or transformation fails.
     """
     if not isinstance(content_part, dict):
-        return None
+        return None  # type: ignore[unreachable]  # defensive check on SDK input
 
     block_type = content_part.get("type")
 
@@ -203,7 +203,7 @@ def transform_anthropic_content_part(
         is not Anthropic format or transformation fails.
     """
     if not isinstance(content_part, dict):
-        return None
+        return None  # type: ignore[unreachable]  # defensive check on SDK input
 
     block_type = content_part.get("type")
 
@@ -271,7 +271,7 @@ def transform_google_content_part(
         is not Google format or transformation fails.
     """
     if not isinstance(content_part, dict):
-        return None
+        return None  # type: ignore[unreachable]  # defensive check on SDK input
 
     # Handle Google inline_data format
     if "inline_data" in content_part:
@@ -330,7 +330,7 @@ def transform_generic_content_part(
         is not generic format or transformation fails.
     """
     if not isinstance(content_part, dict):
-        return None
+        return None  # type: ignore[unreachable]  # defensive check on SDK input
 
     block_type = content_part.get("type")
 
@@ -405,7 +405,7 @@ def transform_content_part(
         is unrecognized or transformation fails.
     """
     if not isinstance(content_part, dict):
-        return None
+        return None  # type: ignore[unreachable]  # defensive check on SDK input
 
     # Try OpenAI format first (most common, clear indicator)
     result = transform_openai_content_part(content_part)
@@ -526,7 +526,7 @@ def normalize_message_roles(messages: "list[dict[str, Any]]") -> "list[dict[str,
     normalized_messages = []
     for message in messages:
         if not isinstance(message, dict):
-            normalized_messages.append(message)
+            normalized_messages.append(message)  # type: ignore[unreachable]  # defensive check on SDK input
             continue
         normalized_message = message.copy()
         if "role" in message:
@@ -661,7 +661,7 @@ def redact_blob_message_parts(
     has_blobs = False
     for message in messages:
         if not isinstance(message, dict):
-            continue
+            continue  # type: ignore[unreachable]  # defensive check on SDK input
         content = message.get("content")
         if isinstance(content, list):
             for item in content:
@@ -683,7 +683,7 @@ def redact_blob_message_parts(
     # Second pass: redact blob content in the copy
     for message in messages_copy:
         if not isinstance(message, dict):
-            continue
+            continue  # type: ignore[unreachable]  # defensive check on SDK input
 
         content = message.get("content")
         if isinstance(content, list):

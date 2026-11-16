@@ -45,8 +45,8 @@ def get_template_frame_from_exception(
 
 
 def _get_template_name_description(template_name: str) -> str:
-    if isinstance(template_name, (list, tuple)):
-        if template_name:
+    if isinstance(template_name, (list, tuple)):  # type: ignore[unreachable]  # Django also accepts a list of names
+        if template_name:  # type: ignore[unreachable]
             return "[{}, ...]".format(template_name[0])
     else:
         return template_name
@@ -133,7 +133,9 @@ def patch_templates() -> None:
     django.shortcuts.render = render
 
 
-def _get_template_frame_from_debug(debug: "Dict[str, Any]") -> "Dict[str, Any]":
+def _get_template_frame_from_debug(
+    debug: "Optional[Dict[str, Any]]",
+) -> "Optional[Dict[str, Any]]":
     if debug is None:
         return None
 
@@ -176,7 +178,7 @@ def _get_template_frame_from_source(
     source: "Tuple[Origin, Tuple[int, int]]",
 ) -> "Optional[Dict[str, Any]]":
     if not source:
-        return None
+        return None  # type: ignore[unreachable]  # defensive check
 
     origin, (start, end) = source
     filename = getattr(origin, "loadname", None)

@@ -101,7 +101,9 @@ def _handle_error(context: "Any", *args: "Any") -> None:
     if execution_context is None:
         return
 
-    span: "Optional[Span]" = getattr(execution_context, "_sentry_sql_span", None)
+    span: "Optional[Union[Span, StreamedSpan]]" = getattr(
+        execution_context, "_sentry_sql_span", None
+    )
 
     if span is not None:
         if isinstance(span, StreamedSpan):

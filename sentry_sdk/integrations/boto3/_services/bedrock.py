@@ -583,7 +583,7 @@ def _transform_tool_definitions(
     result: "list[ToolDefinition]" = []
     for tool in tools:
         if not isinstance(tool, dict):
-            continue
+            continue  # type: ignore[unreachable]  # defensive check on user input
 
         if "toolSpec" in tool:
             tool_definition: "ToolDefinition" = {"type": "function"}

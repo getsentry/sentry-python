@@ -1283,9 +1283,6 @@ class Scope:
 
             # get current span or transaction
             span = self.span or self.get_isolation_scope().span
-            if isinstance(span, StreamedSpan):
-                # make mypy happy
-                return NoOpSpan()
 
             if span is None:
                 # New spans get the `trace_id` from the scope

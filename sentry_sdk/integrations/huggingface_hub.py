@@ -376,8 +376,8 @@ def _wrap_huggingface_task(f: "Callable[..., Any]", op: str) -> "Callable[..., A
                                 if hasattr(chunk, "usage") and chunk.usage is not None:
                                     usage = chunk.usage
 
-                                if isinstance(chunk, str):
-                                    if chunk is not None:
+                                if isinstance(chunk, str):  # type: ignore[unreachable]  # defensive check
+                                    if chunk is not None:  # type: ignore[unreachable]
                                         response_text_buffer.append(chunk)
 
                                 if (
@@ -491,7 +491,7 @@ def _wrap_huggingface_task(f: "Callable[..., Any]", op: str) -> "Callable[..., A
                                 SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, usage.total_tokens
                             )
                         elif (
-                            usage.prompt_tokens is not None
+                            usage.prompt_tokens is not None  # type: ignore[unreachable]  # defensive check
                             and usage.completion_tokens is not None
                         ):
                             set_on_span(
