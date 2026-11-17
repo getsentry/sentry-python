@@ -1,3 +1,4 @@
+import heapq
 import math
 import random
 import time
@@ -5,6 +6,7 @@ from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk._batcher import Batcher
+from sentry_sdk.tracing_utils import _generate_sample_rand
 from sentry_sdk.utils import capture_internal_exceptions, logger, serialize_attribute
 
 if TYPE_CHECKING:
@@ -89,17 +91,16 @@ class MetricsBatcher(Batcher["Metric"]):
             return True
 
         with capture_internal_exceptions():
-            in_sampled_span = _in_sampled_span()
+            key = _priority()
             with self._lock:
                 chunk = self._get_chunk(name, limit)
-                stratum = chunk.sampled if in_sampled_span else chunk.other
-                if not self._has_room(chunk, stratum):
+                if not self._has_room(chunk):
                     # Let add() drop and report it
                     return True
-                index = self._pick_index(chunk, stratum)
-                if index is None:
+                entry = self._pick(chunk, key)
+                if entry is None:
                     return False
-                self._active.reserved = (name, chunk, stratum, index)
+                self._active.reserved = (name, chunk, entry)
         return True
 
     def _add_locked(self, item: "Metric") -> bool:
@@ -109,27 +110,24 @@ class MetricsBatcher(Batcher["Metric"]):
                 return False
             return super()._add_locked(item)
 
-        reserved: "Optional[Tuple[str, _Chunk, _Stratum, int]]" = getattr(
+        reserved: "Optional[Tuple[str, _Chunk, List[Any]]]" = getattr(
             self._active, "reserved", None
         )
         self._active.reserved = None
         with capture_internal_exceptions():
             name = item["name"]
             if reserved is not None and reserved[0] == name:
-                _, reserved_chunk, stratum, index = reserved
-                # If the chunk closed in between, it already counted this metric
-                # as sampled out
-                if self._chunks.get(name) is reserved_chunk:
-                    stratum.kept[index] = item
+                # If the chunk closed or dropped the entry in between, it
+                # already counted this metric as sampled out
+                reserved[2][1] = item
                 return True
 
             chunk = self._get_chunk(name, limit)
-            stratum = chunk.sampled if _in_sampled_span() else chunk.other
-            if not self._has_room(chunk, stratum):
+            if not self._has_room(chunk):
                 return False
-            index = self._pick_index(chunk, stratum)
-            if index is not None:
-                stratum.kept[index] = item
+            entry = self._pick(chunk, _priority())
+            if entry is not None:
+                entry[1] = item
         return True
 
     def _get_chunk(self, name: str, limit: "Tuple[int, float]") -> "_Chunk":
@@ -144,71 +142,54 @@ class MetricsBatcher(Batcher["Metric"]):
             chunk = self._chunks[name] = _Chunk(now, *limit)
         return chunk
 
-    def _has_room(self, chunk: "_Chunk", stratum: "_Stratum") -> bool:
-        # A full reservoir replaces slots, so only a new slot needs room
+    def _has_room(self, chunk: "_Chunk") -> bool:
+        # A full reservoir replaces entries, so only a new entry needs room
         return (
-            len(stratum.kept) >= chunk.size
+            self._is_full(chunk)
             or len(self._buffer) + self._held < self.MAX_BEFORE_DROP
         )
 
-    def _pick_index(self, chunk: "_Chunk", stratum: "_Stratum") -> "Optional[int]":
-        # Reservoir sampling (Algorithm R). Slots are reserved with None until
-        # the metric arrives.
-        stratum.seen += 1
-        if len(stratum.kept) < chunk.size:
-            stratum.kept.append(None)
+    def _pick(
+        self, chunk: "_Chunk", key: "Tuple[float, float]"
+    ) -> "Optional[List[Any]]":
+        # Bottom-k sampling: keep the metrics with the lowest keys. The heap is
+        # ordered by the negated key, so the highest kept key is on top. Entries
+        # are reserved with None until the metric arrives.
+        chunk.seen += 1
+        entry: "List[Any]" = [(-key[0], -key[1]), None]
+        if not self._is_full(chunk):
+            heapq.heappush(chunk.kept, entry)
             self._held += 1
-            return len(stratum.kept) - 1
-        index = random.randrange(stratum.seen)
-        return index if index < chunk.size else None
+            return entry
+        if entry[0] > chunk.kept[0][0]:
+            heapq.heapreplace(chunk.kept, entry)
+            return entry
+        return None
 
     def _is_full(self, chunk: "_Chunk") -> bool:
-        return len(chunk.sampled.kept) + len(chunk.other.kept) >= chunk.size
+        return len(chunk.kept) >= chunk.size
 
     def _is_done(self, chunk: "_Chunk", now: float) -> bool:
         # Chunks that aren't full were not sampled, so they can wait for the flush
         return self._is_full(chunk) and now - chunk.start >= chunk.seconds
 
     def _close(self, chunk: "_Chunk") -> None:
-        sampled, other = chunk.sampled, chunk.other
-        self._held -= len(sampled.kept) + len(other.kept)
-        # Metrics in sampled spans get the budget first. The others keep at
-        # least one slot, so they can still be extrapolated.
-        other_floor = 1 if other.kept else 0
-        sampled_count = min(len(sampled.kept), chunk.size - other_floor)
-        other_count = min(len(other.kept), chunk.size - sampled_count)
+        self._held -= len(chunk.kept)
+        kept = [item for _, item in chunk.kept if item is not None]
 
-        if sampled.kept and not sampled_count:
-            # A single slot can't keep both without bias, so pick one uniformly
-            # from every metric seen
-            seen = sampled.seen + other.seen
-            stratum = sampled if random.randrange(seen) < sampled.seen else other
-            kept = self._keep(stratum, 1, seen)
-        else:
-            kept = self._keep(sampled, sampled_count, sampled.seen)
-            kept += self._keep(other, other_count, other.seen)
-
-        self._buffer.extend(kept)
-        if len(self._buffer) >= self.MAX_BEFORE_FLUSH:
-            self._flush_event.set()
-
-    def _keep(self, stratum: "_Stratum", count: int, seen: int) -> "List[Metric]":
-        # A random subset of a uniform sample is still a uniform sample
-        slots = stratum.kept
-        if count < len(slots):
-            slots = random.sample(slots, count)
-        kept = [item for item in slots if item is not None]
-
-        if kept and seen > len(kept):
-            rate = len(kept) / seen
+        if kept and chunk.seen > len(kept):
+            rate = len(kept) / chunk.seen
             for item in kept:
                 attributes = item["attributes"]
                 client_rate = attributes.get("sentry.client_sample_rate")
                 if not (isinstance(client_rate, (int, float)) and 0 < client_rate <= 1):
                     client_rate = 1.0
                 attributes["sentry.client_sample_rate"] = rate * client_rate
-            self._sampled_out.append((kept[0], seen - len(kept)))
-        return kept
+            self._sampled_out.append((kept[0], chunk.seen - len(kept)))
+
+        self._buffer.extend(kept)
+        if len(self._buffer) >= self.MAX_BEFORE_FLUSH:
+            self._flush_event.set()
 
     def _close_chunks(self, force: bool) -> None:
         now = time.monotonic()
@@ -277,29 +258,38 @@ class MetricsBatcher(Batcher["Metric"]):
 
 
 class _Chunk:
-    __slots__ = ("start", "size", "seconds", "sampled", "other")
+    __slots__ = ("start", "size", "seconds", "seen", "kept")
 
     def __init__(self, start: float, size: int, seconds: float) -> None:
         self.start = start
         self.size = size
         self.seconds = seconds
-        # Metrics recorded in a sampled span, preferred when picking what to keep
-        self.sampled = _Stratum()
-        self.other = _Stratum()
-
-
-class _Stratum:
-    __slots__ = ("seen", "kept")
-
-    def __init__(self) -> None:
         self.seen = 0
-        self.kept: "List[Optional[Metric]]" = []
+        # Heap of [negated key, metric or None]
+        self.kept: "List[List[Any]]" = []
 
 
-def _in_sampled_span() -> bool:
+def _priority() -> "Tuple[float, float]":
+    # Sort by the trace's sample_rand. Traces are sampled when sample_rand is
+    # below the sample rate, so metrics in sampled traces sort first, while
+    # sample_rand stays uniform, so the kept metrics aren't biased. The
+    # second value breaks ties between metrics in the same trace.
+    scope = sentry_sdk.get_current_scope()
+    span = scope._span
     # _span holds the active span in both trace lifecycles
-    span = sentry_sdk.get_current_scope()._span
-    return span is not None and span.sampled is True
+    root = (
+        getattr(span, "_segment", None)
+        or getattr(span, "containing_transaction", None)
+        or span
+    )
+    sample_rand = getattr(root, "_sample_rand", None)
+    if not isinstance(sample_rand, float):
+        propagation_context = scope.get_active_propagation_context()
+        if propagation_context.baggage is not None:
+            sample_rand = propagation_context.baggage._sample_rand()
+        if sample_rand is None:
+            sample_rand = _generate_sample_rand(propagation_context.trace_id)
+    return sample_rand, random.random()
 
 
 def _parse_rate(value: float) -> float:

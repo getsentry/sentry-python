@@ -915,56 +915,36 @@ def test_metrics_window_sampling_before_send_metric(sentry_init, capture_items):
 
 
 @pytest.mark.parametrize("trace_lifecycle", ["static", "stream"])
-@pytest.mark.parametrize(
-    "in_span,outside,kept_in_span,kept_outside",
-    [
-        # Metrics in sampled spans get the budget first, the others keep a slot
-        (50, 200, 9, 1),
-        # The others get whatever the sampled spans leave over
-        (3, 200, 3, 7),
-    ],
-)
-def test_metrics_window_sampling_prefers_sampled_spans(
-    sentry_init,
-    capture_items,
-    trace_lifecycle,
-    in_span,
-    outside,
-    kept_in_span,
-    kept_outside,
+def test_metrics_window_sampling_prefers_sampled_traces(
+    sentry_init, capture_items, trace_lifecycle
 ):
     sentry_init(
-        traces_sample_rate=1.0,
+        traces_sample_rate=0.5,
         trace_lifecycle=trace_lifecycle,
         _experiments={"metrics_window_sampling": True},
     )
     items = capture_items("trace_metric")
 
-    for _ in range(outside // 2):
-        sentry_sdk.metrics.count("test.hot", 1)
-    if trace_lifecycle == "stream":
-        span = sentry_sdk.traces.start_span(name="test-span")
-    else:
-        span = sentry_sdk.start_transaction(op="test", name="test-span")
-    with span:
-        for _ in range(in_span):
+    sampled = {}
+    for _ in range(100):
+        if trace_lifecycle == "stream":
+            sentry_sdk.traces.new_trace()
+            span = sentry_sdk.traces.start_span(name="test-span")
+        else:
+            span = sentry_sdk.start_transaction(op="test", name="test-span")
+        with span:
             sentry_sdk.metrics.count("test.hot", 1)
-    for _ in range(outside // 2):
-        sentry_sdk.metrics.count("test.hot", 1)
+        sampled[span.trace_id] = span.sampled
 
     get_client().flush()
     metrics = [item.payload for item in items]
 
-    def weight(metric):
-        return 1 / metric["attributes"].get("sentry.client_sample_rate", 1)
-
-    kept = [m for m in metrics if m.get("span_id") is not None]
-    assert len(kept) == kept_in_span
-    assert sum(weight(m) for m in kept) == pytest.approx(in_span)
-
-    others = [m for m in metrics if m.get("span_id") is None]
-    assert len(others) == kept_outside
-    assert sum(weight(m) for m in others) == pytest.approx(outside)
+    # The lowest sample_rands are kept, and those traces are the sampled ones
+    assert len(metrics) == 10
+    assert all(sampled[m["trace_id"]] for m in metrics)
+    assert sum(
+        1 / m["attributes"]["sentry.client_sample_rate"] for m in metrics
+    ) == pytest.approx(100)
 
 
 def test_metrics_window_sampling_unsampled_span_not_preferred(
