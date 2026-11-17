@@ -37,10 +37,11 @@ jobs:
       - name: Setup Test Env
         run: |
           uv sync
-      - name: Test gevent
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-gevent"
+      - parallel:
+          - name: Test gevent
+            run: |
+              set -x # print commands that are executed
+              ./scripts/runtox.sh "py${{ matrix.python-version }}-gevent"
       - name: Upload coverage data
         if: ${{ !cancelled() }}
         continue-on-error: true
