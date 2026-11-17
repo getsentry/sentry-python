@@ -1600,6 +1600,39 @@ def test_coding_agent_hint_names_what_is_off(
     assert coding_agent_hint.printed_at_exit().startswith(f"[sentry] {missing} ")
 
 
+@pytest.mark.parametrize(
+    "env, options, advice",
+    [
+        (
+            {"CODEX_THREAD_ID": "1"},
+            {},
+            "If you leave them off, tell the user they're off and that you can turn them on if they want.",
+        ),
+        (
+            {"AI_AGENT": "codex"},
+            {"enable_logs": True},
+            "If you leave it off, tell the user it's off and that you can turn it on if they want.",
+        ),
+        (
+            {"CLAUDECODE": "1"},
+            {},
+            "If you're setting up Sentry, it is strongly recommended",
+        ),
+    ],
+)
+def test_coding_agent_hint_advice_per_agent(
+    sentry_init, coding_agent_hint, env, options, advice
+):
+    for name, value in env.items():
+        coding_agent_hint.setenv(name, value)
+
+    sentry_init(dsn=AGENT_HINT_DSN, **options)
+
+    printed = coding_agent_hint.printed_at_exit()
+    assert advice in printed
+    assert SETUP_CHECKLIST_PATH in printed
+
+
 def test_coding_agent_hint_shown_once(sentry_init, coding_agent_hint):
     coding_agent_hint.setenv("AI_AGENT", "claude-code")
 
