@@ -736,6 +736,48 @@ def test_metrics_window_sampling_chunks(sentry_init, capture_items, monkeypatch)
     assert "sentry.client_sample_rate" not in rare["attributes"]
 
 
+def test_metrics_window_sampling_per_name(sentry_init, capture_items):
+    sentry_init(
+        _experiments={"metrics_window_sampling": {"per_name": {"test.hot": 0.2}}}
+    )
+    items = capture_items("trace_metric")
+
+    for _ in range(200):
+        sentry_sdk.metrics.count("test.hot", 1)
+        sentry_sdk.metrics.count("test.other", 1)
+
+    get_client().flush()
+    metrics = [item.payload for item in items]
+
+    # Only the listed name is sampled, at one per 5s chunk
+    (hot,) = [m for m in metrics if m["name"] == "test.hot"]
+    assert hot["attributes"]["sentry.client_sample_rate"] == 1 / 200
+
+    other = [m for m in metrics if m["name"] == "test.other"]
+    assert len(other) == 200
+    assert all("sentry.client_sample_rate" not in m["attributes"] for m in other)
+
+
+def test_metrics_window_sampling_long_chunks(sentry_init, capture_items, monkeypatch):
+    monkeypatch.setattr(sentry_sdk._metrics_batcher, "CHUNK_SECONDS", 0.1)
+    sentry_init(
+        _experiments={"metrics_window_sampling": {"per_name": {"test.hot": 0.5}}}
+    )
+    items = capture_items("trace_metric")
+
+    for _ in range(10):
+        sentry_sdk.metrics.count("test.hot", 1)
+    time.sleep(0.3)
+    for _ in range(10):
+        sentry_sdk.metrics.count("test.hot", 1)
+
+    get_client().flush()
+
+    # Below one per chunk, the chunk lasts 1 / rate (2s), so both bursts share it
+    (item,) = items
+    assert item.payload["attributes"]["sentry.client_sample_rate"] == 1 / 20
+
+
 def test_metrics_window_sampling_before_send_metric(sentry_init, capture_items):
     seen = []
 
