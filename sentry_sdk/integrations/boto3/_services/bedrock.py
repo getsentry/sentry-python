@@ -107,14 +107,15 @@ def _patch_event_stream() -> None:
                     if cache_read_tokens is not None:
                         input_tokens += cache_read_tokens
                         span.set_attribute(
-                            SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED, cache_read_tokens
+                            SPANDATA.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
+                            cache_read_tokens,
                         )
 
                     cache_write_tokens = usage.get("cacheWriteInputTokens")
                     if cache_write_tokens is not None:
                         input_tokens += cache_write_tokens
                         span.set_attribute(
-                            SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE,
+                            SPANDATA.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS,
                             cache_write_tokens,
                         )
 
@@ -693,14 +694,15 @@ class _BedrockExtension(_ServiceExtension):
             if cache_read_tokens is not None:
                 input_tokens += cache_read_tokens
                 span.set_attribute(
-                    SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED, cache_read_tokens
+                    SPANDATA.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS, cache_read_tokens
                 )
 
             cache_write_tokens = usage.get("cacheWriteInputTokens")
             if cache_write_tokens is not None:
                 input_tokens += cache_write_tokens
                 span.set_attribute(
-                    SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE, cache_write_tokens
+                    SPANDATA.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS,
+                    cache_write_tokens,
                 )
 
             span.set_attribute(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, input_tokens)
