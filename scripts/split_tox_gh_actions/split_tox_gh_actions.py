@@ -58,6 +58,10 @@ FRAMEWORKS_NEEDING_CLICKHOUSE = {
     "clickhouse_driver",
 }
 
+FRAMEWORKS_NEEDING_ES = {
+    "elasticsearch",
+}
+
 FRAMEWORKS_NEEDING_DOCKER = {
     "aws_lambda",
 }
@@ -108,6 +112,7 @@ GROUPS = {
         "aiomysql",
         "asyncpg",
         "clickhouse_driver",
+        "elasticsearch",
         "pymongo",
         "redis",
         "redis_py_cluster_legacy",
@@ -336,6 +341,7 @@ def render_template(group, frameworks, py_versions):
         "group": group,
         "frameworks": frameworks,
         "needs_clickhouse": bool(set(frameworks) & FRAMEWORKS_NEEDING_CLICKHOUSE),
+        "needs_es": bool(set(frameworks) & FRAMEWORKS_NEEDING_ES),
         "needs_docker": bool(set(frameworks) & FRAMEWORKS_NEEDING_DOCKER),
         "needs_mysql": bool(set(frameworks) & FRAMEWORKS_NEEDING_MYSQL),
         "needs_postgres": bool(set(frameworks) & FRAMEWORKS_NEEDING_POSTGRES),
