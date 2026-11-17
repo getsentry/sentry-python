@@ -144,9 +144,10 @@ class MetricsBatcher(Batcher["Metric"]):
             rate = len(kept) / chunk.seen
             for item in kept:
                 attributes = item["attributes"]
-                attributes["sentry.client_sample_rate"] = rate * _parse_rate(
-                    attributes.get("sentry.client_sample_rate", 1.0), default=1.0
-                )
+                client_rate = attributes.get("sentry.client_sample_rate")
+                if not (isinstance(client_rate, (int, float)) and 0 < client_rate <= 1):
+                    client_rate = 1.0
+                attributes["sentry.client_sample_rate"] = rate * client_rate
             self._sampled_out.append((kept[0], chunk.seen - len(kept)))
 
         self._buffer.extend(kept)
@@ -229,7 +230,7 @@ class _Chunk:
         self.kept: "List[Optional[Metric]]" = []
 
 
-def _parse_rate(value: "Any", default: float = DEFAULT_SAMPLE_PER_SECOND) -> float:
+def _parse_rate(value: float) -> float:
     try:
         rate = float(value)
     except (TypeError, ValueError):
@@ -238,5 +239,7 @@ def _parse_rate(value: "Any", default: float = DEFAULT_SAMPLE_PER_SECOND) -> flo
     if math.isfinite(rate) and rate > 0:
         return rate
 
-    logger.warning("[Metrics] Invalid sample rate %r, using %s", value, default)
-    return default
+    logger.warning(
+        "[Metrics] Invalid sample rate %r, using %s", value, DEFAULT_SAMPLE_PER_SECOND
+    )
+    return DEFAULT_SAMPLE_PER_SECOND
