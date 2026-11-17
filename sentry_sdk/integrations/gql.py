@@ -144,22 +144,25 @@ def _patch_execute() -> None:
         *args: "Any",
         **kwargs: "Any",
     ) -> "Any":
-        scope = sentry_sdk.get_isolation_scope()
-        # document is a gql.GraphQLRequest with gql v4.0.0.
-        scope.add_event_processor(_make_gql_event_processor(self, document))
-
-        try:
+        # Add the processor to a scope that lives only as long as this
+        # query, so that it doesn't apply to unrelated events captured
+        # later on the same isolation scope.
+        with sentry_sdk.new_scope() as scope:
             # document is a gql.GraphQLRequest with gql v4.0.0.
-            return real_execute(self, document, *args, **kwargs)
-        except TransportQueryError as e:
-            event, hint = event_from_exception(
-                e,
-                client_options=sentry_sdk.get_client().options,
-                mechanism={"type": "gql", "handled": False},
-            )
+            scope.add_event_processor(_make_gql_event_processor(self, document))
 
-            sentry_sdk.capture_event(event, hint)
-            raise e
+            try:
+                # document is a gql.GraphQLRequest with gql v4.0.0.
+                return real_execute(self, document, *args, **kwargs)
+            except TransportQueryError as e:
+                event, hint = event_from_exception(
+                    e,
+                    client_options=sentry_sdk.get_client().options,
+                    mechanism={"type": "gql", "handled": False},
+                )
+
+                sentry_sdk.capture_event(event, hint)
+                raise e
 
     gql.Client.execute = sentry_patched_execute
 
@@ -200,7 +203,7 @@ def _make_gql_event_processor(
                 response.update(
                     {
                         "data": {"errors": errors},
-                        "type": response,
+                        "type": "response",
                     }
                 )
 
@@ -221,7 +224,7 @@ def _make_gql_event_processor(
             response.update(
                 {
                     "data": {"errors": errors},
-                    "type": response,
+                    "type": "response",
                 }
             )
 

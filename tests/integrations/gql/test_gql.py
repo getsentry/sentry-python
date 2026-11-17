@@ -6,6 +6,7 @@ from gql import Client, __version__, gql
 from gql.transport.exceptions import TransportQueryError
 from gql.transport.requests import RequestsHTTPTransport
 
+import sentry_sdk
 from sentry_sdk.integrations.gql import GQLIntegration
 from sentry_sdk.utils import parse_version
 
@@ -356,3 +357,50 @@ def test_transport_url_is_sanitized(
     assert event["request"].get("query_string") == expected_query_string
     assert "password" not in str(event["request"])
     assert "secret" not in str(event["request"])
+
+
+def test_event_processor_does_not_outlive_query(sentry_init, capture_events):
+    """
+    Events captured after a query has finished must not get the query's
+    request data.
+    """
+    sentry_init(integrations=[GQLIntegration()], send_default_pii=True)
+    events = capture_events()
+
+    _execute_mock_query({"data": {"example": "This is the example"}})
+    sentry_sdk.capture_message("unrelated")
+
+    (event,) = events
+    assert "request" not in event
+    assert "response" not in event.get("contexts", {})
+
+
+def test_queries_do_not_remove_other_event_processors(sentry_init, capture_events):
+    """
+    Running many queries must not fill up the isolation scope's event
+    processors, which would make the scope drop processors added by others.
+    """
+    sentry_init(integrations=[GQLIntegration()])
+    events = capture_events()
+
+    def add_tag(event, hint):
+        event.setdefault("tags", {})["other_processor"] = "ran"
+        return event
+
+    sentry_sdk.get_isolation_scope().add_event_processor(add_tag)
+
+    for _ in range(25):
+        _execute_mock_query({"data": {"example": "This is the example"}})
+
+    sentry_sdk.capture_message("unrelated")
+
+    (event,) = events
+    assert event["tags"]["other_processor"] == "ran"
+
+
+def test_response_context_type(sentry_init, capture_events):
+    sentry_init(integrations=[GQLIntegration()], send_default_pii=True)
+
+    event = _make_erroneous_query(capture_events, _execute_mock_query)
+
+    assert event["contexts"]["response"]["type"] == "response"
