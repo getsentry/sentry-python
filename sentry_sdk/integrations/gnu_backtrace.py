@@ -35,6 +35,7 @@ class GnuBacktraceIntegration(Integration):
         def process_gnu_backtrace(event: "Event", hint: "dict[str, Any]") -> "Event":
             with capture_internal_exceptions():
                 return _process_gnu_backtrace(event, hint)
+            return event
 
 
 def _process_gnu_backtrace(event: "Event", hint: "dict[str, Any]") -> "Event":

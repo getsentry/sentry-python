@@ -177,10 +177,10 @@ class LoggingIntegration(Integration):
                 name = record.name.strip()
 
                 handle_events = (
-                    ignored_loggers is not None and name not in ignored_loggers
+                    ignored_loggers is not None and name not in ignored_loggers  # type: ignore[redundant-expr]  # globals might be None on interpreter shutdown
                 )
                 handle_sentry_logs = (
-                    ignored_loggers_sentry_logs is not None
+                    ignored_loggers_sentry_logs is not None  # type: ignore[redundant-expr]  # globals might be None on interpreter shutdown
                     and name not in ignored_loggers_sentry_logs
                 )
 
@@ -238,7 +238,7 @@ class _BaseHandler(logging.Handler):
             k: v
             for k, v in vars(record).items()
             if k not in self.COMMON_RECORD_ATTRS
-            and (not isinstance(k, str) or not k.startswith("_"))
+            and (not isinstance(k, str) or not k.startswith("_"))  # type: ignore[redundant-expr]  # record attributes may have non-str keys at runtime
         }
 
 

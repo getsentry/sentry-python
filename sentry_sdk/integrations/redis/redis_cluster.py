@@ -35,7 +35,7 @@ def _set_async_cluster_db_data(
     async_redis_cluster_instance: "AsyncRedisCluster[Any]",
 ) -> None:
     default_node = async_redis_cluster_instance.get_default_node()
-    if default_node is not None and default_node.connection_kwargs is not None:
+    if default_node is not None and default_node.connection_kwargs is not None:  # type: ignore[redundant-expr]  # defensive against redis returning None
         _set_db_data_on_span(span, default_node.connection_kwargs)
 
 

@@ -552,7 +552,7 @@ def _truncate_single_message_content_if_present(
     Truncate a message's content to at most `max_chars` characters and append an
     ellipsis if truncation occurs.
     """
-    if not isinstance(message, dict) or "content" not in message:
+    if not isinstance(message, dict) or "content" not in message:  # type: ignore[redundant-expr]  # message may not be a dict at runtime
         return message
     content = message["content"]
 

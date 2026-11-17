@@ -113,7 +113,7 @@ def _wrap_middleware(middleware: "Any", middleware_name: str) -> "Any":
             # causing Django to call the hook synchronously and never await the
             # returned coroutine. Wrap async hooks with an async wrapper so the
             # wrapped method continues to report as a coroutine function.
-            if iscoroutinefunction is not None and iscoroutinefunction(old_method):
+            if iscoroutinefunction(old_method):
 
                 async def async_sentry_wrapped_method(
                     *args: "Any", **kwargs: "Any"

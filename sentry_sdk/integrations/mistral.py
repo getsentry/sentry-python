@@ -131,7 +131,7 @@ def _transform_input_messages(
         text_parts = [
             part
             for part in content
-            if isinstance(part, dict) and part.get("type") == "text" and "text" in part
+            if isinstance(part, dict) and part.get("type") == "text" and "text" in part  # type: ignore[redundant-expr]  # user input may not match the annotation
         ]
         input_messages.append(
             {
@@ -178,7 +178,7 @@ def _transform_output_message(
     text_parts = [
         part
         for part in content
-        if isinstance(part, dict) and part.get("type") == "text"
+        if isinstance(part, dict) and part.get("type") == "text"  # type: ignore[redundant-expr]  # user input may not match the annotation
     ]
     return {
         "role": "assistant",
@@ -214,7 +214,7 @@ def _transform_system_instructions(
 
         for part in content:
             if (
-                not isinstance(part, dict)
+                not isinstance(part, dict)  # type: ignore[redundant-expr]  # user input may not match the annotation
                 or part.get("type") != "text"
                 or "text" not in part
             ):

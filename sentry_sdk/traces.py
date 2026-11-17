@@ -612,7 +612,7 @@ class StreamedSpan:
         res: "SpanJSON" = {
             "trace_id": self.trace_id,
             "span_id": self.span_id,
-            "name": self._name if self._name is not None else "<unlabeled span>",
+            "name": self._name if self._name is not None else "<unlabeled span>",  # type: ignore[redundant-expr]  # name can be None if set by the user
             "status": self._status,
             "is_segment": self._is_segment(),
             "start_timestamp": self._start_timestamp.timestamp(),

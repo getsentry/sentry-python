@@ -499,14 +499,14 @@ def _transform_system_instructions(
             "content": instruction["text"],
         }
         for instruction in system_instructions
-        if isinstance(instruction, dict) and "text" in instruction
+        if isinstance(instruction, dict) and "text" in instruction  # type: ignore[redundant-expr]  # user input may not match the annotation
     ]
 
 
 def _set_common_input_data(
     span: "Union[Span, StreamedSpan]",
     integration: "AnthropicIntegration",
-    max_tokens: "int",
+    max_tokens: "Optional[int]",
     messages: "Iterable[MessageParam]",
     model: "Optional[ModelParam]",
     system: "Optional[Union[str, Iterable[TextBlockParam]]]",
@@ -570,7 +570,7 @@ def _set_common_input_data(
         for message in messages:
             if (
                 message.get("role") == GEN_AI_ALLOWED_MESSAGE_ROLES.USER
-                and "content" in message
+                and "content" in message  # type: ignore[redundant-expr]  # user input may not match the annotation
                 and isinstance(message["content"], (list, tuple))
             ):
                 transformed_content = []
@@ -644,7 +644,7 @@ def _set_create_input_data(
     _set_common_input_data(
         span=span,
         integration=integration,
-        max_tokens=kwargs.get("max_tokens"),  # type: ignore
+        max_tokens=kwargs.get("max_tokens"),
         messages=kwargs.get("messages"),  # type: ignore
         model=kwargs.get("model"),
         system=kwargs.get("system"),

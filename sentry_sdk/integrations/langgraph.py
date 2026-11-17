@@ -1,5 +1,5 @@
 from functools import wraps
-from typing import Any, Callable, List, Optional
+from typing import Any, Callable, List, Optional, Union
 
 import sentry_sdk
 from sentry_sdk.ai.utils import (
@@ -432,7 +432,9 @@ def _extract_tool_calls(messages: "Optional[List[Any]]") -> "Optional[List[Any]]
     return tool_calls if tool_calls else None
 
 
-def _set_usage_data(span: "sentry_sdk.tracing.Span", messages: "Any") -> None:
+def _set_usage_data(
+    span: "Union[sentry_sdk.tracing.Span, StreamedSpan]", messages: "Any"
+) -> None:
     input_tokens = 0
     output_tokens = 0
     total_tokens = 0

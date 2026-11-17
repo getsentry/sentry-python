@@ -412,8 +412,7 @@ class SentryAsgiMiddleware:
                         finally:
                             if isinstance(span, StreamedSpan):
                                 already_set = (
-                                    span is not None
-                                    and span.name != _DEFAULT_TRANSACTION_NAME
+                                    span.name != _DEFAULT_TRANSACTION_NAME
                                     and span.get_attributes().get(
                                         "sentry.segment.name.source"
                                     )
