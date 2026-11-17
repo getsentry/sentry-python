@@ -1,5 +1,6 @@
 import math
 import random
+import time
 from typing import TYPE_CHECKING
 
 from sentry_sdk._batcher import Batcher
@@ -12,6 +13,7 @@ if TYPE_CHECKING:
     from sentry_sdk.envelope import Envelope
 
 DEFAULT_SAMPLE_PER_SECOND = 10
+CHUNK_SECONDS = 1.0
 
 
 class MetricsBatcher(Batcher["Metric"]):
@@ -29,20 +31,19 @@ class MetricsBatcher(Batcher["Metric"]):
         record_lost_func: "Callable[..., None]",
         window_sampling: "Union[bool, MetricWindowSamplingOptions, None]" = None,
     ) -> None:
-        # Experimental: keep at most this many metrics per name per flush,
+        # Experimental: keep at most this many metrics per name per chunk,
         # picked by reservoir sampling.
-        self._max_per_name: "Optional[int]" = None
+        self._max_per_chunk = 0
         if window_sampling:
             options = window_sampling if isinstance(window_sampling, dict) else {}
             rate = _parse_rate(
                 options.get("sample_per_second", DEFAULT_SAMPLE_PER_SECOND)
             )
-            self._max_per_name = min(
-                max(1, int(rate * self.FLUSH_WAIT_TIME)), self.MAX_BEFORE_DROP
+            self._max_per_chunk = min(
+                max(1, int(rate * CHUNK_SECONDS)), self.MAX_BEFORE_DROP
             )
-            # Admitted names always fit their samples, so the buffer can't fill
-            # up under a name that is still sampling.
-            self._max_names = self.MAX_BEFORE_DROP // self._max_per_name
+            # Bounds the open chunks to MAX_BEFORE_DROP metrics
+            self._max_names = self.MAX_BEFORE_DROP // self._max_per_chunk
 
         self._reset_sampling_state()
         super().__init__(capture_func, record_lost_func)
@@ -52,57 +53,81 @@ class MetricsBatcher(Batcher["Metric"]):
         self._reset_sampling_state()
 
     def _reset_sampling_state(self) -> None:
-        self._seen: "Dict[str, int]" = {}
-        # metric name -> buffer indices of the kept metrics
-        self._kept: "Dict[str, List[int]]" = {}
+        self._chunks: "Dict[str, _Chunk]" = {}
         self._sampled_out: "List[Tuple[Metric, int]]" = []
 
     def _add_locked(self, item: "Metric") -> bool:
-        if self._max_per_name is None:
+        if not self._max_per_chunk:
             return super()._add_locked(item)
 
         name = item["name"]
-        kept = self._kept.get(name)
-        if kept is None:
-            if len(self._kept) >= self._max_names:
-                return False
-            kept = self._kept[name] = []
+        now = time.monotonic()
+        chunk = self._chunks.get(name)
+        if chunk is not None and self._is_done(chunk, now) and self._close(chunk):
+            del self._chunks[name]
+            chunk = None
 
-        seen = self._seen.get(name, 0)
-        if len(kept) < self._max_per_name:
-            if not super()._add_locked(item):
+        if chunk is None:
+            if len(self._chunks) >= self._max_names:
                 return False
-            kept.append(len(self._buffer) - 1)
+            chunk = self._chunks[name] = _Chunk(now)
+
+        if not self._is_full(chunk):
+            chunk.kept.append(item)
         else:
-            j = random.randrange(seen + 1)
-            if j < self._max_per_name:
-                self._buffer[kept[j]] = item
-
-        self._seen[name] = seen + 1
+            j = random.randrange(chunk.seen + 1)
+            if j < self._max_per_chunk:
+                chunk.kept[j] = item
+        chunk.seen += 1
         return True
 
-    def _add_to_envelope(self, envelope: "Envelope") -> None:
-        for name, kept in self._kept.items():
-            seen = self._seen[name]
-            if seen <= len(kept):
-                continue
+    def _is_full(self, chunk: "_Chunk") -> bool:
+        return len(chunk.kept) >= self._max_per_chunk
 
-            rate = len(kept) / seen
-            for index in kept:
-                attributes = self._buffer[index]["attributes"]
+    def _is_done(self, chunk: "_Chunk", now: float) -> bool:
+        # Chunks that aren't full were not sampled, so they can wait for the flush
+        return self._is_full(chunk) and now - chunk.start >= CHUNK_SECONDS
+
+    def _close(self, chunk: "_Chunk") -> bool:
+        # If the buffer is full, keep sampling into the open chunk instead
+        if len(self._buffer) + len(chunk.kept) > self.MAX_BEFORE_DROP:
+            return False
+
+        if chunk.seen > len(chunk.kept):
+            rate = len(chunk.kept) / chunk.seen
+            for item in chunk.kept:
+                attributes = item["attributes"]
                 attributes["sentry.client_sample_rate"] = rate * _parse_rate(
                     attributes.get("sentry.client_sample_rate", 1.0), default=1.0
                 )
-            self._sampled_out.append((self._buffer[kept[0]], seen - len(kept)))
+            self._sampled_out.append((chunk.kept[0], chunk.seen - len(chunk.kept)))
 
-        self._seen = {}
-        self._kept = {}
-        super()._add_to_envelope(envelope)
+        self._buffer.extend(chunk.kept)
+        if len(self._buffer) >= self.MAX_BEFORE_FLUSH:
+            self._flush_event.set()
+        return True
+
+    def _close_chunks(self, force: bool) -> None:
+        now = time.monotonic()
+        for name, chunk in list(self._chunks.items()):
+            # Full chunks stay open for CHUNK_SECONDS, so they don't go over the rate
+            if force or not self._is_full(chunk) or self._is_done(chunk, now):
+                if self._close(chunk):
+                    del self._chunks[name]
+
+    def flush(self) -> None:
+        if self._max_per_chunk:
+            with self._lock:
+                self._close_chunks(force=True)
+        super().flush()
 
     def _flush(self) -> "Optional[Envelope]":
+        if not self._max_per_chunk:
+            return super()._flush()
+
+        with self._lock:
+            self._close_chunks(force=False)
         envelope = super()._flush()
-        if self._max_per_name is None:
-            return envelope
 
         # Record outside of the lock, since this serializes metrics
         with self._lock:
@@ -146,6 +171,15 @@ class MetricsBatcher(Batcher["Metric"]):
             res["unit"] = item["unit"]
 
         return res
+
+
+class _Chunk:
+    __slots__ = ("start", "seen", "kept")
+
+    def __init__(self, start: float) -> None:
+        self.start = start
+        self.seen = 0
+        self.kept: "List[Metric]" = []
 
 
 def _parse_rate(value: "Any", default: float = DEFAULT_SAMPLE_PER_SECOND) -> float:
