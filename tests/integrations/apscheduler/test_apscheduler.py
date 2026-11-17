@@ -491,7 +491,7 @@ def test_interval_trigger_monitor_config(
     "trigger_cls,trigger_kwargs",
     [(CronTrigger, {"minute": "*/5"}), (IntervalTrigger, {"minutes": 5})],
 )
-@pytest.mark.parametrize("jitter", [None, 300])
+@pytest.mark.parametrize("jitter", [None, 30, 60])
 def test_trigger_sends_no_checkin_margin(
     sentry_init, capture_envelopes, trigger_cls, trigger_kwargs, jitter
 ):
@@ -509,6 +509,28 @@ def test_trigger_sends_no_checkin_margin(
     check_ins = _run_once(envelopes, trigger)
 
     assert "checkin_margin" not in check_ins[0]["monitor_config"]
+    assert [c["status"] for c in check_ins] == ["in_progress", "ok"]
+
+
+@pytest.mark.parametrize(
+    "trigger_cls,trigger_kwargs",
+    [(CronTrigger, {"minute": "*/5"}), (IntervalTrigger, {"minutes": 5})],
+)
+def test_trigger_with_long_jitter_sends_no_monitor_config(
+    sentry_init, capture_envelopes, trigger_cls, trigger_kwargs
+):
+    try:
+        trigger = trigger_cls(timezone="UTC", jitter=300, **trigger_kwargs)
+    except TypeError:
+        pytest.skip("APScheduler < 3.5 has no jitter.")
+
+    sentry_init(integrations=[APSchedulerIntegration()])
+    envelopes = capture_envelopes()
+
+    check_ins = _run_once(envelopes, trigger)
+
+    assert [c["monitor_slug"] for c in check_ins] == ["my-job", "my-job"]
+    assert all("monitor_config" not in c for c in check_ins)
     assert [c["status"] for c in check_ins] == ["in_progress", "ok"]
 
 

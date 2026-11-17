@@ -61,7 +61,10 @@ class APSchedulerIntegration(Integration):
 
 class _PendingCheckIn:
     def __init__(
-        self, monitor_slug: str, monitor_config: "MonitorConfig", start: float
+        self,
+        monitor_slug: str,
+        monitor_config: "Optional[MonitorConfig]",
+        start: float,
     ) -> None:
         self.monitor_slug = monitor_slug
         self.monitor_config = monitor_config
@@ -296,6 +299,20 @@ def _begin_check_in(
             job.trigger,
         )
         return None
+
+    # Sentry's default check-in margin is one minute, and the SDK doesn't set
+    # one, so longer jitter would report healthy runs as missed. Without a
+    # schedule, check-ins only reach a monitor the user creates in Sentry.
+    jitter = getattr(job.trigger, "jitter", None)
+    if jitter is not None and jitter > 60:
+        logger.debug(
+            "Sending APScheduler job %r without a schedule: its trigger's "
+            "jitter of %ss is longer than Sentry's default check-in margin. "
+            "Create its monitor in Sentry with a larger margin.",
+            job.id,
+            jitter,
+        )
+        monitor_config = None
 
     if has_generated_id:
         logger.debug(
