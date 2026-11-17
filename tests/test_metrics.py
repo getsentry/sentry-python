@@ -709,3 +709,30 @@ def test_metrics_window_sampling_chunks(sentry_init, capture_items):
 
     (rare,) = [m for m in metrics if m["name"] == "test.rare"]
     assert "sentry.client_sample_rate" not in rare["attributes"]
+
+
+def test_metrics_window_sampling_before_send_metric(sentry_init, capture_items):
+    seen = []
+
+    def before_send_metric(metric, _):
+        seen.append(metric)
+        return metric
+
+    sentry_init(
+        before_send_metric=before_send_metric,
+        _experiments={"metrics_window_sampling": True},
+    )
+    items = capture_items("trace_metric")
+
+    for _ in range(200):
+        sentry_sdk.metrics.count("test.hot", 1)
+
+    get_client().flush()
+
+    # Sampling happens after before_send_metric, so it still sees every metric
+    assert len(seen) == 200
+    assert len(items) == 10
+    assert all(
+        item.payload["attributes"]["sentry.client_sample_rate"] == 0.05
+        for item in items
+    )

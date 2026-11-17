@@ -385,6 +385,7 @@ class _Client(BaseClient):
                 window_sampling=self.options["_experiments"].get(
                     "metrics_window_sampling"
                 ),
+                sample_early=get_before_send_metric(self.options) is None,
             )
 
             self.span_batcher = SpanBatcher(

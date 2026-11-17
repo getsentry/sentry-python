@@ -30,10 +30,13 @@ class MetricsBatcher(Batcher["Metric"]):
         capture_func: "Callable[[Envelope], None]",
         record_lost_func: "Callable[..., None]",
         window_sampling: "Union[bool, MetricWindowSamplingOptions, None]" = None,
+        sample_early: bool = False,
     ) -> None:
         # Experimental: keep at most this many metrics per name per chunk,
         # picked by reservoir sampling.
         self._max_per_chunk = 0
+        # Only safe without before_send_metric, which must see every metric
+        self._sample_early = sample_early
         if window_sampling:
             options = window_sampling if isinstance(window_sampling, dict) else {}
             rate = _parse_rate(
@@ -56,11 +59,51 @@ class MetricsBatcher(Batcher["Metric"]):
         self._chunks: "Dict[str, _Chunk]" = {}
         self._sampled_out: "List[Tuple[Metric, int]]" = []
 
+    def should_capture(self, name: str) -> bool:
+        # Called before the metric is built, so sampled out metrics are cheap
+        if not (self._max_per_chunk and self._sample_early):
+            return True
+        self._active.reserved = None
+        if getattr(self._active, "flag", False):
+            return True
+
+        with capture_internal_exceptions(), self._lock:
+            chunk = self._get_chunk(name)
+            if chunk is None:
+                # Over the name cap, let add() drop and report it
+                return True
+            index = self._pick_index(chunk)
+            if index is None:
+                return False
+            self._active.reserved = (name, chunk, index)
+        return True
+
     def _add_locked(self, item: "Metric") -> bool:
         if not self._max_per_chunk:
             return super()._add_locked(item)
 
         name = item["name"]
+        reserved: "Optional[Tuple[str, _Chunk, int]]" = getattr(
+            self._active, "reserved", None
+        )
+        self._active.reserved = None
+        if reserved is not None and reserved[0] == name:
+            _, reserved_chunk, index = reserved
+            # If the chunk closed in between, it already counted this metric
+            # as sampled out
+            if self._chunks.get(name) is reserved_chunk:
+                reserved_chunk.kept[index] = item
+            return True
+
+        chunk = self._get_chunk(name)
+        if chunk is None:
+            return False
+        index = self._pick_index(chunk)
+        if index is not None:
+            chunk.kept[index] = item
+        return True
+
+    def _get_chunk(self, name: str) -> "Optional[_Chunk]":
         now = time.monotonic()
         chunk = self._chunks.get(name)
         if chunk is not None and self._is_done(chunk, now) and self._close(chunk):
@@ -69,17 +112,19 @@ class MetricsBatcher(Batcher["Metric"]):
 
         if chunk is None:
             if len(self._chunks) >= self._max_names:
-                return False
+                return None
             chunk = self._chunks[name] = _Chunk(now)
+        return chunk
 
-        if not self._is_full(chunk):
-            chunk.kept.append(item)
-        else:
-            j = random.randrange(chunk.seen + 1)
-            if j < self._max_per_chunk:
-                chunk.kept[j] = item
+    def _pick_index(self, chunk: "_Chunk") -> "Optional[int]":
+        # Reservoir sampling (Algorithm R). Slots are reserved with None until
+        # the metric arrives.
         chunk.seen += 1
-        return True
+        if not self._is_full(chunk):
+            chunk.kept.append(None)
+            return len(chunk.kept) - 1
+        index = random.randrange(chunk.seen)
+        return index if index < self._max_per_chunk else None
 
     def _is_full(self, chunk: "_Chunk") -> bool:
         return len(chunk.kept) >= self._max_per_chunk
@@ -93,16 +138,17 @@ class MetricsBatcher(Batcher["Metric"]):
         if len(self._buffer) + len(chunk.kept) > self.MAX_BEFORE_DROP:
             return False
 
-        if chunk.seen > len(chunk.kept):
-            rate = len(chunk.kept) / chunk.seen
-            for item in chunk.kept:
+        kept = [item for item in chunk.kept if item is not None]
+        if kept and chunk.seen > len(kept):
+            rate = len(kept) / chunk.seen
+            for item in kept:
                 attributes = item["attributes"]
                 attributes["sentry.client_sample_rate"] = rate * _parse_rate(
                     attributes.get("sentry.client_sample_rate", 1.0), default=1.0
                 )
-            self._sampled_out.append((chunk.kept[0], chunk.seen - len(chunk.kept)))
+            self._sampled_out.append((kept[0], chunk.seen - len(kept)))
 
-        self._buffer.extend(chunk.kept)
+        self._buffer.extend(kept)
         if len(self._buffer) >= self.MAX_BEFORE_FLUSH:
             self._flush_event.set()
         return True
@@ -179,7 +225,7 @@ class _Chunk:
     def __init__(self, start: float) -> None:
         self.start = start
         self.seen = 0
-        self.kept: "List[Metric]" = []
+        self.kept: "List[Optional[Metric]]" = []
 
 
 def _parse_rate(value: "Any", default: float = DEFAULT_SAMPLE_PER_SECOND) -> float:
