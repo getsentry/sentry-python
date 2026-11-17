@@ -1,5 +1,6 @@
 import os
 import sys
+import time
 from unittest import mock
 
 import pytest
@@ -597,7 +598,7 @@ def test_metrics_window_sampling(
     items = capture_items("trace_metric")
     lost = capture_record_lost_event_calls()
 
-    # 10/s * 5s flush interval
+    # 10/s, so 10 per 1s chunk
     for _ in range(200):
         sentry_sdk.metrics.count("test.hot", 2)
     for _ in range(3):
@@ -614,8 +615,8 @@ def test_metrics_window_sampling(
         return [m for m in metrics if m["name"] == name]
 
     hot = by_name("test.hot")
-    assert len(hot) == 50
-    assert all(m["attributes"]["sentry.client_sample_rate"] == 0.25 for m in hot)
+    assert len(hot) == 10
+    assert all(m["attributes"]["sentry.client_sample_rate"] == 0.05 for m in hot)
     assert sum(
         m["value"] / m["attributes"]["sentry.client_sample_rate"] for m in hot
     ) == pytest.approx(400)
@@ -625,26 +626,26 @@ def test_metrics_window_sampling(
     assert all("sentry.client_sample_rate" not in m["attributes"] for m in cold)
 
     presampled = by_name("test.presampled")
-    assert len(presampled) == 50
-    assert all(m["attributes"]["sentry.client_sample_rate"] == 0.25 for m in presampled)
+    assert len(presampled) == 10
+    assert all(m["attributes"]["sentry.client_sample_rate"] == 0.05 for m in presampled)
 
     def sampled_out(category):
         return sum(q for (r, c, _, q) in lost if (r, c) == ("sample_rate", category))
 
-    assert sampled_out("trace_metric") == 150 + 50
+    assert sampled_out("trace_metric") == 190 + 90
     assert sampled_out("trace_metric_byte") > 0
 
 
 @pytest.mark.parametrize(
     "sample_per_second,kept",
     [
-        (20, 100),
+        (20, 20),
         # invalid, falls back to the default
-        (float("inf"), 50),
-        (float("nan"), 50),
-        (0, 50),
-        (-1, 50),
-        ("fast", 50),
+        (float("inf"), 10),
+        (float("nan"), 10),
+        (0, 10),
+        (-1, 10),
+        ("fast", 10),
     ],
 )
 def test_metrics_window_sampling_rate(
@@ -668,8 +669,8 @@ def test_metrics_window_sampling_rate(
 def test_metrics_window_sampling_max_names(
     sentry_init, capture_items, capture_record_lost_event_calls
 ):
-    # 5000 per name fits 2 names in the 10k buffer
-    sentry_init(_experiments={"metrics_window_sampling": {"sample_per_second": 1000}})
+    # 5000 per chunk fits 2 names
+    sentry_init(_experiments={"metrics_window_sampling": {"sample_per_second": 5000}})
     items = capture_items("trace_metric")
     lost = capture_record_lost_event_calls()
 
@@ -685,3 +686,26 @@ def test_metrics_window_sampling_max_names(
         sum(q for (r, c, _, q) in lost if (r, c) == ("queue_overflow", "trace_metric"))
         == 10
     )
+
+
+def test_metrics_window_sampling_chunks(sentry_init, capture_items):
+    sentry_init(_experiments={"metrics_window_sampling": True})
+    items = capture_items("trace_metric")
+
+    sentry_sdk.metrics.count("test.rare", 1)
+    for _ in range(30):
+        sentry_sdk.metrics.count("test.hot", 1)
+    time.sleep(1.1)
+    for _ in range(30):
+        sentry_sdk.metrics.count("test.hot", 1)
+
+    get_client().flush()
+    metrics = [item.payload for item in items]
+
+    # The hot name starts a new chunk after 1s, the rare one waits for the flush
+    hot = [m for m in metrics if m["name"] == "test.hot"]
+    assert len(hot) == 20
+    assert all(m["attributes"]["sentry.client_sample_rate"] == 1 / 3 for m in hot)
+
+    (rare,) = [m for m in metrics if m["name"] == "test.rare"]
+    assert "sentry.client_sample_rate" not in rare["attributes"]
