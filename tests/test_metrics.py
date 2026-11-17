@@ -780,8 +780,8 @@ def test_metrics_window_sampling_invalid_client_sample_rate(
 def test_metrics_window_sampling_max_names(
     sentry_init, capture_items, capture_record_lost_event_calls
 ):
-    # 5000 per chunk fits 2 names
-    sentry_init(_experiments={"metrics_window_sampling": {"sample_per_second": 5000}})
+    # 2500 per chunk fits 2 names, with two reservoirs per name
+    sentry_init(_experiments={"metrics_window_sampling": {"sample_per_second": 2500}})
     items = capture_items("trace_metric")
     lost = capture_record_lost_event_calls()
 
@@ -847,3 +847,100 @@ def test_metrics_window_sampling_before_send_metric(sentry_init, capture_items):
         item.payload["attributes"]["sentry.client_sample_rate"] == 0.05
         for item in items
     )
+
+
+@pytest.mark.parametrize("trace_lifecycle", ["static", "stream"])
+@pytest.mark.parametrize(
+    "in_span,outside,kept_in_span,kept_outside",
+    [
+        # Metrics in sampled spans get the budget first, the others keep a slot
+        (50, 200, 9, 1),
+        # The others get whatever the sampled spans leave over
+        (3, 200, 3, 7),
+    ],
+)
+def test_metrics_window_sampling_prefers_sampled_spans(
+    sentry_init,
+    capture_items,
+    trace_lifecycle,
+    in_span,
+    outside,
+    kept_in_span,
+    kept_outside,
+):
+    sentry_init(
+        traces_sample_rate=1.0,
+        trace_lifecycle=trace_lifecycle,
+        _experiments={"metrics_window_sampling": True},
+    )
+    items = capture_items("trace_metric")
+
+    for _ in range(outside // 2):
+        sentry_sdk.metrics.count("test.hot", 1)
+    if trace_lifecycle == "stream":
+        span = sentry_sdk.traces.start_span(name="test-span")
+    else:
+        span = sentry_sdk.start_transaction(op="test", name="test-span")
+    with span:
+        for _ in range(in_span):
+            sentry_sdk.metrics.count("test.hot", 1)
+    for _ in range(outside // 2):
+        sentry_sdk.metrics.count("test.hot", 1)
+
+    get_client().flush()
+    metrics = [item.payload for item in items]
+
+    def weight(metric):
+        return 1 / metric["attributes"].get("sentry.client_sample_rate", 1)
+
+    kept = [m for m in metrics if m.get("span_id") is not None]
+    assert len(kept) == kept_in_span
+    assert sum(weight(m) for m in kept) == pytest.approx(in_span)
+
+    others = [m for m in metrics if m.get("span_id") is None]
+    assert len(others) == kept_outside
+    assert sum(weight(m) for m in others) == pytest.approx(outside)
+
+
+def test_metrics_window_sampling_unsampled_span_not_preferred(
+    sentry_init, capture_items
+):
+    sentry_init(
+        traces_sample_rate=0.0,
+        _experiments={"metrics_window_sampling": True},
+    )
+    items = capture_items("trace_metric")
+
+    with sentry_sdk.start_transaction(op="test", name="test-span"):
+        for _ in range(200):
+            sentry_sdk.metrics.count("test.hot", 1)
+
+    get_client().flush()
+
+    assert len(items) == 10
+    assert all(
+        item.payload["attributes"]["sentry.client_sample_rate"] == 0.05
+        for item in items
+    )
+
+
+def test_metrics_window_sampling_single_slot_with_sampled_spans(
+    sentry_init, capture_items
+):
+    sentry_init(
+        traces_sample_rate=1.0,
+        _experiments={"metrics_window_sampling": {"sample_per_second": 1}},
+    )
+    items = capture_items("trace_metric")
+
+    for _ in range(200):
+        sentry_sdk.metrics.count("test.hot", 1)
+    with sentry_sdk.start_transaction(op="test", name="test-span"):
+        for _ in range(50):
+            sentry_sdk.metrics.count("test.hot", 1)
+
+    get_client().flush()
+
+    # One slot can't keep both, so it stands in for every metric seen
+    (item,) = items
+    assert item.payload["attributes"]["sentry.client_sample_rate"] == 1 / 250
