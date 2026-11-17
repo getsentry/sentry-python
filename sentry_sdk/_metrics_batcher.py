@@ -35,21 +35,32 @@ class MetricsBatcher(Batcher["Metric"]):
         sample_early: bool = False,
     ) -> None:
         # Experimental: keep at most this many metrics per name per chunk,
-        # picked by reservoir sampling.
-        self._max_per_chunk = 0
+        # picked by reservoir sampling. Names without a limit are not sampled.
+        self._default_limit: "Optional[Tuple[int, float]]" = None
+        self._name_limits: "Dict[str, Tuple[int, float]]" = {}
         # Only safe without before_send_metric, which must see every metric
         self._sample_early = sample_early
         if window_sampling:
             options = window_sampling if isinstance(window_sampling, dict) else {}
-            rate = _parse_rate(
-                options.get("sample_per_second", DEFAULT_SAMPLE_PER_SECOND)
+            per_name = options.get("per_name")
+            if isinstance(per_name, dict):
+                self._name_limits = {
+                    name: self._parse_limit(rate) for name, rate in per_name.items()
+                }
+            if "sample_per_second" in options or not self._name_limits:
+                self._default_limit = self._parse_limit(
+                    options.get("sample_per_second", DEFAULT_SAMPLE_PER_SECOND)
+                )
+        limits = list(self._name_limits.values())
+        if self._default_limit is not None:
+            limits.append(self._default_limit)
+        self._sampling = bool(limits)
+        if limits:
+            # Each chunk has two reservoirs of up to its limit, so this bounds
+            # the open chunks to MAX_BEFORE_DROP metrics
+            self._max_names = self.MAX_BEFORE_DROP // (
+                2 * max(size for size, _ in limits)
             )
-            self._max_per_chunk = min(
-                max(1, int(rate * CHUNK_SECONDS)), self.MAX_BEFORE_DROP
-            )
-            # Each chunk has two reservoirs of up to max_per_chunk metrics, so
-            # this bounds the open chunks to MAX_BEFORE_DROP metrics
-            self._max_names = self.MAX_BEFORE_DROP // (2 * self._max_per_chunk)
 
         self._reset_sampling_state()
         super().__init__(capture_func, record_lost_func)
@@ -62,30 +73,44 @@ class MetricsBatcher(Batcher["Metric"]):
         self._chunks: "Dict[str, _Chunk]" = {}
         self._sampled_out: "List[Tuple[Metric, int]]" = []
 
+    def _parse_limit(self, value: float) -> "Tuple[int, float]":
+        # Below one per chunk, the chunk gets longer and keeps one metric
+        rate = _parse_rate(value)
+        seconds = max(CHUNK_SECONDS, 1 / rate)
+        return min(max(1, int(rate * seconds)), self.MAX_BEFORE_DROP), seconds
+
+    def _limit_for(self, name: str) -> "Optional[Tuple[int, float]]":
+        return self._name_limits.get(name, self._default_limit)
+
     def should_capture(self, name: str) -> bool:
         # Called before the metric is built, so sampled out metrics are cheap
-        if not (self._max_per_chunk and self._sample_early):
+        if not (self._sampling and self._sample_early):
             return True
         self._active.reserved = None
         if getattr(self._active, "flag", False):
             return True
 
+        limit = self._limit_for(name)
+        if limit is None:
+            return True
+
         with capture_internal_exceptions():
             in_sampled_span = _in_sampled_span()
             with self._lock:
-                chunk = self._get_chunk(name)
+                chunk = self._get_chunk(name, limit)
                 if chunk is None:
                     # Over the name cap, let add() drop and report it
                     return True
                 stratum = chunk.sampled if in_sampled_span else chunk.other
-                index = self._pick_index(stratum)
+                index = self._pick_index(chunk, stratum)
                 if index is None:
                     return False
                 self._active.reserved = (name, chunk, stratum, index)
         return True
 
     def _add_locked(self, item: "Metric") -> bool:
-        if not self._max_per_chunk:
+        limit = self._limit_for(item["name"]) if self._sampling else None
+        if limit is None:
             return super()._add_locked(item)
 
         reserved: "Optional[Tuple[str, _Chunk, _Stratum, int]]" = getattr(
@@ -102,16 +127,16 @@ class MetricsBatcher(Batcher["Metric"]):
                     stratum.kept[index] = item
                 return True
 
-            chunk = self._get_chunk(name)
+            chunk = self._get_chunk(name, limit)
             if chunk is None:
                 return False
             stratum = chunk.sampled if _in_sampled_span() else chunk.other
-            index = self._pick_index(stratum)
+            index = self._pick_index(chunk, stratum)
             if index is not None:
                 stratum.kept[index] = item
         return True
 
-    def _get_chunk(self, name: str) -> "Optional[_Chunk]":
+    def _get_chunk(self, name: str, limit: "Tuple[int, float]") -> "Optional[_Chunk]":
         now = time.monotonic()
         chunk = self._chunks.get(name)
         if chunk is not None and self._is_done(chunk, now) and self._close(chunk):
@@ -121,33 +146,33 @@ class MetricsBatcher(Batcher["Metric"]):
         if chunk is None:
             if len(self._chunks) >= self._max_names:
                 return None
-            chunk = self._chunks[name] = _Chunk(now)
+            chunk = self._chunks[name] = _Chunk(now, *limit)
         return chunk
 
-    def _pick_index(self, stratum: "_Stratum") -> "Optional[int]":
+    def _pick_index(self, chunk: "_Chunk", stratum: "_Stratum") -> "Optional[int]":
         # Reservoir sampling (Algorithm R). Slots are reserved with None until
         # the metric arrives.
         stratum.seen += 1
-        if len(stratum.kept) < self._max_per_chunk:
+        if len(stratum.kept) < chunk.size:
             stratum.kept.append(None)
             return len(stratum.kept) - 1
         index = random.randrange(stratum.seen)
-        return index if index < self._max_per_chunk else None
+        return index if index < chunk.size else None
 
     def _is_full(self, chunk: "_Chunk") -> bool:
-        return len(chunk.sampled.kept) + len(chunk.other.kept) >= self._max_per_chunk
+        return len(chunk.sampled.kept) + len(chunk.other.kept) >= chunk.size
 
     def _is_done(self, chunk: "_Chunk", now: float) -> bool:
         # Chunks that aren't full were not sampled, so they can wait for the flush
-        return self._is_full(chunk) and now - chunk.start >= CHUNK_SECONDS
+        return self._is_full(chunk) and now - chunk.start >= chunk.seconds
 
     def _close(self, chunk: "_Chunk") -> bool:
         sampled, other = chunk.sampled, chunk.other
         # Metrics in sampled spans get the budget first. The others keep at
         # least one slot, so they can still be extrapolated.
         other_floor = 1 if other.kept else 0
-        sampled_count = min(len(sampled.kept), self._max_per_chunk - other_floor)
-        other_count = min(len(other.kept), self._max_per_chunk - sampled_count)
+        sampled_count = min(len(sampled.kept), chunk.size - other_floor)
+        other_count = min(len(other.kept), chunk.size - sampled_count)
 
         # If the buffer is full, keep sampling into the open chunk instead
         if len(self._buffer) + sampled_count + other_count > self.MAX_BEFORE_DROP:
@@ -189,19 +214,19 @@ class MetricsBatcher(Batcher["Metric"]):
     def _close_chunks(self, force: bool) -> None:
         now = time.monotonic()
         for name, chunk in list(self._chunks.items()):
-            # Full chunks stay open for CHUNK_SECONDS, so they don't go over the rate
+            # Full chunks stay open for their length, so they don't go over the rate
             if force or not self._is_full(chunk) or self._is_done(chunk, now):
                 if self._close(chunk):
                     del self._chunks[name]
 
     def flush(self) -> None:
-        if self._max_per_chunk:
+        if self._sampling:
             with self._lock:
                 self._close_chunks(force=True)
         super().flush()
 
     def _flush(self) -> "Optional[Envelope]":
-        if not self._max_per_chunk:
+        if not self._sampling:
             return super()._flush()
 
         with self._lock:
@@ -253,10 +278,12 @@ class MetricsBatcher(Batcher["Metric"]):
 
 
 class _Chunk:
-    __slots__ = ("start", "sampled", "other")
+    __slots__ = ("start", "size", "seconds", "sampled", "other")
 
-    def __init__(self, start: float) -> None:
+    def __init__(self, start: float, size: int, seconds: float) -> None:
         self.start = start
+        self.size = size
+        self.seconds = seconds
         # Metrics recorded in a sampled span, preferred when picking what to keep
         self.sampled = _Stratum()
         self.other = _Stratum()
