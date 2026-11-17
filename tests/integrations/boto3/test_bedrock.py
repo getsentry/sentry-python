@@ -476,8 +476,8 @@ def test_converse(
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
         return
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 110
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 80
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 20
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS] == 80
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS] == 20
 
 
 def test_converse_error(
@@ -782,8 +782,8 @@ def test_converse_stream(
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
         return
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 110
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 80
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 20
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS] == 80
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS] == 20
 
 
 def test_converse_stream_error_during_iteration(
