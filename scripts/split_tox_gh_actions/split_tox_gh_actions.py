@@ -147,11 +147,13 @@ GROUPS = {
     ],
     "Web 1": [
         "django",
+    ],
+    "Web 2": [
         "flask",
         "starlette",
         "fastapi",
     ],
-    "Web 2": [
+    "Web 3": [
         "aiohttp",
         "asgi",
         "bottle",

@@ -130,6 +130,11 @@ jobs:
     needs: files-changed
     if: ${{ needs.files-changed.outputs.code == 'true' }}
     uses: ./.github/workflows/test-integrations-web-2.yml
+  web_3:
+    name: Web 3
+    needs: files-changed
+    if: ${{ needs.files-changed.outputs.code == 'true' }}
+    uses: ./.github/workflows/test-integrations-web-3.yml
   misc:
     name: Misc
     needs: files-changed
@@ -153,6 +158,7 @@ jobs:
       - tasks
       - web_1
       - web_2
+      - web_3
       - misc
     # Report whatever coverage exists, even if some test jobs failed.
     if: ${{ !cancelled() && needs.files-changed.outputs.code == 'true' }}
@@ -201,6 +207,7 @@ jobs:
       - tasks
       - web_1
       - web_2
+      - web_3
       - misc
     # Always run so it can gate merges even when a dependency failed.
     if: always()
