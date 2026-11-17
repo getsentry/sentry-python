@@ -37,18 +37,19 @@ jobs:
       - name: Setup Test Env
         run: |
           uv sync
-      - name: Test langchain-base
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-langchain-base"
-      - name: Test langchain-notiktoken
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-langchain-notiktoken"
-      - name: Test langgraph
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-langgraph"
+      - parallel:
+          - name: Test langchain-base
+            run: |
+              set -x # print commands that are executed
+              ./scripts/runtox.sh "py${{ matrix.python-version }}-langchain-base"
+          - name: Test langchain-notiktoken
+            run: |
+              set -x # print commands that are executed
+              ./scripts/runtox.sh "py${{ matrix.python-version }}-langchain-notiktoken"
+          - name: Test langgraph
+            run: |
+              set -x # print commands that are executed
+              ./scripts/runtox.sh "py${{ matrix.python-version }}-langgraph"
       - name: Upload coverage data
         if: ${{ !cancelled() }}
         continue-on-error: true
