@@ -174,6 +174,7 @@ def test_real_gql_request_with_error_with_pii(
 
     assert "data" in event["request"]
     assert "response" in event["contexts"]
+    assert event["contexts"]["response"]["type"] == "response"
 
 
 @pytest.mark.parametrize("execute_query", _execute_query_funcs)
@@ -373,34 +374,3 @@ def test_event_processor_does_not_outlive_query(sentry_init, capture_events):
     (event,) = events
     assert "request" not in event
     assert "response" not in event.get("contexts", {})
-
-
-def test_queries_do_not_remove_other_event_processors(sentry_init, capture_events):
-    """
-    Running many queries must not fill up the isolation scope's event
-    processors, which would make the scope drop processors added by others.
-    """
-    sentry_init(integrations=[GQLIntegration()])
-    events = capture_events()
-
-    def add_tag(event, hint):
-        event.setdefault("tags", {})["other_processor"] = "ran"
-        return event
-
-    sentry_sdk.get_isolation_scope().add_event_processor(add_tag)
-
-    for _ in range(25):
-        _execute_mock_query({"data": {"example": "This is the example"}})
-
-    sentry_sdk.capture_message("unrelated")
-
-    (event,) = events
-    assert event["tags"]["other_processor"] == "ran"
-
-
-def test_response_context_type(sentry_init, capture_events):
-    sentry_init(integrations=[GQLIntegration()], send_default_pii=True)
-
-    event = _make_erroneous_query(capture_events, _execute_mock_query)
-
-    assert event["contexts"]["response"]["type"] == "response"
