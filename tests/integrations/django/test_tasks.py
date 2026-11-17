@@ -7,12 +7,11 @@ from sentry_sdk.consts import OP
 from sentry_sdk.integrations.django import DjangoIntegration
 from sentry_sdk.integrations.logging import LoggingIntegration
 
-try:
-    from django.tasks import task
+pytest.importorskip(
+    "django.tasks", reason="Django tasks are only available in Django 6.0+"
+)
 
-    HAS_DJANGO_TASKS = True
-except ImportError:
-    HAS_DJANGO_TASKS = False
+from django.tasks import task
 
 
 @pytest.fixture
@@ -23,37 +22,36 @@ def immediate_backend(settings):
     }
 
 
-if HAS_DJANGO_TASKS:
-
-    @task
-    def simple_task():
-        return "result"
-
-    @task
-    def add_numbers(a, b):
-        return a + b
-
-    @task
-    def greet(name, greeting="Hello"):
-        return f"{greeting}, {name}!"
-
-    @task
-    def failing_task():
-        raise ValueError("Task failed!")
-
-    @task
-    def task_one():
-        return 1
-
-    @task
-    def task_two():
-        return 2
+@task
+def simple_task():
+    return "result"
 
 
-@pytest.mark.skipif(
-    not HAS_DJANGO_TASKS,
-    reason="Django tasks are only available in Django 6.0+",
-)
+@task
+def add_numbers(a, b):
+    return a + b
+
+
+@task
+def greet(name, greeting="Hello"):
+    return f"{greeting}, {name}!"
+
+
+@task
+def failing_task():
+    raise ValueError("Task failed!")
+
+
+@task
+def task_one():
+    return 1
+
+
+@task
+def task_two():
+    return 2
+
+
 def test_task_span_is_created(
     sentry_init,
     capture_items,
@@ -85,10 +83,6 @@ def test_task_span_is_created(
     assert queue_submit_spans[0]["attributes"]["sentry.origin"] == "auto.http.django"
 
 
-@pytest.mark.skipif(
-    not HAS_DJANGO_TASKS,
-    reason="Django tasks are only available in Django 6.0+",
-)
 def test_task_enqueue_returns_result(sentry_init, immediate_backend):
     """Test that the task enqueuing behavior is unchanged from the user perspective."""
     sentry_init(
@@ -102,10 +96,6 @@ def test_task_enqueue_returns_result(sentry_init, immediate_backend):
     assert result.return_value == 8
 
 
-@pytest.mark.skipif(
-    not HAS_DJANGO_TASKS,
-    reason="Django tasks are only available in Django 6.0+",
-)
 def test_task_enqueue_with_kwargs(
     sentry_init,
     immediate_backend,
@@ -135,10 +125,6 @@ def test_task_enqueue_with_kwargs(
     assert queue_submit_spans[0]["name"] == "tests.integrations.django.test_tasks.greet"
 
 
-@pytest.mark.skipif(
-    not HAS_DJANGO_TASKS,
-    reason="Django tasks are only available in Django 6.0+",
-)
 def test_task_error_reporting(
     sentry_init,
     immediate_backend,
@@ -176,10 +162,6 @@ def test_task_error_reporting(
     )
 
 
-@pytest.mark.skipif(
-    not HAS_DJANGO_TASKS,
-    reason="Django tasks are only available in Django 6.0+",
-)
 def test_multiple_task_enqueues_create_multiple_spans(
     sentry_init,
     capture_items,

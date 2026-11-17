@@ -682,6 +682,7 @@ class Baggage:
                 with capture_internal_exceptions():
                     item = item.strip()
                     key, val = item.split("=", 1)
+                    key, val = key.strip(), val.strip()
                     if Baggage.SENTRY_PREFIX_REGEX.match(key):
                         baggage_key = unquote(key.split("-")[1])
                         sentry_items[baggage_key] = unquote(val)
