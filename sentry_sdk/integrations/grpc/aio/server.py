@@ -120,15 +120,17 @@ class ServerInterceptor(grpc.aio.ServerInterceptor):  # type: ignore
                 response = handler.stream_unary(request, context)
                 return await response
 
-        else:
+        elif handler.request_streaming and handler.response_streaming:
             handler_factory = grpc.stream_stream_rpc_method_handler
 
             async def wrapped(request: "Any", context: "ServicerContext") -> "Any":  # type: ignore
                 async for r in handler.stream_stream(request, context):
                     yield r
 
-        return handler_factory(
-            wrapped,
+        # The four branches above cover every streaming combination, so both
+        # names are always bound here.
+        return handler_factory(  # type: ignore[possibly-undefined]
+            wrapped,  # type: ignore[possibly-undefined]
             request_deserializer=handler.request_deserializer,
             response_serializer=handler.response_serializer,
         )
