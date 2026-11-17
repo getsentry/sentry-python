@@ -18,6 +18,7 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
   - The `@trace` decorator accepts three optional arguments: `name`, `attributes`, `active` (default: `True`).
   - `sentry_sdk.continue_trace` accepts a single dictionary with the incoming headers or environment data. It is no longer a context manager and it does not return a span/transaction anymore. A span needs to be started manually afterwards.
   - `sentry_sdk.new_trace` resets the trace.
+- The type hints of `sentry_sdk.set_attribute` and `sentry_sdk.set_attributes` now only accept primitives and lists of primitives, matching `Scope.set_attribute` and `Scope.set_attributes`. Unexpected values are still passed through `repr()` at runtime.
 
 ### Integrations
 
