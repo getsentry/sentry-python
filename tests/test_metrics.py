@@ -755,6 +755,28 @@ def test_metrics_window_sampling_rate(
     assert len(items) == kept
 
 
+@pytest.mark.parametrize("client_sample_rate", [5, 0, -1, float("nan"), "0.5"])
+def test_metrics_window_sampling_invalid_client_sample_rate(
+    sentry_init, capture_items, client_sample_rate
+):
+    sentry_init(_experiments={"metrics_window_sampling": True})
+    items = capture_items("trace_metric")
+
+    for _ in range(100):
+        sentry_sdk.metrics.count(
+            "test.counter",
+            1,
+            attributes={"sentry.client_sample_rate": client_sample_rate},
+        )
+
+    get_client().flush()
+
+    assert len(items) == 10
+    assert all(
+        item.payload["attributes"]["sentry.client_sample_rate"] == 0.1 for item in items
+    )
+
+
 def test_metrics_window_sampling_max_names(
     sentry_init, capture_items, capture_record_lost_event_calls
 ):
