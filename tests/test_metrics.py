@@ -825,7 +825,6 @@ def test_metrics_window_sampling_before_send_metric(sentry_init, capture_items):
     )
 
 
-@pytest.mark.parametrize("trace_lifecycle", ["static", "stream"])
 @pytest.mark.parametrize(
     "in_span,outside,kept_in_span,kept_outside",
     [
@@ -838,7 +837,6 @@ def test_metrics_window_sampling_before_send_metric(sentry_init, capture_items):
 def test_metrics_window_sampling_prefers_sampled_spans(
     sentry_init,
     capture_items,
-    trace_lifecycle,
     in_span,
     outside,
     kept_in_span,
@@ -846,18 +844,13 @@ def test_metrics_window_sampling_prefers_sampled_spans(
 ):
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle=trace_lifecycle,
         _experiments={"metrics_window_sampling": True},
     )
     items = capture_items("trace_metric")
 
     for _ in range(outside // 2):
         sentry_sdk.metrics.count("test.hot", 1)
-    if trace_lifecycle == "stream":
-        span = sentry_sdk.traces.start_span(name="test-span")
-    else:
-        span = sentry_sdk.start_transaction(op="test", name="test-span")
-    with span:
+    with sentry_sdk.traces.start_span(name="test-span"):
         for _ in range(in_span):
             sentry_sdk.metrics.count("test.hot", 1)
     for _ in range(outside // 2):
@@ -887,7 +880,7 @@ def test_metrics_window_sampling_unsampled_span_not_preferred(
     )
     items = capture_items("trace_metric")
 
-    with sentry_sdk.start_transaction(op="test", name="test-span"):
+    with sentry_sdk.traces.start_span(name="test-span"):
         for _ in range(200):
             sentry_sdk.metrics.count("test.hot", 1)
 
@@ -911,7 +904,7 @@ def test_metrics_window_sampling_single_slot_with_sampled_spans(
 
     for _ in range(200):
         sentry_sdk.metrics.count("test.hot", 1)
-    with sentry_sdk.start_transaction(op="test", name="test-span"):
+    with sentry_sdk.traces.start_span(name="test-span"):
         for _ in range(50):
             sentry_sdk.metrics.count("test.hot", 1)
 
