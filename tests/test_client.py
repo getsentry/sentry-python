@@ -1292,7 +1292,7 @@ def test_error_sampler(_, sentry_init, capture_events, test_config):
 def test_uwsgi_warnings(sentry_init, opt, missing_flags):
     uwsgi = mock.MagicMock()
     uwsgi.opt = opt
-    with mock.patch("sentry_sdk.utils.logger") as mock_logger:
+    with mock.patch("sentry_sdk._compat.logger") as mock_logger:
         with mock.patch.dict("sys.modules", uwsgi=uwsgi):
             sentry_init()
             if missing_flags:
