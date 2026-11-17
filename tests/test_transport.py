@@ -12,7 +12,7 @@ import pytest
 try:
     import httpcore
 except (ImportError, ModuleNotFoundError):
-    httpcore = None
+    httpcore = None  # type: ignore[assignment]
 
 try:
     import gevent  # noqa: F401

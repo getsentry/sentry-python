@@ -1,4 +1,5 @@
-import importlib
+import importlib.util
+import logging
 import sys
 import threading
 
@@ -22,6 +23,7 @@ except ImportError:
     from importlib_metadata import version
 
 QUART_VERSION = parse_version(version("quart"))
+assert QUART_VERSION is not None
 
 
 def quart_app_factory():
@@ -264,7 +266,10 @@ async def test_quart_auth_configured(
     "integrations",
     [
         [quart_sentry.QuartIntegration()],
-        [quart_sentry.QuartIntegration(), LoggingIntegration(event_level="ERROR")],
+        [
+            quart_sentry.QuartIntegration(),
+            LoggingIntegration(event_level=logging.ERROR),
+        ],
     ],
 )
 async def test_errors_not_reported_twice(sentry_init, integrations, capture_events):
@@ -294,7 +299,7 @@ async def test_logging(sentry_init, capture_events):
     sentry_init(
         integrations=[
             quart_sentry.QuartIntegration(),
-            LoggingIntegration(event_level="ERROR"),
+            LoggingIntegration(event_level=logging.ERROR),
         ],
     )
     app = quart_app_factory()

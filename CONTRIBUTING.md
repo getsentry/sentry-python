@@ -97,10 +97,10 @@ uv run ruff format tests sentry_sdk
 
 #### Typing
 
-We use `mypy` for typing our codebase. Use the following command to typecheck the source:
+We use `mypy` for typing our codebase. Use the following command to typecheck the source and the tests:
 
 ```
-uv run --group typing mypy sentry_sdk
+uv run --group typing mypy sentry_sdk tests
 ```
 
 ##### Install Coding Style Pre-commit Hooks

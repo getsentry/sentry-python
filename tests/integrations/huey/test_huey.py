@@ -13,6 +13,7 @@ from sentry_sdk.utils import parse_version
 from tests.integrations.utils import DATA_COLLECTION_QUEUES_CASES
 
 HUEY_VERSION = parse_version(HUEY_VERSION)
+assert HUEY_VERSION is not None
 
 try:
     from huey.api import chord, group

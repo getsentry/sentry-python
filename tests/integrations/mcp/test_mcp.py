@@ -29,7 +29,7 @@ try:
     from unittest.mock import AsyncMock
 except ImportError:
 
-    class AsyncMock(mock.MagicMock):
+    class AsyncMock(mock.MagicMock):  # type: ignore[no-redef]
         async def __call__(self, *args, **kwargs):
             return super(AsyncMock, self).__call__(*args, **kwargs)
 
@@ -39,7 +39,7 @@ from mcp.server.lowlevel import Server
 MCP_PACKAGE_VERSION = package_version("mcp")
 
 try:
-    from mcp.server.lowlevel.server import (  # type: ignore[import-not-found]
+    from mcp.server.lowlevel.server import (  # type: ignore[attr-defined]
         request_ctx,
     )
 except ImportError:

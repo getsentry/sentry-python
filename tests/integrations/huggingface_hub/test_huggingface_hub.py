@@ -29,7 +29,6 @@ INFERENCE_ENDPOINT = "https://router.huggingface.co/hf-inference/models/{model_n
 
 @pytest.fixture
 def mock_hf_text_generation_api(httpx2_mock):
-    # type: () -> Any
     """Mock HuggingFace text generation API"""
 
     model_name = "test-model"
@@ -82,7 +81,6 @@ def mock_hf_text_generation_api(httpx2_mock):
 
 @pytest.fixture
 def mock_hf_api_with_errors(httpx2_mock):
-    # type: () -> Any
     """Mock HuggingFace API that always raises errors for any request"""
 
     model_name = "test-model"
@@ -136,7 +134,6 @@ def mock_hf_api_with_errors(httpx2_mock):
 
 @pytest.fixture
 def mock_hf_text_generation_api_streaming(httpx2_mock):
-    # type: () -> Any
     """Mock streaming HuggingFace text generation API"""
     model_name = "test-model"
 
@@ -184,7 +181,6 @@ def mock_hf_text_generation_api_streaming(httpx2_mock):
 
 @pytest.fixture
 def mock_hf_chat_completion_api(httpx2_mock):
-    # type: () -> Any
     """Mock HuggingFace chat completion API"""
     model_name = "test-model"
 
@@ -245,7 +241,6 @@ def mock_hf_chat_completion_api(httpx2_mock):
 
 @pytest.fixture
 def mock_hf_chat_completion_api_tools(httpx2_mock):
-    # type: () -> Any
     """Mock HuggingFace chat completion API with tool calls."""
     model_name = "test-model"
 
@@ -315,7 +310,6 @@ def mock_hf_chat_completion_api_tools(httpx2_mock):
 
 @pytest.fixture
 def mock_hf_chat_completion_api_streaming(httpx2_mock):
-    # type: () -> Any
     """Mock streaming HuggingFace chat completion API"""
     model_name = "test-model"
 
@@ -365,7 +359,6 @@ def mock_hf_chat_completion_api_streaming(httpx2_mock):
 
 @pytest.fixture
 def mock_hf_chat_completion_api_streaming_tools(httpx2_mock):
-    # type: () -> Any
     """Mock streaming HuggingFace chat completion API with tool calls."""
     model_name = "test-model"
 
@@ -1124,7 +1117,7 @@ def test_chat_completion_with_tools(
     ]
     items = capture_items("span")
 
-    client.chat_completion(
+    client.chat_completion(  # type: ignore[call-overload]
         messages=[{"role": "user", "content": "What is the weather in Paris?"}],
         tools=tools,
         tool_choice="auto",
@@ -1209,7 +1202,7 @@ def test_chat_completion_with_tools_no_sensitive_data(
     ]
     items = capture_items("span")
 
-    client.chat_completion(
+    client.chat_completion(  # type: ignore[call-overload]
         messages=[{"role": "user", "content": "What is the weather in Paris?"}],
         tools=tools,
         tool_choice="auto",
@@ -1293,7 +1286,7 @@ def test_chat_completion_streaming_with_tools(
     items = capture_items("span")
 
     _ = list(
-        client.chat_completion(
+        client.chat_completion(  # type: ignore[call-overload]
             messages=[{"role": "user", "content": "What is the weather in Paris?"}],
             stream=True,
             tools=tools,
@@ -1385,7 +1378,7 @@ def test_chat_completion_streaming_with_tools_no_sensitive_data(
     items = capture_items("span")
 
     _ = list(
-        client.chat_completion(
+        client.chat_completion(  # type: ignore[call-overload]
             messages=[{"role": "user", "content": "What is the weather in Paris?"}],
             stream=True,
             tools=tools,
@@ -1649,7 +1642,7 @@ def test_chat_completion_data_collection_tools(
 
     captured = capture_items("span")
 
-    client.chat_completion(
+    client.chat_completion(  # type: ignore[call-overload]
         messages=[{"role": "user", "content": "What is the weather in Paris?"}],
         tools=DATA_COLLECTION_TOOLS,
         tool_choice="auto",
@@ -1736,7 +1729,7 @@ def test_chat_completion_streaming_data_collection_tools(
 
     captured = capture_items("span")
 
-    for _ in client.chat_completion(
+    for _ in client.chat_completion(  # type: ignore[call-overload]
         messages=[{"role": "user", "content": "What is the weather in Paris?"}],
         tools=DATA_COLLECTION_TOOLS,
         tool_choice="auto",

@@ -2,7 +2,7 @@
 # Project dev dependencies (PEP 735 groups).
 # `dev` is installed by default; `typing` is opt-in via `uv run --group typing`.
 # Run tox with: `uv run tox -e <env>`
-# Run mypy with: `uv run --group typing mypy sentry_sdk`
+# Run mypy with: `uv run --group typing mypy sentry_sdk tests`
 #
 
 [dependency-groups]
@@ -275,6 +275,21 @@ ignore_missing_imports = true
 [[tool.mypy.overrides]]
 module = "dramatiq.*"
 ignore_missing_imports = true
+
+# Tests are only checked at the module level and where they're annotated.
+# - Bodies of untyped test functions are not checked, so type: ignore comments
+#   in them would be reported as unused.
+# - Most integration test dependencies are not installed in the typing
+#   environment.
+[[tool.mypy.overrides]]
+module = "tests.*"
+check_untyped_defs = false
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+disallow_untyped_decorators = false
+disallow_subclassing_any = false
+warn_unused_ignores = false
+disable_error_code = ["import-not-found", "import-untyped", "annotation-unchecked"]
 
 #
 # Tool: Ruff (linting and formatting)

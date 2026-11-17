@@ -26,7 +26,7 @@ try:
     from langchain_google_genai import ChatGoogleGenerativeAI
 except ImportError:
     ChatGoogleGenerativeAI = None
-    google = None
+    google = None  # type: ignore[assignment]
 
 import sentry_sdk
 from sentry_sdk.integrations.langchain import (
@@ -73,6 +73,7 @@ from openai.types.responses.response_usage import (
 )
 
 LANGCHAIN_VERSION = package_version("langchain")
+assert LANGCHAIN_VERSION is not None
 LANGCHAIN_OPENAI_VERSION = package_version("langchain-openai")
 
 

@@ -2,6 +2,7 @@ import copy
 import json
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from threading import Thread
+from typing import Any
 from urllib.parse import parse_qs, urlparse
 
 import boto3
@@ -28,7 +29,7 @@ BOTOCORE_SIGNS_BAGGAGE = "baggage" not in SIGNED_HEADERS_BLACKLIST
 
 
 class _AwsRequestHandler(BaseHTTPRequestHandler):
-    requests = []
+    requests: "list[Any]" = []
 
     def do_HEAD(self):
         self.__class__.requests.append(self.headers)

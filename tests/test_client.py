@@ -43,9 +43,9 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from collections.abc import Callable
-    from typing import Any, Optional, Union
+    from typing import Optional, Union
 
-    from sentry_sdk._types import Event
+    from sentry_sdk._types import Event, Hint
 
 
 maximum_python_312 = pytest.mark.skipif(
@@ -1158,7 +1158,7 @@ class IssuesSamplerTestConfig:
     def __init__(
         self,
         expected_events: int,
-        sampler_function: "Optional[Callable[[Event], Union[float, bool]]]" = None,
+        sampler_function: "Optional[Callable[[Event, Hint], Union[float, bool]]]" = None,
         sample_rate: "Optional[float]" = None,
         exception_to_raise: "type[Exception]" = Exception,
     ) -> None:
@@ -1171,7 +1171,7 @@ class IssuesSamplerTestConfig:
         self.sample_rate = sample_rate
         self.exception_to_raise = exception_to_raise
 
-    def init_sdk(self, sentry_init: "Callable[[*Any], None]") -> None:
+    def init_sdk(self, sentry_init: "Callable[..., None]") -> None:
         sentry_init(
             error_sampler=self.sampler_function_mock, sample_rate=self.sample_rate
         )
@@ -1238,7 +1238,7 @@ class IssuesSamplerTestConfig:
         ),
         # If sampler returns invalid value, we should still send the event
         IssuesSamplerTestConfig(
-            sampler_function=lambda *_: (
+            sampler_function=lambda *_: (  # type: ignore[arg-type, return-value]
                 "This is an invalid return value for the sampler"
             ),
             expected_events=1,

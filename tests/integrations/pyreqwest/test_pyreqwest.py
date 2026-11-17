@@ -3,6 +3,7 @@ import os
 from contextlib import contextmanager
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from threading import Thread
+from typing import Any
 from unittest import mock
 
 import pytest
@@ -18,7 +19,7 @@ from tests.conftest import ApproxDict, get_free_port
 
 
 class PyreqwestMockHandler(BaseHTTPRequestHandler):
-    captured_requests = []
+    captured_requests: "list[Any]" = []
 
     def do_GET(self) -> None:
         self.captured_requests.append(

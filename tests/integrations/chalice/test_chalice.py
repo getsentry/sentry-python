@@ -10,6 +10,9 @@ from sentry_sdk import capture_message
 from sentry_sdk.integrations.chalice import CHALICE_VERSION, ChaliceIntegration
 from sentry_sdk.utils import parse_version
 
+CHALICE_VERSION_TUPLE = parse_version(CHALICE_VERSION)
+assert CHALICE_VERSION_TUPLE is not None
+
 
 def _populate_lambda_context(context):
     fn = context.function_name
@@ -26,7 +29,6 @@ def _generate_lambda_context(self):
     # Monkeypatch of the function _generate_lambda_context
     # from the class LocalGateway
     # for mock the timeout
-    # type: () -> LambdaContext
     if self._config.lambda_timeout is None:
         timeout = 10 * 1000
     else:
@@ -125,7 +127,7 @@ def test_scheduled_event(app, lambda_context_args):
 
 
 @pytest.mark.skipif(
-    parse_version(CHALICE_VERSION) >= (1, 26, 0),
+    CHALICE_VERSION_TUPLE >= (1, 26, 0),
     reason="different behavior based on chalice version",
 )
 def test_bad_request_old(client: RequestHandler) -> None:
@@ -139,7 +141,7 @@ def test_bad_request_old(client: RequestHandler) -> None:
 
 
 @pytest.mark.skipif(
-    parse_version(CHALICE_VERSION) < (1, 26, 0),
+    CHALICE_VERSION_TUPLE < (1, 26, 0),
     reason="different behavior based on chalice version",
 )
 def test_bad_request(client: RequestHandler) -> None:

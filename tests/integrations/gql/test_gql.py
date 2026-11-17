@@ -10,6 +10,7 @@ from sentry_sdk.integrations.gql import GQLIntegration
 from sentry_sdk.utils import parse_version
 
 GQL_VERSION = parse_version(__version__)
+assert GQL_VERSION is not None
 
 
 @responses.activate

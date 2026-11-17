@@ -51,7 +51,7 @@ class TestIntegration(Integration):
 try:
     import gevent
 except ImportError:
-    gevent = None
+    gevent = None  # type: ignore[assignment]
 
 
 def _normalize_distribution_name(name: str) -> str:

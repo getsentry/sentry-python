@@ -56,7 +56,7 @@ class Query:
 
     @strawberry.field
     def error(self) -> int:
-        return 1 / 0
+        return 1 / 0  # type: ignore[return-value]
 
 
 @strawberry.type
@@ -95,7 +95,7 @@ class Message:
 class Subscription:
     @strawberry.subscription
     async def message_added(self) -> Optional[AsyncGenerator[Message, None]]:
-        message = Message(content="Hello, world!")
+        message = Message(content="Hello, world!")  # type: ignore[call-arg]
         yield message
 
 

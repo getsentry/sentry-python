@@ -8,12 +8,12 @@ from sentry_sdk.utils import package_version
 try:
     from openai import NOT_GIVEN
 except ImportError:
-    NOT_GIVEN = None
+    NOT_GIVEN = None  # type: ignore[assignment]
 try:
     from openai import Omit, omit
 except ImportError:
-    omit = None
-    Omit = None
+    omit = None  # type: ignore[assignment]
+    Omit = None  # type: ignore[assignment, misc]
 
 from openai import AsyncOpenAI, AsyncStream, OpenAI, OpenAIError, Stream
 from openai.types import CompletionUsage, CreateEmbeddingResponse, Embedding
@@ -33,8 +33,8 @@ try:
         PromptTokensDetails,
     )
 except ImportError:
-    CompletionTokensDetails = None
-    PromptTokensDetails = None
+    CompletionTokensDetails = None  # type: ignore[assignment, misc]
+    PromptTokensDetails = None  # type: ignore[assignment, misc]
 
 try:
     from openai.types.chat import (
@@ -79,12 +79,13 @@ try:
     from unittest.mock import AsyncMock
 except ImportError:
 
-    class AsyncMock(mock.MagicMock):
+    class AsyncMock(mock.MagicMock):  # type: ignore[no-redef]
         async def __call__(self, *args, **kwargs):
             return super(AsyncMock, self).__call__(*args, **kwargs)
 
 
 OPENAI_VERSION = package_version("openai")
+assert OPENAI_VERSION is not None
 
 
 if SKIP_RESPONSES_TESTS:

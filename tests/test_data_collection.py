@@ -3,7 +3,7 @@ import pytest
 
 def test_kvcb_invalid_mode(sentry_init):
     with pytest.raises(ValueError, match="Invalid collection mode 'nope'"):
-        sentry_init(data_collection={"cookies": {"mode": "nope"}})  # type: ignore Purposely ignoring to test invalid option
+        sentry_init(data_collection={"cookies": {"mode": "nope"}})  # type: ignore  # Purposely ignoring to test invalid option
 
 
 @pytest.mark.parametrize(

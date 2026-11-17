@@ -313,7 +313,7 @@ def test_json_not_truncated_if_max_request_body_size_is_always(
     "integrations",
     [
         [BottleIntegration()],
-        [BottleIntegration(), LoggingIntegration(event_level="ERROR")],
+        [BottleIntegration(), LoggingIntegration(event_level=logging.ERROR)],
     ],
 )
 def test_errors_not_reported_twice(

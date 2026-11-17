@@ -32,7 +32,9 @@ from sentry_sdk.integrations.starlette import StarletteIntegration
 from sentry_sdk.utils import parse_version
 
 FASTAPI_VERSION = parse_version(fastapi.__version__)
+assert FASTAPI_VERSION is not None
 STARLETTE_VERSION = parse_version(starlette.__version__)
+assert STARLETTE_VERSION is not None
 
 PICTURE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "photo.jpg")
 

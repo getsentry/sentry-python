@@ -5,6 +5,8 @@ docker run -d -p 18123:8123 -p9000:9000 --name clickhouse-test --ulimit nofile=2
 ```
 """
 
+from typing import Any
+
 import clickhouse_driver
 from clickhouse_driver import Client, connect
 
@@ -37,7 +39,7 @@ def test_clickhouse_client_breadcrumbs(sentry_init, capture_events) -> None:
 
     (event,) = events
 
-    expected_breadcrumbs = [
+    expected_breadcrumbs: "list[dict[str, Any]]" = [
         {
             "category": "query",
             "data": {
@@ -142,7 +144,7 @@ def test_clickhouse_client_breadcrumbs_with_data_collection(
 
     (event,) = events
 
-    expected_breadcrumbs = [
+    expected_breadcrumbs: "list[dict[str, Any]]" = [
         {
             "category": "query",
             "data": {
@@ -244,7 +246,7 @@ def test_clickhouse_client_breadcrumbs_with_data_collection_disabled(
 
     (event,) = events
 
-    expected_breadcrumbs = [
+    expected_breadcrumbs: "list[dict[str, Any]]" = [
         {
             "category": "query",
             "data": {
@@ -563,7 +565,7 @@ def test_clickhouse_dbapi_breadcrumbs(sentry_init, capture_events) -> None:
 
     (event,) = events
 
-    expected_breadcrumbs = [
+    expected_breadcrumbs: "list[dict[str, Any]]" = [
         {
             "category": "query",
             "data": {

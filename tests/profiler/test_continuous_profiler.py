@@ -19,7 +19,7 @@ from tests.conftest import ApproxDict
 try:
     import gevent
 except ImportError:
-    gevent = None
+    gevent = None  # type: ignore[assignment]
 
 
 requires_gevent = pytest.mark.skipif(gevent is None, reason="gevent not enabled")

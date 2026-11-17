@@ -18,7 +18,7 @@ from typesafe_sdk import (
 try:
     from typesafe_sdk import Image
 except ImportError:
-    Image = None
+    Image = None  # type: ignore[assignment, misc]
 
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA

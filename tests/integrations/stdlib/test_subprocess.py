@@ -2,7 +2,7 @@ import os
 import platform
 import subprocess
 import sys
-from collections.abc import Mapping
+from typing import Any, Mapping
 
 import pytest
 
@@ -13,7 +13,7 @@ from sentry_sdk.integrations.stdlib import StdlibIntegration
 from tests.conftest import ApproxDict
 
 
-class ImmutableDict(Mapping):
+class ImmutableDict(Mapping[Any, Any]):
     def __init__(self, inner):
         self.inner = inner
 

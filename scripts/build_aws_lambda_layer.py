@@ -100,7 +100,9 @@ class LayerBuilder:
         )
 
 
-def build_packaged_zip(base_dir=None, out_zip_filename=None):
+def build_packaged_zip(
+    base_dir: "Optional[str]" = None, out_zip_filename: "Optional[str]" = None
+) -> None:
     if base_dir is None:
         base_dir = tempfile.mkdtemp()
 

@@ -18,7 +18,7 @@ if django.VERSION >= (3, 1):
 
         else:
 
-            def middleware(request):
+            def middleware(request):  # type: ignore[misc]
                 response = get_response(request)
                 return response
 

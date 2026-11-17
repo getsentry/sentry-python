@@ -10,6 +10,9 @@ from sentry_sdk.integrations.rq import RqIntegration
 from sentry_sdk.utils import parse_version
 from tests.integrations.utils import DATA_COLLECTION_QUEUES_CASES
 
+RQ_VERSION = parse_version(rq.__version__)
+assert RQ_VERSION is not None
+
 
 @pytest.fixture(autouse=True)
 def _patch_rq_get_server_version(monkeypatch):
@@ -334,9 +337,7 @@ def test_traces_sampler_gets_correct_values_in_sampling_context(
     )
 
 
-@pytest.mark.skipif(
-    parse_version(rq.__version__) < (1, 5), reason="At least rq-1.5 required"
-)
+@pytest.mark.skipif(RQ_VERSION < (1, 5), reason="At least rq-1.5 required")
 def test_job_with_retries(
     sentry_init,
     capture_items,
