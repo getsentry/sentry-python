@@ -13,8 +13,9 @@ if TYPE_CHECKING:
     from sentry_sdk._types import Metric, MetricWindowSamplingOptions
     from sentry_sdk.envelope import Envelope
 
-DEFAULT_SAMPLE_PER_SECOND = 10
-CHUNK_SECONDS = 1.0
+DEFAULT_SAMPLE_PER_SECOND = 2
+# Matches the flush interval, so rates down to 1 per flush work
+CHUNK_SECONDS = 5.0
 
 
 class MetricsBatcher(Batcher["Metric"]):
