@@ -96,3 +96,22 @@ def test_malformed_baggage():
     assert baggage.sentry_items == {}
     assert baggage.third_party_items == ""
     assert baggage.mutable
+
+
+def test_baggage_with_optional_whitespace_around_equals():
+    # W3C baggage allows optional whitespace around "=" in list members
+    header = (
+        "sentry-trace_id = 771a43a4192642f0b136d5159a501700, "
+        "sentry-sample_rand= 0.5, other-vendor = foo"
+    )
+
+    baggage = Baggage.from_incoming_header(header)
+
+    assert baggage.sentry_items == {
+        "trace_id": "771a43a4192642f0b136d5159a501700",
+        "sample_rand": "0.5",
+    }
+    assert baggage._sample_rand() == 0.5
+    assert baggage.serialize() == (
+        "sentry-trace_id=771a43a4192642f0b136d5159a501700,sentry-sample_rand=0.5"
+    )
