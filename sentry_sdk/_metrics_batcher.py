@@ -37,7 +37,12 @@ class MetricsBatcher(Batcher["Metric"]):
             rate = _parse_rate(
                 options.get("sample_per_second", DEFAULT_SAMPLE_PER_SECOND)
             )
-            self._max_per_name = max(1, int(rate * self.FLUSH_WAIT_TIME))
+            self._max_per_name = min(
+                max(1, int(rate * self.FLUSH_WAIT_TIME)), self.MAX_BEFORE_DROP
+            )
+            # Admitted names always fit their samples, so the buffer can't fill
+            # up under a name that is still sampling.
+            self._max_names = self.MAX_BEFORE_DROP // self._max_per_name
 
         self._reset_sampling_state()
         super().__init__(capture_func, record_lost_func)
@@ -57,13 +62,17 @@ class MetricsBatcher(Batcher["Metric"]):
             return super()._add_locked(item)
 
         name = item["name"]
+        kept = self._kept.get(name)
+        if kept is None:
+            if len(self._kept) >= self._max_names:
+                return False
+            kept = self._kept[name] = []
+
         seen = self._seen.get(name, 0)
-        kept = self._kept.get(name) or []
         if len(kept) < self._max_per_name:
             if not super()._add_locked(item):
                 return False
             kept.append(len(self._buffer) - 1)
-            self._kept[name] = kept
         else:
             j = random.randrange(seen + 1)
             if j < self._max_per_name:

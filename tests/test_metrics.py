@@ -752,3 +752,25 @@ def test_metrics_window_sampling_rate(
     get_client().flush()
 
     assert len(items) == kept
+
+
+def test_metrics_window_sampling_max_names(
+    sentry_init, capture_items, capture_record_lost_event_calls
+):
+    # 5000 per name fits 2 names in the 10k buffer
+    sentry_init(_experiments={"metrics_window_sampling": {"sample_per_second": 1000}})
+    items = capture_items("trace_metric")
+    lost = capture_record_lost_event_calls()
+
+    for name in ("test.a", "test.b", "test.c"):
+        for _ in range(10):
+            sentry_sdk.metrics.count(name, 1)
+
+    get_client().flush()
+
+    assert sorted({item.payload["name"] for item in items}) == ["test.a", "test.b"]
+    assert len(items) == 20
+    assert (
+        sum(q for (r, c, _, q) in lost if (r, c) == ("queue_overflow", "trace_metric"))
+        == 10
+    )
