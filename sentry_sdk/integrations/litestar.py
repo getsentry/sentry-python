@@ -298,6 +298,7 @@ def patch_http_route_handle() -> None:
 
         route_handler = scope.get("route_handler")
 
+        name = None
         func = None
         if route_handler.name is not None:
             name = route_handler.name

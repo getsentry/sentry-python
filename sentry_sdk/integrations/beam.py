@@ -14,7 +14,7 @@ from sentry_sdk.utils import (
 )
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Iterator, TypeVar
+    from typing import Any, Callable, Iterator, NoReturn, TypeVar
 
     from sentry_sdk._types import ExcInfo
 
@@ -141,7 +141,7 @@ def _capture_exception(exc_info: "ExcInfo") -> None:
     sentry_sdk.capture_event(event, hint=hint)
 
 
-def raise_exception() -> None:
+def raise_exception() -> "NoReturn":
     """
     Raise an exception.
     """

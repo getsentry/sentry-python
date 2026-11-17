@@ -161,13 +161,15 @@ class ChaliceIntegration(Integration):
             raise DidNotEnable("Unparsable Chalice version: {}".format(CHALICE_VERSION))
 
         if version < (1, 20):
-            old_get_view_function_response = Chalice._get_view_function_response
+            view_function_response_owner = Chalice
         else:
             from chalice.app import RestAPIEventHandler  # noqa: PLC0415
 
-            old_get_view_function_response = (
-                RestAPIEventHandler._get_view_function_response
-            )
+            view_function_response_owner = RestAPIEventHandler
+
+        old_get_view_function_response = (
+            view_function_response_owner._get_view_function_response
+        )
 
         def sentry_event_response(
             app: "Any", view_function: "F", function_args: "Dict[str, Any]"
@@ -180,9 +182,6 @@ class ChaliceIntegration(Integration):
                 app, wrapped_view_function, function_args
             )
 
-        if version < (1, 20):
-            Chalice._get_view_function_response = sentry_event_response
-        else:
-            RestAPIEventHandler._get_view_function_response = sentry_event_response
+        view_function_response_owner._get_view_function_response = sentry_event_response
         # for everything else (like events)
         chalice.app.EventSourceHandler = EventSourceHandler

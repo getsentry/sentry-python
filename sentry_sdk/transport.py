@@ -816,21 +816,17 @@ class HttpTransport(BaseHttpTransport):
                 opts["proxy_headers"] = proxy_headers
 
             if proxy.startswith("socks"):
-                use_socks_proxy = True
                 try:
                     # Check if PySocks dependency is available
                     from urllib3.contrib.socks import SOCKSProxyManager  # noqa: PLC0415
                 except ImportError:
-                    use_socks_proxy = False
                     logger.warning(
                         "You have configured a SOCKS proxy (%s) but support for SOCKS proxies is not installed. Disabling proxy support. Please add `PySocks` (or `urllib3` with the `[socks]` extra) to your dependencies.",
                         proxy,
                     )
-
-                if use_socks_proxy:
-                    return SOCKSProxyManager(proxy, **opts)
-                else:
                     return urllib3.PoolManager(**opts)
+
+                return SOCKSProxyManager(proxy, **opts)
             else:
                 return urllib3.ProxyManager(proxy, **opts)
         else:
