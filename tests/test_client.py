@@ -1517,11 +1517,15 @@ def coding_agent_hint(monkeypatch, capsys):
         monkeypatch.delenv(name, raising=False)
     monkeypatch.setattr(sentry_sdk.client, "_coding_agent_hint_shown", False)
     registered = []
-    monkeypatch.setattr(sentry_sdk.client.atexit, "register", registered.append)
+    monkeypatch.setattr(
+        sentry_sdk.client.atexit,
+        "register",
+        lambda hook, *args: registered.append((hook, args)),
+    )
 
     def printed_at_exit():
-        for hook in registered:
-            hook()
+        for hook, args in registered:
+            hook(*args)
         return capsys.readouterr().err
 
     monkeypatch.printed_at_exit = printed_at_exit
@@ -1570,6 +1574,30 @@ def test_coding_agent_hint_not_shown(sentry_init, coding_agent_hint, env, option
     sentry_init(**{"dsn": AGENT_HINT_DSN, **options})
 
     assert "[sentry]" not in coding_agent_hint.printed_at_exit()
+
+
+@pytest.mark.parametrize(
+    "options, missing",
+    [
+        ({}, "Tracing and logs are off, so Sentry only gets errors."),
+        (
+            {"enable_logs": True},
+            "Tracing is off, so Sentry gets errors and logs but no traces.",
+        ),
+        (
+            {"traces_sample_rate": 0.1},
+            "Logs are off, so Sentry gets errors and traces but no logs.",
+        ),
+    ],
+)
+def test_coding_agent_hint_names_what_is_off(
+    sentry_init, coding_agent_hint, options, missing
+):
+    coding_agent_hint.setenv("CLAUDECODE", "1")
+
+    sentry_init(dsn=AGENT_HINT_DSN, **options)
+
+    assert coding_agent_hint.printed_at_exit().startswith(f"[sentry] {missing} ")
 
 
 def test_coding_agent_hint_shown_once(sentry_init, coding_agent_hint):

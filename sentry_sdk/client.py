@@ -329,12 +329,19 @@ def _running_under_coding_agent() -> bool:
     return any(os.environ.get(name) for name in CODING_AGENT_ENV_VARS)
 
 
-def _write_coding_agent_hint() -> None:
+_MISSING_PRODUCTS = {
+    (False, False): "Tracing and logs are off, so Sentry only gets errors.",
+    (False, True): "Tracing is off, so Sentry gets errors and logs but no traces.",
+    (True, False): "Logs are off, so Sentry gets errors and traces but no logs.",
+}
+
+
+def _write_coding_agent_hint(missing: str) -> None:
     sys.stdout.flush()
     sys.stderr.write(
-        "[sentry] If you're setting up Sentry, it is strongly recommended to check "
-        "your setup against Sentry's official setup checklist, included in the "
-        f"sentry-sdk package you installed: {SETUP_CHECKLIST_PATH} "
+        f"[sentry] {missing} If you're setting up Sentry, it is strongly recommended "
+        "to check your setup against Sentry's official setup checklist, included in "
+        f"the sentry-sdk package you installed: {SETUP_CHECKLIST_PATH} "
         "(hide with SENTRY_AGENT_HINTS=0)\n"
     )
     sys.stderr.flush()
@@ -346,18 +353,19 @@ def _show_coding_agent_hint(options: "Dict[str, Any]") -> None:
 
     rate = options["traces_sample_rate"]
     tracing_on = options["traces_sampler"] is not None or rate not in (0, None)
+    logs_on = bool(options["enable_logs"])
     if (
         _coding_agent_hint_shown
         or not options["dsn"]
         or options["agent_setup_complete"]
-        or (tracing_on and options["enable_logs"])
+        or (tracing_on and logs_on)
         or not _running_under_coding_agent()
     ):
         return
 
     _coding_agent_hint_shown = True
     # Agents often cut a command's output with `| tail`, so the hint goes last.
-    atexit.register(_write_coding_agent_hint)
+    atexit.register(_write_coding_agent_hint, _MISSING_PRODUCTS[(tracing_on, logs_on)])
 
 
 def _get_options(*args: "Optional[str]", **kwargs: "Any") -> "Dict[str, Any]":
