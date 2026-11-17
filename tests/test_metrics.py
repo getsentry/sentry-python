@@ -687,7 +687,7 @@ def test_metrics_window_sampling(
     items = capture_items("trace_metric")
     lost = capture_record_lost_event_calls()
 
-    # 10/s, so 10 per 1s chunk
+    # 2/s, so 10 per 5s chunk
     for _ in range(200):
         sentry_sdk.metrics.count("test.hot", 2)
     for _ in range(3):
@@ -728,7 +728,9 @@ def test_metrics_window_sampling(
 @pytest.mark.parametrize(
     "sample_per_second,kept",
     [
-        (20, 20),
+        (4, 20),
+        # below 1/s still keeps one per chunk
+        (0.2, 1),
         # invalid, falls back to the default
         (float("inf"), 10),
         (float("nan"), 10),
@@ -781,7 +783,7 @@ def test_metrics_window_sampling_max_names(
     sentry_init, capture_items, capture_record_lost_event_calls
 ):
     # 2500 per chunk fits 2 names, with two reservoirs per name
-    sentry_init(_experiments={"metrics_window_sampling": {"sample_per_second": 2500}})
+    sentry_init(_experiments={"metrics_window_sampling": {"sample_per_second": 500}})
     items = capture_items("trace_metric")
     lost = capture_record_lost_event_calls()
 
@@ -799,8 +801,9 @@ def test_metrics_window_sampling_max_names(
     )
 
 
-def test_metrics_window_sampling_chunks(sentry_init, capture_items):
-    sentry_init(_experiments={"metrics_window_sampling": True})
+def test_metrics_window_sampling_chunks(sentry_init, capture_items, monkeypatch):
+    monkeypatch.setattr(sentry_sdk._metrics_batcher, "CHUNK_SECONDS", 1.0)
+    sentry_init(_experiments={"metrics_window_sampling": {"sample_per_second": 10}})
     items = capture_items("trace_metric")
 
     sentry_sdk.metrics.count("test.rare", 1)
@@ -929,7 +932,7 @@ def test_metrics_window_sampling_single_slot_with_sampled_spans(
 ):
     sentry_init(
         traces_sample_rate=1.0,
-        _experiments={"metrics_window_sampling": {"sample_per_second": 1}},
+        _experiments={"metrics_window_sampling": {"sample_per_second": 0.2}},
     )
     items = capture_items("trace_metric")
 
