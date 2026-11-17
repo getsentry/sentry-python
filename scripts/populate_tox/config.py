@@ -304,6 +304,11 @@ TEST_SUITE_CONFIG = {
             # affected interpreters.
             "py3.10,py3.11": ["filelock>=4.0.3"],
         },
+        "python": {
+            # litellm 1.97.0-1.100.x is broken on Python 3.10
+            # (https://github.com/BerriAI/litellm/issues/36384)
+            ">=1.97,<1.101": ">=3.11",
+        },
     },
     "litestar": {
         "package": "litestar",
