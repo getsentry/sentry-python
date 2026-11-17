@@ -20,6 +20,7 @@ if TYPE_CHECKING:
     )
 
     from sentry_sdk._types import (
+        AttributeValue,
         Breadcrumb,
         BreadcrumbHint,
         Event,
@@ -188,7 +189,7 @@ def add_breadcrumb(
 
 
 @scopemethod
-def set_attribute(attribute: str, value: "Any") -> None:
+def set_attribute(attribute: str, value: "AttributeValue") -> None:
     """
     Set an attribute.
 
@@ -199,7 +200,7 @@ def set_attribute(attribute: str, value: "Any") -> None:
 
 
 @scopemethod
-def set_attributes(attributes: "dict[str, Any]") -> None:
+def set_attributes(attributes: "dict[str, AttributeValue]") -> None:
     """
     Set multiple attributes.
 
