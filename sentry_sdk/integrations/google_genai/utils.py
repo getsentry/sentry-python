@@ -804,7 +804,7 @@ def _extract_response_text(
 ) -> "Optional[List[str | None]]":
     """Extract text from response candidates."""
 
-    if not response or not getattr(response, "candidates", []):
+    if response is None or not getattr(response, "candidates", []):
         return None
 
     texts: "list[str | None]" = []
@@ -829,7 +829,7 @@ def extract_finish_reasons(
     response: "GenerateContentResponse",
 ) -> "Optional[List[str]]":
     """Extract finish reasons from response candidates."""
-    if not response or not getattr(response, "candidates", []):
+    if response is None or not getattr(response, "candidates", []):
         return None
 
     finish_reasons: "list[str]" = []
@@ -1026,7 +1026,7 @@ def set_span_data_for_response(
     integration: "Any",
     response: "GenerateContentResponse",
 ) -> None:
-    if not response:
+    if response is None:
         return
 
     client = sentry_sdk.get_client()
@@ -1177,7 +1177,7 @@ def set_span_data_for_embed_response(
     response: "EmbedContentResponse",
 ) -> None:
     """Set span data for embedding response."""
-    if not response:
+    if response is None:
         return
 
     # Extract token counts from embeddings statistics (Vertex AI only)

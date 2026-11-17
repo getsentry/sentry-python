@@ -296,7 +296,7 @@ class SentryLangchainCallback(BaseCallbackHandler):
         is_ignored = isinstance(error, tuple(LangchainIntegration._ignored_exceptions))
 
         with capture_internal_exceptions():
-            if not run_id or run_id not in self.span_map:
+            if run_id is None or run_id not in self.span_map:
                 return
 
             span = self.span_map[run_id]
@@ -384,7 +384,7 @@ class SentryLangchainCallback(BaseCallbackHandler):
         **kwargs: "Any",
     ) -> "Any":
         with capture_internal_exceptions():
-            if not run_id:
+            if run_id is None:
                 return
 
             all_params = kwargs.get("invocation_params", {})
@@ -485,7 +485,7 @@ class SentryLangchainCallback(BaseCallbackHandler):
     ) -> "Any":
         """Run when Chat Model starts running."""
         with capture_internal_exceptions():
-            if not run_id:
+            if run_id is None:
                 return
 
             all_params = kwargs.get("invocation_params", {})
@@ -597,7 +597,7 @@ class SentryLangchainCallback(BaseCallbackHandler):
     ) -> "Any":
         """Run when Chat Model ends running."""
         with capture_internal_exceptions():
-            if not run_id or run_id not in self.span_map:
+            if run_id is None or run_id not in self.span_map:
                 return
 
             span = self.span_map[run_id]
@@ -630,7 +630,7 @@ class SentryLangchainCallback(BaseCallbackHandler):
     ) -> "Any":
         """Run when LLM ends running."""
         with capture_internal_exceptions():
-            if not run_id or run_id not in self.span_map:
+            if run_id is None or run_id not in self.span_map:
                 return
 
             span = self.span_map[run_id]
@@ -716,7 +716,7 @@ class SentryLangchainCallback(BaseCallbackHandler):
     ) -> "Any":
         """Run when tool starts running."""
         with capture_internal_exceptions():
-            if not run_id:
+            if run_id is None:
                 return
 
             tool_name = serialized.get("name") or kwargs.get("name") or ""
@@ -772,7 +772,7 @@ class SentryLangchainCallback(BaseCallbackHandler):
     ) -> "Any":
         """Run when tool ends running."""
         with capture_internal_exceptions():
-            if not run_id or run_id not in self.span_map:
+            if run_id is None or run_id not in self.span_map:
                 return
 
             span = self.span_map[run_id]

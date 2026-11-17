@@ -757,8 +757,8 @@ class _Client(BaseClient):
 
         if (
             self.monitor
-            or self.log_batcher
-            or self.metrics_batcher
+            or self.log_batcher is not None
+            or self.metrics_batcher is not None
             or self.span_batcher
             or has_profiling_enabled(self.options)
             or isinstance(self.transport, HttpTransportCore)

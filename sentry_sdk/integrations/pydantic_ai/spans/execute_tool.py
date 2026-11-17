@@ -72,7 +72,7 @@ def update_execute_tool_span(
     span: "Union[sentry_sdk.tracing.Span, StreamedSpan]", result: "Any"
 ) -> None:
     """Update the execute tool span with the result."""
-    if not span:
+    if span is None:
         return
 
     if not _should_send_outputs() or result is None:

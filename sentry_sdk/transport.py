@@ -938,7 +938,7 @@ class AsyncHttpTransport(HttpTransportCore):
 
     def capture_envelope(self: "Self", envelope: "Envelope") -> None:
         # Synchronous entry point
-        if self.loop and self.loop.is_running():
+        if self.loop is not None and self.loop.is_running():
             self.loop.call_soon_threadsafe(self._capture_envelope, envelope)
         else:
             # The event loop is no longer running
