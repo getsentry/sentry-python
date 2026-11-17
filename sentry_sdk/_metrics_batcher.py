@@ -82,25 +82,26 @@ class MetricsBatcher(Batcher["Metric"]):
         if not self._max_per_chunk:
             return super()._add_locked(item)
 
-        name = item["name"]
         reserved: "Optional[Tuple[str, _Chunk, int]]" = getattr(
             self._active, "reserved", None
         )
         self._active.reserved = None
-        if reserved is not None and reserved[0] == name:
-            _, reserved_chunk, index = reserved
-            # If the chunk closed in between, it already counted this metric
-            # as sampled out
-            if self._chunks.get(name) is reserved_chunk:
-                reserved_chunk.kept[index] = item
-            return True
+        with capture_internal_exceptions():
+            name = item["name"]
+            if reserved is not None and reserved[0] == name:
+                _, reserved_chunk, index = reserved
+                # If the chunk closed in between, it already counted this metric
+                # as sampled out
+                if self._chunks.get(name) is reserved_chunk:
+                    reserved_chunk.kept[index] = item
+                return True
 
-        chunk = self._get_chunk(name)
-        if chunk is None:
-            return False
-        index = self._pick_index(chunk)
-        if index is not None:
-            chunk.kept[index] = item
+            chunk = self._get_chunk(name)
+            if chunk is None:
+                return False
+            index = self._pick_index(chunk)
+            if index is not None:
+                chunk.kept[index] = item
         return True
 
     def _get_chunk(self, name: str) -> "Optional[_Chunk]":
