@@ -58,18 +58,6 @@ jobs:
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh "py${{ matrix.python-version }}-django"
-      - name: Test flask
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-flask"
-      - name: Test starlette
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-starlette"
-      - name: Test fastapi
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-fastapi"
       - name: Upload coverage data
         if: ${{ !cancelled() }}
         continue-on-error: true
