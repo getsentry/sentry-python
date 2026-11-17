@@ -10,7 +10,7 @@ try:
 except ImportError:
     raise DidNotEnable("Trytond is not installed.")
 
-# TODO: trytond-worker, trytond-cron and trytond-admin intergations
+# TODO: trytond-worker, trytond-cron and trytond-admin integrations
 
 
 class TrytondWSGIIntegration(Integration):

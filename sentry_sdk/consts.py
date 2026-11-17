@@ -1,3 +1,4 @@
+import inspect
 import itertools
 from enum import Enum
 from typing import TYPE_CHECKING
@@ -644,6 +645,12 @@ class SPANDATA:
     """
     The model's response messages. It has to be a stringified version of an array of message objects, which can include text responses and tool calls.
     Example: [{"role": "assistant", "parts": [{"type": "text", "content": "The weather in Paris is currently rainy with a temperature of 57°F."}], "finish_reason": "stop"}]
+    """
+
+    GEN_AI_RESPONSE_TIME_TO_FIRST_CHUNK = "gen_ai.response.time_to_first_chunk"
+    """
+    Time in seconds when the first response content chunk arrived in streaming responses.
+    Example: 0.6853435
     """
 
     GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN = "gen_ai.response.time_to_first_token"
@@ -1382,10 +1389,10 @@ class ClientConstructor:
         environment: "Optional[str]" = None,
         server_name: "Optional[str]" = None,
         shutdown_timeout: float = 2,
-        integrations: "Sequence[sentry_sdk.integrations.Integration]" = [],  # noqa: B006
+        integrations: "Sequence[sentry_sdk.integrations.Integration]" = [],
         ignore_spans: "Optional[IgnoreSpansConfig]" = None,
-        in_app_include: "List[str]" = [],  # noqa: B006
-        in_app_exclude: "List[str]" = [],  # noqa: B006
+        in_app_include: "List[str]" = [],
+        in_app_exclude: "List[str]" = [],
         default_integrations: bool = True,
         dist: "Optional[str]" = None,
         transport: "Optional[Union[sentry_sdk.transport.Transport, Type[sentry_sdk.transport.Transport], Callable[[Event], None]]]" = None,
@@ -1395,7 +1402,7 @@ class ClientConstructor:
         data_collection: "Optional[DataCollectionUserOptions]" = None,
         http_proxy: "Optional[str]" = None,
         https_proxy: "Optional[str]" = None,
-        ignore_errors: "Sequence[Union[type, str]]" = [],  # noqa: B006
+        ignore_errors: "Sequence[Union[type, str]]" = [],
         max_request_body_size: str = "medium",
         socket_options: "Optional[List[Tuple[int, int, int | bytes]]]" = None,
         keep_alive: "Optional[bool]" = None,
@@ -1417,7 +1424,7 @@ class ClientConstructor:
         disabled_integrations: "Optional[Sequence[Union[sentry_sdk.integrations.Integration, type[sentry_sdk.integrations.Integration]]]]" = None,
         auto_session_tracking: bool = True,
         send_client_reports: bool = True,
-        _experiments: "Experiments" = {},  # noqa: B006
+        _experiments: "Experiments" = {},
         proxy_headers: "Optional[Dict[str, str]]" = None,
         instrumenter: "Optional[str]" = INSTRUMENTER.SENTRY,
         before_send_transaction: "Optional[TransactionProcessor]" = None,
@@ -1425,10 +1432,8 @@ class ClientConstructor:
         enable_tracing: "Optional[bool]" = None,
         include_local_variables: "Optional[bool]" = True,
         include_source_context: "Optional[bool]" = True,
-        trace_propagation_targets: "Optional[Sequence[str]]" = [  # noqa: B006
-            MATCH_ALL
-        ],
-        functions_to_trace: "Sequence[Dict[str, str]]" = [],  # noqa: B006
+        trace_propagation_targets: "Optional[Sequence[str]]" = [MATCH_ALL],
+        functions_to_trace: "Sequence[Dict[str, str]]" = [],
         event_scrubber: "Optional[sentry_sdk.scrubber.EventScrubber]" = None,
         max_value_length: "Optional[int]" = DEFAULT_MAX_VALUE_LENGTH,
         enable_backpressure_handling: bool = True,
@@ -1906,8 +1911,6 @@ class ClientConstructor:
 
 
 def _get_default_options() -> "dict[str, Any]":
-    import inspect
-
     a = inspect.getfullargspec(ClientConstructor.__init__)
     defaults = a.defaults or ()
     kwonlydefaults = a.kwonlydefaults or {}
@@ -1924,4 +1927,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "2.74.0"
+VERSION = "2.75.0"

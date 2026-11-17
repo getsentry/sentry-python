@@ -22,7 +22,7 @@ def _get_receiver_name(receiver: "Callable[..., Any]") -> str:
         name = receiver.__name__
     elif hasattr(
         receiver, "func"
-    ):  # certain functions (like partials) dont have a name
+    ):  # certain functions (like partials) don't have a name
         if hasattr(receiver, "func") and hasattr(receiver.func, "__name__"):
             name = "partial(<function " + receiver.func.__name__ + ">)"
 
@@ -44,7 +44,7 @@ def patch_signals() -> None:
     This only wraps sync receivers. Django>=5.0 introduced async receivers, but
     since we don't create transactions for ASGI Django, we don't wrap them.
     """
-    from sentry_sdk.integrations.django import DjangoIntegration
+    from sentry_sdk.integrations.django import DjangoIntegration  # noqa: PLC0415
 
     old_live_receivers = Signal._live_receivers
 

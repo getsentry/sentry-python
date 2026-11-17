@@ -56,7 +56,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install uv
-        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
           enable-cache: false
       - name: "Setup ClickHouse Server"
@@ -69,34 +69,35 @@ jobs:
       - name: Setup Test Env
         run: |
           uv sync
-      - name: Test aiomysql
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-aiomysql"
-      - name: Test asyncpg
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-asyncpg"
-      - name: Test clickhouse_driver
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-clickhouse_driver"
-      - name: Test pymongo
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-pymongo"
-      - name: Test redis
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-redis"
-      - name: Test redis_py_cluster_legacy
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-redis_py_cluster_legacy"
-      - name: Test sqlalchemy
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-sqlalchemy"
+      - parallel:
+          - name: Test aiomysql
+            run: |
+              set -x # print commands that are executed
+              ./scripts/runtox.sh "py${{ matrix.python-version }}-aiomysql"
+          - name: Test asyncpg
+            run: |
+              set -x # print commands that are executed
+              ./scripts/runtox.sh "py${{ matrix.python-version }}-asyncpg"
+          - name: Test clickhouse_driver
+            run: |
+              set -x # print commands that are executed
+              ./scripts/runtox.sh "py${{ matrix.python-version }}-clickhouse_driver"
+          - name: Test pymongo
+            run: |
+              set -x # print commands that are executed
+              ./scripts/runtox.sh "py${{ matrix.python-version }}-pymongo"
+          - name: Test redis
+            run: |
+              set -x # print commands that are executed
+              ./scripts/runtox.sh "py${{ matrix.python-version }}-redis"
+          - name: Test redis_py_cluster_legacy
+            run: |
+              set -x # print commands that are executed
+              ./scripts/runtox.sh "py${{ matrix.python-version }}-redis_py_cluster_legacy"
+          - name: Test sqlalchemy
+            run: |
+              set -x # print commands that are executed
+              ./scripts/runtox.sh "py${{ matrix.python-version }}-sqlalchemy"
       - name: Upload coverage data
         if: ${{ !cancelled() }}
         continue-on-error: true

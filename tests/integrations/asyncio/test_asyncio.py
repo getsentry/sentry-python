@@ -328,14 +328,14 @@ def test_patch_asyncio(mock_get_running_loop):
 @minimum_python_38
 @patch("asyncio.get_running_loop")
 @patch("sentry_sdk.integrations.asyncio.Task")
-def test_sentry_task_factory_no_factory(MockTask, mock_get_running_loop):  # noqa: N803
+def test_sentry_task_factory_no_factory(MockTask, mock_get_running_loop):
     mock_loop = mock_get_running_loop.return_value
     mock_coro = MagicMock()
 
     # Set the original task factory to None
     mock_loop.get_task_factory.return_value = None
 
-    # Retieve sentry task factory (since it is an inner function within patch_asyncio)
+    # Retrieve sentry task factory (since it is an inner function within patch_asyncio)
     sentry_task_factory = get_sentry_task_factory(mock_get_running_loop)
 
     # The call we are testing
@@ -364,7 +364,7 @@ def test_sentry_task_factory_with_factory(mock_get_running_loop):
     orig_task_factory = mock_loop.get_task_factory.return_value
     orig_task_factory._is_sentry_task_factory = False
 
-    # Retieve sentry task factory (since it is an inner function within patch_asyncio)
+    # Retrieve sentry task factory (since it is an inner function within patch_asyncio)
     sentry_task_factory = get_sentry_task_factory(mock_get_running_loop)
 
     # The call we are testing
@@ -386,7 +386,7 @@ def test_sentry_task_factory_with_factory(mock_get_running_loop):
 @patch("sentry_sdk.integrations.asyncio.Task")
 def test_sentry_task_factory_context_no_factory(
     MockTask,
-    mock_get_running_loop,  # noqa: N803
+    mock_get_running_loop,
 ):
     mock_loop = mock_get_running_loop.return_value
     mock_coro = MagicMock()
@@ -395,7 +395,7 @@ def test_sentry_task_factory_context_no_factory(
     # Set the original task factory to None
     mock_loop.get_task_factory.return_value = None
 
-    # Retieve sentry task factory (since it is an inner function within patch_asyncio)
+    # Retrieve sentry task factory (since it is an inner function within patch_asyncio)
     sentry_task_factory = get_sentry_task_factory(mock_get_running_loop)
 
     # The call we are testing
@@ -427,7 +427,7 @@ def test_sentry_task_factory_context_with_factory(mock_get_running_loop):
     orig_task_factory = mock_loop.get_task_factory.return_value
     orig_task_factory._is_sentry_task_factory = False
 
-    # Retieve sentry task factory (since it is an inner function within patch_asyncio)
+    # Retrieve sentry task factory (since it is an inner function within patch_asyncio)
     sentry_task_factory = get_sentry_task_factory(mock_get_running_loop)
 
     # The call we are testing

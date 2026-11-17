@@ -64,6 +64,7 @@ TEST_SUITE_CONFIG = {
     "beam": {
         "package": "apache-beam",
         "python": ">=3.7",
+        "include": "!=2.78.0rc4",  # incomplete upload: no Linux wheels for py3.13+
         "num_versions": 2,
         "deps": {
             "*": ["dill"],
@@ -460,6 +461,7 @@ TEST_SUITE_CONFIG = {
     },
     "redis": {
         "package": "redis",
+        "include": "!=8.2.0b1",
         "deps": {
             "*": ["fakeredis!=1.7.4", "pytest<8.0.0"],
             ">=4.0,<5.0": ["fakeredis<2.31.0"],

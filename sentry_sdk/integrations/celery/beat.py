@@ -188,7 +188,7 @@ def _wrap_beat_scheduler(
     if already_patched:
         return original_function
 
-    from sentry_sdk.integrations.celery import CeleryIntegration
+    from sentry_sdk.integrations.celery import CeleryIntegration  # noqa: PLC0415
 
     def sentry_patched_scheduler(*args: "Any", **kwargs: "Any") -> None:
         integration = sentry_sdk.get_client().get_integration(CeleryIntegration)

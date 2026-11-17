@@ -1,3 +1,4 @@
+import time
 from contextlib import contextmanager
 from typing import TYPE_CHECKING
 
@@ -14,9 +15,7 @@ from sentry_sdk.integrations.boto3._instrumentation import (
     _set_span_attributes,
     _start_client_span,
 )
-from sentry_sdk.integrations.boto3._services.registry import (
-    _resolve_service,
-)
+from sentry_sdk.integrations.boto3._services.bedrock import _BedrockExtension
 from sentry_sdk.integrations.boto3.consts import IDENTIFIER
 from sentry_sdk.traces import NoOpStreamedSpan, StreamedSpan
 from sentry_sdk.utils import capture_internal_exceptions
@@ -29,7 +28,6 @@ if TYPE_CHECKING:
 
 try:
     from botocore.client import BaseClient
-    from botocore.exceptions import ClientError
 except ImportError:
     raise DidNotEnable("botocore not installed")
 
@@ -104,7 +102,11 @@ def _patch_botocore_client() -> None:
             with capture_internal_exceptions():
                 # add optional metadata to the context, e.g. service-name, region-name, etc.
                 ctx.add_metadata(self)
-            service_ext = _resolve_service(ctx.service_name)
+
+            service_ext = None
+            if ctx.service_name == "bedrock-runtime":
+                service_ext = _BedrockExtension()
+
             span = _start_client_span(ctx, service_ext)
 
         if span is None:
@@ -115,25 +117,17 @@ def _patch_botocore_client() -> None:
 
         attributes: "Attributes" = {}
         try:
+            if service_ext is not None:
+                service_ext.request_start_time = time.perf_counter()
             with span_ctx:
                 try:
                     parsed = orig_make_api_call(self, operation_name, api_params)
                 except BaseException as error:
-                    if service_ext is not None and isinstance(error, ClientError):
-                        with capture_internal_exceptions():
-                            attributes.update(
-                                service_ext.get_response_attributes(ctx, error.response)
-                            )
                     with capture_internal_exceptions():
                         attributes.update(_get_error_attributes(error))
                     with capture_internal_exceptions():
                         _set_span_attributes(span, attributes)
                     raise
-                if service_ext is not None:
-                    with capture_internal_exceptions():
-                        attributes.update(
-                            service_ext.get_response_attributes(ctx, parsed)
-                        )
                 with capture_internal_exceptions():
                     attributes.update(_get_response_attributes(parsed))
                 with capture_internal_exceptions():
@@ -141,6 +135,10 @@ def _patch_botocore_client() -> None:
         except BaseException as error:
             _finish_span(span, error)
             raise
+
+        if service_ext is not None:
+            service_ext.on_success_response(ctx, parsed, span)
+            return parsed
 
         streaming_body_instrumented = False
         with capture_internal_exceptions():

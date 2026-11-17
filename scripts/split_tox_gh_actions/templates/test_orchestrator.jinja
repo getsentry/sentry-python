@@ -36,25 +36,58 @@ permissions:
 #     if: false  # TEMP: skipping, see PR #xxxx
 #     uses: ./.github/workflows/test-integrations-dbs.yml
 jobs:
+  files-changed:
+    name: Detect changed files
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      code: {% raw %}${{ github.event_name != 'pull_request' || steps.changes.outputs.code == 'true' }}{% endraw %}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: github.event_name == 'pull_request'
+      - name: Check for code changes
+        id: changes
+        if: github.event_name == 'pull_request'
+        uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
+        with:
+          token: {% raw %}${{ github.token }}{% endraw %}
+          predicate-quantifier: some-with-excludes
+          filters: |
+            code:
+              - '**'
+              - '!**/*.md'
+              - '!docs/**'
+              - '!LICENSE'
+              - '!.agents/**'
+              - '!.github/ISSUE_TEMPLATE/**'
+              - '!.github/CODEOWNERS'
+              - '!.git-blame-ignore-revs'
+
 {% for g in orchestrated_groups %}
   {{ g.id }}:
     name: {{ g.name }}
+    needs: files-changed
+    if: {% raw %}${{ needs.files-changed.outputs.code == 'true' }}{% endraw %}
     uses: ./.github/workflows/test-integrations-{{ g.slug }}.yml
 {% endfor %}
 
   report:
     name: Combine and report coverage
     needs:
+      - files-changed
 {% for g in orchestrated_groups %}
       - {{ g.id }}
 {% endfor %}
     # Report whatever coverage exists, even if some test jobs failed.
-    if: {% raw %}${{ !cancelled() }}{% endraw %}
+    if: {% raw %}${{ !cancelled() && needs.files-changed.outputs.code == 'true' }}{% endraw %}
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install uv
-        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
       - name: Download coverage data
         # Artifacts from the reusable test workflows live in this same run.
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
@@ -81,6 +114,7 @@ jobs:
   check-required:
     name: All tests passed
     needs:
+      - files-changed
 {% for g in orchestrated_groups %}
       - {{ g.id }}
 {% endfor %}

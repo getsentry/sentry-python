@@ -155,7 +155,7 @@ def start_profiler() -> None:
 
 def start_profile_session() -> None:
     warnings.warn(
-        "The `start_profile_session` function is deprecated. Please use `start_profile` instead.",
+        "The `start_profile_session` function is deprecated. Please use `start_profiler` instead.",
         DeprecationWarning,
         stacklevel=2,
     )
@@ -171,7 +171,7 @@ def stop_profiler() -> None:
 
 def stop_profile_session() -> None:
     warnings.warn(
-        "The `stop_profile_session` function is deprecated. Please use `stop_profile` instead.",
+        "The `stop_profile_session` function is deprecated. Please use `stop_profiler` instead.",
         DeprecationWarning,
         stacklevel=2,
     )
@@ -289,9 +289,6 @@ class ContinuousScheduler:
         raise NotImplementedError
 
     def teardown(self) -> None:
-        raise NotImplementedError
-
-    def pause(self) -> None:
         raise NotImplementedError
 
     def reset_buffer(self) -> None:

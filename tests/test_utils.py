@@ -485,7 +485,7 @@ def test_accepts_valid_sample_rate(rate):
         1.231,  # wrong value
     ],
 )
-def test_warns_on_invalid_sample_rate(rate, StringContaining):  # noqa: N803
+def test_warns_on_invalid_sample_rate(rate, StringContaining):
     with mock.patch.object(logger, "warning", mock.Mock()):
         result = is_valid_sample_rate(rate, source="Testing")
         logger.warning.assert_any_call(StringContaining("Given sample rate is invalid"))
@@ -835,7 +835,6 @@ def test_parse_version(version, expected_result):
             ),
             False,
         ),
-        ("1.0.1", (2, 0, 0), False),
         ("2.0", (1,), True),
         (
             "2.0.1",
@@ -913,14 +912,12 @@ def test_is_sentry_url_no_client():
     ],
 )
 def test_get_error_message(error, expected_result):
-    with pytest.raises(BaseException) as exc_value:
-        exc_value.message = error
-        raise Exception
+    exc_value = Exception()
+    exc_value.message = error
     assert get_error_message(exc_value) == expected_result(exc_value)
 
-    with pytest.raises(BaseException) as exc_value:
-        exc_value.detail = error
-        raise Exception
+    exc_value = Exception()
+    exc_value.detail = error
     assert get_error_message(exc_value) == expected_result(exc_value)
 
 
@@ -1296,10 +1293,10 @@ def test_exc_info_from_error_dont_get_an_exc():
     class NotAnException:
         pass
 
-    with pytest.raises(ValueError) as exc:
+    with pytest.raises(
+        ValueError, match="Expected Exception object to report, got <class"
+    ):
         exc_info_from_error(NotAnException())
-
-    assert "Expected Exception object to report, got <class" in str(exc.value)
 
 
 def test_get_lines_from_file_handle_linecache_errors():
@@ -1409,6 +1406,24 @@ def test_safe_serialize_object():
 
 
 def test_package_version_is_none():
+    assert package_version("non_existent_package") is None
+
+
+@pytest.mark.skipif(sys.version_info < (3, 8), reason="requires importlib.metadata")
+def test_package_version_installed_package():
+    from importlib import metadata
+
+    assert package_version("pytest") == parse_version(metadata.version("pytest"))
+
+
+@pytest.mark.skipif(sys.version_info < (3, 8), reason="requires importlib.metadata")
+def test_package_version_does_not_scan_all_installed_packages(monkeypatch):
+    def _fail():
+        raise AssertionError("package_version must not scan all installed packages")
+
+    monkeypatch.setattr("sentry_sdk.utils._get_installed_modules", _fail)
+
+    assert package_version("pytest") is not None
     assert package_version("non_existent_package") is None
 
 

@@ -28,6 +28,11 @@ except ImportError:
     # Python 3.10 and below
     BaseExceptionGroup = None  # type: ignore
 
+try:
+    from importlib import metadata as importlib_metadata
+except ImportError:
+    importlib_metadata = None  # type: ignore[assignment]
+
 from typing import TYPE_CHECKING
 
 import sentry_sdk
@@ -587,7 +592,7 @@ def serialize_frame(
     max_value_length: "Optional[int]" = None,
     custom_repr: "Optional[Callable[..., Optional[str]]]" = None,
 ) -> "Dict[str, Any]":
-    from sentry_sdk.serializer import serialize
+    from sentry_sdk.serializer import serialize  # noqa: PLC0415
 
     f_code = getattr(frame, "f_code", None)
     if not f_code:
@@ -914,10 +919,10 @@ def exceptions_from_error(
     parent_id = exception_id
     exception_id += 1
 
-    should_supress_context = (
+    should_suppress_context = (
         hasattr(exc_value, "__suppress_context__") and exc_value.__suppress_context__  # type: ignore
     )
-    if should_supress_context:
+    if should_suppress_context:
         # Add direct cause.
         # The field `__cause__` is set when raised with the exception (using the `from` keyword).
         exception_has_cause = (
@@ -1306,10 +1311,10 @@ def strip_string(
 def parse_version(version: str) -> "Optional[Tuple[int, ...]]":
     """
     Parses a version string into a tuple of integers.
-    This uses the parsing loging from PEP 440:
+    This uses the parsing logic from PEP 440:
     https://peps.python.org/pep-0440/#appendix-b-parsing-version-strings-with-regular-expressions
     """
-    VERSION_PATTERN = r"""  # noqa: N806
+    VERSION_PATTERN = r"""
         v?
         (?:
             (?:(?P<epoch>[0-9]+)!)?                           # epoch
@@ -1359,8 +1364,8 @@ def _is_contextvars_broken() -> bool:
     Returns whether gevent/eventlet have patched the stdlib in a way where thread locals are now more "correct" than contextvars.
     """
     try:
-        import gevent
-        from gevent.monkey import is_object_patched
+        import gevent  # noqa: PLC0415
+        from gevent.monkey import is_object_patched  # noqa: PLC0415
 
         # Get the MAJOR and MINOR version numbers of Gevent
         version_tuple = tuple(
@@ -1386,8 +1391,8 @@ def _is_contextvars_broken() -> bool:
         pass
 
     try:
-        import greenlet
-        from eventlet.patcher import is_monkey_patched  # type: ignore
+        import greenlet  # noqa: PLC0415
+        from eventlet.patcher import is_monkey_patched  # type: ignore  # noqa: PLC0415
 
         greenlet_version = parse_version(greenlet.__version__)
 
@@ -1449,7 +1454,7 @@ def _get_contextvars() -> "Tuple[bool, type]":
             # `aiocontextvars` is absolutely required for functional
             # contextvars on Python 3.6.
             try:
-                from aiocontextvars import ContextVar
+                from aiocontextvars import ContextVar  # noqa: PLC0415
 
                 return True, ContextVar
             except ImportError:
@@ -1457,17 +1462,14 @@ def _get_contextvars() -> "Tuple[bool, type]":
         else:
             # On Python 3.7 contextvars are functional.
             try:
-                from contextvars import ContextVar
+                from contextvars import ContextVar  # noqa: PLC0415
 
                 return True, ContextVar
             except ImportError:
                 pass
 
     # Fall back to basic thread-local usage.
-
-    from threading import local
-
-    return False, _make_threadlocal_contextvars(local)
+    return False, _make_threadlocal_contextvars(threading.local)
 
 
 HAS_REAL_CONTEXTVARS, ContextVar = _get_contextvars()
@@ -1541,7 +1543,7 @@ def transaction_from_function(func: "Callable[..., Any]") -> "Optional[str]":
 disable_capture_event = ContextVar("disable_capture_event")
 
 
-class ServerlessTimeoutWarning(Exception):  # noqa: N818
+class ServerlessTimeoutWarning(Exception):
     """Raised when a serverless method is about to reach its timeout."""
 
     pass
@@ -1673,7 +1675,7 @@ ParsedUrl = namedtuple("ParsedUrl", ["url", "query", "fragment"])
 def parse_url(url: str, sanitize: bool = True) -> "ParsedUrl":
     """
     Splits a URL into a url (including path), query and fragment. If sanitize is True, the query
-    parameters will be sanitized to remove sensitive data. The autority (username and password)
+    parameters will be sanitized to remove sensitive data. The authority (username and password)
     in the URL will always be removed.
     """
     parsed_url = sanitize_url(
@@ -1794,7 +1796,7 @@ def is_sentry_url(client: "sentry_sdk.client.BaseClient", url: str) -> bool:
 
 def _generate_installed_modules() -> "Iterator[Tuple[str, str]]":
     try:
-        from importlib import metadata
+        from importlib import metadata  # noqa: PLC0415
 
         yielded = set()
         for dist in metadata.distributions():
@@ -1812,7 +1814,7 @@ def _generate_installed_modules() -> "Iterator[Tuple[str, str]]":
     except ImportError:
         # < py3.8
         try:
-            import pkg_resources
+            import pkg_resources  # noqa: PLC0415
         except ImportError:
             return
 
@@ -1840,6 +1842,14 @@ def package_version(package: str) -> "Optional[Tuple[int, ...]]":
     normalized_package = _normalize_module_name(
         _replace_hyphens_dots_and_underscores_with_dashes(package)
     )
+
+    if importlib_metadata is not None:
+        # Look up the single distribution instead of scanning (and parsing
+        # the metadata of) every installed package on each call.
+        try:
+            return parse_version(importlib_metadata.version(normalized_package))
+        except importlib_metadata.PackageNotFoundError:
+            return None
 
     installed_packages = {
         _replace_hyphens_dots_and_underscores_with_dashes(module): v

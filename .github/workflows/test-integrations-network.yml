@@ -26,7 +26,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install uv
-        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
           enable-cache: false
       - name: Mark workspace safe for git (3.6/3.7 container)
@@ -37,26 +37,27 @@ jobs:
       - name: Setup Test Env
         run: |
           uv sync
-      - name: Test grpc
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-grpc"
-      - name: Test httpx0
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-httpx0"
-      - name: Test httpx2
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-httpx2"
-      - name: Test pyreqwest
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-pyreqwest"
-      - name: Test requests
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-requests"
+      - parallel:
+          - name: Test grpc
+            run: |
+              set -x # print commands that are executed
+              ./scripts/runtox.sh "py${{ matrix.python-version }}-grpc"
+          - name: Test httpx0
+            run: |
+              set -x # print commands that are executed
+              ./scripts/runtox.sh "py${{ matrix.python-version }}-httpx0"
+          - name: Test httpx2
+            run: |
+              set -x # print commands that are executed
+              ./scripts/runtox.sh "py${{ matrix.python-version }}-httpx2"
+          - name: Test pyreqwest
+            run: |
+              set -x # print commands that are executed
+              ./scripts/runtox.sh "py${{ matrix.python-version }}-pyreqwest"
+          - name: Test requests
+            run: |
+              set -x # print commands that are executed
+              ./scripts/runtox.sh "py${{ matrix.python-version }}-requests"
       - name: Upload coverage data
         if: ${{ !cancelled() }}
         continue-on-error: true

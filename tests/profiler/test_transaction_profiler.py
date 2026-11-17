@@ -62,7 +62,7 @@ def experimental_options(mode=None, sample_rate=None):
     ],
 )
 def test_profiler_invalid_mode(mode, make_options, teardown_profiling):
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Unknown profiler mode: foo"):
         setup_profiler(make_options(mode))
 
 
@@ -289,7 +289,7 @@ def test_minimum_unique_samples_required(
             items[item.type].append(item)
 
     assert len(items["transaction"]) == 1
-    # because we dont leave any time for the profiler to
+    # because we don't leave any time for the profiler to
     # take any samples, it should be not be sent
     assert len(items["profile"]) == 0
     assert record_lost_event_calls == [("insufficient_data", "profile", None, 1)]
@@ -531,7 +531,7 @@ def test_extract_stack_with_max_depth(depth, max_stack_depth, actual_depth):
     for i in range(actual_depth):
         assert frames[i]["function"] == "get_frame", i
 
-    # index 0 contains the inner most frame on the stack, so the lamdba
+    # index 0 contains the inner most frame on the stack, so the lambda
     # should be at index `actual_depth`
     if sys.version_info >= (3, 11):
         assert (
@@ -822,7 +822,7 @@ sample_stacks = [
 )
 @mock.patch("sentry_sdk.profiler.transaction_profiler.MAX_PROFILE_DURATION_NS", 5)
 def test_profile_processing(
-    DictionaryContaining,  # noqa: N803
+    DictionaryContaining,
     samples,
     expected,
 ):

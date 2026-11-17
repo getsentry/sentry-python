@@ -177,10 +177,12 @@ async def _request_websocket_started(app: "Quart", **kwargs: "Any") -> None:
     if integration is None:
         return
 
-    if has_request_context():
-        request_websocket = request._get_current_object()
     if has_websocket_context():
         request_websocket = websocket._get_current_object()
+    elif has_request_context():
+        request_websocket = request._get_current_object()
+    else:
+        return
 
     route_path = None
     try:

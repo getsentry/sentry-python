@@ -295,6 +295,7 @@ def _install_httplib() -> None:
         span_streaming = has_span_streaming_enabled(client.options)
         span: "Union[Span, StreamedSpan, None]" = None
         breadcrumb: "dict[str, Any]" = {}
+        set_on_span: "Optional[Callable[[str, Any], None]]" = None
 
         if span_streaming:
             url_attributes = get_url_attributes(client, parsed_url)
@@ -361,7 +362,7 @@ def _install_httplib() -> None:
 
         # for proxies, these point to the proxy host/port
         if tunnel_host:
-            if span:
+            if set_on_span is not None:
                 set_on_span(SPANDATA.NETWORK_PEER_ADDRESS, self.host)
                 set_on_span(SPANDATA.NETWORK_PEER_PORT, self.port)
 

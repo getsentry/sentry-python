@@ -89,7 +89,7 @@ mock_sdk_info = {
     ],
 )
 def test_continuous_profiler_invalid_mode(mode, make_options, teardown_profiling):
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Unknown continuous profiler mode: foo"):
         setup_continuous_profiler(
             make_options(mode=mode),
             mock_sdk_info,
@@ -1049,7 +1049,7 @@ def test_continuous_profiler_auto_start_and_stop_unsampled_span_streaming(
         pytest.param(get_client_options(False), id="experiment"),
     ],
 )
-def test_continuous_profiler_manual_start_and_stop_noop_when_using_trace_lifecyle(
+def test_continuous_profiler_manual_start_and_stop_noop_when_using_trace_lifecycle(
     sentry_init,
     mode,
     start_profiler_func,
@@ -1112,7 +1112,7 @@ def test_continuous_profiler_manual_start_and_stop_noop_when_using_trace_lifecyl
         pytest.param(get_client_options(False), id="experiment"),
     ],
 )
-def test_continuous_profiler_manual_start_and_stop_noop_when_using_trace_lifecyle_span_streaming(
+def test_continuous_profiler_manual_start_and_stop_noop_when_using_trace_lifecycle_span_streaming(
     sentry_init,
     mode,
     start_profiler_func,

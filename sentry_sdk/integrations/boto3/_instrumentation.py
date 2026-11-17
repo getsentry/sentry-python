@@ -173,8 +173,7 @@ def _start_client_span(
         # https://opentelemetry.io/docs/specs/semconv/cloud-providers/aws-sdk/#aws-sdk-spans
         SPANDATA.SENTRY_KIND: "client",
     }
-    with capture_internal_exceptions():
-        attributes.update(_get_client_attributes(ctx))
+    attributes.update(_get_client_attributes(ctx))
 
     # `sentry.span_op` and `sentry.span_origin` are set to generic defaults;
     # a service extension can override them with `get_span_op()` and `get_span_origin()`.
@@ -182,21 +181,20 @@ def _start_client_span(
     span_origin = ORIGIN
 
     if service_ext is not None:
-        with capture_internal_exceptions():
-            service_op = service_ext.get_span_op(ctx)
-            if service_op is not None:
-                span_op = service_op
+        service_op = service_ext.get_span_op(ctx)
+        if service_op is not None:
+            span_op = service_op
 
-        with capture_internal_exceptions():
-            service_origin = service_ext.get_span_origin(ctx)
-            if service_origin is not None:
-                span_origin = service_origin
+        service_origin = service_ext.get_span_origin(ctx)
+        if service_origin is not None:
+            span_origin = service_origin
 
-        with capture_internal_exceptions():
-            attributes.update(service_ext.get_request_attributes(ctx))
+        attributes.update(service_ext.get_request_attributes(ctx))
 
     if has_span_streaming_enabled(client.options):
-        if sentry_sdk.traces.get_current_span() is None:
+        if (
+            service_ext is None or service_ext.skip_if_no_active_span
+        ) and sentry_sdk.traces.get_current_span() is None:
             return None
 
         # `start_span()` evaluates `ignore_spans` against the initial attributes.

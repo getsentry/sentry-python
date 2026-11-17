@@ -3623,14 +3623,18 @@ def test_langchain_error(
     if span_streaming or stream_gen_ai_spans:
         items = capture_items("event")
 
-        with start_transaction(), pytest.raises(ValueError):
+        with start_transaction(), pytest.raises(
+            ValueError, match="API rate limit error"
+        ):
             list(agent_executor.stream({"input": "How many letters in the word eudca"}))
 
         (error,) = (item.payload for item in items)
     else:
         events = capture_events()
 
-        with start_transaction(), pytest.raises(ValueError):
+        with start_transaction(), pytest.raises(
+            ValueError, match="API rate limit error"
+        ):
             list(agent_executor.stream({"input": "How many letters in the word eudca"}))
 
         error = events[0]
@@ -3698,7 +3702,7 @@ def test_span_status_error(
                 agent=agent, tools=[get_word_length], verbose=True
             )
 
-            with pytest.raises(ValueError):
+            with pytest.raises(ValueError, match="API rate limit error"):
                 list(
                     agent_executor.stream(
                         {"input": "How many letters in the word eudca"}
@@ -3737,7 +3741,7 @@ def test_span_status_error(
                 agent=agent, tools=[get_word_length], verbose=True
             )
 
-            with pytest.raises(ValueError):
+            with pytest.raises(ValueError, match="API rate limit error"):
                 list(
                     agent_executor.stream(
                         {"input": "How many letters in the word eudca"}
@@ -3777,7 +3781,7 @@ def test_span_status_error(
                 agent=agent, tools=[get_word_length], verbose=True
             )
 
-            with pytest.raises(ValueError):
+            with pytest.raises(ValueError, match="API rate limit error"):
                 list(
                     agent_executor.stream(
                         {"input": "How many letters in the word eudca"}
@@ -3857,7 +3861,9 @@ def test_langchain_tool_error(
 
     with patch.object(
         llm.client._client._client, "send", side_effect=[tool_response]
-    ), start_transaction(name="tx"), pytest.raises(ValueError):
+    ), start_transaction(name="tx"), pytest.raises(
+        ValueError, match="Tool execution failed"
+    ):
         agent.invoke({"messages": [HumanMessage(content="hi")]})
 
     error_events = [event for event in events if event.get("level") == "error"]

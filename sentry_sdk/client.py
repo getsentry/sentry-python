@@ -539,7 +539,7 @@ class _Client(BaseClient):
     the client options as keyword arguments and optionally the DSN as first
     argument.
 
-    Alias of :py:class:`sentry_sdk.Client`. (Was created for better intelisense support)
+    Alias of :py:class:`sentry_sdk.Client`. (Was created for better IntelliSense support)
     """
 
     def __init__(self, *args: "Any", **kwargs: "Any") -> None:
@@ -653,7 +653,7 @@ class _Client(BaseClient):
 
             # Setup Spotlight before creating batchers so _capture_envelope can use it.
             # setup_spotlight handles all config/env var resolution per the SDK spec.
-            from sentry_sdk.spotlight import setup_spotlight
+            from sentry_sdk.spotlight import setup_spotlight  # noqa: PLC0415
 
             self.spotlight = setup_spotlight(self.options)
             if self.spotlight is not None and not self.options["dsn"]:
@@ -1559,7 +1559,7 @@ if TYPE_CHECKING:
     # Use `ClientConstructor` to define the argument types of `init` and
     # `Dict[str, Any]` to tell static analyzers about the return type.
 
-    class get_options(ClientConstructor, Dict[str, Any]):  # noqa: N801
+    class get_options(ClientConstructor, Dict[str, Any]):
         pass
 
     class Client(ClientConstructor, _Client):

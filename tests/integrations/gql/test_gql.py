@@ -1,3 +1,5 @@
+import re
+
 import pytest
 import responses
 from gql import Client, __version__, gql
@@ -273,3 +275,84 @@ def test_real_gql_request_with_error_data_collection_variables(
         assert event["request"]["data"].get("variables")
     else:
         assert not event["request"]["data"].get("variables")
+
+
+@pytest.mark.parametrize(
+    "init_kwargs,expected_query_string",
+    [
+        pytest.param(
+            {},
+            "access_token=[Filtered]&v=[Filtered]&page=[Filtered]",
+            id="no_pii_no_data_collection",
+        ),
+        pytest.param(
+            {"send_default_pii": True},
+            "access_token=[Filtered]&v=[Filtered]&page=[Filtered]",
+            id="legacy_pii_on",
+        ),
+        pytest.param(
+            {"data_collection": {}},
+            "access_token=%5BFiltered%5D&v=1&page=2",
+            id="data_collection_defaults",
+        ),
+        pytest.param(
+            {"data_collection": {"url_query_params": {"mode": "off"}}},
+            None,
+            id="data_collection_query_params_off",
+        ),
+        pytest.param(
+            {
+                "data_collection": {
+                    "url_query_params": {"mode": "denylist", "terms": ["page"]}
+                }
+            },
+            "access_token=%5BFiltered%5D&v=1&page=%5BFiltered%5D",
+            id="data_collection_denylist",
+        ),
+        pytest.param(
+            {
+                "data_collection": {
+                    "url_query_params": {"mode": "allowlist", "terms": ["page"]}
+                }
+            },
+            "access_token=%5BFiltered%5D&v=%5BFiltered%5D&page=2",
+            id="data_collection_allowlist",
+        ),
+        pytest.param(
+            {
+                "send_default_pii": True,
+                "data_collection": {"url_query_params": {"mode": "off"}},
+            },
+            None,
+            id="data_collection_takes_precedence_over_send_default_pii",
+        ),
+    ],
+)
+@responses.activate
+def test_transport_url_is_sanitized(
+    sentry_init, capture_events, init_kwargs, expected_query_string
+):
+    sentry_init(integrations=[GQLIntegration()], **init_kwargs)
+    events = capture_events()
+
+    responses.add(
+        method=responses.POST,
+        url=re.compile(r"https://.*api\.example\.com/graphql.*"),
+        json={"errors": [{"message": "some error"}]},
+        status=200,
+    )
+    transport = RequestsHTTPTransport(
+        url="https://user:password@api.example.com/graphql?access_token=secret&v=1&page=2#frag"
+    )
+    client = Client(transport=transport)
+
+    with pytest.raises(TransportQueryError):
+        client.execute(gql("query Example { example }"))
+
+    (event,) = events
+    assert event["request"]["url"] == (
+        "https://[Filtered]:[Filtered]@api.example.com/graphql"
+    )
+    assert event["request"].get("query_string") == expected_query_string
+    assert "password" not in str(event["request"])
+    assert "secret" not in str(event["request"])

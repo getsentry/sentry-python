@@ -100,7 +100,7 @@ def lambda_client():
     """
     return boto3.client(
         "lambda",
-        endpoint_url=f"http://127.0.0.1:{SAM_PORT}",  # noqa: E231
+        endpoint_url=f"http://127.0.0.1:{SAM_PORT}",
         aws_access_key_id="dummy",
         aws_secret_access_key="dummy",
         region_name="us-east-1",
@@ -199,6 +199,21 @@ def test_init_error(lambda_client, test_environment):
         error_event["exception"]["values"][0]["value"] == "name 'func' is not defined"
     )
     assert transaction_event["transaction"] == "InitError"
+
+
+@pytest.mark.parametrize("function_name", ["PathHandler", "AbsolutePathHandler"])
+def test_path_handler_loaded_once(lambda_client, test_environment, function_name):
+    num_invocations = [
+        json.loads(
+            lambda_client.invoke(FunctionName=function_name, Payload=json.dumps({}))[
+                "Payload"
+            ].read()
+        )["num_invocations"]
+        for _ in range(2)
+    ]
+    # Sentry layer should load the function's module once (on cold start or whenever
+    # the module is reloaded), not on every warm invocation.
+    assert num_invocations == [1, 2]
 
 
 def test_timeout_error_scope_modified(lambda_client, test_environment):
