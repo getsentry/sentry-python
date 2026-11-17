@@ -188,7 +188,7 @@ if TYPE_CHECKING:
         gen_ai: "GenAICollectionUserOptions"
         database_query_data: bool
         queues: bool
-        stack_frame_variables: bool
+        stack_frame_variables: "Union[bool, KeyValueCollectionBehaviour]"
         frame_context_lines: int
 
     class DataCollection(TypedDict):
@@ -202,7 +202,7 @@ if TYPE_CHECKING:
         gen_ai: "GenAICollectionBehaviour"
         database_query_data: bool
         queues: bool
-        stack_frame_variables: bool
+        stack_frame_variables: "Union[bool, KeyValueCollectionBehaviour]"
         frame_context_lines: int
 
     # "critical" is an alias of "fatal" recognized by Relay
@@ -425,6 +425,7 @@ if TYPE_CHECKING:
         "log_item",
         "log_byte",
         "trace_metric",
+        "trace_metric_byte",
     ]
     SessionStatus = Literal["ok", "exited", "crashed", "abnormal"]
 
@@ -470,16 +471,48 @@ if TYPE_CHECKING:
 
     class TextPart(TypedDict):
         type: Literal["text"]
-        content: str
+        content: NotRequired[str]
 
     class ReasoningPart(TypedDict):
         type: Literal["reasoning"]
-        content: str
+        content: NotRequired[str]
 
     class ToolCallPart(TypedDict):
         type: Literal["tool_call"]
         name: NotRequired[str]
         arguments: NotRequired[Any]
+
+    class ToolCallResponsePart(TypedDict):
+        type: Literal["tool_call_response"]
+        response: NotRequired[Any]
+
+    Modality = Literal["image", "video", "audio", "document"]
+
+    class UriPart(TypedDict):
+        type: Literal["uri"]
+        modality: NotRequired[Modality]
+        uri: NotRequired[str]
+
+    class BlobPart(TypedDict):
+        type: Literal["blob"]
+        modality: NotRequired[Modality]
+
+    class InputMessage(TypedDict):
+        role: Literal["user", "assistant", "tool"]
+        parts: list[
+            Union[
+                TextPart,
+                ReasoningPart,
+                ToolCallPart,
+                ToolCallResponsePart,
+                UriPart,
+                BlobPart,
+            ]
+        ]
+
+    class OutputMessage(TypedDict):
+        role: Literal["assistant"]
+        parts: list[Union[TextPart, ReasoningPart]]
 
     class ToolDefinition(TypedDict):
         type: str

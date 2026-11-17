@@ -118,7 +118,7 @@ try:
         def __init__(self: "Self", get_response: "Callable[..., HttpResponse]") -> None:
             super().__init__(get_response)
 
-            import sentry_sdk.api
+            import sentry_sdk.api  # noqa: PLC0415
 
             self.sentry_sdk = sentry_sdk.api
 
@@ -205,7 +205,7 @@ try:
         def process_exception(
             self: "Self", _request: "HttpRequest", exception: Exception
         ) -> "Optional[HttpResponseServerError]":
-            if not settings.DEBUG or not self._spotlight_url:
+            if settings is None or not settings.DEBUG or not self._spotlight_url:
                 return None
 
             try:

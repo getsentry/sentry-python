@@ -138,7 +138,7 @@ def test_redis_pipeline_data_collection(
         integrations=[RedisIntegration()],
         traces_sample_rate=1.0,
         trace_lifecycle="stream" if span_streaming else "static",
-        _experiments={"data_collection": data_collection},
+        data_collection=data_collection,
     )
 
     connection = FakeStrictRedis()
@@ -293,7 +293,7 @@ def test_data_collection_database_query_data(
         integrations=[RedisIntegration()],
         traces_sample_rate=1.0,
         trace_lifecycle="stream" if span_streaming else "static",
-        _experiments={"data_collection": data_collection},
+        data_collection=data_collection,
     )
 
     connection = FakeStrictRedis()
@@ -349,7 +349,7 @@ def test_database_query_data_takes_precedence_over_send_default_pii(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         trace_lifecycle="stream" if span_streaming else "static",
-        _experiments={"data_collection": data_collection},
+        data_collection=data_collection,
     )
 
     connection = FakeStrictRedis()

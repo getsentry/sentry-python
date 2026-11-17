@@ -163,7 +163,7 @@ class ChaliceIntegration(Integration):
         if version < (1, 20):
             old_get_view_function_response = Chalice._get_view_function_response
         else:
-            from chalice.app import RestAPIEventHandler
+            from chalice.app import RestAPIEventHandler  # noqa: PLC0415
 
             old_get_view_function_response = (
                 RestAPIEventHandler._get_view_function_response

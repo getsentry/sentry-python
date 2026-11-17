@@ -56,7 +56,7 @@ class LayerBuilder:
                 "pip",
                 "install",
                 "--no-cache-dir",  # always access PyPI
-                "--no-deps",  # the right depencencies have been installed in the call above
+                "--no-deps",  # the right dependencies have been installed in the call above
                 "--quiet",
                 sentry_python_sdk,
                 "--target",

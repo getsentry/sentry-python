@@ -11,12 +11,10 @@ from sentry_sdk.utils import (
     Dsn,
     exceptions_from_error_tuple,
     filename_for_module,
-    from_base64,
     iter_event_stacktraces,
     safe_repr,
     set_in_app_in_frames,
     strip_string,
-    to_base64,
 )
 
 try:
@@ -548,59 +546,6 @@ def test_iter_stacktraces():
             }
         )
     ) == {1, 2, 3}
-
-
-@pytest.mark.parametrize(
-    ("original", "base64_encoded"),
-    [
-        # ascii only
-        ("Dogs are great!", "RG9ncyBhcmUgZ3JlYXQh"),
-        # emoji
-        ("🐶", "8J+Qtg=="),
-        # non-ascii
-        (
-            "Καλό κορίτσι, Μάιζεϊ!",
-            "zprOsc67z4wgzrrOv8+Bzq/PhM+DzrksIM6czqzOuc62zrXPiiE=",
-        ),
-        # mix of ascii and non-ascii
-        (
-            "Of margir hundar! Ég geri ráð fyrir að ég þurfi stærra rúm.",
-            "T2YgbWFyZ2lyIGh1bmRhciEgw4lnIGdlcmkgcsOhw7AgZnlyaXIgYcOwIMOpZyDDvnVyZmkgc3TDpnJyYSByw7ptLg==",
-        ),
-    ],
-)
-def test_successful_base64_conversion(original, base64_encoded):
-    # all unicode characters should be handled correctly
-    assert to_base64(original) == base64_encoded
-    assert from_base64(base64_encoded) == original
-
-    # "to" and "from" should be inverses
-    assert from_base64(to_base64(original)) == original
-    assert to_base64(from_base64(base64_encoded)) == base64_encoded
-
-
-@pytest.mark.parametrize(
-    "input",
-    [
-        1231,  # incorrect type
-        True,  # incorrect type
-        [],  # incorrect type
-        {},  # incorrect type
-        None,  # incorrect type
-        "yayfordogs",  # wrong length
-        "#dog",  # invalid ascii character
-        "🐶",  # non-ascii character
-    ],
-)
-def test_failed_base64_conversion(input):
-    # conversion from base64 should fail if given input of the wrong type or
-    # input which isn't a valid base64 string
-    assert from_base64(input) is None
-
-    # any string can be converted to base64, so only type errors will cause
-    # failures
-    if not isinstance(input, str):
-        assert to_base64(input) is None
 
 
 @pytest.mark.parametrize(

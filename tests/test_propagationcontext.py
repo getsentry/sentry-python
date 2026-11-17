@@ -131,7 +131,7 @@ def test_existing_sample_rand_kept():
 def test_sample_rand_filled(parent_sampled, sample_rate, expected_interval):
     """When continuing a trace, we want to fill in the sample_rand value if it's missing."""
     if sample_rate is not None:
-        sample_rate_str = f",sentry-sample_rate={sample_rate}"  # noqa: E231
+        sample_rate_str = f",sentry-sample_rate={sample_rate}"
     else:
         sample_rate_str = ""
 
@@ -153,9 +153,7 @@ def test_sample_rand_filled(parent_sampled, sample_rate, expected_interval):
             }
         )
 
-    assert (
-        ctx.dynamic_sampling_context["sample_rand"] == f"{expected_interval[0]:.6f}"  # noqa: E231
-    )
+    assert ctx.dynamic_sampling_context["sample_rand"] == f"{expected_interval[0]:.6f}"
     assert mock_randrange.call_count == 1
     assert mock_randrange.call_args[0] == (
         int(expected_interval[0] * 1000000),

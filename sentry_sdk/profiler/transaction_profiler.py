@@ -286,7 +286,15 @@ class Profile:
         options = client.options
 
         if callable(options.get("profiles_sampler")):
-            sample_rate = options["profiles_sampler"](sampling_context)
+            try:
+                sample_rate = options["profiles_sampler"](sampling_context)
+            except Exception:
+                logger.warning(
+                    "[Profiling] profiles_sampler raised; unsampling profile",
+                    exc_info=True,
+                )
+                self.sampled = False
+                return
         elif options["profiles_sample_rate"] is not None:
             sample_rate = options["profiles_sample_rate"]
         else:
@@ -574,7 +582,7 @@ class Scheduler(ABC):
             """
             # no profiles taking place, so we can stop early
             if not self.new_profiles and not self.active_profiles:
-                # make sure to clear the cache if we're not profiling so we dont
+                # make sure to clear the cache if we're not profiling so we don't
                 # keep a reference to the last stack of frames around
                 return
 

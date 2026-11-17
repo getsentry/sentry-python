@@ -10,6 +10,7 @@ from werkzeug.wrappers import Response
 
 import sentry_sdk
 from sentry_sdk import capture_message
+from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.bottle import BottleIntegration
 from sentry_sdk.integrations.logging import LoggingIntegration
 from sentry_sdk.serializer import MAX_DATABAG_BREADTH
@@ -163,6 +164,39 @@ def test_large_json_request(
         assert len(event["request"]["data"]["foo"]["bar"]) == 1024
     else:
         assert len(event["request"]["data"]["foo"]["bar"]) == 1034
+
+
+def test_attach_stacktrace_doesnt_hang(sentry_init, capture_events, app, get_client):
+    sentry_init(
+        integrations=[BottleIntegration()],
+        max_request_body_size="always",
+        attach_stacktrace=True,
+    )
+
+    data = {"foo": {"bar": "a" * (1024)}}
+
+    @app.route("/", method="POST")
+    def index():
+        import bottle
+
+        assert bottle.request.json == data
+        assert bottle.request.body.read() == json.dumps(data).encode("ascii")
+        capture_message("hi")
+        return "ok"
+
+    events = capture_events()
+
+    client = get_client()
+    response = client.get("/")
+
+    response = client.post("/", content_type="application/json", data=json.dumps(data))
+    assert response[1] == "200 OK"
+
+    (event,) = events
+
+    # As long as this test finishes, we're good. It's just making sure we don't
+    # hang.
+    assert event["request"]["data"]
 
 
 @pytest.mark.parametrize("data", [{}, []], ids=["empty-dict", "empty-list"])
@@ -662,6 +696,32 @@ def test_span_streaming_transaction_style(
     assert segment["attributes"]["sentry.segment.name.source"] == expected_source
 
 
+def test_http_route(
+    sentry_init,
+    capture_items,
+):
+    sentry_init(
+        integrations=[BottleIntegration()],
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+    )
+    items = capture_items("span")
+
+    app = Bottle()
+
+    @app.route("/message/<message_id>")
+    def hi_with_id(message_id):
+        return "ok"
+
+    client = Client(app)
+    client.get("/message/123456")
+
+    sentry_sdk.flush()
+
+    (segment,) = (item.payload for item in items if item.payload.get("is_segment"))
+    assert segment["attributes"][SPANDATA.HTTP_ROUTE] == "/message/<message_id>"
+
+
 def test_span_streaming_with_error(sentry_init, capture_items):
     sentry_init(
         integrations=[BottleIntegration()],
@@ -807,3 +867,142 @@ def test_span_streaming_failed_request_status_codes(
         assert events[0]["exception"]["values"][0]["mechanism"]["handled"] is True
     else:
         assert len(events) == 0
+
+
+@pytest.mark.parametrize(
+    "data_collection, expect_body",
+    [
+        pytest.param({}, True, id="data_collection_http_bodies_default"),
+        pytest.param(
+            {"http_bodies": ["incoming_request"]},
+            True,
+            id="data_collection_http_bodies_incoming_request",
+        ),
+        pytest.param(
+            {"http_bodies": ["outgoing_request"]},
+            False,
+            id="data_collection_http_bodies_outgoing_request_only",
+        ),
+        pytest.param(
+            {"http_bodies": []}, False, id="data_collection_http_bodies_empty"
+        ),
+    ],
+)
+def test_request_body_data_collection(
+    sentry_init, capture_events, app, get_client, data_collection, expect_body
+):
+    sentry_init(
+        integrations=[BottleIntegration()],
+        data_collection=data_collection,
+    )
+
+    data = {"foo": "bar"}
+
+    @app.route("/", method="POST")
+    def index():
+        capture_message("hi")
+        return "ok"
+
+    events = capture_events()
+
+    client = get_client()
+    response = client.post("/", content_type="application/json", data=json.dumps(data))
+    assert response[1] == "200 OK"
+
+    (event,) = events
+    if expect_body:
+        assert event["request"]["data"] == data
+    else:
+        assert "data" not in event["request"]
+
+
+def test_request_body_dropped_with_form_and_files_data_collection(
+    sentry_init, capture_events, app, get_client
+):
+    sentry_init(
+        integrations=[BottleIntegration()],
+        max_request_body_size="always",
+        data_collection={"http_bodies": []},
+    )
+
+    data = {
+        "foo": "bar",
+        "file": (BytesIO(b"hello"), "hello.txt"),
+    }
+
+    @app.route("/", method="POST")
+    def index():
+        import bottle
+
+        assert list(bottle.request.forms) == ["foo"]
+        assert list(bottle.request.files) == ["file"]
+        capture_message("hi")
+        return "ok"
+
+    events = capture_events()
+
+    client = get_client()
+    response = client.post("/", data=data)
+    assert response[1] == "200 OK"
+
+    (event,) = events
+    assert "data" not in event["request"]
+    assert "data" not in event.get("_meta", {}).get("request", {})
+
+
+def test_transaction_request_body_data_collection(
+    sentry_init, capture_events, app, get_client
+):
+    sentry_init(
+        integrations=[BottleIntegration()],
+        traces_sample_rate=1.0,
+        data_collection={"http_bodies": []},
+    )
+
+    data = {"username": "sentry-user", "age": "26"}
+
+    @app.route("/", method="POST")
+    def index():
+        capture_message("hi")
+        return "ok"
+
+    events = capture_events()
+
+    client = get_client()
+    response = client.post("/", content_type="application/json", data=json.dumps(data))
+    assert response[1] == "200 OK"
+
+    event, transaction_event = events
+    assert "data" not in event["request"]
+    assert "data" not in transaction_event["request"]
+
+
+def test_oversized_request_body_not_annotated_data_collection(
+    sentry_init, capture_events, app, get_client
+):
+    """
+    The gating happens before the size check, so an oversized body is dropped
+    outright instead of being reported as removed because of the size limit.
+    """
+    sentry_init(
+        integrations=[BottleIntegration()],
+        max_request_body_size="small",
+        data_collection={"http_bodies": []},
+    )
+
+    data = "a" * 2000
+
+    @app.route("/", method="POST")
+    def index():
+        capture_message("hi")
+        return "ok"
+
+    events = capture_events()
+
+    client = get_client()
+    response = client.post("/", data=data)
+    assert response[1] == "200 OK"
+
+    (event,) = events
+    assert "data" not in event["request"]
+    assert "data" not in event.get("_meta", {}).get("request", {})

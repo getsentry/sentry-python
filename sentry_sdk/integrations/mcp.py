@@ -20,15 +20,22 @@ from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
-from sentry_sdk.utils import nullcontext, package_version, safe_serialize
-
-MCP_PACKAGE_VERSION = package_version("mcp")
+from sentry_sdk.utils import (
+    capture_internal_exceptions,
+    event_from_exception,
+    has_data_collection_enabled,
+    nullcontext,
+    package_version,
+    safe_serialize,
+)
 
 try:
     from mcp.server.lowlevel import Server
     from mcp.server.streamable_http import (
         StreamableHTTPServerTransport,
     )
+
+    MCP_PACKAGE_VERSION = package_version("mcp")
 
     if MCP_PACKAGE_VERSION and MCP_PACKAGE_VERSION < (2, 0, 0):
         from mcp.server.lowlevel.server import (  # type: ignore[attr-defined]
@@ -95,6 +102,15 @@ class MCPIntegration(Integration):
             _patch_fastmcp()
 
 
+def _capture_exception(exc: "Any") -> None:
+    event, hint = event_from_exception(
+        exc,
+        client_options=sentry_sdk.get_client().options,
+        mechanism={"type": "mcp", "handled": False},
+    )
+    sentry_sdk.capture_event(event, hint=hint)
+
+
 @contextmanager
 def _active_http_scopes(
     ctx: "Any",
@@ -157,7 +173,7 @@ def _get_request_context_data(
                 # SSE transport uses query parameter
                 mcp_transport = "sse"
                 session_id = request.query_params.get("session_id")
-            elif hasattr(request, "headers") and request.headers.get("mcp-session-id"):
+            elif hasattr(request, "headers"):
                 # StreamableHTTP transport uses header
                 mcp_transport = "http"
                 session_id = request.headers.get("mcp-session-id")
@@ -254,57 +270,6 @@ def _extract_text_from_content_blocks(content_blocks: "Any") -> "Any":
     return " ".join(texts) if texts else content_blocks
 
 
-def _extract_handler_data_from_args(
-    handler_type: str,
-    original_args: "tuple[Any, ...]",
-    original_kwargs: "Optional[dict[str, Any]]" = None,
-) -> "tuple[str, dict[str, Any]]":
-    """
-    Extract handler name and arguments from v1 positional args.
-
-    In MCP SDK v1, handlers receive positional args:
-    - Tool: (tool_name, arguments)
-    - Prompt: (name, arguments)
-    - Resource: (uri,)
-    """
-    original_kwargs = original_kwargs or {}
-
-    if handler_type == "tool":
-        if original_args:
-            handler_name = original_args[0]
-        elif original_kwargs.get("name"):
-            handler_name = original_kwargs["name"]
-
-        arguments = {}
-        if len(original_args) > 1:
-            arguments = original_args[1]
-        elif original_kwargs.get("arguments"):
-            arguments = original_kwargs["arguments"]
-
-    elif handler_type == "prompt":
-        if original_args:
-            handler_name = original_args[0]
-        elif original_kwargs.get("name"):
-            handler_name = original_kwargs["name"]
-
-        arguments = {}
-        if len(original_args) > 1:
-            arguments = original_args[1]
-        elif original_kwargs.get("arguments"):
-            arguments = original_kwargs["arguments"]
-
-    else:  # resource
-        handler_name = "unknown"
-        if original_args:
-            handler_name = str(original_args[0])
-        elif original_kwargs.get("uri"):
-            handler_name = str(original_kwargs["uri"])
-
-        arguments = {}
-
-    return handler_name, arguments
-
-
 async def _tool_handler_wrapper(
     func: "Callable[..., Awaitable[Union[CallToolResult, InputRequiredResult]]]",
     original_args: "tuple[Any, ...]",
@@ -322,12 +287,26 @@ async def _tool_handler_wrapper(
         original_kwargs: Original keyword arguments passed to the handler
         self: Optional instance for bound methods
     """
-    if original_kwargs is None:
-        original_kwargs = {}
+    client = sentry_sdk.get_client()
 
-    handler_name, arguments = _extract_handler_data_from_args(
-        "tool", original_args, original_kwargs
-    )
+    original_kwargs = original_kwargs or {}
+
+    if original_args:
+        handler_name = original_args[0]
+    elif original_kwargs.get("name"):
+        handler_name = original_kwargs["name"]
+
+    arguments = {}
+    if len(original_args) > 1 and original_args[1] is not None:
+        arguments = original_args[1]
+    elif original_kwargs.get("arguments"):
+        arguments = original_kwargs["arguments"]
+
+    if has_data_collection_enabled(client.options):
+        if not client.options["data_collection"]["gen_ai"]["inputs"]:
+            # Arguments can contain sensitive data and shouldn't be added to the span
+            # if the user has opted out via this config.
+            arguments = {}
 
     ctx = None
     try:
@@ -381,21 +360,25 @@ async def _tool_handler_wrapper(
                     result = await result
 
             except Exception as e:
-                sentry_sdk.capture_exception(e)
+                with capture_internal_exceptions():
+                    _capture_exception(e)
                 raise
 
             if result is None:
                 return result
 
             # Get integration to check PII settings
-            integration = sentry_sdk.get_client().get_integration(MCPIntegration)
+            integration = client.get_integration(MCPIntegration)
             if integration is None:
                 return result
 
             # Check if we should include sensitive data
-            should_include_data = (
-                should_send_default_pii() and integration.include_prompts
-            )
+            should_include_data = False
+            if has_data_collection_enabled(client.options):
+                if client.options["data_collection"]["gen_ai"]["outputs"]:
+                    should_include_data = True
+            elif should_send_default_pii() and integration.include_prompts:
+                should_include_data = True
 
             extracted = _extract_tool_result_content(result)
             if extracted is not None and should_include_data:
@@ -422,15 +405,22 @@ async def _instrument_v2_tool_call(
     if ctx.params is None or ctx.params.get("name") is None:
         return await call_next(ctx)
 
+    client = sentry_sdk.get_client()
     handler_name = ctx.params["name"]
     arguments = ctx.params.get("arguments")
     if arguments is None:
         arguments = {}
 
+    if has_data_collection_enabled(client.options):
+        if not client.options["data_collection"]["gen_ai"]["inputs"]:
+            # Arguments can contain sensitive data and shouldn't be added to the span
+            # if the user has opted out via this config.
+            arguments = {}
+
     # Get request ID, session ID, and transport from context
     request_id, session_id, mcp_transport = _get_request_context_data(ctx=ctx)
 
-    span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
+    span_streaming = has_span_streaming_enabled(client.options)
 
     # Start span and execute
     with _active_http_scopes(ctx=ctx):
@@ -467,21 +457,25 @@ async def _instrument_v2_tool_call(
                 result = await call_next(ctx)
 
             except Exception as e:
-                sentry_sdk.capture_exception(e)
+                with capture_internal_exceptions():
+                    _capture_exception(e)
                 raise
 
             if not isinstance(result, dict):
                 return result
 
             # Get integration to check PII settings
-            integration = sentry_sdk.get_client().get_integration(MCPIntegration)
+            integration = client.get_integration(MCPIntegration)
             if integration is None:
                 return result
 
             # Check if we should include sensitive data
-            should_include_data = (
-                should_send_default_pii() and integration.include_prompts
-            )
+            should_include_result_data = False
+            if has_data_collection_enabled(client.options):
+                if client.options["data_collection"]["gen_ai"]["outputs"]:
+                    should_include_result_data = True
+            elif should_send_default_pii() and integration.include_prompts:
+                should_include_result_data = True
 
             result_content = result
             if "structuredContent" in result:
@@ -489,7 +483,7 @@ async def _instrument_v2_tool_call(
             elif isinstance(result.get("content"), list):
                 result_content = _extract_text_from_content_blocks(result["content"])
 
-            if result_content is not None and should_include_data:
+            if result_content is not None and should_include_result_data:
                 _set_span_data_attribute(
                     span,
                     SPANDATA.MCP_TOOL_RESULT_CONTENT,
@@ -523,12 +517,26 @@ async def _prompt_handler_wrapper(
         original_kwargs: Original keyword arguments passed to the handler
         self: Optional instance for bound methods
     """
-    if original_kwargs is None:
-        original_kwargs = {}
+    client = sentry_sdk.get_client()
 
-    handler_name, arguments = _extract_handler_data_from_args(
-        "prompt", original_args, original_kwargs
-    )
+    original_kwargs = original_kwargs or {}
+
+    if original_args:
+        handler_name = original_args[0]
+    elif original_kwargs.get("name"):
+        handler_name = original_kwargs["name"]
+
+    arguments = {}
+    if len(original_args) > 1 and original_args[1] is not None:
+        arguments = original_args[1]
+    elif original_kwargs.get("arguments"):
+        arguments = original_kwargs["arguments"]
+
+    if has_data_collection_enabled(client.options):
+        if not client.options["data_collection"]["gen_ai"]["inputs"]:
+            # Arguments can contain sensitive data and shouldn't be added to the span
+            # if the user has opted out via this config.
+            arguments = {}
 
     ctx = None
     try:
@@ -539,7 +547,7 @@ async def _prompt_handler_wrapper(
     # Get request ID, session ID, and transport from context
     request_id, session_id, mcp_transport = _get_request_context_data(ctx=ctx)
 
-    span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
+    span_streaming = has_span_streaming_enabled(client.options)
 
     # Start span and execute
     with _active_http_scopes(ctx=ctx):
@@ -582,21 +590,25 @@ async def _prompt_handler_wrapper(
                     result = await result
 
             except Exception as e:
-                sentry_sdk.capture_exception(e)
+                with capture_internal_exceptions():
+                    _capture_exception(e)
                 raise
 
             if result is None:
                 return result
 
             # Get integration to check PII settings
-            integration = sentry_sdk.get_client().get_integration(MCPIntegration)
+            integration = client.get_integration(MCPIntegration)
             if integration is None:
                 return result
 
             # Check if we should include sensitive data
-            should_include_data = (
-                should_send_default_pii() and integration.include_prompts
-            )
+            should_include_result_data = False
+            if has_data_collection_enabled(client.options):
+                if client.options["data_collection"]["gen_ai"]["inputs"]:
+                    should_include_result_data = True
+            elif should_send_default_pii() and integration.include_prompts:
+                should_include_result_data = True
 
             # For prompts, count messages and set role/content only for single-message prompts
             try:
@@ -619,7 +631,7 @@ async def _prompt_handler_wrapper(
                     )
 
                 # Only set role and content for single-message prompts if PII is allowed
-                if message_count == 1 and should_include_data and messages:
+                if message_count == 1 and should_include_result_data and messages:
                     first_message = messages[0]
                     # Extract role
                     role = None
@@ -675,15 +687,24 @@ async def _instrument_v2_prompt_get(
     if ctx.params is None or ctx.params.get("name") is None:
         return await call_next(ctx)
 
+    client = sentry_sdk.get_client()
     handler_name = ctx.params["name"]
+
     arguments = ctx.params.get("arguments")
+
     if arguments is None:
         arguments = {}
+
+    if has_data_collection_enabled(client.options):
+        if not client.options["data_collection"]["gen_ai"]["inputs"]:
+            # Arguments can contain sensitive data and shouldn't be added to the span
+            # if the user has opted out via this config.
+            arguments = {}
 
     # Get request ID, session ID, and transport from context
     request_id, session_id, mcp_transport = _get_request_context_data(ctx=ctx)
 
-    span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
+    span_streaming = has_span_streaming_enabled(client.options)
 
     # Start span and execute
     with _active_http_scopes(ctx=ctx):
@@ -719,21 +740,25 @@ async def _instrument_v2_prompt_get(
             try:
                 result = await call_next(ctx)
             except Exception as e:
-                sentry_sdk.capture_exception(e)
+                with capture_internal_exceptions():
+                    _capture_exception(e)
                 raise
 
             if not isinstance(result, dict):
                 return result
 
             # Get integration to check PII settings
-            integration = sentry_sdk.get_client().get_integration(MCPIntegration)
+            integration = client.get_integration(MCPIntegration)
             if integration is None:
                 return result
 
             # Check if we should include sensitive data
-            should_include_data = (
-                should_send_default_pii() and integration.include_prompts
-            )
+            should_include_result_data = False
+            if has_data_collection_enabled(client.options):
+                if client.options["data_collection"]["gen_ai"]["inputs"]:
+                    should_include_result_data = True
+            elif should_send_default_pii() and integration.include_prompts:
+                should_include_result_data = True
 
             # For prompts, count messages and set role/content only for single-message prompts
             try:
@@ -751,7 +776,7 @@ async def _instrument_v2_prompt_get(
                     )
 
                 # Only set role and content for single-message prompts if PII is allowed
-                if message_count == 1 and should_include_data and messages:
+                if message_count == 1 and should_include_result_data and messages:
                     first_message = messages[0]
                     # Extract role
                     role = None
@@ -799,12 +824,15 @@ async def _resource_handler_wrapper(
         original_kwargs: Original keyword arguments passed to the handler
         self: Optional instance for bound methods
     """
-    if original_kwargs is None:
-        original_kwargs = {}
+    original_kwargs = original_kwargs or {}
 
-    handler_name, arguments = _extract_handler_data_from_args(
-        "resource", original_args, original_kwargs
-    )
+    handler_name = "unknown"
+    if original_args:
+        handler_name = str(original_args[0])
+    elif original_kwargs.get("uri"):
+        handler_name = str(original_kwargs["uri"])
+
+    arguments: "dict[str, Any]" = {}
 
     ctx = None
     try:
@@ -871,7 +899,8 @@ async def _resource_handler_wrapper(
                     result = await result
 
             except Exception as e:
-                sentry_sdk.capture_exception(e)
+                with capture_internal_exceptions():
+                    _capture_exception(e)
                 raise
 
     return result
@@ -936,7 +965,8 @@ async def _instrument_v2_resource_read(
                 result = await call_next(ctx)
 
             except Exception as e:
-                sentry_sdk.capture_exception(e)
+                with capture_internal_exceptions():
+                    _capture_exception(e)
                 raise
 
     return result

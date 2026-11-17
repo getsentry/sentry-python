@@ -1,3 +1,5 @@
+import pytest
+
 import sentry_sdk
 
 
@@ -21,7 +23,7 @@ def test_top_level_api(sentry_init, capture_items):
     sentry_sdk.remove_attribute("nonexistent")
 
     sentry_sdk.metrics.count("test", 1)
-    sentry_sdk.get_client().flush()
+    sentry_sdk.flush()
 
     metrics = [item.payload for item in items]
     (metric,) = metrics
@@ -56,7 +58,7 @@ def test_scope_precedence(sentry_init, capture_items):
     current_scope.set_attribute("overwritten.attribute", "current")
 
     sentry_sdk.metrics.count("test", 1)
-    sentry_sdk.get_client().flush()
+    sentry_sdk.flush()
 
     metrics = [item.payload for item in items]
     (metric,) = metrics
@@ -99,7 +101,7 @@ def test_telemetry_precedence(sentry_init, capture_items):
         },
     )
 
-    sentry_sdk.get_client().flush()
+    sentry_sdk.flush()
 
     metrics = [item.payload for item in items]
     (metric,) = metrics
@@ -122,7 +124,7 @@ def test_attribute_out_of_scope(sentry_init, capture_items):
 
     sentry_sdk.metrics.count("test", 1)
 
-    sentry_sdk.get_client().flush()
+    sentry_sdk.flush()
 
     metrics = [item.payload for item in items]
     (metric,) = metrics
@@ -141,7 +143,7 @@ def test_remove_attribute(sentry_init, capture_items):
 
         sentry_sdk.metrics.count("test", 1)
 
-    sentry_sdk.get_client().flush()
+    sentry_sdk.flush()
 
     metrics = [item.payload for item in items]
     (metric,) = metrics
@@ -177,7 +179,7 @@ def test_scope_attributes_preserialized(sentry_init, capture_items):
 
         sentry_sdk.metrics.count("test", 1)
 
-    sentry_sdk.get_client().flush()
+    sentry_sdk.flush()
 
     metrics = [item.payload for item in items]
     (metric,) = metrics
@@ -208,7 +210,7 @@ def test_user_attributes(sentry_init, capture_items):
     with sentry_sdk.traces.start_span(name="login"):
         sentry_sdk.metrics.count("test", 1)
 
-    sentry_sdk.get_client().flush()
+    sentry_sdk.flush()
 
     metric, span = [item.payload for item in items]
 
@@ -221,3 +223,32 @@ def test_user_attributes(sentry_init, capture_items):
     assert span["attributes"]["user.name"] == "username"
     assert span["attributes"]["user.email"] == "username@example.com"
     assert span["attributes"]["user.ip_address"] == "127.0.0.1"
+
+
+@pytest.mark.parametrize(
+    "bad_value, expected",
+    [
+        (float("inf"), "inf"),
+        (float("-inf"), "-inf"),
+        (float("nan"), "nan"),
+    ],
+)
+def test_unserializable_attributes(sentry_init, capture_items, bad_value, expected):
+    sentry_init(
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+    )
+
+    items = capture_items("span")
+
+    with sentry_sdk.traces.start_span(name="login", attributes={"bad_attr": bad_value}):
+        pass
+
+    sentry_sdk.flush()
+
+    assert items
+
+    (span,) = [item.payload for item in items]
+
+    assert "bad_attr" in span["attributes"]
+    assert span["attributes"]["bad_attr"] == expected

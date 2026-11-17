@@ -12,6 +12,7 @@ from importlib import import_module
 from typing import TYPE_CHECKING, Dict, List, cast, overload
 
 from sentry_sdk._compat import check_uwsgi_thread_support
+from sentry_sdk._log_batcher import LogBatcher
 from sentry_sdk._metrics_batcher import MetricsBatcher
 from sentry_sdk._span_batcher import SpanBatcher
 from sentry_sdk.consts import (
@@ -41,7 +42,8 @@ from sentry_sdk.scrubber import EventScrubber
 from sentry_sdk.serializer import serialize
 from sentry_sdk.sessions import SessionFlusher
 from sentry_sdk.traces import SpanStatus, StreamedSpan
-from sentry_sdk.tracing import trace
+from sentry_sdk.traces import trace as streaming_trace
+from sentry_sdk.tracing import trace as legacy_trace
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.transport import (
     AsyncHttpTransport,
@@ -54,6 +56,7 @@ from sentry_sdk.utils import (
     capture_internal_exceptions,
     current_stacktrace,
     datetime_from_isoformat,
+    deprecation_warning,
     env_to_bool,
     format_timestamp,
     get_before_send_log,
@@ -64,8 +67,6 @@ from sentry_sdk.utils import (
     get_type_name,
     handle_in_app,
     has_data_collection_enabled,
-    has_logs_enabled,
-    has_metrics_enabled,
     logger,
 )
 
@@ -350,6 +351,13 @@ def _get_options(*args: "Optional[str]", **kwargs: "Any") -> "Dict[str, Any]":
     if rv["enable_tracing"] is True and rv["traces_sample_rate"] is None:
         rv["traces_sample_rate"] = 1.0
 
+    if rv["send_default_pii"] is not None:
+        deprecation_warning(
+            "The send_default_pii option is deprecated. Use data_collection "
+            "instead. "
+            "See https://docs.sentry.io/platforms/python/data-management/data-collected/"
+        )
+
     rv["data_collection"] = _resolve_data_collection(rv)
 
     # Do not add the event scrubber if data collection is enabled as it can remove data that's
@@ -402,6 +410,21 @@ def _get_options(*args: "Optional[str]", **kwargs: "Any") -> "Dict[str, Any]":
             "The `before_send_span` parameter only works when `trace_lifecycle` is set to `stream`.",
             stacklevel=2,
         )
+
+    if has_profiling_enabled(rv):
+        warnings.warn(
+            "Transaction-based profiling is deprecated and will be removed in the next major version of the SDK. "
+            "Please use continuous profiling instead: https://docs.sentry.io/platforms/python/profiling/",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        if has_span_streaming_enabled(rv):
+            warnings.warn(
+                "Transaction-based profiling has no effect when `trace_lifecycle` is set to `stream`. "
+                "Please use continuous profiling instead: https://docs.sentry.io/platforms/python/profiling/",
+                UserWarning,
+                stacklevel=2,
+            )
 
     return rv
 
@@ -516,7 +539,7 @@ class _Client(BaseClient):
     the client options as keyword arguments and optionally the DSN as first
     argument.
 
-    Alias of :py:class:`sentry_sdk.Client`. (Was created for better intelisense support)
+    Alias of :py:class:`sentry_sdk.Client`. (Was created for better IntelliSense support)
     """
 
     def __init__(self, *args: "Any", **kwargs: "Any") -> None:
@@ -534,8 +557,14 @@ class _Client(BaseClient):
         self, functions_to_trace: "Sequence[Dict[str, str]]"
     ) -> None:
         """
-        Instruments the functions given in the list `functions_to_trace` with the `@sentry_sdk.tracing.trace` decorator.
+        Instruments the functions given in the list `functions_to_trace` with a trace decorator.
         """
+        trace = (
+            streaming_trace
+            if has_span_streaming_enabled(self.options)
+            else legacy_trace
+        )
+
         for function in functions_to_trace:
             class_name = None
             function_qualname = function["qualified_name"]
@@ -624,7 +653,7 @@ class _Client(BaseClient):
 
             # Setup Spotlight before creating batchers so _capture_envelope can use it.
             # setup_spotlight handles all config/env var resolution per the SDK spec.
-            from sentry_sdk.spotlight import setup_spotlight
+            from sentry_sdk.spotlight import setup_spotlight  # noqa: PLC0415
 
             self.spotlight = setup_spotlight(self.options)
             if self.spotlight is not None and not self.options["dsn"]:
@@ -649,22 +678,20 @@ class _Client(BaseClient):
 
             self.session_flusher = SessionFlusher(capture_func=_capture_envelope)
 
-            self.log_batcher = None
+            self.log_batcher = LogBatcher(
+                capture_func=_capture_envelope,
+                record_lost_func=_record_lost_event,
+            )
 
-            if has_logs_enabled(self.options):
-                from sentry_sdk._log_batcher import LogBatcher
-
-                self.log_batcher = LogBatcher(
-                    capture_func=_capture_envelope,
-                    record_lost_func=_record_lost_event,
+            if self.options.get("enable_metrics", True) is False:
+                logger.warning(
+                    "The enable_metrics option has no effect and will be removed in the next major."
                 )
 
-            self.metrics_batcher = None
-            if has_metrics_enabled(self.options):
-                self.metrics_batcher = MetricsBatcher(
-                    capture_func=_capture_envelope,
-                    record_lost_func=_record_lost_event,
-                )
+            self.metrics_batcher = MetricsBatcher(
+                capture_func=_capture_envelope,
+                record_lost_func=_record_lost_event,
+            )
 
             self.span_batcher = None
             if has_span_streaming_enabled(self.options):
@@ -779,6 +806,7 @@ class _Client(BaseClient):
             event["timestamp"] = datetime.now(timezone.utc)
 
         is_transaction = event.get("type") == "transaction"
+        is_checkin = event.get("type") == "check_in"
 
         if scope is not None:
             spans_before = len(cast(List[Dict[str, object]], event.get("spans", [])))
@@ -833,6 +861,7 @@ class _Client(BaseClient):
 
         if (
             not is_transaction
+            and not is_checkin
             and self.options["attach_stacktrace"]
             and "exception" not in event
             and "stacktrace" not in event
@@ -924,14 +953,22 @@ class _Client(BaseClient):
             and event.get("type") != "transaction"
         ):
             new_event = None
+            exception_raised_in_before_send = False
             with capture_internal_exceptions():
-                new_event = before_send(event, hint or {})
+                try:
+                    new_event = before_send(event, hint or {})
+                except Exception:
+                    exception_raised_in_before_send = True
+                    raise
             if new_event is None:
                 logger.info("before send dropped event")
                 if self.transport:
-                    self.transport.record_lost_event(
-                        "before_send", data_category="error"
+                    reason = (
+                        "callback_error"
+                        if exception_raised_in_before_send
+                        else "before_send"
                     )
+                    self.transport.record_lost_event(reason, data_category="error")
 
                 # If this is an exception, reset the DedupeIntegration. It still
                 # remembers the dropped exception as the last exception, meaning
@@ -949,17 +986,29 @@ class _Client(BaseClient):
             and event.get("type") == "transaction"
         ):
             new_event = None
+            exception_raised_in_before_send_transaction = False
             spans_before = len(cast(List[Dict[str, object]], event.get("spans", [])))
+
             with capture_internal_exceptions():
-                new_event = before_send_transaction(event, hint or {})
+                try:
+                    new_event = before_send_transaction(event, hint or {})
+                except Exception:
+                    exception_raised_in_before_send_transaction = True
+                    raise
+
             if new_event is None:
                 logger.info("before send transaction dropped event")
                 if self.transport:
-                    self.transport.record_lost_event(
-                        reason="before_send", data_category="transaction"
+                    reason = (
+                        "callback_error"
+                        if exception_raised_in_before_send_transaction
+                        else "before_send"
                     )
                     self.transport.record_lost_event(
-                        reason="before_send",
+                        reason=reason, data_category="transaction"
+                    )
+                    self.transport.record_lost_event(
+                        reason=reason,
                         data_category="span",
                         quantity=spans_before + 1,  # +1 for the transaction itself
                     )
@@ -1219,6 +1268,27 @@ class _Client(BaseClient):
 
         return return_value
 
+    def _record_lost_telemetry(
+        self, reason: str, ty: str, telemetry: "Union[Log, Metric]"
+    ) -> None:
+        if self.transport is None:
+            return
+
+        batcher_cls: "Union[type[LogBatcher], type[MetricsBatcher]]"
+        if ty == "log":
+            data_category: "EventDataCategory" = "log_item"
+            batcher_cls = LogBatcher
+        else:
+            data_category = "trace_metric"
+            batcher_cls = MetricsBatcher
+
+        # Construct envelope item without sending it to report lost bytes
+        item = None
+        with capture_internal_exceptions():
+            item = batcher_cls._to_envelope_item([telemetry])  # type: ignore[list-item]
+
+        self.transport.record_lost_event(reason, data_category=data_category, item=item)
+
     def _capture_telemetry(
         self,
         telemetry: "Optional[Union[Log, Metric, StreamedSpan]]",
@@ -1260,14 +1330,11 @@ class _Client(BaseClient):
                     raise
 
             if ty in ("log", "metric"):
-                # We are ok with dropping metrics and logs when an exception is raised
-                # because we allow users to drop them in their respect before_send_*
-                # functions.
                 if exception_raised_in_before_send_func:
+                    self._record_lost_telemetry("callback_error", ty, telemetry)  # type: ignore[arg-type]
                     return
-                # Logs and metrics can be dropped in their respective
-                # before_send, so if we get None, don't queue them for sending.
                 if serialized is None:
+                    self._record_lost_telemetry("before_send", ty, telemetry)  # type: ignore[arg-type]
                     return
 
             elif ty == "span" and isinstance(telemetry, StreamedSpan):
@@ -1492,7 +1559,7 @@ if TYPE_CHECKING:
     # Use `ClientConstructor` to define the argument types of `init` and
     # `Dict[str, Any]` to tell static analyzers about the return type.
 
-    class get_options(ClientConstructor, Dict[str, Any]):  # noqa: N801
+    class get_options(ClientConstructor, Dict[str, Any]):
         pass
 
     class Client(ClientConstructor, _Client):

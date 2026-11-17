@@ -114,7 +114,7 @@ def _get_model(
 
         return result
 
-    model.get_response = wrapped_get_response
+    model.get_response = wrapped_get_response  # type: ignore[method-assign]
 
     # Also wrap stream_response for streaming support
     if hasattr(model, "stream_response"):
@@ -177,6 +177,6 @@ def _get_model(
                         span, streaming_response, response_model, agent
                     )
 
-        model.stream_response = wrapped_stream_response
+        model.stream_response = wrapped_stream_response  # type: ignore[method-assign]
 
     return model

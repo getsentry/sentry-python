@@ -201,7 +201,7 @@ def test_dsc_continuation_of_trace(sentry_init, capture_envelopes):
         dsn="https://mysecret@o1234.ingest.sentry.io/12312012",
         release="myapp@0.0.1",
         environment="canary",
-        traces_sample_rate=1.0,
+        traces_sample_rate=0.5,
         transport=TestTransportWithOptions,
     )
     envelopes = capture_envelopes()
@@ -244,7 +244,7 @@ def test_dsc_continuation_of_trace(sentry_init, capture_envelopes):
 
     assert "sample_rate" in envelope_trace_header
     assert type(envelope_trace_header["sample_rate"]) == str
-    assert envelope_trace_header["sample_rate"] == "1.0"
+    assert envelope_trace_header["sample_rate"] == "0.01337"
 
     assert "sampled" in envelope_trace_header
     assert type(envelope_trace_header["sampled"]) == str
@@ -272,7 +272,7 @@ def test_dsc_continuation_of_trace_span_streaming(sentry_init, capture_envelopes
         dsn="https://mysecret@o1234.ingest.sentry.io/12312012",
         release="myapp@0.0.1",
         environment="canary",
-        traces_sample_rate=1.0,
+        traces_sample_rate=0.5,
         trace_lifecycle="stream",
         transport=TestTransportWithOptions,
     )
@@ -318,7 +318,7 @@ def test_dsc_continuation_of_trace_span_streaming(sentry_init, capture_envelopes
 
     assert "sample_rate" in envelope_trace_header
     assert type(envelope_trace_header["sample_rate"]) == str
-    assert envelope_trace_header["sample_rate"] == "1.0"
+    assert envelope_trace_header["sample_rate"] == "0.01337"
 
     assert "sampled" in envelope_trace_header
     assert type(envelope_trace_header["sampled"]) == str

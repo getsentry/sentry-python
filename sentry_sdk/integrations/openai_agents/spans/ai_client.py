@@ -6,6 +6,7 @@ from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
+from sentry_sdk.utils import has_data_collection_enabled
 
 try:
     from agents import (
@@ -24,23 +25,23 @@ except ImportError:
 try:
     from agents import ApplyPatchTool, ShellTool
 except ImportError:
-    ShellTool = None
-    ApplyPatchTool = None
+    ShellTool = None  # type: ignore[assignment,misc]
+    ApplyPatchTool = None  # type: ignore[assignment,misc]
 
 try:
     from agents import ToolSearchTool
 except ImportError:
-    ToolSearchTool = None
+    ToolSearchTool = None  # type: ignore[assignment,misc]
 
 try:
     from agents import CustomTool
 except ImportError:
-    CustomTool = None
+    CustomTool = None  # type: ignore[assignment,misc]
 
 try:
     from agents import ProgrammaticToolCallingTool
 except ImportError:
-    ProgrammaticToolCallingTool = None
+    ProgrammaticToolCallingTool = None  # type: ignore[assignment,misc]
 
 
 from ..consts import SPAN_ORIGIN
@@ -200,14 +201,15 @@ def ai_client_span(
     agent: "Agent", get_response_kwargs: "dict[str, Any]"
 ) -> "Union[sentry_sdk.tracing.Span, StreamedSpan]":
     # TODO-anton: implement other types of operations. Now "chat" is hardcoded.
-    # Get model name from agent.model or fall back to request model (for when agent.model is None/default)
     model_name = None
     if agent.model:
         model_name = agent.model.model if hasattr(agent.model, "model") else agent.model
     elif hasattr(agent, "_sentry_request_model"):
         model_name = agent._sentry_request_model
 
-    span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
+    client_options = sentry_sdk.get_client().options
+
+    span_streaming = has_span_streaming_enabled(client_options)
     if span_streaming:
         span = sentry_sdk.traces.start_span(
             name=f"chat {model_name}",
@@ -232,10 +234,19 @@ def ai_client_span(
 
     _set_agent_data(span, agent)
 
-    set_on_span(
-        SPANDATA.GEN_AI_TOOL_DEFINITIONS,
-        json.dumps(_transform_tool_definitions(agent.tools)),
-    )
+    if has_data_collection_enabled(client_options):
+        if client_options["data_collection"]["gen_ai"]["inputs"]:
+            set_on_span(
+                SPANDATA.GEN_AI_TOOL_DEFINITIONS,
+                json.dumps(_transform_tool_definitions(agent.tools)),
+            )
+    else:
+        # This is set unconditionally prior to data collection being introduced.
+        # Remove this block once data collection is fully rolled out
+        set_on_span(
+            SPANDATA.GEN_AI_TOOL_DEFINITIONS,
+            json.dumps(_transform_tool_definitions(agent.tools)),
+        )
 
     _set_input_data(span, get_response_kwargs)
 

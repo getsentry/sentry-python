@@ -58,8 +58,6 @@ from sentry_sdk.utils import (
     exc_info_from_error,
     format_attribute,
     has_data_collection_enabled,
-    has_logs_enabled,
-    has_metrics_enabled,
     logger,
 )
 
@@ -232,6 +230,7 @@ class Scope:
         "_error_processors",
         "_should_capture",
         "_span",
+        "_server_segment_span",
         "_session",
         "_attachments",
         "_force_auto_session_tracking",
@@ -258,6 +257,8 @@ class Scope:
         self._propagation_context: "Optional[PropagationContext]" = None
         self._n_breadcrumbs_truncated: int = 0
         self._gen_ai_original_message_count: "Dict[str, int]" = {}
+
+        self._server_segment_span: "Optional[StreamedSpan]" = None
 
         self.client: "sentry_sdk.client.BaseClient" = NonRecordingClient()
 
@@ -298,6 +299,7 @@ class Scope:
 
         rv._should_capture = self._should_capture
         rv._span = self._span
+        rv._server_segment_span = self._server_segment_span
         rv._session = self._session
         rv._force_auto_session_tracking = self._force_auto_session_tracking
         rv._attachments = self._attachments.copy()
@@ -376,8 +378,6 @@ class Scope:
         return _global_scope
 
     def set_global_attributes(self) -> None:
-        from sentry_sdk.client import SDK_INFO
-
         self.set_attribute(SPANDATA.SENTRY_SDK_NAME, SDK_INFO["name"])
         self.set_attribute(SPANDATA.SENTRY_SDK_VERSION, SDK_INFO["version"])
 
@@ -861,10 +861,7 @@ class Scope:
         """Set the transaction name and optionally the transaction source."""
         self._transaction = name
         if self._span:
-            if isinstance(self._span, NoOpStreamedSpan):
-                return
-
-            elif isinstance(self._span, StreamedSpan):
+            if isinstance(self._span, StreamedSpan):
                 self._span._segment.name = name
                 if source:
                     self._span._segment.set_attribute(
@@ -925,8 +922,20 @@ class Scope:
 
         # Also set _transaction and _transaction_info in streaming mode as this
         # is used for populating events and linking them to segments
-        if type(span) is StreamedSpan and span._is_segment():
+        if not isinstance(span, StreamedSpan) or not span._is_segment():
+            return
+
+        if type(span) is StreamedSpan:
             self._transaction = span.name
+            if span._attributes.get("sentry.segment.name.source"):
+                self._transaction_info["source"] = str(
+                    span._attributes["sentry.segment.name.source"]
+                )
+            return
+
+        if type(span) is NoOpStreamedSpan:
+            if span._name is not None:
+                self._transaction = span.name
             if span._attributes.get("sentry.segment.name.source"):
                 self._transaction_info["source"] = str(
                     span._attributes["sentry.segment.name.source"]
@@ -1090,10 +1099,10 @@ class Scope:
         if crumb.get("type") is None:
             crumb["type"] = "default"
 
+        new_crumb = crumb
         if before_breadcrumb is not None:
-            new_crumb = before_breadcrumb(crumb, hint)
-        else:
-            new_crumb = crumb
+            with capture_internal_exceptions():
+                new_crumb = before_breadcrumb(crumb, hint)
 
         if new_crumb is not None:
             self._breadcrumbs.append(new_crumb)
@@ -1177,10 +1186,17 @@ class Scope:
             "parent_sampled": transaction.parent_sampled,
         }
         sampling_context.update(custom_sampling_context)
+
+        keep_incoming_sample_rate = (
+            transaction.sampled is None
+            and transaction.parent_sampled is not None
+            and not callable(client.options.get("traces_sampler"))
+        )
+
         transaction._set_initial_sampling_decision(sampling_context=sampling_context)
 
         # update the sample rate in the dsc
-        if transaction.sample_rate is not None:
+        if transaction.sample_rate is not None and not keep_incoming_sample_rate:
             propagation_context = self.get_active_propagation_context()
             baggage = propagation_context.baggage
 
@@ -1309,6 +1325,8 @@ class Scope:
 
             if is_ignored_span(name, attributes):
                 return NoOpStreamedSpan(
+                    name=name,
+                    attributes=attributes,
                     scope=self,
                     segment=None,
                     trace_id=propagation_context.trace_id,
@@ -1324,11 +1342,18 @@ class Scope:
                 self,
             )
 
-            if sample_rate is not None:
+            keep_incoming_sample_rate = (
+                propagation_context.parent_sampled is not None
+                and not callable(self.get_client().options.get("traces_sampler"))
+            )
+
+            if sample_rate is not None and not keep_incoming_sample_rate:
                 self._update_sample_rate(sample_rate)
 
             if sampled is False or sampled is None:
                 return NoOpStreamedSpan(
+                    name=name,
+                    attributes=attributes,
                     scope=self,
                     segment=None,
                     trace_id=propagation_context.trace_id,
@@ -1359,6 +1384,8 @@ class Scope:
         with new_scope():
             if is_ignored_span(name, attributes):
                 return NoOpStreamedSpan(
+                    name=name,
+                    attributes=attributes,
                     segment=parent_span._segment,
                     trace_id=parent_span.trace_id,
                     parent_span_id=parent_span.span_id,
@@ -1368,6 +1395,8 @@ class Scope:
 
             if isinstance(parent_span, NoOpStreamedSpan):
                 return NoOpStreamedSpan(
+                    name=name,
+                    attributes=attributes,
                     segment=parent_span._segment,
                     trace_id=parent_span.trace_id,
                     parent_span_id=parent_span.span_id,
@@ -1470,8 +1499,6 @@ class Scope:
             return
 
         client = self.get_client()
-        if not has_logs_enabled(client.options):
-            return
 
         merged_scope = self._merge_scopes()
 
@@ -1488,8 +1515,6 @@ class Scope:
             return
 
         client = self.get_client()
-        if not has_metrics_enabled(client.options):
-            return
 
         merged_scope = self._merge_scopes()
 
@@ -1813,7 +1838,9 @@ class Scope:
             )
 
             for error_processor in error_processors:
-                new_event = error_processor(event, exc_info)
+                new_event = event
+                with capture_internal_exceptions():
+                    new_event = error_processor(event, exc_info)
                 if new_event is None:
                     return self._drop(error_processor, "error processor")
 
@@ -2224,7 +2251,7 @@ def should_send_default_pii() -> bool:
 
 
 # Circular imports
-from sentry_sdk.client import NonRecordingClient
+from sentry_sdk.client import SDK_INFO, NonRecordingClient
 
 if TYPE_CHECKING:
     import sentry_sdk.client

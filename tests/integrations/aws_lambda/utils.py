@@ -27,7 +27,17 @@ LAMBDA_FUNCTION_WITH_EMBEDDED_SDK_DIR = (
 LAMBDA_FUNCTION_TIMEOUT = 10
 SAM_PORT = 3001
 
+# functions whose handler is a path instead of `index.handler`.
+INITIAL_HANDLERS = {
+    "PathHandler": "app/index.handler",
+    "AbsolutePathHandler": "/var/task/app/index.handler",
+}
+
 PYTHON_VERSION = f"python{sys.version_info.major}.{sys.version_info.minor}"
+
+# Match the host CPU architecture so local runs on ARM machines (e.g. macOS)
+# don't run the Lambda containers under slow x86_64 emulation.
+ARCHITECTURE = "arm64" if platform.machine() in ("arm64", "aarch64") else "x86_64"
 
 
 def get_host_ip():
@@ -84,7 +94,7 @@ class LocalLambdaStack(Stack):
             },
         )
 
-        dsn = f"http://123@{get_host_ip()}:9999/0"  # noqa: E231
+        dsn = f"http://123@{get_host_ip()}:9999/0"
         print("[LocalLambdaStack] Using Sentry DSN: %s" % dsn)
 
         print(
@@ -105,6 +115,7 @@ class LocalLambdaStack(Stack):
                     "CodeUri": os.path.join(LAMBDA_FUNCTION_DIR, lambda_dir),
                     "Handler": "sentry_sdk.integrations.init_serverless_sdk.sentry_lambda_handler",
                     "Runtime": PYTHON_VERSION,
+                    "Architectures": [ARCHITECTURE],
                     "Timeout": LAMBDA_FUNCTION_TIMEOUT,
                     "Layers": [
                         {"Ref": self.sentry_layer.logical_id}
@@ -112,7 +123,9 @@ class LocalLambdaStack(Stack):
                     "Environment": {
                         "Variables": {
                             "SENTRY_DSN": dsn,
-                            "SENTRY_INITIAL_HANDLER": "index.handler",
+                            "SENTRY_INITIAL_HANDLER": INITIAL_HANDLERS.get(
+                                lambda_dir, "index.handler"
+                            ),
                             "SENTRY_TRACES_SAMPLE_RATE": "1.0",
                         }
                     },
@@ -172,6 +185,7 @@ class LocalLambdaStack(Stack):
                     "Handler": "index.handler",
                     "Runtime": PYTHON_VERSION,
                     "Timeout": LAMBDA_FUNCTION_TIMEOUT,
+                    "Architectures": [ARCHITECTURE],
                     "Environment": {
                         "Variables": {
                             "SENTRY_DSN": dsn,
@@ -202,7 +216,7 @@ class LocalLambdaStack(Stack):
 
             try:
                 # Try to connect to SAM
-                response = requests.get(f"http://127.0.0.1:{port}/")  # noqa: E231
+                response = requests.get(f"http://127.0.0.1:{port}/")
                 if response.status_code == 200 or response.status_code == 404:
                     return
 

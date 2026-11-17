@@ -89,6 +89,10 @@ class RequestExtractor:
         content_length = self.content_length()
         request_info = event.get("request", {})
 
+        # Prior to data collection being implemented we unconditionally attached
+        # the request body, which is why we default to True here.
+        attach_request_body = True
+
         if has_data_collection_enabled(client.options):
             cookies = _apply_key_value_collection_filtering(
                 items=dict(self.cookies()),
@@ -96,31 +100,36 @@ class RequestExtractor:
             )
             if cookies:
                 request_info["cookies"] = cookies
+
+            attach_request_body = (
+                "incoming_request" in client.options["data_collection"]["http_bodies"]
+            )
         elif should_send_default_pii():
             request_info["cookies"] = dict(self.cookies())
 
-        if not request_body_within_bounds(client, content_length):
-            data = AnnotatedValue.removed_because_over_size_limit()
-        else:
-            # First read the raw body data
-            # It is important to read this first because if it is Django
-            # it will cache the body and then we can read the cached version
-            # again in parsed_body() (or json() or wherever).
-            raw_data = None
-            try:
-                raw_data = self.raw_data()
-            except _RAW_DATA_EXCEPTIONS:
-                # If DjangoRestFramework is used it already read the body for us
-                # so reading it here will fail. We can ignore this.
-                pass
-
-            parsed_body = self.parsed_body()
-            if parsed_body is not None:
-                data = parsed_body
-            elif raw_data:
-                data = AnnotatedValue.removed_because_raw_data()
+        if attach_request_body:
+            if not request_body_within_bounds(client, content_length):
+                data = AnnotatedValue.removed_because_over_size_limit()
             else:
-                data = None
+                # First read the raw body data
+                # It is important to read this first because if it is Django
+                # it will cache the body and then we can read the cached version
+                # again in parsed_body() (or json() or wherever).
+                raw_data = None
+                try:
+                    raw_data = self.raw_data()
+                except _RAW_DATA_EXCEPTIONS:
+                    # If DjangoRestFramework is used it already read the body for us
+                    # so reading it here will fail. We can ignore this.
+                    pass
+
+                parsed_body = self.parsed_body()
+                if parsed_body is not None:
+                    data = parsed_body
+                elif raw_data:
+                    data = AnnotatedValue.removed_because_raw_data()
+                else:
+                    data = None
 
         if data is not None:
             request_info["data"] = data

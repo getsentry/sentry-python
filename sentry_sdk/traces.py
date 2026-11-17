@@ -1,10 +1,21 @@
 """
-EXPERIMENTAL. Do not use in production.
+The API in this file is only meant to be used in span streaming mode. It should
+not be mixed with the legacy tracing API (sentry_sdk.start_transaction,
+sentry_sdk.start_span, etc.).
 
-The API in this file is only meant to be used in span streaming mode.
+You can enable span streaming mode via:
 
-You can enable span streaming mode via
-sentry_sdk.init(trace_lifecycle="stream").
+```
+import sentry_sdk
+
+sentry_sdk.init(
+    trace_lifecycle="stream",
+)
+```
+
+See
+https://docs.sentry.io/platforms/python/tracing/streamed-spans/migration-guide/
+for how to migrate to span streaming.
 """
 
 import sys
@@ -21,7 +32,11 @@ from sentry_sdk.profiler.continuous_profiler import (
     try_autostart_continuous_profiler,
     try_profile_lifecycle_trace_start,
 )
-from sentry_sdk.tracing_utils import Baggage
+from sentry_sdk.tracing_utils import (
+    Baggage,
+    create_streaming_span_decorator,
+    has_span_streaming_enabled,
+)
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     format_attribute,
@@ -66,7 +81,7 @@ _VALID_SPAN_STATUSES = frozenset(e.value for e in SpanStatus)
 
 
 # The source of a segment name, see
-# https://getsentry.github.io/sentry-conventions/attributes/sentry/#sentry-segment-name-source
+# https://conventions.sentry.dev/attributes/sentry/#sentry-segment-name-source
 class SegmentNameSource(str, Enum):
     COMPONENT = "component"
     CUSTOM = "custom"
@@ -110,10 +125,7 @@ def start_span(
     active: bool = True,
 ) -> "StreamedSpan":
     """
-    Start a span.
-
-    EXPERIMENTAL. Use sentry_sdk.start_transaction() and sentry_sdk.start_span()
-    instead.
+    Start a span in streaming mode.
 
     The span's parent, unless provided explicitly via the `parent_span` argument,
     will be the current active span, if any. If there is none, this span will
@@ -166,8 +178,6 @@ def start_span(
     :return: The span that has been started.
     :rtype: StreamedSpan
     """
-    from sentry_sdk.tracing_utils import has_span_streaming_enabled
-
     client = sentry_sdk.get_client()
     if client.is_active() and not has_span_streaming_enabled(client.options):
         warnings.warn(
@@ -185,9 +195,7 @@ def start_span(
 
 def continue_trace(incoming: "dict[str, Any]") -> None:
     """
-    Continue a trace from headers or environment variables.
-
-    EXPERIMENTAL. Use sentry_sdk.continue_trace() instead.
+    Continue a trace from headers or environment variables in streaming mode.
 
     This function sets the propagation context on the scope. Any span started
     in the updated scope will belong under the trace extracted from the
@@ -211,9 +219,7 @@ def continue_trace(incoming: "dict[str, Any]") -> None:
 
 def new_trace() -> None:
     """
-    Resets the propagation context, forcing a new trace.
-
-    EXPERIMENTAL.
+    Resets the propagation context, forcing a new trace, in streaming mode.
 
     This function sets the propagation context on the scope. Any span started
     in the updated scope will start its own trace.
@@ -632,6 +638,8 @@ class NoOpStreamedSpan(StreamedSpan):
 
     def __init__(
         self,
+        name: "Optional[str]" = None,
+        attributes: "Optional[Attributes]" = None,
         segment: "Optional[StreamedSpan]" = None,
         trace_id: "Optional[str]" = None,
         parent_span_id: "Optional[str]" = None,
@@ -643,6 +651,13 @@ class NoOpStreamedSpan(StreamedSpan):
         sample_rand: "Optional[float]" = None,
         sample_rate: "Optional[float]" = None,
     ) -> None:
+        self._name = name  # type: ignore[assignment]
+        self._attributes = {}
+        if attributes is not None and "sentry.segment.name.source" in attributes:
+            self.set_attribute(
+                "sentry.segment.name.source", attributes["sentry.segment.name.source"]
+            )
+
         self._span_id: "Optional[str]" = None
 
         self._sampled = sampled
@@ -721,10 +736,17 @@ class NoOpStreamedSpan(StreamedSpan):
         return {}
 
     def set_attribute(self, key: str, value: "AttributeValue") -> None:
-        pass
+        if key != "sentry.segment.name.source":
+            return
+
+        super().set_attribute("sentry.segment.name.source", value)
 
     def set_attributes(self, attributes: "Attributes") -> None:
-        pass
+        for key, value in attributes.items():
+            if key != "sentry.segment.name.source":
+                continue
+
+            self.set_attribute("sentry.segment.name.source", value)
 
     def remove_attribute(self, key: str) -> None:
         pass
@@ -739,11 +761,11 @@ class NoOpStreamedSpan(StreamedSpan):
 
     @property
     def name(self) -> str:
-        return ""
+        return self._name or ""
 
     @name.setter
-    def name(self, value: str) -> None:
-        pass
+    def name(self, name: str) -> None:
+        self._name = name
 
     @property
     def active(self) -> bool:
@@ -795,9 +817,7 @@ def trace(
     active: bool = True,
 ) -> "Union[Callable[P, R], Callable[[Callable[P, R]], Callable[P, R]]]":
     """
-    Decorator to start a span around a function call.
-
-    EXPERIMENTAL. Use @sentry_sdk.trace instead.
+    Decorator to start a span around a function call in streaming mode.
 
     This decorator automatically creates a new span when the decorated function
     is called, and finishes the span when the function returns or raises an exception.
@@ -846,10 +866,6 @@ def trace(
             # Function implementation
             pass
     """
-    from sentry_sdk.tracing_utils import (
-        create_streaming_span_decorator,
-    )
-
     decorator = create_streaming_span_decorator(
         name=name,
         attributes=attributes,

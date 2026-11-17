@@ -23,7 +23,7 @@ TEST_SUITE_CONFIG = {
     "anthropic": {
         "package": "anthropic",
         "deps": {
-            "*": ["pytest-asyncio"],
+            "*": ["pytest-asyncio", "httpx"],
             "<0.50": ["httpx<0.28.0"],
             # tokenizers dropped Python 3.8 support, but didn't update package metadata.
             # https://github.com/huggingface/tokenizers/commit/f4c9fd7f402fc794df8f1b547a95ee5305f9fe62
@@ -59,6 +59,7 @@ TEST_SUITE_CONFIG = {
     "beam": {
         "package": "apache-beam",
         "python": ">=3.7",
+        "include": "!=2.78.0rc4",  # incomplete upload: no Linux wheels for py3.13+
         "num_versions": 2,
         "deps": {
             "*": ["dill"],
@@ -80,7 +81,7 @@ TEST_SUITE_CONFIG = {
     "celery": {
         "package": "celery",
         "deps": {
-            "*": ["newrelic<10.17.0", "redis", "pytest-forked"],
+            "*": ["newrelic<10.17.0", "redis", "pytest-forked", "pytest<9.2.0"],
             "py3.6": ["newrelic<8"],
             "py3.7": ["importlib-metadata<5.0"],
         },
@@ -98,7 +99,7 @@ TEST_SUITE_CONFIG = {
     },
     "cohere": {
         "package": "cohere",
-        "python": ">=3.9",
+        "python": ">=3.9,<3.15",
     },
     "django": {
         "package": "django",
@@ -108,6 +109,7 @@ TEST_SUITE_CONFIG = {
                 "djangorestframework",
                 "pytest-django",
                 "pytest-forked",
+                "pytest<9.2.0",
                 "Werkzeug",
                 "channels[daphne]",
                 "executing",
@@ -122,7 +124,6 @@ TEST_SUITE_CONFIG = {
             "<3.1": ["pytest-django<4.0", "six"],
             "py3.14,py3.14t": ["coverage==7.11.0"],
         },
-        "include": "<6.1b1",
     },
     "dramatiq": {
         "package": "dramatiq",
@@ -202,15 +203,21 @@ TEST_SUITE_CONFIG = {
                 "types-protobuf",
                 "pytest-asyncio",
                 "pytest-forked",
+                "pytest<9.2.0",
             ],
         },
         "python": ">=3.7",
     },
-    "httpx": {
+    "httpx0": {
         "package": "httpx",
+        "integration_name": "httpx",
         "deps": {
-            "*": ["anyio>=3,<5"],
+            # Old pytest-asyncio versions are not compatible with pytest>=9.2.0
+            "*": ["anyio>=3,<5", "pytest-asyncio", "pytest<9.2.0"],
             "<0.24": ["anyio<4"],
+            # pytest-cov>=7 requires pytest>=7, so installing the latest pytest-cov
+            # would override the pytest<7 pin these versions resolve to
+            "<0.21": ["pytest-cov<7"],
             ">=0.16,<0.17": ["pytest-httpx==0.10.0"],
             ">=0.17,<0.19": ["pytest-httpx==0.12.0"],
             ">=0.19,<0.21": ["pytest-httpx==0.14.0"],
@@ -229,7 +236,7 @@ TEST_SUITE_CONFIG = {
     "httpx2": {
         "package": "httpx2",
         "deps": {
-            "*": ["anyio>=3,<5", "httpx2-pytest==1.0.1"],
+            "*": ["anyio>=3,<5", "httpx2-pytest==1.0.1", "pytest-asyncio"],
         },
         "python": ">=3.10",
     },
@@ -244,16 +251,18 @@ TEST_SUITE_CONFIG = {
         "package": "huggingface_hub",
         "deps": {
             "*": ["responses", "pytest-httpx"],
+            ">=2": ["httpx2-pytest"],
         },
     },
     "langchain-base": {
         "package": "langchain",
         "integration_name": "langchain",
         "deps": {
-            "*": ["pytest-asyncio", "openai", "tiktoken", "langchain-openai"],
+            "*": ["pytest-asyncio", "openai", "tiktoken", "langchain-openai", "httpx"],
             "<=0.1": ["httpx<0.28.0"],
             ">=0.3": ["langchain-community"],
             ">=1.0": ["langchain-classic"],
+            ">=1.1.2": ["google-genai", "langchain-google-genai>=4"],
         },
         "python": {
             "<1.0": "<3.14",  # https://github.com/langchain-ai/langchain/issues/33449#issuecomment-3408876631
@@ -263,10 +272,11 @@ TEST_SUITE_CONFIG = {
         "package": "langchain",
         "integration_name": "langchain",
         "deps": {
-            "*": ["pytest-asyncio", "openai", "langchain-openai"],
+            "*": ["pytest-asyncio", "openai", "langchain-openai", "httpx"],
             "<=0.1": ["httpx<0.28.0"],
             ">=0.3": ["langchain-community"],
             ">=1.0": ["langchain-classic"],
+            ">=1.1.2": ["google-genai", "langchain-google-genai>=4"],
         },
         "python": {
             "<1.0": "<3.14",  # https://github.com/langchain-ai/langchain/issues/33449#issuecomment-3408876631
@@ -274,6 +284,7 @@ TEST_SUITE_CONFIG = {
     },
     "langgraph": {
         "package": "langgraph",
+        "python": "<3.15",
     },
     "launchdarkly": {
         "package": "launchdarkly-server-sdk",
@@ -282,8 +293,18 @@ TEST_SUITE_CONFIG = {
     "litellm": {
         "package": "litellm",
         "deps": {
-            "*": ["anthropic", "google-genai", "pytest-asyncio"],
+            "*": ["anthropic", "google-genai", "pytest-asyncio", "httpx"],
+            # filelock 3.30.0-4.0.2 registers a Python audit hook on import. On
+            # CPython < 3.12, sys.settrace() is guarded by a process-wide flag
+            # that stays set while audit hooks run, so with coverage enabled a
+            # new thread can die in Thread._bootstrap with "Cannot install a
+            # trace function while another trace function is being installed"
+            # (python/cpython#98257). LiteLLM finishes spans in thread pool
+            # callbacks, so the span is lost. filelock 4.0.3 skips the hook on
+            # affected interpreters.
+            "py3.10,py3.11": ["filelock>=4.0.3"],
         },
+        "include": "<=1.96",  # https://github.com/BerriAI/litellm/issues/36384
     },
     "litestar": {
         "package": "litestar",
@@ -308,6 +329,12 @@ TEST_SUITE_CONFIG = {
             "*": ["pytest-asyncio", "httpx"],
         },
     },
+    "mistral": {
+        "package": "mistralai",
+        "deps": {
+            "*": ["pytest-asyncio", "httpx"],
+        },
+    },
     "fastmcp": {
         "package": "fastmcp",
         "deps": {
@@ -321,7 +348,7 @@ TEST_SUITE_CONFIG = {
         "package": "openai",
         "integration_name": "openai",
         "deps": {
-            "*": ["pytest-asyncio", "tiktoken"],
+            "*": ["pytest-asyncio", "tiktoken", "httpx"],
             "<1.55": ["httpx<0.28"],
         },
         "python": {
@@ -333,7 +360,7 @@ TEST_SUITE_CONFIG = {
         "package": "openai",
         "integration_name": "openai",
         "deps": {
-            "*": ["pytest-asyncio"],
+            "*": ["pytest-asyncio", "httpx"],
             "<1.55": ["httpx<0.28"],
         },
         "python": {
@@ -344,7 +371,9 @@ TEST_SUITE_CONFIG = {
     "openai_agents": {
         "package": "openai-agents",
         "deps": {
-            "*": ["pytest-asyncio"],
+            "*": ["pytest-asyncio", "httpx"],
+            # https://github.com/openai/openai-python/commit/f16fbbd2bd25dc1ff150b5f78dbd15ff6bab6d91 makes `cache_write_tokens` required.
+            "<=0.18.0": ["openai<2.45"],
         },
         "python": ">=3.10",
     },
@@ -394,8 +423,14 @@ TEST_SUITE_CONFIG = {
     "quart": {
         "package": "quart",
         "deps": {
-            "*": ["quart-auth", "pytest-asyncio", "pytest-forked", "Werkzeug"],
-            ">=0.19": ["quart-flask-patch"],
+            "*": [
+                "quart-auth",
+                "pytest-asyncio",
+                "pytest-forked",
+                "pytest<9.2.0",
+                "Werkzeug",
+            ],
+            ">=0.19,<0.23": ["quart-flask-patch"],
             "<0.19": [
                 "blinker<1.6",
                 "jinja2<3.1.0",
@@ -421,6 +456,7 @@ TEST_SUITE_CONFIG = {
     },
     "redis": {
         "package": "redis",
+        "include": "!=8.2.0b1",
         "deps": {
             "*": ["fakeredis!=1.7.4", "pytest<8.0.0"],
             ">=4.0,<5.0": ["fakeredis<2.31.0"],
@@ -449,6 +485,7 @@ TEST_SUITE_CONFIG = {
             # The default "addr" value was removed in https://github.com/cunla/fakeredis-py/commit/0441288fb22c8c191fc716b561e0001cf512abe5.
             # from fakeredis.
             ">=1.1.14": ["fakeredis<2.36.0"],
+            ">=2.0": ["rq-scheduler"],
             "<0.9": ["fakeredis<1.0", "redis<3.2.2"],
             ">=0.9,<0.14": ["fakeredis>=1.0,<1.7.4"],
             "py3.6,py3.7": ["fakeredis!=2.26.0"],
@@ -485,7 +522,6 @@ TEST_SUITE_CONFIG = {
                 "pytest-asyncio",
                 "python-multipart",
                 "requests",
-                "anyio<4.0.0",
                 "jinja2",
                 "httpx",
             ],
@@ -517,6 +553,7 @@ TEST_SUITE_CONFIG = {
             "*": ["typing_extensions"],
         },
         "num_versions": 2,
+        "python": "<3.15",
     },
     "strawberry": {
         "package": "strawberry-graphql[fastapi,flask]",
@@ -547,6 +584,13 @@ TEST_SUITE_CONFIG = {
     "typer": {
         "package": "typer",
         "num_versions": 2,
+    },
+    "typesafe": {
+        "package": "typesafe-sdk",
+        "integration_name": "typesafe",
+        "deps": {
+            "*": ["pytest-asyncio"],
+        },
     },
     "unleash": {
         "package": "UnleashClient",

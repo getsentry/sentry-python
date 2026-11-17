@@ -15,7 +15,7 @@ from sentry_sdk.integrations.redis.utils import _parse_rediscluster_command
 
 def _patch_rediscluster() -> None:
     try:
-        import rediscluster  # type: ignore
+        import rediscluster  # type: ignore  # noqa: PLC0415
     except ImportError:
         return
 

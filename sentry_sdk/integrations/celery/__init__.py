@@ -24,6 +24,7 @@ from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
     has_data_collection_enabled,
+    parse_version,
     reraise,
 )
 
@@ -36,7 +37,10 @@ if TYPE_CHECKING:
 
 
 try:
-    from celery import VERSION as CELERY_VERSION  # type: ignore
+    import celery.app.trace as trace  # type: ignore
+    from billiard.pool import Worker  # type: ignore
+    from celery import Celery
+    from celery import __version__ as CELERY_VERSION
     from celery.app.task import Task  # type: ignore
     from celery.app.trace import task_has_custom
     from celery.exceptions import (  # type: ignore
@@ -73,7 +77,7 @@ class CeleryIntegration(Integration):
 
     @staticmethod
     def setup_once() -> None:
-        _check_minimum_version(CeleryIntegration, CELERY_VERSION)
+        _check_minimum_version(CeleryIntegration, parse_version(CELERY_VERSION))
 
         _patch_build_tracer()
         _patch_task_apply_async()
@@ -240,8 +244,9 @@ def _update_celery_task_headers(
             if combined_baggage:
                 updated_headers["headers"][BAGGAGE_HEADER_NAME] = combined_baggage
 
-            # Add the Sentry options potentially added in `sentry_apply_entry`
-            # to the headers (done when auto-instrumenting Celery Beat tasks)
+            # Add the Sentry options potentially added in
+            # `_apply_crons_data_to_schedule_entry` to the headers (done when
+            # auto-instrumenting Celery Beat tasks)
             for key, value in updated_headers.items():
                 if key.startswith("sentry-"):
                     updated_headers["headers"][key] = value
@@ -495,8 +500,6 @@ def _wrap_task_call(task: "Any", f: "F") -> "F":
 
 
 def _patch_build_tracer() -> None:
-    import celery.app.trace as trace  # type: ignore
-
     original_build_tracer = trace.build_tracer
 
     def sentry_build_tracer(
@@ -525,16 +528,12 @@ def _patch_task_apply_async() -> None:
 
 
 def _patch_celery_send_task() -> None:
-    from celery import Celery
-
     Celery.send_task = _wrap_task_run(Celery.send_task)
 
 
 def _patch_worker_exit() -> None:
     # Need to flush queue before worker shutdown because a crashing worker will
     # call os._exit
-    from billiard.pool import Worker  # type: ignore
-
     original_workloop = Worker.workloop
 
     def sentry_workloop(*args: "Any", **kwargs: "Any") -> "Any":

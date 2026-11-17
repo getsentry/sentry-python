@@ -9,11 +9,11 @@ from sentry_sdk.integrations.logging import (
     _BaseHandler,
 )
 from sentry_sdk.logger import _log_level_to_otel
-from sentry_sdk.utils import has_logs_enabled, safe_repr
+from sentry_sdk.utils import safe_repr
 
 if TYPE_CHECKING:
     from logging import LogRecord
-    from typing import Any, Optional
+    from typing import Any, Optional, Union
 
 try:
     import loguru
@@ -24,6 +24,9 @@ try:
         from loguru import Message
 except ImportError:
     raise DidNotEnable("LOGURU is not installed")
+
+
+_SENTINEL = object()
 
 
 class LoggingLevels(enum.IntEnum):
@@ -70,6 +73,7 @@ class LoguruIntegration(Integration):
     breadcrumb_format = DEFAULT_FORMAT
     event_format = DEFAULT_FORMAT
     sentry_logs_level: "Optional[int]" = DEFAULT_LEVEL
+    capture_sentry_logs: "Optional[Union[bool, object]]" = _SENTINEL
 
     def __init__(
         self,
@@ -78,12 +82,14 @@ class LoguruIntegration(Integration):
         breadcrumb_format: "str | loguru.FormatFunction" = DEFAULT_FORMAT,
         event_format: "str | loguru.FormatFunction" = DEFAULT_FORMAT,
         sentry_logs_level: "Optional[int]" = DEFAULT_LEVEL,
+        capture_sentry_logs: "Optional[Union[bool, object]]" = _SENTINEL,
     ) -> None:
         LoguruIntegration.level = level
         LoguruIntegration.event_level = event_level
         LoguruIntegration.breadcrumb_format = breadcrumb_format
         LoguruIntegration.event_format = event_format
         LoguruIntegration.sentry_logs_level = sentry_logs_level
+        LoguruIntegration.capture_sentry_logs = capture_sentry_logs
 
     @staticmethod
     def setup_once() -> None:
@@ -142,11 +148,21 @@ def loguru_sentry_logs_handler(message: "Message") -> None:
     # This is intentionally a callable sink instead of a standard logging handler
     # since otherwise we wouldn't get direct access to message.record
     client = sentry_sdk.get_client()
-
     if not client.is_active():
         return
 
-    if not has_logs_enabled(client.options):
+    # TODO: remove this compat hack in the next major. Capture should
+    # only depend on capture_sentry_logs being True.
+    compat_logs_enabled = client.options.get("enable_logs", False) or client.options[
+        "_experiments"
+    ].get("enable_logs", False)
+    should_capture_logs = False
+    if LoguruIntegration.capture_sentry_logs is True:
+        should_capture_logs = True
+    elif LoguruIntegration.capture_sentry_logs is _SENTINEL and compat_logs_enabled:
+        should_capture_logs = True
+
+    if not should_capture_logs:
         return
 
     record = message.record

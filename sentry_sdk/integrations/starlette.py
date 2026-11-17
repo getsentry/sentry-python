@@ -184,8 +184,20 @@ def _enable_span_for_middleware(
         if integration is None:
             return await old_call(app, scope, receive, send, **kwargs)
 
+        route_path, name_source = _http_route_and_source_from_router(scope)
+
+        server_span = sentry_sdk.get_current_scope()._server_segment_span
+        if (
+            server_span is not None
+            and route_path is not None
+            and name_source == TransactionSource.ROUTE
+        ):
+            server_span.set_attribute(SPANDATA.HTTP_ROUTE, route_path)
+
         # Update transaction name with middleware name
-        name, source = _get_transaction_from_middleware(app, scope, integration)
+        name, source = _get_transaction_from_middleware(
+            app, integration, route_path=route_path, name_source=name_source
+        )
 
         if name is not None:
             sentry_sdk.get_current_scope().set_transaction_name(
@@ -265,16 +277,6 @@ def _enable_span_for_middleware(
     return middleware_class
 
 
-def _serialize_request_body_data(data: "Any") -> str:
-    # data may be a JSON-serializable value, an AnnotatedValue, or a dict with AnnotatedValue values
-    def _default(value: "Any") -> "Any":
-        if isinstance(value, AnnotatedValue):
-            return value.value
-        return str(value)
-
-    return json.dumps(data, default=_default)
-
-
 @ensure_integration_enabled(StarletteIntegration)
 def _capture_exception(exception: BaseException, handled: "Any" = False) -> None:
     event, hint = event_from_exception(
@@ -352,8 +354,8 @@ def patch_exception_middleware(middleware_class: "Any") -> None:
             # Also add the user (that was eventually set by be Authentication middle
             # that was called before this middleware). This is done because the authentication
             # middleware sets the user in the scope and then (in the same function)
-            # calls this exception middelware. In case there is no exception (or no handler
-            # for the type of exception occuring) then the exception bubbles up and setting the
+            # calls this exception middleware. In case there is no exception (or no handler
+            # for the type of exception occurring) then the exception bubbles up and setting the
             # user information into the sentry scope is done in auth middleware and the
             # ASGI middleware will then send everything to Sentry and this is fine.
             # But if there is an exception happening that the exception middleware here
@@ -541,10 +543,22 @@ async def _wrap_async_handler(
 
     request = args[0]
 
+    route_path, name_source = _http_route_and_source_from_router(request.scope)
+
+    server_span = sentry_sdk.get_current_scope()._server_segment_span
+    if (
+        server_span is not None
+        and route_path is not None
+        and name_source == TransactionSource.ROUTE
+    ):
+        server_span.set_attribute(SPANDATA.HTTP_ROUTE, route_path)
+
     _set_transaction_name_and_source(
         sentry_sdk.get_current_scope(),
         integration.transaction_style,
-        request,
+        endpoint=request.scope.get("endpoint"),
+        route_path=route_path,
+        name_source=name_source,
     )
 
     sentry_scope = sentry_sdk.get_isolation_scope()
@@ -562,7 +576,15 @@ async def _wrap_async_handler(
                 if "cookies" in info:
                     request_info["cookies"] = info["cookies"]
                 if "data" in info:
-                    request_info["data"] = info["data"]
+                    attach_request_data = True
+                    if has_data_collection_enabled(client.options):
+                        attach_request_data = (
+                            "incoming_request"
+                            in client.options["data_collection"]["http_bodies"]
+                        )
+
+                    if attach_request_data:
+                        request_info["data"] = info["data"]
             event["request"] = deepcopy(request_info)
 
             return event
@@ -580,14 +602,53 @@ async def _wrap_async_handler(
         current_span = get_current_span()
 
         if type(current_span) is StreamedSpan:
-            request_body = _get_cached_request_body_attribute(
-                client=client, request=request
-            )
-            if request_body:
-                current_span._segment.set_attribute(
-                    SPANDATA.HTTP_REQUEST_BODY_DATA,
-                    request_body,
+            attach_request_data = True
+            if has_data_collection_enabled(client.options):
+                attach_request_data = (
+                    "incoming_request"
+                    in client.options["data_collection"]["http_bodies"]
                 )
+
+            if attach_request_data:
+                request_body = _get_cached_request_body_attribute(
+                    client=client, request=request
+                )
+                if request_body:
+                    current_span._segment.set_attribute(
+                        SPANDATA.HTTP_REQUEST_BODY_DATA,
+                        request_body,
+                    )
+
+
+def _update_active_thread() -> None:
+    client = sentry_sdk.get_client()
+    current_scope = sentry_sdk.get_current_scope()
+
+    span_streaming = has_span_streaming_enabled(client.options)
+    if span_streaming:
+        current_span = current_scope.streamed_span
+
+        if type(current_span) is StreamedSpan:
+            current_span._segment._update_active_thread()
+    elif current_scope.transaction is not None:
+        current_scope.transaction.update_active_thread()
+
+    sentry_scope = sentry_sdk.get_isolation_scope()
+    if sentry_scope.profile is not None:
+        sentry_scope.profile.update_active_thread_id()
+
+
+def _wrap_sync_handler(handler: "Callable[..., Any]") -> "Callable[..., Any]":
+    if getattr(handler, "_sentry_patched", False):
+        return handler
+
+    @functools.wraps(handler)
+    def _sentry_sync_handler(*args: "Any", **kwargs: "Any") -> "Any":
+        _update_active_thread()
+        return handler(*args, **kwargs)
+
+    _sentry_sync_handler._sentry_patched = True  # type: ignore[attr-defined]
+    return _sentry_sync_handler
 
 
 def patch_request_response() -> None:
@@ -614,25 +675,30 @@ def patch_request_response() -> None:
                 if integration is None:
                     return old_func(*args, **kwargs)
 
+                _update_active_thread()
                 current_scope = sentry_sdk.get_current_scope()
-
-                span_streaming = has_span_streaming_enabled(client.options)
-                if span_streaming:
-                    current_span = current_scope.streamed_span
-
-                    if type(current_span) is StreamedSpan:
-                        current_span._segment._update_active_thread()
-                elif current_scope.transaction is not None:
-                    current_scope.transaction.update_active_thread()
-
                 sentry_scope = sentry_sdk.get_isolation_scope()
-                if sentry_scope.profile is not None:
-                    sentry_scope.profile.update_active_thread_id()
 
                 request = args[0]
 
+                route_path, name_source = _http_route_and_source_from_router(
+                    request.scope
+                )
+
+                server_span = sentry_sdk.get_current_scope()._server_segment_span
+                if (
+                    server_span is not None
+                    and route_path is not None
+                    and name_source == TransactionSource.ROUTE
+                ):
+                    server_span.set_attribute(SPANDATA.HTTP_ROUTE, route_path)
+
                 _set_transaction_name_and_source(
-                    sentry_scope, integration.transaction_style, request
+                    current_scope,
+                    integration.transaction_style,
+                    endpoint=request.scope.get("endpoint"),
+                    route_path=route_path,
+                    name_source=name_source,
                 )
 
                 extractor = StarletteRequestExtractor(request)
@@ -674,13 +740,13 @@ def patch_templates() -> None:
     # (markupsafe is a dependency of Jinja2)
     # In this case we do not need to patch the Jinja2Templates class
     try:
-        from markupsafe import Markup
+        from markupsafe import Markup  # noqa: PLC0415
     except ImportError:
         return  # Nothing to do
 
     # https://github.com/Kludex/starlette/commit/96479daca2e4bd8157f68d914fd162aa94eff73a
     try:
-        from starlette.templating import Jinja2Templates
+        from starlette.templating import Jinja2Templates  # noqa: PLC0415
     except ImportError:
         return
 
@@ -827,36 +893,41 @@ class StarletteRequestExtractor:
             return None
 
 
-def _transaction_name_from_router(scope: "StarletteScope") -> "Optional[str]":
+def _http_route_and_source_from_router(
+    scope: "StarletteScope",
+) -> "Tuple[Optional[str], TransactionSource]":
     router = scope.get("router")
     if not router:
-        return None
+        return None, TransactionSource.ROUTE
 
     for route in router.routes:
         match = route.matches(scope)
         if match[0] == Match.FULL:
             try:
-                return route.path
+                return route.path, TransactionSource.ROUTE
             except AttributeError:
-                # routes added via app.host() won't have a path attribute
-                return scope.get("path")
+                # Host routes have no path template, so fall back to the
+                # concrete request path and classify it as a URL.
+                return scope.get("path"), TransactionSource.URL
 
-    return None
+    return None, TransactionSource.ROUTE
 
 
 def _set_transaction_name_and_source(
-    scope: "sentry_sdk.Scope", transaction_style: str, request: "Any"
+    scope: "sentry_sdk.Scope",
+    transaction_style: str,
+    endpoint: "Optional[Callable[..., Any]]",
+    route_path: "Optional[str]",
+    name_source: "TransactionSource",
 ) -> None:
     name = None
     source = SOURCE_FOR_STYLE[transaction_style]
 
-    if transaction_style == "endpoint":
-        endpoint = request.scope.get("endpoint")
-        if endpoint:
-            name = transaction_from_function(endpoint) or None
+    if transaction_style == "endpoint" and endpoint:
+        name = transaction_from_function(endpoint) or None
 
     elif transaction_style == "url":
-        name = _transaction_name_from_router(request.scope)
+        name, source = route_path, name_source
 
     if name is None:
         name = _DEFAULT_TRANSACTION_NAME
@@ -866,7 +937,10 @@ def _set_transaction_name_and_source(
 
 
 def _get_transaction_from_middleware(
-    app: "Any", asgi_scope: "Dict[str, Any]", integration: "StarletteIntegration"
+    app: "Any",
+    integration: "StarletteIntegration",
+    route_path: "Optional[str]",
+    name_source: "TransactionSource",
 ) -> "Tuple[Optional[str], Optional[str]]":
     name = None
     source = None
@@ -875,7 +949,6 @@ def _get_transaction_from_middleware(
         name = transaction_from_function(app.__class__)
         source = TransactionSource.COMPONENT
     elif integration.transaction_style == "url":
-        name = _transaction_name_from_router(asgi_scope)
-        source = TransactionSource.ROUTE
+        name, source = route_path, name_source
 
     return name, source

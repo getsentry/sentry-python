@@ -4,7 +4,10 @@ import boto3
 import pytest
 
 import sentry_sdk
+from sentry_sdk import capture_message
+from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.boto3 import Boto3Integration
+from sentry_sdk.integrations.boto3.consts import ORIGIN
 from tests.conftest import ApproxDict
 from tests.integrations.boto3 import read_fixture
 from tests.integrations.boto3.aws_mock import MockResponse
@@ -108,16 +111,27 @@ def test_streaming(
         spans = [item.payload for item in items]
         assert len(spans) == 3
 
-        span1 = spans[0]
-        assert span1["attributes"]["sentry.op"] == "http.client"
-        assert span1["name"] == "aws.s3.GetObject"
+        stream_span, client_span, parent_span = spans
+        assert stream_span["attributes"]["sentry.op"] == "http.client.stream"
+        assert stream_span["name"] == "aws.s3.GetObject"
+        assert stream_span["parent_span_id"] == client_span["span_id"]
+
+        assert client_span["attributes"]["sentry.op"] == "http.client"
+        assert client_span["name"] == "aws.s3.GetObject"
+        assert client_span["parent_span_id"] == parent_span["span_id"]
+
+        assert parent_span["name"] == "custom parent"
+        assert parent_span["start_timestamp"] <= client_span["start_timestamp"]
+        assert client_span["start_timestamp"] <= stream_span["start_timestamp"]
+        assert stream_span["end_timestamp"] <= client_span["end_timestamp"]
 
         expected_attrs = {
             "http.request.method": "GET",
-            "rpc.method": "S3/GetObject",
+            "rpc.method": "GetObject",
+            "rpc.service": "S3",
             "sentry.environment": "production",
             "sentry.op": "http.client",
-            "sentry.origin": "auto.http.boto3",
+            "sentry.origin": ORIGIN,
             "sentry.release": mock.ANY,
             "sentry.sdk.name": "sentry.python",
             "sentry.sdk.version": mock.ANY,
@@ -129,19 +143,12 @@ def test_streaming(
         }
         if send_default_pii:
             expected_attrs["url.full"] = "https://bucket.s3.amazonaws.com/foo.pdf"
-            expected_attrs["url.fragment"] = ""
-            expected_attrs["url.query"] = ""
-        assert span1["attributes"] == ApproxDict(expected_attrs)
+        assert client_span["attributes"] == ApproxDict(expected_attrs)
 
+        assert "url.fragment" not in client_span["attributes"]
+        assert "url.query" not in client_span["attributes"]
         if not send_default_pii:
-            assert "url.full" not in span1["attributes"]
-            assert "url.fragment" not in span1["attributes"]
-            assert "url.query" not in span1["attributes"]
-
-        span2 = spans[1]
-        assert span2["attributes"]["sentry.op"] == "http.client.stream"
-        assert span2["name"] == "aws.s3.GetObject"
-        assert span2["parent_span_id"] == span1["span_id"]
+            assert "url.full" not in client_span["attributes"]
     else:
         events = capture_events()
 
@@ -207,10 +214,20 @@ def test_streaming_close(
         sentry_sdk.flush()
         spans = [item.payload for item in items]
         assert len(spans) == 3
-        span1 = spans[0]
-        assert span1["attributes"]["sentry.op"] == "http.client"
-        span2 = spans[1]
-        assert span2["attributes"]["sentry.op"] == "http.client.stream"
+
+        stream_span, client_span, parent_span = spans
+        assert stream_span["attributes"]["sentry.op"] == "http.client.stream"
+        assert stream_span["name"] == "aws.s3.GetObject"
+        assert stream_span["parent_span_id"] == client_span["span_id"]
+
+        assert client_span["attributes"]["sentry.op"] == "http.client"
+        assert client_span["name"] == "aws.s3.GetObject"
+        assert client_span["parent_span_id"] == parent_span["span_id"]
+
+        assert parent_span["name"] == "custom parent"
+        assert parent_span["start_timestamp"] <= client_span["start_timestamp"]
+        assert client_span["start_timestamp"] <= stream_span["start_timestamp"]
+        assert stream_span["end_timestamp"] <= client_span["end_timestamp"]
     else:
         events = capture_events()
 
@@ -253,7 +270,7 @@ def test_omit_url_data_if_parsing_fails(
         items = capture_items("span")
 
         with mock.patch(
-            "sentry_sdk.integrations.boto3.parse_url",
+            "sentry_sdk.integrations.boto3._instrumentation.parse_url",
             side_effect=ValueError,
         ):
             with sentry_sdk.traces.start_span(
@@ -272,10 +289,11 @@ def test_omit_url_data_if_parsing_fails(
                 assert spans[0]["attributes"] == ApproxDict(
                     {
                         "http.request.method": "GET",
-                        "rpc.method": "S3/ListObjects",
+                        "rpc.method": "ListObjects",
+                        "rpc.service": "S3",
                         "sentry.environment": "production",
                         "sentry.op": "http.client",
-                        "sentry.origin": "auto.http.boto3",
+                        "sentry.origin": ORIGIN,
                         "sentry.release": mock.ANY,
                         "sentry.sdk.name": "sentry.python",
                         "sentry.sdk.version": mock.ANY,
@@ -294,7 +312,7 @@ def test_omit_url_data_if_parsing_fails(
         events = capture_events()
 
         with mock.patch(
-            "sentry_sdk.integrations.boto3.parse_url",
+            "sentry_sdk.integrations.boto3._instrumentation.parse_url",
             side_effect=ValueError,
         ):
             with sentry_sdk.start_transaction() as transaction, MockResponse(
@@ -347,7 +365,7 @@ def test_span_origin(
         spans = [item.payload for item in items]
 
         assert spans[1]["attributes"]["sentry.origin"] == "manual"
-        assert spans[0]["attributes"]["sentry.origin"] == "auto.http.boto3"
+        assert spans[0]["attributes"]["sentry.origin"] == ORIGIN
     else:
         events = capture_events()
 
@@ -359,4 +377,230 @@ def test_span_origin(
         (event,) = events
 
         assert event["contexts"]["trace"]["origin"] == "manual"
-        assert event["spans"][0]["origin"] == "auto.http.boto3"
+        assert event["spans"][0]["origin"] == ORIGIN
+
+
+def test_breadcrumb(sentry_init, capture_events):
+    sentry_init(
+        integrations=[Boto3Integration()],
+        default_integrations=False,
+    )
+
+    s3 = session.resource("s3")
+    bucket = s3.Bucket("bucket")
+
+    events = capture_events()
+
+    with MockResponse(s3.meta.client, 200, {}, read_fixture("s3_list.xml")):
+        _ = [obj for obj in bucket.objects.all()]
+
+    capture_message("Testing!")
+
+    (event,) = events
+    (crumb,) = event["breadcrumbs"]["values"]
+    assert crumb["type"] == "http"
+    assert crumb["category"] == "httplib"
+    assert crumb["data"] == ApproxDict(
+        {
+            "aws.request.url": mock.ANY,
+            SPANDATA.HTTP_METHOD: "GET",
+            SPANDATA.HTTP_QUERY: mock.ANY,
+            SPANDATA.HTTP_FRAGMENT: "",
+        }
+    )
+
+
+@pytest.mark.parametrize("send_default_pii", [True, False])
+def test_breadcrumb_span_streaming(sentry_init, capture_events, send_default_pii):
+    sentry_init(
+        integrations=[Boto3Integration()],
+        default_integrations=False,
+        trace_lifecycle="stream",
+        send_default_pii=send_default_pii,
+    )
+
+    s3 = session.resource("s3")
+    bucket = s3.Bucket("bucket")
+
+    events = capture_events()
+
+    with sentry_sdk.traces.start_span(name="custom parent"), MockResponse(
+        s3.meta.client, 200, {}, read_fixture("s3_list.xml")
+    ):
+        _ = [obj for obj in bucket.objects.all()]
+
+    capture_message("Testing!")
+
+    (event,) = events
+    (crumb,) = event["breadcrumbs"]["values"]
+    assert crumb["type"] == "http"
+    assert crumb["category"] == "httplib"
+
+    if send_default_pii:
+        assert crumb["data"] == ApproxDict(
+            {
+                SPANDATA.URL_FULL: mock.ANY,
+                SPANDATA.HTTP_REQUEST_METHOD: "GET",
+                SPANDATA.URL_QUERY: mock.ANY,
+            }
+        )
+        assert SPANDATA.URL_FRAGMENT not in crumb["data"]
+    else:
+        assert crumb["data"] == ApproxDict(
+            {
+                SPANDATA.HTTP_REQUEST_METHOD: "GET",
+            }
+        )
+        assert SPANDATA.URL_FULL not in crumb["data"]
+        assert SPANDATA.URL_QUERY not in crumb["data"]
+        assert SPANDATA.URL_FRAGMENT not in crumb["data"]
+
+
+BUCKET_URL = "https://bucket.s3.amazonaws.com/"
+
+# ``expected_query`` of ``None`` means no URL data is recorded at all; ``""``
+# means the URL is recorded without a query string.
+# Structure of the parameters is "init_kwargs, expected_query"
+URL_QUERY_PARAMS = [
+    pytest.param(
+        {"send_default_pii": True},
+        "list-type=2&prefix=foo&continuation-token=abc&encoding-type=url",
+        id="send_default_pii_true",
+    ),
+    pytest.param(
+        {"send_default_pii": False},
+        None,
+        id="send_default_pii_false",
+    ),
+    pytest.param(
+        {},
+        None,
+        id="defaults",
+    ),
+    pytest.param(
+        {"data_collection": {}},
+        "list-type=2&prefix=foo&continuation-token=%5BFiltered%5D&encoding-type=url",
+        id="data_collection_denylist_default",
+    ),
+    pytest.param(
+        {
+            "data_collection": {
+                "url_query_params": {"mode": "denylist", "terms": ["prefix"]}
+            }
+        },
+        "list-type=2&prefix=%5BFiltered%5D&continuation-token=%5BFiltered%5D&encoding-type=url",
+        id="data_collection_denylist_custom_terms",
+    ),
+    pytest.param(
+        {
+            "data_collection": {
+                "url_query_params": {"mode": "allowlist", "terms": ["prefix"]}
+            }
+        },
+        "list-type=%5BFiltered%5D&prefix=foo&continuation-token=%5BFiltered%5D&encoding-type=%5BFiltered%5D",
+        id="data_collection_allowlist",
+    ),
+    pytest.param(
+        {
+            "data_collection": {
+                "url_query_params": {
+                    "mode": "allowlist",
+                    "terms": ["continuation-token"],
+                }
+            }
+        },
+        "list-type=%5BFiltered%5D&prefix=%5BFiltered%5D&continuation-token=%5BFiltered%5D&encoding-type=%5BFiltered%5D",
+        id="data_collection_allowlist_sensitive_term",
+    ),
+    pytest.param(
+        {"data_collection": {"url_query_params": {"mode": "off"}}},
+        "",
+        id="data_collection_off",
+    ),
+    pytest.param(
+        {
+            "send_default_pii": True,
+            "data_collection": {"url_query_params": {"mode": "off"}},
+        },
+        "",
+        id="data_collection_wins_over_send_default_pii",
+    ),
+]
+
+
+@pytest.mark.parametrize("init_kwargs, expected_query", URL_QUERY_PARAMS)
+def test_url_query_data_collection_span_streaming(
+    sentry_init, capture_items, init_kwargs, expected_query
+):
+    sentry_init(
+        traces_sample_rate=1.0,
+        integrations=[Boto3Integration()],
+        default_integrations=False,
+        trace_lifecycle="stream",
+        **init_kwargs,
+    )
+
+    client = session.client("s3")
+
+    items = capture_items("span")
+
+    with sentry_sdk.traces.start_span(name="custom parent"), MockResponse(
+        client, 200, {}, read_fixture("s3_list.xml")
+    ):
+        client.list_objects_v2(Bucket="bucket", Prefix="foo", ContinuationToken="abc")
+
+    sentry_sdk.flush()
+
+    (span,) = [
+        item.payload
+        for item in items
+        if item.payload["attributes"].get("sentry.op") == "http.client"
+    ]
+
+    if expected_query is None:
+        assert SPANDATA.URL_QUERY not in span["attributes"]
+        assert SPANDATA.URL_FULL not in span["attributes"]
+    elif expected_query == "":
+        assert SPANDATA.URL_QUERY not in span["attributes"]
+        assert span["attributes"][SPANDATA.URL_FULL] == BUCKET_URL
+    else:
+        assert span["attributes"][SPANDATA.URL_QUERY] == expected_query
+        assert (
+            span["attributes"][SPANDATA.URL_FULL] == BUCKET_URL + "?" + expected_query
+        )
+
+
+@pytest.mark.parametrize("init_kwargs, expected_query", URL_QUERY_PARAMS)
+def test_url_query_data_collection_breadcrumb(
+    sentry_init, capture_events, init_kwargs, expected_query
+):
+    sentry_init(
+        integrations=[Boto3Integration()],
+        default_integrations=False,
+        trace_lifecycle="stream",
+        **init_kwargs,
+    )
+
+    client = session.client("s3")
+
+    events = capture_events()
+
+    with sentry_sdk.traces.start_span(name="custom parent"), MockResponse(
+        client, 200, {}, read_fixture("s3_list.xml")
+    ):
+        client.list_objects_v2(Bucket="bucket", Prefix="foo", ContinuationToken="abc")
+
+    capture_message("Testing!")
+
+    (event,) = events
+    (crumb,) = event["breadcrumbs"]["values"]
+
+    if expected_query is None:
+        assert SPANDATA.URL_QUERY not in crumb["data"]
+        assert SPANDATA.URL_FULL not in crumb["data"]
+    elif expected_query == "":
+        assert SPANDATA.URL_QUERY not in crumb["data"]
+        assert crumb["data"][SPANDATA.URL_FULL] == BUCKET_URL
+    else:
+        assert crumb["data"][SPANDATA.URL_QUERY] == expected_query
+        assert crumb["data"][SPANDATA.URL_FULL] == BUCKET_URL + "?" + expected_query

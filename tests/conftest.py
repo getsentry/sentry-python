@@ -4,6 +4,7 @@ import io
 import json
 import os
 import socket
+import threading
 import warnings
 from collections import namedtuple
 from contextlib import contextmanager
@@ -56,7 +57,7 @@ except ImportError:
 import sentry_sdk
 import sentry_sdk.utils
 from sentry_sdk.envelope import Envelope, parse_json
-from sentry_sdk.integrations import (  # noqa: F401
+from sentry_sdk.integrations import (
     _DEFAULT_INTEGRATIONS,
     _installed_integrations,
     _processed_integrations,
@@ -293,11 +294,73 @@ def uninstall_integration():
     return inner
 
 
+def _install_flush_completion_handshake(client: "sentry_sdk.Client") -> None:
+    """Make batcher.flush() wait for the flusher thread to drain.
+
+    Otherwise, test assertions can run before envelopes are captured.
+    The span batcher flushes pending items asynchronously with the main thread.
+    Flushes triggered by segments finishing are asynchronous, and can collect buckets
+    that would have otherwise been flushed synchronously by `sentry_sdk.flush()`.
+    """
+    batcher = client.span_batcher
+    if batcher is None:
+        return
+
+    orig_flush_raw = batcher._flush
+    orig_flush = batcher.flush
+    lock = threading.Lock()
+    drained_count = 0
+    wake = threading.Event()
+
+    def _flush(*args: "Any", **kwargs: "Any") -> "Any":
+        nonlocal drained_count
+        try:
+            return orig_flush_raw(*args, **kwargs)
+        finally:
+            with lock:
+                drained_count += 1
+            wake.set()
+
+    def flush() -> None:
+        nonlocal drained_count
+        # Re-entrancy guard: if `flush()` is invoked from within a drain (e.g. a
+        # custom transport), waiting on the flusher thread would deadlock, because
+        # the flusher is blocked inside our own handler.
+        if getattr(getattr(batcher, "_active", None), "flag", False):
+            orig_flush()
+            return
+
+        # If the background flusher thread was never started (no spans have
+        # been added), there is no thread to drain and the counter will never
+        # advance. Fall back to the original synchronous flush.
+        if batcher._flusher is None or not batcher._flusher.is_alive():
+            orig_flush()
+            return
+
+        with lock:
+            target = drained_count
+
+        batcher._flush_event.set()
+        while True:
+            with lock:
+                if drained_count > target:
+                    break
+            wake.wait()
+            wake.clear()
+        orig_flush()
+
+    object.__setattr__(batcher, "_flush", _flush)
+    object.__setattr__(batcher, "flush", flush)
+
+
 @pytest.fixture
 def sentry_init(request):
+    client = None
+
     def inner(*a, **kw):
         kw.setdefault("transport", TestTransport())
         client = sentry_sdk.Client(*a, **kw)
+        _install_flush_completion_handshake(client)
         sentry_sdk.get_global_scope().set_client(client)
 
     if request.node.get_closest_marker("forked"):
@@ -312,6 +375,8 @@ def sentry_init(request):
             yield inner
         finally:
             sentry_sdk.get_global_scope().set_client(old_client)
+            if client is not None:
+                client.close()
 
 
 class TestTransport(Transport):
@@ -960,25 +1025,12 @@ def json_rpc():
 
 
 @pytest.fixture()
-def select_mcp_transactions():
-    def inner(events):
-        return [
-            event
-            for event in events
-            if event["type"] == "transaction"
-            and event["contexts"]["trace"]["op"] == "mcp.server"
-        ]
-
-    return inner
-
-
-@pytest.fixture()
 def select_transactions_with_mcp_spans():
     def inner(events, method_name):
         return [
             transaction
             for transaction in events
-            if transaction["type"] == "transaction"
+            if transaction.get("type") == "transaction"
             and any(
                 span["data"].get("mcp.method.name") == method_name
                 for span in transaction.get("spans", [])
@@ -1220,6 +1272,7 @@ def get_model_response():
             200,
             request=model_request,
             content=response_content,
+            headers={"Content-Type": "application/json"},
         )
 
         return response
@@ -1251,116 +1304,61 @@ def get_rate_limit_model_response():
 
 @pytest.fixture
 def streaming_chat_completions_model_response():
-    return [
-        openai.types.chat.ChatCompletionChunk(
-            id="chatcmpl-test",
-            object="chat.completion.chunk",
-            created=10000000,
-            model="gpt-3.5-turbo",
-            choices=[
-                openai.types.chat.chat_completion_chunk.Choice(
-                    index=0,
-                    delta=openai.types.chat.chat_completion_chunk.ChoiceDelta(
-                        role="assistant"
+    def inner(
+        usage: "openai.types.CompletionUsage",
+        message_contents: "Iterator[str]",
+    ):
+        return [
+            openai.types.chat.ChatCompletionChunk(
+                id="chatcmpl-test",
+                object="chat.completion.chunk",
+                created=10000000,
+                model="gpt-3.5-turbo",
+                choices=[
+                    openai.types.chat.chat_completion_chunk.Choice(
+                        index=0,
+                        delta=openai.types.chat.chat_completion_chunk.ChoiceDelta(
+                            role="assistant"
+                        ),
+                        finish_reason=None,
                     ),
-                    finish_reason=None,
-                ),
-            ],
-        ),
-        openai.types.chat.ChatCompletionChunk(
-            id="chatcmpl-test",
-            object="chat.completion.chunk",
-            created=10000000,
-            model="gpt-3.5-turbo",
-            choices=[
-                openai.types.chat.chat_completion_chunk.Choice(
-                    index=0,
-                    delta=openai.types.chat.chat_completion_chunk.ChoiceDelta(
-                        content="Tes"
-                    ),
-                    finish_reason=None,
-                ),
-            ],
-        ),
-        openai.types.chat.ChatCompletionChunk(
-            id="chatcmpl-test",
-            object="chat.completion.chunk",
-            created=10000000,
-            model="gpt-3.5-turbo",
-            choices=[
-                openai.types.chat.chat_completion_chunk.Choice(
-                    index=0,
-                    delta=openai.types.chat.chat_completion_chunk.ChoiceDelta(
-                        content="t r"
-                    ),
-                    finish_reason=None,
-                ),
-            ],
-        ),
-        openai.types.chat.ChatCompletionChunk(
-            id="chatcmpl-test",
-            object="chat.completion.chunk",
-            created=10000000,
-            model="gpt-3.5-turbo",
-            choices=[
-                openai.types.chat.chat_completion_chunk.Choice(
-                    index=0,
-                    delta=openai.types.chat.chat_completion_chunk.ChoiceDelta(
-                        content="esp"
-                    ),
-                    finish_reason=None,
-                ),
-            ],
-        ),
-        openai.types.chat.ChatCompletionChunk(
-            id="chatcmpl-test",
-            object="chat.completion.chunk",
-            created=10000000,
-            model="gpt-3.5-turbo",
-            choices=[
-                openai.types.chat.chat_completion_chunk.Choice(
-                    index=0,
-                    delta=openai.types.chat.chat_completion_chunk.ChoiceDelta(
-                        content="ons"
-                    ),
-                    finish_reason=None,
-                ),
-            ],
-        ),
-        openai.types.chat.ChatCompletionChunk(
-            id="chatcmpl-test",
-            object="chat.completion.chunk",
-            created=10000000,
-            model="gpt-3.5-turbo",
-            choices=[
-                openai.types.chat.chat_completion_chunk.Choice(
-                    index=0,
-                    delta=openai.types.chat.chat_completion_chunk.ChoiceDelta(
-                        content="e"
-                    ),
-                    finish_reason=None,
-                ),
-            ],
-        ),
-        openai.types.chat.ChatCompletionChunk(
-            id="chatcmpl-test",
-            object="chat.completion.chunk",
-            created=10000000,
-            model="gpt-3.5-turbo",
-            choices=[
-                openai.types.chat.chat_completion_chunk.Choice(
-                    index=0,
-                    delta=openai.types.chat.chat_completion_chunk.ChoiceDelta(),
-                    finish_reason="stop",
-                ),
-            ],
-            usage=openai.types.CompletionUsage(
-                prompt_tokens=10,
-                completion_tokens=20,
-                total_tokens=30,
+                ],
             ),
-        ),
-    ]
+            *[
+                openai.types.chat.ChatCompletionChunk(
+                    id="chatcmpl-test",
+                    object="chat.completion.chunk",
+                    created=10000000,
+                    model="gpt-3.5-turbo",
+                    choices=[
+                        openai.types.chat.chat_completion_chunk.Choice(
+                            index=0,
+                            delta=openai.types.chat.chat_completion_chunk.ChoiceDelta(
+                                content=message_content
+                            ),
+                            finish_reason=None,
+                        ),
+                    ],
+                )
+                for message_content in message_contents
+            ],
+            openai.types.chat.ChatCompletionChunk(
+                id="chatcmpl-test",
+                object="chat.completion.chunk",
+                created=10000000,
+                model="gpt-3.5-turbo",
+                choices=[
+                    openai.types.chat.chat_completion_chunk.Choice(
+                        index=0,
+                        delta=openai.types.chat.chat_completion_chunk.ChoiceDelta(),
+                        finish_reason="stop",
+                    ),
+                ],
+                usage=usage,
+            ),
+        ]
+
+    return inner
 
 
 @pytest.fixture
@@ -1413,42 +1411,38 @@ def openai_embedding_model_response():
 
 @pytest.fixture
 def nonstreaming_responses_model_response():
-    return openai.types.responses.Response(
-        id="resp_123",
-        output=[
-            openai.types.responses.ResponseOutputMessage(
-                id="msg_123",
-                type="message",
-                status="completed",
-                content=[
-                    openai.types.responses.ResponseOutputText(
-                        text="Hello, how can I help you?",
-                        type="output_text",
-                        annotations=[],
-                    )
-                ],
-                role="assistant",
-            )
-        ],
-        parallel_tool_calls=False,
-        tool_choice="none",
-        tools=[],
-        created_at=10000000,
-        model="gpt-4",
-        object="response",
-        usage=openai.types.responses.ResponseUsage(
-            input_tokens=10,
-            input_tokens_details=openai.types.responses.response_usage.InputTokensDetails(
-                cached_tokens=0,
-                cache_write_tokens=0,
-            ),
-            output_tokens=20,
-            output_tokens_details=openai.types.responses.response_usage.OutputTokensDetails(
-                reasoning_tokens=5,
-            ),
-            total_tokens=30,
-        ),
-    )
+    def inner(
+        message_contents: "Iterator[str]",
+        usage: "openai.types.responses.ResponseUsage",
+    ):
+        return openai.types.responses.Response(
+            id="resp_123",
+            output=[
+                openai.types.responses.ResponseOutputMessage(
+                    id="msg_123",
+                    type="message",
+                    status="completed",
+                    content=[
+                        openai.types.responses.ResponseOutputText(
+                            text=message_content,
+                            type="output_text",
+                            annotations=[],
+                        )
+                    ],
+                    role="assistant",
+                )
+                for message_content in message_contents
+            ],
+            parallel_tool_calls=False,
+            tool_choice="none",
+            tools=[],
+            created_at=10000000,
+            model="gpt-4",
+            object="response",
+            usage=usage,
+        )
+
+    return inner
 
 
 @pytest.fixture
@@ -1681,7 +1675,7 @@ def streaming_responses_tool_call_model_responses():
 
 
 class MockServerRequestHandler(BaseHTTPRequestHandler):
-    def do_GET(self):  # noqa: N802
+    def do_GET(self):
         # Process an HTTP GET request and return a response.
         # If the path ends with /status/<number>, return status code <number>.
         # Otherwise return a 200 response.

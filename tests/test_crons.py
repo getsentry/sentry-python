@@ -5,6 +5,7 @@ import pytest
 
 import sentry_sdk
 from sentry_sdk.crons import capture_checkin
+from sentry_sdk.crons.utils import _get_interval_schedule
 
 
 @sentry_sdk.monitor(monitor_slug="abc123")
@@ -321,7 +322,42 @@ def test_capture_checkin_sdk_not_initialized():
         status=None,
         duration=None,
     )
-    assert check_in_id == "112233"
+    assert check_in_id is None
+
+
+def test_capture_checkin_dropped_by_before_send(sentry_init, capture_envelopes):
+    sentry_init(before_send=lambda event, hint: None)
+    envelopes = capture_envelopes()
+
+    check_in_id = capture_checkin(monitor_slug="abc123", status="in_progress")
+
+    assert check_in_id is None
+    assert envelopes == []
+
+
+def test_context_monitor_exit_successfully_sends_checkin_when_enter_checkin_dropped(
+    sentry_init, capture_envelopes
+):
+    sentry_init(
+        before_send=lambda event, hint: (
+            None if event.get("status") == "in_progress" else event
+        )
+    )
+    envelopes = capture_envelopes()
+
+    monitor = sentry_sdk.monitor(monitor_slug="abc123")
+    with monitor:
+        # Confirms that the check in was dropped in the `__enter__`
+        assert monitor.check_in_id is None
+
+    (envelope,) = envelopes
+    check_in = envelope.items[0].payload.json
+
+    # Confirms that the second check in in `__exit__` works correctly
+    assert check_in["monitor_slug"] == "abc123"
+    assert check_in["check_in_id"]
+    assert check_in["status"] == "ok"
+    assert check_in["duration"] > 0
 
 
 def test_scope_data_in_checkin(sentry_init, capture_envelopes):
@@ -482,3 +518,29 @@ async def test_contextmanager_error_async(sentry_init):
         assert fake_capture_checkin.call_args[1]["status"] == "error"
         assert fake_capture_checkin.call_args[1]["duration"]
         assert fake_capture_checkin.call_args[1]["check_in_id"]
+
+
+@pytest.mark.parametrize(
+    "seconds, expected",
+    [
+        (60, (1, "minute")),
+        (90 * 60, (90, "minute")),
+        (2 * 60 * 60, (2, "hour")),
+        (36 * 60 * 60, (36, "hour")),
+        (24 * 60 * 60, (1, "day")),
+        (7 * 24 * 60 * 60, (7, "day")),
+        (300.0, (5, "minute")),
+    ],
+)
+def test_get_interval_schedule(seconds, expected):
+    value, unit = expected
+    assert _get_interval_schedule(seconds) == {
+        "type": "interval",
+        "value": value,
+        "unit": unit,
+    }
+
+
+@pytest.mark.parametrize("seconds", [0, 0.5, 30, 59, 90, 61.5, 3601])
+def test_get_interval_schedule_not_whole_minutes(seconds):
+    assert _get_interval_schedule(seconds) is None

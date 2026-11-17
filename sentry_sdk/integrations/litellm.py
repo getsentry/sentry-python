@@ -3,7 +3,6 @@ from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk import consts
-from sentry_sdk.ai.monitoring import record_token_usage
 from sentry_sdk.ai.utils import (
     get_start_span_function,
     set_data_normalized,
@@ -14,11 +13,12 @@ from sentry_sdk.ai.utils import (
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.scope import should_send_default_pii
+from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing_utils import (
     has_span_streaming_enabled,
     should_truncate_gen_ai_input,
 )
-from sentry_sdk.utils import event_from_exception
+from sentry_sdk.utils import event_from_exception, has_data_collection_enabled
 
 if TYPE_CHECKING:
     from datetime import datetime
@@ -129,7 +129,13 @@ def _input_callback(kwargs: "Dict[str, Any]") -> None:
     set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, operation)
 
     # Record input/messages if allowed
-    if should_send_default_pii() and integration.include_prompts:
+    record_inputs = False
+    if has_data_collection_enabled(client.options):
+        record_inputs = client.options["data_collection"]["gen_ai"]["inputs"]
+    elif should_send_default_pii() and integration.include_prompts:
+        record_inputs = True
+
+    if record_inputs:
         if operation == "embeddings":
             # For embeddings, look for the 'input' parameter
             embedding_input = kwargs.get("input")
@@ -141,7 +147,6 @@ def _input_callback(kwargs: "Dict[str, Any]") -> None:
                     if isinstance(embedding_input, list)
                     else [embedding_input]
                 )
-                client = sentry_sdk.get_client()
                 messages_data = (
                     truncate_and_annotate_embedding_inputs(input_list, span, scope)
                     if should_truncate_gen_ai_input(client.options)
@@ -158,7 +163,6 @@ def _input_callback(kwargs: "Dict[str, Any]") -> None:
             # For chat, look for the 'messages' parameter
             messages = kwargs.get("messages", [])
             if messages:
-                client = sentry_sdk.get_client()
                 scope = sentry_sdk.get_current_scope()
                 messages = _convert_message_parts(messages)
                 messages_data = (
@@ -206,7 +210,8 @@ def _success_callback(
     if span is None:
         return
 
-    integration = sentry_sdk.get_client().get_integration(LiteLLMIntegration)
+    client = sentry_sdk.get_client()
+    integration = client.get_integration(LiteLLMIntegration)
     if integration is None:
         return
 
@@ -218,7 +223,13 @@ def _success_callback(
             )
 
         # Record response content if allowed
-        if should_send_default_pii() and integration.include_prompts:
+        record_outputs = False
+        if has_data_collection_enabled(client.options):
+            record_outputs = client.options["data_collection"]["gen_ai"]["outputs"]
+        elif should_send_default_pii() and integration.include_prompts:
+            record_outputs = True
+
+        if record_outputs:
             if hasattr(completion_response, "choices"):
                 response_messages = []
                 for choice in completion_response.choices:
@@ -246,12 +257,29 @@ def _success_callback(
         # Record token usage
         if hasattr(completion_response, "usage"):
             usage = completion_response.usage
-            record_token_usage(
-                span,
-                input_tokens=getattr(usage, "prompt_tokens", None),
-                output_tokens=getattr(usage, "completion_tokens", None),
-                total_tokens=getattr(usage, "total_tokens", None),
+
+            set_on_span = (
+                span.set_attribute if isinstance(span, StreamedSpan) else span.set_data
             )
+
+            input_tokens = getattr(usage, "prompt_tokens", None)
+            if input_tokens is not None:
+                set_on_span(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, input_tokens)
+
+            output_tokens = getattr(usage, "completion_tokens", None)
+            if output_tokens is not None:
+                set_on_span(SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS, output_tokens)
+
+            total_tokens = getattr(usage, "total_tokens", None)
+            if (
+                total_tokens is None
+                and input_tokens is not None
+                and output_tokens is not None
+            ):
+                total_tokens = input_tokens + output_tokens
+
+            if total_tokens is not None:
+                set_on_span(SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, total_tokens)
 
     finally:
         is_streaming = kwargs.get("stream")

@@ -16,7 +16,10 @@ from sentry_sdk import capture_message
 from sentry_sdk.integrations.sanic import SanicIntegration
 from sentry_sdk.tracing import TransactionSource
 from tests.conftest import get_free_port
-from tests.integrations.utils import DATA_COLLECTION_USER_INFO_CASES
+from tests.integrations.utils import (
+    DATA_COLLECTION_REMOTE_ADDR_CASES,
+    DATA_COLLECTION_USER_INFO_CASES,
+)
 
 try:
     from sanic_testing import TestManager
@@ -55,7 +58,7 @@ def app():
         Sanic.test_client = property(new_test_client)
 
     if SANIC_VERSION >= (20, 12) and SANIC_VERSION < (22, 6):
-        # Some builds (20.12.0 intruduced and 22.6.0 removed again) have a feature where the instance is stored in an internal class
+        # Some builds (20.12.0 introduced and 22.6.0 removed again) have a feature where the instance is stored in an internal class
         # registry for later retrieval, and so add register=False to disable that
         sanic_app = Sanic("Test", register=False)
     else:
@@ -658,16 +661,14 @@ _QUERY_PARAM_DATA_COLLECTION_CASES = [
         id="defaults",
     ),
     pytest.param(
-        {"_experiments": {"data_collection": {}}},
+        {"data_collection": {}},
         "toy=tennisball&color=red&auth=%5BFiltered%5D",
         id="data_collection_denylist_default",
     ),
     pytest.param(
         {
-            "_experiments": {
-                "data_collection": {
-                    "url_query_params": {"mode": "denylist", "terms": ["toy"]}
-                }
+            "data_collection": {
+                "url_query_params": {"mode": "denylist", "terms": ["toy"]}
             }
         },
         "toy=%5BFiltered%5D&color=red&auth=%5BFiltered%5D",
@@ -675,10 +676,8 @@ _QUERY_PARAM_DATA_COLLECTION_CASES = [
     ),
     pytest.param(
         {
-            "_experiments": {
-                "data_collection": {
-                    "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
-                }
+            "data_collection": {
+                "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
             }
         },
         "toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D",
@@ -686,24 +685,22 @@ _QUERY_PARAM_DATA_COLLECTION_CASES = [
     ),
     pytest.param(
         {
-            "_experiments": {
-                "data_collection": {
-                    "url_query_params": {"mode": "allowlist", "terms": ["auth"]}
-                }
+            "data_collection": {
+                "url_query_params": {"mode": "allowlist", "terms": ["auth"]}
             }
         },
         "toy=%5BFiltered%5D&color=%5BFiltered%5D&auth=%5BFiltered%5D",
         id="data_collection_allowlist_sensitive_term",
     ),
     pytest.param(
-        {"_experiments": {"data_collection": {"url_query_params": {"mode": "off"}}}},
+        {"data_collection": {"url_query_params": {"mode": "off"}}},
         None,
         id="data_collection_off",
     ),
     pytest.param(
         {
             "send_default_pii": True,
-            "_experiments": {"data_collection": {"url_query_params": {"mode": "off"}}},
+            "data_collection": {"url_query_params": {"mode": "off"}},
         },
         None,
         id="data_collection_wins_over_send_default_pii",
@@ -720,13 +717,10 @@ _QUERY_PARAM_DATA_COLLECTION_CASES = [
 def test_url_query_data_collection_span_streaming(
     sentry_init, app, capture_items, init_kwargs, expected_query
 ):
-    init_kwargs = dict(init_kwargs)
-    experiments = dict(init_kwargs.pop("_experiments", {}))
-    experiments["trace_lifecycle"] = "stream"
     sentry_init(
         integrations=[SanicIntegration()],
         traces_sample_rate=1.0,
-        _experiments=experiments,
+        _experiments={"trace_lifecycle": "stream"},
         **init_kwargs,
     )
 
@@ -746,7 +740,7 @@ def test_url_query_data_collection_span_streaming(
         and i.payload["is_segment"]
     ]
 
-    data_collection_enabled = "data_collection" in experiments
+    data_collection_enabled = "data_collection" in init_kwargs
     url_attrs_expected = data_collection_enabled or init_kwargs.get(
         "send_default_pii", False
     )
@@ -786,7 +780,7 @@ def test_url_query_data_collection_event_processor(
 
     assert event["request"]["url"].endswith("/message")
     assert event["request"]["method"] == "GET"
-    if "data_collection" not in init_kwargs.get("_experiments", {}):
+    if "data_collection" not in init_kwargs:
         assert (
             event["request"]["query_string"] == "toy=tennisball&color=red&auth=secret"
         )
@@ -794,3 +788,192 @@ def test_url_query_data_collection_event_processor(
         assert "query_string" not in event["request"]
     else:
         assert event["request"]["query_string"] == expected_query
+
+
+@pytest.mark.parametrize(
+    "data_collection, expect_body",
+    [
+        pytest.param({}, True, id="data_collection_http_bodies_default"),
+        pytest.param(
+            {"http_bodies": ["incoming_request"]},
+            True,
+            id="data_collection_http_bodies_incoming_request",
+        ),
+        pytest.param(
+            {"http_bodies": ["outgoing_request"]},
+            False,
+            id="data_collection_http_bodies_outgoing_request_only",
+        ),
+        pytest.param(
+            {"http_bodies": []}, False, id="data_collection_http_bodies_empty"
+        ),
+    ],
+)
+def test_request_body_data_collection_event_processor(
+    sentry_init, app, capture_events, data_collection, expect_body
+):
+    sentry_init(
+        integrations=[SanicIntegration()],
+        data_collection=data_collection,
+    )
+
+    data = {"hey": 42}
+
+    @app.route("/body", methods=["POST"])
+    def body_handler(request):
+        capture_message("hi")
+        return response.text("ok")
+
+    events = capture_events()
+
+    c = get_client(app)
+    with c as client:
+        _, http_response = client.post("/body", json=data)
+        assert http_response.status == 200
+
+    (event,) = events
+
+    if expect_body:
+        assert event["request"]["data"] == data
+    else:
+        assert "data" not in event["request"]
+
+
+def test_oversized_request_body_not_annotated_data_collection(
+    sentry_init, app, capture_events
+):
+    """
+    The gating happens before the size check, so an oversized body is dropped
+    outright instead of being reported as removed because of the size limit.
+    """
+    sentry_init(
+        integrations=[SanicIntegration()],
+        max_request_body_size="small",
+        data_collection={"http_bodies": []},
+    )
+
+    @app.route("/oversized", methods=["POST"])
+    def oversized_handler(request):
+        capture_message("hi")
+        return response.text("ok")
+
+    events = capture_events()
+
+    c = get_client(app)
+    with c as client:
+        _, http_response = client.post("/oversized", data="a" * 2000)
+        assert http_response.status == 200
+
+    (event,) = events
+
+    assert "data" not in event["request"]
+    assert "data" not in event.get("_meta", {}).get("request", {})
+
+
+@pytest.mark.parametrize(
+    "init_kwargs, expect_remote_addr", DATA_COLLECTION_REMOTE_ADDR_CASES
+)
+def test_remote_addr_data_collection(
+    sentry_init, app, capture_events, init_kwargs, expect_remote_addr
+):
+    sentry_init(integrations=[SanicIntegration()], **init_kwargs)
+    events = capture_events()
+
+    c = get_client(app)
+    with c as client:
+        _, response = client.get("/message")
+        assert response.status == 200
+
+    (event,) = events
+    if expect_remote_addr:
+        assert event["request"]["env"] == {"REMOTE_ADDR": ""}
+    else:
+        assert "env" not in event["request"]
+
+
+@pytest.mark.skipif(
+    not PERFORMANCE_SUPPORTED, reason="Performance not supported on this Sanic version"
+)
+@pytest.mark.parametrize(
+    "forwarded_for, host_header, is_localhost",
+    [
+        # Loopback IP
+        ("127.0.0.1", "example.com", True),
+        # IPv6 loopback (quoted brackets per RFC 7239)
+        ('"[::1]"', "example.com", True),
+        # Localhost host header with non-local IP
+        ("203.0.113.50", "localhost:8000", True),
+        # Non-local everything
+        ("203.0.113.50", "example.com", False),
+    ],
+)
+def test_is_localhost_span_attribute(
+    sentry_init, app, capture_items, forwarded_for, host_header, is_localhost
+):
+    app.config.FORWARDED_SECRET = "test"
+
+    @app.route("/child-span")
+    def child_span_handler_localhost(request):
+        with sentry_sdk.traces.start_span(name="child-span"):
+            pass
+        return response.text("ok")
+
+    sentry_init(
+        integrations=[SanicIntegration()],
+        default_integrations=False,
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+    )
+
+    items = capture_items("span")
+
+    c = get_client(app)
+    with c as client:
+        client.get(
+            "/child-span",
+            headers={
+                "Forwarded": f"for={forwarded_for};secret=test",
+                "Host": host_header,
+            },
+        )
+
+    sentry_sdk.flush()
+
+    child_span, server_span = [item.payload for item in items]
+
+    assert server_span["attributes"]["sentry.is_localhost"] is is_localhost
+    assert child_span["attributes"]["sentry.is_localhost"] is is_localhost
+
+
+@pytest.mark.skipif(
+    not PERFORMANCE_SUPPORTED, reason="Performance not supported on this Sanic version"
+)
+def test_user_agent_attribute(sentry_init, app, capture_items):
+    @app.route("/child-span")
+    def child_span_handler_ua(request):
+        with sentry_sdk.traces.start_span(name="child-span"):
+            pass
+        return response.text("ok")
+
+    sentry_init(
+        integrations=[SanicIntegration()],
+        default_integrations=False,
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+    )
+
+    items = capture_items("span")
+
+    c = get_client(app)
+    with c as client:
+        client.get(
+            "/child-span",
+            headers={"User-Agent": "TestBrowser/1.0"},
+        )
+
+    sentry_sdk.flush()
+
+    child_span, server_span = [item.payload for item in items]
+
+    assert server_span["attributes"]["user_agent.original"] == "TestBrowser/1.0"
+    assert child_span["attributes"]["user_agent.original"] == "TestBrowser/1.0"

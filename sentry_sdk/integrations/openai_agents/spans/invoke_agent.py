@@ -14,7 +14,7 @@ from sentry_sdk.tracing_utils import (
     has_span_streaming_enabled,
     should_truncate_gen_ai_input,
 )
-from sentry_sdk.utils import safe_serialize
+from sentry_sdk.utils import has_data_collection_enabled, safe_serialize
 
 from ..consts import SPAN_ORIGIN
 from ..utils import _set_agent_data, _set_usage_data
@@ -28,9 +28,10 @@ if TYPE_CHECKING:
 
 
 def invoke_agent_span(
-    agent: "agents.Agent", turn_input: "Optional[list[TResponseInputItem]]"
+    agent: "agents.Agent", turn_input: "Optional[Union[str, list[TResponseInputItem]]]"
 ) -> "Union[sentry_sdk.tracing.Span, StreamedSpan]":
-    span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
+    client_options = sentry_sdk.get_client().options
+    span_streaming = has_span_streaming_enabled(client_options)
     if span_streaming:
         span = sentry_sdk.traces.start_span(
             name=f"invoke_agent {agent.name}",
@@ -51,7 +52,14 @@ def invoke_agent_span(
 
         span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "invoke_agent")
 
-    if should_send_default_pii():
+    record_inputs = False
+    if has_data_collection_enabled(client_options):
+        if client_options["data_collection"]["gen_ai"]["inputs"]:
+            record_inputs = True
+    elif should_send_default_pii():
+        record_inputs = True
+
+    if record_inputs:
         messages = []
         if agent.instructions:
             message = (
@@ -104,14 +112,23 @@ def invoke_agent_span(
 def update_invoke_agent_span(
     span: "Union[sentry_sdk.tracing.Span, StreamedSpan]",
     usage: "Optional[Usage]",
-    agent: "agents.Agent",
+    agent: "Optional[agents.Agent]",
     output: "Any" = None,
 ) -> None:
     if usage is not None:
         _set_usage_data(span, usage)
 
-    if should_send_default_pii():
+    client = sentry_sdk.get_client()
+    if has_data_collection_enabled(client.options):
+        if client.options["data_collection"]["gen_ai"]["outputs"]:
+            set_data_normalized(
+                span, SPANDATA.GEN_AI_RESPONSE_TEXT, output, unpack=False
+            )
+    elif should_send_default_pii():
         set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, output, unpack=False)
+
+    if agent is None:
+        return
 
     # Add conversation ID from agent
     conv_id = getattr(agent, "_sentry_conversation_id", None)

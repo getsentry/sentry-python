@@ -123,7 +123,7 @@ async def test_agent_run_async(
         chat_spans = [
             s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
         ]
-        assert len(chat_spans) >= 1
+        assert len(chat_spans) == 1
 
         # Check chat span
         chat_span = chat_spans[0]
@@ -173,7 +173,7 @@ async def test_agent_run_async(
         chat_spans = [
             s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
         ]
-        assert len(chat_spans) >= 1
+        assert len(chat_spans) == 1
 
         # Check chat span
         chat_span = chat_spans[0]
@@ -219,7 +219,7 @@ async def test_agent_run_async(
 
         # Find child span types (invoke_agent is the transaction, not a child span)
         chat_spans = [s for s in spans if s["op"] == "gen_ai.chat"]
-        assert len(chat_spans) >= 1
+        assert len(chat_spans) == 1
 
         # Check chat span
         chat_span = chat_spans[0]
@@ -341,11 +341,10 @@ def test_agent_run_sync(
         chat_spans = [
             s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
         ]
-        assert len(chat_spans) >= 1
+        assert len(chat_spans) == 1
 
         # Verify streaming flag is False for sync
-        for chat_span in chat_spans:
-            assert chat_span["attributes"]["gen_ai.response.streaming"] is False
+        assert chat_spans[0]["attributes"]["gen_ai.response.streaming"] is False
     elif stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
@@ -368,11 +367,10 @@ def test_agent_run_sync(
         chat_spans = [
             s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
         ]
-        assert len(chat_spans) >= 1
+        assert len(chat_spans) == 1
 
         # Verify streaming flag is False for sync
-        for chat_span in chat_spans:
-            assert chat_span["attributes"]["gen_ai.response.streaming"] is False
+        assert chat_spans[0]["attributes"]["gen_ai.response.streaming"] is False
     else:
         events = capture_events()
 
@@ -390,11 +388,10 @@ def test_agent_run_sync(
 
         # Find span types
         chat_spans = [s for s in spans if s["op"] == "gen_ai.chat"]
-        assert len(chat_spans) >= 1
+        assert len(chat_spans) == 1
 
         # Verify streaming flag is False for sync
-        for chat_span in chat_spans:
-            assert chat_span["data"]["gen_ai.response.streaming"] is False
+        assert chat_spans[0]["data"]["gen_ai.response.streaming"] is False
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
@@ -507,34 +504,33 @@ async def test_agent_run_stream(
         chat_spans = [
             s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
         ]
-        assert len(chat_spans) >= 1
+        assert len(chat_spans) == 1
 
         # Verify streaming flag is True for streaming
-        for chat_span in chat_spans:
-            assert chat_span["attributes"]["gen_ai.response.streaming"] is True
-            assert json.loads(
-                chat_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-            ) == [
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": "Message demonstrating the absence of truncation.",
-                        },
-                        {
-                            "type": "text",
-                            "text": "Test input",
-                        },
-                    ],
-                }
-            ]
-            assert "gen_ai.usage.input_tokens" in chat_span["attributes"]
-            # Streaming responses should still have output data
-            assert (
-                "gen_ai.response.text" in chat_span["attributes"]
-                or "gen_ai.response.model" in chat_span["attributes"]
-            )
+        assert chat_spans[0]["attributes"]["gen_ai.response.streaming"] is True
+        assert json.loads(
+            chat_spans[0]["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        ) == [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": "Message demonstrating the absence of truncation.",
+                    },
+                    {
+                        "type": "text",
+                        "text": "Test input",
+                    },
+                ],
+            }
+        ]
+        assert "gen_ai.usage.input_tokens" in chat_spans[0]["attributes"]
+        # Streaming responses should still have output data
+        assert (
+            "gen_ai.response.text" in chat_spans[0]["attributes"]
+            or "gen_ai.response.model" in chat_spans[0]["attributes"]
+        )
     elif stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
@@ -557,34 +553,33 @@ async def test_agent_run_stream(
         chat_spans = [
             s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
         ]
-        assert len(chat_spans) >= 1
+        assert len(chat_spans) == 1
 
         # Verify streaming flag is True for streaming
-        for chat_span in chat_spans:
-            assert chat_span["attributes"]["gen_ai.response.streaming"] is True
-            assert json.loads(
-                chat_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-            ) == [
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": "Message demonstrating the absence of truncation.",
-                        },
-                        {
-                            "type": "text",
-                            "text": "Test input",
-                        },
-                    ],
-                }
-            ]
-            assert "gen_ai.usage.input_tokens" in chat_span["attributes"]
-            # Streaming responses should still have output data
-            assert (
-                "gen_ai.response.text" in chat_span["attributes"]
-                or "gen_ai.response.model" in chat_span["attributes"]
-            )
+        assert chat_spans[0]["attributes"]["gen_ai.response.streaming"] is True
+        assert json.loads(
+            chat_spans[0]["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        ) == [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": "Message demonstrating the absence of truncation.",
+                    },
+                    {
+                        "type": "text",
+                        "text": "Test input",
+                    },
+                ],
+            }
+        ]
+        assert "gen_ai.usage.input_tokens" in chat_spans[0]["attributes"]
+        # Streaming responses should still have output data
+        assert (
+            "gen_ai.response.text" in chat_spans[0]["attributes"]
+            or "gen_ai.response.model" in chat_spans[0]["attributes"]
+        )
     else:
         events = capture_events()
 
@@ -602,18 +597,17 @@ async def test_agent_run_stream(
 
         # Find chat spans
         chat_spans = [s for s in spans if s["op"] == "gen_ai.chat"]
-        assert len(chat_spans) >= 1
+        assert len(chat_spans) == 1
 
         # Verify streaming flag is True for streaming
-        for chat_span in chat_spans:
-            assert chat_span["data"]["gen_ai.response.streaming"] is True
-            assert "gen_ai.request.messages" in chat_span["data"]
-            assert "gen_ai.usage.input_tokens" in chat_span["data"]
-            # Streaming responses should still have output data
-            assert (
-                "gen_ai.response.text" in chat_span["data"]
-                or "gen_ai.response.model" in chat_span["data"]
-            )
+        assert chat_spans[0]["data"]["gen_ai.response.streaming"] is True
+        assert "gen_ai.request.messages" in chat_spans[0]["data"]
+        assert "gen_ai.usage.input_tokens" in chat_spans[0]["data"]
+        # Streaming responses should still have output data
+        assert (
+            "gen_ai.response.text" in chat_spans[0]["data"]
+            or "gen_ai.response.model" in chat_spans[0]["data"]
+        )
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
@@ -664,11 +658,10 @@ async def test_agent_run_stream_events(
         chat_spans = [
             s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
         ]
-        assert len(chat_spans) >= 1
+        assert len(chat_spans) == 1
 
         # run_stream_events uses run() internally, so streaming should be False
-        for chat_span in chat_spans:
-            assert chat_span["attributes"]["gen_ai.response.streaming"] is False
+        assert chat_spans[0]["attributes"]["gen_ai.response.streaming"] is False
     elif stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
@@ -695,11 +688,10 @@ async def test_agent_run_stream_events(
         chat_spans = [
             s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
         ]
-        assert len(chat_spans) >= 1
+        assert len(chat_spans) == 1
 
         # run_stream_events uses run() internally, so streaming should be False
-        for chat_span in chat_spans:
-            assert chat_span["attributes"]["gen_ai.response.streaming"] is False
+        assert chat_spans[0]["attributes"]["gen_ai.response.streaming"] is False
     else:
         events = capture_events()
 
@@ -719,11 +711,10 @@ async def test_agent_run_stream_events(
         # Find chat spans
         spans = transaction["spans"]
         chat_spans = [s for s in spans if s["op"] == "gen_ai.chat"]
-        assert len(chat_spans) >= 1
+        assert len(chat_spans) == 1
 
         # run_stream_events uses run() internally, so streaming should be False
-        for chat_span in chat_spans:
-            assert chat_span["data"]["gen_ai.response.streaming"] is False
+        assert chat_spans[0]["data"]["gen_ai.response.streaming"] is False
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
@@ -1031,34 +1022,15 @@ async def test_agent_with_tool_validation_error(
         chat_spans = [
             s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
         ]
-        tool_spans = [
-            s
-            for s in spans
-            if s["attributes"].get("sentry.op", "") == "gen_ai.execute_tool"
-        ]
-
-        # Should have tool spans
-        assert len(tool_spans) >= 1
-
-        # Check tool spans
-        model_retry_tool_span = tool_spans[0]
-        assert "execute_tool" in model_retry_tool_span["name"]
-        assert (
-            model_retry_tool_span["attributes"]["gen_ai.operation.name"]
-            == "execute_tool"
-        )
-        assert model_retry_tool_span["attributes"]["gen_ai.tool.name"] == "add_numbers"
-        assert "gen_ai.tool.input" in model_retry_tool_span["attributes"]
 
         # Check chat spans have available_tools
-        for chat_span in chat_spans:
-            assert "gen_ai.request.available_tools" in chat_span["attributes"]
-            available_tools_str = chat_span["attributes"][
-                "gen_ai.request.available_tools"
-            ]
+        assert "gen_ai.request.available_tools" in chat_spans[0]["attributes"]
+        available_tools_str = chat_spans[0]["attributes"][
+            "gen_ai.request.available_tools"
+        ]
 
-            # Available tools is serialized as a string
-            assert "add_numbers" in available_tools_str
+        # Available tools is serialized as a string
+        assert "add_numbers" in available_tools_str
     else:
         events = capture_events()
 
@@ -1083,24 +1055,12 @@ async def test_agent_with_tool_validation_error(
 
         # Find child span types (invoke_agent is the transaction, not a child span)
         chat_spans = [s for s in spans if s["op"] == "gen_ai.chat"]
-        tool_spans = [s for s in spans if s["op"] == "gen_ai.execute_tool"]
-
-        # Should have tool spans
-        assert len(tool_spans) >= 1
-
-        # Check tool spans
-        model_retry_tool_span = tool_spans[0]
-        assert "execute_tool" in model_retry_tool_span["description"]
-        assert model_retry_tool_span["data"]["gen_ai.operation.name"] == "execute_tool"
-        assert model_retry_tool_span["data"]["gen_ai.tool.name"] == "add_numbers"
-        assert "gen_ai.tool.input" in model_retry_tool_span["data"]
 
         # Check chat spans have available_tools
-        for chat_span in chat_spans:
-            assert "gen_ai.request.available_tools" in chat_span["data"]
-            available_tools_str = chat_span["data"]["gen_ai.request.available_tools"]
-            # Available tools is serialized as a string
-            assert "add_numbers" in available_tools_str
+        assert "gen_ai.request.available_tools" in chat_spans[0]["data"]
+        available_tools_str = chat_spans[0]["data"]["gen_ai.request.available_tools"]
+        # Available tools is serialized as a string
+        assert "add_numbers" in available_tools_str
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
@@ -1156,8 +1116,7 @@ async def test_agent_with_tools_streaming(
         assert len(tool_spans) >= 1
 
         # Verify streaming flag is True
-        for chat_span in chat_spans:
-            assert chat_span["attributes"]["gen_ai.response.streaming"] is True
+        assert chat_spans[0]["attributes"]["gen_ai.response.streaming"] is True
 
         # Check tool span
         tool_span = tool_spans[0]
@@ -1182,8 +1141,7 @@ async def test_agent_with_tools_streaming(
         assert len(tool_spans) >= 1
 
         # Verify streaming flag is True
-        for chat_span in chat_spans:
-            assert chat_span["data"]["gen_ai.response.streaming"] is True
+        assert chat_spans[0]["data"]["gen_ai.response.streaming"] is True
 
         # Check tool span
         tool_span = tool_spans[0]
@@ -1227,7 +1185,7 @@ async def test_model_settings(
         chat_spans = [
             s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
         ]
-        assert len(chat_spans) >= 1
+        assert len(chat_spans) == 1
 
         chat_span = chat_spans[0]
         # Check that model settings are captured
@@ -1244,7 +1202,7 @@ async def test_model_settings(
 
         # Find chat span
         chat_spans = [s for s in spans if s["op"] == "gen_ai.chat"]
-        assert len(chat_spans) >= 1
+        assert len(chat_spans) == 1
 
         chat_span = chat_spans[0]
         # Check that model settings are captured
@@ -1303,7 +1261,7 @@ async def test_system_prompt_attribute(
         chat_spans = [
             s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
         ]
-        assert len(chat_spans) >= 1
+        assert len(chat_spans) == 1
 
         chat_span = chat_spans[0]
 
@@ -1329,7 +1287,7 @@ async def test_system_prompt_attribute(
 
         # The transaction IS the invoke_agent span, check for messages in chat spans instead
         chat_spans = [s for s in spans if s["op"] == "gen_ai.chat"]
-        assert len(chat_spans) >= 1
+        assert len(chat_spans) == 1
 
         chat_span = chat_spans[0]
 
@@ -1403,7 +1361,7 @@ async def test_error_handling(
         await agent.run("Hello")
 
         # At minimum, we should have a transaction
-        assert len(events) >= 1
+        assert len(events) == 1
         transaction = [e for e in events if e.get("type") == "transaction"][0]
 
         assert transaction["transaction"] == "invoke_agent test_error"
@@ -1602,7 +1560,7 @@ async def test_multiple_agents_concurrent(
             assert transaction["type"] == "transaction"
             assert transaction["transaction"] == "invoke_agent test_agent"
             # Each should have its own spans
-            assert len(transaction["spans"]) >= 1
+            assert len(transaction["spans"]) == 1
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
@@ -1673,7 +1631,7 @@ async def test_message_history(
         await agent.run("What is my name?", message_history=history)
 
         # We should have 2 transactions
-        assert len(events) >= 2
+        assert len(events) == 2
 
         # Check the second transaction has the full history
         second_transaction = events[1]
@@ -1723,7 +1681,7 @@ async def test_gen_ai_system(
         chat_spans = [
             s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
         ]
-        assert len(chat_spans) >= 1
+        assert len(chat_spans) == 1
 
         chat_span = chat_spans[0]
         # gen_ai.system should be set from the model (TestModel -> 'test')
@@ -1739,7 +1697,7 @@ async def test_gen_ai_system(
 
         # Find chat span
         chat_spans = [s for s in spans if s["op"] == "gen_ai.chat"]
-        assert len(chat_spans) >= 1
+        assert len(chat_spans) == 1
 
         chat_span = chat_spans[0]
         # gen_ai.system should be set from the model (TestModel -> 'test')
@@ -1843,9 +1801,8 @@ async def test_include_prompts_true(
         ]
 
         # Verify that messages are captured in chat spans
-        assert len(chat_spans) >= 1
-        for chat_span in chat_spans:
-            assert "gen_ai.request.messages" in chat_span["attributes"]
+        assert len(chat_spans) == 1
+        assert "gen_ai.request.messages" in chat_spans[0]["attributes"]
     else:
         events = capture_events()
 
@@ -1858,9 +1815,8 @@ async def test_include_prompts_true(
         chat_spans = [s for s in spans if s["op"] == "gen_ai.chat"]
 
         # Verify that messages are captured in chat spans
-        assert len(chat_spans) >= 1
-        for chat_span in chat_spans:
-            assert "gen_ai.request.messages" in chat_span["data"]
+        assert len(chat_spans) == 1
+        assert "gen_ai.request.messages" in chat_spans[0]["data"]
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
@@ -2243,15 +2199,15 @@ async def test_invoke_agent_with_instructions(
     """
     from pydantic_ai import Agent
 
-    # Create agent with instructions (can be string or list)
     agent = Agent(
         "test",
         name="test_instructions",
+        instructions=["Instruction 1", "Instruction 2"],
+        system_prompt="System prompt",
     )
 
-    # Add instructions via _instructions attribute (internal API)
-    agent._instructions = ["Instruction 1", "Instruction 2"]
-    agent._system_prompts = ["System prompt"]
+    # pydantic-ai >=2.36.0 joins multiple instructions with a blank line, earlier versions with a single newline
+    instructions_separator = "\n\n" if PYDANTIC_AI_VERSION >= (2, 36) else "\n"
 
     sentry_init(
         integrations=[PydanticAIIntegration(include_prompts=include_prompts)],
@@ -2273,7 +2229,7 @@ async def test_invoke_agent_with_instructions(
         chat_spans = [
             s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
         ]
-        assert len(chat_spans) >= 1
+        assert len(chat_spans) == 1
 
         chat_span = chat_spans[0]
 
@@ -2283,7 +2239,10 @@ async def test_invoke_agent_with_instructions(
             ]
             assert json.loads(system_instructions) == [
                 {"type": "text", "content": "System prompt"},
-                {"type": "text", "content": "Instruction 1\nInstruction 2"},
+                {
+                    "type": "text",
+                    "content": f"Instruction 1{instructions_separator}Instruction 2",
+                },
             ]
         else:
             assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in chat_span["attributes"]
@@ -2298,7 +2257,7 @@ async def test_invoke_agent_with_instructions(
 
         # The transaction IS the invoke_agent span, check for messages in chat spans instead
         chat_spans = [s for s in spans if s["op"] == "gen_ai.chat"]
-        assert len(chat_spans) >= 1
+        assert len(chat_spans) == 1
 
         chat_span = chat_spans[0]
 
@@ -2306,7 +2265,10 @@ async def test_invoke_agent_with_instructions(
             system_instructions = chat_span["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
             assert json.loads(system_instructions) == [
                 {"type": "text", "content": "System prompt"},
-                {"type": "text", "content": "Instruction 1\nInstruction 2"},
+                {
+                    "type": "text",
+                    "content": f"Instruction 1{instructions_separator}Instruction 2",
+                },
             ]
         else:
             assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in chat_span["data"]
@@ -2367,41 +2329,6 @@ async def test_model_name_extraction_fallback_to_str(sentry_init, capture_items)
     assert isinstance(result, str)
 
 
-@pytest.mark.asyncio
-async def test_model_settings_object_style(sentry_init, capture_items):
-    """
-    Test that object-style model settings (non-dict) are handled correctly.
-    """
-    from unittest.mock import MagicMock
-
-    import sentry_sdk
-    from sentry_sdk.integrations.pydantic_ai.utils import _set_model_data
-
-    sentry_init(
-        integrations=[PydanticAIIntegration()],
-        traces_sample_rate=1.0,
-    )
-
-    with sentry_sdk.start_transaction(op="test", name="test") as transaction:
-        span = sentry_sdk.start_span(op="test_span")
-
-        # Create mock settings object (not a dict)
-        mock_settings = MagicMock()
-        mock_settings.temperature = 0.8
-        mock_settings.max_tokens = 200
-        mock_settings.top_p = 0.95
-        mock_settings.frequency_penalty = 0.5
-        mock_settings.presence_penalty = 0.3
-
-        # Set model data with object-style settings
-        _set_model_data(span, None, mock_settings)
-
-        span.finish()
-
-    # Should not crash and should set the settings
-    assert transaction is not None
-
-
 @pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
@@ -2448,7 +2375,7 @@ async def test_usage_data_partial(
 
         chat_spans = [s for s in spans if s["op"] == "gen_ai.chat"]
 
-    assert len(chat_spans) >= 1
+    assert len(chat_spans) == 1
 
     # Check that usage data fields exist (they may or may not be set depending on TestModel)
     chat_span = chat_spans[0]
@@ -2621,10 +2548,9 @@ async def test_output_with_tool_calls(
         assert len(chat_spans) >= 1
 
         # Check if tool calls are captured in response
-        for chat_span in chat_spans:
-            # Tool calls may or may not be in response depending on TestModel behavior
-            # Just verify the span was created and has basic data
-            assert "gen_ai.operation.name" in chat_span["attributes"]
+        # Tool calls may or may not be in response depending on TestModel behavior
+        # Just verify the span was created and has basic data
+        assert "gen_ai.operation.name" in chat_spans[0]["attributes"]
     else:
         events = capture_events()
 
@@ -2639,10 +2565,9 @@ async def test_output_with_tool_calls(
         assert len(chat_spans) >= 1
 
         # Check if tool calls are captured in response
-        for chat_span in chat_spans:
-            # Tool calls may or may not be in response depending on TestModel behavior
-            # Just verify the span was created and has basic data
-            assert "gen_ai.operation.name" in chat_span["data"]
+        # Tool calls may or may not be in response depending on TestModel behavior
+        # Just verify the span was created and has basic data
+        assert "gen_ai.operation.name" in chat_spans[0]["data"]
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
@@ -2697,7 +2622,7 @@ async def test_message_formatting_with_different_parts(
         ]
 
         # Should have chat spans
-        assert len(chat_spans) >= 1
+        assert len(chat_spans) == 1
 
         # Check that messages are captured
         chat_span = chat_spans[0]
@@ -2715,7 +2640,7 @@ async def test_message_formatting_with_different_parts(
         chat_spans = [s for s in spans if s["op"] == "gen_ai.chat"]
 
         # Should have chat spans
-        assert len(chat_spans) >= 1
+        assert len(chat_spans) == 1
 
         # Check that messages are captured
         chat_span = chat_spans[0]
@@ -3010,7 +2935,7 @@ async def test_message_parts_with_tool_return(
         chat_spans = [s for s in spans if s["op"] == "gen_ai.chat"]
 
     # Should have chat spans
-    assert len(chat_spans) >= 1
+    assert len(chat_spans) == 2
 
 
 @pytest.mark.asyncio
@@ -3409,110 +3334,14 @@ async def test_get_model_name_with_none(sentry_init, capture_items):
 
 
 @pytest.mark.asyncio
-async def test_set_model_data_with_system(sentry_init, capture_items):
-    """
-    Test that _set_model_data captures system from model.
-    """
-    from unittest.mock import MagicMock
-
-    import sentry_sdk
-    from sentry_sdk.integrations.pydantic_ai.utils import _set_model_data
-
-    sentry_init(
-        integrations=[PydanticAIIntegration()],
-        traces_sample_rate=1.0,
-    )
-
-    with sentry_sdk.start_transaction(op="test", name="test") as transaction:
-        span = sentry_sdk.start_span(op="test_span")
-
-        # Create model with system
-        mock_model = MagicMock()
-        mock_model.system = "openai"
-        mock_model.model_name = "gpt-4"
-
-        # Set model data
-        _set_model_data(span, mock_model, None)
-
-        span.finish()
-
-    # Should not crash
-    assert transaction is not None
-
-
-@pytest.mark.asyncio
-async def test_set_model_data_from_agent_scope(sentry_init, capture_items):
-    """
-    Test that _set_model_data retrieves model from agent in scope when not passed.
-    """
-    from unittest.mock import MagicMock
-
-    import sentry_sdk
-    from sentry_sdk.integrations.pydantic_ai.utils import _set_model_data
-
-    sentry_init(
-        integrations=[PydanticAIIntegration()],
-        traces_sample_rate=1.0,
-    )
-
-    with sentry_sdk.start_transaction(op="test", name="test") as transaction:
-        # Set agent in scope
-        scope = sentry_sdk.get_current_scope()
-        mock_agent = MagicMock()
-        mock_agent.model = MagicMock()
-        mock_agent.model.model_name = "test-model"
-        mock_agent.model_settings = {"temperature": 0.5}
-        scope._contexts["pydantic_ai_agent"] = {"_agent": mock_agent}
-
-        span = sentry_sdk.start_span(op="test_span")
-
-        # Pass None for model, should get from scope
-        _set_model_data(span, None, None)
-
-        span.finish()
-
-    # Should not crash
-    assert transaction is not None
-
-
-@pytest.mark.asyncio
-async def test_set_model_data_with_none_settings_values(sentry_init, capture_items):
-    """
-    Test that _set_model_data skips None values in settings.
-    """
-    import sentry_sdk
-    from sentry_sdk.integrations.pydantic_ai.utils import _set_model_data
-
-    sentry_init(
-        integrations=[PydanticAIIntegration()],
-        traces_sample_rate=1.0,
-    )
-
-    with sentry_sdk.start_transaction(op="test", name="test") as transaction:
-        span = sentry_sdk.start_span(op="test_span")
-
-        # Create settings with None values
-        settings = {
-            "temperature": 0.7,
-            "max_tokens": None,  # Should be skipped
-            "top_p": None,  # Should be skipped
-        }
-
-        # Set model data
-        _set_model_data(span, None, settings)
-
-        span.finish()
-
-    # Should not crash
-    assert transaction is not None
-
-
-@pytest.mark.asyncio
 async def test_should_send_prompts_without_pii(sentry_init, capture_items):
     """
-    Test that _should_send_prompts returns False when PII disabled.
+    Test that _should_send_inputs/_should_send_outputs return False when PII disabled.
     """
-    from sentry_sdk.integrations.pydantic_ai.utils import _should_send_prompts
+    from sentry_sdk.integrations.pydantic_ai.utils import (
+        _should_send_inputs,
+        _should_send_outputs,
+    )
 
     sentry_init(
         integrations=[PydanticAIIntegration(include_prompts=True)],
@@ -3521,97 +3350,8 @@ async def test_should_send_prompts_without_pii(sentry_init, capture_items):
     )
 
     # Should return False
-    result = _should_send_prompts()
-    assert result is False
-
-
-@pytest.mark.asyncio
-async def test_set_agent_data_without_agent(sentry_init, capture_items):
-    """
-    Test that _set_agent_data handles None agent gracefully.
-    """
-    import sentry_sdk
-    from sentry_sdk.integrations.pydantic_ai.utils import _set_agent_data
-
-    sentry_init(
-        integrations=[PydanticAIIntegration()],
-        traces_sample_rate=1.0,
-    )
-
-    with sentry_sdk.start_transaction(op="test", name="test") as transaction:
-        span = sentry_sdk.start_span(op="test_span")
-
-        # Pass None agent, with no agent in scope
-        _set_agent_data(span, None)
-
-        span.finish()
-
-    # Should not crash
-    assert transaction is not None
-
-
-@pytest.mark.asyncio
-async def test_set_agent_data_from_scope(sentry_init, capture_items):
-    """
-    Test that _set_agent_data retrieves agent from scope when not passed.
-    """
-    from unittest.mock import MagicMock
-
-    import sentry_sdk
-    from sentry_sdk.integrations.pydantic_ai.utils import _set_agent_data
-
-    sentry_init(
-        integrations=[PydanticAIIntegration()],
-        traces_sample_rate=1.0,
-    )
-
-    with sentry_sdk.start_transaction(op="test", name="test") as transaction:
-        # Set agent in scope
-        scope = sentry_sdk.get_current_scope()
-        mock_agent = MagicMock()
-        mock_agent.name = "test_agent_from_scope"
-        scope._contexts["pydantic_ai_agent"] = {"_agent": mock_agent}
-
-        span = sentry_sdk.start_span(op="test_span")
-
-        # Pass None for agent, should get from scope
-        _set_agent_data(span, None)
-
-        span.finish()
-
-    # Should not crash
-    assert transaction is not None
-
-
-@pytest.mark.asyncio
-async def test_set_agent_data_without_name(sentry_init, capture_items):
-    """
-    Test that _set_agent_data handles agent without name attribute.
-    """
-    from unittest.mock import MagicMock
-
-    import sentry_sdk
-    from sentry_sdk.integrations.pydantic_ai.utils import _set_agent_data
-
-    sentry_init(
-        integrations=[PydanticAIIntegration()],
-        traces_sample_rate=1.0,
-    )
-
-    with sentry_sdk.start_transaction(op="test", name="test") as transaction:
-        span = sentry_sdk.start_span(op="test_span")
-
-        # Create agent without name
-        mock_agent = MagicMock()
-        mock_agent.name = None  # No name
-
-        # Should not set agent name
-        _set_agent_data(span, mock_agent)
-
-        span.finish()
-
-    # Should not crash
-    assert transaction is not None
+    assert _should_send_inputs() is False
+    assert _should_send_outputs() is False
 
 
 @pytest.mark.asyncio
@@ -3851,15 +3591,8 @@ async def test_tool_execution_without_span_context(sentry_init, capture_items):
 
     # Call without span context (no transaction active)
     # The patches should handle this gracefully
-    try:
-        # This will fail because we're not in a transaction, but it should not crash
-        await agent.run("test")
-    except Exception:
-        # Expected to fail, that's okay
-        pass
-
-    # Should not crash
-    assert True
+    result = await agent.run("test")
+    assert result.output is not None
 
 
 @pytest.mark.asyncio
@@ -4249,7 +3982,7 @@ async def test_binary_content_in_agent_run(
         chat_spans = [
             s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
         ]
-        assert len(chat_spans) >= 1
+        assert len(chat_spans) == 1
 
         chat_span = chat_spans[0]
         if "gen_ai.request.messages" in chat_span["attributes"]:
@@ -4265,7 +3998,7 @@ async def test_binary_content_in_agent_run(
 
         (transaction,) = events
         chat_spans = [s for s in transaction["spans"] if s["op"] == "gen_ai.chat"]
-        assert len(chat_spans) >= 1
+        assert len(chat_spans) == 1
 
         chat_span = chat_spans[0]
         if "gen_ai.request.messages" in chat_span["data"]:
@@ -4438,7 +4171,7 @@ def test_image_url_base64_content_in_span(
         chat_spans = [
             s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
         ]
-        assert len(chat_spans) >= 1
+        assert len(chat_spans) == 1
         messages_data = _get_messages_from_span(chat_spans[0]["attributes"])
 
         for msg in messages_data:
@@ -4463,7 +4196,7 @@ def test_image_url_base64_content_in_span(
 
         (event,) = events
         chat_spans = [s for s in event["spans"] if s["op"] == "gen_ai.chat"]
-        assert len(chat_spans) >= 1
+        assert len(chat_spans) == 1
         messages_data = _get_messages_from_span(chat_spans[0]["data"])
 
         for msg in messages_data:
@@ -4543,15 +4276,14 @@ async def test_invoke_agent_image_url(
         chat_spans = [
             s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
         ]
-        for chat_span in chat_spans:
-            messages_data = _get_messages_from_span(chat_span["attributes"])
-            for msg in messages_data:
-                if "content" not in msg:
-                    continue
-                for content_item in msg["content"]:
-                    if content_item.get("type") == "image":
-                        assert content_item["content"] == expected_content
-                        found_image = True
+        messages_data = _get_messages_from_span(chat_spans[0]["attributes"])
+        for msg in messages_data:
+            if "content" not in msg:
+                continue
+            for content_item in msg["content"]:
+                if content_item.get("type") == "image":
+                    assert content_item["content"] == expected_content
+                    found_image = True
     else:
         events = capture_events()
 
@@ -4562,15 +4294,14 @@ async def test_invoke_agent_image_url(
         found_image = False
 
         chat_spans = [s for s in transaction["spans"] if s["op"] == "gen_ai.chat"]
-        for chat_span in chat_spans:
-            messages_data = _get_messages_from_span(chat_span["data"])
-            for msg in messages_data:
-                if "content" not in msg:
-                    continue
-                for content_item in msg["content"]:
-                    if content_item.get("type") == "image":
-                        assert content_item["content"] == expected_content
-                        found_image = True
+        messages_data = _get_messages_from_span(chat_spans[0]["data"])
+        for msg in messages_data:
+            if "content" not in msg:
+                continue
+            for content_item in msg["content"]:
+                if content_item.get("type") == "image":
+                    assert content_item["content"] == expected_content
+                    found_image = True
 
     assert found_image, "Image content item should be found in messages data"
 
@@ -4653,3 +4384,488 @@ async def test_tool_description_in_execute_tool_span(
             "Multiply two numbers"
             in tool_span["data"][SPANDATA.GEN_AI_TOOL_DESCRIPTION]
         )
+
+
+def _spans_by_op(items, events, streaming):
+    """Normalize captured spans to a list of (op, data) tuples.
+
+    Works for both the span-streaming/gen-AI-span-streaming payloads and the
+    classic transaction payload so data collection assertions can be shared.
+    """
+    if streaming:
+        sentry_sdk.flush()
+        return [
+            (
+                item.payload["attributes"].get("sentry.op", ""),
+                item.payload["attributes"],
+            )
+            for item in items
+            if item.type == "span"
+        ]
+
+    (transaction,) = events
+    return [(span["op"], span["data"]) for span in transaction["spans"]]
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+@pytest.mark.parametrize(
+    "data_collection,send_default_pii,include_prompts,expect_inputs,expect_available_tools",
+    [
+        pytest.param(
+            {"gen_ai": {"inputs": True}},
+            False,
+            False,
+            True,
+            True,
+            id="gen-ai-inputs-enabled-overrides-pii-and-include-prompts-disabled",
+        ),
+        pytest.param(
+            {"gen_ai": {"inputs": False}},
+            True,
+            True,
+            False,
+            False,
+            id="gen-ai-inputs-disabled-overrides-pii-enabled",
+        ),
+        pytest.param(
+            {},
+            False,
+            False,
+            True,
+            True,
+            id="gen-ai-omitted-defaults-to-enabled",
+        ),
+        pytest.param(
+            {"gen_ai": {"outputs": False}},
+            False,
+            False,
+            True,
+            True,
+            id="gen-ai-outputs-disabled-does-not-affect-inputs",
+        ),
+        pytest.param(
+            None,
+            True,
+            True,
+            True,
+            True,
+            id="no-data-collection-pii-and-include-prompts-enabled-collects",
+        ),
+        pytest.param(
+            None,
+            True,
+            False,
+            False,
+            True,
+            id="no-data-collection-include-prompts-disabled",
+        ),
+        pytest.param(
+            None,
+            False,
+            True,
+            False,
+            True,
+            id="no-data-collection-pii-disabled",
+        ),
+    ],
+)
+@pytest.mark.asyncio
+async def test_data_collection_gen_ai_inputs_gates_request_messages_tool_inputs_and_available_tools(
+    sentry_init,
+    capture_events,
+    capture_items,
+    get_test_agent,
+    data_collection,
+    send_default_pii,
+    include_prompts,
+    expect_inputs,
+    expect_available_tools,
+    stream_gen_ai_spans,
+    span_streaming,
+):
+    init_kwargs = {
+        "integrations": [PydanticAIIntegration(include_prompts=include_prompts)],
+        "traces_sample_rate": 1.0,
+        "send_default_pii": send_default_pii,
+        "stream_gen_ai_spans": stream_gen_ai_spans,
+        "trace_lifecycle": "stream" if span_streaming else "static",
+    }
+    if data_collection is not None:
+        init_kwargs["data_collection"] = data_collection
+
+    sentry_init(**init_kwargs)
+
+    test_agent = get_test_agent()
+
+    @test_agent.tool_plain
+    def add_numbers(a: int, b: int) -> int:
+        return a + b
+
+    streaming = span_streaming or stream_gen_ai_spans
+    if streaming:
+        items = capture_items("span")
+        events = None
+    else:
+        items = None
+        events = capture_events()
+
+    result = await test_agent.run("What is 5 + 3?")
+    assert result is not None
+
+    spans = _spans_by_op(items, events, streaming)
+
+    chat_spans = [data for op, data in spans if op == "gen_ai.chat"]
+    tool_spans = [data for op, data in spans if op == "gen_ai.execute_tool"]
+
+    assert len(chat_spans) >= 1
+    assert len(tool_spans) >= 1
+
+    for chat_span in chat_spans:
+        if expect_inputs:
+            assert SPANDATA.GEN_AI_REQUEST_MESSAGES in chat_span
+            assert (
+                "helpful test assistant"
+                in chat_span[SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
+            )
+        else:
+            assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in chat_span
+            assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in chat_span
+
+        # Non-PII data is unaffected by the gate
+        assert SPANDATA.GEN_AI_REQUEST_MODEL in chat_span
+
+    # Both the chat and the invoke_agent spans list the agent's available tools
+    for op, span_data in spans:
+        if op not in ("gen_ai.chat", "gen_ai.invoke_agent"):
+            continue
+
+        if expect_available_tools:
+            assert "add_numbers" in span_data[SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS]
+        else:
+            assert SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS not in span_data
+
+    for tool_span in tool_spans:
+        if expect_inputs:
+            assert SPANDATA.GEN_AI_TOOL_INPUT in tool_span
+        else:
+            assert SPANDATA.GEN_AI_TOOL_INPUT not in tool_span
+
+        # Non-PII data is unaffected by the gate
+        assert tool_span[SPANDATA.GEN_AI_TOOL_NAME] == "add_numbers"
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+@pytest.mark.parametrize(
+    "data_collection,send_default_pii,include_prompts,expect_outputs",
+    [
+        pytest.param(
+            {"gen_ai": {"outputs": True}},
+            False,
+            False,
+            True,
+            id="gen-ai-outputs-enabled-overrides-pii-and-include-prompts-disabled",
+        ),
+        pytest.param(
+            {"gen_ai": {"outputs": False}},
+            True,
+            True,
+            False,
+            id="gen-ai-outputs-disabled-overrides-pii-enabled",
+        ),
+        pytest.param(
+            {},
+            False,
+            False,
+            True,
+            id="gen-ai-omitted-defaults-to-enabled",
+        ),
+        pytest.param(
+            {"gen_ai": {"inputs": False}},
+            False,
+            False,
+            True,
+            id="gen-ai-inputs-disabled-does-not-affect-outputs",
+        ),
+        pytest.param(
+            None,
+            True,
+            True,
+            True,
+            id="no-data-collection-pii-and-include-prompts-enabled-collects",
+        ),
+        pytest.param(
+            None,
+            True,
+            False,
+            False,
+            id="no-data-collection-include-prompts-disabled",
+        ),
+        pytest.param(
+            None,
+            False,
+            True,
+            False,
+            id="no-data-collection-pii-disabled",
+        ),
+    ],
+)
+@pytest.mark.asyncio
+async def test_data_collection_gen_ai_outputs_gates_response_text_and_tool_outputs(
+    sentry_init,
+    capture_events,
+    capture_items,
+    get_test_agent,
+    data_collection,
+    send_default_pii,
+    include_prompts,
+    expect_outputs,
+    stream_gen_ai_spans,
+    span_streaming,
+):
+    init_kwargs = {
+        "integrations": [PydanticAIIntegration(include_prompts=include_prompts)],
+        "traces_sample_rate": 1.0,
+        "send_default_pii": send_default_pii,
+        "stream_gen_ai_spans": stream_gen_ai_spans,
+        "trace_lifecycle": "stream" if span_streaming else "static",
+    }
+    if data_collection is not None:
+        init_kwargs["data_collection"] = data_collection
+
+    sentry_init(**init_kwargs)
+
+    test_agent = get_test_agent()
+
+    @test_agent.tool_plain
+    def add_numbers(a: int, b: int) -> int:
+        return a + b
+
+    streaming = span_streaming or stream_gen_ai_spans
+    if streaming:
+        items = capture_items("transaction", "span")
+        events = None
+    else:
+        items = None
+        events = capture_events()
+
+    result = await test_agent.run("What is 5 + 3?")
+    assert result is not None
+
+    spans = _spans_by_op(items, events, streaming)
+
+    # The invoke_agent span is either a child span or, when it is the segment
+    # span, the transaction itself.
+    invoke_agent_data = next(
+        (data for op, data in spans if op == "gen_ai.invoke_agent"), None
+    )
+    if invoke_agent_data is None:
+        if streaming:
+            (transaction,) = (
+                item.payload for item in items if item.type == "transaction"
+            )
+        else:
+            (transaction,) = events
+        invoke_agent_data = transaction["contexts"]["trace"]["data"]
+
+    chat_spans = [data for op, data in spans if op == "gen_ai.chat"]
+    tool_spans = [data for op, data in spans if op == "gen_ai.execute_tool"]
+
+    assert len(chat_spans) >= 1
+    assert len(tool_spans) >= 1
+
+    if expect_outputs:
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT in invoke_agent_data
+    else:
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in invoke_agent_data
+
+    # Every part of the output message follows the outputs gate, so the
+    # attribute is dropped entirely when outputs are disabled.
+    response_part_types = set()
+    for chat_span in chat_spans:
+        for message in json.loads(chat_span.get(SPANDATA.GEN_AI_OUTPUT_MESSAGES, "[]")):
+            for part in message["parts"]:
+                response_part_types.add(part["type"])
+
+    if expect_outputs:
+        assert "text" in response_part_types
+    else:
+        assert response_part_types == set()
+        for chat_span in chat_spans:
+            assert SPANDATA.GEN_AI_OUTPUT_MESSAGES not in chat_span
+
+    for tool_span in tool_spans:
+        if expect_outputs:
+            assert SPANDATA.GEN_AI_TOOL_OUTPUT in tool_span
+        else:
+            assert SPANDATA.GEN_AI_TOOL_OUTPUT not in tool_span
+
+        # Non-PII data is unaffected by the gate
+        assert tool_span[SPANDATA.GEN_AI_TOOL_NAME] == "add_numbers"
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+@pytest.mark.parametrize(
+    "gen_ai,expect_outputs",
+    [
+        pytest.param(
+            {"inputs": True, "outputs": False},
+            False,
+            id="gen-ai-outputs-disabled-drops-text-and-tool-calls",
+        ),
+        pytest.param(
+            {"inputs": False, "outputs": True},
+            True,
+            id="gen-ai-inputs-disabled-does-not-affect-output-messages",
+        ),
+        pytest.param(
+            {"inputs": True, "outputs": True},
+            True,
+            id="gen-ai-inputs-and-outputs-enabled",
+        ),
+        pytest.param(
+            {"inputs": False, "outputs": False},
+            False,
+            id="gen-ai-inputs-and-outputs-disabled",
+        ),
+    ],
+)
+@pytest.mark.asyncio
+async def test_data_collection_gen_ai_output_message_parts_follow_outputs_gate(
+    sentry_init,
+    capture_events,
+    capture_items,
+    get_test_agent,
+    gen_ai,
+    expect_outputs,
+    stream_gen_ai_spans,
+    span_streaming,
+):
+    sentry_init(
+        integrations=[PydanticAIIntegration()],
+        traces_sample_rate=1.0,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
+        data_collection={"gen_ai": gen_ai},
+    )
+
+    test_agent = get_test_agent()
+
+    @test_agent.tool_plain
+    def add_numbers(a: int, b: int) -> int:
+        return a + b
+
+    streaming = span_streaming or stream_gen_ai_spans
+    if streaming:
+        items = capture_items("transaction", "span")
+        events = None
+    else:
+        items = None
+        events = capture_events()
+
+    result = await test_agent.run("What is 5 + 3?")
+    assert result is not None
+
+    spans = _spans_by_op(items, events, streaming)
+    chat_spans = [data for op, data in spans if op == "gen_ai.chat"]
+
+    # The test model calls the tool on the first response and answers with text
+    # on the second, so a single run produces both part types.
+    assert len(chat_spans) >= 2
+
+    parts = []
+    for chat_span in chat_spans:
+        for message in json.loads(chat_span.get(SPANDATA.GEN_AI_OUTPUT_MESSAGES, "[]")):
+            parts.extend(message["parts"])
+
+    part_types = {part["type"] for part in parts}
+
+    if expect_outputs:
+        assert "text" in part_types
+
+        tool_calls = [part for part in parts if part["type"] == "tool_call"]
+        assert len(tool_calls) >= 1
+        assert tool_calls[0]["name"] == "add_numbers"
+        assert tool_calls[0]["arguments"]
+    else:
+        assert part_types == set()
+
+    for chat_span in chat_spans:
+        # The response model is not PII, so it is recorded regardless of the gates
+        assert SPANDATA.GEN_AI_RESPONSE_MODEL in chat_span
+
+        if not expect_outputs:
+            assert SPANDATA.GEN_AI_OUTPUT_MESSAGES not in chat_span
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+@pytest.mark.asyncio
+async def test_data_collection_gen_ai_request_messages_keep_tool_returns_when_outputs_disabled(
+    sentry_init,
+    capture_events,
+    capture_items,
+    get_test_agent,
+    stream_gen_ai_spans,
+    span_streaming,
+):
+    """
+    A tool return value is an output on the `gen_ai.execute_tool` span, so
+    `outputs: False` drops it there. The same value is then fed back into the
+    next model call, where it is an input, so `inputs: True` records it under
+    `gen_ai.request.messages`. This is intended: the gates describe a value's
+    position in the call being instrumented, not which party produced it.
+    """
+    sentry_init(
+        integrations=[PydanticAIIntegration()],
+        traces_sample_rate=1.0,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
+        data_collection={"gen_ai": {"inputs": True, "outputs": False}},
+    )
+
+    test_agent = get_test_agent()
+
+    @test_agent.tool_plain
+    def add_numbers(a: int, b: int) -> int:
+        return a + b
+
+    streaming = span_streaming or stream_gen_ai_spans
+    if streaming:
+        items = capture_items("transaction", "span")
+        events = None
+    else:
+        items = None
+        events = capture_events()
+
+    result = await test_agent.run("What is 5 + 3?")
+    assert result is not None
+
+    spans = _spans_by_op(items, events, streaming)
+    chat_spans = [data for op, data in spans if op == "gen_ai.chat"]
+    tool_spans = [data for op, data in spans if op == "gen_ai.execute_tool"]
+
+    assert len(chat_spans) >= 2
+    assert len(tool_spans) >= 1
+
+    # Derive the expected return value from the arguments the model actually
+    # sent, so the assertion does not depend on the test model's defaults.
+    tool_span = tool_spans[0]
+    assert SPANDATA.GEN_AI_TOOL_OUTPUT not in tool_span
+    tool_input = json.loads(tool_span[SPANDATA.GEN_AI_TOOL_INPUT])
+    expected_tool_return = str(tool_input["a"] + tool_input["b"])
+
+    tool_messages = [
+        message
+        for chat_span in chat_spans
+        for message in json.loads(chat_span.get(SPANDATA.GEN_AI_REQUEST_MESSAGES, "[]"))
+        if message["role"] == "tool"
+    ]
+
+    assert len(tool_messages) >= 1
+    assert tool_messages[0]["tool_call_id"] == "add_numbers"
+    assert tool_messages[0]["content"] == [
+        {"type": "text", "text": expected_tool_return}
+    ]

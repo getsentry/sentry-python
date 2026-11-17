@@ -13,8 +13,10 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     # Re-export types to make them available in the public API
     from sentry_sdk._types import (
+        Attributes,
         Breadcrumb,
         BreadcrumbHint,
+        DataCollectionUserOptions,
         Event,
         EventDataCategory,
         Hint,
@@ -22,31 +24,38 @@ if TYPE_CHECKING:
         Metric,
         MonitorConfig,
         SamplingContext,
+        SpanJSON,
     )
 else:
     from typing import Any
 
     # The lines below allow the types to be imported from outside `if TYPE_CHECKING`
     # guards. The types in this module are only intended to be used for type hints.
+    Attributes = Any
     Breadcrumb = Any
     BreadcrumbHint = Any
+    DataCollectionUserOptions = Any
     Event = Any
     EventDataCategory = Any
     Hint = Any
     Log = Any
     MonitorConfig = Any
     SamplingContext = Any
+    SpanJSON = Any
     Metric = Any
 
 
 __all__ = (
+    "Attributes",
     "Breadcrumb",
     "BreadcrumbHint",
+    "DataCollectionUserOptions",
     "Event",
     "EventDataCategory",
     "Hint",
     "Log",
     "MonitorConfig",
     "SamplingContext",
+    "SpanJSON",
     "Metric",
 )

@@ -14,6 +14,7 @@ from sentry_sdk import (
     set_tag,
 )
 from sentry_sdk._types import SENSITIVE_DATA_SUBSTITUTE
+from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.logging import LoggingIntegration
 from sentry_sdk.utils import parse_version
 
@@ -91,6 +92,10 @@ def integration_enabled_params(request):
 @pytest.mark.skipif(
     sys.version_info >= (3, 14),
     reason="quart_flask_patch not working on 3.14 (yet?)",
+)
+@pytest.mark.skipif(
+    QUART_VERSION >= (0, 23),
+    reason="quart_flask_patch is incompatible with quart>=0.23 RequestContext changes",
 )
 async def test_quart_flask_patch(sentry_init, capture_events, reset_integrations):
     # This testcase is forked because `import quart_flask_patch` needs to run
@@ -170,6 +175,29 @@ async def test_transaction_style(
 
     (event,) = events
     assert event["transaction"] == expected_transaction
+
+
+@pytest.mark.asyncio
+async def test_http_route(
+    sentry_init,
+    capture_items,
+):
+    sentry_init(
+        integrations=[quart_sentry.QuartIntegration()],
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+    )
+
+    app = quart_app_factory()
+    items = capture_items("span")
+
+    client = app.test_client()
+    await client.get("/message/123456")
+
+    sentry_sdk.flush()
+
+    (segment,) = [item.payload for item in items if item.payload.get("is_segment")]
+    assert segment["attributes"][SPANDATA.HTTP_ROUTE] == "/message/<message_id>"
 
 
 @pytest.mark.asyncio
@@ -407,14 +435,37 @@ async def test_error_in_errorhandler(sentry_init, capture_events):
 
     client = app.test_client()
 
-    if QUART_VERSION >= (0, 21, 0):
-        # Exception propagation behavior changed in 0.21.0
+    if QUART_VERSION >= (0, 21, 0) and QUART_VERSION < (0, 22, 0):
+        # Exception propagation behavior changed in 0.21.0, and was reverted
+        # back in 0.22.0
         await client.get("/")
 
         (event,) = events
 
         (exception,) = event["exception"]["values"]
         assert exception["type"] == "ValueError"
+
+    elif QUART_VERSION >= (0, 23):
+        # Starting in 0.23 (db05772), Quart runs request handling inside an
+        # asyncio.TaskGroup, so the ZeroDivisionError propagates wrapped
+        # in an ExceptionGroup instead of bare.
+        with pytest.raises(ExceptionGroup) as exc_info:  # noqa: F821
+            await client.get("/")
+
+        (exception,) = exc_info.value.exceptions
+        assert isinstance(exception, ZeroDivisionError)
+
+        event1, event2 = events
+
+        (exception,) = event1["exception"]["values"]
+        assert exception["type"] == "ValueError"
+
+        # event2's exception chain is [ValueError, ZeroDivisionError,
+        # ExceptionGroup]: the ValueError that triggered the errorhandler,
+        # the ZeroDivisionError raised inside it, and the ExceptionGroup
+        # Quart's TaskGroup wraps them in.
+        exception_types = [e["type"] for e in event2["exception"]["values"]]
+        assert exception_types == ["ValueError", "ZeroDivisionError", "ExceptionGroup"]
 
     else:
         with pytest.raises(ZeroDivisionError):
@@ -885,7 +936,7 @@ async def test_span_streaming_request_attributes_with_pii(sentry_init, capture_i
         pytest.param(
             {
                 "send_default_pii": True,
-                "data_collection": None,
+                "data_collection": {},
             },
             {
                 "authorization": "[Filtered]",
@@ -897,7 +948,7 @@ async def test_span_streaming_request_attributes_with_pii(sentry_init, capture_i
         pytest.param(
             {
                 "send_default_pii": False,
-                "data_collection": None,
+                "data_collection": {},
             },
             {
                 "authorization": "[Filtered]",
@@ -1001,9 +1052,7 @@ async def test_span_streaming_sensitive_header_scrubbing(
         traces_sample_rate=1.0,
         send_default_pii=options["send_default_pii"],
         trace_lifecycle="stream",
-        _experiments={
-            "data_collection": options["data_collection"],
-        },
+        data_collection=options["data_collection"],
     )
     items = capture_items("span")
 
@@ -1112,7 +1161,7 @@ async def test_span_streaming_quart_auth_user_id(
     spans = [item.payload for item in items]
     assert len(spans) == 2
 
-    segment = spans[1]
+    segment = next(s for s in spans if s["name"] == "hi")
     if send_default_pii and user_id is not None:
         assert segment["attributes"]["user.id"] == user_id
     else:
@@ -1121,24 +1170,24 @@ async def test_span_streaming_quart_auth_user_id(
 
 QUART_USER_INFO_CASES = [
     pytest.param(
-        {"_experiments": {"data_collection": {}}},
+        {"data_collection": {}},
         True,
         id="dc_default_user_info",
     ),
     pytest.param(
-        {"_experiments": {"data_collection": {"user_info": True}}},
+        {"data_collection": {"user_info": True}},
         True,
         id="dc_user_info_true",
     ),
     pytest.param(
-        {"_experiments": {"data_collection": {"user_info": False}}},
+        {"data_collection": {"user_info": False}},
         False,
         id="dc_user_info_false",
     ),
     pytest.param(
         {
             "send_default_pii": True,
-            "_experiments": {"data_collection": {"user_info": False}},
+            "data_collection": {"user_info": False},
         },
         False,
         id="dc_wins_over_pii",
@@ -1192,13 +1241,11 @@ async def test_span_streaming_quart_auth_user_id_data_collection(
 ):
     from quart_auth import AuthUser, login_user
 
-    kwargs = dict(init_kwargs)
     sentry_init(
         integrations=[quart_sentry.QuartIntegration()],
         traces_sample_rate=1.0,
         trace_lifecycle="stream",
-        _experiments=kwargs.pop("_experiments", {}),
-        **kwargs,
+        **init_kwargs,
     )
     items = capture_items("span")
 
@@ -1218,7 +1265,9 @@ async def test_span_streaming_quart_auth_user_id_data_collection(
     spans = [item.payload for item in items]
     assert len(spans) == 2
 
-    segment = spans[1]
+    (segment,) = (
+        span for span in spans if span["attributes"]["url.path"] == "/message"
+    )
     if expect_user_info:
         assert segment["attributes"]["user.id"] == "42"
     else:
@@ -1230,13 +1279,11 @@ async def test_span_streaming_quart_auth_user_id_data_collection(
 async def test_span_streaming_request_attributes_data_collection(
     sentry_init, capture_items, init_kwargs, expect_user_info
 ):
-    kwargs = dict(init_kwargs)
     sentry_init(
         integrations=[quart_sentry.QuartIntegration()],
         traces_sample_rate=1.0,
         trace_lifecycle="stream",
-        _experiments=kwargs.pop("_experiments", {}),
-        **kwargs,
+        **init_kwargs,
     )
     items = capture_items("span")
 
@@ -1308,16 +1355,14 @@ _QUERY_PARAM_DATA_COLLECTION_CASES = [
         id="defaults",
     ),
     pytest.param(
-        {"_experiments": {"data_collection": {}}},
+        {"data_collection": {}},
         "toy=tennisball&color=red&auth=%5BFiltered%5D",
         id="data_collection_denylist_default",
     ),
     pytest.param(
         {
-            "_experiments": {
-                "data_collection": {
-                    "url_query_params": {"mode": "denylist", "terms": ["toy"]}
-                }
+            "data_collection": {
+                "url_query_params": {"mode": "denylist", "terms": ["toy"]}
             }
         },
         "toy=%5BFiltered%5D&color=red&auth=%5BFiltered%5D",
@@ -1325,10 +1370,8 @@ _QUERY_PARAM_DATA_COLLECTION_CASES = [
     ),
     pytest.param(
         {
-            "_experiments": {
-                "data_collection": {
-                    "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
-                }
+            "data_collection": {
+                "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
             }
         },
         "toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D",
@@ -1336,24 +1379,22 @@ _QUERY_PARAM_DATA_COLLECTION_CASES = [
     ),
     pytest.param(
         {
-            "_experiments": {
-                "data_collection": {
-                    "url_query_params": {"mode": "allowlist", "terms": ["auth"]}
-                }
+            "data_collection": {
+                "url_query_params": {"mode": "allowlist", "terms": ["auth"]}
             }
         },
         "toy=%5BFiltered%5D&color=%5BFiltered%5D&auth=%5BFiltered%5D",
         id="data_collection_allowlist_sensitive_term",
     ),
     pytest.param(
-        {"_experiments": {"data_collection": {"url_query_params": {"mode": "off"}}}},
+        {"data_collection": {"url_query_params": {"mode": "off"}}},
         None,
         id="data_collection_off",
     ),
     pytest.param(
         {
             "send_default_pii": True,
-            "_experiments": {"data_collection": {"url_query_params": {"mode": "off"}}},
+            "data_collection": {"url_query_params": {"mode": "off"}},
         },
         None,
         id="data_collection_wins_over_send_default_pii",
@@ -1368,14 +1409,11 @@ _QUERY_PARAM_DATA_COLLECTION_CASES = [
 async def test_span_streaming_url_query_data_collection(
     sentry_init, capture_items, init_kwargs, expected_query
 ):
-    kwargs = dict(init_kwargs)
-    experiments = kwargs.pop("_experiments", {})
     sentry_init(
         integrations=[quart_sentry.QuartIntegration()],
         traces_sample_rate=1.0,
         trace_lifecycle="stream",
-        _experiments=experiments,
-        **kwargs,
+        **init_kwargs,
     )
     items = capture_items("span")
 
@@ -1391,7 +1429,7 @@ async def test_span_streaming_url_query_data_collection(
 
     segment = spans[0]
 
-    data_collection_enabled = "data_collection" in experiments
+    data_collection_enabled = "data_collection" in init_kwargs
     url_attrs_expected = data_collection_enabled or init_kwargs.get(
         "send_default_pii", False
     )
@@ -1419,7 +1457,7 @@ async def test_span_streaming_url_query_multi_and_blank_values(
         integrations=[quart_sentry.QuartIntegration()],
         traces_sample_rate=1.0,
         trace_lifecycle="stream",
-        _experiments={"data_collection": {}},
+        data_collection={},
     )
     items = capture_items("span")
 

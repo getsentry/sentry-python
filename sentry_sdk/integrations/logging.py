@@ -12,7 +12,6 @@ from sentry_sdk.utils import (
     capture_internal_exceptions,
     current_stacktrace,
     event_from_exception,
-    has_logs_enabled,
     safe_repr,
     to_string,
 )
@@ -20,7 +19,9 @@ from sentry_sdk.utils import (
 if TYPE_CHECKING:
     from collections.abc import MutableMapping
     from logging import LogRecord
-    from typing import Any, Dict, Optional
+    from typing import Any, Dict, Optional, Union
+
+_SENTINEL = object()
 
 DEFAULT_LEVEL = logging.INFO
 DEFAULT_EVENT_LEVEL = logging.ERROR
@@ -115,13 +116,17 @@ def unignore_logger_for_sentry_logs(
 
 class LoggingIntegration(Integration):
     identifier = "logging"
+    capture_sentry_logs: "Optional[Union[bool, object]]" = _SENTINEL
 
     def __init__(
         self,
         level: "Optional[int]" = DEFAULT_LEVEL,
         event_level: "Optional[int]" = DEFAULT_EVENT_LEVEL,
         sentry_logs_level: "Optional[int]" = DEFAULT_LEVEL,
+        capture_sentry_logs: "Optional[Union[bool, object]]" = _SENTINEL,
     ) -> None:
+        LoggingIntegration.capture_sentry_logs = capture_sentry_logs
+
         self._handler = None
         self._breadcrumb_handler = None
         self._sentry_logs_handler = None
@@ -378,7 +383,7 @@ class SentryLogsHandler(_BaseHandler):
     """
     A logging handler that records Sentry logs for each Python log record.
 
-    Note that you do not have to use this class if the logging integration is enabled, which it is by default.
+    Note that you do not have to use this class if the LoggingIntegration's capture_sentry_logs option is enabled.
     """
 
     def _can_record(self, record: "LogRecord") -> bool:
@@ -390,7 +395,6 @@ class SentryLogsHandler(_BaseHandler):
 
     def emit(self, record: "LogRecord") -> "Any":
         with capture_internal_exceptions():
-            self.format(record)
             if not self._can_record(record):
                 return
 
@@ -398,9 +402,24 @@ class SentryLogsHandler(_BaseHandler):
             if not client.is_active():
                 return
 
-            if not has_logs_enabled(client.options):
+            # TODO: remove this compat hack in the next major. Capture should
+            # only depend on capture_sentry_logs being True.
+            compat_logs_enabled = client.options.get(
+                "enable_logs", False
+            ) or client.options["_experiments"].get("enable_logs", False)
+            should_capture_logs = False
+            if LoggingIntegration.capture_sentry_logs is True:
+                should_capture_logs = True
+            elif (
+                LoggingIntegration.capture_sentry_logs is _SENTINEL
+                and compat_logs_enabled
+            ):
+                should_capture_logs = True
+
+            if not should_capture_logs:
                 return
 
+            self.format(record)
             self._capture_log_from_record(client, record)
 
     def _capture_log_from_record(
@@ -462,7 +481,6 @@ class SentryLogsHandler(_BaseHandler):
         if record.name:
             attrs["logger.name"] = record.name
 
-        # noinspection PyProtectedMember
         sentry_sdk.get_current_scope()._capture_log(
             {
                 "severity_text": otel_severity_text,

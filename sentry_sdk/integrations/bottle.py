@@ -2,6 +2,7 @@ import functools
 from typing import TYPE_CHECKING
 
 import sentry_sdk
+from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import (
     _DEFAULT_FAILED_REQUEST_STATUS_CODES,
     DidNotEnable,
@@ -74,6 +75,19 @@ class BottleIntegration(Integration):
         version = parse_version(BOTTLE_VERSION)
         _check_minimum_version(BottleIntegration, version)
 
+        # Bottle's Route.__repr__ might lead to a never-terminating while True
+        # loop when attach_stacktrace=True.
+        def _sentry_route_repr(self: "Route") -> str:
+            cb = self.callback
+            return "<%s %s -> %s:%s>" % (
+                self.method,
+                self.rule,
+                getattr(cb, "__module__", "?"),
+                getattr(cb, "__name__", "?"),
+            )
+
+        Route.__sentry_repr__ = _sentry_route_repr
+
         old_app = Bottle.__call__
 
         @ensure_integration_enabled(BottleIntegration, old_app)
@@ -103,6 +117,17 @@ class BottleIntegration(Integration):
                 _make_request_event_processor(self, bottle_request, integration)
             )
             res = old_handle(self, environ)
+
+            server_span = sentry_sdk.get_current_scope()._server_segment_span
+            if server_span is not None:
+                route_path = None
+                try:
+                    route_path = bottle_request.route.rule
+                except RuntimeError:
+                    pass
+
+                if route_path is not None:
+                    server_span.set_attribute(SPANDATA.HTTP_ROUTE, route_path)
 
             if has_span_streaming_enabled(sentry_sdk.get_client().options):
                 _set_segment_name_and_source(

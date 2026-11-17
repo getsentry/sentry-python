@@ -2,6 +2,7 @@ import pytest
 import responses
 from opentelemetry import trace
 from opentelemetry.context import attach, detach
+from opentelemetry.exporter.otlp.proto.http import __version__
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 from opentelemetry.propagate import get_global_textmap, set_global_textmap
 from opentelemetry.sdk.trace import TracerProvider
@@ -18,6 +19,9 @@ from opentelemetry.util._once import Once
 
 from sentry_sdk.integrations.otlp import OTLPIntegration, SentryOTLPPropagator
 from sentry_sdk.scope import get_external_propagation_context
+from sentry_sdk.utils import parse_version
+
+OTLP_EXPORTER_VERSION = parse_version(__version__)
 
 original_propagator = get_global_textmap()
 
@@ -78,6 +82,15 @@ def test_sets_new_tracer_provider_with_otlp_exporter(sentry_init):
         exporter._endpoint
         == "https://bla.ingest.sentry.io/api/12312012/integration/otlp/v1/traces/"
     )
+
+    if OTLP_EXPORTER_VERSION is not None and OTLP_EXPORTER_VERSION >= (1, 45):
+        assert "x-sentry-auth" in exporter._client._headers
+        assert (
+            "Sentry sentry_key=mysecret, sentry_version=7, sentry_client=sentry.python/"
+            in exporter._client._headers["x-sentry-auth"]
+        )
+        return
+
     assert "X-Sentry-Auth" in exporter._headers
     assert (
         "Sentry sentry_key=mysecret, sentry_version=7, sentry_client=sentry.python/"
@@ -107,6 +120,14 @@ def test_uses_existing_tracer_provider_with_otlp_exporter(sentry_init):
         exporter._endpoint
         == "https://bla.ingest.sentry.io/api/12312012/integration/otlp/v1/traces/"
     )
+    if OTLP_EXPORTER_VERSION is not None and OTLP_EXPORTER_VERSION >= (1, 45):
+        assert "x-sentry-auth" in exporter._client._headers
+        assert (
+            "Sentry sentry_key=mysecret, sentry_version=7, sentry_client=sentry.python/"
+            in exporter._client._headers["x-sentry-auth"]
+        )
+        return
+
     assert "X-Sentry-Auth" in exporter._headers
     assert (
         "Sentry sentry_key=mysecret, sentry_version=7, sentry_client=sentry.python/"
@@ -253,6 +274,14 @@ def test_collector_url_sets_endpoint(sentry_init):
     exporter = span_processor.span_exporter
     assert isinstance(exporter, OTLPSpanExporter)
     assert exporter._endpoint == "https://my-collector.example.com/v1/traces"
+
+    if OTLP_EXPORTER_VERSION is not None and OTLP_EXPORTER_VERSION >= (1, 45):
+        assert (
+            exporter._client._headers is None
+            or "x-sentry-auth" not in exporter._client._headers
+        )
+        return
+
     assert exporter._headers is None or "X-Sentry-Auth" not in exporter._headers
 
 
@@ -294,6 +323,11 @@ def test_collector_url_none_falls_back_to_dsn(sentry_init):
         exporter._endpoint
         == "https://bla.ingest.sentry.io/api/12312012/integration/otlp/v1/traces/"
     )
+
+    if OTLP_EXPORTER_VERSION is not None and OTLP_EXPORTER_VERSION >= (1, 45):
+        assert "x-sentry-auth" in exporter._client._headers
+        return
+
     assert "X-Sentry-Auth" in exporter._headers
 
 

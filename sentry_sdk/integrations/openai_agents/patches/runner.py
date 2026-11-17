@@ -6,7 +6,11 @@ from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import StreamedSpan
-from sentry_sdk.utils import capture_internal_exceptions, reraise
+from sentry_sdk.utils import (
+    capture_internal_exceptions,
+    has_data_collection_enabled,
+    reraise,
+)
 
 from ..spans import (
     agent_workflow_span,
@@ -35,7 +39,7 @@ if TYPE_CHECKING:
 TContext = TypeVar("TContext")
 
 
-class _SentryRunHooks(RunHooks[TContext]):  # type: ignore[misc]
+class _SentryRunHooks(RunHooks[TContext]):
     """
     Responsible for creating Execute Tool and Invoke Agent spans. Both
     spans can also be closed by hooks, and Execute Tool spans are exclusively
@@ -102,7 +106,7 @@ class _SentryRunHooks(RunHooks[TContext]):  # type: ignore[misc]
         context: "ToolContext[TContext]",
         agent: "Agent[TContext]",
         tool: "Tool",
-    ) -> "None":
+    ) -> None:
         if not isinstance(tool, FunctionTool):
             return
 
@@ -110,7 +114,11 @@ class _SentryRunHooks(RunHooks[TContext]):  # type: ignore[misc]
         span.__enter__()
         context._sentry_execute_tool_span = span
 
-        if not should_send_default_pii():
+        client = sentry_sdk.get_client()
+        if has_data_collection_enabled(client.options):
+            if not client.options["data_collection"]["gen_ai"]["inputs"]:
+                return
+        elif not should_send_default_pii():
             return
 
         if isinstance(span, StreamedSpan):
@@ -124,7 +132,7 @@ class _SentryRunHooks(RunHooks[TContext]):  # type: ignore[misc]
         agent: "Agent[TContext]",
         tool: "Tool",
         result: "object",
-    ) -> "None":
+    ) -> None:
         if not isinstance(tool, FunctionTool):
             return
 
@@ -186,7 +194,7 @@ def _patch_run_hooks(hooks: "RunHooks[TContext]") -> None:
     @wraps(original_on_tool_start)
     async def on_tool_start(
         context: "ToolContext[TContext]", agent: "Agent[TContext]", tool: "Tool"
-    ) -> "None":
+    ) -> None:
         with capture_internal_exceptions():
             await sentry_hooks.on_tool_start(context, agent, tool)
         await original_on_tool_start(context, agent, tool)
@@ -197,19 +205,19 @@ def _patch_run_hooks(hooks: "RunHooks[TContext]") -> None:
         agent: "Agent[TContext]",
         tool: "Tool",
         result: "object",
-    ) -> "None":
+    ) -> None:
         with capture_internal_exceptions():
             await sentry_hooks.on_tool_end(context, agent, tool, result)
         await original_on_tool_end(context, agent, tool, result)
 
-    hooks._sentry_is_patched = True
+    hooks._sentry_is_patched = True  # type: ignore[attr-defined]
 
-    hooks.on_agent_start = on_agent_start
-    hooks.on_agent_end = on_agent_end
-    hooks.on_handoff = on_handoff
+    hooks.on_agent_start = on_agent_start  # type: ignore[method-assign]
+    hooks.on_agent_end = on_agent_end  # type: ignore[method-assign]
+    hooks.on_handoff = on_handoff  # type: ignore[method-assign]
 
-    hooks.on_tool_start = on_tool_start
-    hooks.on_tool_end = on_tool_end
+    hooks.on_tool_start = on_tool_start  # type: ignore[method-assign]
+    hooks.on_tool_end = on_tool_end  # type: ignore[method-assign]
 
 
 def _create_run_wrapper(

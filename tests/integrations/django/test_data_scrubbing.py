@@ -22,17 +22,14 @@ def client():
 
 @pytest.mark.forked
 @pytest_mark_django_db_decorator()
-@pytest.mark.parametrize("span_streaming", [True, False])
 def test_scrub_django_session_cookies_removed(
     sentry_init,
     client,
     capture_items,
-    span_streaming,
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
         send_default_pii=False,
-        trace_lifecycle="stream" if span_streaming else "static",
     )
     items = capture_items("event")
     werkzeug_set_cookie(client, "localhost", "sessionid", "123")
@@ -46,17 +43,14 @@ def test_scrub_django_session_cookies_removed(
 
 @pytest.mark.forked
 @pytest_mark_django_db_decorator()
-@pytest.mark.parametrize("span_streaming", [True, False])
 def test_scrub_django_session_cookies_filtered(
     sentry_init,
     client,
     capture_items,
-    span_streaming,
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
         send_default_pii=True,
-        trace_lifecycle="stream" if span_streaming else "static",
     )
     items = capture_items("event")
     werkzeug_set_cookie(client, "localhost", "sessionid", "123")
@@ -74,13 +68,11 @@ def test_scrub_django_session_cookies_filtered(
 
 @pytest.mark.forked
 @pytest_mark_django_db_decorator()
-@pytest.mark.parametrize("span_streaming", [True, False])
 def test_scrub_django_custom_session_cookies_filtered(
     sentry_init,
     client,
     capture_items,
     settings,
-    span_streaming,
 ):
     settings.SESSION_COOKIE_NAME = "my_sess"
     settings.CSRF_COOKIE_NAME = "csrf_secret"
@@ -88,7 +80,6 @@ def test_scrub_django_custom_session_cookies_filtered(
     sentry_init(
         integrations=[DjangoIntegration()],
         send_default_pii=True,
-        trace_lifecycle="stream" if span_streaming else "static",
     )
     items = capture_items("event")
     werkzeug_set_cookie(client, "localhost", "my_sess", "123")
@@ -179,7 +170,7 @@ def test_data_collection_cookies(
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
-        _experiments={"data_collection": data_collection},
+        data_collection=data_collection,
     )
     items = capture_items("event")
     for name, value in cookies_to_set.items():
@@ -203,7 +194,7 @@ def test_data_collection_cookies_precedence_over_send_default_pii(
     sentry_init(
         integrations=[DjangoIntegration()],
         send_default_pii=False,
-        _experiments={"data_collection": {"cookies": {"mode": "denylist"}}},
+        data_collection={"cookies": {"mode": "denylist"}},
     )
     items = capture_items("event")
     werkzeug_set_cookie(client, "localhost", "sessionid", "123")
@@ -240,27 +231,21 @@ QUERY_STRING = "toy=tennisball&color=red&auth=secret"
             id="legacy_send_default_pii_false",
         ),
         pytest.param(
-            {"_experiments": {"data_collection": {}}},
+            {"data_collection": {}},
             "toy=tennisball&color=red&auth=%5BFiltered%5D",
             id="data_collection_denylist_default",
         ),
         pytest.param(
             {
-                "_experiments": {
-                    "data_collection": {
-                        "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
-                    }
+                "data_collection": {
+                    "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
                 }
             },
             "toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D",
             id="data_collection_allowlist",
         ),
         pytest.param(
-            {
-                "_experiments": {
-                    "data_collection": {"url_query_params": {"mode": "off"}}
-                }
-            },
+            {"data_collection": {"url_query_params": {"mode": "off"}}},
             None,
             id="data_collection_off",
         ),
@@ -302,27 +287,21 @@ def test_query_string_data_collection(
             id="legacy_send_default_pii_false",
         ),
         pytest.param(
-            {"_experiments": {"data_collection": {}}},
+            {"data_collection": {}},
             "toy=tennisball&color=red&auth=%5BFiltered%5D",
             id="data_collection_denylist_default",
         ),
         pytest.param(
             {
-                "_experiments": {
-                    "data_collection": {
-                        "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
-                    }
+                "data_collection": {
+                    "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
                 }
             },
             "toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D",
             id="data_collection_allowlist",
         ),
         pytest.param(
-            {
-                "_experiments": {
-                    "data_collection": {"url_query_params": {"mode": "off"}}
-                }
-            },
+            {"data_collection": {"url_query_params": {"mode": "off"}}},
             None,
             id="data_collection_off",
         ),
@@ -380,7 +359,7 @@ def test_empty_query_string_is_dropped_with_data_collection(
     # reduce envelope size, so the ``query_string`` key is absent.
     sentry_init(
         integrations=[DjangoIntegration()],
-        _experiments={"data_collection": {}},
+        data_collection={},
     )
     events = capture_events()
 
@@ -396,14 +375,10 @@ def test_empty_query_string_is_dropped_with_data_collection(
 def test_user_info_span_attributes_data_collection(
     sentry_init, client, capture_items, init_kwargs, expect_ip
 ):
-    init_kwargs = dict(init_kwargs)  # shallow copy so we can mutate
-    experiments = init_kwargs.pop("_experiments", {})
-
     sentry_init(
         integrations=[DjangoIntegration()],
         traces_sample_rate=1.0,
         trace_lifecycle="stream",
-        _experiments=experiments,
         **init_kwargs,
     )
 
@@ -432,14 +407,10 @@ def test_user_info_span_attributes_data_collection(
 def test_user_identity_span_attributes_data_collection(
     sentry_init, client, capture_items, init_kwargs, expect_user
 ):
-    init_kwargs = dict(init_kwargs)  # shallow copy so we can mutate
-    experiments = init_kwargs.pop("_experiments", {})
-
     sentry_init(
         integrations=[DjangoIntegration()],
         traces_sample_rate=1.0,
         trace_lifecycle="stream",
-        _experiments=experiments,
         **init_kwargs,
     )
 
@@ -514,7 +485,7 @@ def test_error_event_no_user_ip_address_without_remote_addr(
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
-        _experiments={"data_collection": {"user_info": True}},
+        data_collection={"user_info": True},
     )
     events = capture_events()
 

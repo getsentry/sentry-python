@@ -4,7 +4,7 @@ from functools import wraps
 
 import sentry_sdk
 from sentry_sdk.api import continue_trace
-from sentry_sdk.consts import OP, SPANDATA, SPANSTATUS
+from sentry_sdk.consts import _SENTRY_HEADER_NAMES, OP, SPANDATA, SPANSTATUS
 from sentry_sdk.data_collection import (
     _apply_data_collection_filtering_to_query_string,
 )
@@ -22,9 +22,6 @@ from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.scope import Scope, should_send_default_pii
 from sentry_sdk.sessions import track_session
 from sentry_sdk.traces import (
-    SOURCE_FOR_STYLE as SEGMENT_SOURCE_FOR_STYLE,
-)
-from sentry_sdk.traces import (
     NoOpStreamedSpan,
     SegmentNameSource,
     SpanStatus,
@@ -32,10 +29,13 @@ from sentry_sdk.traces import (
 )
 from sentry_sdk.tracing import (
     BAGGAGE_HEADER_NAME,
+    SENTRY_TRACE_HEADER_NAME,
     SOURCE_FOR_STYLE,
     TransactionSource,
 )
 from sentry_sdk.tracing_utils import (
+    Baggage,
+    add_http_breadcrumb,
     add_http_request_source,
     has_span_streaming_enabled,
     should_propagate_trace,
@@ -45,6 +45,9 @@ from sentry_sdk.utils import (
     HAS_REAL_CONTEXTVARS,
     SENSITIVE_DATA_SUBSTITUTE,
     AnnotatedValue,
+    _get_aws_sigv4_signed_headers_from_authorization_header,
+    _get_aws_sigv4_signed_headers_from_url_query_string,
+    _is_localhost,
     _register_control_flow_exception,
     capture_internal_exceptions,
     ensure_integration_enabled,
@@ -145,6 +148,21 @@ class AioHttpIntegration(Integration):
                     scope.clear_breadcrumbs()
                     scope.add_event_processor(_make_request_processor(weak_request))
 
+                    scope.set_attribute(
+                        SPANDATA.SENTRY_IS_LOCALHOST,
+                        _is_localhost(
+                            client_ip=_get_client_ip(request),
+                            host_header=request.headers.get("Host"),
+                            forwarded_host_header=request.headers.get(
+                                "X-Forwarded-Host"
+                            ),
+                        ),
+                    )
+
+                    user_agent = request.headers.get("User-Agent")
+                    if user_agent:
+                        scope.set_attribute(SPANDATA.USER_AGENT_ORIGINAL, user_agent)
+
                     headers = dict(request.headers)
 
                     span_ctx: "ContextManager[Union[Span, StreamedSpan]]"
@@ -235,6 +253,7 @@ class AioHttpIntegration(Integration):
                             },
                             parent_span=None,
                         )
+                        scope.get_current_scope()._server_segment_span = span_ctx
                     else:
                         transaction = continue_trace(
                             headers,
@@ -311,7 +330,7 @@ class AioHttpIntegration(Integration):
 
                         return response
 
-        Application._handle = sentry_app_handle
+        Application._handle = sentry_app_handle  # type: ignore[method-assign]
 
         old_urldispatcher_resolve = UrlDispatcher.resolve
 
@@ -325,38 +344,33 @@ class AioHttpIntegration(Integration):
             if integration is None:
                 return rv
 
+            route_info = rv.get_info()
+            pattern = route_info.get("path") or route_info.get("formatter")
+
+            server_span = sentry_sdk.get_current_scope()._server_segment_span
+            if server_span is not None and pattern is not None:
+                server_span.set_attribute(SPANDATA.HTTP_ROUTE, pattern)
+
             name = None
 
             try:
                 if integration.transaction_style == "handler_name":
                     name = transaction_from_function(rv.handler)
                 elif integration.transaction_style == "method_and_path_pattern":
-                    route_info = rv.get_info()
-                    pattern = route_info.get("path") or route_info.get("formatter")
                     name = "{} {}".format(request.method, pattern)
             except Exception:
                 pass
 
             if name is not None:
-                current_span = sentry_sdk.get_current_span()
-                if isinstance(current_span, StreamedSpan) and not isinstance(
-                    current_span, NoOpStreamedSpan
-                ):
-                    current_span._segment.name = name
-                    current_span._segment.set_attribute(
-                        "sentry.segment.name.source",
-                        SEGMENT_SOURCE_FOR_STYLE[integration.transaction_style].value,
-                    )
-                else:
-                    current_scope = sentry_sdk.get_current_scope()
-                    current_scope.set_transaction_name(
-                        name,
-                        source=SOURCE_FOR_STYLE[integration.transaction_style],
-                    )
+                current_scope = sentry_sdk.get_current_scope()
+                current_scope.set_transaction_name(
+                    name,
+                    source=SOURCE_FOR_STYLE[integration.transaction_style],
+                )
 
             return rv
 
-        UrlDispatcher.resolve = sentry_urldispatcher_resolve
+        UrlDispatcher.resolve = sentry_urldispatcher_resolve  # type: ignore[method-assign]
 
         old_client_session_init = ClientSession.__init__
 
@@ -369,7 +383,7 @@ class AioHttpIntegration(Integration):
             kwargs["trace_configs"] = client_trace_configs
             return old_client_session_init(*args, **kwargs)
 
-        ClientSession.__init__ = init
+        ClientSession.__init__ = init  # type: ignore[method-assign]
 
 
 def create_trace_config() -> "TraceConfig":
@@ -388,57 +402,64 @@ def create_trace_config() -> "TraceConfig":
         with capture_internal_exceptions():
             parsed_url = parse_url(str(params.url), sanitize=False)
 
+        breadcrumb = {}
+
         span_name = "%s %s" % (
             method,
             parsed_url.url if parsed_url else SENSITIVE_DATA_SUBSTITUTE,
         )
 
-        span: "Union[Span, StreamedSpan, None]"
+        span: "Union[Span, StreamedSpan, None]" = None
         if has_span_streaming_enabled(client.options):
-            if sentry_sdk.traces.get_current_span() is None:
-                span = None
-            else:
-                attributes: "Attributes" = {
-                    "sentry.op": OP.HTTP_CLIENT,
-                    "sentry.origin": AioHttpIntegration.origin,
-                    "http.request.method": method,
-                }
-                if parsed_url is not None:
-                    if has_data_collection_enabled(client.options):
-                        url_full = parsed_url.url
-                        attributes["url.path"] = params.url.path
+            attributes: "Attributes" = {
+                "sentry.op": OP.HTTP_CLIENT,
+                "sentry.origin": AioHttpIntegration.origin,
+                "http.request.method": method,
+            }
+            if parsed_url is not None:
+                if has_data_collection_enabled(client.options):
+                    url_full = parsed_url.url
+                    attributes["url.path"] = params.url.path
 
-                        if parsed_url.query:
-                            filtered_query = (
-                                _apply_data_collection_filtering_to_query_string(
-                                    query_string=parsed_url.query,
-                                    behaviour=client.options["data_collection"][
-                                        "url_query_params"
-                                    ],
-                                )
+                    if parsed_url.query:
+                        filtered_query = (
+                            _apply_data_collection_filtering_to_query_string(
+                                query_string=parsed_url.query,
+                                behaviour=client.options["data_collection"][
+                                    "url_query_params"
+                                ],
                             )
-                            if filtered_query:
-                                attributes["url.query"] = filtered_query
-                                url_full += "?" + filtered_query
+                        )
+                        if filtered_query:
+                            attributes["url.query"] = filtered_query
+                            url_full += "?" + filtered_query
+                            breadcrumb[SPANDATA.HTTP_QUERY] = filtered_query
 
-                        if parsed_url.fragment:
-                            attributes["url.fragment"] = parsed_url.fragment
-                            url_full += "#" + parsed_url.fragment
+                    if parsed_url.fragment:
+                        attributes["url.fragment"] = parsed_url.fragment
+                        url_full += "#" + parsed_url.fragment
+                        breadcrumb[SPANDATA.HTTP_FRAGMENT] = parsed_url.fragment
 
-                        attributes["url.full"] = url_full
-                    elif should_send_default_pii():
-                        url_full = parsed_url.url
-                        attributes["url.path"] = params.url.path
+                    attributes["url.full"] = url_full
+                    breadcrumb["url"] = url_full
 
-                        if parsed_url.query:
-                            url_full += "?" + parsed_url.query
-                            attributes["url.query"] = parsed_url.query
-                        if parsed_url.fragment:
-                            url_full += "#" + parsed_url.fragment
-                            attributes["url.fragment"] = parsed_url.fragment
+                elif should_send_default_pii():
+                    url_full = parsed_url.url
+                    attributes["url.path"] = params.url.path
 
-                        attributes["url.full"] = url_full
+                    if parsed_url.query:
+                        url_full += "?" + parsed_url.query
+                        attributes["url.query"] = parsed_url.query
+                        breadcrumb[SPANDATA.HTTP_QUERY] = parsed_url.query
+                    if parsed_url.fragment:
+                        url_full += "#" + parsed_url.fragment
+                        attributes["url.fragment"] = parsed_url.fragment
+                        breadcrumb[SPANDATA.HTTP_FRAGMENT] = parsed_url.fragment
 
+                    attributes["url.full"] = url_full
+                    breadcrumb["url"] = url_full
+
+            if sentry_sdk.traces.get_current_span() is not None:
                 span = sentry_sdk.traces.start_span(
                     name=span_name, attributes=attributes
                 )
@@ -453,15 +474,73 @@ def create_trace_config() -> "TraceConfig":
                 legacy_span.set_data("url", parsed_url.url)
                 legacy_span.set_data(SPANDATA.HTTP_QUERY, parsed_url.query)
                 legacy_span.set_data(SPANDATA.HTTP_FRAGMENT, parsed_url.fragment)
+                breadcrumb.update(
+                    {
+                        SPANDATA.HTTP_QUERY: parsed_url.query,
+                        SPANDATA.HTTP_FRAGMENT: parsed_url.fragment,
+                        "url": parsed_url.url,
+                    }
+                )
             span = legacy_span
 
         if should_propagate_trace(client, str(params.url)):
+            # existing `sentry-trace`: skip so it is not duplicated.
+            headers_to_skip: "set[str]" = set()
+            if SENTRY_TRACE_HEADER_NAME in params.headers:
+                headers_to_skip.add(SENTRY_TRACE_HEADER_NAME)
+
+            # `baggage` with Sentry members (e.g. merged by the boto3 integration
+            # before signing): skip so Sentry members are not duplicated.
+            with capture_internal_exceptions():
+                baggage = params.headers.get(BAGGAGE_HEADER_NAME)
+                if baggage:
+                    if isinstance(baggage, bytes):
+                        baggage = baggage.decode("latin-1")
+                    if any(
+                        Baggage.SENTRY_PREFIX_REGEX.match(item.strip())
+                        for item in baggage.split(",")
+                    ):
+                        headers_to_skip.add(BAGGAGE_HEADER_NAME)
+
+            with capture_internal_exceptions():
+                authorization = params.headers.get("Authorization")
+                if authorization:
+                    if isinstance(authorization, bytes):
+                        authorization = authorization.decode("latin-1")
+                    # `SignedHeaders` lists fields covered by SigV4.
+                    signed_headers = (
+                        _get_aws_sigv4_signed_headers_from_authorization_header(
+                            authorization
+                        )
+                    )
+                    # skip signed `sentry-trace` and `baggage`.
+                    headers_to_skip.update(
+                        _SENTRY_HEADER_NAMES.intersection(signed_headers)
+                    )
+
+                # presigned URLs list signed names in the query string.
+                query_signed_headers = (
+                    _get_aws_sigv4_signed_headers_from_url_query_string(str(params.url))
+                )
+                headers_to_skip.update(
+                    _SENTRY_HEADER_NAMES.intersection(query_signed_headers)
+                )
+
             for (
                 key,
                 value,
             ) in sentry_sdk.get_current_scope().iter_trace_propagation_headers(
                 span=span
             ):
+                # skip signed headers and an existing `sentry-trace`.
+                if key.lower() in headers_to_skip:
+                    logger.debug(
+                        "[Tracing] Not adding `{key}` header to outgoing request "
+                        "to {url}: it already exists or is covered by the AWS "
+                        "SigV4 signature.".format(key=key, url=params.url)
+                    )
+                    continue
+
                 logger.debug(
                     "[Tracing] Adding `{key}` header {value} to outgoing request to {url}.".format(
                         key=key, value=value, url=params.url
@@ -475,18 +554,34 @@ def create_trace_config() -> "TraceConfig":
                 else:
                     params.headers[key] = value
 
-        trace_config_ctx.span = span
+        trace_config_ctx._sentry_span = span
+        trace_config_ctx._sentry_breadcrumb = breadcrumb
 
     async def on_request_end(
         session: "ClientSession",
         trace_config_ctx: "SimpleNamespace",
         params: "TraceRequestEndParams",
     ) -> None:
-        if trace_config_ctx.span is None:
-            return
-
-        span = trace_config_ctx.span
         status = int(params.response.status)
+
+        breadcrumb = getattr(trace_config_ctx, "_sentry_breadcrumb", None)
+        if breadcrumb is not None:
+            breadcrumb.update(
+                {
+                    SPANDATA.HTTP_METHOD: params.method.upper(),
+                    SPANDATA.HTTP_STATUS_CODE: status,
+                    "reason": params.response.reason,
+                }
+            )
+
+            add_http_breadcrumb(
+                status,
+                breadcrumb,
+            )
+
+        span = getattr(trace_config_ctx, "_sentry_span", None)
+        if span is None:
+            return
 
         if isinstance(span, StreamedSpan):
             span.set_attribute("http.response.status_code", status)
@@ -523,6 +618,7 @@ def _make_request_processor(
         if request is None:
             return event
 
+        client_options = sentry_sdk.get_client().options
         with capture_internal_exceptions():
             request_info = event.setdefault("request", {})
 
@@ -532,19 +628,60 @@ def _make_request_processor(
                 request.path,
             )
 
-            request_info["query_string"] = request.query_string
+            if has_data_collection_enabled(client_options):
+                if request.query_string:
+                    filtered_query_string = (
+                        _apply_data_collection_filtering_to_query_string(
+                            query_string=request.query_string,
+                            behaviour=client_options["data_collection"][
+                                "url_query_params"
+                            ],
+                        )
+                    )
+                    if filtered_query_string:
+                        request_info["query_string"] = filtered_query_string
+            else:
+                request_info["query_string"] = request.query_string
+
             request_info["method"] = request.method
-            request_info["env"] = {"REMOTE_ADDR": request.remote}
+
+            # REMOTE_ADDR was unconditionally set pre-data collection, so it
+            # continues to be set when data collection is not enabled.
+            if (
+                not has_data_collection_enabled(client_options)
+                or client_options["data_collection"]["user_info"]
+            ):
+                request_info["env"] = {"REMOTE_ADDR": request.remote}
             request_info["headers"] = _filter_headers(dict(request.headers))
 
             # Just attach raw data here if it is within bounds, if available.
             # Unfortunately there's no way to get structured data from aiohttp
             # without awaiting on some coroutine.
-            request_info["data"] = get_aiohttp_request_data(request)
+            if has_data_collection_enabled(client_options):
+                if (
+                    "incoming_request"
+                    in client_options["data_collection"]["http_bodies"]
+                ):
+                    request_info["data"] = get_aiohttp_request_data(request)
+            else:
+                # We never gated this prior to data collection, so it should be attached
+                # when data collection is not enabled.
+                request_info["data"] = get_aiohttp_request_data(request)
 
         return event
 
     return aiohttp_processor
+
+
+def _get_client_ip(request: "Request") -> "Optional[str]":
+    x_forwarded_for = request.headers.get("X-Forwarded-For", "").split(",")[0].strip()
+    if x_forwarded_for:
+        return x_forwarded_for
+
+    if request.headers.get("X-Real-IP"):
+        return request.headers["X-Real-IP"]
+
+    return request.remote
 
 
 def _capture_exception() -> "ExcInfo":

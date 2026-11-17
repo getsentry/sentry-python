@@ -7,7 +7,7 @@ from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import safe_serialize
 
 from ..consts import SPAN_ORIGIN
-from ..utils import _set_agent_data, _should_send_prompts
+from ..utils import _set_agent_data, _should_send_inputs, _should_send_outputs
 
 if TYPE_CHECKING:
     from typing import Any, Optional, Union
@@ -62,7 +62,7 @@ def execute_tool_span(
 
     _set_agent_data(span, agent)
 
-    if _should_send_prompts() and tool_args is not None:
+    if _should_send_inputs() and tool_args is not None:
         set_on_span(SPANDATA.GEN_AI_TOOL_INPUT, safe_serialize(tool_args))
 
     return span
@@ -75,7 +75,7 @@ def update_execute_tool_span(
     if not span:
         return
 
-    if not _should_send_prompts() or result is None:
+    if not _should_send_outputs() or result is None:
         return
 
     if isinstance(span, StreamedSpan):

@@ -20,7 +20,7 @@ except ImportError:
 
 try:
     import httpcore
-except ImportError:
+except (ImportError, AttributeError):
     httpcore = None  # type: ignore[assignment,unused-ignore]
 
 try:
@@ -43,7 +43,7 @@ import certifi
 import urllib3
 
 import sentry_sdk
-from sentry_sdk.consts import EndpointType
+from sentry_sdk.consts import VERSION, EndpointType
 from sentry_sdk.envelope import Envelope, Item, PayloadRef
 from sentry_sdk.utils import (
     Dsn,
@@ -73,10 +73,10 @@ if TYPE_CHECKING:
 
 KEEP_ALIVE_SOCKET_OPTIONS = []
 for option in [
-    (socket.SOL_SOCKET, lambda: getattr(socket, "SO_KEEPALIVE"), 1),  # noqa: B009
-    (socket.SOL_TCP, lambda: getattr(socket, "TCP_KEEPIDLE"), 45),  # noqa: B009
-    (socket.SOL_TCP, lambda: getattr(socket, "TCP_KEEPINTVL"), 10),  # noqa: B009
-    (socket.SOL_TCP, lambda: getattr(socket, "TCP_KEEPCNT"), 6),  # noqa: B009
+    (socket.SOL_SOCKET, lambda: getattr(socket, "SO_KEEPALIVE"), 1),
+    (socket.SOL_TCP, lambda: getattr(socket, "TCP_KEEPIDLE"), 45),
+    (socket.SOL_TCP, lambda: getattr(socket, "TCP_KEEPINTVL"), 10),
+    (socket.SOL_TCP, lambda: getattr(socket, "TCP_KEEPCNT"), 6),
 ]:
     try:
         KEEP_ALIVE_SOCKET_OPTIONS.append((option[0], option[1](), option[2]))
@@ -217,8 +217,6 @@ class HttpTransportCore(Transport):
     TIMEOUT = 30  # seconds
 
     def __init__(self: "Self", options: "Dict[str, Any]") -> None:
-        from sentry_sdk.consts import VERSION
-
         Transport.__init__(self, options)
         assert self.parsed_dsn is not None
         self.options: "Dict[str, Any]" = options
@@ -292,7 +290,7 @@ class HttpTransportCore(Transport):
 
         if item is not None:
             data_category = item.data_category
-            quantity = 1  # If an item is provided, we always count it as 1 (except for attachments, handled below).
+            quantity = 1  # If an item is provided, we count it as 1 unless it's a batched item or an attachment (handled below).
 
             if data_category == "transaction":
                 # Also record the lost spans
@@ -304,10 +302,21 @@ class HttpTransportCore(Transport):
                 )
                 self.record_lost_event(reason, "span", quantity=span_count)
 
-            elif data_category == "log_item" and item:
-                # Also record size of lost logs in bytes
-                bytes_size = len(item.get_bytes())
-                self.record_lost_event(reason, "log_byte", quantity=bytes_size)
+            elif data_category in ("span", "log_item", "trace_metric"):
+                # Batched items can contain multiple spans, logs or metrics
+                item_count = item.headers.get("item_count")
+                if isinstance(item_count, int) and item_count > 0:
+                    quantity = item_count
+
+                # Also record size of lost logs and metrics in bytes
+                if data_category == "log_item":
+                    bytes_size = len(item.get_bytes())
+                    self.record_lost_event(reason, "log_byte", quantity=bytes_size)
+                elif data_category == "trace_metric":
+                    bytes_size = len(item.get_bytes())
+                    self.record_lost_event(
+                        reason, "trace_metric_byte", quantity=bytes_size
+                    )
 
             elif data_category == "attachment":
                 # quantity of 0 is actually 1 as we do not want to count
@@ -810,7 +819,7 @@ class HttpTransport(BaseHttpTransport):
                 use_socks_proxy = True
                 try:
                     # Check if PySocks dependency is available
-                    from urllib3.contrib.socks import SOCKSProxyManager
+                    from urllib3.contrib.socks import SOCKSProxyManager  # noqa: PLC0415
                 except ImportError:
                     use_socks_proxy = False
                     logger.warning(

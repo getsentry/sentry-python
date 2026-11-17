@@ -43,8 +43,8 @@ MAX_EVENT_BYTES = 10**6
 
 # Maximum depth and breadth of databags. Excess data will be trimmed. If
 # max_request_body_size is "always", request bodies won't be trimmed.
-MAX_DATABAG_DEPTH = 5
-MAX_DATABAG_BREADTH = 10
+MAX_DATABAG_DEPTH: int = 5
+MAX_DATABAG_BREADTH: int = 10
 CYCLE_MARKER = "<cyclic>"
 
 

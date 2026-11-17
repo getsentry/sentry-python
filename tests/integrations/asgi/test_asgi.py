@@ -156,14 +156,39 @@ def asgi3_custom_transaction_app():
     return app
 
 
-def test_invalid_transaction_style(asgi3_app):
-    with pytest.raises(ValueError) as exp:
-        SentryAsgiMiddleware(asgi3_app, transaction_style="URL")
+@pytest.fixture
+def asgi3_app_with_span():
+    async def app(scope, receive, send):
+        if scope["type"] == "lifespan":
+            while True:
+                message = await receive()
+                if message["type"] == "lifespan.startup":
+                    await send({"type": "lifespan.startup.complete"})
+                elif message["type"] == "lifespan.shutdown":
+                    await send({"type": "lifespan.shutdown.complete"})
+                    return
 
-    assert (
-        str(exp.value)
-        == "Invalid value for transaction_style: URL (must be in ('endpoint', 'url'))"
-    )
+        with sentry_sdk.traces.start_span(name="child-span"):
+            pass
+
+        await send(
+            {
+                "type": "http.response.start",
+                "status": 200,
+                "headers": [[b"content-type", b"text/plain"]],
+            }
+        )
+        await send({"type": "http.response.body", "body": b"Hello, world!"})
+
+    return app
+
+
+def test_invalid_transaction_style(asgi3_app):
+    with pytest.raises(
+        ValueError,
+        match=r"Invalid value for transaction_style: URL \(must be in \('endpoint', 'url'\)\)",
+    ):
+        SentryAsgiMiddleware(asgi3_app, transaction_style="URL")
 
 
 @pytest.mark.asyncio
@@ -254,7 +279,7 @@ async def test_capture_transaction_with_error(
     asgi3_app_with_error,
     capture_events,
     capture_items,
-    DictionaryContaining,  # noqa: N803
+    DictionaryContaining,
     span_streaming,
 ):
     sentry_init(
@@ -525,7 +550,7 @@ async def test_websocket(
 
     request_url = "/ws"
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Oh no"):
         client = TestClient(asgi3_ws_app)
         if span_streaming:
             items = capture_items("event", "span")
@@ -782,7 +807,7 @@ def test_get_ip():
     ip = _get_ip(scope)
     assert ip == "127.0.0.1"
 
-    # x-forwarded-for header overides the ip from client
+    # x-forwarded-for header overrides the ip from client
     headers = [
         (b"x-forwarded-for", b"8.8.8.8"),
     ]
@@ -793,7 +818,7 @@ def test_get_ip():
     ip = _get_ip(scope)
     assert ip == "8.8.8.8"
 
-    # x-real-for header overides the ip from client
+    # x-real-for header overrides the ip from client
     headers = [
         (b"x-real-ip", b"10.10.10.10"),
     ]
@@ -831,10 +856,8 @@ async def test_get_request_data_url_with_filtered_host(
     # substituted "[Filtered]" value.
     sentry_init(
         traces_sample_rate=1.0,
-        _experiments={
-            "data_collection": {
-                "http_headers": {"request": {"mode": "allowlist", "terms": []}}
-            }
+        data_collection={
+            "http_headers": {"request": {"mode": "allowlist", "terms": []}}
         },
     )
     app = SentryAsgiMiddleware(asgi3_app)
@@ -863,10 +886,8 @@ async def test_get_request_attributes_url_with_filtered_host(
         send_default_pii=True,
         traces_sample_rate=1.0,
         trace_lifecycle="stream",
-        _experiments={
-            "data_collection": {
-                "http_headers": {"request": {"mode": "allowlist", "terms": []}}
-            },
+        data_collection={
+            "http_headers": {"request": {"mode": "allowlist", "terms": []}}
         },
     )
     app = SentryAsgiMiddleware(asgi3_app)
@@ -895,9 +916,7 @@ async def test_get_request_attributes_url_with_headers_off(
         send_default_pii=True,
         traces_sample_rate=1.0,
         trace_lifecycle="stream",
-        _experiments={
-            "data_collection": {"http_headers": {"request": {"mode": "off"}}},
-        },
+        data_collection={"http_headers": {"request": {"mode": "off"}}},
     )
     app = SentryAsgiMiddleware(asgi3_app)
 
@@ -942,16 +961,14 @@ def _http_scope():
             id="defaults",
         ),
         pytest.param(
-            {"_experiments": {"data_collection": {}}},
+            {"data_collection": {}},
             "token=%5BFiltered%5D&theme=dark&lang=en&session=%5BFiltered%5D",
             id="data_collection_denylist_default",
         ),
         pytest.param(
             {
-                "_experiments": {
-                    "data_collection": {
-                        "url_query_params": {"mode": "denylist", "terms": ["theme"]}
-                    }
+                "data_collection": {
+                    "url_query_params": {"mode": "denylist", "terms": ["theme"]}
                 }
             },
             "token=%5BFiltered%5D&theme=%5BFiltered%5D&lang=en&session=%5BFiltered%5D",
@@ -959,10 +976,8 @@ def _http_scope():
         ),
         pytest.param(
             {
-                "_experiments": {
-                    "data_collection": {
-                        "url_query_params": {"mode": "allowlist", "terms": ["theme"]}
-                    }
+                "data_collection": {
+                    "url_query_params": {"mode": "allowlist", "terms": ["theme"]}
                 }
             },
             "token=%5BFiltered%5D&theme=dark&lang=%5BFiltered%5D&session=%5BFiltered%5D",
@@ -970,21 +985,15 @@ def _http_scope():
         ),
         pytest.param(
             {
-                "_experiments": {
-                    "data_collection": {
-                        "url_query_params": {"mode": "allowlist", "terms": ["token"]}
-                    }
+                "data_collection": {
+                    "url_query_params": {"mode": "allowlist", "terms": ["token"]}
                 }
             },
             "token=%5BFiltered%5D&theme=%5BFiltered%5D&lang=%5BFiltered%5D&session=%5BFiltered%5D",
             id="data_collection_allowlist_sensitive_term",
         ),
         pytest.param(
-            {
-                "_experiments": {
-                    "data_collection": {"url_query_params": {"mode": "off"}}
-                }
-            },
+            {"data_collection": {"url_query_params": {"mode": "off"}}},
             None,
             id="data_collection_off",
         ),
@@ -992,9 +1001,7 @@ def _http_scope():
         pytest.param(
             {
                 "send_default_pii": True,
-                "_experiments": {
-                    "data_collection": {"url_query_params": {"mode": "off"}}
-                },
+                "data_collection": {"url_query_params": {"mode": "off"}},
             },
             None,
             id="data_collection_wins_over_send_default_pii",
@@ -1044,7 +1051,7 @@ async def test_get_request_data_query_string_empty_legacy_is_none(
 async def test_get_request_data_empty_query_string_dropped_with_data_collection(
     sentry_init, capture_events, asgi3_app
 ):
-    sentry_init(traces_sample_rate=1.0, _experiments={"data_collection": {}})
+    sentry_init(traces_sample_rate=1.0, data_collection={})
     app = SentryAsgiMiddleware(asgi3_app)
 
     events = capture_events()
@@ -1080,17 +1087,15 @@ async def test_get_request_data_empty_query_string_dropped_with_data_collection(
             id="defaults",
         ),
         pytest.param(
-            {"_experiments": {"data_collection": {}}},
+            {"data_collection": {}},
             "token=%5BFiltered%5D&theme=dark&lang=en&session=%5BFiltered%5D",
             "http://example.com/foo?token=%5BFiltered%5D&theme=dark&lang=en&session=%5BFiltered%5D",
             id="data_collection_denylist_default",
         ),
         pytest.param(
             {
-                "_experiments": {
-                    "data_collection": {
-                        "url_query_params": {"mode": "allowlist", "terms": ["theme"]}
-                    }
+                "data_collection": {
+                    "url_query_params": {"mode": "allowlist", "terms": ["theme"]}
                 }
             },
             "token=%5BFiltered%5D&theme=dark&lang=%5BFiltered%5D&session=%5BFiltered%5D",
@@ -1098,11 +1103,7 @@ async def test_get_request_data_empty_query_string_dropped_with_data_collection(
             id="data_collection_allowlist",
         ),
         pytest.param(
-            {
-                "_experiments": {
-                    "data_collection": {"url_query_params": {"mode": "off"}}
-                }
-            },
+            {"data_collection": {"url_query_params": {"mode": "off"}}},
             None,
             "http://example.com/foo",
             id="data_collection_off",
@@ -1110,9 +1111,7 @@ async def test_get_request_data_empty_query_string_dropped_with_data_collection(
         pytest.param(
             {
                 "send_default_pii": True,
-                "_experiments": {
-                    "data_collection": {"url_query_params": {"mode": "off"}}
-                },
+                "data_collection": {"url_query_params": {"mode": "off"}},
             },
             None,
             "http://example.com/foo",
@@ -1159,13 +1158,13 @@ async def test_get_request_attributes_query_data_collection(
 
 USER_INFO_CASES = [
     pytest.param(
-        {"_experiments": {"data_collection": {"user_info": False}}},
+        {"data_collection": {"user_info": False}},
         True,
         False,
         id="dc_user_info_false",
     ),
     pytest.param(
-        {"_experiments": {"data_collection": {}}},
+        {"data_collection": {}},
         True,
         True,
         id="dc_default_user_info",
@@ -1173,7 +1172,7 @@ USER_INFO_CASES = [
     pytest.param(
         {
             "send_default_pii": True,
-            "_experiments": {"data_collection": {"user_info": False}},
+            "data_collection": {"user_info": False},
         },
         True,
         False,
@@ -1192,7 +1191,7 @@ USER_INFO_CASES = [
         id="legacy_pii_false",
     ),
     pytest.param(
-        {"_experiments": {"data_collection": {}}},
+        {"data_collection": {}},
         False,
         False,
         id="no_client",
@@ -1438,24 +1437,24 @@ async def test_custom_transaction_name(
         pytest.param({"send_default_pii": True}, True, id="legacy_pii_true"),
         pytest.param({"send_default_pii": False}, False, id="legacy_pii_false"),
         pytest.param(
-            {"_experiments": {"data_collection": {}}},
+            {"data_collection": {}},
             True,
             id="dc_default_user_info",
         ),
         pytest.param(
-            {"_experiments": {"data_collection": {"user_info": True}}},
+            {"data_collection": {"user_info": True}},
             True,
             id="dc_user_info_true",
         ),
         pytest.param(
-            {"_experiments": {"data_collection": {"user_info": False}}},
+            {"data_collection": {"user_info": False}},
             False,
             id="dc_user_info_false",
         ),
         pytest.param(
             {
                 "send_default_pii": True,
-                "_experiments": {"data_collection": {"user_info": False}},
+                "data_collection": {"user_info": False},
             },
             False,
             id="dc_wins_over_pii",
@@ -1467,40 +1466,20 @@ async def test_user_ip_address_on_all_spans(
     capture_items,
     init_kwargs,
     expect_ip,
+    asgi3_app_with_span,
 ):
-    async def app(scope, receive, send):
-        if scope["type"] == "lifespan":
-            while True:
-                message = await receive()
-                if message["type"] == "lifespan.startup":
-                    await send({"type": "lifespan.startup.complete"})
-                elif message["type"] == "lifespan.shutdown":
-                    await send({"type": "lifespan.shutdown.complete"})
-                    return
-
-        with sentry_sdk.traces.start_span(name="child-span"):
-            pass
-
-        await send(
-            {
-                "type": "http.response.start",
-                "status": 200,
-                "headers": [[b"content-type", b"text/plain"]],
-            }
-        )
-        await send({"type": "http.response.body", "body": b"Hello, world!"})
-
     kwargs = dict(init_kwargs)
     sentry_init(
         trace_lifecycle="stream",
         traces_sample_rate=1.0,
         **kwargs,
     )
-    sentry_app = SentryAsgiMiddleware(app)
+
+    app = SentryAsgiMiddleware(asgi3_app_with_span)
 
     async def wrapped_app(scope, receive, send):
         scope["client"] = ("127.0.0.1", 0)
-        await sentry_app(scope, receive, send)
+        await app(scope, receive, send)
 
     async with TestClient(wrapped_app) as client:
         items = capture_items("span")
@@ -1516,3 +1495,84 @@ async def test_user_ip_address_on_all_spans(
     else:
         assert "user.ip_address" not in server_span["attributes"]
         assert "user.ip_address" not in child_span["attributes"]
+
+
+@pytest.mark.parametrize(
+    "client_ip, server, host_header, is_localhost",
+    [
+        # Loopback IP
+        ("127.0.0.1", ("example.com", 80), b"example.com", True),
+        # IPv6 loopback
+        ("::1", ("example.com", 80), b"example.com", True),
+        # Localhost host header with non-local IP
+        ("203.0.113.50", ("example.com", 80), b"localhost:8000", True),
+        # Server bound to localhost, but host header is public (reverse proxy)
+        ("203.0.113.50", ("localhost", 8000), b"example.com", False),
+        # Server bound to localhost, no host header (fallback to server)
+        ("203.0.113.50", ("localhost", 8000), None, True),
+        # Non-local everything
+        ("203.0.113.50", ("example.com", 80), b"example.com", False),
+    ],
+)
+@pytest.mark.asyncio
+async def test_is_localhost_attribute(
+    sentry_init,
+    capture_items,
+    client_ip,
+    server,
+    host_header,
+    is_localhost,
+    asgi3_app_with_span,
+):
+    sentry_init(
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+    )
+
+    app = SentryAsgiMiddleware(asgi3_app_with_span)
+
+    async def wrapped_app(scope, receive, send):
+        if scope["type"] != "lifespan":
+            scope["client"] = (client_ip, 0)
+            scope["server"] = server
+            scope["headers"] = [(k, v) for k, v in scope["headers"] if k != b"host"]
+            if host_header is not None:
+                scope["headers"].append((b"host", host_header))
+
+        await app(scope, receive, send)
+
+    async with TestClient(wrapped_app) as client:
+        items = capture_items("span")
+        await client.get("/some_url")
+
+    sentry_sdk.flush()
+
+    child_span, server_span = [item.payload for item in items]
+
+    assert server_span["attributes"]["sentry.is_localhost"] is is_localhost
+    assert child_span["attributes"]["sentry.is_localhost"] is is_localhost
+
+
+@pytest.mark.asyncio
+async def test_user_agent_original_attribute(
+    sentry_init,
+    capture_items,
+    asgi3_app_with_span,
+):
+    sentry_init(
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+    )
+
+    app = SentryAsgiMiddleware(asgi3_app_with_span)
+
+    async with TestClient(app) as client:
+        items = capture_items("span")
+        await client.get("/some_url", headers={"User-Agent": "TestBrowser/1.0"})
+
+    sentry_sdk.flush()
+
+    child_span, server_span = [item.payload for item in items]
+
+    assert server_span["attributes"]["user_agent.original"] == "TestBrowser/1.0"
+    assert child_span["attributes"]["user_agent.original"] == "TestBrowser/1.0"

@@ -22,6 +22,7 @@ from sentry_sdk.utils import (
     CONTEXTVARS_ERROR_MESSAGE,
     HAS_REAL_CONTEXTVARS,
     AnnotatedValue,
+    _is_localhost,
     capture_internal_exceptions,
     ensure_integration_enabled,
     event_from_exception,
@@ -127,6 +128,19 @@ def _handle_request_impl(self: "RequestHandler") -> "Generator[None, None, None]
         processor = _make_event_processor(weak_handler)
         scope.add_event_processor(processor)
 
+        scope.set_attribute(
+            SPANDATA.SENTRY_IS_LOCALHOST,
+            _is_localhost(
+                client_ip=_get_client_ip(self.request),
+                host_header=self.request.headers.get("Host"),
+                forwarded_host_header=self.request.headers.get("X-Forwarded-Host"),
+            ),
+        )
+
+        user_agent = headers.get("User-Agent")
+        if user_agent:
+            scope.set_attribute(SPANDATA.USER_AGENT_ORIGINAL, user_agent)
+
         span_ctx: "ContextManager[Union[Span, StreamedSpan, None]]"
 
         if is_span_streaming_enabled:
@@ -198,6 +212,17 @@ def _handle_request_impl(self: "RequestHandler") -> "Generator[None, None, None]
                         span.status = "error" if status_int >= 400 else "ok"
 
 
+def _get_client_ip(request: "Any") -> "Optional[str]":
+    x_forwarded_for = request.headers.get("X-Forwarded-For", "").split(",")[0].strip()
+    if x_forwarded_for:
+        return x_forwarded_for
+
+    if request.headers.get("X-Real-IP"):
+        return request.headers["X-Real-IP"]
+
+    return request.remote_ip
+
+
 def _get_request_attributes(request: "Any") -> "Dict[str, Any]":
     attributes = {}  # type: Dict[str, Any]
     client_options = sentry_sdk.get_client().options
@@ -243,11 +268,22 @@ def _get_request_attributes(request: "Any") -> "Dict[str, Any]":
     if request.protocol:
         attributes[SPANDATA.NETWORK_PROTOCOL_NAME] = request.protocol
 
-    with capture_internal_exceptions():
-        raw_data = _get_tornado_request_data(request)
-        body_data = raw_data.value if isinstance(raw_data, AnnotatedValue) else raw_data
-        if body_data is not None:
-            attributes[SPANDATA.HTTP_REQUEST_BODY_DATA] = body_data
+    # The request data was unconditionally set pre-data collection which is
+    # why we're defaulting to True
+    record_incoming_request_data = True
+    if has_data_collection_enabled(client_options):
+        record_incoming_request_data = (
+            "incoming_request" in client_options["data_collection"]["http_bodies"]
+        )
+
+    if record_incoming_request_data:
+        with capture_internal_exceptions():
+            raw_data = _get_tornado_request_data(request)
+            body_data = (
+                raw_data.value if isinstance(raw_data, AnnotatedValue) else raw_data
+            )
+            if body_data is not None:
+                attributes[SPANDATA.HTTP_REQUEST_BODY_DATA] = body_data
 
     return attributes
 
@@ -319,7 +355,14 @@ def _make_event_processor(
                 request_info["query_string"] = request.query
 
             request_info["method"] = request.method
-            request_info["env"] = {"REMOTE_ADDR": request.remote_ip}
+
+            # REMOTE_ADDR was unconditionally set pre-data collection, so it
+            # continues to be set when data collection is not enabled.
+            if (
+                not has_data_collection_enabled(client_options)
+                or client_options["data_collection"]["user_info"]
+            ):
+                request_info["env"] = {"REMOTE_ADDR": request.remote_ip}
             request_info["headers"] = _filter_headers(dict(request.headers))
 
         if has_data_collection_enabled(client_options):

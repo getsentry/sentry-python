@@ -78,7 +78,7 @@ def test_script_name_is_respected(
 
     with pytest.raises(ZeroDivisionError):
         # setting url with PATH_INFO: bark/, HTTP_HOST: dogs.are.great and SCRIPT_NAME: woof/woof/
-        client.get(path_info, f"https://dogs.are.great/{script_name}")  # noqa: E231
+        client.get(path_info, f"https://dogs.are.great/{script_name}")
 
     (event,) = events
 
@@ -146,7 +146,7 @@ def test_transaction_with_error(
     crashing_app,
     capture_events,
     capture_items,
-    DictionaryContaining,  # noqa:N803
+    DictionaryContaining,
     span_streaming,
 ):
     def dogpark(environ, start_response):
@@ -165,7 +165,7 @@ def test_transaction_with_error(
     else:
         events = capture_events()
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Fetch aborted"):
         client.get("http://dogs.are.great/sit/stay/rollover/")
 
     sentry_sdk.flush()
@@ -213,7 +213,7 @@ def test_transaction_no_error(
     sentry_init,
     capture_events,
     capture_items,
-    DictionaryContaining,  # noqa:N803
+    DictionaryContaining,
     span_streaming,
     send_pii,
 ):
@@ -300,7 +300,7 @@ def test_has_trace_if_performance_enabled(
     else:
         events = capture_events()
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Fetch aborted"):
         client.get("http://dogs.are.great/sit/stay/rollover/")
 
     sentry_sdk.flush()
@@ -359,7 +359,7 @@ def test_has_trace_if_performance_disabled(
     client = Client(app)
     events = capture_events()
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Fetch aborted"):
         client.get("http://dogs.are.great/sit/stay/rollover/")
 
     msg_event, error_event = events
@@ -397,7 +397,7 @@ def test_trace_from_headers_if_performance_enabled(
     trace_id = "582b43a4192642f0b136d5159a501701"
     sentry_trace_header = "{}-{}-{}".format(trace_id, "6e8f22c393e68f19", 1)
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Fetch aborted"):
         client.get(
             "http://dogs.are.great/sit/stay/rollover/",
             headers={"sentry-trace": sentry_trace_header},
@@ -444,7 +444,7 @@ def test_trace_from_headers_if_performance_disabled(
     trace_id = "582b43a4192642f0b136d5159a501701"
     sentry_trace_header = "{}-{}-{}".format(trace_id, "6e8f22c393e68f19", 1)
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Fetch aborted"):
         client.get(
             "http://dogs.are.great/sit/stay/rollover/",
             headers={"sentry-trace": sentry_trace_header},
@@ -464,7 +464,7 @@ def test_trace_from_headers_if_performance_disabled(
 @pytest.mark.parametrize("span_streaming", [True, False])
 def test_traces_sampler_gets_correct_values_in_sampling_context(
     sentry_init,
-    DictionaryContaining,  # noqa:N803
+    DictionaryContaining,
     span_streaming,
 ):
     def app(environ, start_response):
@@ -835,7 +835,7 @@ def test_request_headers_data_collection_default_redacts_sensitive(
     sentry_init, crashing_app, capture_events, send_default_pii
 ):
     """
-    When ``data_collection`` is configured (even as ``None``, i.e. spec
+    When ``data_collection`` is configured (here as ``{}``, i.e. spec
     defaults), the WSGI event processor routes request headers through the
     data-collection filtering path. Sensitive headers are redacted regardless
     of ``send_default_pii`` -- the value of that legacy option must not change
@@ -843,7 +843,7 @@ def test_request_headers_data_collection_default_redacts_sensitive(
     """
     sentry_init(
         send_default_pii=send_default_pii,
-        _experiments={"data_collection": None},
+        data_collection={},
     )
     app = SentryWsgiMiddleware(crashing_app)
     client = Client(app)
@@ -914,9 +914,7 @@ def test_request_headers_data_collection_off_collects_no_headers(
     collected at all -- the filtering returns an empty mapping.
     """
     sentry_init(
-        _experiments={
-            "data_collection": {"http_headers": {"request": {"mode": "off"}}}
-        },
+        data_collection={"http_headers": {"request": {"mode": "off"}}},
     )
     app = SentryWsgiMiddleware(crashing_app)
     client = Client(app)
@@ -945,10 +943,8 @@ def test_request_headers_data_collection_allowlist_redacts_all_but_allowed_terms
     is redacted.
     """
     sentry_init(
-        _experiments={
-            "data_collection": {
-                "http_headers": {"request": {"mode": "allowlist", "terms": ["custom"]}}
-            }
+        data_collection={
+            "http_headers": {"request": {"mode": "allowlist", "terms": ["custom"]}}
         },
     )
     app = SentryWsgiMiddleware(crashing_app)
@@ -980,10 +976,8 @@ def test_request_headers_data_collection_denylist_redacts_only_matched_terms(
     matching a configured term (partial, case-insensitive).
     """
     sentry_init(
-        _experiments={
-            "data_collection": {
-                "http_headers": {"request": {"mode": "denylist", "terms": ["custom"]}}
-            }
+        data_collection={
+            "http_headers": {"request": {"mode": "denylist", "terms": ["custom"]}}
         },
     )
     app = SentryWsgiMiddleware(crashing_app)
@@ -1020,11 +1014,9 @@ def test_request_headers_data_collection_cookie_always_redacted(
     ``Client`` manages its own cookie jar and strips the ``Cookie`` header.
     """
     sentry_init(
-        _experiments={
-            "data_collection": {
-                "http_headers": {
-                    "request": {"mode": "allowlist", "terms": ["cookie", "custom"]}
-                }
+        data_collection={
+            "http_headers": {
+                "request": {"mode": "allowlist", "terms": ["cookie", "custom"]}
             }
         },
     )
@@ -1103,16 +1095,14 @@ def test_request_headers_legacy_pii_passes_headers_through(
         # data_collection configured: query string is routed through filtering.
         # Spec defaults -> denylist: only the sensitive ``auth`` is redacted.
         pytest.param(
-            {"_experiments": {"data_collection": {}}},
+            {"data_collection": {}},
             "toy=tennisball&color=red&auth=%5BFiltered%5D",
             id="data_collection_denylist_default",
         ),
         pytest.param(
             {
-                "_experiments": {
-                    "data_collection": {
-                        "url_query_params": {"mode": "denylist", "terms": ["toy"]}
-                    }
+                "data_collection": {
+                    "url_query_params": {"mode": "denylist", "terms": ["toy"]}
                 }
             },
             "toy=%5BFiltered%5D&color=red&auth=%5BFiltered%5D",
@@ -1122,21 +1112,15 @@ def test_request_headers_legacy_pii_passes_headers_through(
         # it is not sensitive, proving the redaction comes from the allowlist.
         pytest.param(
             {
-                "_experiments": {
-                    "data_collection": {
-                        "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
-                    }
+                "data_collection": {
+                    "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
                 }
             },
             "toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D",
             id="data_collection_allowlist",
         ),
         pytest.param(
-            {
-                "_experiments": {
-                    "data_collection": {"url_query_params": {"mode": "off"}}
-                }
-            },
+            {"data_collection": {"url_query_params": {"mode": "off"}}},
             None,
             id="data_collection_off",
         ),
@@ -1183,16 +1167,14 @@ def test_query_string_data_collection(
         ),
         # data_collection configured: attribute is routed through filtering.
         pytest.param(
-            {"_experiments": {"data_collection": {}}},
+            {"data_collection": {}},
             "toy=tennisball&color=red&auth=%5BFiltered%5D",
             id="data_collection_denylist_default",
         ),
         pytest.param(
             {
-                "_experiments": {
-                    "data_collection": {
-                        "url_query_params": {"mode": "denylist", "terms": ["toy"]}
-                    }
+                "data_collection": {
+                    "url_query_params": {"mode": "denylist", "terms": ["toy"]}
                 }
             },
             "toy=%5BFiltered%5D&color=red&auth=%5BFiltered%5D",
@@ -1202,21 +1184,15 @@ def test_query_string_data_collection(
         # it is not sensitive, proving the redaction comes from the allowlist.
         pytest.param(
             {
-                "_experiments": {
-                    "data_collection": {
-                        "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
-                    }
+                "data_collection": {
+                    "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
                 }
             },
             "toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D",
             id="data_collection_allowlist",
         ),
         pytest.param(
-            {
-                "_experiments": {
-                    "data_collection": {"url_query_params": {"mode": "off"}}
-                }
-            },
+            {"data_collection": {"url_query_params": {"mode": "off"}}},
             None,
             id="data_collection_off",
         ),
@@ -1346,7 +1322,7 @@ def test_user_info_error_event_data_collection(
 def test_error_event_no_user_ip_address_without_remote_addr(
     sentry_init, crashing_app, capture_events
 ):
-    sentry_init(_experiments={"data_collection": {"user_info": True}})
+    sentry_init(data_collection={"user_info": True})
     app = SentryWsgiMiddleware(crashing_app)
     client = Client(app)
     events = capture_events()
@@ -1357,3 +1333,81 @@ def test_error_event_no_user_ip_address_without_remote_addr(
     (event,) = events
 
     assert "ip_address" not in event.get("user", {})
+
+
+@pytest.mark.parametrize(
+    "client_kwargs, is_localhost",
+    [
+        # Default werkzeug client: REMOTE_ADDR=127.0.0.1, Host=localhost
+        ({"path": "/dogs/"}, True),
+        # IPv6 loopback
+        ({"path": "/dogs/", "environ_base": {"REMOTE_ADDR": "::1"}}, True),
+        # Localhost Host header with non-local IP
+        (
+            {
+                "path": "http://localhost:8000/dogs/",
+                "environ_overrides": {"REMOTE_ADDR": "1.2.3.4"},
+            },
+            True,
+        ),
+        # Non-local IP and non-local host
+        (
+            {
+                "path": "/dogs/",
+                "base_url": "http://example.com",
+                "environ_overrides": {"REMOTE_ADDR": "1.2.3.4"},
+            },
+            False,
+        ),
+    ],
+)
+def test_is_localhost_attribute(
+    sentry_init, capture_items, client_kwargs, is_localhost
+):
+    def dogpark(environ, start_response):
+        with sentry_sdk.traces.start_span(name="child-span"):
+            pass
+        start_response("200 OK", [])
+        return ["woof"]
+
+    sentry_init(traces_sample_rate=1.0, trace_lifecycle="stream")
+    app = SentryWsgiMiddleware(dogpark)
+    client = Client(app)
+
+    items = capture_items("span")
+
+    client.get(**client_kwargs)
+
+    sentry_sdk.flush()
+
+    child_span, server_span = [item.payload for item in items]
+
+    assert server_span["attributes"]["sentry.is_localhost"] is is_localhost
+    assert child_span["attributes"]["sentry.is_localhost"] is is_localhost
+
+
+def test_user_agent_attribute(sentry_init, capture_items):
+    def dogpark(environ, start_response):
+        with sentry_sdk.traces.start_span(name="child-span"):
+            pass
+        start_response("200 OK", [])
+        return ["woof"]
+
+    sentry_init(
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+    )
+
+    app = SentryWsgiMiddleware(dogpark)
+    client = Client(app)
+
+    items = capture_items("span")
+
+    client.get("/dogs/", headers={"User-Agent": "TestBrowser/1.0"})
+
+    sentry_sdk.flush()
+
+    child_span, server_span = [item.payload for item in items]
+
+    assert server_span["attributes"]["user_agent.original"] == "TestBrowser/1.0"
+    assert child_span["attributes"]["user_agent.original"] == "TestBrowser/1.0"

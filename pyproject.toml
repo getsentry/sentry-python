@@ -12,11 +12,12 @@ dev = [
     "coverage[toml]",
     "pre-commit",
     "ruff",
+    "typos",
 ]
 
 toxgen = [
     "jinja2",
-    "packaging<26.0",
+    "packaging",
     "pip",
     "requests",
 ]
@@ -24,7 +25,7 @@ toxgen = [
 docs = [
     "gevent",
     "shibuya",
-    "sphinx<8.2",
+    "sphinx",
     "sphinx-autodoc-typehints[type_comments]>=2.3.0",
     "typing-extensions",
 ]
@@ -73,6 +74,16 @@ typing = [
     "pydantic>=2.13.4",
     "pydantic-ai-slim>=2.23.0",
     "langchain-core>=1.5.3",
+    "huggingface-hub>=1.26.1",
+    "anthropic>=1.2.0",
+    "google-genai>=2.21.0",
+    "openai>=3.7.0",
+    "tiktoken>=0.14.0",
+    "aiohttp>=3.14.3",
+    "openai-agents>=0.22.0",
+    "mistralai>=2.10.1",
+    "typesafe-sdk>=0.7.5",
+    "mypy-boto3-bedrock-runtime>=1.43.62",
 ]
 test = [
     "dataclasses ; python_full_version < '3.7'",
@@ -136,6 +147,7 @@ disallow_incomplete_defs = true
 disallow_subclassing_any = true
 disallow_untyped_decorators = true
 disallow_untyped_defs = true
+enable_error_code = ["unused-awaitable"]
 no_implicit_optional = true
 python_version = "3.11"
 strict_equality = true
@@ -289,8 +301,10 @@ select = [
     "W",   # pycodestyle warnings (same as flake8 default)
     "F",   # Pyflakes (same as flake8 default)
     "I",
-    # Note: B and N rules are NOT enabled by default in flake8
-    # They were only active through the plugins, which may not have been fully enabled
+    "T20",     # print() and pprint() calls
+    "PT011",   # pytest.raises() too broad
+    "PLC0415", # Import not at the top level of the file
+    "RUF100",  # Unused noqa directive
 ]
 
 # Use ONLY the same ignores as the original flake8 config + compatibility for this codebase
@@ -299,13 +313,14 @@ ignore = [
     "E501", # Line too long
     "E402", # Module level import not at top of file
     "E731", # Do not assign a lambda expression, use a def
-    "B014", # Redundant exception types
-    "N812", # Lowercase imported as non-lowercase
-    "N804", # First argument of classmethod should be named cls
 
     # Additional ignores for codebase compatibility
     "E721", # Use isinstance instead of type() == - existing pattern in this codebase
 ]
+
+[tool.ruff.lint.per-file-ignores]
+"scripts/**" = ["T20"]
+"tests/**" = ["T20", "PLC0415"]
 
 [tool.ruff.format]
 # ruff format already excludes the same files as specified in extend-exclude

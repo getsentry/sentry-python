@@ -18,6 +18,7 @@ from sentry_sdk.tracing import Span, TransactionSource
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
     ContextVar,
+    _is_localhost,
     capture_internal_exceptions,
     event_from_exception,
     has_data_collection_enabled,
@@ -126,6 +127,22 @@ class SentryWsgiMiddleware:
                             )
                         )
 
+                    scope.set_attribute(
+                        SPANDATA.SENTRY_IS_LOCALHOST,
+                        _is_localhost(
+                            client_ip=get_client_ip(environ),
+                            url_host=environ.get("SERVER_NAME")
+                            if not environ.get("HTTP_HOST")
+                            else None,
+                            host_header=environ.get("HTTP_HOST"),
+                            forwarded_host_header=environ.get("HTTP_X_FORWARDED_HOST"),
+                        ),
+                    )
+                    if environ.get("HTTP_USER_AGENT"):
+                        scope.set_attribute(
+                            SPANDATA.USER_AGENT_ORIGINAL, environ["HTTP_USER_AGENT"]
+                        )
+
                     method = environ.get("REQUEST_METHOD", "").upper()
 
                     span_ctx: "Optional[ContextManager[Union[Span, StreamedSpan, None]]]" = None
@@ -159,6 +176,7 @@ class SentryWsgiMiddleware:
                                 },
                                 parent_span=None,
                             )
+                            scope.get_current_scope()._server_segment_span = span_ctx
                         else:
                             transaction = continue_trace(
                                 environ,
@@ -428,10 +446,6 @@ def _get_request_attributes(
     url_scheme = environ.get("wsgi.url_scheme")
     if url_scheme:
         attributes["network.protocol.name"] = url_scheme
-
-    server_name = environ.get("SERVER_NAME")
-    if server_name:
-        attributes["server.address"] = server_name
 
     server_port = environ.get("SERVER_PORT")
     if server_port:

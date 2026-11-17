@@ -141,6 +141,27 @@ def test_transaction_or_segment_style(
         assert event["transaction_info"] == {"source": expected_source}
 
 
+def test_http_route(
+    sentry_init,
+    app,
+    capture_items,
+):
+    sentry_init(
+        integrations=[flask_sentry.FlaskIntegration()],
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+    )
+    items = capture_items("span")
+
+    client = app.test_client()
+    client.get("/message/123456")
+
+    sentry_sdk.flush()
+
+    (segment,) = (item.payload for item in items if item.payload.get("is_segment"))
+    assert segment["attributes"][SPANDATA.HTTP_ROUTE] == "/message/<int:message_id>"
+
+
 @pytest.mark.parametrize("debug", (True, False))
 @pytest.mark.parametrize("testing", (True, False))
 def test_errors(
@@ -359,7 +380,7 @@ def test_flask_session_tracking(sentry_init, capture_envelopes, app):
         except ZeroDivisionError:
             pass
 
-    sentry_sdk.get_client().flush()
+    sentry_sdk.flush()
 
     (first_event, error_event, session) = envelopes
     first_event = first_event.get_event()
@@ -1064,7 +1085,7 @@ def test_response_status_code_ok_in_transaction_context(
     client = app.test_client()
     client.get("/message")
 
-    sentry_sdk.get_client().flush()
+    sentry_sdk.flush()
 
     (_, transaction_envelope, _) = envelopes
     transaction = transaction_envelope.get_transaction_event()
@@ -1091,7 +1112,7 @@ def test_response_status_code_not_found_in_transaction_context(
     client = app.test_client()
     client.get("/not-existing-route")
 
-    sentry_sdk.get_client().flush()
+    sentry_sdk.flush()
 
     (transaction_envelope, _) = envelopes
     transaction = transaction_envelope.get_transaction_event()
@@ -1211,20 +1232,31 @@ def test_transaction_or_segment_http_method_custom(
     response = client.options("/nomessage")
     assert response.status_code == 200
 
-    response = client.head("/nomessage")
-    assert response.status_code == 200
-
     if span_streaming:
         sentry_sdk.flush()
         spans = [i.payload for i in items]
-        assert len(spans) == 2
-        (options_segment, head_segment) = spans
+        (options_segment,) = spans
         assert options_segment["attributes"]["http.request.method"] == "OPTIONS"
+
+        response = client.head("/nomessage")
+        assert response.status_code == 200
+
+        sentry_sdk.flush()
+        spans = [i.payload for i in items]
+        assert len(spans) == 2
+        (_, head_segment) = spans
+
         assert head_segment["attributes"]["http.request.method"] == "HEAD"
     else:
-        assert len(events) == 2
-        (event1, event2) = events
+        (event1,) = events
         assert event1["request"]["method"] == "OPTIONS"
+
+        response = client.head("/nomessage")
+        assert response.status_code == 200
+
+        assert len(events) == 2
+        (_, event2) = events
+
         assert event2["request"]["method"] == "HEAD"
 
 
@@ -1242,27 +1274,21 @@ def test_transaction_or_segment_http_method_custom(
             id="legacy_send_default_pii_false",
         ),
         pytest.param(
-            {"_experiments": {"data_collection": {}}},
+            {"data_collection": {}},
             "toy=tennisball&color=red&auth=%5BFiltered%5D",
             id="data_collection_denylist_default",
         ),
         pytest.param(
             {
-                "_experiments": {
-                    "data_collection": {
-                        "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
-                    }
+                "data_collection": {
+                    "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
                 }
             },
             "toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D",
             id="data_collection_allowlist",
         ),
         pytest.param(
-            {
-                "_experiments": {
-                    "data_collection": {"url_query_params": {"mode": "off"}}
-                }
-            },
+            {"data_collection": {"url_query_params": {"mode": "off"}}},
             None,
             id="data_collection_off",
         ),
@@ -1308,27 +1334,21 @@ def test_query_string_data_collection(
             id="legacy_send_default_pii_false",
         ),
         pytest.param(
-            {"_experiments": {"data_collection": {}}},
+            {"data_collection": {}},
             "toy=tennisball&color=red&auth=%5BFiltered%5D",
             id="data_collection_denylist_default",
         ),
         pytest.param(
             {
-                "_experiments": {
-                    "data_collection": {
-                        "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
-                    }
+                "data_collection": {
+                    "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
                 }
             },
             "toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D",
             id="data_collection_allowlist",
         ),
         pytest.param(
-            {
-                "_experiments": {
-                    "data_collection": {"url_query_params": {"mode": "off"}}
-                }
-            },
+            {"data_collection": {"url_query_params": {"mode": "off"}}},
             None,
             id="data_collection_off",
         ),
@@ -1385,7 +1405,7 @@ def test_empty_query_string_is_dropped_with_data_collection(
 ):
     sentry_init(
         integrations=[flask_sentry.FlaskIntegration()],
-        _experiments={"data_collection": {}},
+        data_collection={},
     )
     events = capture_events()
 
@@ -1400,14 +1420,10 @@ def test_empty_query_string_is_dropped_with_data_collection(
 def test_user_info_span_attributes_data_collection(
     sentry_init, app, capture_items, monkeypatch, init_kwargs, expect_ip
 ):
-    init_kwargs = dict(init_kwargs)  # shallow copy so we can mutate
-    experiments = init_kwargs.pop("_experiments", {})
-
     sentry_init(
         integrations=[flask_sentry.FlaskIntegration()],
         traces_sample_rate=1.0,
         trace_lifecycle="stream",
-        _experiments=experiments,
         **init_kwargs,
     )
     # This test is about user IP collection, not flask_login. Disable
@@ -1464,7 +1480,7 @@ def test_error_event_no_user_ip_address_without_remote_addr(
 ):
     sentry_init(
         integrations=[flask_sentry.FlaskIntegration()],
-        _experiments={"data_collection": {"user_info": True}},
+        data_collection={"user_info": True},
     )
     monkeypatch.setattr(flask_sentry, "flask_login", None)
 
@@ -1535,14 +1551,10 @@ def test_flask_login_user_identity_error_event_data_collection(
 def test_flask_login_user_identity_span_attributes_data_collection(
     sentry_init, app, capture_items, init_kwargs, expect_user
 ):
-    init_kwargs = dict(init_kwargs)
-    experiments = init_kwargs.pop("_experiments", {})
-
     sentry_init(
         integrations=[flask_sentry.FlaskIntegration()],
         traces_sample_rate=1.0,
         trace_lifecycle="stream",
-        _experiments=experiments,
         **init_kwargs,
     )
 
@@ -1583,3 +1595,145 @@ def test_flask_login_user_identity_span_attributes_data_collection(
         assert "user.id" not in segment.get("attributes", {})
         assert "user.email" not in segment.get("attributes", {})
         assert "user.name" not in segment.get("attributes", {})
+
+
+@pytest.mark.parametrize(
+    "data_collection, expect_body",
+    [
+        pytest.param({}, True, id="data_collection_http_bodies_default"),
+        pytest.param(
+            {"http_bodies": ["incoming_request"]},
+            True,
+            id="data_collection_http_bodies_incoming_request",
+        ),
+        pytest.param(
+            {"http_bodies": ["outgoing_request"]},
+            False,
+            id="data_collection_http_bodies_outgoing_request_only",
+        ),
+        pytest.param(
+            {"http_bodies": []}, False, id="data_collection_http_bodies_empty"
+        ),
+    ],
+)
+def test_flask_request_body_data_collection(
+    sentry_init, capture_events, app, monkeypatch, data_collection, expect_body
+):
+    sentry_init(
+        integrations=[flask_sentry.FlaskIntegration()],
+        data_collection=data_collection,
+    )
+    # This test is about request body gating, not user data.
+    monkeypatch.setattr(flask_sentry, "flask_login", None)
+
+    data = {"foo": "bar"}
+
+    @app.route("/", methods=["POST"])
+    def index():
+        capture_message("hi")
+        return "ok"
+
+    events = capture_events()
+
+    client = app.test_client()
+    response = client.post("/", content_type="application/json", data=json.dumps(data))
+    assert response.status_code == 200
+
+    (event,) = events
+    if expect_body:
+        assert event["request"]["data"] == data
+    else:
+        assert "data" not in event["request"]
+
+
+def test_flask_request_body_dropped_with_form_and_files_data_collection(
+    sentry_init, capture_events, app, monkeypatch
+):
+    sentry_init(
+        integrations=[flask_sentry.FlaskIntegration()],
+        max_request_body_size="always",
+        data_collection={"http_bodies": []},
+    )
+    monkeypatch.setattr(flask_sentry, "flask_login", None)
+
+    data = {
+        "foo": "bar",
+        "file": (BytesIO(b"hello"), "hello.txt"),
+    }
+
+    @app.route("/", methods=["POST"])
+    def index():
+        assert list(request.form) == ["foo"]
+        assert list(request.files) == ["file"]
+        capture_message("hi")
+        return "ok"
+
+    events = capture_events()
+
+    client = app.test_client()
+    response = client.post("/", data=data)
+    assert response.status_code == 200
+
+    (event,) = events
+    assert "data" not in event["request"]
+    assert "data" not in event.get("_meta", {}).get("request", {})
+
+
+def test_flask_transaction_request_body_data_collection(
+    sentry_init, capture_events, app, monkeypatch
+):
+    sentry_init(
+        integrations=[flask_sentry.FlaskIntegration()],
+        traces_sample_rate=1.0,
+        data_collection={"http_bodies": []},
+    )
+    monkeypatch.setattr(flask_sentry, "flask_login", None)
+
+    data = {"username": "sentry-user", "age": "26"}
+
+    @app.route("/", methods=["POST"])
+    def index():
+        capture_message("hi")
+        return "ok"
+
+    events = capture_events()
+
+    client = app.test_client()
+    response = client.post("/", content_type="application/json", data=data)
+    assert response.status_code == 200
+
+    event, transaction_event = events
+    assert "data" not in event["request"]
+    assert "data" not in transaction_event["request"]
+
+
+def test_flask_oversized_request_body_not_annotated_data_collection(
+    sentry_init, capture_events, app, monkeypatch
+):
+    """
+    The gating happens before the size check, so an oversized body is dropped
+    outright instead of being reported as removed because of the size limit.
+    """
+    sentry_init(
+        integrations=[flask_sentry.FlaskIntegration()],
+        max_request_body_size="small",
+        data_collection={"http_bodies": []},
+    )
+    monkeypatch.setattr(flask_sentry, "flask_login", None)
+
+    data = "a" * 2000
+
+    @app.route("/", methods=["POST"])
+    def index():
+        capture_message("hi")
+        return "ok"
+
+    events = capture_events()
+
+    client = app.test_client()
+    response = client.post("/", data=data)
+    assert response.status_code == 200
+
+    (event,) = events
+    assert "data" not in event["request"]
+    assert "data" not in event.get("_meta", {}).get("request", {})

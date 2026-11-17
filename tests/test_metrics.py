@@ -9,7 +9,8 @@ from sentry_sdk import get_client
 from sentry_sdk.consts import SPANDATA, VERSION
 
 
-def test_metrics_disabled(sentry_init, capture_envelopes):
+def test_metrics_enable_metrics_noop(sentry_init, capture_envelopes):
+    # The enable_metrics option has no effect anymore.
     sentry_init(enable_metrics=False)
 
     envelopes = capture_envelopes()
@@ -18,7 +19,9 @@ def test_metrics_disabled(sentry_init, capture_envelopes):
     sentry_sdk.metrics.gauge("test.gauge", 42)
     sentry_sdk.metrics.distribution("test.distribution", 200)
 
-    assert len(envelopes) == 0
+    sentry_sdk.flush()
+
+    assert envelopes
 
 
 def test_metrics_basics(sentry_init, capture_items):
@@ -286,6 +289,59 @@ def test_metrics_before_send_raises_does_not_crash_application(
     assert not metrics
 
 
+@pytest.mark.tests_internal_exceptions
+def test_metrics_before_send_raises_records_callback_error(
+    sentry_init, capture_items, capture_record_lost_event_calls
+):
+    def _before_metric(record, hint):
+        raise ValueError("before_send_metric error")
+
+    sentry_init(before_send_metric=_before_metric)
+    items = capture_items("trace_metric")
+    record_lost_event_calls = capture_record_lost_event_calls()
+
+    sentry_sdk.metrics.count("test.keep", 1)
+
+    get_client().flush()
+
+    assert not items
+    (lost_event_call,) = [
+        call for call in record_lost_event_calls if call[0] == "callback_error"
+    ]
+    reason, data_category, item, quantity = lost_event_call
+    assert data_category == "trace_metric"
+    assert quantity == 1
+    assert item.type == "trace_metric"
+    assert item.headers["item_count"] == 1
+    assert item.payload.json["items"][0]["name"] == "test.keep"
+
+
+def test_metrics_before_send_returns_none_records_before_send(
+    sentry_init, capture_items, capture_record_lost_event_calls
+):
+    def _before_metric(record, hint):
+        return None
+
+    sentry_init(before_send_metric=_before_metric)
+    items = capture_items("trace_metric")
+    record_lost_event_calls = capture_record_lost_event_calls()
+
+    sentry_sdk.metrics.count("test.drop", 1)
+
+    get_client().flush()
+
+    assert not items
+    (lost_event_call,) = [
+        call for call in record_lost_event_calls if call[0] == "before_send"
+    ]
+    reason, data_category, item, quantity = lost_event_call
+    assert data_category == "trace_metric"
+    assert quantity == 1
+    assert item.type == "trace_metric"
+    assert item.headers["item_count"] == 1
+    assert item.payload.json["items"][0]["name"] == "test.drop"
+
+
 def test_transport_format(sentry_init, capture_envelopes):
     sentry_init(server_name="test-server", release="1.0.0")
 
@@ -293,7 +349,7 @@ def test_transport_format(sentry_init, capture_envelopes):
 
     sentry_sdk.metrics.count("test.counter", 1)
 
-    sentry_sdk.get_client().flush()
+    sentry_sdk.flush()
 
     assert len(envelopes) == 1
     assert len(envelopes[0].items) == 1
@@ -360,8 +416,8 @@ def test_batcher_drops_metrics(sentry_init, monkeypatch):
 
     lost_event_calls = []
 
-    def record_lost_event(reason, data_category, quantity):
-        lost_event_calls.append((reason, data_category, quantity))
+    def record_lost_event(reason, data_category=None, item=None, *, quantity=1):
+        lost_event_calls.append((reason, data_category, item, quantity))
 
     monkeypatch.setattr(client.metrics_batcher, "_record_lost_func", record_lost_event)
 
@@ -370,7 +426,19 @@ def test_batcher_drops_metrics(sentry_init, monkeypatch):
 
     assert len(lost_event_calls) == 5
     for lost_event_call in lost_event_calls:
-        assert lost_event_call == ("queue_overflow", "trace_metric", 1)
+        reason, data_category, item, quantity = lost_event_call
+
+        assert reason == "queue_overflow"
+        assert data_category == "trace_metric"
+        assert quantity == 1
+
+        assert item.type == "trace_metric"
+        assert item.headers == {
+            "type": "trace_metric",
+            "item_count": 1,
+            "content_type": "application/vnd.sentry.items.trace-metric+json",
+        }
+        assert item.payload.json["items"][0]["name"] == "test.counter"
 
 
 def test_metric_gets_attributes_from_scopes(sentry_init, capture_items):

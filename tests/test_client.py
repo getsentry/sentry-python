@@ -1038,20 +1038,8 @@ def test_custom_repr_on_vars(sentry_init, capture_events):
     assert "Fail object" in my_vars["fail"]
 
 
-@pytest.mark.parametrize(
-    "dsn",
-    [
-        "http://894b7d594095440f8dfea9b300e6f572@localhost:8000/2",
-        "http://894b7d594095440f8dfea9b300e6f572@localhost:8000/2",
-    ],
-)
-def test_init_string_types(dsn, sentry_init):
-    # Allow unicode strings on Python 3 and both on Python 2 (due to
-    # unicode_literals)
-    #
-    # Supporting bytes on Python 3 is not really wrong but probably would be
-    # extra code
-    sentry_init(dsn)
+def test_init_string_types(sentry_init):
+    sentry_init("http://894b7d594095440f8dfea9b300e6f572@localhost:8000/2")
     assert (
         sentry_sdk.get_client().dsn
         == "http://894b7d594095440f8dfea9b300e6f572@localhost:8000/2"
@@ -1311,7 +1299,7 @@ def test_uwsgi_warnings(sentry_init, recwarn, opt, missing_flags):
     uwsgi = mock.MagicMock()
     uwsgi.opt = opt
     with mock.patch.dict("sys.modules", uwsgi=uwsgi):
-        sentry_init(profiles_sample_rate=1.0)
+        sentry_init()
         if missing_flags:
             assert len(recwarn) == 1
             record = recwarn.pop()
@@ -1483,6 +1471,28 @@ def test_dropped_transaction(sentry_init, capture_record_lost_event_calls, test_
 def test_enable_tracing_deprecated(sentry_init, enable_tracing):
     with pytest.warns(DeprecationWarning):
         sentry_init(enable_tracing=enable_tracing)
+
+
+@pytest.mark.parametrize("send_default_pii", [True, False])
+def test_send_default_pii_deprecated(sentry_init, send_default_pii):
+    with pytest.warns(DeprecationWarning):
+        sentry_init(send_default_pii=send_default_pii)
+
+
+def test_transaction_profiling_warns(sentry_init):
+    with pytest.warns(DeprecationWarning, match="Transaction-based profiling"):
+        sentry_init(profiles_sample_rate=1.0)
+
+
+def test_continuous_profiling_does_not_warn(sentry_init):
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        sentry_init(profile_session_sample_rate=1.0)
+
+    profiling_warnings = [
+        w for w in caught if "Transaction-based profiling" in str(w.message)
+    ]
+    assert profiling_warnings == []
 
 
 def test_ignore_spans_warns_without_streaming(sentry_init):

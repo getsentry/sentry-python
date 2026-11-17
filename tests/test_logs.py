@@ -1,4 +1,3 @@
-import logging
 import os
 import sys
 import time
@@ -17,10 +16,8 @@ minimum_python_37 = pytest.mark.skipif(
 
 
 @minimum_python_37
-def test_logs_disabled_by_default(sentry_init, capture_envelopes):
+def test_logs_enabled_by_default(sentry_init, capture_envelopes):
     sentry_init()
-
-    python_logger = logging.Logger("some-logger")
 
     envelopes = capture_envelopes()
 
@@ -30,14 +27,33 @@ def test_logs_disabled_by_default(sentry_init, capture_envelopes):
     sentry_sdk.logger.warning("This is a 'warning' log...")
     sentry_sdk.logger.error("This is a 'error' log...")
     sentry_sdk.logger.fatal("This is a 'fatal' log...")
-    python_logger.warning("sad")
 
-    assert len(envelopes) == 0
+    sentry_sdk.flush()
+
+    assert envelopes
+
+
+@minimum_python_37
+def test_enable_logs_noop(sentry_init, capture_envelopes):
+    sentry_init(enable_logs=False)
+
+    envelopes = capture_envelopes()
+
+    sentry_sdk.logger.trace("This is a 'trace' log.")
+    sentry_sdk.logger.debug("This is a 'debug' log...")
+    sentry_sdk.logger.info("This is a 'info' log...")
+    sentry_sdk.logger.warning("This is a 'warning' log...")
+    sentry_sdk.logger.error("This is a 'error' log...")
+    sentry_sdk.logger.fatal("This is a 'fatal' log...")
+
+    sentry_sdk.flush()
+
+    assert envelopes
 
 
 @minimum_python_37
 def test_logs_basics(sentry_init, capture_items):
-    sentry_init(enable_logs=True)
+    sentry_init()
     items = capture_items("log")
 
     sentry_sdk.logger.trace("This is a 'trace' log...")
@@ -69,22 +85,6 @@ def test_logs_basics(sentry_init, capture_items):
 
 
 @minimum_python_37
-def test_logs_experimental_option_still_works(sentry_init, capture_items):
-    sentry_init(_experiments={"enable_logs": True})
-    items = capture_items("log")
-
-    sentry_sdk.logger.error("This is an error log...")
-
-    get_client().flush()
-
-    logs = [item.payload for item in items]
-    assert len(logs) == 1
-
-    assert logs[0]["attributes"]["sentry.severity_text"] == "error"
-    assert logs[0]["attributes"]["sentry.severity_number"] == 17
-
-
-@minimum_python_37
 def test_logs_before_send_log(sentry_init, capture_items):
     before_log_called = False
 
@@ -109,7 +109,6 @@ def test_logs_before_send_log(sentry_init, capture_items):
         return record
 
     sentry_init(
-        enable_logs=True,
         before_send_log=_before_log,
     )
     items = capture_items("log")
@@ -145,7 +144,6 @@ def test_logs_before_send_log_experimental_option_still_works(
         return record
 
     sentry_init(
-        enable_logs=True,
         _experiments={
             "before_send_log": _before_log,
         },
@@ -171,7 +169,6 @@ def test_logs_before_send_log_raises_does_not_crash_application(
         raise ValueError("before_send_log error")
 
     sentry_init(
-        enable_logs=True,
         before_send_log=_before_log,
     )
     items = capture_items("log")
@@ -186,11 +183,66 @@ def test_logs_before_send_log_raises_does_not_crash_application(
 
 
 @minimum_python_37
+@pytest.mark.tests_internal_exceptions
+def test_logs_before_send_log_raises_records_callback_error(
+    sentry_init, capture_items, capture_record_lost_event_calls
+):
+    def _before_log(record, hint):
+        raise ValueError("before_send_log error")
+
+    sentry_init(before_send_log=_before_log)
+    items = capture_items("log")
+    record_lost_event_calls = capture_record_lost_event_calls()
+
+    sentry_sdk.logger.error("This is an error log...")
+
+    get_client().flush()
+
+    assert not items
+    (lost_event_call,) = [
+        call for call in record_lost_event_calls if call[0] == "callback_error"
+    ]
+    reason, data_category, item, quantity = lost_event_call
+    assert data_category == "log_item"
+    assert quantity == 1
+    assert item.type == "log"
+    assert item.headers["item_count"] == 1
+    assert item.payload.json["items"][0]["body"] == "This is an error log..."
+
+
+@minimum_python_37
+def test_logs_before_send_log_returns_none_records_before_send(
+    sentry_init, capture_items, capture_record_lost_event_calls
+):
+    def _before_log(record, hint):
+        return None
+
+    sentry_init(before_send_log=_before_log)
+    items = capture_items("log")
+    record_lost_event_calls = capture_record_lost_event_calls()
+
+    sentry_sdk.logger.error("This is an error log...")
+
+    get_client().flush()
+
+    assert not items
+    (lost_event_call,) = [
+        call for call in record_lost_event_calls if call[0] == "before_send"
+    ]
+    reason, data_category, item, quantity = lost_event_call
+    assert data_category == "log_item"
+    assert quantity == 1
+    assert item.type == "log"
+    assert item.headers["item_count"] == 1
+    assert item.payload.json["items"][0]["body"] == "This is an error log..."
+
+
+@minimum_python_37
 def test_logs_attributes(sentry_init, capture_items):
     """
     Passing arbitrary attributes to log messages.
     """
-    sentry_init(enable_logs=True, server_name="test-server")
+    sentry_init(server_name="test-server")
     items = capture_items("log")
 
     attrs = {
@@ -224,7 +276,7 @@ def test_logs_message_params(sentry_init, capture_items):
     """
     This is the official way of how to pass vars to log messages.
     """
-    sentry_init(enable_logs=True)
+    sentry_init()
     items = capture_items("log")
 
     sentry_sdk.logger.warning("The recorded value was '{int_var}'", int_var=1)
@@ -291,7 +343,7 @@ def test_logs_tied_to_transactions(sentry_init, capture_items):
     """
     Log messages are also tied to transactions.
     """
-    sentry_init(enable_logs=True, traces_sample_rate=1.0)
+    sentry_init(traces_sample_rate=1.0)
     items = capture_items("log")
 
     with sentry_sdk.start_transaction(name="test-transaction") as trx:
@@ -309,7 +361,7 @@ def test_logs_tied_to_segments(sentry_init, capture_items):
     """
     Log messages are also tied to segments.
     """
-    sentry_init(enable_logs=True, traces_sample_rate=1.0, trace_lifecycle="stream")
+    sentry_init(traces_sample_rate=1.0, trace_lifecycle="stream")
     items = capture_items("log")
 
     with sentry_sdk.traces.start_span(name="test-segment") as sgmt:
@@ -329,7 +381,7 @@ def test_logs_no_span_id_without_active_span(sentry_init, capture_items):
     when the telemetry is emitted. The propagation context's synthesized
     span_id must not be used as a fallback.
     """
-    sentry_init(enable_logs=True)
+    sentry_init()
     items = capture_items("log")
 
     sentry_sdk.logger.warning("This is a log without an active span")
@@ -345,7 +397,7 @@ def test_logs_tied_to_spans(sentry_init, capture_items):
     """
     Log messages are also tied to spans.
     """
-    sentry_init(enable_logs=True, traces_sample_rate=1.0)
+    sentry_init(traces_sample_rate=1.0)
     items = capture_items("log")
 
     with sentry_sdk.start_transaction(name="test-transaction"):
@@ -362,7 +414,7 @@ def test_logs_tied_to_spans_span_streaming(sentry_init, capture_items):
     """
     Log messages are also tied to spans.
     """
-    sentry_init(enable_logs=True, traces_sample_rate=1.0, trace_lifecycle="stream")
+    sentry_init(traces_sample_rate=1.0, trace_lifecycle="stream")
     items = capture_items("log")
 
     with sentry_sdk.traces.start_span(name="test-segment"):
@@ -379,7 +431,7 @@ def test_auto_flush_logs_after_100(sentry_init, capture_envelopes):
     """
     If you log >100 logs, it should automatically trigger a flush.
     """
-    sentry_init(enable_logs=True)
+    sentry_init()
     envelopes = capture_envelopes()
 
     for i in range(200):
@@ -395,8 +447,8 @@ def test_auto_flush_logs_after_100(sentry_init, capture_envelopes):
 
 @minimum_python_37
 def test_log_user_attributes(sentry_init, capture_items):
-    """User attributes are sent if enable_logs is True and send_default_pii is True."""
-    sentry_init(enable_logs=True, send_default_pii=True)
+    """User attributes are sent if send_default_pii is True."""
+    sentry_init(send_default_pii=True)
 
     sentry_sdk.set_user({"id": "1", "email": "test@example.com", "username": "test"})
     items = capture_items("log")
@@ -419,7 +471,7 @@ def test_log_user_attributes(sentry_init, capture_items):
 @minimum_python_37
 def test_log_no_user_attributes_if_no_pii(sentry_init, capture_items):
     """User attributes are not if PII sending is off."""
-    sentry_init(enable_logs=True, send_default_pii=False)
+    sentry_init(send_default_pii=False)
 
     sentry_sdk.set_user({"id": "1", "email": "test@example.com", "username": "test"})
     items = capture_items("log")
@@ -441,7 +493,7 @@ def test_auto_flush_logs_after_5s(sentry_init, capture_envelopes):
     """
     If you log a single log, it should automatically flush after 5 seconds, at most 10 seconds.
     """
-    sentry_init(enable_logs=True)
+    sentry_init()
     envelopes = capture_envelopes()
 
     sentry_sdk.logger.warning("log")
@@ -482,7 +534,7 @@ def test_logs_with_literal_braces(
     Test that log messages with literal braces (like JSON) work without crashing.
     This is a regression test for issue #4975.
     """
-    sentry_init(enable_logs=True)
+    sentry_init()
     items = capture_items("log")
 
     if params:
@@ -505,13 +557,13 @@ def test_logs_with_literal_braces(
 
 @minimum_python_37
 def test_transport_format(sentry_init, capture_envelopes):
-    sentry_init(enable_logs=True, server_name="test-server", release="1.0.0")
+    sentry_init(server_name="test-server", release="1.0.0")
 
     envelopes = capture_envelopes()
 
     sentry_sdk.logger.warning("This is a log...")
 
-    sentry_sdk.get_client().flush()
+    sentry_sdk.flush()
 
     assert len(envelopes) == 1
     assert len(envelopes[0].items) == 1
@@ -576,7 +628,7 @@ def test_transport_format(sentry_init, capture_envelopes):
 
 @minimum_python_37
 def test_batcher_drops_logs(sentry_init, monkeypatch):
-    sentry_init(enable_logs=True, server_name="test-server", release="1.0.0")
+    sentry_init(server_name="test-server", release="1.0.0")
     client = sentry_sdk.get_client()
 
     def no_op_flush():
@@ -662,7 +714,7 @@ def test_batcher_drops_logs(sentry_init, monkeypatch):
 
 @minimum_python_37
 def test_log_gets_attributes_from_scopes(sentry_init, capture_items):
-    sentry_init(enable_logs=True)
+    sentry_init()
 
     items = capture_items("log")
 
@@ -689,7 +741,7 @@ def test_log_gets_attributes_from_scopes(sentry_init, capture_items):
 
 @minimum_python_37
 def test_log_attributes_override_scope_attributes(sentry_init, capture_items):
-    sentry_init(enable_logs=True)
+    sentry_init()
 
     items = capture_items("log")
 
@@ -713,7 +765,7 @@ def test_log_attributes_override_scope_attributes(sentry_init, capture_items):
 def test_log_array_attributes(sentry_init, capture_envelopes):
     """Test homogeneous list and tuple attributes, and fallback for inhomogeneous collections."""
 
-    sentry_init(enable_logs=True)
+    sentry_init()
 
     envelopes = capture_envelopes()
 
@@ -777,7 +829,7 @@ def test_attributes_preserialized_in_before_send(sentry_init, capture_items):
 
         return log
 
-    sentry_init(enable_logs=True, before_send_log=before_send_log)
+    sentry_init(before_send_log=before_send_log)
 
     items = capture_items("log")
 
@@ -821,7 +873,7 @@ def test_array_attributes_deep_copied_in_before_send(sentry_init, capture_envelo
 
         return log
 
-    sentry_init(enable_logs=True, before_send_log=before_send_log)
+    sentry_init(before_send_log=before_send_log)
 
     sentry_sdk.logger.warning(
         "Hello world!",
@@ -844,7 +896,7 @@ def test_reentrant_add_does_not_deadlock(sentry_init, capture_envelopes):
     routed through the logging integration back into batcher.add().
     See https://github.com/getsentry/sentry-python/issues/5681
     """
-    sentry_init(enable_logs=True)
+    sentry_init()
     capture_envelopes()
 
     client = sentry_sdk.get_client()
@@ -886,7 +938,7 @@ def test_log_batcher_lock_reset_in_child_after_fork(sentry_init):
     fresh one in the child and reset
     _flusher / _flusher_pid / _buffer / _active / _flush_event.
     """
-    sentry_init(enable_logs=True)
+    sentry_init()
     batcher = sentry_sdk.get_client().log_batcher
     assert batcher is not None
 
@@ -925,3 +977,36 @@ def test_log_batcher_lock_reset_in_child_after_fork(sentry_init):
     original_lock.release()
     _, status = os.waitpid(pid, 0)
     assert os.WIFEXITED(status) and os.WEXITSTATUS(status) == 0
+
+
+@pytest.mark.tests_internal_exceptions
+def test_flush_loop_swallows_flush_exception():
+    """The flush loop must not let one failed flush kill the flusher thread.
+
+    Regression test for #7138: an unhandled exception inside _flush_loop
+    terminated the daemon flusher thread. After that logs silently stopped
+    being delivered and eventually got dropped at the queue cap. The loop must
+    swallow the error and keep running.
+
+    Driven synchronously on a bare batcher: _flush raises once and then stops
+    the loop, so _flush_loop returns cleanly on fixed code and propagates the
+    exception on unfixed code.
+    """
+    from sentry_sdk._batcher import Batcher
+
+    calls = []
+
+    class ExplodingBatcher(Batcher):
+        def _flush(self):
+            calls.append(1)
+            self._running = False  # exit the loop after this one iteration
+            raise RuntimeError("boom in flush")
+
+    batcher = ExplodingBatcher(
+        capture_func=lambda envelope: None,
+        record_lost_func=lambda *a, **k: None,
+    )
+    batcher._flush_event.set()  # so the loop's wait() returns at once
+    batcher._flush_loop()
+
+    assert calls == [1]

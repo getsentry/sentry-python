@@ -7,10 +7,8 @@ sentry_sdk.init(
     dsn=os.environ.get("SENTRY_DSN"),
     traces_sample_rate=1.0,
     integrations=[AwsLambdaIntegration()],
-    _experiments={
-        "data_collection": {
-            "url_query_params": {"mode": "off"},
-        }
+    data_collection={
+        "url_query_params": {"mode": "off"},
     },
 )
 

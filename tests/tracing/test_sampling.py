@@ -198,115 +198,15 @@ def test_tolerates_traces_sampler_returning_a_boolean_span_streaming(
         assert span.sampled is traces_sampler_return_value
 
 
-@pytest.mark.parametrize(
-    "traces_sample_rate,expected_decision",
-    [(0.0, False), (0.25, False), (0.75, True), (1.00, True)],
-)
-def test_traces_sampler_raising_falls_back_to_traces_sample_rate(
-    sentry_init,
-    traces_sample_rate,
-    expected_decision,
-):
+def test_traces_sampler_raising_unsamples(sentry_init):
     sentry_init(
         traces_sampler=mock.Mock(side_effect=ValueError("boom")),
-        traces_sample_rate=traces_sample_rate,
+        traces_sample_rate=1.0,
     )
 
     baggage = Baggage(sentry_items={"sample_rand": "0.500000"})
     transaction = start_transaction(name="dogpark", baggage=baggage)
-    assert transaction.sampled is expected_decision
-
-
-@pytest.mark.parametrize("parent_sampling_decision", [True, False])
-def test_traces_sampler_raising_falls_back_to_parent_sampling_decision(
-    sentry_init, parent_sampling_decision
-):
-    # set traces_sample_rate to produce the opposite of the parent decision,
-    # to prove the parent's decision takes precedence in the fallback
-    sentry_init(
-        traces_sampler=mock.Mock(side_effect=ValueError("boom")),
-        traces_sample_rate=0.0 if parent_sampling_decision else 1.0,
-    )
-
-    baggage = Baggage(sentry_items={"sample_rand": "0.500000"})
-    transaction = start_transaction(
-        name="dogpark", baggage=baggage, parent_sampled=parent_sampling_decision
-    )
-    assert transaction.sampled is parent_sampling_decision
-
-
-@pytest.mark.parametrize(
-    "traces_sample_rate,expected_decision",
-    [(0.0, False), (0.25, False), (0.75, True), (1.00, True)],
-)
-def test_traces_sampler_raising_falls_back_to_traces_sample_rate_span_streaming(
-    sentry_init,
-    traces_sample_rate,
-    expected_decision,
-):
-    sentry_init(
-        traces_sampler=mock.Mock(side_effect=ValueError("boom")),
-        traces_sample_rate=traces_sample_rate,
-        trace_lifecycle="stream",
-    )
-
-    sentry_sdk.traces.continue_trace(
-        {
-            "sentry-trace": "0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331",
-            "baggage": "sentry-sample_rand=0.500000",
-        }
-    )
-
-    with sentry_sdk.traces.start_span(name="dogpark") as span:
-        assert span.sampled is expected_decision
-
-
-@pytest.mark.parametrize(
-    "traces_sample_rate,expected_decision",
-    [(0.0, False), (0.25, False), (0.75, True), (1.00, True)],
-)
-def test_traces_sampler_raising_no_incoming_trace_falls_back_to_traces_sample_rate_span_streaming(
-    sentry_init,
-    traces_sample_rate,
-    expected_decision,
-    monkeypatch,
-):
-    sentry_init(
-        traces_sampler=mock.Mock(side_effect=ValueError("boom")),
-        traces_sample_rate=traces_sample_rate,
-        trace_lifecycle="stream",
-    )
-
-    # no continue_trace, so no propagated sample_rand; make it deterministic
-    monkeypatch.setattr(
-        "sentry_sdk.tracing_utils._generate_sample_rand", lambda *a, **kw: 0.5
-    )
-
-    with sentry_sdk.traces.start_span(name="dogpark") as span:
-        assert span.sampled is expected_decision
-
-
-def test_traces_sampler_raising_no_incoming_trace_and_no_traces_sample_rate(
-    sentry_init,
-):
-    sentry_init(
-        traces_sampler=mock.Mock(side_effect=ValueError("boom")),
-    )
-
-    transaction = start_transaction(name="dogpark")
     assert transaction.sampled is False
-
-
-def test_traces_sampler_raising_no_incoming_trace_and_no_traces_sample_rate_span_streaming(
-    sentry_init,
-):
-    sentry_init(
-        traces_sampler=mock.Mock(side_effect=ValueError("boom")),
-        trace_lifecycle="stream",
-    )
-
-    with sentry_sdk.traces.start_span(name="dogpark") as span:
-        assert span.sampled is False
 
 
 @pytest.mark.parametrize("sampling_decision", [True, False])
@@ -505,7 +405,7 @@ def test_passes_parent_sampling_decision_in_sampling_context(
 
 def test_passes_custom_sampling_context_from_start_transaction_to_traces_sampler(
     sentry_init,
-    DictionaryContaining,  # noqa: N803
+    DictionaryContaining,
 ):
     traces_sampler = mock.Mock()
     sentry_init(traces_sampler=traces_sampler)
@@ -598,7 +498,7 @@ def test_sample_rate_affects_errors(sentry_init, capture_events):
 def test_warns_and_sets_sampled_to_false_on_invalid_traces_sampler_return_value(
     sentry_init,
     traces_sampler_return_value,
-    StringContaining,  # noqa: N803
+    StringContaining,
 ):
     sentry_init(traces_sampler=mock.Mock(return_value=traces_sampler_return_value))
 
@@ -621,7 +521,7 @@ def test_warns_and_sets_sampled_to_false_on_invalid_traces_sampler_return_value(
 def test_warns_and_sets_sampled_to_false_on_invalid_traces_sampler_return_value_span_streaming(
     sentry_init,
     traces_sampler_return_value,
-    StringContaining,  # noqa: N803
+    StringContaining,
 ):
     sentry_init(
         traces_sampler=mock.Mock(return_value=traces_sampler_return_value),
@@ -711,7 +611,7 @@ def test_unsampled_spans_produce_client_report_if_traces_sample_rate_defined(
         with sentry_sdk.traces.start_span(name="child2"):
             pass
 
-    sentry_sdk.get_client().flush()
+    sentry_sdk.flush()
 
     spans = [item.payload for item in items]
     assert not spans
@@ -740,7 +640,7 @@ def test_unsampled_spans_produce_client_report_if_traces_sampler_defined(
         with sentry_sdk.traces.start_span(name="child2"):
             pass
 
-    sentry_sdk.get_client().flush()
+    sentry_sdk.flush()
 
     spans = [item.payload for item in items]
     assert not spans
@@ -769,7 +669,7 @@ def test_no_client_reports_if_tracing_is_off(
         with sentry_sdk.traces.start_span(name="child2"):
             pass
 
-    sentry_sdk.get_client().flush()
+    sentry_sdk.flush()
 
     spans = [item.payload for item in items]
     assert not spans

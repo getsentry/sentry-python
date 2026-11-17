@@ -32,28 +32,32 @@ reportOn = "medium"
 
 [[skills]]
 name = "code-review"
+ignorePaths = ["uv.lock", ".github/workflows/test-integrations-*.yml"]
+incremental = true
 
 [[skills.triggers]]
 type = "pull_request"
 actions = ["opened", "synchronize", "reopened"]
-
-[[skills]]
-name = "find-bugs"
-
-[[skills.triggers]]
-type = "pull_request"
-actions = ["opened", "synchronize", "reopened"]
+draft = false
 
 [[skills]]
 name = "skill-scanner"
+incremental = true
+remote = "getsentry/skills"
+paths = [".agents/**", ".claude/**", "**/SKILL.md", "AGENTS.md", "CLAUDE.md", "agents.toml"]
 
 [[skills.triggers]]
 type = "pull_request"
 actions = ["opened", "synchronize", "reopened"]
 
 [[skills]]
-name = "security-review"
+name = "sdk-review"
+paths = ["sentry_sdk/**"]
+incremental = true
+reportOn = "medium"
+failOn = "off"
 
 [[skills.triggers]]
 type = "pull_request"
 actions = ["opened", "synchronize", "reopened"]
+draft = false

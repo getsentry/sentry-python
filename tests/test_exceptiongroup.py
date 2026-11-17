@@ -280,10 +280,10 @@ def test_exception_chain_context():
 
 @minimum_python_311
 def test_simple_exception():
-    simple_excpetion = ValueError("A simple exception")
+    simple_exception = ValueError("A simple exception")
 
     (event, _) = event_from_exception(
-        simple_excpetion,
+        simple_exception,
         client_options={
             "include_local_variables": True,
             "include_source_context": True,

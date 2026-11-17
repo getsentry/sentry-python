@@ -1,3 +1,4 @@
+import functools
 import inspect
 import sys
 import threading
@@ -6,7 +7,12 @@ from importlib import import_module
 
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA, SPANNAME
-from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
+from sentry_sdk.integrations import (
+    _DEFAULT_FAILED_REQUEST_STATUS_CODES,
+    DidNotEnable,
+    Integration,
+    _check_minimum_version,
+)
 from sentry_sdk.integrations._wsgi_common import (
     DEFAULT_HTTP_METHODS_TO_CAPTURE,
     RequestExtractor,
@@ -80,6 +86,7 @@ else:
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from collections.abc import Set
     from typing import Any, Callable, Dict, List, Optional, Union
 
     from django.core.handlers.wsgi import WSGIRequest
@@ -87,7 +94,13 @@ if TYPE_CHECKING:
     from django.http.response import HttpResponse
     from django.utils.datastructures import MultiValueDict
 
-    from sentry_sdk._types import Event, EventProcessor, Hint, NotImplementedType
+    from sentry_sdk._types import (
+        Event,
+        EventProcessor,
+        ExcInfo,
+        Hint,
+        NotImplementedType,
+    )
     from sentry_sdk.integrations.wsgi import _ScopedResponse
     from sentry_sdk.traces import StreamedSpan
     from sentry_sdk.tracing import Span
@@ -116,6 +129,11 @@ class DjangoIntegration(Integration):
     :param signals_spans: Whether to create spans for signals. Defaults to `True`.
     :param signals_denylist: A list of signals to ignore when creating spans.
     :param cache_spans: Whether to create spans for cache operations. Defaults to `False`.
+    :param failed_request_status_codes: Which HTTP error responses to report to Sentry.
+        Django answers some exceptions itself instead of failing: `raise Http404` gets
+        the user a 404 page, `PermissionDenied` a 403. Those are reported only if their
+        status code is in this set, which defaults to the 5xx range. Exceptions Django
+        gives up on end in a 500 and are always reported.
     """
 
     identifier = "django"
@@ -137,6 +155,8 @@ class DjangoIntegration(Integration):
         db_transaction_spans: bool = False,
         signals_denylist: "Optional[list[signals.Signal]]" = None,
         http_methods_to_capture: "tuple[str, ...]" = DEFAULT_HTTP_METHODS_TO_CAPTURE,
+        *,
+        failed_request_status_codes: "Set[int]" = _DEFAULT_FAILED_REQUEST_STATUS_CODES,
     ) -> None:
         if transaction_style not in TRANSACTION_STYLE_VALUES:
             raise ValueError(
@@ -154,6 +174,8 @@ class DjangoIntegration(Integration):
 
         self.http_methods_to_capture = tuple(map(str.upper, http_methods_to_capture))
 
+        self.failed_request_status_codes = failed_request_status_codes
+
     @staticmethod
     def setup_once() -> None:
         _check_minimum_version(DjangoIntegration, DJANGO_VERSION)
@@ -165,7 +187,7 @@ class DjangoIntegration(Integration):
         ignore_logger("django.server")
         ignore_logger("django.request")
 
-        from django.core.handlers.wsgi import WSGIHandler
+        from django.core.handlers.wsgi import WSGIHandler  # noqa: PLC0415
 
         old_app = WSGIHandler.__call__
 
@@ -175,7 +197,7 @@ class DjangoIntegration(Integration):
         ) -> "_ScopedResponse":
             bound_old_app = old_app.__get__(self, WSGIHandler)
 
-            from django.conf import settings
+            from django.conf import settings  # noqa: PLC0415
 
             use_x_forwarded_for = settings.USE_X_FORWARDED_HOST
 
@@ -198,6 +220,8 @@ class DjangoIntegration(Integration):
         _patch_get_response()
 
         _patch_django_asgi_handler()
+
+        _patch_response_for_exception()
 
         signals.got_request_exception.connect(_got_request_exception)
 
@@ -256,7 +280,7 @@ class DjangoIntegration(Integration):
                 # If we fail to import, return `NotImplemented`. It's at least
                 # unlikely that we have a query set in `value` when importing
                 # `QuerySet` fails.
-                from django.db.models.query import QuerySet
+                from django.db.models.query import QuerySet  # noqa: PLC0415
             except Exception:
                 return NotImplemented
 
@@ -298,6 +322,10 @@ def _patch_drf() -> None:
     DRF request object, such that we can later use either in
     `DjangoRequestExtractor`.
 
+    We also patch DRF's authentication to create a span, so that the work done
+    by the configured authentication classes (which often involves database
+    queries) doesn't show up as part of the view itself.
+
     This function is not called directly on SDK setup, because importing almost
     any part of Django Rest Framework will try to access Django settings (where
     `sentry_sdk.init()` might be called from in the first place). Instead we
@@ -321,7 +349,7 @@ def _patch_drf() -> None:
 
         with capture_internal_exceptions():
             try:
-                from rest_framework.views import APIView  # type: ignore
+                from rest_framework.views import APIView  # type: ignore  # noqa: PLC0415
             except ImportError:
                 pass
             else:
@@ -339,10 +367,47 @@ def _patch_drf() -> None:
 
                 APIView.initial = sentry_patched_drf_initial
 
+        with capture_internal_exceptions():
+            try:
+                from rest_framework.request import Request  # type: ignore  # noqa: PLC0415
+            except ImportError:
+                pass
+            else:
+                old_drf_authenticate = Request._authenticate
+
+                def sentry_patched_drf_authenticate(self: "Request") -> "Any":
+                    client = sentry_sdk.get_client()
+                    integration = client.get_integration(DjangoIntegration)
+                    # Nothing to time if there are no authenticators configured
+                    # for this view.
+                    if integration is None or not getattr(self, "authenticators", None):
+                        return old_drf_authenticate(self)
+
+                    if has_span_streaming_enabled(client.options):
+                        if sentry_sdk.traces.get_current_span() is None:
+                            return old_drf_authenticate(self)
+                        with sentry_sdk.traces.start_span(
+                            name="authenticate",
+                            attributes={
+                                "sentry.op": OP.VIEW_AUTHENTICATE,
+                                "sentry.origin": DjangoIntegration.origin,
+                            },
+                        ):
+                            return old_drf_authenticate(self)
+                    else:
+                        with sentry_sdk.start_span(
+                            op=OP.VIEW_AUTHENTICATE,
+                            name="authenticate",
+                            origin=DjangoIntegration.origin,
+                        ):
+                            return old_drf_authenticate(self)
+
+                Request._authenticate = sentry_patched_drf_authenticate
+
 
 def _patch_channels() -> None:
     try:
-        from channels.http import AsgiHandler  # type: ignore
+        from channels.http import AsgiHandler  # type: ignore  # noqa: PLC0415
     except ImportError:
         return
 
@@ -359,14 +424,14 @@ def _patch_channels() -> None:
             + CONTEXTVARS_ERROR_MESSAGE
         )
 
-    from sentry_sdk.integrations.django.asgi import patch_channels_asgi_handler_impl
+    from sentry_sdk.integrations.django.asgi import patch_channels_asgi_handler_impl  # noqa: PLC0415
 
     patch_channels_asgi_handler_impl(AsgiHandler)
 
 
 def _patch_django_asgi_handler() -> None:
     try:
-        from django.core.handlers.asgi import ASGIHandler
+        from django.core.handlers.asgi import ASGIHandler  # noqa: PLC0415
     except ImportError:
         return
 
@@ -380,13 +445,16 @@ def _patch_django_asgi_handler() -> None:
             "We detected that you are using Django 3." + CONTEXTVARS_ERROR_MESSAGE
         )
 
-    from sentry_sdk.integrations.django.asgi import patch_django_asgi_handler_impl
+    from sentry_sdk.integrations.django.asgi import patch_django_asgi_handler_impl  # noqa: PLC0415
 
     patch_django_asgi_handler_impl(ASGIHandler)
 
 
 def _set_transaction_name_and_source(
-    scope: "sentry_sdk.Scope", transaction_style: str, request: "WSGIRequest"
+    scope: "sentry_sdk.Scope",
+    transaction_style: str,
+    request: "WSGIRequest",
+    route_path: "Optional[str]",
 ) -> None:
     try:
         transaction_name = None
@@ -394,13 +462,8 @@ def _set_transaction_name_and_source(
             fn = resolve(request.path).func
             transaction_name = transaction_from_function(getattr(fn, "view_class", fn))
 
-        elif transaction_style == "url":
-            if hasattr(request, "urlconf"):
-                transaction_name = LEGACY_RESOLVER.resolve(
-                    request.path_info, urlconf=request.urlconf
-                )
-            else:
-                transaction_name = LEGACY_RESOLVER.resolve(request.path_info)
+        elif transaction_style == "url" and route_path is not None:
+            transaction_name = route_path
 
         if transaction_name is None:
             transaction_name = request.path_info
@@ -412,6 +475,11 @@ def _set_transaction_name_and_source(
             transaction_name,
             source=source,
         )
+
+        if transaction_style == "url" and route_path is not None:
+            server_span = scope._server_segment_span
+            if server_span is not None:
+                server_span.set_attribute(SPANDATA.HTTP_ROUTE, route_path)
     except Resolver404:
         urlconf = import_module(settings.ROOT_URLCONF)
         # This exception only gets thrown when transaction_style is `function_name`
@@ -436,8 +504,29 @@ def _before_get_response(request: "WSGIRequest") -> None:
     _patch_drf()
 
     scope = sentry_sdk.get_current_scope()
+
+    route_path = None
+    if hasattr(request, "urlconf"):
+        try:
+            route_path = LEGACY_RESOLVER.resolve(
+                request.path_info, urlconf=request.urlconf
+            )
+        except Exception:
+            pass
+    else:
+        try:
+            route_path = LEGACY_RESOLVER.resolve(request.path_info)
+        except Exception:
+            pass
+
+    server_span = sentry_sdk.get_current_scope()._server_segment_span
+    if server_span is not None and route_path is not None:
+        server_span.set_attribute(SPANDATA.HTTP_ROUTE, route_path)
+
     # Rely on WSGI middleware to start a trace
-    _set_transaction_name_and_source(scope, integration.transaction_style, request)
+    _set_transaction_name_and_source(
+        scope, integration.transaction_style, request, route_path=route_path
+    )
 
     scope.add_event_processor(
         _make_wsgi_request_event_processor(weakref.ref(request), integration)
@@ -455,7 +544,27 @@ def _attempt_resolve_again(
     if not hasattr(request, "urlconf"):
         return
 
-    _set_transaction_name_and_source(scope, transaction_style, request)
+    route_path = None
+    if hasattr(request, "urlconf"):
+        try:
+            route_path = LEGACY_RESOLVER.resolve(
+                request.path_info, urlconf=request.urlconf
+            )
+        except Exception:
+            pass
+    else:
+        try:
+            route_path = LEGACY_RESOLVER.resolve(request.path_info)
+        except Exception:
+            pass
+
+    server_span = sentry_sdk.get_current_scope()._server_segment_span
+    if server_span is not None and route_path is not None:
+        server_span.set_attribute(SPANDATA.HTTP_ROUTE, route_path)
+
+    _set_transaction_name_and_source(
+        scope, transaction_style, request, route_path=route_path
+    )
 
 
 def _get_user_from_request_and_set_on_scope(request: "WSGIRequest") -> None:
@@ -514,7 +623,7 @@ def _patch_get_response() -> None:
     """
     patch get_response, because at that point we have the Django request object
     """
-    from django.core.handlers.base import BaseHandler
+    from django.core.handlers.base import BaseHandler  # noqa: PLC0415
 
     old_get_response = BaseHandler.get_response
 
@@ -529,7 +638,7 @@ def _patch_get_response() -> None:
     BaseHandler.get_response = sentry_patched_get_response
 
     if hasattr(BaseHandler, "get_response_async"):
-        from sentry_sdk.integrations.django.asgi import patch_get_response_async
+        from sentry_sdk.integrations.django.asgi import patch_get_response_async  # noqa: PLC0415
 
         patch_get_response_async(BaseHandler, _before_get_response)
 
@@ -573,16 +682,87 @@ def _got_request_exception(request: "WSGIRequest" = None, **kwargs: "Any") -> No
     if integration is None:
         return
 
+    # Record that this exception is reported, so `_patch_response_for_exception`
+    # doesn't report it a second time.
+    with capture_internal_exceptions():
+        request._sentry_exception_reported = True
+
+    _capture_exception(sys.exc_info(), request, integration, handled=False)
+
+
+def _capture_exception(
+    exc_info: "Union[BaseException, ExcInfo]",
+    request: "Optional[WSGIRequest]",
+    integration: "DjangoIntegration",
+    handled: bool,
+) -> None:
     if request is not None and integration.transaction_style == "url":
         scope = sentry_sdk.get_current_scope()
         _attempt_resolve_again(request, scope, integration.transaction_style)
 
     event, hint = event_from_exception(
-        sys.exc_info(),
-        client_options=client.options,
-        mechanism={"type": "django", "handled": False},
+        exc_info,
+        client_options=sentry_sdk.get_client().options,
+        mechanism={"type": "django", "handled": handled},
     )
     sentry_sdk.capture_event(event, hint=hint)
+
+
+def _patch_response_for_exception() -> None:
+    """
+    Report the errors Django answers itself.
+
+    Django deals with every exception in one function, which boils down to:
+
+        if isinstance(exc, Http404):             return <404 page>
+        if isinstance(exc, PermissionDenied):    return <403 page>
+        if isinstance(exc, SuspiciousOperation): return <400 page>
+        got_request_exception.send(...)          # Django gives up
+        return <500 page>
+
+    We only ever listened to that signal, so we heard about the exceptions Django
+    gives up on and about nothing else. Wrapping the function lets us see the rest
+    too, along with the status code Django picked for them.
+    """
+    try:
+        from django.core.handlers import exception as exception_handler  # noqa: PLC0415
+    except ImportError:
+        # Django < 1.10 does this in `BaseHandler`, nothing to patch here
+        return
+
+    old_response_for_exception = getattr(
+        exception_handler, "response_for_exception", None
+    )
+    if old_response_for_exception is None:
+        return
+
+    @functools.wraps(old_response_for_exception)
+    def sentry_patched_response_for_exception(
+        request: "WSGIRequest", exc: Exception
+    ) -> "HttpResponse":
+        integration = sentry_sdk.get_client().get_integration(DjangoIntegration)
+        if integration is None:
+            return old_response_for_exception(request, exc)
+
+        # Clear the flag before delegating. The same request can reach this
+        # function twice: first when the view raises, then again if a middleware
+        # raises while handing the response back out. Without the reset, the
+        # first exception would keep the second one from being reported.
+        with capture_internal_exceptions():
+            request._sentry_exception_reported = False
+
+        response = old_response_for_exception(request, exc)
+
+        # The flag is set when Django gives up on the exception and fires
+        # `got_request_exception`, which means we reported it already.
+        if not getattr(request, "_sentry_exception_reported", False):
+            status_code = getattr(response, "status_code", None)
+            if status_code in integration.failed_request_status_codes:
+                _capture_exception(exc, request, integration, handled=True)
+
+        return response
+
+    exception_handler.response_for_exception = sentry_patched_response_for_exception
 
 
 class DjangoRequestExtractor(RequestExtractor):
@@ -659,16 +839,16 @@ def _set_user_info(request: "WSGIRequest", event: "Event") -> None:
 def install_sql_hook() -> None:
     """If installed this causes Django's queries to be captured."""
     try:
-        from django.db.backends.utils import CursorWrapper
+        from django.db.backends.utils import CursorWrapper  # noqa: PLC0415
     except ImportError:
-        from django.db.backends.util import CursorWrapper
+        from django.db.backends.util import CursorWrapper  # noqa: PLC0415
 
     try:
-        # django 1.6 and 1.7 compatability
-        from django.db.backends import BaseDatabaseWrapper
+        # django 1.6 and 1.7 compatibility
+        from django.db.backends import BaseDatabaseWrapper  # noqa: PLC0415
     except ImportError:
         # django 1.8 or later
-        from django.db.backends.base.base import BaseDatabaseWrapper
+        from django.db.backends.base.base import BaseDatabaseWrapper  # noqa: PLC0415
 
     try:
         real_execute = CursorWrapper.execute
@@ -897,7 +1077,7 @@ def _set_db_data(
 
 def add_template_context_repr_sequence() -> None:
     try:
-        from django.template.context import BaseContext
+        from django.template.context import BaseContext  # noqa: PLC0415
 
         add_repr_sequence_type(BaseContext)
     except Exception:

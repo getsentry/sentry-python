@@ -1,10 +1,12 @@
 from typing import TYPE_CHECKING, Any, List, Optional, TypedDict, Union
 
+import sentry_sdk
 from sentry_sdk.ai.utils import set_data_normalized
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.utils import (
+    has_data_collection_enabled,
     safe_serialize,
 )
 
@@ -106,28 +108,13 @@ def set_span_data_for_streaming_response(
     set_on_span = (
         span.set_attribute if isinstance(span, StreamedSpan) else span.set_data
     )
-
-    if (
-        should_send_default_pii()
-        and integration.include_prompts
-        and accumulated_response.get("text")
-    ):
-        set_on_span(
-            SPANDATA.GEN_AI_RESPONSE_TEXT,
-            safe_serialize([accumulated_response["text"]]),
-        )
+    client = sentry_sdk.get_client()
 
     if accumulated_response.get("finish_reasons"):
         set_data_normalized(
             span,
             SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS,
             accumulated_response["finish_reasons"],
-        )
-
-    if accumulated_response.get("tool_calls"):
-        set_on_span(
-            SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
-            safe_serialize(accumulated_response["tool_calls"]),
         )
 
     response_id = accumulated_response.get("id")
@@ -170,3 +157,31 @@ def set_span_data_for_streaming_response(
             SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS,
             accumulated_response["usage_metadata"]["total_tokens"],
         )
+
+    if accumulated_response.get("tool_calls"):
+        if has_data_collection_enabled(client.options):
+            if client.options["data_collection"]["gen_ai"]["outputs"]:
+                set_on_span(
+                    SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
+                    safe_serialize(accumulated_response["tool_calls"]),
+                )
+        else:
+            # Before data collection was introduced this was unconditionally set
+            set_on_span(
+                SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
+                safe_serialize(accumulated_response["tool_calls"]),
+            )
+
+    if accumulated_response.get("text"):
+        if has_data_collection_enabled(client.options):
+            if client.options["data_collection"]["gen_ai"]["outputs"]:
+                set_on_span(
+                    SPANDATA.GEN_AI_RESPONSE_TEXT,
+                    safe_serialize([accumulated_response["text"]]),
+                )
+
+        elif should_send_default_pii() and integration.include_prompts:
+            set_on_span(
+                SPANDATA.GEN_AI_RESPONSE_TEXT,
+                safe_serialize([accumulated_response["text"]]),
+            )

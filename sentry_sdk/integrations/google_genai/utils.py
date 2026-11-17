@@ -13,6 +13,7 @@ from typing import (
     Optional,
     TypedDict,
     Union,
+    cast,
 )
 
 from google.genai.types import Content, GenerateContentConfig, Part, PartDict
@@ -36,6 +37,7 @@ from sentry_sdk.tracing_utils import (
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
+    has_data_collection_enabled,
     safe_serialize,
 )
 
@@ -43,6 +45,7 @@ from .consts import GEN_AI_SYSTEM, ORIGIN, TOOL_ATTRIBUTES_MAP
 
 if TYPE_CHECKING:
     from google.genai.types import (
+        ContentDict,
         ContentListUnion,
         ContentUnion,
         ContentUnionDict,
@@ -50,6 +53,7 @@ if TYPE_CHECKING:
         GenerateContentResponse,
         Model,
         Tool,
+        ToolUnion,
     )
 
     from sentry_sdk._types import TextPart
@@ -554,7 +558,7 @@ def extract_contents_text(contents: "ContentListUnion") -> "Optional[str]":
 
 
 def _format_tools_for_span(
-    tools: "Iterable[Tool | Callable[..., Any]]",
+    tools: "Iterable[ToolUnion]",
 ) -> "Optional[List[dict[str, Any]]]":
     """Format tools parameter for span data."""
     formatted_tools = []
@@ -603,11 +607,15 @@ def extract_tool_calls(
     tool_calls = []
 
     # Extract from candidates, sometimes tool calls are nested under the content.parts object
-    if getattr(response, "candidates", []):
-        for candidate in response.candidates:
+    candidates = getattr(response, "candidates", [])
+    if candidates and response is not None:
+        for candidate in candidates:
             if not hasattr(candidate, "content") or not getattr(
                 candidate.content, "parts", []
             ):
+                continue
+
+            if candidate.content is None or candidate.content.parts is None:
                 continue
 
             for part in candidate.content.parts:
@@ -626,33 +634,41 @@ def extract_tool_calls(
 
     # Extract from automatic_function_calling_history
     # This is the history of tool calls made by the model
-    if getattr(response, "automatic_function_calling_history", None):
-        for content in response.automatic_function_calling_history:
-            if not getattr(content, "parts", None):
-                continue
+    automatic_function_calling_history = getattr(
+        response, "automatic_function_calling_history", None
+    )
+    if automatic_function_calling_history is None:
+        return tool_calls if tool_calls else None
 
-            for part in getattr(content, "parts", []):
-                if getattr(part, "function_call", None):
-                    function_call = part.function_call
-                    tool_call = {
-                        "name": getattr(function_call, "name", None),
-                        "type": "function_call",
-                    }
+    for content in automatic_function_calling_history:
+        if not getattr(content, "parts", None):
+            continue
 
-                    # Extract arguments if available
-                    if hasattr(function_call, "args"):
-                        tool_call["arguments"] = safe_serialize(function_call.args)
+        for part in getattr(content, "parts", []):
+            if getattr(part, "function_call", None):
+                function_call = part.function_call
+                tool_call = {
+                    "name": getattr(function_call, "name", None),
+                    "type": "function_call",
+                }
 
-                    tool_calls.append(tool_call)
+                # Extract arguments if available
+                if hasattr(function_call, "args"):
+                    tool_call["arguments"] = safe_serialize(function_call.args)
+
+                tool_calls.append(tool_call)
 
     return tool_calls if tool_calls else None
 
 
 def _capture_tool_input(
-    args: "tuple[Any, ...]", kwargs: "dict[str, Any]", tool: "Tool"
+    args: "tuple[Any, ...]", kwargs: "dict[str, Any]", tool: "Tool | Callable[..., Any]"
 ) -> "dict[str, Any]":
     """Capture tool input from args and kwargs."""
     tool_input = kwargs.copy() if kwargs else {}
+
+    if not callable(tool):
+        return tool_input
 
     # If we have positional args, try to map them to the function signature
     if args:
@@ -766,29 +782,35 @@ def wrapped_tool(tool: "Tool | Callable[..., Any]") -> "Tool | Callable[..., Any
 
 
 def wrapped_config_with_tools(
-    config: "GenerateContentConfig",
-) -> "GenerateContentConfig":
+    config: "GenerateContentConfig | None",
+) -> "GenerateContentConfig | None":
     """Wrap tools in config to emit execute_tool spans. Tools are sometimes passed directly as
     callable functions as a part of the config object."""
+    if not config:
+        return config
 
-    if not config or not getattr(config, "tools", None):
+    tools = getattr(config, "tools", None)
+    if tools is None:
         return config
 
     result = copy.copy(config)
-    result.tools = [wrapped_tool(tool) for tool in config.tools]
+    result.tools = [wrapped_tool(tool) for tool in tools]
 
     return result
 
 
 def _extract_response_text(
     response: "GenerateContentResponse",
-) -> "Optional[List[str]]":
+) -> "Optional[List[str | None]]":
     """Extract text from response candidates."""
 
     if not response or not getattr(response, "candidates", []):
         return None
 
-    texts = []
+    texts: "list[str | None]" = []
+    if response.candidates is None:
+        return texts if texts else None
+
     for candidate in response.candidates:
         if not hasattr(candidate, "content") or not hasattr(candidate.content, "parts"):
             continue
@@ -810,7 +832,11 @@ def extract_finish_reasons(
     if not response or not getattr(response, "candidates", []):
         return None
 
-    finish_reasons = []
+    finish_reasons: "list[str]" = []
+
+    if response.candidates is None:
+        return finish_reasons if finish_reasons else None
+
     for candidate in response.candidates:
         if getattr(candidate, "finish_reason", None):
             # Convert enum value to string if necessary
@@ -842,16 +868,29 @@ def _transform_system_instruction_one_level(
                     text_parts.append({"type": "text", "content": part.text})
         return text_parts
 
-    if isinstance(system_instructions, dict) and system_instructions.get("text"):
-        return [{"type": "text", "content": system_instructions["text"]}]
+    if isinstance(system_instructions, dict) and "text" in system_instructions:
+        text = cast("PartDict", system_instructions)["text"]
+        if text is None:
+            return []
+
+        return [{"type": "text", "content": text}]
 
     elif can_be_content and isinstance(system_instructions, dict):
-        parts = system_instructions.get("parts", [])
+        parts = cast("ContentDict", system_instructions).get("parts", [])
+        if parts is None:
+            return text_parts
+
         for part in parts:
             if isinstance(part, Part) and isinstance(part.text, str):
                 text_parts.append({"type": "text", "content": part.text})
-            elif isinstance(part, dict) and isinstance(part.get("text"), str):
-                text_parts.append({"type": "text", "content": part["text"]})
+                continue
+
+            if not isinstance(part, dict):
+                continue
+
+            text = part.get("text")
+            if isinstance(text, str):
+                text_parts.append({"type": "text", "content": text})
         return text_parts
 
     return text_parts
@@ -887,6 +926,7 @@ def set_span_data_for_request(
     kwargs: "dict[str, Any]",
 ) -> None:
     """Set span data for the request."""
+    client = sentry_sdk.get_client()
     set_on_span = (
         span.set_attribute if isinstance(span, StreamedSpan) else span.set_data
     )
@@ -898,8 +938,37 @@ def set_span_data_for_request(
 
     config: "Optional[GenerateContentConfig]" = kwargs.get("config")
 
-    # Set input messages/prompts if PII is allowed
-    if should_send_default_pii() and integration.include_prompts:
+    # Set tools if available
+    if config is not None and hasattr(config, "tools"):
+        tools = config.tools
+        if tools:
+            formatted_tools = _format_tools_for_span(tools)
+            if formatted_tools:
+                if has_data_collection_enabled(client.options):
+                    if client.options["data_collection"]["gen_ai"]["inputs"]:
+                        set_data_normalized(
+                            span,
+                            SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
+                            formatted_tools,
+                            unpack=False,
+                        )
+                else:
+                    # To remove once data collection has been fully rolled out
+                    set_data_normalized(
+                        span,
+                        SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
+                        formatted_tools,
+                        unpack=False,
+                    )
+
+    record_inputs = False
+    if has_data_collection_enabled(client.options):
+        if client.options["data_collection"]["gen_ai"]["inputs"]:
+            record_inputs = True
+    elif should_send_default_pii() and integration.include_prompts:
+        record_inputs = True
+
+    if record_inputs:
         messages = []
 
         # Add system instruction if present
@@ -951,42 +1020,19 @@ def set_span_data_for_request(
             if value is not None:
                 set_on_span(span_key, value)
 
-    # Set tools if available
-    if config is not None and hasattr(config, "tools"):
-        tools = config.tools
-        if tools:
-            formatted_tools = _format_tools_for_span(tools)
-            if formatted_tools:
-                set_data_normalized(
-                    span,
-                    SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
-                    formatted_tools,
-                    unpack=False,
-                )
-
 
 def set_span_data_for_response(
     span: "Union[Span, StreamedSpan]",
     integration: "Any",
     response: "GenerateContentResponse",
 ) -> None:
-    """Set span data for the response."""
     if not response:
         return
 
+    client = sentry_sdk.get_client()
     set_on_span = (
         span.set_attribute if isinstance(span, StreamedSpan) else span.set_data
     )
-    if should_send_default_pii() and integration.include_prompts:
-        response_texts = _extract_response_text(response)
-        if response_texts:
-            # Format as JSON string array as per documentation
-            set_on_span(SPANDATA.GEN_AI_RESPONSE_TEXT, safe_serialize(response_texts))
-
-    tool_calls = extract_tool_calls(response)
-    if tool_calls:
-        # Tool calls should be JSON serialized
-        set_on_span(SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS, safe_serialize(tool_calls))
 
     finish_reasons = extract_finish_reasons(response)
     if finish_reasons:
@@ -994,11 +1040,13 @@ def set_span_data_for_response(
             span, SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS, finish_reasons
         )
 
-    if getattr(response, "response_id", None):
-        set_on_span(SPANDATA.GEN_AI_RESPONSE_ID, response.response_id)
+    response_id = getattr(response, "response_id", None)
+    if response_id is not None:
+        set_on_span(SPANDATA.GEN_AI_RESPONSE_ID, response_id)
 
-    if getattr(response, "model_version", None):
-        set_on_span(SPANDATA.GEN_AI_RESPONSE_MODEL, response.model_version)
+    model_version = getattr(response, "model_version", None)
+    if model_version is not None:
+        set_on_span(SPANDATA.GEN_AI_RESPONSE_MODEL, model_version)
 
     usage_data = extract_usage_data(response)
 
@@ -1023,6 +1071,31 @@ def set_span_data_for_response(
     if usage_data["total_tokens"]:
         set_on_span(SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, usage_data["total_tokens"])
 
+    tool_calls = extract_tool_calls(response)
+    if tool_calls:
+        if has_data_collection_enabled(client.options):
+            if client.options["data_collection"]["gen_ai"]["outputs"]:
+                set_on_span(
+                    SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS, safe_serialize(tool_calls)
+                )
+        else:
+            # Before data collection was introduced, this was set unconditionally
+            set_on_span(SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS, safe_serialize(tool_calls))
+
+    if has_data_collection_enabled(client.options):
+        if client.options["data_collection"]["gen_ai"]["outputs"]:
+            response_texts = _extract_response_text(response)
+            if response_texts:
+                set_on_span(
+                    SPANDATA.GEN_AI_RESPONSE_TEXT, safe_serialize(response_texts)
+                )
+    elif should_send_default_pii() and integration.include_prompts:
+        # TODO: Delete this block once data collection has been completely rolled out
+        response_texts = _extract_response_text(response)
+        if response_texts:
+            # Format as JSON string array as per documentation
+            set_on_span(SPANDATA.GEN_AI_RESPONSE_TEXT, safe_serialize(response_texts))
+
 
 def prepare_generate_content_args(
     args: "tuple[Any, ...]", kwargs: "dict[str, Any]"
@@ -1032,7 +1105,7 @@ def prepare_generate_content_args(
     contents = args[1] if len(args) > 1 else kwargs.get("contents")
     model_name = get_model_name(model)
 
-    config = kwargs.get("config")
+    config: "GenerateContentConfig | None" = kwargs.get("config")
     wrapped_config = wrapped_config_with_tools(config)
     if wrapped_config is not config:
         kwargs["config"] = wrapped_config
@@ -1062,8 +1135,16 @@ def set_span_data_for_embed_request(
     kwargs: "dict[str, Any]",
 ) -> None:
     """Set span data for embedding request."""
-    # Include input contents if PII is allowed
-    if should_send_default_pii() and integration.include_prompts:
+    client = sentry_sdk.get_client()
+
+    record_inputs = False
+    if has_data_collection_enabled(client.options):
+        if client.options["data_collection"]["gen_ai"]["inputs"]:
+            record_inputs = True
+    elif should_send_default_pii() and integration.include_prompts:
+        record_inputs = True
+
+    if record_inputs:
         if contents:
             # For embeddings, contents is typically a list of strings/texts
             input_texts = []

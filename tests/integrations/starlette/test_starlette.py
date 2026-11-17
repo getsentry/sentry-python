@@ -511,6 +511,117 @@ async def test_request_body_too_big(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("span_streaming", [True, False])
+async def test_formdata_request_body_data_collection_http_bodies_empty(
+    sentry_init, capture_events, capture_items, span_streaming
+):
+    sentry_init(
+        traces_sample_rate=1.0,
+        max_request_body_size="always",
+        integrations=[StarletteIntegration()],
+        trace_lifecycle="stream" if span_streaming else "static",
+        data_collection={"http_bodies": []},
+    )
+
+    starlette_app = starlette_app_factory()
+    client = TestClient(starlette_app)
+
+    headers = {"content-type": "multipart/form-data; boundary=fd721ef49ea403a6"}
+
+    if span_streaming:
+        items = capture_items("event", "span")
+
+        client.post("/body/form", data=BODY_FORM.encode("utf-8"), headers=headers)
+
+        (event,) = (item.payload for item in items if item.type == "event")
+        assert "data" not in event["request"]
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+        server_span = next(
+            span for span in spans if span["attributes"]["sentry.op"] == "http.server"
+        )
+        assert SPANDATA.HTTP_REQUEST_BODY_DATA not in server_span["attributes"]
+    else:
+        events = capture_events()
+
+        client.post("/body/form", data=BODY_FORM.encode("utf-8"), headers=headers)
+
+        (event, _) = events
+        assert "data" not in event["request"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize(
+    "data_collection, expect_body",
+    [
+        pytest.param(None, True, id="no_data_collection_experiment"),
+        pytest.param({}, True, id="data_collection_http_bodies_default"),
+        pytest.param(
+            {"http_bodies": ["incoming_request"]},
+            True,
+            id="data_collection_http_bodies_incoming_request",
+        ),
+        pytest.param(
+            {"http_bodies": []}, False, id="data_collection_http_bodies_empty"
+        ),
+    ],
+)
+async def test_request_body_data_collection(
+    sentry_init,
+    capture_events,
+    capture_items,
+    span_streaming,
+    data_collection,
+    expect_body,
+):
+    sentry_init(
+        traces_sample_rate=1.0,
+        integrations=[StarletteIntegration()],
+        trace_lifecycle="stream" if span_streaming else "static",
+        data_collection=data_collection,
+    )
+
+    starlette_app = starlette_app_factory()
+    client = TestClient(starlette_app)
+
+    if span_streaming:
+        items = capture_items("event", "span")
+
+        client.post("/body/json", json=BODY_JSON)
+
+        (event,) = (item.payload for item in items if item.type == "event")
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+        server_span = next(
+            span for span in spans if span["attributes"]["sentry.op"] == "http.server"
+        )
+
+        if expect_body:
+            assert event["request"]["data"] == BODY_JSON
+            assert (
+                json.loads(server_span["attributes"][SPANDATA.HTTP_REQUEST_BODY_DATA])
+                == BODY_JSON
+            )
+        else:
+            assert "data" not in event["request"]
+            assert SPANDATA.HTTP_REQUEST_BODY_DATA not in server_span["attributes"]
+    else:
+        events = capture_events()
+
+        client.post("/body/json", json=BODY_JSON)
+
+        (event, _) = events
+
+        if expect_body:
+            assert event["request"]["data"] == BODY_JSON
+        else:
+            assert "data" not in event["request"]
+
+
+@pytest.mark.asyncio
 async def test_request_info_no_pii(sentry_init, capture_events):
     sentry_init(
         traces_sample_rate=1.0,
@@ -563,12 +674,12 @@ async def test_request_info_no_pii(sentry_init, capture_events):
             id="defaults",
         ),
         pytest.param(
-            {"_experiments": {"data_collection": {"cookies": {"mode": "off"}}}},
+            {"data_collection": {"cookies": {"mode": "off"}}},
             None,
             id="data_collection_off",
         ),
         pytest.param(
-            {"_experiments": {"data_collection": {"cookies": {"mode": "denylist"}}}},
+            {"data_collection": {"cookies": {"mode": "denylist"}}},
             {
                 "jwt": SENSITIVE_DATA_SUBSTITUTE,
                 "theme": "dark",
@@ -578,13 +689,7 @@ async def test_request_info_no_pii(sentry_init, capture_events):
             id="data_collection_denylist_default",
         ),
         pytest.param(
-            {
-                "_experiments": {
-                    "data_collection": {
-                        "cookies": {"mode": "denylist", "terms": ["theme"]}
-                    }
-                }
-            },
+            {"data_collection": {"cookies": {"mode": "denylist", "terms": ["theme"]}}},
             {
                 "jwt": SENSITIVE_DATA_SUBSTITUTE,
                 "theme": SENSITIVE_DATA_SUBSTITUTE,
@@ -594,13 +699,7 @@ async def test_request_info_no_pii(sentry_init, capture_events):
             id="data_collection_denylist_custom_terms",
         ),
         pytest.param(
-            {
-                "_experiments": {
-                    "data_collection": {
-                        "cookies": {"mode": "allowlist", "terms": ["theme"]}
-                    }
-                }
-            },
+            {"data_collection": {"cookies": {"mode": "allowlist", "terms": ["theme"]}}},
             {
                 "jwt": SENSITIVE_DATA_SUBSTITUTE,
                 "theme": "dark",
@@ -611,10 +710,8 @@ async def test_request_info_no_pii(sentry_init, capture_events):
         ),
         pytest.param(
             {
-                "_experiments": {
-                    "data_collection": {
-                        "cookies": {"mode": "allowlist", "terms": ["identity"]}
-                    }
+                "data_collection": {
+                    "cookies": {"mode": "allowlist", "terms": ["identity"]}
                 }
             },
             {
@@ -628,7 +725,7 @@ async def test_request_info_no_pii(sentry_init, capture_events):
         pytest.param(
             {
                 "send_default_pii": False,
-                "_experiments": {"data_collection": {"cookies": {"mode": "denylist"}}},
+                "data_collection": {"cookies": {"mode": "denylist"}},
             },
             {
                 "jwt": SENSITIVE_DATA_SUBSTITUTE,
@@ -674,27 +771,21 @@ async def test_cookie_data_collection(
             id="legacy_send_default_pii_true",
         ),
         pytest.param(
-            {"_experiments": {"data_collection": {}}},
+            {"data_collection": {}},
             "toy=tennisball&color=red&auth=%5BFiltered%5D",
             id="data_collection_denylist_default",
         ),
         pytest.param(
             {
-                "_experiments": {
-                    "data_collection": {
-                        "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
-                    }
+                "data_collection": {
+                    "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
                 }
             },
             "toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D",
             id="data_collection_allowlist",
         ),
         pytest.param(
-            {
-                "_experiments": {
-                    "data_collection": {"url_query_params": {"mode": "off"}}
-                }
-            },
+            {"data_collection": {"url_query_params": {"mode": "off"}}},
             None,
             id="data_collection_off",
         ),
@@ -735,17 +826,13 @@ def test_query_string_data_collection(
             id="legacy_send_default_pii_true",
         ),
         pytest.param(
-            {"_experiments": {"data_collection": {}}},
+            {"data_collection": {}},
             "toy=tennisball&color=red&auth=%5BFiltered%5D",
             "http://testserver/message?toy=tennisball&color=red&auth=%5BFiltered%5D",
             id="data_collection_denylist_default",
         ),
         pytest.param(
-            {
-                "_experiments": {
-                    "data_collection": {"url_query_params": {"mode": "off"}}
-                }
-            },
+            {"data_collection": {"url_query_params": {"mode": "off"}}},
             None,
             "http://testserver/message",
             id="data_collection_off",
@@ -805,24 +892,24 @@ USER_INFO_CASES = [
         id="legacy_send_default_pii_false",
     ),
     pytest.param(
-        {"_experiments": {"data_collection": {}}},
+        {"data_collection": {}},
         TESTCLIENT_IP,
         id="data_collection_default_user_info_true",
     ),
     pytest.param(
-        {"_experiments": {"data_collection": {"user_info": True}}},
+        {"data_collection": {"user_info": True}},
         TESTCLIENT_IP,
         id="data_collection_user_info_true",
     ),
     pytest.param(
-        {"_experiments": {"data_collection": {"user_info": False}}},
+        {"data_collection": {"user_info": False}},
         NO_USER_INFO,
         id="data_collection_user_info_false",
     ),
     pytest.param(
         {
             "send_default_pii": True,
-            "_experiments": {"data_collection": {"user_info": False}},
+            "data_collection": {"user_info": False},
         },
         NO_USER_INFO,
         id="data_collection_wins_over_send_default_pii",
@@ -938,6 +1025,36 @@ def test_transaction_style(
     assert event["transaction_info"] == {"source": expected_source}
 
 
+def test_hosted_route_transaction_info(sentry_init, capture_events):
+    sentry_init(
+        integrations=[StarletteIntegration(transaction_style="url")],
+        traces_sample_rate=1.0,
+    )
+
+    async def hosted_endpoint(request):
+        return starlette.responses.JSONResponse({"status": "ok"})
+
+    subapp = starlette.applications.Starlette(
+        routes=[starlette.routing.Route("/users/{user_id}", hosted_endpoint)]
+    )
+    app = starlette.applications.Starlette(
+        routes=[starlette.routing.Host("subapp", subapp)]
+    )
+
+    events = capture_events()
+    client = TestClient(app)
+    client.get("/users/123456", headers={"Host": "subapp"})
+
+    (event,) = events
+    # Starlette starting setting scope["route"] with https://github.com/Kludex/starlette/commit/9c594b56e8da9c3d8c35baa40f357e7bc94f6d02
+    if STARLETTE_VERSION >= (1, 7):
+        assert event["transaction"] == "/users/{user_id}"
+        assert event["transaction_info"] == {"source": "route"}
+    else:
+        assert event["transaction"].endswith("/users/123456")
+        assert event["transaction_info"] == {"source": "url"}
+
+
 @pytest.mark.parametrize(
     "test_url,expected_error,expected_message",
     [
@@ -976,24 +1093,24 @@ USER_AUTH_CASES = [
     pytest.param({"send_default_pii": True}, True, id="legacy_pii_true"),
     pytest.param({"send_default_pii": False}, False, id="legacy_pii_false"),
     pytest.param(
-        {"_experiments": {"data_collection": {}}},
+        {"data_collection": {}},
         True,
         id="dc_default_user_info",
     ),
     pytest.param(
-        {"_experiments": {"data_collection": {"user_info": True}}},
+        {"data_collection": {"user_info": True}},
         True,
         id="dc_user_info_true",
     ),
     pytest.param(
-        {"_experiments": {"data_collection": {"user_info": False}}},
+        {"data_collection": {"user_info": False}},
         False,
         id="dc_user_info_false",
     ),
     pytest.param(
         {
             "send_default_pii": True,
-            "_experiments": {"data_collection": {"user_info": False}},
+            "data_collection": {"user_info": False},
         },
         False,
         id="dc_wins_over_pii",
@@ -1497,6 +1614,50 @@ def test_active_thread_id_span_streaming(sentry_init, capture_items, endpoint):
     segments = [item.payload for item in items if item.payload.get("is_segment")]
     assert len(segments) == 1
     assert str(data["active"]) == segments[0]["attributes"]["thread.id"]
+
+
+@pytest.mark.parametrize("endpoint", ["/sync/thread_ids", "/async/thread_ids"])
+def test_http_route_span_streaming(sentry_init, capture_items, endpoint):
+    sentry_init(
+        auto_enabling_integrations=False,
+        integrations=[StarletteIntegration(transaction_style="url")],
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+    )
+    app = starlette_app_factory()
+
+    items = capture_items("span")
+
+    client = TestClient(app)
+    response = client.get(endpoint)
+    assert response.status_code == 200
+
+    sentry_sdk.flush()
+
+    segments = [item.payload for item in items if item.payload.get("is_segment")]
+    assert len(segments) == 1
+    assert segments[0]["name"] == endpoint
+    assert segments[0]["attributes"]["sentry.segment.name.source"] == "route"
+    assert segments[0]["attributes"]["http.route"] == endpoint
+
+
+@pytest.mark.parametrize("endpoint", ["/sync/thread_ids", "/async/thread_ids"])
+def test_transaction_name_is_route_resolved_name_static(
+    sentry_init, capture_events, endpoint
+):
+    sentry_init(
+        integrations=[StarletteIntegration(transaction_style="url")],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    client = TestClient(starlette_app_factory())
+    response = client.get(endpoint)
+    assert response.status_code == 200
+
+    (transaction,) = [e for e in events if e.get("type") == "transaction"]
+    assert transaction["transaction"] == endpoint
+    assert transaction["transaction_info"] == {"source": "route"}
 
 
 def test_original_request_not_scrubbed(sentry_init, capture_events):

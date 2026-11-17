@@ -1,5 +1,736 @@
 # Changelog
 
+## 2.75.0
+
+### New Features ✨
+
+#### Bedrock
+
+- **Support for Amazon Bedrock's Converse and ConverseStream APIs**
+
+  The Boto3 integration is enabled automatically when `boto3` is installed. To configure it explicitly:
+
+```python
+import sentry_sdk
+from sentry_sdk.integrations.boto3 import Boto3Integration
+
+sentry_sdk.init(
+    dsn="...",
+    traces_sample_rate=1.0,
+    integrations=[
+        Boto3Integration(),
+    ]
+)
+```
+
+- Set `gen_ai.response.time_to_first_chunk` by @alexander-alderman-webb in [#8255](https://github.com/getsentry/sentry-python/pull/8255)
+- Record `gen_ai.response.finish_reasons` for streamed responses by @alexander-alderman-webb in [#8252](https://github.com/getsentry/sentry-python/pull/8252)
+- Set `gen_ai.output.messages` for streamed responses by @alexander-alderman-webb in [#8251](https://github.com/getsentry/sentry-python/pull/8251)
+- Set `gen_ai.response.finish_reasons` for non-streaming responses by @alexander-alderman-webb in [#8250](https://github.com/getsentry/sentry-python/pull/8250)
+- Set `gen_ai.output.messages` for non-streaming responses by @alexander-alderman-webb in [#8249](https://github.com/getsentry/sentry-python/pull/8249)
+- Set `gen_ai.input.messages` attribute by @alexander-alderman-webb in [#8242](https://github.com/getsentry/sentry-python/pull/8242)
+- Set `gen_ai.system_instructions` attribute by @alexander-alderman-webb in [#8239](https://github.com/getsentry/sentry-python/pull/8239)
+- Set token attributes for streamed responses by @alexander-alderman-webb in [#8235](https://github.com/getsentry/sentry-python/pull/8235)
+- Set token attributes for non-streaming responses by @alexander-alderman-webb in [#8234](https://github.com/getsentry/sentry-python/pull/8234)
+- Set `gen_ai.tool.definitions` attribute by @alexander-alderman-webb in [#8233](https://github.com/getsentry/sentry-python/pull/8233)
+- Record `inferenceConfig` parameters by @alexander-alderman-webb in [#8232](https://github.com/getsentry/sentry-python/pull/8232)
+- Set `gen_ai.request.model` attribute by @alexander-alderman-webb in [#8231](https://github.com/getsentry/sentry-python/pull/8231)
+- Add extension skeleton by @alexander-alderman-webb in [#8226](https://github.com/getsentry/sentry-python/pull/8226)
+
+#### Other
+
+- (crons) Mark @monitor jobs so scheduler integrations skip them by @wedamija in [#8198](https://github.com/getsentry/sentry-python/pull/8198)
+
+### Bug Fixes 🐛
+
+- (aws-lambda) Load path-style handlers once instead of on every invocation by @pabloDeputter and @sentrivana with @sentry-junior in [#8134](https://github.com/getsentry/sentry-python/pull/8134)
+- (gql) Remove credentials and query values from the transport URL by @Mohil-Ahuja in [#8227](https://github.com/getsentry/sentry-python/pull/8227)
+- (toxgen) Preserve caches on `--only` and `--skip` by @sentrivana in [#8240](https://github.com/getsentry/sentry-python/pull/8240)
+- (utils) Look up package versions without scanning all installed packages by @Shellghostt in [#8215](https://github.com/getsentry/sentry-python/pull/8215)
+
+### Documentation 📚
+
+- (celery) Fix stale comment referencing removed `sentry_apply_entry` by @sentry-junior in [#8253](https://github.com/getsentry/sentry-python/pull/8253)
+- Point Sentry Conventions links to conventions.sentry.dev by @cleptric and @claude in [#8200](https://github.com/getsentry/sentry-python/pull/8200)
+
+### Internal Changes 🔧
+
+#### Warden
+
+- Add sdk-review skill and run built-in code-review by @dingsdax with @sentry-junior in [#8247](https://github.com/getsentry/sentry-python/pull/8247)
+- Remove find-bugs, already covered by code-review by @dcramer with @sentry-junior in [#8204](https://github.com/getsentry/sentry-python/pull/8204)
+- Enable incremental review by @Jeffreyhung with @sentry-junior in [#8199](https://github.com/getsentry/sentry-python/pull/8199)
+
+#### Other
+
+- (deps) Lock file maintenance by @renovate in [#8217](https://github.com/getsentry/sentry-python/pull/8217)
+- (profiling) Remove unused ContinuousScheduler.pause stub by @sentry-junior in [#8224](https://github.com/getsentry/sentry-python/pull/8224)
+- Fix typos by @sentrivana with @sentry-junior in [#8241](https://github.com/getsentry/sentry-python/pull/8241)
+- 🤖 Update test matrix with new releases (11/09) by @sentrivana with @github-actions in [#8218](https://github.com/getsentry/sentry-python/pull/8218)
+
+## 2.74.0
+
+### New Features ✨
+
+#### Anthropic
+
+- Record reasoning parts in streaming output by @alexander-alderman-webb in [#8193](https://github.com/getsentry/sentry-python/pull/8193)
+- Record reasoning parts in nonstreaming output by @alexander-alderman-webb in [#8192](https://github.com/getsentry/sentry-python/pull/8192)
+
+#### Other
+
+- (typesafe) Handle inline images by @alexander-alderman-webb in [#8164](https://github.com/getsentry/sentry-python/pull/8164)
+
+### Bug Fixes 🐛
+
+#### Anthropic
+
+- Preserve cached `_iterator` property by @alexander-alderman-webb in [#8163](https://github.com/getsentry/sentry-python/pull/8163)
+- Stop unpacking output arrays by @alexander-alderman-webb in [#8160](https://github.com/getsentry/sentry-python/pull/8160)
+
+#### Other
+
+- (aiohttp) Leave existing `baggage` header alone if it has existin… by @pabloDeputter in [#8116](https://github.com/getsentry/sentry-python/pull/8116)
+- (boto3) Adapt to botocore no longer signing baggage by @sentrivana in [#8113](https://github.com/getsentry/sentry-python/pull/8113)
+- (ci) Restrict pytest because of incompatibilities by @sentrivana in [#8140](https://github.com/getsentry/sentry-python/pull/8140)
+- (falcon) Handle integer HTTP statuses by @jap and @sentrivana in [#8139](https://github.com/getsentry/sentry-python/pull/8139)
+- (sampling) Respect incoming sample rate if not explicitly overridden by @sentrivana in [#8185](https://github.com/getsentry/sentry-python/pull/8185)
+- (tracing) Drop trailing comma when serializing baggage without third-party items by @alphasafal and @pabloDeputter in [#8119](https://github.com/getsentry/sentry-python/pull/8119)
+- (wsgi) Stop overwriting `server.address` by @alexander-alderman-webb in [#8171](https://github.com/getsentry/sentry-python/pull/8171)
+
+### Internal Changes 🔧
+
+#### Deps
+
+- Lock file maintenance by @renovate in [#8055](https://github.com/getsentry/sentry-python/pull/8055)
+- Bump grpcio to 1.84.1 by @geoffg-sentry with @sentry-junior in [#8136](https://github.com/getsentry/sentry-python/pull/8136)
+- Bump uv to 0.13.5 by @geoffg-sentry with @sentry-junior in [#8135](https://github.com/getsentry/sentry-python/pull/8135)
+- Bump brotli to 1.2.1 by @geoffg-sentry with @sentry-junior in [#8122](https://github.com/getsentry/sentry-python/pull/8122)
+
+#### Other
+
+- (mcp) Remove unused select_mcp_transactions fixture by @sentrivana with @sentry-junior in [#8150](https://github.com/getsentry/sentry-python/pull/8150)
+- (release) Bump craft to 3.9.0 and update config by @BYK with @sentry-junior in [#8181](https://github.com/getsentry/sentry-python/pull/8181)
+- (sessions) Remove unused TERMINAL_SESSION_STATES constant by @sentrivana with @sentry-junior in [#8151](https://github.com/getsentry/sentry-python/pull/8151)
+- (starlette) Remove unused \_serialize_request_body_data helper by @sentry-junior in [#8146](https://github.com/getsentry/sentry-python/pull/8146)
+- (toxgen) Remove unused `get_file_hash()` and `get_last_updated()` helpers by @sentry-junior in [#8173](https://github.com/getsentry/sentry-python/pull/8173)
+- (tracing) Remove unused base64_stripped regex by @sentry-junior in [#8148](https://github.com/getsentry/sentry-python/pull/8148)
+- (utils) Remove unused to_timestamp helper and epoch constant by @sentry-junior in [#8147](https://github.com/getsentry/sentry-python/pull/8147)
+- 🤖 Update test matrix with new releases (11/02) by @sentrivana with @github-actions in [#8172](https://github.com/getsentry/sentry-python/pull/8172)
+- Upgrade `sphinx` and remove `packaging` upper bound by @alexander-alderman-webb in [#8183](https://github.com/getsentry/sentry-python/pull/8183)
+- Update test matrix with new releases (27/10) by @alexander-alderman-webb in [#8126](https://github.com/getsentry/sentry-python/pull/8126)
+
+## 2.73.0
+
+### New Features ✨
+
+- (arq) Add an option to monitor arq cron jobs by @wedamija in [#8051](https://github.com/getsentry/sentry-python/pull/8051)
+- (huey) Add an option to monitor Huey periodic tasks by @wedamija in [#8052](https://github.com/getsentry/sentry-python/pull/8052)
+- (rq) Add an option to monitor rq-scheduler jobs by @wedamija in [#8053](https://github.com/getsentry/sentry-python/pull/8053)
+- (types) Export Attributes from the public types module by @sansynx in [#8019](https://github.com/getsentry/sentry-python/pull/8019)
+
+### Bug Fixes 🐛
+
+- (arq) Don't monitor cron jobs with unsupported schedules by @wedamija in [#8098](https://github.com/getsentry/sentry-python/pull/8098)
+- (attributes) Handle special float values correctly by @sentrivana in [#8067](https://github.com/getsentry/sentry-python/pull/8067)
+- (celery) Don't round down beat schedule intervals by @wedamija in [#7842](https://github.com/getsentry/sentry-python/pull/7842)
+- (cohere) Stop swallowing exceptions during stream iteration by @intertermux-code in [#8017](https://github.com/getsentry/sentry-python/pull/8017)
+- (huggingface_hub) Stop swallowing exceptions during stream iteration by @intertermux-code in [#8018](https://github.com/getsentry/sentry-python/pull/8018)
+- Exclude litellm==1.107.0 from extras by @jonny-norwine in [#8104](https://github.com/getsentry/sentry-python/pull/8104)
+
+### Internal Changes 🔧
+
+#### Deps
+
+- Update github workflows by @renovate in [#8045](https://github.com/getsentry/sentry-python/pull/8045)
+- Update github workflows by @renovate in [#8036](https://github.com/getsentry/sentry-python/pull/8036)
+- Update github workflows by @renovate in [#7276](https://github.com/getsentry/sentry-python/pull/7276)
+
+#### Other
+
+- (litellm) Require filelock>=4.0.3 on Python 3.10/3.11 by @sentry-junior in [#8026](https://github.com/getsentry/sentry-python/pull/8026)
+- (monitor) Stop background health checks in tests that drive the monitor by @sentry-junior in [#8032](https://github.com/getsentry/sentry-python/pull/8032)
+- Update `AGENTS.md` by @sentrivana in [#8077](https://github.com/getsentry/sentry-python/pull/8077)
+- 🤖 Update test matrix with new releases (10/12) by @github-actions in [#7944](https://github.com/getsentry/sentry-python/pull/7944)
+
+## 2.72.0
+
+### New Features ✨
+
+#### Asgi
+
+- Set `user_agent.original` for inbound filters by @sentrivana in [#7794](https://github.com/getsentry/sentry-python/pull/7794)
+- Add `sentry.is_localhost` for inbound filters by @sentrivana in [#7781](https://github.com/getsentry/sentry-python/pull/7781)
+
+#### Boto3
+
+- Add `ServiceExtension` class by @pabloDeputter in [#7536](https://github.com/getsentry/sentry-python/pull/7536)
+- Add response, retry, and error span attributes by @pabloDeputter in [#7499](https://github.com/getsentry/sentry-python/pull/7499)
+- Add common OTel AWS client attributes by @pabloDeputter in [#7481](https://github.com/getsentry/sentry-python/pull/7481)
+
+#### Wsgi
+
+- Add `user_agent.original` attr for inbound filters by @sentrivana in [#7793](https://github.com/getsentry/sentry-python/pull/7793)
+- Add `sentry.is_localhost` for inbound filters by @sentrivana in [#7780](https://github.com/getsentry/sentry-python/pull/7780)
+
+#### Other
+
+- (aiohttp) Add `sentry.is_localhost` for inbound filters by @sentrivana in [#7785](https://github.com/getsentry/sentry-python/pull/7785)
+- (aiohttp,sanic,tornado) Add `user_agent.original` attr for inbound filters by @sentrivana in [#7795](https://github.com/getsentry/sentry-python/pull/7795)
+- (sanic) Add `sentry.is_localhost` for inbound filters by @sentrivana in [#7783](https://github.com/getsentry/sentry-python/pull/7783)
+- (tornado) Add `sentry.is_localhost` for inbound filters by @sentrivana in [#7787](https://github.com/getsentry/sentry-python/pull/7787)
+- (types) Export DataCollectionUserOptions from sentry_sdk.types by @sentrivana in [#7957](https://github.com/getsentry/sentry-python/pull/7957)
+- Better IPv6 localhost detection by @sentrivana in [#7786](https://github.com/getsentry/sentry-python/pull/7786)
+
+### Bug Fixes 🐛
+
+#### Boto3
+
+- Trace the complete botocore client-call lifecycle by @pabloDeputter in [#7538](https://github.com/getsentry/sentry-python/pull/7538)
+- Finish `StreamingBody` span correctly by @pabloDeputter in [#7540](https://github.com/getsentry/sentry-python/pull/7540)
+
+#### Other
+
+- (crons) Return `None` from `capture_checkin` when nothing is sent by @HardMax71 in [#7868](https://github.com/getsentry/sentry-python/pull/7868)
+- (scrubber) Scrub request bodies that are JSON arrays by @Om-singhaI in [#7561](https://github.com/getsentry/sentry-python/pull/7561)
+- Fix span, metrics, log client reports by @sentrivana in [#7933](https://github.com/getsentry/sentry-python/pull/7933)
+
+### Internal Changes 🔧
+
+#### Deps
+
+- Lock file maintenance by @renovate in [#7848](https://github.com/getsentry/sentry-python/pull/7848)
+- Lock file maintenance by @renovate in [#7484](https://github.com/getsentry/sentry-python/pull/7484)
+
+#### Openai Agents
+
+- Bump version for type checking to 0.23.1 by @alexander-alderman-webb in [#7935](https://github.com/getsentry/sentry-python/pull/7935)
+- Use `model_dump()` instead of deprecated `dict()` by @intertermux-code in [#7862](https://github.com/getsentry/sentry-python/pull/7862)
+
+#### Starlette
+
+- Drop direct `anyio` dependency by @alexander-alderman-webb in [#7724](https://github.com/getsentry/sentry-python/pull/7724)
+- Expect parametrized route in `starlette>=1.7` by @alexander-alderman-webb in [#7789](https://github.com/getsentry/sentry-python/pull/7789)
+
+#### Other
+
+- (boto3) Split integration into internal modules by @pabloDeputter in [#7537](https://github.com/getsentry/sentry-python/pull/7537)
+- (huggingface_hub) Use `httpx2-pytest` for `huggingface_hub>=2` by @alexander-alderman-webb in [#7790](https://github.com/getsentry/sentry-python/pull/7790)
+- (mypy) Bump version to 2.4.0 by @alexander-alderman-webb in [#7937](https://github.com/getsentry/sentry-python/pull/7937)
+- (openai) Stop directly calling `_calculate_*_token_usage()` by @alexander-alderman-webb in [#7875](https://github.com/getsentry/sentry-python/pull/7875)
+- (strawberry-graphql) Bump version for type checking to 0.332.0 by @alexander-alderman-webb in [#7936](https://github.com/getsentry/sentry-python/pull/7936)
+- Deprecate `ai.monitoring.record_token_usage()` by @alexander-alderman-webb in [#7918](https://github.com/getsentry/sentry-python/pull/7918)
+- Deprecate `send_default_pii` by @sentrivana in [#7694](https://github.com/getsentry/sentry-python/pull/7694)
+- Move FastAPI active thread tracking into Starlette by @faizansaiyed123 in [#7825](https://github.com/getsentry/sentry-python/pull/7825)
+- Upgrade ubuntu 20.04/22.04 runners to 24.04 by @joshuarli in [#7843](https://github.com/getsentry/sentry-python/pull/7843)
+- 🤖 Update test matrix with new releases (10/05) by @github-actions in [#7849](https://github.com/getsentry/sentry-python/pull/7849)
+- 🤖 Update test matrix with new releases (09/28) by @github-actions in [#7715](https://github.com/getsentry/sentry-python/pull/7715)
+- Deprecate transaction profiling by @sentrivana in [#7751](https://github.com/getsentry/sentry-python/pull/7751)
+
+## 2.71.0
+
+### New Features ✨
+
+- **New integration:** TypeSafe (#4733) by @alexander-alderman-webb
+
+  Add the TypeSafe integration to your `sentry_sdk.init` call:
+
+```python
+import sentry_sdk
+from sentry_sdk.integrations.typesafe import TypeSafeIntegration
+
+sentry_sdk.init(
+    dsn="...",
+    traces_sample_rate=1.0,
+    integrations=[
+        TypeSafeIntegration(),
+    ]
+)
+```
+
+#### Typesafe
+
+- Record `gen_ai.output.messages` by @alexander-alderman-webb in [#7720](https://github.com/getsentry/sentry-python/pull/7720)
+- Set token usage attributes by @alexander-alderman-webb in [#7719](https://github.com/getsentry/sentry-python/pull/7719)
+- Record `gen_ai.input.messages` by @alexander-alderman-webb in [#7718](https://github.com/getsentry/sentry-python/pull/7718)
+- Record `gen_ai.response.model` by @alexander-alderman-webb in [#7717](https://github.com/getsentry/sentry-python/pull/7717)
+- Add integration with `system_one()` patches by @alexander-alderman-webb in [#7716](https://github.com/getsentry/sentry-python/pull/7716)
+
+### Bug Fixes 🐛
+
+- Keep event if processor raises by @sentrivana in [#7701](https://github.com/getsentry/sentry-python/pull/7701)
+- Isolate user callbacks, emit client reports by @sentrivana in [#7692](https://github.com/getsentry/sentry-python/pull/7692)
+
+### Documentation 📚
+
+- Promote `data_collection` in changelog by @sentrivana in [#7565](https://github.com/getsentry/sentry-python/pull/7565)
+
+### Internal Changes 🔧
+
+- (aws-lambda) Add `.gitignore` to lambda handlers by @pabloDeputter in [#7638](https://github.com/getsentry/sentry-python/pull/7638)
+- (litellm) Set `LITELLM_LOCAL_MODEL_COST_MAP=true` by @alexander-alderman-webb in [#7630](https://github.com/getsentry/sentry-python/pull/7630)
+- (otlp) Adjust to `OTLPSpanExporter._headers` removal by @alexander-alderman-webb in [#7722](https://github.com/getsentry/sentry-python/pull/7722)
+- Use top-level flush API in tests by @sentrivana in [#7725](https://github.com/getsentry/sentry-python/pull/7725)
+- Unsample on sampler exception by @sentrivana in [#7723](https://github.com/getsentry/sentry-python/pull/7723)
+- Use `sentry_init` fixture by @sentrivana in [#7577](https://github.com/getsentry/sentry-python/pull/7577)
+
+## 2.70.0
+
+### New Features ✨
+
+- **New integration:** Mistral AI (#4733) by @alexander-alderman-webb
+
+  Add the Mistral integration to your `sentry_sdk.init` call:
+
+```python
+import sentry_sdk
+from sentry_sdk.integrations.mistral import MistralIntegration
+
+sentry_sdk.init(
+    dsn="...",
+    traces_sample_rate=1.0,
+    integrations=[
+        MistralIntegration(),
+    ]
+)
+```
+
+- **New option:** A fine-grained way to configure what data should be sent from the SDK.
+
+  Offers much more flexibility than `send_default_pii`, allowing you to specify what
+  data should be collected. If `data_collection` is defined, it takes precedence over
+  `send_default_pii`.
+  
+  See https://docs.sentry.io/platforms/python/configuration/options/#data_collection
+  for the available configuration options.
+
+```python
+import sentry_sdk
+
+sentry_sdk.init(
+    data_collection={
+        "user_info": False,
+        "gen_ai": {"inputs": False, "outputs": False},
+        "graphql": {"document": False, "variables": False},
+        "database_query_data": False,
+        "queues": False,
+        "http_bodies": [],
+        "cookies": {
+            "mode": "denylist",
+            "terms": ["forwarded", "-ip", "remote-", "via", "-user"],
+        },
+        "http_headers": {
+            "request": {
+                "mode": "denylist",
+                "terms": ["forwarded", "-ip", "remote-", "via", "-user"],
+            },
+        },
+        "url_query_params": {
+            "mode": "denylist",
+            "terms": ["forwarded", "-ip", "remote-", "via", "-user"],
+        },
+    }
+)
+```
+
+#### Mistral
+
+- Record `gen_ai.output.messages` by @alexander-alderman-webb in [#7549](https://github.com/getsentry/sentry-python/pull/7549)
+- Record `gen_ai.input.messages` by @alexander-alderman-webb in [#7548](https://github.com/getsentry/sentry-python/pull/7548)
+- Record `gen_ai.system_instructions` by @alexander-alderman-webb in [#7547](https://github.com/getsentry/sentry-python/pull/7547)
+- Record request parameters by @alexander-alderman-webb in [#7531](https://github.com/getsentry/sentry-python/pull/7531)
+- Record token usage by @alexander-alderman-webb in [#7529](https://github.com/getsentry/sentry-python/pull/7529)
+- Add integration with `Chat.complete` and `Chat.complete_async` patches by @alexander-alderman-webb in [#7528](https://github.com/getsentry/sentry-python/pull/7528)
+
+### Internal Changes 🔧
+
+- (data-collection) Promote `data_collection` from `_experiments` o top-level by @ericapisani in [#7560](https://github.com/getsentry/sentry-python/pull/7560)
+- Close client on teardown by @alexander-alderman-webb in [#7562](https://github.com/getsentry/sentry-python/pull/7562)
+- 🤖 Update test matrix with new releases (09/21) by @github-actions in [#7546](https://github.com/getsentry/sentry-python/pull/7546)
+- Remove `getsentry/testing-ai-sdk-integrations` by @alexander-alderman-webb in [#7526](https://github.com/getsentry/sentry-python/pull/7526)
+
+## 2.69.2
+
+### Bug Fixes 🐛
+
+- (aws-lambda) Attach user info when streaming spans by @sentrivana in [#7429](https://github.com/getsentry/sentry-python/pull/7429)
+- (bottle) Avoid infinite serializing loop by @sentrivana in [#7511](https://github.com/getsentry/sentry-python/pull/7511)
+- (clickhouse_driver) Only set `db.result` in breadcrumb with sensitive data opt-in by @alexander-alderman-webb in [#7432](https://github.com/getsentry/sentry-python/pull/7432)
+- (google-genai) Tolerate `None` candidates by @alexander-alderman-webb in [#7519](https://github.com/getsentry/sentry-python/pull/7519)
+- (pydantic-ai) Stop capturing tool execution spans when validation fails by @alexander-alderman-webb in [#7448](https://github.com/getsentry/sentry-python/pull/7448)
+- (serializer) Add type annotations to databag limits by @8rulerstar in [#7505](https://github.com/getsentry/sentry-python/pull/7505)
+- (tracing) Make `functions_to_trace` work when streaming spans by @sentrivana in [#7430](https://github.com/getsentry/sentry-python/pull/7430)
+- (typing) Fix `disabled_integrations` type by @sentrivana in [#7506](https://github.com/getsentry/sentry-python/pull/7506)
+- Don't attach stacktrace to check-ins by @sentrivana in [#7497](https://github.com/getsentry/sentry-python/pull/7497)
+
+### Documentation 📚
+
+- Update span streaming docstrings by @sentrivana in [#7463](https://github.com/getsentry/sentry-python/pull/7463)
+
+### Internal Changes 🔧
+
+#### Huggingface Hub
+
+- Parametrize tests on the streaming trace lifecycle by @alexander-alderman-webb in [#7436](https://github.com/getsentry/sentry-python/pull/7436)
+- Only check relevant data with `ApproxDict` by @alexander-alderman-webb in [#7434](https://github.com/getsentry/sentry-python/pull/7434)
+
+#### Pydantic Ai
+
+- Remove vacuous `_set_model_data()` tests by @alexander-alderman-webb in [#7453](https://github.com/getsentry/sentry-python/pull/7453)
+- Remove vacuous `_set_agent_data()` tests by @alexander-alderman-webb in [#7450](https://github.com/getsentry/sentry-python/pull/7450)
+
+#### Other
+
+- (deps) Lock file maintenance by @renovate in [#7302](https://github.com/getsentry/sentry-python/pull/7302)
+- (django) Fix flaky cache tests by using uuid for cache LOCATION by @sentry-junior in [#7444](https://github.com/getsentry/sentry-python/pull/7444)
+- (pymongo) Raise `maxWireVersion` by @alexander-alderman-webb in [#7473](https://github.com/getsentry/sentry-python/pull/7473)
+- Remove unused base64 utils by @sentrivana in [#7495](https://github.com/getsentry/sentry-python/pull/7495)
+- 🤖 Update test matrix with new releases (09/14) by @github-actions in [#7486](https://github.com/getsentry/sentry-python/pull/7486)
+- 🤖 Update test matrix with new releases (09/07) by @github-actions in [#7399](https://github.com/getsentry/sentry-python/pull/7399)
+
+### Other
+
+- Skip formatting log records when Sentry logs are off by @gyanu2507 in [#7422](https://github.com/getsentry/sentry-python/pull/7422)
+
+## 2.69.1
+
+### New Features ✨
+
+- (django) Add `http.route` attribute by @alexander-alderman-webb in [#7428](https://github.com/getsentry/sentry-python/pull/7428)
+
+### Bug Fixes 🐛
+
+- (aiohttp) Preserve SigV4-signed propagation headers by @Robinbinu in [#7427](https://github.com/getsentry/sentry-python/pull/7427)
+
+### Internal Changes 🔧
+
+#### Mcp
+
+- Parametrize tests on the streaming trace lifecycle by @alexander-alderman-webb in [#7424](https://github.com/getsentry/sentry-python/pull/7424)
+- Remove vacuous tests by @alexander-alderman-webb in [#7420](https://github.com/getsentry/sentry-python/pull/7420)
+
+#### Other
+
+- (cohere) Parametrize tests on the streaming trace lifecycle by @alexander-alderman-webb in [#7419](https://github.com/getsentry/sentry-python/pull/7419)
+- (openai-agents) Parametrize tests on `stream_gen_ai_spans` and the streaming trace lifecycle by @alexander-alderman-webb in [#7405](https://github.com/getsentry/sentry-python/pull/7405)
+
+## 2.69.0
+
+### New Features ✨
+
+#### Other
+
+- (aiohttp) Add `http.route` attribute by @alexander-alderman-webb in [#7341](https://github.com/getsentry/sentry-python/pull/7341)
+- (bottle) Add `http.route` attribute by @alexander-alderman-webb in [#7343](https://github.com/getsentry/sentry-python/pull/7343)
+- (clickhouse_driver) Set breadcrumbs in the streaming trace lifecycle by @alexander-alderman-webb in [#7325](https://github.com/getsentry/sentry-python/pull/7325)
+- (docs) Add Plausible analytics to Sphinx docs by @ericapisani in [#7319](https://github.com/getsentry/sentry-python/pull/7319)
+- (falcon) Add `http.route` attribute by @alexander-alderman-webb in [#7340](https://github.com/getsentry/sentry-python/pull/7340)
+- (fastapi) Add `http.route` attribute by @alexander-alderman-webb in [#7322](https://github.com/getsentry/sentry-python/pull/7322)
+- (flask) Add `http.route` attribute by @alexander-alderman-webb in [#7344](https://github.com/getsentry/sentry-python/pull/7344)
+- (pyramid) Add `http.route` attribute by @alexander-alderman-webb in [#7347](https://github.com/getsentry/sentry-python/pull/7347)
+- (quart) Add `http.route` attribute by @alexander-alderman-webb in [#7348](https://github.com/getsentry/sentry-python/pull/7348)
+- (sqlalchemy) Add more db system names for span data by @ericapisani in [#7329](https://github.com/getsentry/sentry-python/pull/7329)
+- (starlette) Add `http.route` attribute by @alexander-alderman-webb in [#7338](https://github.com/getsentry/sentry-python/pull/7338)
+- (types) Export SpanJSON type by @ericapisani in [#7331](https://github.com/getsentry/sentry-python/pull/7331)
+- Add Python 3.15 to test matrix by @sentrivana in [#7326](https://github.com/getsentry/sentry-python/pull/7326)
+
+### Bug Fixes 🐛
+
+#### Mcp
+
+- Handle `None` arguments in tool and prompt handlers by @alexander-alderman-webb in [#7387](https://github.com/getsentry/sentry-python/pull/7387)
+- Don't report stateless StreamableHTTP servers as stdio by @Snaylaker in [#7224](https://github.com/getsentry/sentry-python/pull/7224)
+
+#### Openai
+
+- Read `input_text` parts for the Responses API by @alexander-alderman-webb in [#7333](https://github.com/getsentry/sentry-python/pull/7333)
+- Check `Response.output` is a `list` before iterating by @alexander-alderman-webb in [#7238](https://github.com/getsentry/sentry-python/pull/7238)
+
+#### Starlette
+
+- Use `url` transaction source for host routing by @mjq in [#7266](https://github.com/getsentry/sentry-python/pull/7266)
+- Set transaction name on current scope in sync handler by @mjq in [#7201](https://github.com/getsentry/sentry-python/pull/7201)
+
+#### Other
+
+- (batcher) Do not let a failed flush kill the flusher thread (#7138) by @zkasuran in [#7186](https://github.com/getsentry/sentry-python/pull/7186)
+- (boto3) Fix botocore SigV4 failures caused by post-sign trace propagation by @pabloDeputter in [#7050](https://github.com/getsentry/sentry-python/pull/7050)
+- (httpx,httpx2) Always capture breadcrumb by @sentrivana in [#7351](https://github.com/getsentry/sentry-python/pull/7351)
+- (mcp,langchain) Add mechanism to captured exceptions by @gmassello in [#7226](https://github.com/getsentry/sentry-python/pull/7226)
+- (openai-agents) Use `isinstance` to determine tool type by @alexander-alderman-webb in [#7412](https://github.com/getsentry/sentry-python/pull/7412)
+- (quart) Skip quart-flask-patch and adjust error test for quart>=0.23 by @ericapisani in [#7320](https://github.com/getsentry/sentry-python/pull/7320)
+- Allow to correctly compare parsed versions by @sentrivana in [#7184](https://github.com/getsentry/sentry-python/pull/7184)
+
+### Internal Changes 🔧
+
+#### Openai Agents
+
+- Capture spans instead of reading from span recorder by @alexander-alderman-webb in [#7404](https://github.com/getsentry/sentry-python/pull/7404)
+- Pin `openai` version when incompatible by @alexander-alderman-webb in [#7236](https://github.com/getsentry/sentry-python/pull/7236)
+
+#### Pydantic Ai
+
+- Replace individual hooks with `hooks.on.model_request` by @alexander-alderman-webb in [#7327](https://github.com/getsentry/sentry-python/pull/7327)
+- Fix instructions test for pydantic-ai >=2.36.0 by @ericapisani in [#7321](https://github.com/getsentry/sentry-python/pull/7321)
+
+#### Other
+
+- (aiohttp) Remove dead segment name code by @mjq in [#7284](https://github.com/getsentry/sentry-python/pull/7284)
+- (anthropic) Include `StreamedSpan` in type annotations by @alexander-alderman-webb in [#7373](https://github.com/getsentry/sentry-python/pull/7373)
+- (mcp) Inline `_extract_handler_data_from_args()` by @alexander-alderman-webb in [#7386](https://github.com/getsentry/sentry-python/pull/7386)
+- (quart) Fix flake caused by flushing spans on segment end by @alexander-alderman-webb in [#7240](https://github.com/getsentry/sentry-python/pull/7240)
+- (stdlib) Remove urllib3 workaround by @pabloDeputter in [#7283](https://github.com/getsentry/sentry-python/pull/7283)
+- Add `openai-agents` to uv typing group by @alexander-alderman-webb in [#7415](https://github.com/getsentry/sentry-python/pull/7415)
+- Add `aiohttp` to uv typing group by @alexander-alderman-webb in [#7395](https://github.com/getsentry/sentry-python/pull/7395)
+- Isolate `httpx` test suite from `httpx2` by @ZaafirRizwan in [#7398](https://github.com/getsentry/sentry-python/pull/7398)
+- Remove `test_langchain_embeddings_error_handling()` by @alexander-alderman-webb in [#7389](https://github.com/getsentry/sentry-python/pull/7389)
+- Add `tiktoken` to uv typing group by @alexander-alderman-webb in [#7394](https://github.com/getsentry/sentry-python/pull/7394)
+- Reference renamed coverage action by @MathurAditya724 in [#7371](https://github.com/getsentry/sentry-python/pull/7371)
+- Remove flaky detector by @sl0thentr0py in [#7363](https://github.com/getsentry/sentry-python/pull/7363)
+- Add `openai` to uv typing group by @alexander-alderman-webb in [#7334](https://github.com/getsentry/sentry-python/pull/7334)
+- 🤖 Update test matrix with new releases (08/31) by @github-actions in [#7303](https://github.com/getsentry/sentry-python/pull/7303)
+- Add `anthropic` to uv typing group by @alexander-alderman-webb in [#7324](https://github.com/getsentry/sentry-python/pull/7324)
+- Add `google-genai` to uv typing group by @alexander-alderman-webb in [#7323](https://github.com/getsentry/sentry-python/pull/7323)
+- Use tagged versions for `getsentry/codecov-action` by @alexander-alderman-webb in [#7241](https://github.com/getsentry/sentry-python/pull/7241)
+- Update test matrix with new releases (08/24) by @alexander-alderman-webb in [#7228](https://github.com/getsentry/sentry-python/pull/7228)
+- Add `httpx` dependency to tests relying on `get_model_response()` by @alexander-alderman-webb in [#7235](https://github.com/getsentry/sentry-python/pull/7235)
+- Access the 'type' in an event using `.get` by @ericapisani in [#7239](https://github.com/getsentry/sentry-python/pull/7239)
+
+## 2.68.1
+
+### `enable_logs`
+
+- (logs) Don't stop sending auto-collected logs when `enable_logs=True` by @sentrivana in [#7237](https://github.com/getsentry/sentry-python/pull/7237)
+
+  If you have `enable_logs` set to `True`, our logging integrations for the standard library logging module as well as Loguru will auto-collect logs and send them to Sentry as Sentry logs by default, preserving old behavior. Turning automatic collection off for a specific integration can still be achieved using the `capture_sentry_logs` integration option.
+
+    ```python
+    import sentry_sdk
+    from sentry_sdk.integrations.logging import LoggingIntegration
+    from sentry_sdk.integrations.loguru import LoguruIntegration
+
+    sentry_sdk.init(
+        enable_logs=True,
+        integrations=[
+            LoggingIntegration(capture_sentry_logs=True),
+            LoguruIntegration(capture_sentry_logs=False),
+        ],
+    )
+    ```
+
+  Please note that the `enable_logs` option is deprecated and will be removed in the next major release. The `sentry_sdk.logger.X` API now works regardless of it, and auto-collection can be opted into via the `capture_sentry_logs` integration-level options, which are `False` by default, unless you have `enable_logs=True`. We've added this compatibility layer to make the transition to a `enable_logs`-free world easier.
+
+### Bug Fixes 🐛
+
+- (django) Add `failed_request_status_codes` by @mgaligniana in [#7140](https://github.com/getsentry/sentry-python/pull/7140)
+- (anthropic) Gate `gen_ai.response.tool_calls` on outputs, not inputs by @ericapisani in [#7207](https://github.com/getsentry/sentry-python/pull/7207)
+- (google_genai) Gate streaming `gen_ai.response.tool_calls` on outputs, not inputs by @ericapisani in [#7210](https://github.com/getsentry/sentry-python/pull/7210)
+- (langchain) Use `gen_ai.tool.definitions` attribute when data collection is enabled by @ericapisani in [#7204](https://github.com/getsentry/sentry-python/pull/7204)
+- (langgraph,huggingface_hub) Gate `gen_ai.response.tool_calls` on outputs, not inputs by @ericapisani in [#7208](https://github.com/getsentry/sentry-python/pull/7208)
+- (openai) Gate `gen_ai.response.tool_calls` on outputs, not inputs by @ericapisani in [#7205](https://github.com/getsentry/sentry-python/pull/7205)
+- (openai_agents) Gate `gen_ai.response.tool_calls` on outputs, not inputs by @ericapisani in [#7209](https://github.com/getsentry/sentry-python/pull/7209)
+
+
+## 2.68.0
+
+### Important
+
+- We're making `enable_logs` and `enable_metrics` no-op with this release ([#7177](https://github.com/getsentry/sentry-python/pull/7177)), and they'll be dropped in the next major.
+
+  Previously, `enable_logs` also controlled automatic logs collection from the logging and Loguru integrations. These integrations now get an integration-level `capture_sentry_logs` boolean option to allow for more control over the auto-collection. These options are `False` by default, i.e., **nothing is auto-collected without your explicit opt-in**.
+
+  #### Action Needed
+
+  If you had `enable_logs` set to `True`:
+  - If you were using the `sentry_sdk.logger.X` API, no action necessary, the API will just work.
+  - If you were auto-collecting logs from either `LoggingIntegration` or `LoguruIntegration`, the auto-collection **will be turned off in this release**. You can switch auto-collection on explicitly with:
+
+  ```python
+  import sentry_sdk
+  from sentry_sdk.integrations.logging import LoggingIntegration
+  from sentry_sdk.integrations.loguru import LoguruIntegration
+
+  sentry_sdk.init(
+      integrations=[
+          LoggingIntegration(capture_sentry_logs=True),
+          LoguruIntegration(capture_sentry_logs=True),
+      ],
+  )
+  ```
+
+  If you had `enable_logs` set to `False`:
+  - If you were using it to gate usages of the `sentry_sdk.logger.X` API, you'll need to remove the calls entirely or define a `before_send_log` callback to filter out unwanted logs.
+
+  If you has `enable_metrics` set to `False`:
+  - Any metrics emitted using the metrics API will be emitted. You'll need to drop them in a `before_send_metric` or remove the calls to the API.
+
+  ### Why We're Doing This
+
+  We recognize this is a disruptive change for some folks and want to make it clear this is a one-off. We're removing the options because they were an unnecessary hurdle that one had to jump through to be able to use logs and metrics, and it was confusing why the logging API would not just work on its own. On the other hand, we wanted to give you more fine-grained control over automatic collection.
+
+
+### New Features ✨
+
+#### Other
+
+- Set the segment source on the scope for `NoOpStreamedSpan` by @alexander-alderman-webb in [#7163](https://github.com/getsentry/sentry-python/pull/7163)
+- Remove early return for `NoOpStreamedSpan` in `set_transaction_name()` by @alexander-alderman-webb in [#7164](https://github.com/getsentry/sentry-python/pull/7164)
+- Set the segment name on the scope with `NoOpStreamedSpan` by @alexander-alderman-webb in [#7162](https://github.com/getsentry/sentry-python/pull/7162)
+
+### Bug Fixes 🐛
+
+- (batcher) Add global flush trigger based on the span number by @alexander-alderman-webb in [#7150](https://github.com/getsentry/sentry-python/pull/7150)
+
+### Internal Changes 🔧
+
+#### HTTPX, HTTPX2
+
+- Move crumbs to integrations by @sentrivana in [#7149](https://github.com/getsentry/sentry-python/pull/7149)
+- Split into sync/async tests by @sentrivana in [#7152](https://github.com/getsentry/sentry-python/pull/7152)
+
+#### Other
+
+- (aiohttp) Move crumbs to integration by @sentrivana in [#7135](https://github.com/getsentry/sentry-python/pull/7135)
+- (boto3) Move crumbs to integration by @sentrivana in [#7165](https://github.com/getsentry/sentry-python/pull/7165)
+- (django) Remove dead code and stale markers from the Django test suite by @ericapisani in [#7156](https://github.com/getsentry/sentry-python/pull/7156)
+- (pyreqwest) Move crumbs to integration by @sentrivana in [#7148](https://github.com/getsentry/sentry-python/pull/7148)
+- (stdlib) Move crumbs to integration by @sentrivana in [#7161](https://github.com/getsentry/sentry-python/pull/7161)
+- Flush trace buckets when segment spans finish by @alexander-alderman-webb in [#7170](https://github.com/getsentry/sentry-python/pull/7170)
+- Revert global span batcher limits by @alexander-alderman-webb in [#7168](https://github.com/getsentry/sentry-python/pull/7168)
+
+## 2.67.0
+
+### New Features ✨
+
+#### Batcher
+
+- Add global flush trigger based on summed size estimates by @alexander-alderman-webb in [#7144](https://github.com/getsentry/sentry-python/pull/7144)
+- Add hard span limit by @alexander-alderman-webb in [#7143](https://github.com/getsentry/sentry-python/pull/7143)
+
+#### Integrations
+
+- Add span for DRF authentication by @mgaligniana in [#6984](https://github.com/getsentry/sentry-python/pull/6984)
+
+#### Langchain
+
+- Record reasoning token usage attribute by @alexander-alderman-webb in [#7136](https://github.com/getsentry/sentry-python/pull/7136)
+- Record cached token usage attributes by @alexander-alderman-webb in [#7132](https://github.com/getsentry/sentry-python/pull/7132)
+
+#### Openai
+
+- Set `gen_ai.tool.definitions` for the Responses API by @alexander-alderman-webb in [#6951](https://github.com/getsentry/sentry-python/pull/6951)
+- Set `gen_ai.tool.definitions` for the Chat Completions API by @alexander-alderman-webb in [#6950](https://github.com/getsentry/sentry-python/pull/6950)
+- Add `gen_ai.request.reasoning.level` to OpenAI spans by @pabloDeputter in [#6892](https://github.com/getsentry/sentry-python/pull/6892)
+
+#### Streaming
+
+- Support ai_track decorator by @sentrivana in [#6895](https://github.com/getsentry/sentry-python/pull/6895)
+- Promote `before_send_span` to top-level option by @sentrivana in [#6885](https://github.com/getsentry/sentry-python/pull/6885)
+- Make `set_conversation_id` API work by @sentrivana in [#6866](https://github.com/getsentry/sentry-python/pull/6866)
+
+#### Other
+
+- (api) Add top-level `set_attributes` API by @sentrivana in [#6897](https://github.com/getsentry/sentry-python/pull/6897)
+- (aws-lambda) Enable Python 3.14 support to the Lambda layer by @pabloDeputter in [#6916](https://github.com/getsentry/sentry-python/pull/6916)
+- (openai-agents) Set the `gen_ai.tool.definitions` attribute by @alexander-alderman-webb in [#6956](https://github.com/getsentry/sentry-python/pull/6956)
+- (pydantic-ai) Record `gen_ai.output.messages` including `ThinkingPart` by @alexander-alderman-webb in [#7037](https://github.com/getsentry/sentry-python/pull/7037)
+- Add possibility to allowlist integrations in toxgen by @sentrivana in [#6996](https://github.com/getsentry/sentry-python/pull/6996)
+
+### Bug Fixes 🐛
+
+#### Openai Agents
+
+- Patch correct `run_single_turn_streamed` reference by @alexander-alderman-webb in [#7032](https://github.com/getsentry/sentry-python/pull/7032)
+- Stop destructively wrapping tools by @alexander-alderman-webb in [#6961](https://github.com/getsentry/sentry-python/pull/6961)
+
+#### Tests
+
+- Adapt to new exception propagation behavior in Quart by @sentrivana in [#6995](https://github.com/getsentry/sentry-python/pull/6995)
+- Remove redundant type filters after `capture_items` with args by @sentrivana in [#6867](https://github.com/getsentry/sentry-python/pull/6867)
+
+#### Other
+
+- (aws-lambda) Fix flake in aws lambda tests by @pabloDeputter in [#6937](https://github.com/getsentry/sentry-python/pull/6937)
+- (langchain) Stop double-counting usage in multi-candidate responses by @alexander-alderman-webb in [#7064](https://github.com/getsentry/sentry-python/pull/7064)
+- (mcp) Stop adding the prompt name to arguments by @alexander-alderman-webb in [#6765](https://github.com/getsentry/sentry-python/pull/6765)
+- (pydantic-ai) Stop recording duplicate spans by @alexander-alderman-webb in [#7056](https://github.com/getsentry/sentry-python/pull/7056)
+- (sampling) `sentry-trace` should take precedence over baggage by @sentrivana in [#6863](https://github.com/getsentry/sentry-python/pull/6863)
+- (streaming) Set segment source if unset by @sentrivana in [#6791](https://github.com/getsentry/sentry-python/pull/6791)
+- Do not let exceptions in before_breadcrumb bubble up by @sentrivana in [#7133](https://github.com/getsentry/sentry-python/pull/7133)
+- Correct typo in test function name by @TheGreatApollyon in [#6967](https://github.com/getsentry/sentry-python/pull/6967)
+- Include query string and fragment in `url.full` span attribute by @sentrivana in [#6861](https://github.com/getsentry/sentry-python/pull/6861)
+
+### Documentation 📚
+
+- Remove AI commit attribution requirement from AGENTS.md by @ericapisani in [#6828](https://github.com/getsentry/sentry-python/pull/6828)
+
+### Internal Changes 🔧
+
+#### Fastmcp
+
+- Skip SSE test for `fastmcp>=4` by @alexander-alderman-webb in [#6923](https://github.com/getsentry/sentry-python/pull/6923)
+- Remove assertions on `RootModel` instances by @alexander-alderman-webb in [#6909](https://github.com/getsentry/sentry-python/pull/6909)
+- Replace broad `try...except` with `skipif` by @alexander-alderman-webb in [#6922](https://github.com/getsentry/sentry-python/pull/6922)
+
+#### Mcp
+
+- Replace instance patches with middleware by @alexander-alderman-webb in [#6764](https://github.com/getsentry/sentry-python/pull/6764)
+- Remove redundant `mcp.tool.result.is_error` by @alexander-alderman-webb in [#6915](https://github.com/getsentry/sentry-python/pull/6915)
+- Use `mcp_types` package by @alexander-alderman-webb in [#6763](https://github.com/getsentry/sentry-python/pull/6763)
+- Inline `_set_span_output_data()` by @alexander-alderman-webb in [#6762](https://github.com/getsentry/sentry-python/pull/6762)
+- Inline `_get_span_config()` by @alexander-alderman-webb in [#6761](https://github.com/getsentry/sentry-python/pull/6761)
+- Inline `_prepare_handler_data()` by @alexander-alderman-webb in [#6758](https://github.com/getsentry/sentry-python/pull/6758)
+- Separate tool, prompt and resource patches by @alexander-alderman-webb in [#6726](https://github.com/getsentry/sentry-python/pull/6726)
+
+#### Openai Agents
+
+- Stop setting `gen_ai.response.model` on Invoke Agent spans by @alexander-alderman-webb in [#7028](https://github.com/getsentry/sentry-python/pull/7028)
+- Use first class tool hooks when available by @alexander-alderman-webb in [#6994](https://github.com/getsentry/sentry-python/pull/6994)
+- Assert subset of expected dictionary is in `gen_ai.response.tool_calls` by @alexander-alderman-webb in [#6973](https://github.com/getsentry/sentry-python/pull/6973)
+- Stop setting `gen_ai.request.available_tools` on Invoke Agent spans by @alexander-alderman-webb in [#6955](https://github.com/getsentry/sentry-python/pull/6955)
+- Stop setting `gen_ai.request.available_tools` on Execute Tool spans by @alexander-alderman-webb in [#6954](https://github.com/getsentry/sentry-python/pull/6954)
+
+#### Other
+
+- (ai) Route AI integration tests through OpenRouter by @sentry-junior in [#6979](https://github.com/getsentry/sentry-python/pull/6979)
+- (arq) Avoid race between the exception and transaction events by @alexander-alderman-webb in [#7052](https://github.com/getsentry/sentry-python/pull/7052)
+- (aws_lambda) Add ARM64 architecture support for local Lambda testing by @ericapisani in [#7053](https://github.com/getsentry/sentry-python/pull/7053)
+- (deps) Lock file maintenance by @renovate in [#6734](https://github.com/getsentry/sentry-python/pull/6734)
+- (django) Use `iscoroutinefunction` shim in `patch_views()` by @alexander-alderman-webb in [#7024](https://github.com/getsentry/sentry-python/pull/7024)
+- (httpx) Replace deprecated `asyncio.iscoroutinefunction` by @alexander-alderman-webb in [#7023](https://github.com/getsentry/sentry-python/pull/7023)
+- (huggingface-hub) Fix chat completion stream type by @alexander-alderman-webb in [#7070](https://github.com/getsentry/sentry-python/pull/7070)
+- (langchain) Remove `on_agent_finish()` hook by @alexander-alderman-webb in [#7059](https://github.com/getsentry/sentry-python/pull/7059)
+- (pydantic-ai) Use `FunctionModel` for testing output data transformations by @alexander-alderman-webb in [#7036](https://github.com/getsentry/sentry-python/pull/7036)
+- (serializer) Avoid copying the whole Mapping before trimming to `MAX_DATABAG_BREADTH` by @Malkiz223 in [#6783](https://github.com/getsentry/sentry-python/pull/6783)
+- (tests) Replace \_transport_works_cases loop with explicit case list by @ericapisani in [#6978](https://github.com/getsentry/sentry-python/pull/6978)
+- 🤖 Update test matrix with new releases (08/10) by @github-actions in [#7142](https://github.com/getsentry/sentry-python/pull/7142)
+- Pin `litellm<=1.96` for generating test suites by @alexander-alderman-webb in [#7147](https://github.com/getsentry/sentry-python/pull/7147)
+- Unpin Django version for generating test suites by @alexander-alderman-webb in [#7146](https://github.com/getsentry/sentry-python/pull/7146)
+- Move Redis breadcrumbs to integration by @sentrivana in [#7129](https://github.com/getsentry/sentry-python/pull/7129)
+- Move subprocess breadcrumbs to integration by @sentrivana in [#7128](https://github.com/getsentry/sentry-python/pull/7128)
+- Avoid scanning installed packages when MCP SDK is not installed by @mangodxd in [#6865](https://github.com/getsentry/sentry-python/pull/6865)
+- Remove `test-lambda-locally` by @alexander-alderman-webb in [#7069](https://github.com/getsentry/sentry-python/pull/7069)
+- Add `pydantic-ai-slim` to uv typing group by @alexander-alderman-webb in [#7025](https://github.com/getsentry/sentry-python/pull/7025)
+- Add `langchain-base` to uv typing group by @alexander-alderman-webb in [#7016](https://github.com/getsentry/sentry-python/pull/7016)
+- 🤖 Update test matrix with new releases (08/03) by @github-actions in [#6985](https://github.com/getsentry/sentry-python/pull/6985)
+- Mock attributes in redis cluster tests by @sentrivana in [#7022](https://github.com/getsentry/sentry-python/pull/7022)
+- Deprecate `ai_track()` by @alexander-alderman-webb in [#7005](https://github.com/getsentry/sentry-python/pull/7005)
+- Reduce common test suite while not reducing coverage by @ericapisani in [#6972](https://github.com/getsentry/sentry-python/pull/6972)
+- Use top-level options if available by @sentrivana in [#6959](https://github.com/getsentry/sentry-python/pull/6959)
+- Restore wrapped functions in `functions_to_trace` tests by @alexander-alderman-webb in [#6933](https://github.com/getsentry/sentry-python/pull/6933)
+- Pin `mcp<2` for `fastmcp<0.3` by @alexander-alderman-webb in [#6925](https://github.com/getsentry/sentry-python/pull/6925)
+- Pin Python > 3.7 for `huey>=3.3.0` by @alexander-alderman-webb in [#6913](https://github.com/getsentry/sentry-python/pull/6913)
+- Add `httpx` dependency to `mcp` and `fastmcp` tests by @alexander-alderman-webb in [#6905](https://github.com/getsentry/sentry-python/pull/6905)
+- Remove flaky circular references tests by @alexander-alderman-webb in [#6903](https://github.com/getsentry/sentry-python/pull/6903)
+- Remove old Python compat code by @sentrivana in [#6902](https://github.com/getsentry/sentry-python/pull/6902)
+- Add span streaming DSC tests by @sentrivana in [#6884](https://github.com/getsentry/sentry-python/pull/6884)
+- Add streaming logs tests by @sentrivana in [#6880](https://github.com/getsentry/sentry-python/pull/6880)
+- Add streaming API tests by @sentrivana in [#6883](https://github.com/getsentry/sentry-python/pull/6883)
+- Add streaming continous profiler tests by @sentrivana in [#6879](https://github.com/getsentry/sentry-python/pull/6879)
+- Add streaming monitor test by @sentrivana in [#6882](https://github.com/getsentry/sentry-python/pull/6882)
+- Add streaming metrics test by @sentrivana in [#6881](https://github.com/getsentry/sentry-python/pull/6881)
+- Add sample_rand span streaming tests by @sentrivana in [#6781](https://github.com/getsentry/sentry-python/pull/6781)
+
 ## 2.66.1
 
 ### Bug Fixes 🐛

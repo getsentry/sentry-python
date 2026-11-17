@@ -12,10 +12,12 @@ from sentry_sdk.ai._openai_completions_api import (
 )
 from sentry_sdk.ai._openai_completions_api import (
     _get_text_items,
-    _transform_system_instructions,
 )
 from sentry_sdk.ai._openai_completions_api import (
     _is_system_instruction as _is_system_instruction_completions,
+)
+from sentry_sdk.ai._openai_completions_api import (
+    _transform_system_instructions as _transform_system_instructions_completions,
 )
 from sentry_sdk.ai._openai_completions_api import (
     _transform_tool_definitions as _transform_tool_definitions_completions,
@@ -27,9 +29,11 @@ from sentry_sdk.ai._openai_responses_api import (
     _is_system_instruction as _is_system_instruction_responses,
 )
 from sentry_sdk.ai._openai_responses_api import (
+    _transform_system_instructions as _transform_system_instructions_responses,
+)
+from sentry_sdk.ai._openai_responses_api import (
     _transform_tool_definitions as _transform_tool_definitions_responses,
 )
-from sentry_sdk.ai.monitoring import record_token_usage
 from sentry_sdk.ai.utils import (
     get_start_span_function,
     normalize_message_roles,
@@ -57,6 +61,7 @@ if TYPE_CHECKING:
         Any,
         AsyncIterator,
         Callable,
+        Coroutine,
         Iterable,
         Iterator,
         List,
@@ -65,11 +70,11 @@ if TYPE_CHECKING:
     )
 
     from openai import Omit
+    from openai._types import SequenceNotStr
     from openai.types import CompletionUsage
     from openai.types.responses import (
         ResponseInputParam,
         ResponseStreamEvent,
-        SequenceNotStr,
     )
     from openai.types.responses.response_usage import ResponseUsage
 
@@ -80,16 +85,18 @@ try:
     try:
         from openai import NotGiven
     except ImportError:
-        NotGiven = None
+        NotGiven = None  # type: ignore[misc,assignment]
 
     try:
         from openai import Omit
     except ImportError:
-        Omit = None
+        Omit = None  # type: ignore[misc,assignment]
 
     from openai import AsyncStream, Stream
     from openai.resources import AsyncEmbeddings, Embeddings
     from openai.resources.chat.completions import AsyncCompletions, Completions
+    from openai.types import CreateEmbeddingResponse
+    from openai.types.chat import ChatCompletion
 
     if TYPE_CHECKING:
         from openai.types.chat import (
@@ -103,6 +110,7 @@ RESPONSES_API_ENABLED = True
 try:
     # responses API support was introduced in v1.66.0
     from openai.resources.responses import AsyncResponses, Responses
+    from openai.types.responses import Response, ResponseTextDeltaEvent
     from openai.types.responses.response_completed_event import ResponseCompletedEvent
 except ImportError:
     RESPONSES_API_ENABLED = False
@@ -121,23 +129,23 @@ class OpenAIIntegration(Integration):
 
         self.tiktoken_encoding = None
         if tiktoken_encoding_name is not None:
-            import tiktoken  # type: ignore
+            import tiktoken  # noqa: PLC0415
 
             self.tiktoken_encoding = tiktoken.get_encoding(tiktoken_encoding_name)
 
     @staticmethod
     def setup_once() -> None:
-        Completions.create = _wrap_chat_completion_create(Completions.create)
-        AsyncCompletions.create = _wrap_async_chat_completion_create(
+        Completions.create = _wrap_chat_completion_create(Completions.create)  # type: ignore[assignment,method-assign]
+        AsyncCompletions.create = _wrap_async_chat_completion_create(  # type: ignore[assignment,method-assign]
             AsyncCompletions.create
         )
 
-        Embeddings.create = _wrap_embeddings_create(Embeddings.create)
-        AsyncEmbeddings.create = _wrap_async_embeddings_create(AsyncEmbeddings.create)
+        Embeddings.create = _wrap_embeddings_create(Embeddings.create)  # type: ignore[method-assign]
+        AsyncEmbeddings.create = _wrap_async_embeddings_create(AsyncEmbeddings.create)  # type: ignore[method-assign]
 
         if RESPONSES_API_ENABLED:
-            Responses.create = _wrap_responses_create(Responses.create)
-            AsyncResponses.create = _wrap_async_responses_create(AsyncResponses.create)
+            Responses.create = _wrap_responses_create(Responses.create)  # type: ignore[method-assign]
+            AsyncResponses.create = _wrap_async_responses_create(AsyncResponses.create)  # type: ignore[assignment,method-assign]
 
     def count_tokens(self: "OpenAIIntegration", s: str) -> int:
         if self.tiktoken_encoding is None:
@@ -166,7 +174,7 @@ def _has_attr_and_is_int(
 
 
 def _calculate_completions_token_usage(
-    messages: "Optional[Iterable[ChatCompletionMessageParam]]",
+    messages: "Optional[Union[Iterable[ChatCompletionMessageParam], list[str]]]",
     response: "Any",
     span: "Union[Span, StreamedSpan]",
     streaming_message_responses: "Optional[List[str]]",
@@ -230,21 +238,36 @@ def _calculate_completions_token_usage(
                 if hasattr(choice, "message") and hasattr(choice.message, "content"):
                     output_tokens += count_tokens(choice.message.content)
 
+    set_on_span = (
+        span.set_attribute if isinstance(span, StreamedSpan) else span.set_data
+    )
+
     # Do not set token data if it is 0
     input_tokens = input_tokens or None
-    input_tokens_cached = input_tokens_cached or None
-    output_tokens = output_tokens or None
-    output_tokens_reasoning = output_tokens_reasoning or None
-    total_tokens = total_tokens or None
+    if input_tokens is not None:
+        set_on_span(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, input_tokens)
 
-    record_token_usage(
-        span,
-        input_tokens=input_tokens,
-        input_tokens_cached=input_tokens_cached,
-        output_tokens=output_tokens,
-        output_tokens_reasoning=output_tokens_reasoning,
-        total_tokens=total_tokens,
-    )
+    input_tokens_cached = input_tokens_cached or None
+    if input_tokens_cached is not None:
+        set_on_span(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED, input_tokens_cached)
+
+    output_tokens = output_tokens or None
+    if output_tokens is not None:
+        set_on_span(SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS, output_tokens)
+
+    output_tokens_reasoning = output_tokens_reasoning or None
+    if output_tokens_reasoning is not None:
+        set_on_span(
+            SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS_REASONING,
+            output_tokens_reasoning,
+        )
+
+    total_tokens = total_tokens or None
+    if total_tokens is None and input_tokens is not None and output_tokens is not None:
+        total_tokens = input_tokens + output_tokens
+
+    if total_tokens is not None:
+        set_on_span(SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, total_tokens)
 
 
 def _calculate_responses_token_usage(
@@ -301,28 +324,43 @@ def _calculate_responses_token_usage(
         if streaming_message_responses is not None:
             for message in streaming_message_responses:
                 output_tokens += count_tokens(message)
-        elif hasattr(response, "output"):
+        elif hasattr(response, "output") and isinstance(response.output, list):
             for output_item in response.output:
                 if hasattr(output_item, "content"):
                     for content_item in output_item.content:
                         if hasattr(content_item, "text"):
                             output_tokens += count_tokens(content_item.text)
 
+    set_on_span = (
+        span.set_attribute if isinstance(span, StreamedSpan) else span.set_data
+    )
+
     # Do not set token data if it is 0
     input_tokens = input_tokens or None
-    input_tokens_cached = input_tokens_cached or None
-    output_tokens = output_tokens or None
-    output_tokens_reasoning = output_tokens_reasoning or None
-    total_tokens = total_tokens or None
+    if input_tokens is not None:
+        set_on_span(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, input_tokens)
 
-    record_token_usage(
-        span,
-        input_tokens=input_tokens,
-        input_tokens_cached=input_tokens_cached,
-        output_tokens=output_tokens,
-        output_tokens_reasoning=output_tokens_reasoning,
-        total_tokens=total_tokens,
-    )
+    input_tokens_cached = input_tokens_cached or None
+    if input_tokens_cached is not None:
+        set_on_span(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED, input_tokens_cached)
+
+    output_tokens = output_tokens or None
+    if output_tokens is not None:
+        set_on_span(SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS, output_tokens)
+
+    output_tokens_reasoning = output_tokens_reasoning or None
+    if output_tokens_reasoning is not None:
+        set_on_span(
+            SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS_REASONING,
+            output_tokens_reasoning,
+        )
+
+    total_tokens = total_tokens or None
+    if total_tokens is None and input_tokens is not None and output_tokens is not None:
+        total_tokens = input_tokens + output_tokens
+
+    if total_tokens is not None:
+        set_on_span(SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, total_tokens)
 
 
 def _set_responses_api_input_data(
@@ -428,9 +466,9 @@ def _set_responses_api_input_data(
         )
 
     system_instructions = _get_system_instructions_responses(messages)
-    # Deliberate use of function accepting completions API type because
-    # of shared structure FOR THIS PURPOSE ONLY.
-    instructions_text_parts += _transform_system_instructions(system_instructions)
+    instructions_text_parts += _transform_system_instructions_responses(
+        system_instructions
+    )
     if len(instructions_text_parts) > 0:
         set_on_span(
             SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
@@ -458,7 +496,7 @@ def _set_responses_api_input_data(
         message for message in messages if not _is_system_instruction_responses(message)
     ]
     if len(non_system_messages) > 0:
-        normalized_messages = normalize_message_roles(non_system_messages)
+        normalized_messages = normalize_message_roles(non_system_messages)  # type: ignore
         client = sentry_sdk.get_client()
         scope = sentry_sdk.get_current_scope()
         messages_data = (
@@ -570,7 +608,7 @@ def _set_completions_api_input_data(
     if len(system_instructions) > 0:
         set_on_span(
             SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
-            json.dumps(_transform_system_instructions(system_instructions)),
+            json.dumps(_transform_system_instructions_completions(system_instructions)),
         )
 
     non_system_messages = [
@@ -579,7 +617,7 @@ def _set_completions_api_input_data(
         if not _is_system_instruction_completions(message)
     ]
     if len(non_system_messages) > 0:
-        normalized_messages = normalize_message_roles(non_system_messages)
+        normalized_messages = normalize_message_roles(non_system_messages)  # type: ignore
         client = sentry_sdk.get_client()
         scope = sentry_sdk.get_current_scope()
         messages_data = (
@@ -609,7 +647,7 @@ def _set_embeddings_input_data(
     if model is not None:
         set_on_span(SPANDATA.GEN_AI_REQUEST_MODEL, model)
 
-    messages: "Union[str, SequenceNotStr[str], Iterable[int], Iterable[Iterable[int]]]" = kwargs.get(
+    messages: "Optional[Union[str, SequenceNotStr[str], Iterable[int], Iterable[Iterable[int]]]]" = kwargs.get(
         "input"
     )
 
@@ -642,11 +680,11 @@ def _set_embeddings_input_data(
     if not isinstance(messages, Iterable) or isinstance(messages, dict):
         return
 
-    messages = list(messages)
+    messages_copy = list(messages)
     kwargs["input"] = messages
 
-    if len(messages) > 0:
-        normalized_messages = normalize_message_roles(messages)
+    if len(messages_copy) > 0:
+        normalized_messages = normalize_message_roles(messages_copy)  # type: ignore
         scope = sentry_sdk.get_current_scope()
         messages_data = (
             truncate_and_annotate_embedding_inputs(normalized_messages, span, scope)
@@ -661,7 +699,7 @@ def _set_embeddings_input_data(
 
 def _set_common_output_data(
     span: "Union[Span, StreamedSpan]",
-    response: "Any",
+    response: "Union[ChatCompletion, Stream[ChatCompletionChunk], AsyncStream[ChatCompletionChunk], Response, Stream[ResponseStreamEvent], AsyncStream[ResponseStreamEvent], CreateEmbeddingResponse]",
     input: "Any",
     integration: "OpenAIIntegration",
     finish_span: bool = True,
@@ -706,20 +744,26 @@ def _set_common_output_data(
 
     # Responses API
     elif hasattr(response, "output"):
+        response = cast("Response", response)
+
         output_messages: "dict[str, list[Any]]" = {
             "response": [],
             "tool": [],
         }
 
-        if has_data_collection_enabled(client.options):
-            if client.options["data_collection"]["gen_ai"]["outputs"]:
+        if has_data_collection_enabled(client.options) and isinstance(
+            response.output, list
+        ):
+            record_outputs = client.options["data_collection"]["gen_ai"]["outputs"]
+
+            if record_outputs:
                 for output in response.output:
                     if output.type == "function_call":
                         output_messages["tool"].append(output.dict())
                     elif output.type == "message":
                         for output_message in output.content:
                             try:
-                                output_messages["response"].append(output_message.text)
+                                output_messages["response"].append(output_message.text)  # type: ignore[union-attr]
                             except AttributeError:
                                 # Unknown output message type, just return the json
                                 output_messages["response"].append(
@@ -734,19 +778,23 @@ def _set_common_output_data(
                         unpack=False,
                     )
 
-                if len(output_messages["response"]) > 0:
+                if record_outputs and len(output_messages["response"]) > 0:
                     set_data_normalized(
                         span, SPANDATA.GEN_AI_RESPONSE_TEXT, output_messages["response"]
                     )
 
-        elif should_send_default_pii() and integration.include_prompts:
+        elif (
+            should_send_default_pii()
+            and integration.include_prompts
+            and isinstance(response.output, list)
+        ):
             for output in response.output:
                 if output.type == "function_call":
                     output_messages["tool"].append(output.dict())
                 elif output.type == "message":
                     for output_message in output.content:
                         try:
-                            output_messages["response"].append(output_message.text)
+                            output_messages["response"].append(output_message.text)  # type: ignore[union-attr]
                         except AttributeError:
                             # Unknown output message type, just return the json
                             output_messages["response"].append(output_message.dict())
@@ -788,7 +836,11 @@ def _set_common_output_data(
             span.__exit__(None, None, None)
 
 
-def _new_sync_chat_completion(f: "Any", *args: "Any", **kwargs: "Any") -> "Any":
+def _new_sync_chat_completion(
+    f: "Callable[..., Union[ChatCompletion, Stream[ChatCompletionChunk]]]",
+    *args: "Any",
+    **kwargs: "Any",
+) -> "Union[ChatCompletion, Stream[ChatCompletionChunk]]":
     client = sentry_sdk.get_client()
     integration = client.get_integration(OpenAIIntegration)
     if integration is None:
@@ -846,7 +898,9 @@ def _new_sync_chat_completion(f: "Any", *args: "Any", **kwargs: "Any") -> "Any":
 
     # Attribute check to fail gracefully if the attribute is not present in future `openai` versions.
     if isinstance(response, Stream) and hasattr(response, "_iterator"):
-        messages = kwargs.get("messages")
+        messages: "Optional[Union[Iterable[ChatCompletionMessageParam], list[str]]]" = (
+            kwargs.get("messages")
+        )
 
         if messages is not None and isinstance(messages, str):
             messages = [messages]
@@ -869,7 +923,11 @@ def _new_sync_chat_completion(f: "Any", *args: "Any", **kwargs: "Any") -> "Any":
     return response
 
 
-async def _new_async_chat_completion(f: "Any", *args: "Any", **kwargs: "Any") -> "Any":
+async def _new_async_chat_completion(
+    f: "Callable[..., Coroutine[Any, Any, Union[ChatCompletion, AsyncStream[ChatCompletionChunk]]]]",
+    *args: "Any",
+    **kwargs: "Any",
+) -> "Union[ChatCompletion, AsyncStream[ChatCompletionChunk]]":
     client = sentry_sdk.get_client()
     integration = client.get_integration(OpenAIIntegration)
     if integration is None:
@@ -926,7 +984,7 @@ async def _new_async_chat_completion(f: "Any", *args: "Any", **kwargs: "Any") ->
 
     # Attribute check to fail gracefully if the attribute is not present in future `openai` versions.
     if isinstance(response, AsyncStream) and hasattr(response, "_iterator"):
-        messages = kwargs.get("messages")
+        messages: "Optional[list[str]]" = kwargs.get("messages")
 
         if messages is not None and isinstance(messages, str):
             messages = [messages]
@@ -950,7 +1008,7 @@ async def _new_async_chat_completion(f: "Any", *args: "Any", **kwargs: "Any") ->
 
 def _set_completions_api_output_data(
     span: "Union[Span, StreamedSpan]",
-    response: "Any",
+    response: "Union[ChatCompletion, Stream[ChatCompletionChunk], AsyncStream[ChatCompletionChunk]]",
     kwargs: "dict[str, Any]",
     integration: "OpenAIIntegration",
     finish_span: bool = True,
@@ -973,7 +1031,7 @@ def _wrap_synchronous_completions_chunk_iterator(
     span: "Union[Span, StreamedSpan]",
     integration: "OpenAIIntegration",
     start_time: "Optional[float]",
-    messages: "Optional[Iterable[ChatCompletionMessageParam]]",
+    messages: "Optional[Union[Iterable[ChatCompletionMessageParam], list[str]]]",
     response: "Stream[ChatCompletionChunk]",
     old_iterator: "Iterator[ChatCompletionChunk]",
     finish_span: "bool",
@@ -1044,7 +1102,7 @@ async def _wrap_asynchronous_completions_chunk_iterator(
     span: "Union[Span, StreamedSpan]",
     integration: "OpenAIIntegration",
     start_time: "Optional[float]",
-    messages: "Optional[Iterable[ChatCompletionMessageParam]]",
+    messages: "Optional[Union[Iterable[ChatCompletionMessageParam], list[str]]]",
     response: "AsyncStream[ChatCompletionChunk]",
     old_iterator: "AsyncIterator[ChatCompletionChunk]",
     finish_span: "bool",
@@ -1115,7 +1173,7 @@ def _wrap_synchronous_responses_event_iterator(
     span: "Union[Span, StreamedSpan]",
     integration: "OpenAIIntegration",
     start_time: "Optional[float]",
-    input: "Optional[Union[str, ResponseInputParam]]",
+    input: "Optional[Union[str, list[str], ResponseInputParam]]",
     response: "Stream[ResponseStreamEvent]",
     old_iterator: "Iterator[ResponseStreamEvent]",
     finish_span: "bool",
@@ -1132,14 +1190,14 @@ def _wrap_synchronous_responses_event_iterator(
     count_tokens_manually = True
     for x in old_iterator:
         with capture_internal_exceptions():
-            if hasattr(x, "delta"):
+            if isinstance(x, ResponseTextDeltaEvent):
                 if start_time is not None and ttft is None:
                     ttft = time.perf_counter() - start_time
                 if len(data_buf) == 0:
                     data_buf.append([])
                 data_buf[0].append(x.delta or "")
 
-            if isinstance(x, ResponseCompletedEvent):
+            elif isinstance(x, ResponseCompletedEvent):
                 if isinstance(span, StreamedSpan):
                     span.set_attribute(SPANDATA.GEN_AI_RESPONSE_MODEL, x.response.model)
                 else:
@@ -1188,7 +1246,7 @@ async def _wrap_asynchronous_responses_event_iterator(
     span: "Union[Span, StreamedSpan]",
     integration: "OpenAIIntegration",
     start_time: "Optional[float]",
-    input: "Optional[Union[str, ResponseInputParam]]",
+    input: "Optional[Union[str, list[str], ResponseInputParam]]",
     response: "AsyncStream[ResponseStreamEvent]",
     old_iterator: "AsyncIterator[ResponseStreamEvent]",
     finish_span: "bool",
@@ -1205,14 +1263,14 @@ async def _wrap_asynchronous_responses_event_iterator(
     count_tokens_manually = True
     async for x in old_iterator:
         with capture_internal_exceptions():
-            if hasattr(x, "delta"):
+            if isinstance(x, ResponseTextDeltaEvent):
                 if start_time is not None and ttft is None:
                     ttft = time.perf_counter() - start_time
                 if len(data_buf) == 0:
                     data_buf.append([])
                 data_buf[0].append(x.delta or "")
 
-            if isinstance(x, ResponseCompletedEvent):
+            elif isinstance(x, ResponseCompletedEvent):
                 if isinstance(span, StreamedSpan):
                     span.set_attribute(SPANDATA.GEN_AI_RESPONSE_MODEL, x.response.model)
                 else:
@@ -1259,7 +1317,7 @@ async def _wrap_asynchronous_responses_event_iterator(
 
 def _set_responses_api_output_data(
     span: "Union[Span, StreamedSpan]",
-    response: "Any",
+    response: "Union[Response, Stream[ResponseStreamEvent], AsyncStream[ResponseStreamEvent]]",
     kwargs: "dict[str, Any]",
     integration: "OpenAIIntegration",
     finish_span: bool = True,
@@ -1280,7 +1338,7 @@ def _set_responses_api_output_data(
 
 def _set_embeddings_output_data(
     span: "Union[Span, StreamedSpan]",
-    response: "Any",
+    response: "CreateEmbeddingResponse",
     kwargs: "dict[str, Any]",
     integration: "OpenAIIntegration",
     finish_span: bool = True,
@@ -1299,7 +1357,9 @@ def _set_embeddings_output_data(
     )
 
 
-def _wrap_chat_completion_create(f: "Callable[..., Any]") -> "Callable[..., Any]":
+def _wrap_chat_completion_create(
+    f: "Callable[..., Union[ChatCompletion, Stream[ChatCompletionChunk]]]",
+) -> "Callable[..., Coroutine[Any, Any, Union[ChatCompletion, Stream[ChatCompletionChunk]]]]":
     @wraps(f)
     def _sentry_patched_create_sync(*args: "Any", **kwargs: "Any") -> "Any":
         integration = sentry_sdk.get_client().get_integration(OpenAIIntegration)
@@ -1312,9 +1372,13 @@ def _wrap_chat_completion_create(f: "Callable[..., Any]") -> "Callable[..., Any]
     return _sentry_patched_create_sync
 
 
-def _wrap_async_chat_completion_create(f: "Callable[..., Any]") -> "Callable[..., Any]":
+def _wrap_async_chat_completion_create(
+    f: "Callable[..., Coroutine[Any, Any, Union[ChatCompletion, AsyncStream[ChatCompletionChunk]]]]",
+) -> "Callable[..., Coroutine[Any, Any, Union[ChatCompletion, AsyncStream[ChatCompletionChunk]]]]":
     @wraps(f)
-    async def _sentry_patched_create_async(*args: "Any", **kwargs: "Any") -> "Any":
+    async def _sentry_patched_create_async(
+        *args: "Any", **kwargs: "Any"
+    ) -> "Union[ChatCompletion, AsyncStream[ChatCompletionChunk]]":
         integration = sentry_sdk.get_client().get_integration(OpenAIIntegration)
         if integration is None or "messages" not in kwargs:
             # no "messages" means invalid call (in all versions of openai), let it return error
@@ -1382,8 +1446,10 @@ def _new_sync_embeddings_create(f: "Any", *args: "Any", **kwargs: "Any") -> "Any
 
 
 async def _new_async_embeddings_create(
-    f: "Any", *args: "Any", **kwargs: "Any"
-) -> "Any":
+    f: "Callable[..., Coroutine[Any, Any, CreateEmbeddingResponse]]",
+    *args: "Any",
+    **kwargs: "Any",
+) -> "CreateEmbeddingResponse":
     client = sentry_sdk.get_client()
     integration = client.get_integration(OpenAIIntegration)
     if integration is None:
@@ -1463,7 +1529,11 @@ def _wrap_async_embeddings_create(f: "Any") -> "Any":
     return _sentry_patched_create_async
 
 
-def _new_sync_responses_create(f: "Any", *args: "Any", **kwargs: "Any") -> "Any":
+def _new_sync_responses_create(
+    f: "Callable[..., Union[Response, Stream[ResponseStreamEvent]]]",
+    *args: "Any",
+    **kwargs: "Any",
+) -> "Union[Response, Stream[ResponseStreamEvent]]":
     client = sentry_sdk.get_client()
     integration = client.get_integration(OpenAIIntegration)
     if integration is None:
@@ -1510,7 +1580,9 @@ def _new_sync_responses_create(f: "Any", *args: "Any", **kwargs: "Any") -> "Any"
 
     # Attribute check to fail gracefully if the attribute is not present in future `openai` versions.
     if isinstance(response, Stream) and hasattr(response, "_iterator"):
-        input = kwargs.get("input")
+        input: "Optional[Union[str, list[str], ResponseInputParam]]" = kwargs.get(
+            "input"
+        )
 
         if input is not None and isinstance(input, str):
             input = [input]
@@ -1533,7 +1605,11 @@ def _new_sync_responses_create(f: "Any", *args: "Any", **kwargs: "Any") -> "Any"
     return response
 
 
-async def _new_async_responses_create(f: "Any", *args: "Any", **kwargs: "Any") -> "Any":
+async def _new_async_responses_create(
+    f: "Callable[..., Coroutine[Any, Any, Union[Response, AsyncStream[ResponseStreamEvent]]]]",
+    *args: "Any",
+    **kwargs: "Any",
+) -> "Union[Response, AsyncStream[ResponseStreamEvent]]":
     client = sentry_sdk.get_client()
     integration = client.get_integration(OpenAIIntegration)
     if integration is None:
@@ -1580,7 +1656,9 @@ async def _new_async_responses_create(f: "Any", *args: "Any", **kwargs: "Any") -
 
     # Attribute check to fail gracefully if the attribute is not present in future `openai` versions.
     if isinstance(response, AsyncStream) and hasattr(response, "_iterator"):
-        input = kwargs.get("input")
+        input: "Optional[Union[str, list[str], ResponseInputParam]]" = kwargs.get(
+            "input"
+        )
 
         if input is not None and isinstance(input, str):
             input = [input]
@@ -1614,9 +1692,13 @@ def _wrap_responses_create(f: "Any") -> "Any":
     return _sentry_patched_create_sync
 
 
-def _wrap_async_responses_create(f: "Any") -> "Any":
+def _wrap_async_responses_create(
+    f: "Callable[..., Coroutine[Any, Any, Union[Response, AsyncStream[ResponseStreamEvent]]]]",
+) -> "Callable[..., Coroutine[Any, Any, Union[Response, AsyncStream[ResponseStreamEvent]]]]":
     @wraps(f)
-    async def _sentry_patched_responses_async(*args: "Any", **kwargs: "Any") -> "Any":
+    async def _sentry_patched_responses_async(
+        *args: "Any", **kwargs: "Any"
+    ) -> "Union[Response, AsyncStream[ResponseStreamEvent]]":
         integration = sentry_sdk.get_client().get_integration(OpenAIIntegration)
         if integration is None:
             return await f(*args, **kwargs)

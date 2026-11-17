@@ -21,6 +21,7 @@ from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
     CONTEXTVARS_ERROR_MESSAGE,
     HAS_REAL_CONTEXTVARS,
+    _is_localhost,
     capture_internal_exceptions,
     ensure_integration_enabled,
     event_from_exception,
@@ -181,6 +182,20 @@ async def _context_enter(request: "Request") -> None:
     scope = request.ctx._sentry_scope.__enter__()
     scope.clear_breadcrumbs()
     scope.add_event_processor(_make_request_processor(weak_request))
+
+    scope.set_attribute(
+        SPANDATA.SENTRY_IS_LOCALHOST,
+        _is_localhost(
+            client_ip=request.remote_addr or None,
+            url_host=urlsplit(request.url).hostname,
+            host_header=request.headers.get("host"),
+            forwarded_host_header=request.headers.get("x-forwarded-host"),
+        ),
+    )
+
+    user_agent = request.headers.get("user-agent")
+    if user_agent:
+        scope.set_attribute(SPANDATA.USER_AGENT_ORIGINAL, user_agent)
 
     if is_span_streaming_enabled:
         integration = client.get_integration(SanicIntegration)
@@ -463,7 +478,14 @@ def _make_request_processor(weak_request: "Callable[[], Request]") -> "EventProc
                 request_info["query_string"] = urlparts.query
 
             request_info["method"] = request.method
-            request_info["env"] = {"REMOTE_ADDR": request.remote_addr}
+
+            # REMOTE_ADDR was unconditionally set pre-data collection, so it
+            # continues to be set when data collection is not enabled.
+            if (
+                not has_data_collection_enabled(client_options)
+                or client_options["data_collection"]["user_info"]
+            ):
+                request_info["env"] = {"REMOTE_ADDR": request.remote_addr}
             request_info["headers"] = _filter_headers(dict(request.headers))
 
         return event

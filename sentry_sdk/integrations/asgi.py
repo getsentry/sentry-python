@@ -45,6 +45,7 @@ from sentry_sdk.utils import (
     HAS_REAL_CONTEXTVARS,
     ContextVar,
     _get_installed_modules,
+    _is_localhost,
     capture_internal_exceptions,
     event_from_exception,
     has_data_collection_enabled,
@@ -96,7 +97,7 @@ def _looks_like_asgi3(app: "Any") -> bool:
     elif inspect.isfunction(app):
         return iscoroutinefunction(app)
     else:
-        call = getattr(app, "__call__", None)  # noqa
+        call = getattr(app, "__call__", None)
         return iscoroutinefunction(call)
 
 
@@ -232,6 +233,24 @@ class SentryAsgiMiddleware:
                     processor = partial(self.event_processor, asgi_scope=scope)
                     sentry_scope.add_event_processor(processor)
 
+                    headers = _get_headers(scope)
+                    sentry_scope.set_attribute(
+                        SPANDATA.SENTRY_IS_LOCALHOST,
+                        _is_localhost(
+                            client_ip=_get_ip(scope),
+                            url_host=scope.get("server")[0]
+                            if scope.get("server") and not headers.get("host")
+                            else None,
+                            host_header=headers.get("host"),
+                            forwarded_host_header=headers.get("x-forwarded-host"),
+                        ),
+                    )
+
+                    if headers.get("user-agent"):
+                        sentry_scope.set_attribute(
+                            SPANDATA.USER_AGENT_ORIGINAL, headers["user-agent"]
+                        )
+
                     ty = scope["type"]
                     (
                         transaction_name,
@@ -254,17 +273,16 @@ class SentryAsgiMiddleware:
                             "network.protocol.name": ty,
                         }
 
-                        if scope.get("client"):
+                        ip = _get_ip(scope)
+                        if ip:
                             client_options = sentry_sdk.get_client().options
                             if has_data_collection_enabled(client_options):
                                 if client_options["data_collection"]["user_info"]:
                                     sentry_scope.set_attribute(
-                                        SPANDATA.USER_IP_ADDRESS, _get_ip(scope)
+                                        SPANDATA.USER_IP_ADDRESS, ip
                                     )
                             elif should_send_default_pii():
-                                sentry_scope.set_attribute(
-                                    SPANDATA.USER_IP_ADDRESS, _get_ip(scope)
-                                )
+                                sentry_scope.set_attribute(SPANDATA.USER_IP_ADDRESS, ip)
 
                         if ty in ("http", "websocket"):
                             if (
@@ -281,6 +299,7 @@ class SentryAsgiMiddleware:
                                     attributes=attributes,
                                     parent_span=None,
                                 )
+                                sentry_scope.get_current_scope()._server_segment_span = segment
                         else:
                             sentry_sdk.traces.new_trace()
 
@@ -291,6 +310,9 @@ class SentryAsgiMiddleware:
                                 name=transaction_name,
                                 attributes=attributes,
                                 parent_span=None,
+                            )
+                            sentry_scope.get_current_scope()._server_segment_span = (
+                                segment
                             )
 
                         span_ctx = segment or nullcontext()

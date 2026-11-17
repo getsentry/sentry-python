@@ -2,7 +2,7 @@ import datetime
 import os
 import socket
 import time
-from http.client import HTTPConnection, HTTPSConnection
+from http.client import CannotSendRequest, HTTPConnection, HTTPSConnection
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from socket import SocketIO
 from threading import Thread
@@ -102,6 +102,43 @@ def test_crumb_capture(sentry_init, capture_events):
     )
 
 
+@pytest.mark.parametrize("send_default_pii", [True, False])
+def test_crumb_capture_span_streaming(sentry_init, capture_events, send_default_pii):
+    sentry_init(
+        integrations=[StdlibIntegration()],
+        trace_lifecycle="stream",
+        send_default_pii=send_default_pii,
+    )
+    events = capture_events()
+
+    url = "http://localhost:{}/some/random/url".format(PORT)
+    urlopen(url)
+
+    capture_message("Testing!")
+
+    (event,) = events
+    (crumb,) = event["breadcrumbs"]["values"]
+
+    assert crumb["type"] == "http"
+    assert crumb["category"] == "httplib"
+
+    if send_default_pii:
+        assert crumb["data"] == ApproxDict(
+            {
+                SPANDATA.URL_FULL: url,
+                SPANDATA.HTTP_REQUEST_METHOD: "GET",
+                SPANDATA.HTTP_STATUS_CODE: 200,
+            }
+        )
+    else:
+        assert crumb["data"] == ApproxDict(
+            {
+                SPANDATA.HTTP_REQUEST_METHOD: "GET",
+                SPANDATA.HTTP_STATUS_CODE: 200,
+            }
+        )
+
+
 @pytest.mark.parametrize(
     "status_code,level",
     [
@@ -116,7 +153,7 @@ def test_crumb_capture_client_error(sentry_init, capture_events, status_code, le
     sentry_init(integrations=[StdlibIntegration()], send_default_pii=True)
     events = capture_events()
 
-    url = f"http://localhost:{PORT}/status/{status_code}"  # noqa:E231
+    url = f"http://localhost:{PORT}/status/{status_code}"
     try:
         urlopen(url)
     except HTTPError:
@@ -144,6 +181,63 @@ def test_crumb_capture_client_error(sentry_init, capture_events, status_code, le
             SPANDATA.HTTP_QUERY: "",
         }
     )
+
+
+@pytest.mark.parametrize(
+    "status_code,level",
+    [
+        (200, None),
+        (301, None),
+        (403, "warning"),
+        (405, "warning"),
+        (500, "error"),
+    ],
+)
+@pytest.mark.parametrize("send_default_pii", [True, False])
+def test_crumb_capture_client_error_span_streaming(
+    sentry_init, capture_events, status_code, level, send_default_pii
+):
+    sentry_init(
+        integrations=[StdlibIntegration()],
+        trace_lifecycle="stream",
+        send_default_pii=send_default_pii,
+    )
+    events = capture_events()
+
+    url = f"http://localhost:{PORT}/status/{status_code}"
+    try:
+        urlopen(url)
+    except HTTPError:
+        pass
+
+    capture_message("Testing!")
+
+    (event,) = events
+    (crumb,) = event["breadcrumbs"]["values"]
+
+    assert crumb["type"] == "http"
+    assert crumb["category"] == "httplib"
+
+    if level is None:
+        assert "level" not in crumb
+    else:
+        assert crumb["level"] == level
+
+    if send_default_pii:
+        assert crumb["data"] == ApproxDict(
+            {
+                SPANDATA.URL_FULL: url,
+                SPANDATA.HTTP_REQUEST_METHOD: "GET",
+                SPANDATA.HTTP_STATUS_CODE: status_code,
+            }
+        )
+    else:
+        assert crumb["data"] == ApproxDict(
+            {
+                SPANDATA.HTTP_REQUEST_METHOD: "GET",
+                SPANDATA.HTTP_STATUS_CODE: status_code,
+            }
+        )
 
 
 def test_crumb_capture_hint(sentry_init, capture_events):
@@ -178,6 +272,51 @@ def test_crumb_capture_hint(sentry_init, capture_events):
             SPANDATA.HTTP_QUERY: "",
         }
     )
+
+
+@pytest.mark.parametrize("send_default_pii", [True, False])
+def test_crumb_capture_hint_span_streaming(
+    sentry_init, capture_events, send_default_pii
+):
+    def before_breadcrumb(crumb, hint):
+        crumb["data"]["extra"] = "foo"
+        return crumb
+
+    sentry_init(
+        integrations=[StdlibIntegration()],
+        before_breadcrumb=before_breadcrumb,
+        send_default_pii=send_default_pii,
+        trace_lifecycle="stream",
+    )
+    events = capture_events()
+
+    url = "http://localhost:{}/some/random/url".format(PORT)
+    urlopen(url)
+
+    capture_message("Testing!")
+
+    (event,) = events
+    (crumb,) = event["breadcrumbs"]["values"]
+    assert crumb["type"] == "http"
+    assert crumb["category"] == "httplib"
+
+    if send_default_pii:
+        assert crumb["data"] == ApproxDict(
+            {
+                SPANDATA.URL_FULL: url,
+                SPANDATA.HTTP_REQUEST_METHOD: "GET",
+                SPANDATA.HTTP_STATUS_CODE: 200,
+                "extra": "foo",
+            }
+        )
+    else:
+        assert crumb["data"] == ApproxDict(
+            {
+                SPANDATA.HTTP_REQUEST_METHOD: "GET",
+                SPANDATA.HTTP_STATUS_CODE: 200,
+                "extra": "foo",
+            }
+        )
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
@@ -217,7 +356,7 @@ def test_httplib_misuse(sentry_init, capture_events, request):
 
     conn.request("GET", "/200")
 
-    with pytest.raises(Exception):  # noqa: B017
+    with pytest.raises(CannotSendRequest):
         # This raises an exception, because we didn't call `getresponse` for
         # the previous request yet.
         #
@@ -318,7 +457,7 @@ def test_outgoing_trace_headers(
         expected_outgoing_baggage = (
             "sentry-trace_id=771a43a4192642f0b136d5159a501700,"
             "sentry-public_key=49d0f7386ad645858ae85020e393bef3,"
-            "sentry-sample_rate=1.0,"
+            "sentry-sample_rate=0.01337,"
             "sentry-user_id=Am%C3%A9lie,"
             "sentry-sample_rand=0.000005,"
             "sentry-sampled=true"
@@ -348,7 +487,7 @@ def test_outgoing_trace_headers(
         expected_outgoing_baggage = (
             "sentry-trace_id=771a43a4192642f0b136d5159a501700,"
             "sentry-public_key=49d0f7386ad645858ae85020e393bef3,"
-            "sentry-sample_rate=1.0,"
+            "sentry-sample_rate=0.01337,"
             "sentry-user_id=Am%C3%A9lie,"
             "sentry-sample_rand=0.000005,"
             "sentry-sampled=true"
@@ -1201,7 +1340,7 @@ def test_http_timeout(
         assert len(spans) == 2
         span = spans[0]
         assert span["attributes"]["sentry.op"] == "http.client"
-        assert span["name"] == f"GET http://localhost:{PORT}/bla"  # noqa: E231
+        assert span["name"] == f"GET http://localhost:{PORT}/bla"
     else:
         envelopes = capture_envelopes()
 
@@ -1217,7 +1356,7 @@ def test_http_timeout(
 
         span = transaction["spans"][0]
         assert span["op"] == "http.client"
-        assert span["description"] == f"GET http://localhost:{PORT}/bla"  # noqa: E231
+        assert span["description"] == f"GET http://localhost:{PORT}/bla"
 
 
 @pytest.mark.parametrize("tunnel_port", [8080, None])
@@ -1263,7 +1402,7 @@ def test_proxy_http_tunnel(
         if send_default_pii:
             assert (
                 span["attributes"][SPANDATA.URL_FULL]
-                == f"http://api.example.com{port_modifier}/foo"
+                == f"http://api.example.com{port_modifier}/foo?bar=1"
             )
             assert span["attributes"][SPANDATA.URL_QUERY] == "bar=1"
         else:
@@ -1335,3 +1474,221 @@ def test_chunked_response_span_covers_body_read(
         end = datetime.datetime.strptime(span["timestamp"], fmt)
         duration = (end - start).total_seconds()
         assert duration >= min_expected_duration
+
+
+@pytest.mark.parametrize(
+    "init_kwargs, expected_query",
+    [
+        pytest.param(
+            {"send_default_pii": True},
+            "toy=tennisball&color=red&auth=secret",
+            id="send_default_pii_true",
+        ),
+        pytest.param(
+            {"send_default_pii": False},
+            None,
+            id="send_default_pii_false",
+        ),
+        pytest.param(
+            {},
+            None,
+            id="defaults",
+        ),
+        pytest.param(
+            {"data_collection": {}},
+            "toy=tennisball&color=red&auth=%5BFiltered%5D",
+            id="data_collection_denylist_default",
+        ),
+        pytest.param(
+            {
+                "data_collection": {
+                    "url_query_params": {"mode": "denylist", "terms": ["toy"]}
+                }
+            },
+            "toy=%5BFiltered%5D&color=red&auth=%5BFiltered%5D",
+            id="data_collection_denylist_custom_terms",
+        ),
+        pytest.param(
+            {
+                "data_collection": {
+                    "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
+                }
+            },
+            "toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D",
+            id="data_collection_allowlist",
+        ),
+        pytest.param(
+            {
+                "data_collection": {
+                    "url_query_params": {"mode": "allowlist", "terms": ["auth"]}
+                }
+            },
+            "toy=%5BFiltered%5D&color=%5BFiltered%5D&auth=%5BFiltered%5D",
+            id="data_collection_allowlist_sensitive_term",
+        ),
+        pytest.param(
+            {"data_collection": {"url_query_params": {"mode": "off"}}},
+            None,
+            id="data_collection_off",
+        ),
+        pytest.param(
+            {
+                "send_default_pii": True,
+                "data_collection": {"url_query_params": {"mode": "off"}},
+            },
+            None,
+            id="data_collection_wins_over_send_default_pii",
+        ),
+    ],
+)
+def test_url_query_data_collection_span_streaming(
+    sentry_init, capture_items, init_kwargs, expected_query
+):
+    sentry_init(
+        integrations=[StdlibIntegration()],
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+        **init_kwargs,
+    )
+
+    items = capture_items("span")
+
+    with sentry_sdk.traces.start_span(name="custom parent"):
+        conn = HTTPConnection("localhost", PORT)
+        conn.request(
+            "GET", "/some/random/url?toy=tennisball&color=red&auth=secret#frag"
+        )
+        conn.getresponse()
+
+    sentry_sdk.flush()
+
+    (span,) = (
+        item.payload
+        for item in items
+        if item.payload["attributes"].get("sentry.origin") == "auto.http.stdlib.httplib"
+    )
+
+    if expected_query is None:
+        assert SPANDATA.URL_QUERY not in span["attributes"]
+    else:
+        assert span["attributes"][SPANDATA.URL_QUERY] == expected_query
+
+
+@pytest.mark.parametrize(
+    "init_kwargs, expected_suffix",
+    [
+        pytest.param(
+            {"data_collection": {}},
+            "?toy=tennisball&color=red&auth=%5BFiltered%5D#frag",
+            id="data_collection_denylist_default",
+        ),
+        pytest.param(
+            {
+                "data_collection": {
+                    "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
+                }
+            },
+            "?toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D#frag",
+            id="data_collection_allowlist",
+        ),
+        pytest.param(
+            {"send_default_pii": True},
+            "?toy=tennisball&color=red&auth=secret#frag",
+            id="send_default_pii_true",
+        ),
+    ],
+)
+def test_url_full_reassembly_span_streaming(
+    sentry_init, capture_items, init_kwargs, expected_suffix
+):
+    sentry_init(
+        integrations=[StdlibIntegration()],
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+        **init_kwargs,
+    )
+
+    items = capture_items("span")
+
+    with sentry_sdk.traces.start_span(name="custom parent"):
+        conn = HTTPConnection("localhost", PORT)
+        conn.request(
+            "GET", "/some/random/url?toy=tennisball&color=red&auth=secret#frag"
+        )
+        conn.getresponse()
+
+    sentry_sdk.flush()
+
+    (span,) = (
+        item.payload
+        for item in items
+        if item.payload["attributes"].get("sentry.origin") == "auto.http.stdlib.httplib"
+    )
+
+    base_url = "http://localhost:{}/some/random/url".format(PORT)
+    assert span["attributes"][SPANDATA.URL_FULL] == base_url + expected_suffix
+
+
+@pytest.mark.parametrize(
+    "init_kwargs, expected_query, expects_url",
+    [
+        pytest.param(
+            {"send_default_pii": True},
+            "toy=tennisball&color=red&auth=secret",
+            True,
+            id="send_default_pii_true",
+        ),
+        pytest.param(
+            {},
+            None,
+            False,
+            id="defaults",
+        ),
+        pytest.param(
+            {"data_collection": {}},
+            "toy=tennisball&color=red&auth=%5BFiltered%5D",
+            True,
+            id="data_collection_denylist_default",
+        ),
+        pytest.param(
+            {"data_collection": {"url_query_params": {"mode": "off"}}},
+            None,
+            True,
+            id="data_collection_off",
+        ),
+    ],
+)
+def test_crumb_url_query_data_collection_span_streaming(
+    sentry_init, capture_events, init_kwargs, expected_query, expects_url
+):
+    sentry_init(
+        integrations=[StdlibIntegration()],
+        trace_lifecycle="stream",
+        **init_kwargs,
+    )
+    events = capture_events()
+
+    conn = HTTPConnection("localhost", PORT)
+    conn.request("GET", "/some/random/url?toy=tennisball&color=red&auth=secret#frag")
+    conn.getresponse()
+
+    capture_message("Testing!")
+
+    (event,) = events
+    (crumb,) = event["breadcrumbs"]["values"]
+
+    base_url = "http://localhost:{}/some/random/url".format(PORT)
+
+    if not expects_url:
+        assert SPANDATA.URL_QUERY not in crumb["data"]
+        assert SPANDATA.URL_FULL not in crumb["data"]
+        return
+
+    assert crumb["data"][SPANDATA.URL_FRAGMENT] == "frag"
+
+    if expected_query is None:
+        assert SPANDATA.URL_QUERY not in crumb["data"]
+        assert crumb["data"][SPANDATA.URL_FULL] == f"{base_url}#frag"
+    else:
+        assert crumb["data"][SPANDATA.URL_QUERY] == expected_query
+        assert crumb["data"][SPANDATA.URL_FULL] == f"{base_url}?{expected_query}#frag"

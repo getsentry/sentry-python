@@ -623,7 +623,7 @@ def test_no_query_source_if_duration_too_short(
     # trigger Django to open a new connection by marking the existing one as None.
     connections["postgres"].connection = None
 
-    class fake_record_sql_queries:  # noqa: N801
+    class fake_record_sql_queries:
         def __init__(self, *args, **kwargs):
             self._ctx_mgr = record_sql_queries(*args, **kwargs)
 
@@ -729,7 +729,7 @@ def test_query_source_if_duration_over_threshold(
     # trigger Django to open a new connection by marking the existing one as None.
     connections["postgres"].connection = None
 
-    class fake_record_sql_queries:  # noqa: N801
+    class fake_record_sql_queries:
         def __init__(self, *args, **kwargs):
             self._ctx_mgr = record_sql_queries(*args, **kwargs)
 
@@ -900,7 +900,6 @@ def test_db_span_origin_execute(
 @pytest.mark.parametrize("span_streaming", [True, False])
 def test_db_span_origin_executemany(
     sentry_init,
-    client,
     capture_events,
     capture_items,
     span_streaming,

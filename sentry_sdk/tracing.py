@@ -700,8 +700,6 @@ class Span:
             if has_ai_op or is_ai_span_op:
                 self.set_data("gen_ai.conversation.id", conversation_id)
 
-        maybe_create_breadcrumbs_from_span(scope, self)
-
         return None
 
     def to_json(self) -> "Dict[str, Any]":
@@ -1219,14 +1217,11 @@ class Transaction(Span):
                 sample_rate = client.options["traces_sampler"](sampling_context)
             except Exception:
                 logger.warning(
-                    "[Tracing] traces_sampler raised; falling back to parent sample rate or traces_sample_rate",
+                    "[Tracing] traces_sampler raised; unsampling trace",
                     exc_info=True,
                 )
-                sample_rate = (
-                    sampling_context["parent_sampled"]
-                    if sampling_context["parent_sampled"] is not None
-                    else client.options["traces_sample_rate"]
-                )
+                self.sampled = False
+                return
         else:
             sample_rate = (
                 sampling_context["parent_sampled"]
@@ -1471,8 +1466,6 @@ def trace(
             # Function implementation
             pass
     """
-    from sentry_sdk.tracing_utils import create_span_decorator
-
     decorator = create_span_decorator(
         op=op,
         name=name,
@@ -1492,8 +1485,8 @@ from sentry_sdk.tracing_utils import (
     Baggage,
     EnvironHeaders,
     _generate_sample_rand,
+    create_span_decorator,
     extract_sentrytrace_data,
     has_span_streaming_enabled,
     has_tracing_enabled,
-    maybe_create_breadcrumbs_from_span,
 )

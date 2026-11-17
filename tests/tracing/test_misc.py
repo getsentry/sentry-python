@@ -317,7 +317,7 @@ def test_set_measurement_deprecated(sentry_init):
                 span.set_measurement("metric.baz", 420.69, unit="custom")
 
 
-def test_set_meaurement_compared_to_set_data(sentry_init, capture_events):
+def test_set_measurement_compared_to_set_data(sentry_init, capture_events):
     """
     This is just a test to see the difference
     between measurements and data in the resulting event payload.

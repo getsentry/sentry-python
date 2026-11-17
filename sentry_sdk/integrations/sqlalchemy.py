@@ -140,6 +140,18 @@ def _get_db_system(name: str) -> "Optional[str]":
     if "oracle" in name:
         return "oracle"
 
+    if "snowflake" in name:
+        return "snowflake"
+
+    if "clickhouse" in name:
+        return "clickhouse"
+
+    if "mongodb" in name:
+        return "mongodb"
+
+    if "cockroachdb" in name:
+        return "cockroachdb"
+
     return None
 
 

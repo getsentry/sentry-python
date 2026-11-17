@@ -311,7 +311,7 @@ def test_event_processor_data_collection(
     init_kwargs = {
         "integrations": [StrawberryIntegration(async_execution=async_execution)]
         + framework_integrations,
-        "_experiments": {"data_collection": data_collection},
+        "data_collection": data_collection,
     }
     if send_default_pii is not None:
         init_kwargs["send_default_pii"] = send_default_pii
@@ -350,6 +350,50 @@ def test_event_processor_data_collection(
         assert error_event["request"]["api_target"] == "graphql"
     else:
         assert "api_target" not in error_event.get("request", {})
+
+
+@pytest.mark.parametrize(
+    "http_bodies,expect_response",
+    [
+        pytest.param(None, True, id="http_bodies_default"),
+        pytest.param(["outgoing_response"], True, id="outgoing_response"),
+        pytest.param(["incoming_request"], False, id="incoming_request_only"),
+        pytest.param([], False, id="http_bodies_off"),
+    ],
+)
+@parameterize_strawberry_test
+def test_response_data_collection(
+    request,
+    sentry_init,
+    capture_events,
+    client_factory,
+    async_execution,
+    framework_integrations,
+    http_bodies,
+    expect_response,
+):
+    data_collection = {} if http_bodies is None else {"http_bodies": http_bodies}
+    sentry_init(
+        integrations=[StrawberryIntegration(async_execution=async_execution)]
+        + framework_integrations,
+        data_collection=data_collection,
+    )
+    events = capture_events()
+
+    schema = strawberry.Schema(Query)
+
+    client_factory = request.getfixturevalue(client_factory)
+    client = client_factory(schema)
+
+    client.post(
+        "/graphql",
+        json={"query": "query ErrorQuery { error }", "operationName": "ErrorQuery"},
+    )
+
+    assert len(events) == 1
+    (error_event,) = events
+
+    assert ("response" in error_event["contexts"]) == expect_response
 
 
 @pytest.mark.parametrize(
@@ -395,7 +439,7 @@ def test_request_data_collection_no_framework(
     # the integration's public event-processing path
     sentry_init(
         integrations=[StrawberryIntegration()],
-        _experiments={"data_collection": data_collection},
+        data_collection=data_collection,
     )
     events = capture_events()
 
@@ -435,9 +479,7 @@ def test_request_data_collection_no_framework(
 def test_request_data_collection_no_variables(sentry_init, capture_events):
     sentry_init(
         integrations=[StrawberryIntegration()],
-        _experiments={
-            "data_collection": {"graphql": {"document": True, "variables": True}}
-        },
+        data_collection={"graphql": {"document": True, "variables": True}},
     )
     events = capture_events()
 
@@ -1095,7 +1137,7 @@ def test_graphql_span_data_collection(
         + framework_integrations,
         "traces_sample_rate": 1,
         "trace_lifecycle": "stream" if span_streaming else "static",
-        "_experiments": {"data_collection": data_collection},
+        "data_collection": data_collection,
     }
     if send_default_pii is not None:
         init_kwargs["send_default_pii"] = send_default_pii
@@ -1190,9 +1232,7 @@ def test_handle_none_query_gracefully_with_data_collection(
             StrawberryIntegration(async_execution=async_execution),
         ]
         + framework_integrations,
-        _experiments={
-            "data_collection": {"graphql": {"document": True, "variables": True}}
-        },
+        data_collection={"graphql": {"document": True, "variables": True}},
     )
     events = capture_events()
 

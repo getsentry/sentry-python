@@ -100,7 +100,7 @@ def lambda_client():
     """
     return boto3.client(
         "lambda",
-        endpoint_url=f"http://127.0.0.1:{SAM_PORT}",  # noqa: E231
+        endpoint_url=f"http://127.0.0.1:{SAM_PORT}",
         aws_access_key_id="dummy",
         aws_secret_access_key="dummy",
         region_name="us-east-1",
@@ -201,25 +201,19 @@ def test_init_error(lambda_client, test_environment):
     assert transaction_event["transaction"] == "InitError"
 
 
-def test_timeout_error(lambda_client, test_environment):
-    lambda_client.invoke(
-        FunctionName="TimeoutError",
-        Payload=json.dumps({}),
-    )
-    envelopes = test_environment["server"].envelopes
-
-    (error_event,) = envelopes
-
-    assert error_event["level"] == "error"
-    assert error_event["extra"]["lambda"]["function_name"] == "TimeoutError"
-
-    (exception,) = error_event["exception"]["values"]
-    assert not exception["mechanism"]["handled"]
-    assert exception["type"] == "ServerlessTimeoutWarning"
-    assert exception["value"].startswith(
-        "WARNING : Function is expected to get timed out. Configured timeout duration ="
-    )
-    assert exception["mechanism"]["type"] == "threading"
+@pytest.mark.parametrize("function_name", ["PathHandler", "AbsolutePathHandler"])
+def test_path_handler_loaded_once(lambda_client, test_environment, function_name):
+    num_invocations = [
+        json.loads(
+            lambda_client.invoke(FunctionName=function_name, Payload=json.dumps({}))[
+                "Payload"
+            ].read()
+        )["num_invocations"]
+        for _ in range(2)
+    ]
+    # Sentry layer should load the function's module once (on cold start or whenever
+    # the module is reloaded), not on every warm invocation.
+    assert num_invocations == [1, 2]
 
 
 def test_timeout_error_scope_modified(lambda_client, test_environment):
@@ -551,7 +545,7 @@ def test_request_data_with_data_collection_allowlist(lambda_client, test_environ
               "userArn": "42"
             }
           },
-          "body": null,
+          "body": "{\\"toy\\": \\"tennisball\\"}",
           "isBase64Encoded": false
         }
     """
@@ -581,6 +575,7 @@ def test_request_data_with_data_collection_allowlist(lambda_client, test_environ
         "method": "GET",
         "query_string": {"bonkers": "true"},
         "url": "https://iwsz2c7uwi.execute-api.us-east-1.amazonaws.com/asd",
+        "data": '{"toy": "tennisball"}',
     }
 
 
@@ -609,7 +604,7 @@ def test_request_data_with_data_collection_denylist(lambda_client, test_environm
               "userArn": "42"
             }
           },
-          "body": null,
+          "body": "{\\"toy\\": \\"tennisball\\"}",
           "isBase64Encoded": false
         }
     """
@@ -638,6 +633,7 @@ def test_request_data_with_data_collection_denylist(lambda_client, test_environm
         "method": "GET",
         "query_string": {"bonkers": "true"},
         "url": "https://iwsz2c7uwi.execute-api.us-east-1.amazonaws.com/asd",
+        "data": '{"toy": "tennisball"}',
     }
 
 
@@ -665,7 +661,7 @@ def test_request_data_with_data_collection_off(lambda_client, test_environment):
               "userArn": "42"
             }
           },
-          "body": null,
+          "body": "{\\"toy\\": \\"tennisball\\"}",
           "isBase64Encoded": false
         }
     """
@@ -684,6 +680,7 @@ def test_request_data_with_data_collection_off(lambda_client, test_environment):
         "method": "GET",
         "query_string": {"bonkers": "true"},
         "url": "https://iwsz2c7uwi.execute-api.us-east-1.amazonaws.com/asd",
+        "data": '{"toy": "tennisball"}',
     }
 
 
@@ -1160,6 +1157,80 @@ def test_span_streaming_url_query_params_with_data_collection(
         _get_span_attr(attrs, "url.query")
         == "page=2&tracking=%5BFiltered%5D&token=%5BFiltered%5D"
     )
+
+
+def test_span_streaming_user_info_with_send_default_pii(
+    lambda_client, test_environment
+):
+    payload = b"""
+        {
+          "resource": "/asd",
+          "path": "/asd",
+          "httpMethod": "GET",
+          "headers": {
+            "Host": "iwsz2c7uwi.execute-api.us-east-1.amazonaws.com",
+            "User-Agent": "custom",
+            "X-Forwarded-Proto": "https"
+          },
+          "queryStringParameters": {
+            "bonkers": "true"
+          },
+          "pathParameters": null,
+          "stageVariables": null,
+          "requestContext": {
+            "identity": {
+                "sourceIp": "213.47.147.207",
+                "userArn": "42"
+            }
+          },
+          "body": null,
+          "isBase64Encoded": false
+        }
+    """
+
+    lambda_client.invoke(
+        FunctionName="BasicOkSpanStreamingPii",
+        Payload=payload,
+    )
+    span_items = test_environment["server"].span_items
+
+    segment_spans = [s for s in span_items if s.get("is_segment")]
+    assert len(segment_spans) == 1
+    attrs = segment_spans[0]["attributes"]
+
+    assert _get_span_attr(attrs, "user.id") == "42"
+
+
+def test_span_streaming_user_info_with_data_collection_user_info_on(
+    lambda_client, test_environment
+):
+    lambda_client.invoke(
+        FunctionName="BasicOkSpanStreamingDataCollectionUserInfoOn",
+        Payload=USER_INFO_PAYLOAD,
+    )
+    span_items = test_environment["server"].span_items
+
+    segment_spans = [s for s in span_items if s.get("is_segment")]
+    assert len(segment_spans) == 1
+    attrs = segment_spans[0]["attributes"]
+
+    assert _get_span_attr(attrs, "user.id") == "42"
+
+
+def test_span_streaming_user_info_with_data_collection_user_info_off(
+    lambda_client, test_environment
+):
+    lambda_client.invoke(
+        FunctionName="BasicOkSpanStreamingDataCollectionUserInfoOff",
+        Payload=USER_INFO_PAYLOAD,
+    )
+    span_items = test_environment["server"].span_items
+
+    segment_spans = [s for s in span_items if s.get("is_segment")]
+    assert len(segment_spans) == 1
+    attrs = segment_spans[0]["attributes"]
+
+    assert "user.id" not in attrs
 
 
 @pytest.mark.parametrize(

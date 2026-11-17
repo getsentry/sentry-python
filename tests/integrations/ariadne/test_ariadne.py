@@ -326,43 +326,31 @@ def _init_all_integrations(sentry_init, **kwargs):
     "init_kwargs,expect_query,expect_variables",
     [
         pytest.param(
-            {"_experiments": {"data_collection": {}}},
+            {"data_collection": {}},
             True,
             True,
             id="data_collection_defaults",
         ),
         pytest.param(
-            {
-                "_experiments": {
-                    "data_collection": {
-                        "graphql": {"document": True, "variables": True}
-                    }
-                }
-            },
+            {"data_collection": {"graphql": {"document": True, "variables": True}}},
             True,
             True,
             id="document_on_variables_on",
         ),
         pytest.param(
-            {"_experiments": {"data_collection": {"graphql": {"document": False}}}},
+            {"data_collection": {"graphql": {"document": False}}},
             False,
             True,
             id="document_off_variables_on",
         ),
         pytest.param(
-            {"_experiments": {"data_collection": {"graphql": {"variables": False}}}},
+            {"data_collection": {"graphql": {"variables": False}}},
             True,
             False,
             id="document_on_variables_off",
         ),
         pytest.param(
-            {
-                "_experiments": {
-                    "data_collection": {
-                        "graphql": {"document": False, "variables": False}
-                    }
-                }
-            },
+            {"data_collection": {"graphql": {"document": False, "variables": False}}},
             None,
             None,
             id="document_off_variables_off",
@@ -370,7 +358,7 @@ def _init_all_integrations(sentry_init, **kwargs):
         pytest.param(
             {
                 "send_default_pii": True,
-                "_experiments": {"data_collection": {"graphql": {"document": False}}},
+                "data_collection": {"graphql": {"document": False}},
             },
             False,
             True,
@@ -379,7 +367,7 @@ def _init_all_integrations(sentry_init, **kwargs):
         pytest.param(
             {
                 "send_default_pii": False,
-                "_experiments": {"data_collection": {"graphql": {"document": True}}},
+                "data_collection": {"graphql": {"document": True}},
             },
             True,
             True,
@@ -411,10 +399,8 @@ def test_request_data_collection(
     assert ("query" in event["request"]["data"]) == expect_query
     assert ("variables" in event["request"]["data"]) == expect_variables
 
-    # Response body capture is intentionally tied to send_default_pii only.
-    assert ("response" in event["contexts"]) == bool(
-        init_kwargs.get("send_default_pii")
-    )
+    # ``http_bodies`` defaults to collecting the outgoing response.
+    assert "response" in event["contexts"]
 
 
 def test_request_data_collection_body_out_of_bounds_still_collects_variables(
@@ -428,7 +414,7 @@ def test_request_data_collection_body_out_of_bounds_still_collects_variables(
     _init_all_integrations(
         sentry_init,
         max_request_body_size="small",
-        _experiments={"data_collection": {}},
+        data_collection={},
     )
     events = capture_events()
 
@@ -443,3 +429,27 @@ def test_request_data_collection_body_out_of_bounds_still_collects_variables(
 
     assert "query" not in event["request"]["data"]
     assert event["request"]["data"]["variables"] == {"name": "some name"}
+
+
+@pytest.mark.parametrize(
+    "http_bodies,expect_response",
+    [
+        pytest.param(None, True, id="http_bodies_default"),
+        pytest.param(["outgoing_response"], True, id="outgoing_response"),
+        pytest.param(["incoming_request"], False, id="incoming_request_only"),
+        pytest.param([], False, id="http_bodies_off"),
+    ],
+)
+def test_response_data_collection(
+    sentry_init, capture_events, graphql_client, http_bodies, expect_response
+):
+    data_collection = {} if http_bodies is None else {"http_bodies": http_bodies}
+    _init_all_integrations(sentry_init, data_collection=data_collection)
+    events = capture_events()
+
+    graphql_client().post("/graphql", json={"query": "query ErrorQuery {error}"})
+
+    assert len(events) == 1
+    (event,) = events
+
+    assert ("response" in event["contexts"]) == expect_response

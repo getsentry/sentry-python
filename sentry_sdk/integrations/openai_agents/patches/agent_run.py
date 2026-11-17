@@ -13,7 +13,7 @@ from ..spans import (
 )
 
 if TYPE_CHECKING:
-    from typing import Any, Awaitable, Callable, Optional, Union
+    from typing import Any, Awaitable, Callable, Coroutine, Optional, Union
 
     from agents import TResponseInputItem
     from agents.run_internal.run_steps import SingleStepResult
@@ -47,10 +47,10 @@ def _close_streaming_workflow_span(agent: "Optional[agents.Agent]") -> None:
 
 
 def _maybe_start_agent_span(
-    context_wrapper: "agents.RunContextWrapper",
-    agent: "agents.Agent",
+    context_wrapper: "Optional[agents.RunContextWrapper]",
+    agent: "Optional[agents.Agent]",
     should_run_agent_start_hooks: bool,
-    turn_input: "Optional[list[TResponseInputItem]]",
+    turn_input: "Optional[Union[str, list[TResponseInputItem]]]",
     is_streaming: bool = False,
 ) -> "Optional[Union[Span, StreamedSpan]]":
     """
@@ -75,9 +75,9 @@ def _maybe_start_agent_span(
                 delattr(context_wrapper, "_sentry_agent_span")
 
     # Store the agent on the context wrapper so we can access it later
-    context_wrapper._sentry_current_agent = agent
+    context_wrapper._sentry_current_agent = agent  # type: ignore[attr-defined]
     span = invoke_agent_span(agent, turn_input)
-    context_wrapper._sentry_agent_span = span
+    context_wrapper._sentry_agent_span = span  # type: ignore[attr-defined]
     agent._sentry_agent_span = span
 
     if not is_streaming:
@@ -104,13 +104,15 @@ async def _run_single_turn(
     """
     # openai-agents >= 0.14 passes `bindings: AgentBindings` instead of `agent`.
     bindings = kwargs.get("bindings")
-    agent = (
+    agent: "Optional[agents.Agent]" = (
         getattr(bindings, "public_agent", None)
         if bindings is not None
         else kwargs.get("agent")
     )
 
-    context_wrapper: "agents.RunContextWrapper[Any]" = kwargs.get("context_wrapper")
+    context_wrapper: "Optional[agents.RunContextWrapper[Any]]" = kwargs.get(
+        "context_wrapper"
+    )
     if not use_run_hooks:
         should_run_agent_start_hooks = kwargs.get("should_run_agent_start_hooks", False)
 
@@ -118,7 +120,7 @@ async def _run_single_turn(
             context_wrapper,
             agent,
             should_run_agent_start_hooks,
-            kwargs.get("input"),
+            kwargs.get("original_input"),
         )
 
         if (
@@ -139,7 +141,11 @@ async def _run_single_turn(
                     span = getattr(run_hooks, "_sentry_invoke_agent_span", None)
                     if span is not None:
                         update_invoke_agent_span(
-                            span=span, usage=context_wrapper.usage, agent=agent
+                            span=span,
+                            usage=context_wrapper.usage
+                            if context_wrapper is not None
+                            else None,
+                            agent=agent,
                         )
                         del run_hooks._sentry_invoke_agent_span
                         span.__exit__(*exc_info)
@@ -147,7 +153,11 @@ async def _run_single_turn(
                 span = getattr(context_wrapper, "_sentry_agent_span", None)
                 if span:
                     update_invoke_agent_span(
-                        span=span, usage=context_wrapper.usage, agent=agent
+                        span=span,
+                        usage=context_wrapper.usage
+                        if context_wrapper is not None
+                        else None,
+                        agent=agent,
                     )
                     span.__exit__(*exc_info)
                     delattr(context_wrapper, "_sentry_agent_span")
@@ -201,7 +211,7 @@ async def _run_single_turn_streamed(
     )
     agent = getattr(agent_or_bindings, "public_agent", agent_or_bindings)
 
-    context_wrapper: "agents.RunContextWrapper[Any]" = (
+    context_wrapper: "Optional[agents.RunContextWrapper[Any]]" = (
         args[3] if len(args) > 3 else kwargs.get("context_wrapper")
     )
     if not use_run_hooks:
@@ -241,7 +251,11 @@ async def _run_single_turn_streamed(
                     span = getattr(run_hooks, "_sentry_invoke_agent_span", None)
                     if span is not None:
                         update_invoke_agent_span(
-                            span=span, usage=context_wrapper.usage, agent=agent
+                            span=span,
+                            usage=context_wrapper.usage
+                            if context_wrapper is not None
+                            else None,
+                            agent=agent,
                         )
                         del run_hooks._sentry_invoke_agent_span
                         span.__exit__(*exc_info)
@@ -249,7 +263,11 @@ async def _run_single_turn_streamed(
                 span = getattr(context_wrapper, "_sentry_agent_span", None)
                 if span:
                     update_invoke_agent_span(
-                        span=span, usage=context_wrapper.usage, agent=agent
+                        span=span,
+                        usage=context_wrapper.usage
+                        if context_wrapper is not None
+                        else None,
+                        agent=agent,
                     )
                     span.__exit__(*exc_info)
                     delattr(context_wrapper, "_sentry_agent_span")
@@ -260,7 +278,7 @@ async def _run_single_turn_streamed(
 
 
 async def _execute_handoffs(
-    original_execute_handoffs: "Callable[..., SingleStepResult]",
+    original_execute_handoffs: "Callable[..., Coroutine[Any, Any, SingleStepResult]]",
     use_run_hooks: "bool",
     *args: "Any",
     **kwargs: "Any",
@@ -272,10 +290,12 @@ async def _execute_handoffs(
     - ends the workflow span if the response is streamed and an exception is raised in `execute_handoffs()`.
     """
 
-    context_wrapper = kwargs.get("context_wrapper")
+    context_wrapper: "Optional[agents.RunContextWrapper]" = kwargs.get(
+        "context_wrapper"
+    )
     run_handoffs = kwargs.get("run_handoffs")
     # openai-agents >= 0.14 renamed `agent` to `public_agent`.
-    agent = kwargs.get("public_agent", kwargs.get("agent"))
+    agent: "Optional[agents.Agent]" = kwargs.get("public_agent", kwargs.get("agent"))
 
     # Create Sentry handoff span for the first handoff (agents library only processes the first one)
     if not use_run_hooks and run_handoffs:
@@ -324,7 +344,7 @@ async def _execute_handoffs(
 
 
 async def _execute_final_output(
-    original_execute_final_output: "Callable[..., SingleStepResult]",
+    original_execute_final_output: "Callable[..., Coroutine[Any, Any, SingleStepResult]]",
     *args: "Any",
     **kwargs: "Any",
 ) -> "SingleStepResult":

@@ -27,6 +27,27 @@ except ImportError:
 requires_gevent = pytest.mark.skipif(gevent is None, reason="gevent not enabled")
 
 
+def wait_for_profiler_to_stop(envelopes, timeout=1.0):
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        profiler_stopped = get_profiler_id() is None
+        profile_flushed = any(
+            item.type == "profile_chunk"
+            for envelope in envelopes
+            for item in envelope.items
+        )
+        if profiler_stopped and profile_flushed:
+            return
+        time.sleep(0.01)
+
+    assert get_profiler_id() is None, "profiler should not be running"
+    assert any(
+        item.type == "profile_chunk"
+        for envelope in envelopes
+        for item in envelope.items
+    ), "profiler should have flushed a profile chunk"
+
+
 def get_client_options(use_top_level_profiler_mode):
     def client_options(
         mode=None, auto_start=None, profile_session_sample_rate=1.0, lifecycle="manual"
@@ -68,7 +89,7 @@ mock_sdk_info = {
     ],
 )
 def test_continuous_profiler_invalid_mode(mode, make_options, teardown_profiling):
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Unknown continuous profiler mode: foo"):
         setup_continuous_profiler(
             make_options(mode=mode),
             mock_sdk_info,
@@ -807,9 +828,7 @@ def test_continuous_profiler_auto_start_and_stop_sampled(
             assert profiler_id is not None, "profiler should be running"
             profiler_ids.add(profiler_id)
 
-        # wait at least 1 cycle for the profiler to stop
-        time.sleep(0.2)
-        assert get_profiler_id() is None, "profiler should not be running"
+        wait_for_profiler_to_stop(envelopes)
 
         assert len(profiler_ids) == 1
         all_profiler_ids.add(profiler_ids.pop())
@@ -891,9 +910,7 @@ def test_continuous_profiler_auto_start_and_stop_sampled_span_streaming(
             assert profiler_id is not None, "profiler should be running"
             profiler_ids.add(profiler_id)
 
-        # wait at least 1 cycle for the profiler to stop
-        time.sleep(0.2)
-        assert get_profiler_id() is None, "profiler should not be running"
+        wait_for_profiler_to_stop(envelopes)
 
         assert len(profiler_ids) == 1
         all_profiler_ids.add(profiler_ids.pop())
@@ -1032,7 +1049,7 @@ def test_continuous_profiler_auto_start_and_stop_unsampled_span_streaming(
         pytest.param(get_client_options(False), id="experiment"),
     ],
 )
-def test_continuous_profiler_manual_start_and_stop_noop_when_using_trace_lifecyle(
+def test_continuous_profiler_manual_start_and_stop_noop_when_using_trace_lifecycle(
     sentry_init,
     mode,
     start_profiler_func,
@@ -1095,7 +1112,7 @@ def test_continuous_profiler_manual_start_and_stop_noop_when_using_trace_lifecyl
         pytest.param(get_client_options(False), id="experiment"),
     ],
 )
-def test_continuous_profiler_manual_start_and_stop_noop_when_using_trace_lifecyle_span_streaming(
+def test_continuous_profiler_manual_start_and_stop_noop_when_using_trace_lifecycle_span_streaming(
     sentry_init,
     mode,
     start_profiler_func,
