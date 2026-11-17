@@ -41,7 +41,7 @@ jobs:
         run: uv run python scripts/find_raise_from_none.py
 
       - name: Mypy
-        run: uv run --group typing mypy sentry_sdk
+        run: uv run --group typing mypy sentry_sdk tests
 
   build_lambda_layer:
     name: Build Package

@@ -514,15 +514,15 @@ def mock_asgi2_app():
 
 
 class MockAsgi2App:
-    def __call__():
+    def __call__(self):
         pass
 
 
 class MockAsgi3App(MockAsgi2App):
-    def __await__():
+    def __await__(self):
         pass
 
-    async def __call__():
+    async def __call__(self):
         pass
 
 

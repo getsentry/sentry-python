@@ -28,7 +28,7 @@ try:
     from unittest.mock import AsyncMock
 except ImportError:
 
-    class AsyncMock(mock.MagicMock):
+    class AsyncMock(mock.MagicMock):  # type: ignore[no-redef]
         async def __call__(self, *args, **kwargs):
             return super(AsyncMock, self).__call__(*args, **kwargs)
 
@@ -49,7 +49,7 @@ from starlette.routing import Mount
 
 # Try to import both FastMCP implementations
 try:
-    from mcp.server.fastmcp import FastMCP as MCPFastMCP
+    from mcp.server.fastmcp import FastMCP as MCPFastMCP  # type: ignore[attr-defined]
 
     HAS_MCP_FASTMCP = True
 except ImportError:
@@ -66,7 +66,7 @@ except ImportError:
 
 # Try to import request_ctx for context testing
 try:
-    from mcp.server.lowlevel.server import request_ctx
+    from mcp.server.lowlevel.server import request_ctx  # type: ignore[attr-defined]
 except ImportError:
     request_ctx = None
 
@@ -513,7 +513,7 @@ async def test_fastmcp_prompt_sync(
         @mcp.prompt()
         def code_help_prompt(language: str):
             """Get help for a programming language"""
-            message = Message(
+            message = Message(  # type: ignore[misc]
                 {
                     "role": "user",
                     "content": {
@@ -580,7 +580,7 @@ async def test_fastmcp_prompt_sync_no_sensitive_data(
         @mcp.prompt()
         def code_help_prompt(language: str):
             """Get help for a programming language"""
-            message = Message(
+            message = Message(  # type: ignore[misc]
                 {
                     "role": "user",
                     "content": {

@@ -31,15 +31,15 @@ except ImportError:
 try:
     from werkzeug.wrappers import Request, Response
 except ImportError:
-    Request = None
-    Response = None
+    Request = None  # type: ignore[assignment, misc]
+    Response = None  # type: ignore[assignment, misc]
 
 try:
     from starlette.testclient import TestClient
     # Catch RuntimeError to prevent the following exception in aws_lambda tests.
     # RuntimeError: The starlette.testclient module requires the httpx package to be installed.
 except (ImportError, RuntimeError):
-    TestClient = None
+    TestClient = None  # type: ignore[assignment, misc]
 
 import sentry_sdk
 import sentry_sdk.utils
@@ -55,28 +55,28 @@ from sentry_sdk.utils import package_version, reraise
 try:
     import openai
 except ImportError:
-    openai = None
+    openai = None  # type: ignore[assignment]
 
 
 try:
     import anthropic
 except ImportError:
-    anthropic = None
+    anthropic = None  # type: ignore[assignment]
 
 
 try:
     import google
 except ImportError:
-    google = None
+    google = None  # type: ignore[assignment]
 
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Dict
 
 from tests import _warning_recorder, _warning_recorder_mgr
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
-    from typing import Any, Callable, MutableMapping
+    from typing import Callable, MutableMapping
 
 try:
     from httpx import (
@@ -91,11 +91,11 @@ try:
         Response as HttpxResponse,
     )
 except ImportError:
-    ASGITransport = None
-    HttpxRequest = None
-    HttpxResponse = None
-    AsyncByteStream = None
-    AsyncClient = None
+    ASGITransport = None  # type: ignore[assignment, misc]
+    HttpxRequest = None  # type: ignore[assignment, misc]
+    HttpxResponse = None  # type: ignore[assignment, misc]
+    AsyncByteStream = None  # type: ignore[assignment, misc]
+    AsyncClient = None  # type: ignore[assignment, misc]
 
 
 try:
@@ -118,14 +118,14 @@ try:
             JSONRPCRequest,
         )
 except ImportError:
-    create_memory_object_stream = None
-    create_task_group = None
-    EndOfStream = None
+    create_memory_object_stream = None  # type: ignore[assignment, misc]
+    create_task_group = None  # type: ignore[assignment]
+    EndOfStream = None  # type: ignore[assignment, misc]
 
-    JSONRPCMessage = None
-    JSONRPCNotification = None
-    JSONRPCRequest = None
-    SessionMessage = None
+    JSONRPCMessage = None  # type: ignore[assignment, misc]
+    JSONRPCNotification = None  # type: ignore[assignment, misc]
+    JSONRPCRequest = None  # type: ignore[assignment, misc]
+    SessionMessage = None  # type: ignore[assignment, misc]
     _IS_MCP_V2 = False
 
 
@@ -422,7 +422,7 @@ def capture_envelopes(monkeypatch):
 @dataclass
 class UnwrappedItem:
     type: str
-    payload: dict
+    payload: "dict[str, Any]"
 
 
 @pytest.fixture
@@ -822,7 +822,7 @@ def stdio(
         read_stream_writer, read_stream = create_memory_object_stream(0)  # type: ignore
         write_stream, write_stream_reader = create_memory_object_stream(0)  # type: ignore
 
-        result = {}
+        result: "dict[str, Any]" = {}
 
         async def run_server():
             await server.run(
@@ -995,7 +995,7 @@ def json_rpc_sse():
             stream = StreamingBodyStream(body_receiver)
             response = HttpxResponse(status_code=200, headers=[], stream=stream)  # type: ignore
 
-            asyncio.create_task(run_app())
+            asyncio.create_task(run_app())  # type: ignore[unused-awaitable]
             return response
 
     def parse_sse_data_package(sse_chunk):
@@ -1601,7 +1601,7 @@ def werkzeug_set_cookie(client, servername, key, value):
         client.set_cookie(key, value)
 
 
-class ApproxDict(dict):
+class ApproxDict(Dict[Any, Any]):
     def __eq__(self, other):
         # For an ApproxDict to equal another dict, the other dict just needs to contain
         # all the keys from the ApproxDict with the same values.

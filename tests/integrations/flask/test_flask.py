@@ -20,7 +20,7 @@ from sentry_sdk.traces import SpanStatus
 try:
     from werkzeug.wrappers.request import UnsupportedMediaType
 except ImportError:
-    from werkzeug.exceptions import BadRequest as UnsupportedMediaType
+    from werkzeug.exceptions import BadRequest as UnsupportedMediaType  # type: ignore[assignment]
 
 import sentry_sdk
 import sentry_sdk.integrations.flask as flask_sentry
@@ -561,7 +561,10 @@ def test_json_not_truncated_if_max_request_body_size_is_always(
     "integrations",
     [
         [flask_sentry.FlaskIntegration()],
-        [flask_sentry.FlaskIntegration(), LoggingIntegration(event_level="ERROR")],
+        [
+            flask_sentry.FlaskIntegration(),
+            LoggingIntegration(event_level=logging.ERROR),
+        ],
     ],
 )
 def test_errors_not_reported_twice(sentry_init, integrations, capture_events, app):
@@ -589,7 +592,7 @@ def test_logging(sentry_init, capture_events, app):
     sentry_init(
         integrations=[
             flask_sentry.FlaskIntegration(),
-            LoggingIntegration(event_level="ERROR"),
+            LoggingIntegration(event_level=logging.ERROR),
         ],
     )
 

@@ -9,7 +9,7 @@ try:
     from builtins import ExceptionGroup  # type: ignore
 except ImportError:
     # Python 3.10 and below
-    ExceptionGroup = None
+    ExceptionGroup = None  # type: ignore[assignment, misc]
 
 
 minimum_python_311 = pytest.mark.skipif(

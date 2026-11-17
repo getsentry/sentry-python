@@ -9,7 +9,7 @@ try:
     from unittest.mock import AsyncMock
 except ImportError:
 
-    class AsyncMock(mock.MagicMock):
+    class AsyncMock(mock.MagicMock):  # type: ignore[no-redef]
         async def __call__(self, *args, **kwargs):
             return super(AsyncMock, self).__call__(*args, **kwargs)
 
@@ -26,30 +26,30 @@ from anthropic.types.message_start_event import MessageStartEvent
 try:
     from anthropic.types import ThinkingBlock, ThinkingDelta
 except ImportError:
-    ThinkingBlock = None
-    ThinkingDelta = None
+    ThinkingBlock = None  # type: ignore[assignment, misc]
+    ThinkingDelta = None  # type: ignore[assignment, misc]
 
 
 try:
     from anthropic import APIStatusError
     from anthropic.types import ErrorResponse, OverloadedError
 except ImportError:
-    ErrorResponse = None
-    OverloadedError = None
-    APIStatusError = None
+    ErrorResponse = None  # type: ignore[assignment, misc]
+    OverloadedError = None  # type: ignore[assignment, misc]
+    APIStatusError = None  # type: ignore[assignment, misc]
 
 try:
     from anthropic.types import InputJSONDelta
 except ImportError:
     try:
-        from anthropic.types import InputJsonDelta as InputJSONDelta
+        from anthropic.types import InputJsonDelta as InputJSONDelta  # type: ignore[attr-defined, no-redef]
     except ImportError:
         pass
 
 try:
     from anthropic.lib.streaming import TextEvent
 except ImportError:
-    TextEvent = None
+    TextEvent = None  # type: ignore[assignment, misc]
 
 try:
     # 0.27+
@@ -57,7 +57,7 @@ try:
     from anthropic.types.tool_use_block import ToolUseBlock
 except ImportError:
     # pre 0.27
-    from anthropic.types.message_delta_event import Delta
+    from anthropic.types.message_delta_event import Delta  # type: ignore[attr-defined, no-redef]
 
 try:
     from anthropic.types.text_block import TextBlock
@@ -77,6 +77,7 @@ from sentry_sdk.integrations.stdlib import StdlibIntegration
 from sentry_sdk.utils import package_version
 
 ANTHROPIC_VERSION = package_version("anthropic")
+assert ANTHROPIC_VERSION is not None
 
 EXAMPLE_MESSAGE = Message(
     id="msg_01XFDUDYJgAACzvnptvVoYEL",

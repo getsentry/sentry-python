@@ -13,7 +13,7 @@ try:
     from unittest.mock import AsyncMock
 except ImportError:
 
-    class AsyncMock(mock.MagicMock):
+    class AsyncMock(mock.MagicMock):  # type: ignore[no-redef]
         async def __call__(self, *args, **kwargs):
             return super(AsyncMock, self).__call__(*args, **kwargs)
 

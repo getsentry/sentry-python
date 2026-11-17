@@ -14,6 +14,7 @@ sentry_sdk.init(
 # `sam local` drops `ClientContext`; pass the event's `client_context` to the runtime
 # instead, like lambda does for a synchronous `Invoke`.
 bootstrap = get_lambda_bootstrap()
+assert bootstrap is not None
 handle_event_request = bootstrap.handle_event_request
 
 

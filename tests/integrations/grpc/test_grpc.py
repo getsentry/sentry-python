@@ -1,5 +1,5 @@
 from concurrent import futures
-from typing import List, Optional, Tuple
+from typing import Any, List, Optional, Tuple
 from unittest import mock
 from unittest.mock import Mock
 
@@ -489,7 +489,7 @@ def test_span_origin(
 
 
 class TestService(gRPCTestServiceServicer):
-    events = []
+    events: "list[Any]" = []
 
     @staticmethod
     def TestServe(request, context):

@@ -14,9 +14,10 @@ from sentry_sdk.tracing_utils import (
 from tests.conftest import TestTransportWithOptions
 
 
-def id_function(val: object) -> str:
+def id_function(val: object) -> "Optional[str]":
     if isinstance(val, ShouldBeIncludedTestCase):
         return val.id
+    return None
 
 
 @dataclass(frozen=True)
