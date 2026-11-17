@@ -262,7 +262,7 @@ async def test_capture_transaction(
         assert transaction_event["request"] == {
             "headers": {
                 "host": "localhost",
-                "remote-addr": "127.0.0.1",
+                "remote-addr": "127.0.0.1" if should_send_pii else "[Filtered]",
                 "user-agent": "ASGI-Test-Client",
             },
             "method": "GET",
