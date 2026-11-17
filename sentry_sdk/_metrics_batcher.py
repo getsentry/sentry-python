@@ -51,16 +51,7 @@ class MetricsBatcher(Batcher["Metric"]):
                 self._default_limit = self._parse_limit(
                     options.get("sample_per_second", DEFAULT_SAMPLE_PER_SECOND)
                 )
-        limits = list(self._name_limits.values())
-        if self._default_limit is not None:
-            limits.append(self._default_limit)
-        self._sampling = bool(limits)
-        if limits:
-            # Each chunk has two reservoirs of up to its limit, so this bounds
-            # the open chunks to MAX_BEFORE_DROP metrics
-            self._max_names = self.MAX_BEFORE_DROP // (
-                2 * max(size for size, _ in limits)
-            )
+        self._sampling = bool(self._name_limits) or self._default_limit is not None
 
         self._reset_sampling_state()
         super().__init__(capture_func, record_lost_func)
@@ -71,6 +62,9 @@ class MetricsBatcher(Batcher["Metric"]):
 
     def _reset_sampling_state(self) -> None:
         self._chunks: "Dict[str, _Chunk]" = {}
+        # Slots held by open chunks. They share MAX_BEFORE_DROP with the buffer,
+        # so memory stays bounded however many names there are.
+        self._held = 0
         self._sampled_out: "List[Tuple[Metric, int]]" = []
 
     def _parse_limit(self, value: float) -> "Tuple[int, float]":
@@ -98,10 +92,10 @@ class MetricsBatcher(Batcher["Metric"]):
             in_sampled_span = _in_sampled_span()
             with self._lock:
                 chunk = self._get_chunk(name, limit)
-                if chunk is None:
-                    # Over the name cap, let add() drop and report it
-                    return True
                 stratum = chunk.sampled if in_sampled_span else chunk.other
+                if not self._has_room(chunk, stratum):
+                    # Let add() drop and report it
+                    return True
                 index = self._pick_index(chunk, stratum)
                 if index is None:
                     return False
@@ -111,6 +105,8 @@ class MetricsBatcher(Batcher["Metric"]):
     def _add_locked(self, item: "Metric") -> bool:
         limit = self._limit_for(item["name"]) if self._sampling else None
         if limit is None:
+            if len(self._buffer) + self._held >= self.MAX_BEFORE_DROP:
+                return False
             return super()._add_locked(item)
 
         reserved: "Optional[Tuple[str, _Chunk, _Stratum, int]]" = getattr(
@@ -128,26 +124,32 @@ class MetricsBatcher(Batcher["Metric"]):
                 return True
 
             chunk = self._get_chunk(name, limit)
-            if chunk is None:
-                return False
             stratum = chunk.sampled if _in_sampled_span() else chunk.other
+            if not self._has_room(chunk, stratum):
+                return False
             index = self._pick_index(chunk, stratum)
             if index is not None:
                 stratum.kept[index] = item
         return True
 
-    def _get_chunk(self, name: str, limit: "Tuple[int, float]") -> "Optional[_Chunk]":
+    def _get_chunk(self, name: str, limit: "Tuple[int, float]") -> "_Chunk":
         now = time.monotonic()
         chunk = self._chunks.get(name)
-        if chunk is not None and self._is_done(chunk, now) and self._close(chunk):
+        if chunk is not None and self._is_done(chunk, now):
+            self._close(chunk)
             del self._chunks[name]
             chunk = None
 
         if chunk is None:
-            if len(self._chunks) >= self._max_names:
-                return None
             chunk = self._chunks[name] = _Chunk(now, *limit)
         return chunk
+
+    def _has_room(self, chunk: "_Chunk", stratum: "_Stratum") -> bool:
+        # A full reservoir replaces slots, so only a new slot needs room
+        return (
+            len(stratum.kept) >= chunk.size
+            or len(self._buffer) + self._held < self.MAX_BEFORE_DROP
+        )
 
     def _pick_index(self, chunk: "_Chunk", stratum: "_Stratum") -> "Optional[int]":
         # Reservoir sampling (Algorithm R). Slots are reserved with None until
@@ -155,6 +157,7 @@ class MetricsBatcher(Batcher["Metric"]):
         stratum.seen += 1
         if len(stratum.kept) < chunk.size:
             stratum.kept.append(None)
+            self._held += 1
             return len(stratum.kept) - 1
         index = random.randrange(stratum.seen)
         return index if index < chunk.size else None
@@ -166,17 +169,14 @@ class MetricsBatcher(Batcher["Metric"]):
         # Chunks that aren't full were not sampled, so they can wait for the flush
         return self._is_full(chunk) and now - chunk.start >= chunk.seconds
 
-    def _close(self, chunk: "_Chunk") -> bool:
+    def _close(self, chunk: "_Chunk") -> None:
         sampled, other = chunk.sampled, chunk.other
+        self._held -= len(sampled.kept) + len(other.kept)
         # Metrics in sampled spans get the budget first. The others keep at
         # least one slot, so they can still be extrapolated.
         other_floor = 1 if other.kept else 0
         sampled_count = min(len(sampled.kept), chunk.size - other_floor)
         other_count = min(len(other.kept), chunk.size - sampled_count)
-
-        # If the buffer is full, keep sampling into the open chunk instead
-        if len(self._buffer) + sampled_count + other_count > self.MAX_BEFORE_DROP:
-            return False
 
         if sampled.kept and not sampled_count:
             # A single slot can't keep both without bias, so pick one uniformly
@@ -191,7 +191,6 @@ class MetricsBatcher(Batcher["Metric"]):
         self._buffer.extend(kept)
         if len(self._buffer) >= self.MAX_BEFORE_FLUSH:
             self._flush_event.set()
-        return True
 
     def _keep(self, stratum: "_Stratum", count: int, seen: int) -> "List[Metric]":
         # A random subset of a uniform sample is still a uniform sample
@@ -216,8 +215,8 @@ class MetricsBatcher(Batcher["Metric"]):
         for name, chunk in list(self._chunks.items()):
             # Full chunks stay open for their length, so they don't go over the rate
             if force or not self._is_full(chunk) or self._is_done(chunk, now):
-                if self._close(chunk):
-                    del self._chunks[name]
+                self._close(chunk)
+                del self._chunks[name]
 
     def flush(self) -> None:
         if self._sampling:

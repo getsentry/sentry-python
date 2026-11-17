@@ -690,11 +690,28 @@ def test_metrics_window_sampling_invalid_client_sample_rate(
     )
 
 
-def test_metrics_window_sampling_max_names(
-    sentry_init, capture_items, capture_record_lost_event_calls
+def test_metrics_window_sampling_many_names(sentry_init, capture_items):
+    sentry_init(_experiments={"metrics_window_sampling": True})
+    items = capture_items("trace_metric")
+
+    # No cap on names, only on the metrics held
+    for i in range(600):
+        for _ in range(2):
+            sentry_sdk.metrics.count(f"test.name{i}", 1)
+
+    get_client().flush()
+
+    assert len(items) == 1200
+
+
+def test_metrics_window_sampling_shared_slots(
+    sentry_init, capture_items, capture_record_lost_event_calls, monkeypatch
 ):
-    # 2500 per chunk fits 2 names, with two reservoirs per name
-    sentry_init(_experiments={"metrics_window_sampling": {"sample_per_second": 500}})
+    # Open chunks and the buffer share MAX_BEFORE_DROP, like the buffer today
+    monkeypatch.setattr(
+        sentry_sdk._metrics_batcher.MetricsBatcher, "MAX_BEFORE_DROP", 25
+    )
+    sentry_init(_experiments={"metrics_window_sampling": True})
     items = capture_items("trace_metric")
     lost = capture_record_lost_event_calls()
 
@@ -704,11 +721,14 @@ def test_metrics_window_sampling_max_names(
 
     get_client().flush()
 
-    assert sorted({item.payload["name"] for item in items}) == ["test.a", "test.b"]
-    assert len(items) == 20
+    # Below the limit nothing is sampled, so only the overflow is lost
+    assert len(items) == 25
+    assert all(
+        "sentry.client_sample_rate" not in i.payload["attributes"] for i in items
+    )
     assert (
         sum(q for (r, c, _, q) in lost if (r, c) == ("queue_overflow", "trace_metric"))
-        == 10
+        == 5
     )
 
 
