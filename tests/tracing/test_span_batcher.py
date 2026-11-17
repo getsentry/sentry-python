@@ -488,7 +488,7 @@ def test_span_batcher_lock_reset_in_child_after_fork(sentry_init):
     original_lock = batcher._lock
     original_lock.acquire()
 
-    batcher._span_buffer["test-trace-id"].append(object())
+    batcher._span_buffer["test-trace-id"].append(object())  # type: ignore[arg-type]
     batcher._running_size["test-trace-id"] = 42
     batcher._active.flag = True
     batcher._flush_event.set()

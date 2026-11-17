@@ -2,6 +2,7 @@ import gc
 import re
 import sys
 import weakref
+from typing import Any
 from unittest import mock
 
 import pytest
@@ -255,7 +256,7 @@ def test_dynamic_sampling_head_sdk_creates_dsc(
 def test_memory_usage(sentry_init, args):
     sentry_init(**args)
 
-    references = weakref.WeakSet()
+    references: "weakref.WeakSet[Any]" = weakref.WeakSet()
 
     with sentry_sdk.start_span(name="hi"):
         for i in range(100):
@@ -265,7 +266,7 @@ def test_memory_usage(sentry_init, args):
                     pass
 
                 references.add(foo)
-                span.set_attribute("foo", foo)
+                span.set_attribute("foo", foo)  # type: ignore[arg-type]
 
         sentry_sdk.flush()
 

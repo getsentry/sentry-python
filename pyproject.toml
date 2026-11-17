@@ -291,6 +291,46 @@ disallow_subclassing_any = false
 warn_unused_ignores = false
 disable_error_code = ["import-not-found", "import-untyped", "annotation-unchecked"]
 
+# Core tests (no third-party dependencies) also have the bodies of untyped
+# functions checked.
+[[tool.mypy.overrides]]
+module = [
+    "tests.test_ai_monitoring",
+    "tests.test_api",
+    "tests.test_attributes",
+    "tests.test_basics",
+    "tests.test_client",
+    "tests.test_conftest",
+    "tests.test_crons",
+    "tests.test_data_collection",
+    "tests.test_dsc",
+    "tests.test_envelope",
+    "tests.test_exceptiongroup",
+    "tests.test_feature_flags",
+    "tests.test_full_stack_frames",
+    "tests.test_gevent",
+    "tests.test_import",
+    "tests.test_logs",
+    "tests.test_lru_cache",
+    "tests.test_metrics",
+    "tests.test_monitor",
+    "tests.test_propagationcontext",
+    "tests.test_scope",
+    "tests.test_serializer",
+    "tests.test_sessions",
+    "tests.test_shadowed_module",
+    "tests.test_spotlight",
+    "tests.test_tracing_utils",
+    "tests.test_transport",
+    "tests.test_types",
+    "tests.test_utils",
+    "tests.profiler.*",
+    "tests.tracing.*",
+    "tests.utils.*",
+]
+check_untyped_defs = true
+warn_unused_ignores = true
+
 #
 # Tool: Ruff (linting and formatting)
 #

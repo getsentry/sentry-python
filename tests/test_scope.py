@@ -238,14 +238,14 @@ def test_load_trace_data_from_env(env, excepted_value):
 
 
 def test_scope_client():
-    scope = Scope(ty="test_something")
-    assert scope._type == "test_something"
+    scope = Scope(ty=ScopeType.CURRENT)
+    assert scope._type == ScopeType.CURRENT
     assert scope.client is not None
     assert scope.client.__class__ == NonRecordingClient
 
     custom_client = Client()
-    scope = Scope(ty="test_more", client=custom_client)
-    assert scope._type == "test_more"
+    scope = Scope(ty=ScopeType.ISOLATION, client=custom_client)
+    assert scope._type == ScopeType.ISOLATION
     assert scope.client is not None
     assert scope.client.__class__ == Client
     assert scope.client == custom_client
@@ -829,11 +829,13 @@ def test_set_tags():
     scope = Scope()
     scope.set_tags({"tag1": "value1", "tag2": "value2"})
     event = scope.apply_to_event({}, {})
+    assert event is not None
 
     assert event["tags"] == {"tag1": "value1", "tag2": "value2"}, "Setting tags failed"
 
     scope.set_tags({"tag2": "updated", "tag3": "new"})
     event = scope.apply_to_event({}, {})
+    assert event is not None
 
     assert event["tags"] == {
         "tag1": "value1",
@@ -843,6 +845,7 @@ def test_set_tags():
 
     scope.set_tags({})
     event = scope.apply_to_event({}, {})
+    assert event is not None
 
     assert event["tags"] == {
         "tag1": "value1",

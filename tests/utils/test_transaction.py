@@ -27,9 +27,10 @@ def test_transaction_from_function():
     assert x(MyClass) == "tests.utils.test_transaction.MyClass"
     assert x(MyClass.myfunc) == "tests.utils.test_transaction.MyClass.myfunc"
     assert x(myfunc) == "tests.utils.test_transaction.myfunc"
-    assert x(None) is None
-    assert x(42) is None
-    assert x(lambda: None).endswith("<lambda>")
+    assert x(None) is None  # type: ignore[arg-type]
+    assert x(42) is None  # type: ignore[arg-type]
+    lambda_name = x(lambda: None)
+    assert lambda_name is not None and lambda_name.endswith("<lambda>")
     assert x(my_lambda) == "tests.utils.test_transaction.<lambda>"
     assert (
         x(my_partial) == "partial(<function tests.utils.test_transaction.my_partial>)"

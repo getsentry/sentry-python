@@ -15,6 +15,7 @@ def test_to_traceparent(sentry_init, traces_sample_rate):
 
     with sentry_sdk.start_span(name="/interactions/other-dogs/new-dog") as span:
         traceparent = sentry_sdk.get_traceparent()
+        assert traceparent is not None
 
         parts = traceparent.split("-")
         if traces_sample_rate is None:

@@ -1,5 +1,5 @@
 import ast
-import importlib
+import importlib.util
 import pathlib
 import pkgutil
 import sys
@@ -84,6 +84,7 @@ def test_shadowed_modules_when_importing_integrations(
         return
     except integrations.DidNotEnable:
         spec = importlib.util.find_spec(module_path)
+        assert spec is not None and spec.origin is not None
         source = pathlib.Path(spec.origin).read_text(encoding="utf-8")
         tree = ast.parse(source, filename=spec.origin)
         integration_dependencies = find_unrecognized_dependencies(tree)

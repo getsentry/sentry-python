@@ -407,7 +407,7 @@ def test_log_array_attributes(sentry_init, capture_envelopes):
     with sentry_sdk.new_scope() as scope:
         scope.set_attribute("string_list.attribute", ["value1", "value2"])
         scope.set_attribute("int_tuple.attribute", (3, 2, 1, 4))
-        scope.set_attribute("inhomogeneous_tuple.attribute", (3, 2.0, 1, 4))  # type: ignore[arg-type]
+        scope.set_attribute("inhomogeneous_tuple.attribute", (3, 2.0, 1, 4))
 
         sentry_sdk.metrics.count(
             "test",
@@ -543,7 +543,7 @@ def test_metrics_batcher_lock_reset_in_child_after_fork(sentry_init):
     original_lock = batcher._lock
     original_lock.acquire()
 
-    batcher._buffer.append(object())
+    batcher._buffer.append(object())  # type: ignore[arg-type]
     batcher._active.flag = True
     batcher._flush_event.set()
     batcher._running = False

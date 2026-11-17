@@ -7,6 +7,7 @@ import sys
 import time
 import weakref
 from collections import Counter
+from typing import Optional
 
 import pytest
 
@@ -663,7 +664,7 @@ def test_dedupe_does_not_retain_builtin_exceptions(sentry_init):
     class Payload:
         pass
 
-    payload_ref = None
+    payload_ref: "Optional[weakref.ReferenceType[Payload]]" = None
 
     def fail():
         nonlocal payload_ref
@@ -680,6 +681,7 @@ def test_dedupe_does_not_retain_builtin_exceptions(sentry_init):
     capture()
 
     gc.collect()
+    assert payload_ref is not None
     assert payload_ref() is None
 
 
@@ -943,7 +945,7 @@ def test_functions_to_trace_with_class(sentry_init, capture_items):
         assert child_spans[1]["name"] == "tests.test_basics.WorldGreeter.greet"
 
     finally:
-        WorldGreeter.greet = original_function
+        WorldGreeter.greet = original_function  # type: ignore[method-assign]
 
 
 def test_multiple_setup_integrations_calls():
