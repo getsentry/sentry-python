@@ -1032,20 +1032,8 @@ def test_custom_repr_on_vars(sentry_init, capture_events):
     assert "Fail object" in my_vars["fail"]
 
 
-@pytest.mark.parametrize(
-    "dsn",
-    [
-        "http://894b7d594095440f8dfea9b300e6f572@localhost:8000/2",
-        "http://894b7d594095440f8dfea9b300e6f572@localhost:8000/2",
-    ],
-)
-def test_init_string_types(dsn, sentry_init):
-    # Allow unicode strings on Python 3 and both on Python 2 (due to
-    # unicode_literals)
-    #
-    # Supporting bytes on Python 3 is not really wrong but probably would be
-    # extra code
-    sentry_init(dsn)
+def test_init_string_types(sentry_init):
+    sentry_init("http://894b7d594095440f8dfea9b300e6f572@localhost:8000/2")
     assert (
         sentry_sdk.get_client().dsn
         == "http://894b7d594095440f8dfea9b300e6f572@localhost:8000/2"

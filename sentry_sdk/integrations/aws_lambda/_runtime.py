@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 
 
 def _wrap_init_error(init_error: "F") -> "F":
-    from sentry_sdk.integrations.aws_lambda import AwsLambdaIntegration
+    from sentry_sdk.integrations.aws_lambda import AwsLambdaIntegration  # noqa: PLC0415
 
     @ensure_integration_enabled(AwsLambdaIntegration, init_error)
     def sentry_init_error(*args: "Any", **kwargs: "Any") -> "Any":

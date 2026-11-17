@@ -35,7 +35,7 @@ def patch_redis_async_pipeline(
 ) -> None:
     old_execute = pipeline_cls.execute
 
-    from sentry_sdk.integrations.redis import RedisIntegration
+    from sentry_sdk.integrations.redis import RedisIntegration  # noqa: PLC0415
 
     async def _sentry_execute(self: "Any", *args: "Any", **kwargs: "Any") -> "Any":
         client = sentry_sdk.get_client()
@@ -79,7 +79,7 @@ def patch_redis_async_client(
 ) -> None:
     old_execute_command = cls.execute_command
 
-    from sentry_sdk.integrations.redis import RedisIntegration
+    from sentry_sdk.integrations.redis import RedisIntegration  # noqa: PLC0415
 
     async def _sentry_execute_command(
         self: "Any", name: str, *args: "Any", **kwargs: "Any"

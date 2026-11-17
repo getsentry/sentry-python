@@ -24,7 +24,7 @@ def patch_tasks() -> None:
 
     @wraps(old_task_enqueue)
     def _sentry_enqueue(self: "Any", *args: "Any", **kwargs: "Any") -> "Any":
-        from sentry_sdk.integrations.django import DjangoIntegration
+        from sentry_sdk.integrations.django import DjangoIntegration  # noqa: PLC0415
 
         integration = sentry_sdk.get_client().get_integration(DjangoIntegration)
         if integration is None:

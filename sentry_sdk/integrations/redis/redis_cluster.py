@@ -75,7 +75,7 @@ def _set_cluster_db_data(
 def _patch_redis_cluster() -> None:
     """Patches the cluster module on redis SDK (as opposed to rediscluster library)"""
     try:
-        from redis import RedisCluster, cluster
+        from redis import RedisCluster, cluster  # noqa: PLC0415
     except ImportError:
         pass
     else:
@@ -92,11 +92,11 @@ def _patch_redis_cluster() -> None:
         )
 
     try:
-        from redis.asyncio import cluster as async_cluster
+        from redis.asyncio import cluster as async_cluster  # noqa: PLC0415
     except ImportError:
         pass
     else:
-        from sentry_sdk.integrations.redis._async_common import (
+        from sentry_sdk.integrations.redis._async_common import (  # noqa: PLC0415
             patch_redis_async_client,
             patch_redis_async_pipeline,
         )

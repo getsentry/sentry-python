@@ -22,7 +22,7 @@ def _patch_error_tracing() -> None:
 
     # Try newer location first (agents.util._error_tracing)
     try:
-        from agents.util import _error_tracing
+        from agents.util import _error_tracing  # noqa: PLC0415
 
         error_tracing_module = _error_tracing
     except (ImportError, AttributeError):
@@ -31,7 +31,7 @@ def _patch_error_tracing() -> None:
     # Try older location (agents._utils)
     if error_tracing_module is None:
         try:
-            import agents._utils
+            import agents._utils  # noqa: PLC0415
 
             error_tracing_module = agents._utils
         except (ImportError, AttributeError):

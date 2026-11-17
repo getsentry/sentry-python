@@ -363,7 +363,7 @@ Looking to upgrade from Sentry SDK 1.x to 2.x? Here's a comprehensive list of wh
 ## Changed
 
 - The Pyramid integration will not capture errors that might happen in `authenticated_userid()` in a custom `AuthenticationPolicy` class.
-- The method `need_code_loation` of the `MetricsAggregator` was renamed to `need_code_location`.
+- A typo in the name of the `MetricsAggregator` method `need_code_location` was fixed.
 - The `BackgroundWorker` thread used to process events was renamed from `raven-sentry.BackgroundWorker` to `sentry-sdk.BackgroundWorker`.
 - The `reraise` function was moved from `sentry_sdk._compat` to `sentry_sdk.utils`.
 - The `_ScopeManager` was moved from `sentry_sdk.hub` to `sentry_sdk.scope`.

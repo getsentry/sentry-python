@@ -202,7 +202,7 @@ class PydanticAIIntegration(Integration):
             return
 
         try:
-            from pydantic_ai.capabilities import Hooks
+            from pydantic_ai.capabilities import Hooks  # noqa: PLC0415
         except ImportError:
             return
 

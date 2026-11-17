@@ -44,8 +44,7 @@ except (ImportError, RuntimeError):
 import sentry_sdk
 import sentry_sdk.utils
 from sentry_sdk.envelope import Envelope, parse_json
-from sentry_sdk.integrations import (  # noqa: F401
-    _DEFAULT_INTEGRATIONS,
+from sentry_sdk.integrations import (
     _installed_integrations,
     _processed_integrations,
 )
@@ -258,7 +257,7 @@ def reset_integrations():
     with a clean slate to ensure monkeypatching works well,
     but this also means some other stuff will be monkeypatched twice.
     """
-    global _DEFAULT_INTEGRATIONS, _processed_integrations
+    global _processed_integrations
 
     _processed_integrations.clear()
     _installed_integrations.clear()
@@ -1552,7 +1551,7 @@ def streaming_responses_tool_call_model_responses():
 
 
 class MockServerRequestHandler(BaseHTTPRequestHandler):
-    def do_GET(self):  # noqa: N802
+    def do_GET(self):
         # Process an HTTP GET request and return a response.
         # If the path ends with /status/<number>, return status code <number>.
         # Otherwise return a 200 response.

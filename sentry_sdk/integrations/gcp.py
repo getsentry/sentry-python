@@ -172,7 +172,7 @@ class GcpIntegration(Integration):
 
     @staticmethod
     def setup_once() -> None:
-        import __main__ as gcp_functions
+        import __main__ as gcp_functions  # noqa: PLC0415
 
         if not hasattr(gcp_functions, "worker_v1"):
             logger.warning(

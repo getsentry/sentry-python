@@ -101,7 +101,7 @@ class LocalLambdaStack(Stack):
             },
         )
 
-        dsn = f"http://123@{get_host_ip()}:9999/0"  # noqa: E231
+        dsn = f"http://123@{get_host_ip()}:9999/0"
         print("[LocalLambdaStack] Using Sentry DSN: %s" % dsn)
 
         print(
@@ -232,7 +232,7 @@ class LocalLambdaStack(Stack):
 
             try:
                 # Try to connect to SAM
-                response = requests.get(f"http://127.0.0.1:{port}/")  # noqa: E231
+                response = requests.get(f"http://127.0.0.1:{port}/")
                 if response.status_code == 200 or response.status_code == 404:
                     return
 

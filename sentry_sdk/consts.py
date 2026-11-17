@@ -1,3 +1,4 @@
+import inspect
 import itertools
 from enum import Enum
 from typing import TYPE_CHECKING
@@ -1595,10 +1596,10 @@ class ClientConstructor:
         environment: "Optional[str]" = None,
         server_name: "Optional[str]" = None,
         shutdown_timeout: float = 2,
-        integrations: "Sequence[sentry_sdk.integrations.Integration]" = [],  # noqa: B006
+        integrations: "Sequence[sentry_sdk.integrations.Integration]" = [],
         ignore_spans: "Optional[IgnoreSpansConfig]" = None,
-        in_app_include: "List[str]" = [],  # noqa: B006
-        in_app_exclude: "List[str]" = [],  # noqa: B006
+        in_app_include: "List[str]" = [],
+        in_app_exclude: "List[str]" = [],
         default_integrations: bool = True,
         dist: "Optional[str]" = None,
         transport: "Optional[Union[sentry_sdk.transport.Transport, Type[sentry_sdk.transport.Transport], None]]" = None,
@@ -1607,7 +1608,7 @@ class ClientConstructor:
         data_collection: "Optional[DataCollectionUserOptions]" = {},
         http_proxy: "Optional[str]" = None,
         https_proxy: "Optional[str]" = None,
-        ignore_errors: "Sequence[Union[type, str]]" = [],  # noqa: B006
+        ignore_errors: "Sequence[Union[type, str]]" = [],
         max_request_body_size: str = "medium",
         socket_options: "Optional[List[Tuple[int, int, int | bytes]]]" = None,
         keep_alive: "Optional[bool]" = None,
@@ -1626,13 +1627,11 @@ class ClientConstructor:
         disabled_integrations: "Optional[Sequence[Union[sentry_sdk.integrations.Integration, type[sentry_sdk.integrations.Integration]]]]" = None,
         auto_session_tracking: bool = True,
         send_client_reports: bool = True,
-        _experiments: "Experiments" = {},  # noqa: B006
+        _experiments: "Experiments" = {},
         proxy_headers: "Optional[Dict[str, str]]" = None,
         project_root: "Optional[str]" = None,
-        trace_propagation_targets: "Optional[Sequence[str]]" = [  # noqa: B006
-            MATCH_ALL
-        ],
-        functions_to_trace: "Sequence[Dict[str, str]]" = [],  # noqa: B006
+        trace_propagation_targets: "Optional[Sequence[str]]" = [MATCH_ALL],
+        functions_to_trace: "Sequence[Dict[str, str]]" = [],
         max_value_length: "Optional[int]" = DEFAULT_MAX_VALUE_LENGTH,
         enable_backpressure_handling: bool = True,
         error_sampler: "Optional[Callable[[Event, Hint], Union[float, bool]]]" = None,
@@ -2049,8 +2048,6 @@ class ClientConstructor:
 
 
 def _get_default_options() -> "dict[str, Any]":
-    import inspect
-
     a = inspect.getfullargspec(ClientConstructor.__init__)
     defaults = a.defaults or ()
     kwonlydefaults = a.kwonlydefaults or {}

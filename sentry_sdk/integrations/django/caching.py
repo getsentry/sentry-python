@@ -37,7 +37,7 @@ def _patch_cache_method(
     address: "Optional[str]",
     port: "Optional[int]",
 ) -> None:
-    from sentry_sdk.integrations.django import DjangoIntegration
+    from sentry_sdk.integrations.django import DjangoIntegration  # noqa: PLC0415
 
     original_method = getattr(cache, method_name)
 
@@ -160,7 +160,7 @@ def _get_address_port(
 
 
 def should_enable_cache_spans() -> bool:
-    from sentry_sdk.integrations.django import DjangoIntegration
+    from sentry_sdk.integrations.django import DjangoIntegration  # noqa: PLC0415
 
     integration = sentry_sdk.get_client().get_integration(DjangoIntegration)
 
@@ -177,7 +177,7 @@ def patch_caching() -> None:
                 cache = original_get_item(self, alias)
 
                 if should_enable_cache_spans():
-                    from django.conf import settings
+                    from django.conf import settings  # noqa: PLC0415
 
                     address, port = _get_address_port(
                         settings.CACHES[alias or "default"]

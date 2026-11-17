@@ -140,7 +140,7 @@ class DjangoIntegration(Integration):
         ignore_logger_for_events("django.server")
         ignore_logger_for_events("django.request")
 
-        from django.core.handlers.wsgi import WSGIHandler
+        from django.core.handlers.wsgi import WSGIHandler  # noqa: PLC0415
 
         old_app = WSGIHandler.__call__
 
@@ -150,7 +150,7 @@ class DjangoIntegration(Integration):
         ) -> "_ScopedResponse":
             bound_old_app = old_app.__get__(self, WSGIHandler)
 
-            from django.conf import settings
+            from django.conf import settings  # noqa: PLC0415
 
             use_x_forwarded_for = settings.USE_X_FORWARDED_HOST
 
@@ -233,7 +233,7 @@ class DjangoIntegration(Integration):
                 # If we fail to import, return `NotImplemented`. It's at least
                 # unlikely that we have a query set in `value` when importing
                 # `QuerySet` fails.
-                from django.db.models.query import QuerySet
+                from django.db.models.query import QuerySet  # noqa: PLC0415
             except Exception:
                 return NotImplemented
 
@@ -300,7 +300,7 @@ def _patch_drf() -> None:
 
         with capture_internal_exceptions():
             try:
-                from rest_framework.views import APIView  # type: ignore
+                from rest_framework.views import APIView  # type: ignore  # noqa: PLC0415
             except ImportError:
                 pass
             else:
@@ -320,7 +320,7 @@ def _patch_drf() -> None:
 
         with capture_internal_exceptions():
             try:
-                from rest_framework.request import Request  # type: ignore
+                from rest_framework.request import Request  # type: ignore  # noqa: PLC0415
             except ImportError:
                 pass
             else:
@@ -352,22 +352,22 @@ def _patch_drf() -> None:
 
 def _patch_channels() -> None:
     try:
-        from channels.http import AsgiHandler  # type: ignore
+        from channels.http import AsgiHandler  # type: ignore  # noqa: PLC0415
     except ImportError:
         return
 
-    from sentry_sdk.integrations.django.asgi import patch_channels_asgi_handler_impl
+    from sentry_sdk.integrations.django.asgi import patch_channels_asgi_handler_impl  # noqa: PLC0415
 
     patch_channels_asgi_handler_impl(AsgiHandler)
 
 
 def _patch_django_asgi_handler() -> None:
     try:
-        from django.core.handlers.asgi import ASGIHandler
+        from django.core.handlers.asgi import ASGIHandler  # noqa: PLC0415
     except ImportError:
         return
 
-    from sentry_sdk.integrations.django.asgi import patch_django_asgi_handler_impl
+    from sentry_sdk.integrations.django.asgi import patch_django_asgi_handler_impl  # noqa: PLC0415
 
     patch_django_asgi_handler_impl(ASGIHandler)
 
@@ -519,7 +519,7 @@ def _patch_get_response() -> None:
     """
     patch get_response, because at that point we have the Django request object
     """
-    from django.core.handlers.base import BaseHandler
+    from django.core.handlers.base import BaseHandler  # noqa: PLC0415
 
     old_get_response = BaseHandler.get_response
 
@@ -534,7 +534,7 @@ def _patch_get_response() -> None:
     BaseHandler.get_response = sentry_patched_get_response
 
     if hasattr(BaseHandler, "get_response_async"):
-        from sentry_sdk.integrations.django.asgi import patch_get_response_async
+        from sentry_sdk.integrations.django.asgi import patch_get_response_async  # noqa: PLC0415
 
         patch_get_response_async(BaseHandler, _before_get_response)
 
@@ -615,7 +615,7 @@ def _patch_response_for_exception() -> None:
     too, along with the status code Django picked for them.
     """
     try:
-        from django.core.handlers import exception as exception_handler
+        from django.core.handlers import exception as exception_handler  # noqa: PLC0415
     except ImportError:
         # Django < 1.10 does this in `BaseHandler`, nothing to patch here
         return
@@ -728,8 +728,8 @@ def _set_user_info(request: "WSGIRequest", event: "Event") -> None:
 
 def install_sql_hook() -> None:
     """If installed this causes Django's queries to be captured."""
-    from django.db.backends.base.base import BaseDatabaseWrapper
-    from django.db.backends.utils import CursorWrapper
+    from django.db.backends.base.base import BaseDatabaseWrapper  # noqa: PLC0415
+    from django.db.backends.utils import CursorWrapper  # noqa: PLC0415
 
     real_execute = CursorWrapper.execute
     real_executemany = CursorWrapper.executemany
@@ -902,7 +902,7 @@ def _set_db_data(
 
 def add_template_context_repr_sequence() -> None:
     try:
-        from django.template.context import BaseContext
+        from django.template.context import BaseContext  # noqa: PLC0415
 
         add_repr_sequence_type(BaseContext)
     except Exception:

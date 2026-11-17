@@ -22,7 +22,7 @@ class SparkWorkerIntegration(Integration):
 
     @staticmethod
     def setup_once() -> None:
-        import pyspark.daemon as original_daemon
+        import pyspark.daemon as original_daemon  # noqa: PLC0415
 
         original_daemon.worker_main = _sentry_worker_main
 
@@ -57,7 +57,7 @@ def _capture_exception(exc_info: "ExcInfo") -> None:
 
 
 def _tag_task_context() -> None:
-    from pyspark.taskcontext import TaskContext
+    from pyspark.taskcontext import TaskContext  # noqa: PLC0415
 
     scope = sentry_sdk.get_isolation_scope()
 
@@ -98,7 +98,7 @@ def _tag_task_context() -> None:
 
 
 def _sentry_worker_main(*args: "Optional[Any]", **kwargs: "Optional[Any]") -> None:
-    import pyspark.worker as original_worker
+    import pyspark.worker as original_worker  # noqa: PLC0415
 
     try:
         original_worker.main(*args, **kwargs)

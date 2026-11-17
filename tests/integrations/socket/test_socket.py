@@ -25,7 +25,7 @@ def test_getaddrinfo_trace(sentry_init, capture_items):
 
     assert dns_span["attributes"]["sentry.op"] == "socket.dns"
     assert dns_span["attributes"]["sentry.origin"] == "auto.socket.socket"
-    assert dns_span["name"] == f"localhost:{PORT}"  # noqa: E231
+    assert dns_span["name"] == f"localhost:{PORT}"
     assert dns_span["attributes"]["server.address"] == "localhost"
     assert dns_span["attributes"]["server.port"] == PORT
 
@@ -51,12 +51,12 @@ def test_create_connection_trace(sentry_init, capture_items):
     dns_span, connect_span, _root = spans
 
     assert connect_span["attributes"]["sentry.op"] == "socket.connection"
-    assert connect_span["name"] == f"localhost:{PORT}"  # noqa: E231
+    assert connect_span["name"] == f"localhost:{PORT}"
     assert connect_span["attributes"]["server.address"] == "localhost"
     assert connect_span["attributes"]["server.port"] == PORT
 
     assert dns_span["attributes"]["sentry.op"] == "socket.dns"
-    assert dns_span["name"] == f"localhost:{PORT}"  # noqa: E231
+    assert dns_span["name"] == f"localhost:{PORT}"
     assert dns_span["attributes"]["server.address"] == "localhost"
     assert dns_span["attributes"]["server.port"] == PORT
 

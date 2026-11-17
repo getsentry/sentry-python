@@ -1280,7 +1280,7 @@ def test_set_span_status_on_error(sentry_init, capture_items):
 
     items = capture_items("span")
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="oh no!"):
         with sentry_sdk.start_span(name="span") as span:
             raise ValueError("oh no!")
 

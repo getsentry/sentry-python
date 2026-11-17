@@ -18,6 +18,7 @@ from sentry_sdk.utils import (
 )
 
 try:
+    from pyramid import router
     from pyramid.httpexceptions import HTTPException
     from pyramid.request import Request
 except ImportError:
@@ -45,8 +46,6 @@ class PyramidIntegration(Integration):
     def setup_once() -> None:
         version = package_version("pyramid")
         _check_minimum_version(PyramidIntegration, version)
-
-        from pyramid import router
 
         old_call_view = router._call_view
 

@@ -177,8 +177,6 @@ class GRPCIntegration(Integration):
     def setup_once() -> None:
         _check_minimum_version(GRPCIntegration, GRPC_VERSION)
 
-        import grpc
-
         grpc.insecure_channel = _wrap_channel_sync(grpc.insecure_channel)
         grpc.secure_channel = _wrap_channel_sync(grpc.secure_channel)
         grpc.intercept_channel = _wrap_intercept_channel(grpc.intercept_channel)

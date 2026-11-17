@@ -17,7 +17,7 @@ def test_crumb_capture(sentry_init, capture_events):
     )
     events = capture_events()
 
-    url = f"http://localhost:{PORT}/hello-world"  # noqa:E231
+    url = f"http://localhost:{PORT}/hello-world"
     response = requests.get(url)
     capture_message("Testing!")
 
@@ -52,7 +52,7 @@ def test_crumb_capture_client_error(sentry_init, capture_events, status_code, le
 
     events = capture_events()
 
-    url = f"http://localhost:{PORT}/status/{status_code}"  # noqa:E231
+    url = f"http://localhost:{PORT}/status/{status_code}"
     response = requests.get(url)
 
     assert response.status_code == status_code
@@ -86,7 +86,7 @@ def test_omit_url_data_if_parsing_fails(sentry_init, capture_events):
 
     events = capture_events()
 
-    url = f"http://localhost:{PORT}/ok"  # noqa:E231
+    url = f"http://localhost:{PORT}/ok"
 
     with mock.patch(
         "sentry_sdk.integrations.stdlib.parse_url",

@@ -45,9 +45,9 @@ def _get_template_name_description(template_name: str) -> str:
 
 
 def patch_templates() -> None:
-    from django.template.response import SimpleTemplateResponse
+    from django.template.response import SimpleTemplateResponse  # noqa: PLC0415
 
-    from sentry_sdk.integrations.django import DjangoIntegration
+    from sentry_sdk.integrations.django import DjangoIntegration  # noqa: PLC0415
 
     real_rendered_content = SimpleTemplateResponse.rendered_content
 
@@ -68,7 +68,7 @@ def patch_templates() -> None:
 
     SimpleTemplateResponse.rendered_content = rendered_content
 
-    import django.shortcuts
+    import django.shortcuts  # noqa: PLC0415
 
     real_render = django.shortcuts.render
 

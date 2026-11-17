@@ -25,7 +25,7 @@ def _get_redis_command_args(command: "Any") -> "Sequence[Any]":
 
 
 def _patch_redis() -> None:
-    from redis import Redis, client
+    from redis import Redis, client  # noqa: PLC0415
 
     patch_redis_client(
         Redis,
@@ -41,7 +41,7 @@ def _patch_redis() -> None:
 
     # redis.asyncio was added in redis-py 4.2
     try:
-        import redis.asyncio
+        import redis.asyncio  # noqa: PLC0415
     except ImportError:
         pass
     else:

@@ -284,7 +284,7 @@ def test_sample_rate_affects_errors(sentry_init, capture_events):
 def test_warns_and_sets_sampled_to_false_on_invalid_traces_sampler_return_value(
     sentry_init,
     traces_sampler_return_value,
-    StringContaining,  # noqa: N803
+    StringContaining,
 ):
     sentry_init(
         traces_sampler=mock.Mock(return_value=traces_sampler_return_value),

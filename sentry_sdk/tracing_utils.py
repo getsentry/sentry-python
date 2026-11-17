@@ -619,7 +619,7 @@ class PropagationContext:
             )
             return
 
-        self.baggage.sentry_items["sample_rand"] = f"{sample_rand:.6f}"  # noqa: E231
+        self.baggage.sentry_items["sample_rand"] = f"{sample_rand:.6f}"
 
     def _sample_rand(self) -> "Optional[str]":
         """Convenience method to get the sample_rand value from the baggage."""

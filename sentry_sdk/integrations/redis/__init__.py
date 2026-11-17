@@ -23,7 +23,7 @@ class RedisIntegration(Integration):
     @staticmethod
     def setup_once() -> None:
         try:
-            from redis import __version__ as REDIS_VERSION
+            from redis import __version__ as REDIS_VERSION  # noqa: PLC0415
         except ImportError:
             raise DidNotEnable("Redis client not installed")
 

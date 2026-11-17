@@ -1,0 +1,23 @@
+# Spell checker config, see https://github.com/crate-ci/typos/blob/master/docs/reference.md
+
+[default]
+extend-ignore-re = [
+    "baGGage",           # tests that header matching ignores case
+    "deprecat\\(",       # regex prefix in .github/release.yml
+    "ot-demo-test",      # example S3 bucket name from sentry-conventions
+    "\\b[0-9a-f]{16}\\b", # span IDs
+]
+
+[default.extend-words]
+GAE = "GAE"                 # Google App Engine
+certifi = "certifi"         # package name
+# Chunked strings and key prefixes in tests
+abl = "abl"
+hel = "hel"
+
+[files]
+extend-exclude = [
+    ".git/",
+    "CHANGELOG.md", # historical release notes
+    "checkouts/",   # third-party submodules
+]

@@ -54,7 +54,7 @@ def _make_asgi_request_event_processor(request: "ASGIRequest") -> "EventProcesso
         # if the request is gone we are fine not logging the data from
         # it.  This might happen if the processor is pushed away to
         # another thread.
-        from sentry_sdk.integrations.django import (
+        from sentry_sdk.integrations.django import (  # noqa: PLC0415
             DjangoRequestExtractor,
             _set_user_info,
         )
@@ -79,7 +79,7 @@ def _make_asgi_request_event_processor(request: "ASGIRequest") -> "EventProcesso
 
 
 def patch_django_asgi_handler_impl(cls: "Any") -> None:
-    from sentry_sdk.integrations.django import DjangoIntegration
+    from sentry_sdk.integrations.django import DjangoIntegration  # noqa: PLC0415
 
     old_app = cls.__call__
 
@@ -130,9 +130,9 @@ def patch_get_response_async(cls: "Any", _before_get_response: "Any") -> None:
 
 
 def patch_channels_asgi_handler_impl(cls: "Any") -> None:
-    import channels  # type: ignore
+    import channels  # type: ignore  # noqa: PLC0415
 
-    from sentry_sdk.integrations.django import DjangoIntegration
+    from sentry_sdk.integrations.django import DjangoIntegration  # noqa: PLC0415
 
     if channels.__version__ < "3.0.0":
         old_app = cls.__call__
@@ -161,7 +161,7 @@ def patch_channels_asgi_handler_impl(cls: "Any") -> None:
 
 
 def wrap_async_view(callback: "Any") -> "Any":
-    from sentry_sdk.integrations.django import DjangoIntegration
+    from sentry_sdk.integrations.django import DjangoIntegration  # noqa: PLC0415
 
     @functools.wraps(callback)
     async def sentry_wrapped_callback(

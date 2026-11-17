@@ -2381,15 +2381,8 @@ async def test_tool_execution_without_span_context(
 
     # Call without span context (no transaction active)
     # The patches should handle this gracefully
-    try:
-        # This will fail because we're not in a transaction, but it should not crash
-        await agent.run("test")
-    except Exception:
-        # Expected to fail, that's okay
-        pass
-
-    # Should not crash
-    assert True
+    result = await agent.run("test")
+    assert result.output is not None
 
 
 @pytest.mark.asyncio

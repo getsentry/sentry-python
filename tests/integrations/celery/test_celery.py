@@ -484,7 +484,7 @@ def test_newrelic_interference(init_celery, newrelic_order, celery_invocation):
 def test_traces_sampler_gets_task_info_in_sampling_context(
     init_celery,
     celery_invocation,
-    DictionaryContaining,  # noqa:N803
+    DictionaryContaining,
 ):
     traces_sampler = mock.Mock(return_value=1.0)
     celery = init_celery(traces_sampler=traces_sampler)
@@ -768,7 +768,7 @@ def test_messaging_system(system, init_celery, capture_items):
     )
 
     # Does not need to be a real URL, since we use always eager
-    celery.conf.broker_url = f"{system}://example.com"  # noqa: E231
+    celery.conf.broker_url = f"{system}://example.com"
 
     @celery.task()
     def task(): ...
@@ -796,7 +796,7 @@ def test_producer_span_data(system, monkeypatch, sentry_init, capture_items):
         integrations=[CeleryIntegration()],
         traces_sample_rate=1.0,
     )
-    celery = Celery(__name__, broker=f"{system}://example.com")  # noqa: E231
+    celery = Celery(__name__, broker=f"{system}://example.com")
 
     @celery.task()
     def task(): ...
@@ -844,7 +844,7 @@ def tests_span_origin_consumer(init_celery, capture_items):
     celery = init_celery(
         traces_sample_rate=1.0,
     )
-    celery.conf.broker_url = "redis://example.com"  # noqa: E231
+    celery.conf.broker_url = "redis://example.com"
 
     @celery.task()
     def task(): ...
@@ -872,7 +872,7 @@ def tests_span_origin_producer(monkeypatch, sentry_init, capture_items):
         integrations=[CeleryIntegration()],
         traces_sample_rate=1.0,
     )
-    celery = Celery(__name__, broker="redis://example.com")  # noqa: E231
+    celery = Celery(__name__, broker="redis://example.com")
 
     @celery.task()
     def task(): ...
@@ -906,7 +906,7 @@ def test_send_task_wrapped(
         integrations=[CeleryIntegration()],
         traces_sample_rate=1.0,
     )
-    celery = Celery(__name__, broker="redis://example.com")  # noqa: E231
+    celery = Celery(__name__, broker="redis://example.com")
 
     items = capture_items("span")
     with sentry_sdk.start_span(name="custom parent") as outer_span:

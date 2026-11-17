@@ -36,7 +36,7 @@ def test_deterministic_sampled(sentry_init, capture_items, sample_rate, sample_r
     ):
         with sentry_sdk.start_span(name="span") as span:
             assert (
-                span._get_baggage().sentry_items["sample_rand"] == f"{sample_rand:.6f}"  # noqa: E231
+                span._get_baggage().sentry_items["sample_rand"] == f"{sample_rand:.6f}"
             )
 
     sentry_sdk.flush()
@@ -66,9 +66,7 @@ def test_segment_uses_incoming_sample_rand(
     )
 
     with sentry_sdk.start_span(name="span") as span:
-        assert (
-            span._get_baggage().sentry_items["sample_rand"] == f"{sample_rand:.6f}"  # noqa: E231
-        )
+        assert span._get_baggage().sentry_items["sample_rand"] == f"{sample_rand:.6f}"
 
     sentry_sdk.flush()
 

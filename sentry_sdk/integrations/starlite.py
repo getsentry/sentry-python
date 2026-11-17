@@ -128,7 +128,7 @@ def patch_middlewares() -> None:
 
 def enable_span_for_middleware(middleware: "Middleware") -> "Middleware":
     if (
-        not hasattr(middleware, "__call__")  # noqa: B004
+        not hasattr(middleware, "__call__")
         or middleware is SentryStarliteASGIMiddleware
     ):
         return middleware

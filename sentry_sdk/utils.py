@@ -585,7 +585,7 @@ def serialize_frame(
     max_value_length: "Optional[int]" = None,
     custom_repr: "Optional[Callable[..., Optional[str]]]" = None,
 ) -> "Dict[str, Any]":
-    from sentry_sdk.serializer import serialize
+    from sentry_sdk.serializer import serialize  # noqa: PLC0415
 
     f_code = getattr(frame, "f_code", None)
     if not f_code:
@@ -1240,7 +1240,7 @@ def parse_version(version: str) -> "Optional[Tuple[int, ...]]":
     This uses the parsing logic from PEP 440:
     https://peps.python.org/pep-0440/#appendix-b-parsing-version-strings-with-regular-expressions
     """
-    VERSION_PATTERN = r"""  # noqa: N806
+    VERSION_PATTERN = r"""
         v?
         (?:
             (?:(?P<epoch>[0-9]+)!)?                           # epoch
@@ -1345,7 +1345,7 @@ def transaction_from_function(func: "Callable[..., Any]") -> "Optional[str]":
 disable_capture_event: "ContextVar[bool]" = ContextVar("disable_capture_event")
 
 
-class ServerlessTimeoutWarning(Exception):  # noqa: N818
+class ServerlessTimeoutWarning(Exception):
     """Raised when a serverless method is about to reach its timeout."""
 
     pass
@@ -1584,7 +1584,7 @@ def is_sentry_url(client: "sentry_sdk.client.BaseClient", url: str) -> bool:
 
 def _generate_installed_modules() -> "Iterator[Tuple[str, str]]":
     try:
-        from importlib import metadata
+        from importlib import metadata  # noqa: PLC0415
 
         yielded = set()
         for dist in metadata.distributions():
@@ -1602,7 +1602,7 @@ def _generate_installed_modules() -> "Iterator[Tuple[str, str]]":
     except ImportError:
         # < py3.8
         try:
-            import pkg_resources
+            import pkg_resources  # noqa: PLC0415
         except ImportError:
             return
 

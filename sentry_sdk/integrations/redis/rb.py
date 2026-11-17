@@ -10,7 +10,7 @@ from sentry_sdk.integrations.redis.modules.queries import _set_db_data
 
 def _patch_rb() -> None:
     try:
-        import rb.clients  # type: ignore
+        import rb.clients  # type: ignore  # noqa: PLC0415
     except ImportError:
         pass
     else:

@@ -825,10 +825,6 @@ def trace(
             # Function implementation
             pass
     """
-    from sentry_sdk.tracing_utils import (
-        create_span_decorator,
-    )
-
     decorator = create_span_decorator(
         name=name,
         attributes=attributes,
@@ -850,4 +846,4 @@ def get_current_span(
 
 
 # Circular import
-from sentry_sdk.tracing_utils import Baggage  # noqa: E402, F401, I001
+from sentry_sdk.tracing_utils import Baggage, create_span_decorator

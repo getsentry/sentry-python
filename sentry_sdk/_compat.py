@@ -1,5 +1,8 @@
 import sys
 
+from sentry_sdk.consts import FALSE_VALUES
+from sentry_sdk.utils import logger
+
 PY38 = sys.version_info[0] == 3 and sys.version_info[1] >= 8
 PY310 = sys.version_info[0] == 3 and sys.version_info[1] >= 10
 PY311 = sys.version_info[0] == 3 and sys.version_info[1] >= 11
@@ -19,11 +22,9 @@ def check_uwsgi_thread_support() -> bool:
     #    --py-call-uwsgi-fork-hooks to force uWSGI to run regular cpython
     #    after-fork hooks that take care of cleaning up stale thread data.
     try:
-        from uwsgi import opt  # type: ignore
+        from uwsgi import opt  # type: ignore  # noqa: PLC0415
     except ImportError:
         return True
-
-    from sentry_sdk.consts import FALSE_VALUES
 
     def enabled(option: str) -> bool:
         value = opt.get(option, False)
@@ -45,8 +46,6 @@ def check_uwsgi_thread_support() -> bool:
     lazy_mode = enabled("lazy-apps") or enabled("lazy")
 
     if lazy_mode and not threads_enabled:
-        from sentry_sdk.utils import logger
-
         logger.warning(
             "IMPORTANT: "
             "We detected the use of uWSGI without thread support. "
@@ -57,8 +56,6 @@ def check_uwsgi_thread_support() -> bool:
         return False
 
     elif not lazy_mode and (not threads_enabled or not fork_hooks_on):
-        from sentry_sdk.utils import logger
-
         logger.warning(
             "IMPORTANT: "
             "We detected the use of uWSGI in preforking mode without "

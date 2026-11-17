@@ -2054,7 +2054,7 @@ def test_langchain_error(
     agent_executor = AgentExecutor(agent=agent, tools=[get_word_length], verbose=True)
     items = capture_items("event")
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="API rate limit error"):
         list(agent_executor.stream({"input": "How many letters in the word eudca"}))
 
     (error,) = (item.payload for item in items)
@@ -2110,7 +2110,7 @@ def test_span_status_error(
 
     agent_executor = AgentExecutor(agent=agent, tools=[get_word_length], verbose=True)
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="API rate limit error"):
         list(agent_executor.stream({"input": "How many letters in the word eudca"}))
 
     (error,) = (item.payload for item in items if item.type == "event")
@@ -2187,7 +2187,7 @@ def test_langchain_tool_error(
 
     with patch.object(
         llm.client._client._client, "send", side_effect=[tool_response]
-    ), pytest.raises(ValueError):
+    ), pytest.raises(ValueError, match="Tool execution failed"):
         agent.invoke({"messages": [HumanMessage(content="hi")]})
 
     error_events = [event for event in events if event.get("level") == "error"]

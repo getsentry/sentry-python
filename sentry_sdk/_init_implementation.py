@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 
 def _check_version_deprecations() -> None:
     try:
-        import gevent
+        import gevent  # noqa: PLC0415
 
         gevent_version = tuple(
             int(part) for part in re.split(r"a|b|rc|\.", gevent.__version__)[:2]
@@ -26,7 +26,7 @@ def _check_version_deprecations() -> None:
         pass
 
     try:
-        import greenlet
+        import greenlet  # noqa: PLC0415
 
         greenlet_version = parse_version(greenlet.__version__)
         if greenlet_version is not None and greenlet_version < (0, 4, 17):
@@ -54,7 +54,7 @@ if TYPE_CHECKING:
     #
     # Use `ClientConstructor` to define the argument types of `init`.
 
-    class init(sentry_sdk.consts.ClientConstructor):  # noqa: N801
+    class init(sentry_sdk.consts.ClientConstructor):
         pass
 
 else:

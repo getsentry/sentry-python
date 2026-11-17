@@ -408,7 +408,7 @@ async def test_websocket(
 
     request_url = "/ws"
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Oh no"):
         client = TestClient(asgi3_ws_app)
         items = capture_items("event", "span")
         async with client.websocket_connect(request_url) as ws:

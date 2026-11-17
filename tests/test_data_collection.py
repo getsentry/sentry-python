@@ -2,7 +2,7 @@ import pytest
 
 
 def test_kvcb_invalid_mode(sentry_init):
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Invalid collection mode 'nope'"):
         sentry_init(data_collection={"cookies": {"mode": "nope"}})  # type: ignore Purposely ignoring to test invalid option
 
 
@@ -17,5 +17,5 @@ def test_kvcb_invalid_mode(sentry_init):
     ],
 )
 def test_frame_context_lines_invalid_value(sentry_init, value):
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Invalid `frame_context_lines` value"):
         sentry_init(data_collection={"frame_context_lines": value})

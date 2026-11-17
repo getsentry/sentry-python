@@ -343,8 +343,6 @@ class Scope:
         return _global_scope
 
     def set_global_attributes(self) -> None:
-        from sentry_sdk.client import SDK_INFO
-
         self.set_attribute(SPANDATA.SENTRY_SDK_NAME, SDK_INFO["name"])
         self.set_attribute(SPANDATA.SENTRY_SDK_VERSION, SDK_INFO["version"])
 
@@ -1887,7 +1885,7 @@ def use_isolation_scope(isolation_scope: "Scope") -> "Generator[Scope, None, Non
 
 
 # Circular imports
-from sentry_sdk.client import NonRecordingClient
+from sentry_sdk.client import SDK_INFO, NonRecordingClient
 
 if TYPE_CHECKING:
     import sentry_sdk.client

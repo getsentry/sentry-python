@@ -113,7 +113,7 @@ def _get_producer_links(aws_event: "Any", trace_id: str) -> "list[SpanLink]":
 
 
 def _wrap_handler(handler: "F") -> "F":
-    from sentry_sdk.integrations.aws_lambda import AwsLambdaIntegration
+    from sentry_sdk.integrations.aws_lambda import AwsLambdaIntegration  # noqa: PLC0415
 
     @functools.wraps(handler)
     def sentry_handler(

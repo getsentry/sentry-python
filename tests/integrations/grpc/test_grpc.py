@@ -42,7 +42,7 @@ def _set_up(
     server.start()
 
     # Create channel connected to our server
-    channel = grpc.insecure_channel(f"localhost:{port}")  # noqa: E231
+    channel = grpc.insecure_channel(f"localhost:{port}")
 
     return server, channel
 
@@ -427,8 +427,7 @@ def test_stream_stream(sentry_init):
     # Use the provided channel
     stub = gRPCTestServiceStub(channel)
     response_iterator = stub.TestStreamStream(iter((gRPCTestMessage(text="test"),)))
-    for response in response_iterator:
-        assert response.text == "test"
+    assert [response.text for response in response_iterator] == ["test"]
 
     _tear_down(server=server)
 
@@ -493,7 +492,7 @@ class TestService(gRPCTestServiceServicer):
     events = []
 
     @staticmethod
-    def TestServe(request, context):  # noqa: N802
+    def TestServe(request, context):
         with sentry_sdk.start_span(
             name="test",
             attributes={
@@ -506,16 +505,16 @@ class TestService(gRPCTestServiceServicer):
         return gRPCTestMessage(text=request.text)
 
     @staticmethod
-    def TestUnaryStream(request, context):  # noqa: N802
+    def TestUnaryStream(request, context):
         for _ in range(3):
             yield gRPCTestMessage(text=request.text)
 
     @staticmethod
-    def TestStreamStream(request, context):  # noqa: N802
+    def TestStreamStream(request, context):
         for r in request:
             yield r
 
     @staticmethod
-    def TestStreamUnary(request, context):  # noqa: N802
+    def TestStreamUnary(request, context):
         requests = [r for r in request]
         return requests.pop()

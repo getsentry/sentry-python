@@ -61,7 +61,7 @@ class FlaskIntegration(Integration):
     @staticmethod
     def setup_once() -> None:
         try:
-            from quart import Quart  # type: ignore
+            from quart import Quart  # type: ignore  # noqa: PLC0415
 
             if Flask == Quart:
                 # This is Quart masquerading as Flask, don't enable the Flask

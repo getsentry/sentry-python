@@ -1,5 +1,6 @@
 import sys
 from abc import ABC, abstractmethod
+from importlib import import_module
 from itertools import zip_longest
 from threading import Lock
 from typing import TYPE_CHECKING
@@ -31,8 +32,6 @@ def _generate_default_integrations_iterator(
         with_auto_enabling_integrations: bool,
     ) -> "Iterator[Type[Integration]]":
         """Returns an iterator of the default integration classes:"""
-        from importlib import import_module
-
         if with_auto_enabling_integrations:
             all_import_strings = integrations + auto_enabling_integrations
         else:
@@ -285,7 +284,7 @@ def _check_minimum_version(
             return
 
 
-class DidNotEnable(Exception):  # noqa: N818
+class DidNotEnable(Exception):
     """
     The integration could not be enabled due to a trivial user error like
     `flask` not being installed for the `FlaskIntegration`.

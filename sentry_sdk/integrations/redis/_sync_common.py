@@ -32,7 +32,7 @@ def patch_redis_pipeline(
 ) -> None:
     old_execute = pipeline_cls.execute
 
-    from sentry_sdk.integrations.redis import RedisIntegration
+    from sentry_sdk.integrations.redis import RedisIntegration  # noqa: PLC0415
 
     def sentry_patched_execute(self: "Any", *args: "Any", **kwargs: "Any") -> "Any":
         client = sentry_sdk.get_client()
@@ -80,7 +80,7 @@ def patch_redis_client(
     """
     old_execute_command = cls.execute_command
 
-    from sentry_sdk.integrations.redis import RedisIntegration
+    from sentry_sdk.integrations.redis import RedisIntegration  # noqa: PLC0415
 
     def sentry_patched_execute_command(
         self: "Any", name: str, *args: "Any", **kwargs: "Any"

@@ -119,7 +119,7 @@ class OpenAIIntegration(Integration):
 
         self.tiktoken_encoding = None
         if tiktoken_encoding_name is not None:
-            import tiktoken
+            import tiktoken  # noqa: PLC0415
 
             self.tiktoken_encoding = tiktoken.get_encoding(tiktoken_encoding_name)
 
