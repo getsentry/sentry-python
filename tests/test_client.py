@@ -1577,51 +1577,42 @@ def test_coding_agent_hint_not_shown(sentry_init, coding_agent_hint, env, option
 
 
 @pytest.mark.parametrize(
-    "options, missing",
+    "env, options, hint",
     [
-        ({}, "Tracing and logs are off, so Sentry only gets errors."),
         (
+            {"CLAUDECODE": "1"},
+            {},
+            "Sentry will get errors from this app but not the request or logs around them. The checklist shows what to change. If you're setting up Sentry, it is strongly recommended",
+        ),
+        (
+            {"CLAUDECODE": "1"},
             {"enable_logs": True},
-            "Tracing is off, so Sentry gets errors and logs but no traces.",
+            "Sentry will get errors and logs from this app but not the request around an error. The checklist shows what to change.",
         ),
         (
+            {"CLAUDECODE": "1"},
             {"traces_sample_rate": 0.1},
-            "Logs are off, so Sentry gets errors and traces but no logs.",
+            "Sentry will get errors and traces from this app but not the logs around an error. The checklist shows what to change.",
         ),
-    ],
-)
-def test_coding_agent_hint_names_what_is_off(
-    sentry_init, coding_agent_hint, options, missing
-):
-    coding_agent_hint.setenv("CLAUDECODE", "1")
-
-    sentry_init(dsn=AGENT_HINT_DSN, **options)
-
-    assert coding_agent_hint.printed_at_exit().startswith(f"[sentry] {missing} ")
-
-
-@pytest.mark.parametrize(
-    "env, options, advice",
-    [
         (
             {"CODEX_THREAD_ID": "1"},
             {},
-            "If you leave them off, tell the user they're off and that you can turn them on if they want.",
+            "Tracing and logs are off, so Sentry only gets errors. If you leave them off, tell the user they're off and that you can turn them on if they want.",
         ),
         (
             {"AI_AGENT": "codex"},
             {"enable_logs": True},
-            "If you leave it off, tell the user it's off and that you can turn it on if they want.",
+            "Tracing is off, so Sentry gets errors and logs but no traces. If you leave it off, tell the user it's off and that you can turn it on if they want.",
         ),
         (
-            {"CLAUDECODE": "1"},
-            {},
-            "If you're setting up Sentry, it is strongly recommended",
+            {"AI_AGENT": "codex"},
+            {"traces_sample_rate": 0.1},
+            "Logs are off, so Sentry gets errors and traces but no logs. If you leave it off, tell the user it's off",
         ),
     ],
 )
-def test_coding_agent_hint_advice_per_agent(
-    sentry_init, coding_agent_hint, env, options, advice
+def test_coding_agent_hint_per_agent(
+    sentry_init, coding_agent_hint, env, options, hint
 ):
     for name, value in env.items():
         coding_agent_hint.setenv(name, value)
@@ -1629,7 +1620,7 @@ def test_coding_agent_hint_advice_per_agent(
     sentry_init(dsn=AGENT_HINT_DSN, **options)
 
     printed = coding_agent_hint.printed_at_exit()
-    assert advice in printed
+    assert printed.startswith(f"[sentry] {hint}")
     assert SETUP_CHECKLIST_PATH in printed
 
 
