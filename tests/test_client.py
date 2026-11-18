@@ -1,6 +1,7 @@
 import contextlib
 import json
 import os
+import signal
 import subprocess
 import sys
 import time
@@ -1626,3 +1627,43 @@ async def test_async_socks_proxy(testcase):
     )
 
     await client.close_async()
+
+
+@pytest.mark.skipif(
+    sys.platform == "win32"
+    or not hasattr(os, "fork")
+    or not hasattr(os, "register_at_fork"),
+    reason="requires POSIX fork and os.register_at_fork (Python 3.7+)",
+)
+def test_batchers_work_in_child_after_fork(sentry_init):
+    """Regression test for the batcher fork-deadlock fix.
+
+    If os.fork() runs while another thread holds a batcher's lock, the child
+    inherits the lock locked. The holding thread doesn't exist in the child, so
+    the lock can never be released and the next add() deadlocks forever. The
+    client's after-fork hook must reset every batcher in the child.
+    """
+    sentry_init(traces_sample_rate=1.0)
+    client = sentry_sdk.get_client()
+    assert client._batchers
+
+    # Fork while every batcher that has a lock is holding it
+    locks = [b._lock for b in client._batchers if hasattr(b, "_lock")]
+    for lock in locks:
+        lock.acquire()
+
+    pid = os.fork()
+    if pid == 0:
+        # A deadlock kills the child instead of hanging the test
+        signal.alarm(5)
+        sentry_sdk.logger.warning("log from the child")
+        sentry_sdk.metrics.count("test.counter", 1)
+        with sentry_sdk.start_span(name="span from the child"):
+            pass
+        client.flush(timeout=2)
+        os._exit(0)
+
+    for lock in locks:
+        lock.release()
+    _, status = os.waitpid(pid, 0)
+    assert os.WIFEXITED(status) and os.WEXITSTATUS(status) == 0
