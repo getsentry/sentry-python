@@ -390,11 +390,7 @@ class _Client(BaseClient):
                 record_lost_func=_record_lost_event,
             )
 
-            # A forked child inherits the batchers' buffers, locks and flusher
-            # state, but not their threads. A lock held by another thread at
-            # fork time can never be released in the child, so reset all
-            # batchers there. Bound via a WeakMethod so the handler doesn't pin
-            # this client: register_at_fork has no unregister API.
+            # See https://github.com/getsentry/sentry-python/blob/051cc01640a29bfd64b1f1e2e3414c02f027dd1b/sentry_sdk/monitor.py#L41-L50
             if hasattr(os, "register_at_fork"):
                 weak_reset = weakref.WeakMethod(self._reset_components_after_fork)
 
@@ -960,7 +956,7 @@ class _Client(BaseClient):
             self.monitor.kill()
 
     def _reset_components_after_fork(self) -> None:
-        """Reset the thread state of all batchers in a forked child."""
+        """Reset the state of all batchers to prevent deadlocks and duplicate telemetry."""
         for b in self._batchers:
             b._reset_thread_state()
 
