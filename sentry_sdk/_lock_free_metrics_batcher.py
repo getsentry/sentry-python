@@ -60,8 +60,6 @@ class LockFreeMetricsBatcher:
     MAX_BEFORE_FLUSH = 1000
     MAX_BEFORE_DROP = 10_000
     FLUSH_WAIT_TIME = 5.0
-    # Matches FLUSH_WAIT_TIME, so each window goes out in one flush
-    WINDOW_SECONDS = 5.0
 
     TYPE = "trace_metric"
     CLIENT_REPORT_TYPE = "trace_metric"
@@ -96,7 +94,7 @@ class LockFreeMetricsBatcher:
     def _parse_limit(self, rate: float) -> int:
         # Never go below 1, so we always keep at least one metric per name to
         # extrapolate from
-        return min(max(1, int(rate * self.WINDOW_SECONDS)), self.MAX_BEFORE_DROP)
+        return min(max(1, int(rate * self.FLUSH_WAIT_TIME)), self.MAX_BEFORE_DROP)
 
     def _limit(self, name: str) -> "Optional[int]":
         return self._limits.get(name)
@@ -163,7 +161,7 @@ class LockFreeMetricsBatcher:
 
     def _add_to_window(self, item: "Metric", limit: int) -> bool:
         window = self._window
-        if time.monotonic() - window.start >= self.WINDOW_SECONDS:
+        if time.monotonic() - window.start >= self.FLUSH_WAIT_TIME:
             self._retire_window(window)
             window = self._window
 
@@ -218,7 +216,7 @@ class LockFreeMetricsBatcher:
         sampled_out: "list[tuple[Metric, int]]" = []
 
         window = self._window
-        if force or time.monotonic() - window.start >= self.WINDOW_SECONDS:
+        if force or time.monotonic() - window.start >= self.FLUSH_WAIT_TIME:
             self._retire_window(window)
         for _ in range(len(self._retired)):
             try:

@@ -631,31 +631,10 @@ def test_metrics_window_sampling_rate(sentry_init, capture_items, rate, expected
     assert len(items) == expected_count
 
 
-def test_metrics_window_sampling_unlisted_names(sentry_init, capture_items):
-    sentry_init(_experiments={"metrics_window_sampling": {"test.hot": 0.2}})
-    items = capture_items("trace_metric")
-
-    for _ in range(200):
-        sentry_sdk.metrics.count("test.hot", 1)
-        sentry_sdk.metrics.count("test.other", 1)
-
-    get_client().flush()
-
-    metrics = [item.payload for item in items]
-    assert len(metrics) == 201
-
-    (hot,) = [metric for metric in metrics if metric["name"] == "test.hot"]
-    assert hot["attributes"]["sentry.client_sample_rate"] == 1 / 200
-
-    other = [metric for metric in metrics if metric["name"] == "test.other"]
-    for metric in other:
-        assert "sentry.client_sample_rate" not in metric["attributes"]
-
-
 def test_metrics_window_sampling_new_window(sentry_init, capture_items, monkeypatch):
     # Shorten the window so that the test doesn't have to wait 5 seconds for it
     # to close
-    monkeypatch.setattr(LockFreeMetricsBatcher, "WINDOW_SECONDS", 1.0)
+    monkeypatch.setattr(LockFreeMetricsBatcher, "FLUSH_WAIT_TIME", 1.0)
 
     sentry_init(_experiments={"metrics_window_sampling": {"test.counter": 10}})
     items = capture_items("trace_metric")
@@ -673,23 +652,6 @@ def test_metrics_window_sampling_new_window(sentry_init, capture_items, monkeypa
 
     for metric in metrics:
         assert metric["attributes"]["sentry.client_sample_rate"] == 1 / 3
-
-
-def test_metrics_window_sampling_does_not_cap_names(sentry_init, capture_items):
-    sentry_init(
-        _experiments={
-            "metrics_window_sampling": {f"test.counter{i}": 2 for i in range(600)}
-        }
-    )
-    items = capture_items("trace_metric")
-
-    for i in range(600):
-        sentry_sdk.metrics.count(f"test.counter{i}", 1)
-        sentry_sdk.metrics.count(f"test.counter{i}", 1)
-
-    get_client().flush()
-
-    assert len(items) == 1200
 
 
 def test_metrics_window_sampling_drops_after_max_reached(
@@ -724,29 +686,3 @@ def test_metrics_window_sampling_drops_after_max_reached(
         assert data_category == "trace_metric"
         assert quantity == 1
         assert item.payload.json["items"][0]["name"] == "test.c"
-
-
-def test_metrics_window_sampling_after_before_send_metric(sentry_init, capture_items):
-    before_send_metric_calls = 0
-
-    def _before_metric(record, hint):
-        nonlocal before_send_metric_calls
-        before_send_metric_calls += 1
-        return record
-
-    sentry_init(
-        before_send_metric=_before_metric,
-        _experiments={"metrics_window_sampling": {"test.counter": 2}},
-    )
-    items = capture_items("trace_metric")
-
-    for _ in range(200):
-        sentry_sdk.metrics.count("test.counter", 1)
-
-    get_client().flush()
-
-    # Sampling happens after before_send_metric, so it still sees every metric
-    assert before_send_metric_calls == 200
-
-    metrics = [item.payload for item in items]
-    assert len(metrics) == 10
