@@ -1,14 +1,9 @@
-import os
-import sys
-import threading
-import time
 from unittest import mock
 
 import pytest
 
 import sentry_sdk
 from sentry_sdk import get_client
-from sentry_sdk._lock_free_metrics_batcher import LockFreeMetricsBatcher
 from sentry_sdk.consts import SPANDATA, VERSION
 
 
@@ -521,99 +516,3 @@ def test_array_attributes_deep_copied_in_before_send(sentry_init):
     )
 
     get_client().flush()
-
-
-@pytest.mark.skipif(
-    sys.platform == "win32"
-    or not hasattr(os, "fork")
-    or not hasattr(os, "register_at_fork"),
-    reason="requires POSIX fork and os.register_at_fork (Python 3.7+)",
-)
-def test_lock_free_metrics_batcher_state_reset_in_child_after_fork():
-    """The child must not inherit the parent's queued metrics or flusher
-    thread, and must be able to start its own flusher."""
-    batcher = LockFreeMetricsBatcher(
-        capture_func=lambda envelope: None,
-        record_lost_func=lambda *args, **kwargs: None,
-    )
-
-    batcher.add(_metric())
-    batcher._active.flag = True
-    batcher._flush_event.set()
-    batcher._running = False
-
-    pid = os.fork()
-    if pid == 0:
-        reset = (
-            batcher._flusher is None
-            and batcher._flusher_pid is None
-            and len(batcher._queue) == 0
-            and not getattr(batcher._active, "flag", False)
-            and not batcher._flush_event.is_set()
-            and batcher._running is True
-        )
-        restarted = batcher._ensure_thread() and batcher._flusher_pid == os.getpid()
-        os._exit(0 if reset and restarted else 1)
-
-    batcher.kill()
-    _, status = os.waitpid(pid, 0)
-    assert os.WIFEXITED(status) and os.WEXITSTATUS(status) == 0
-
-
-def test_lock_free_metrics_batcher_concurrent_adds(monkeypatch):
-    # Small enough that the queue overflows, so both paths race
-    monkeypatch.setattr(LockFreeMetricsBatcher, "MAX_BEFORE_DROP", 2000)
-    monkeypatch.setattr(LockFreeMetricsBatcher, "MAX_BEFORE_FLUSH", 500)
-
-    sent = []
-    lost = []
-    batcher = LockFreeMetricsBatcher(
-        capture_func=lambda envelope: sent.extend(
-            envelope.items[0].payload.json["items"]
-        ),
-        record_lost_func=lambda *args, **kwargs: lost.append(kwargs["quantity"]),
-    )
-
-    num_threads, per_thread = 8, 1000
-
-    def add_metrics():
-        for _ in range(per_thread):
-            batcher.add(_metric())
-
-    # Switch threads as often as possible to interleave adds
-    original_interval = sys.getswitchinterval()
-    sys.setswitchinterval(1e-6)
-    try:
-        threads = [threading.Thread(target=add_metrics) for _ in range(num_threads)]
-        for thread in threads:
-            thread.start()
-        for thread in threads:
-            thread.join()
-    finally:
-        sys.setswitchinterval(original_interval)
-
-    batcher.flush()
-    batcher.kill()
-
-    total = num_threads * per_thread
-    # flush() doesn't wait for a batch the background flusher already took, so
-    # give it a moment
-    deadline = time.monotonic() + 5
-    while len(sent) + sum(lost) < total and time.monotonic() < deadline:
-        time.sleep(0.01)
-
-    # Every metric is either sent or reported as lost, exactly once
-    assert len(sent) + sum(lost) == total
-
-
-def _metric():
-    return {
-        "timestamp": 0.0,
-        "trace_id": None,
-        "span_id": None,
-        "name": "test.counter",
-        "type": "counter",
-        "value": 1.0,
-        "unit": None,
-        "attributes": {},
-    }

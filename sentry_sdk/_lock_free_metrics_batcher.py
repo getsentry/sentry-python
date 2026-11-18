@@ -11,12 +11,14 @@ atomic on builtin containers, both with the GIL and on free-threaded CPython:
 
 This is independent of ``Batcher`` on purpose, so it can evolve (e.g. gain
 sampling) without affecting the other batchers.
+
+Like the other batchers, it doesn't register its own fork hook. Its owner must
+call ``_reset_thread_state()`` in a forked child.
 """
 
 import os
 import random
 import threading
-import weakref
 from collections import deque
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
@@ -51,17 +53,6 @@ class LockFreeMetricsBatcher:
         self._capture_func = capture_func
         self._record_lost_func = record_lost_func
         self._reset_thread_state()
-
-        # See https://github.com/getsentry/sentry-python/blob/051cc01640a29bfd64b1f1e2e3414c02f027dd1b/sentry_sdk/monitor.py#L41-L50
-        if hasattr(os, "register_at_fork"):
-            weak_reset = weakref.WeakMethod(self._reset_thread_state)
-
-            def _reset_in_child() -> None:
-                method = weak_reset()
-                if method is not None:
-                    method()
-
-            os.register_at_fork(after_in_child=_reset_in_child)
 
     def _reset_thread_state(self) -> None:
         self._queue: "Deque[Metric]" = deque()
