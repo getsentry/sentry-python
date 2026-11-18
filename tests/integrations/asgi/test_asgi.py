@@ -1,3 +1,4 @@
+import asyncio
 from collections import Counter
 
 import pytest
@@ -1576,3 +1577,108 @@ async def test_user_agent_original_attribute(
 
     assert server_span["attributes"]["user_agent.original"] == "TestBrowser/1.0"
     assert child_span["attributes"]["user_agent.original"] == "TestBrowser/1.0"
+
+
+def _request_scope(path):
+    return {
+        "type": "http",
+        "method": "GET",
+        "path": path,
+        "headers": [],
+        "query_string": b"",
+        "server": ("localhost", 80),
+        "client": ("127.0.0.1", 1234),
+    }
+
+
+async def _noop_receive():
+    return {"type": "http.request", "body": b"", "more_body": False}
+
+
+@pytest.mark.asyncio
+async def test_pipelined_request_does_not_inherit_previous_request_scope(
+    sentry_init, capture_events
+):
+    """
+    uvicorn starts the next pipelined request's task from inside the final
+    `send()` of the previous one, so the new task copies a context in which the
+    previous request is still active.
+    """
+    sentry_init(traces_sample_rate=1.0)
+    events = capture_events()
+    sentry_sdk.set_tag("boot", "1")
+
+    seen_on_entry = {}
+    tasks = []
+
+    async def app(scope, receive, send):
+        path = scope["path"]
+        isolation_scope = sentry_sdk.get_isolation_scope()
+        seen_on_entry[path] = {
+            "tags": dict(isolation_scope._tags),
+            "user": isolation_scope._user,
+            "trace_id": isolation_scope.get_traceparent(),
+        }
+        sentry_sdk.set_tag("path", path)
+        sentry_sdk.set_user({"id": path})
+        await send({"type": "http.response.start", "status": 200, "headers": []})
+        await send({"type": "http.response.body", "body": b"ok"})
+
+    middleware = SentryAsgiMiddleware(app)
+
+    async def send(event):
+        if event["type"] == "http.response.body" and not tasks:
+            # what uvicorn's on_response_complete() does for a pipelined request
+            tasks.append(
+                asyncio.create_task(
+                    middleware(_request_scope("/second"), _noop_receive, _discard_send)
+                )
+            )
+
+    async def _discard_send(event):
+        pass
+
+    await middleware(_request_scope("/first"), _noop_receive, send)
+    await asyncio.gather(*tasks)
+
+    assert seen_on_entry["/second"]["tags"] == {"boot": "1"}
+    assert seen_on_entry["/second"]["user"] is None
+    assert (
+        seen_on_entry["/second"]["trace_id"].split("-")[0]
+        != seen_on_entry["/first"]["trace_id"].split("-")[0]
+    )
+
+    transactions = {e["transaction"]: e for e in events if e["type"] == "transaction"}
+    assert set(transactions) == {"http://localhost/first", "http://localhost/second"}
+    assert transactions["http://localhost/first"]["tags"]["path"] == "/first"
+    assert transactions["http://localhost/second"]["tags"]["path"] == "/second"
+    assert transactions["http://localhost/second"]["user"] == {"id": "/second"}
+    assert (
+        transactions["http://localhost/first"]["contexts"]["trace"]["trace_id"]
+        != transactions["http://localhost/second"]["contexts"]["trace"]["trace_id"]
+    )
+    assert sentry_sdk.get_isolation_scope()._tags == {"boot": "1"}
+
+
+@pytest.mark.asyncio
+async def test_nested_middleware_in_same_request_creates_one_transaction(
+    sentry_init, capture_events
+):
+    sentry_init(traces_sample_rate=1.0)
+    events = capture_events()
+
+    async def app(scope, receive, send):
+        sentry_sdk.set_tag("inner", "1")
+        await send({"type": "http.response.start", "status": 200, "headers": []})
+        await send({"type": "http.response.body", "body": b"ok"})
+
+    async def discard(event):
+        pass
+
+    inner = SentryAsgiMiddleware(app)
+    outer = SentryAsgiMiddleware(inner)
+
+    await outer(_request_scope("/nested"), _noop_receive, discard)
+
+    (transaction,) = [e for e in events if e["type"] == "transaction"]
+    assert transaction["tags"]["inner"] == "1"

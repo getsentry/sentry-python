@@ -25,7 +25,12 @@ from sentry_sdk.integrations._asgi_common import (
 from sentry_sdk.integrations._wsgi_common import (
     DEFAULT_HTTP_METHODS_TO_CAPTURE,
 )
-from sentry_sdk.scope import Scope, should_send_default_pii
+from sentry_sdk.scope import (
+    Scope,
+    should_send_default_pii,
+    use_isolation_scope,
+    use_scope,
+)
 from sentry_sdk.sessions import track_session
 from sentry_sdk.traces import (
     SOURCE_FOR_STYLE as SEGMENT_SOURCE_FOR_STYLE,
@@ -61,6 +66,15 @@ if TYPE_CHECKING:
 
     from sentry_sdk._types import Attributes, Event, Hint
     from sentry_sdk.tracing import Span
+
+
+class _RequestState:
+    __slots__ = ("parent_scope", "parent_isolation_scope", "response_complete")
+
+    def __init__(self, parent_scope: "Scope", parent_isolation_scope: "Scope") -> None:
+        self.parent_scope = parent_scope
+        self.parent_isolation_scope = parent_isolation_scope
+        self.response_complete = False
 
 
 _asgi_middleware_applied = ContextVar("sentry_asgi_middleware_applied")
@@ -197,7 +211,13 @@ class SentryAsgiMiddleware:
     async def _run_app(
         self, scope: "Any", receive: "Any", send: "Any", asgi_version: int
     ) -> "Any":
-        is_recursive_asgi_middleware = _asgi_middleware_applied.get(False)
+        request_state = _asgi_middleware_applied.get(None)
+        # A server can start the next pipelined request's task from inside the
+        # final `send()` of the previous one, so that task inherits a context
+        # in which the previous request is still marked as active.
+        is_recursive_asgi_middleware = (
+            request_state is not None and not request_state.response_complete
+        )
         is_lifespan = scope["type"] == "lifespan"
         if is_recursive_asgi_middleware or is_lifespan:
             try:
@@ -224,9 +244,21 @@ class SentryAsgiMiddleware:
         client = sentry_sdk.get_client()
         span_streaming = has_span_streaming_enabled(client.options)
 
-        _asgi_middleware_applied.set(True)
+        if request_state is not None:
+            # Pipelined sibling request: start from the scopes the previous
+            # request itself started from, not from the previous request's.
+            parent_scope = request_state.parent_scope
+            parent_isolation_scope = request_state.parent_isolation_scope
+        else:
+            parent_scope = Scope.get_current_scope()
+            parent_isolation_scope = Scope.get_isolation_scope()
+
+        request_state = _RequestState(parent_scope, parent_isolation_scope)
+        token = _asgi_middleware_applied.set(request_state)
         try:
-            with sentry_sdk.isolation_scope() as sentry_scope:
+            with use_scope(parent_scope), use_isolation_scope(
+                parent_isolation_scope
+            ), sentry_sdk.isolation_scope() as sentry_scope:
                 with track_session(sentry_scope, session_mode="request"):
                     sentry_scope.clear_breadcrumbs()
                     sentry_scope._name = "asgi"
@@ -383,6 +415,13 @@ class SentryAsgiMiddleware:
                                         else:
                                             span.set_http_status(event["status"])
 
+                                if event.get(
+                                    "type"
+                                ) == "http.response.body" and not event.get(
+                                    "more_body"
+                                ):
+                                    request_state.response_complete = True
+
                                 return await send(event)
 
                             if asgi_version == 2:
@@ -435,7 +474,7 @@ class SentryAsgiMiddleware:
                                             "sentry.segment.name.source", source
                                         )
         finally:
-            _asgi_middleware_applied.set(False)
+            _asgi_middleware_applied.reset(token)
 
     def event_processor(
         self, event: "Event", hint: "Hint", asgi_scope: "Any"
