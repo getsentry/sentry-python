@@ -36,8 +36,8 @@ class MetricsBatcher(Batcher["Metric"]):
     ) -> None:
         # Experimental: keep at most this many metrics per name per chunk,
         # picked by reservoir sampling. Names without a limit are not sampled.
-        self._default_limit: "Optional[Tuple[int, float]]" = None
-        self._name_limits: "Dict[str, Tuple[int, float]]" = {}
+        self._default_limit: "Optional[int]" = None
+        self._name_limits: "Dict[str, int]" = {}
         # Only safe without before_send_metric, which must see every metric
         self._sample_early = sample_early
         if window_sampling:
@@ -67,13 +67,12 @@ class MetricsBatcher(Batcher["Metric"]):
         self._held = 0
         self._sampled_out: "List[Tuple[Metric, int]]" = []
 
-    def _parse_limit(self, value: float) -> "Tuple[int, float]":
-        # Below one per chunk, the chunk gets longer and keeps one metric
+    def _parse_limit(self, value: float) -> int:
+        # At least one per chunk, so rates below 1 / CHUNK_SECONDS act like it
         rate = _parse_rate(value)
-        seconds = max(CHUNK_SECONDS, 1 / rate)
-        return min(max(1, int(rate * seconds)), self.MAX_BEFORE_DROP), seconds
+        return min(max(1, int(rate * CHUNK_SECONDS)), self.MAX_BEFORE_DROP)
 
-    def _limit_for(self, name: str) -> "Optional[Tuple[int, float]]":
+    def _limit_for(self, name: str) -> "Optional[int]":
         return self._name_limits.get(name, self._default_limit)
 
     def should_capture(self, name: str) -> bool:
@@ -132,7 +131,7 @@ class MetricsBatcher(Batcher["Metric"]):
                 stratum.kept[index] = item
         return True
 
-    def _get_chunk(self, name: str, limit: "Tuple[int, float]") -> "_Chunk":
+    def _get_chunk(self, name: str, limit: int) -> "_Chunk":
         now = time.monotonic()
         chunk = self._chunks.get(name)
         if chunk is not None and self._is_done(chunk, now):
@@ -141,7 +140,7 @@ class MetricsBatcher(Batcher["Metric"]):
             chunk = None
 
         if chunk is None:
-            chunk = self._chunks[name] = _Chunk(now, *limit)
+            chunk = self._chunks[name] = _Chunk(now, limit)
         return chunk
 
     def _has_room(self, chunk: "_Chunk", stratum: "_Stratum") -> bool:
@@ -167,7 +166,7 @@ class MetricsBatcher(Batcher["Metric"]):
 
     def _is_done(self, chunk: "_Chunk", now: float) -> bool:
         # Chunks that aren't full were not sampled, so they can wait for the flush
-        return self._is_full(chunk) and now - chunk.start >= chunk.seconds
+        return self._is_full(chunk) and now - chunk.start >= CHUNK_SECONDS
 
     def _close(self, chunk: "_Chunk") -> None:
         sampled, other = chunk.sampled, chunk.other
@@ -277,12 +276,11 @@ class MetricsBatcher(Batcher["Metric"]):
 
 
 class _Chunk:
-    __slots__ = ("start", "size", "seconds", "sampled", "other")
+    __slots__ = ("start", "size", "sampled", "other")
 
-    def __init__(self, start: float, size: int, seconds: float) -> None:
+    def __init__(self, start: float, size: int) -> None:
         self.start = start
         self.size = size
-        self.seconds = seconds
         # Metrics recorded in a sampled span, preferred when picking what to keep
         self.sampled = _Stratum()
         self.other = _Stratum()
