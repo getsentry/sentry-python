@@ -13,7 +13,7 @@ from sentry_sdk.utils import (
 )
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Deque, Dict, List, Optional
+    from typing import Any, Callable, Deque, List, Optional
 
     from sentry_sdk._types import Metric
 
@@ -42,9 +42,8 @@ class LockFreeMetricsBatcher:
         self._flush_event: "threading.Event" = threading.Event()
         self._flusher: "Optional[threading.Thread]" = None
         self._flusher_pid: "Optional[int]" = None
-        # Holds the claim of the one thread that gets to start the flusher. A
-        # forked child gets a fresh one when its owner resets this batcher
-        self._flusher_claim: "Dict[str, object]" = {}
+        # Holds the claim of the one thread that gets to start the flusher.
+        self._flusher_claim: "dict[str, object]" = {}
 
     def _ensure_thread(self) -> bool:
         """For forking processes we might need to restart this thread.
@@ -83,15 +82,12 @@ class LockFreeMetricsBatcher:
             self._flush()
 
     def add(self, item: "Metric") -> None:
-        # Not checking self._flusher here: a thread that lost the race to start
-        # the flusher sees it unset for a moment, and its metric should still be
-        # queued
         if not self._ensure_thread():
             return None
 
         queue = self._queue
-        # Checking and appending isn't atomic, so the queue can go over the
-        # limit by at most one metric per concurrently adding thread
+        # Checking and appending isn't atomic.
+        # The queue can go over the limit by at most one metric per concurrently adding thread.
         if len(queue) >= self.MAX_BEFORE_DROP:
             self._record_lost(item)
             return None
@@ -112,11 +108,9 @@ class LockFreeMetricsBatcher:
         self._flush()
 
     def _flush(self) -> "Optional[Envelope]":
-        # Called by both the flusher thread and flush(). Each popleft hands a
-        # metric to exactly one of them
         queue = self._queue
         items: "List[Metric]" = []
-        # Only take what's queued now, so a flush ends even under constant load
+        # Only take what's queued now. Producers can keep enqueuing (no locks).
         for _ in range(len(queue)):
             try:
                 items.append(queue.popleft())
@@ -130,8 +124,6 @@ class LockFreeMetricsBatcher:
         envelope = Envelope(
             headers={"sent_at": format_timestamp(datetime.now(timezone.utc))}
         )
-        # A failure to serialize or send one batch must not kill the flusher
-        # thread, or every later metric would be dropped.
         with capture_internal_exceptions():
             envelope.add_item(self._to_envelope_item(items))
             self._capture_func(envelope)
