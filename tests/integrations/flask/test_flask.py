@@ -397,6 +397,37 @@ def test_flask_session_tracking(sentry_init, capture_envelopes, app):
     assert session["attrs"]["release"] == "demo-release"
 
 
+def test_flask_session_tracking_log_then_reraise(sentry_init, capture_envelopes, app):
+    sentry_init(
+        integrations=[flask_sentry.FlaskIntegration()],
+        release="demo-release",
+    )
+
+    @app.route("/")
+    def index():
+        try:
+            raise ValueError("db down")
+        except ValueError:
+            logging.exception("failed to load")
+            raise
+
+    envelopes = capture_envelopes()
+
+    with app.test_client() as client:
+        with pytest.raises(ValueError):
+            client.get("/")
+
+    sentry_sdk.flush()
+
+    session_envelopes = [
+        e for e in envelopes if any(item.type == "sessions" for item in e.items)
+    ]
+    assert len(session_envelopes) == 1
+    aggregates = session_envelopes[0].items[0].payload.json["aggregates"]
+    assert sum(agg.get("crashed", 0) for agg in aggregates) == 1
+    assert sum(agg.get("errored", 0) for agg in aggregates) == 0
+
+
 @pytest.mark.parametrize("data", [{}, []], ids=["empty-dict", "empty-list"])
 def test_flask_empty_json_request(sentry_init, capture_events, app, data):
     sentry_init(integrations=[flask_sentry.FlaskIntegration()])

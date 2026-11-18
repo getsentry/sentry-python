@@ -42,6 +42,23 @@ class DedupeIntegration(Integration):
 
             exc = exc_info[1]
             if last_seen is exc:
+                exceptions = (event.get("exception") or {}).get("values") or ()
+                for error in exceptions:
+                    mechanism = (
+                        error.get("mechanism") if isinstance(error, dict) else None
+                    )
+                    if (
+                        isinstance(mechanism, dict)
+                        and mechanism.get("handled") is False
+                    ):
+                        session = (
+                            sentry_sdk.get_isolation_scope()._session
+                            or sentry_sdk.get_current_scope()._session
+                        )
+                        if session is not None:
+                            session.update(status="crashed")
+                        break
+
                 logger.info("DedupeIntegration dropped duplicated error event %s", exc)
                 return None
 
