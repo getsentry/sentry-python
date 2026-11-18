@@ -9041,6 +9041,161 @@ def test_cache_tokens_nonstreaming(
         assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 20
 
 
+@pytest.mark.skipif(
+    ANTHROPIC_VERSION < (0, 105),
+    reason="usage.output_tokens_details added in https://github.com/anthropics/anthropic-sdk-python/commit/f18b01414b21b49943a6ba2cdaa30ff7dd6a3025.",
+)
+@pytest.mark.parametrize(
+    "output_tokens_details, expected_reasoning_tokens",
+    [
+        ({"thinking_tokens": 15}, 15),
+        ({"thinking_tokens": 0}, 0),
+        (None, 0),
+    ],
+)
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+def test_reasoning_tokens_nonstreaming(
+    sentry_init,
+    capture_events,
+    capture_items,
+    stream_gen_ai_spans,
+    span_streaming,
+    output_tokens_details,
+    expected_reasoning_tokens,
+):
+    """Test reasoning (thinking) tokens are tracked for non-streaming responses."""
+    sentry_init(
+        integrations=[AnthropicIntegration()],
+        disabled_integrations=[StdlibIntegration],
+        traces_sample_rate=1.0,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
+
+    client = Anthropic(api_key="z")
+
+    client.messages._post = mock.Mock(
+        return_value=Message(
+            id="id",
+            model="claude-opus-4-8",
+            role="assistant",
+            content=[TextBlock(type="text", text="Response")],
+            type="message",
+            usage=Usage(
+                input_tokens=100,
+                output_tokens=50,
+                output_tokens_details=output_tokens_details,
+            ),
+        )
+    )
+
+    if span_streaming or stream_gen_ai_spans:
+        items = capture_items("span")
+
+        with start_transaction(name="anthropic"):
+            client.messages.create(
+                max_tokens=1024,
+                messages=[{"role": "user", "content": "Hello"}],
+                model="claude-opus-4-8",
+            )
+
+        sentry_sdk.flush()
+        (span,) = (item.payload for item in items)
+        span_data = span["attributes"]
+    else:
+        events = capture_events()
+
+        with start_transaction(name="anthropic"):
+            client.messages.create(
+                max_tokens=1024,
+                messages=[{"role": "user", "content": "Hello"}],
+                model="claude-opus-4-8",
+            )
+
+        (span,) = events[0]["spans"]
+        span_data = span["data"]
+
+    # Reasoning tokens are part of output_tokens, so totals are unchanged.
+    assert span_data[SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 50
+    assert span_data[SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 150
+    assert (
+        span_data[SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS_REASONING]
+        == expected_reasoning_tokens
+    )
+
+
+@pytest.mark.skipif(
+    ANTHROPIC_VERSION < (0, 105),
+    reason="usage.output_tokens_details added in https://github.com/anthropics/anthropic-sdk-python/commit/f18b01414b21b49943a6ba2cdaa30ff7dd6a3025.",
+)
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+@pytest.mark.asyncio
+async def test_reasoning_tokens_nonstreaming_async(
+    sentry_init,
+    capture_events,
+    capture_items,
+    stream_gen_ai_spans,
+    span_streaming,
+):
+    """Test reasoning (thinking) tokens are tracked for async non-streaming responses."""
+    sentry_init(
+        integrations=[AnthropicIntegration()],
+        disabled_integrations=[StdlibIntegration],
+        traces_sample_rate=1.0,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
+
+    client = AsyncAnthropic(api_key="z")
+
+    client.messages._post = AsyncMock(
+        return_value=Message(
+            id="id",
+            model="claude-opus-4-8",
+            role="assistant",
+            content=[TextBlock(type="text", text="Response")],
+            type="message",
+            usage=Usage(
+                input_tokens=100,
+                output_tokens=50,
+                output_tokens_details={"thinking_tokens": 15},
+            ),
+        )
+    )
+
+    if span_streaming or stream_gen_ai_spans:
+        items = capture_items("span")
+
+        with start_transaction(name="anthropic"):
+            await client.messages.create(
+                max_tokens=1024,
+                messages=[{"role": "user", "content": "Hello"}],
+                model="claude-opus-4-8",
+            )
+
+        sentry_sdk.flush()
+        (span,) = (item.payload for item in items)
+        span_data = span["attributes"]
+    else:
+        events = capture_events()
+
+        with start_transaction(name="anthropic"):
+            await client.messages.create(
+                max_tokens=1024,
+                messages=[{"role": "user", "content": "Hello"}],
+                model="claude-opus-4-8",
+            )
+
+        (span,) = events[0]["spans"]
+        span_data = span["data"]
+
+    assert span_data[SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 50
+    assert span_data[SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 150
+    assert span_data[SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS_REASONING] == 15
+
+
 @pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_input_tokens_include_cache_write_nonstreaming(
