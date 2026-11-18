@@ -2,6 +2,7 @@ import os
 import random
 import socket
 import uuid
+import weakref
 from collections.abc import Mapping
 from contextvars import ContextVar
 from datetime import datetime, timezone
@@ -399,6 +400,21 @@ class _Client(BaseClient):
                 capture_func=_capture_envelope,
                 record_lost_func=_record_lost_event,
             )
+
+            # A forked child inherits the batchers' buffers, locks and flusher
+            # state, but not their threads. A lock held by another thread at
+            # fork time can never be released in the child, so reset all
+            # batchers there. Bound via a WeakMethod so the handler doesn't pin
+            # this client: register_at_fork has no unregister API.
+            if hasattr(os, "register_at_fork"):
+                weak_reset = weakref.WeakMethod(self._reset_components_after_fork)
+
+                def _reset_in_child() -> None:
+                    method = weak_reset()
+                    if method is not None:
+                        method()
+
+                os.register_at_fork(after_in_child=_reset_in_child)
 
             max_request_body_size = ("always", "never", "small", "medium")
             if self.options["max_request_body_size"] not in max_request_body_size:
@@ -953,6 +969,11 @@ class _Client(BaseClient):
             b.kill()
         if self.monitor:
             self.monitor.kill()
+
+    def _reset_components_after_fork(self) -> None:
+        """Reset the thread state of all batchers in a forked child."""
+        for b in self._batchers:
+            b._reset_thread_state()
 
     def _flush_components(self) -> None:
         """Flush all client components."""
