@@ -88,6 +88,38 @@ class SpanBatcher(Batcher["SpanJSON"]):
         self._flusher = None
         self._flusher_pid = None
 
+    def _ensure_thread(self) -> bool:
+        """For forking processes we might need to restart this thread.
+        This ensures that our process actually has that thread running.
+        """
+        if not self._running:
+            return False
+
+        pid = os.getpid()
+        if self._flusher_pid == pid:
+            return True
+
+        with self._lock:
+            # Recheck to make sure another thread didn't get here and start the
+            # the flusher in the meantime
+            if self._flusher_pid == pid:
+                return True
+
+            self._flusher_pid = pid
+
+            self._flusher = threading.Thread(target=self._flush_loop)
+            self._flusher.daemon = True
+
+            try:
+                self._flusher.start()
+            except RuntimeError:
+                # Unfortunately at this point the interpreter is in a state that no
+                # longer allows us to spawn a thread and we have to bail.
+                self._running = False
+                return False
+
+        return True
+
     def _flush_loop(self) -> None:
         self._active.flag = True
         while self._running:
