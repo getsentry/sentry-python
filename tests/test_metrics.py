@@ -642,6 +642,8 @@ def test_metrics_window_sampling(
         (4, 20),
         # below 1/s still keeps one per chunk
         (0.2, 1),
+        # below one per chunk, as if one per chunk
+        (0.05, 1),
         # invalid, falls back to the default
         (float("inf"), 10),
         (float("nan"), 10),
@@ -776,26 +778,6 @@ def test_metrics_window_sampling_per_name(sentry_init, capture_items):
     other = [m for m in metrics if m["name"] == "test.other"]
     assert len(other) == 200
     assert all("sentry.client_sample_rate" not in m["attributes"] for m in other)
-
-
-def test_metrics_window_sampling_long_chunks(sentry_init, capture_items, monkeypatch):
-    monkeypatch.setattr(sentry_sdk._metrics_batcher, "CHUNK_SECONDS", 0.1)
-    sentry_init(
-        _experiments={"metrics_window_sampling": {"per_name": {"test.hot": 0.5}}}
-    )
-    items = capture_items("trace_metric")
-
-    for _ in range(10):
-        sentry_sdk.metrics.count("test.hot", 1)
-    time.sleep(0.3)
-    for _ in range(10):
-        sentry_sdk.metrics.count("test.hot", 1)
-
-    get_client().flush()
-
-    # Below one per chunk, the chunk lasts 1 / rate (2s), so both bursts share it
-    (item,) = items
-    assert item.payload["attributes"]["sentry.client_sample_rate"] == 1 / 20
 
 
 def test_metrics_window_sampling_before_send_metric(sentry_init, capture_items):
