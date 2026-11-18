@@ -91,8 +91,10 @@ class LockFreeMetricsBatcher:
             return None
 
         queue.append(item)
-        if len(queue) >= self.MAX_BEFORE_FLUSH and not self._flush_event.is_set():
-            self._flush_event.set()
+        if len(queue) < self.MAX_BEFORE_FLUSH or self._flush_event.is_set():
+            return
+
+        self._flush_event.set()
 
     def kill(self) -> None:
         if self._flusher is None:
@@ -113,7 +115,6 @@ class LockFreeMetricsBatcher:
             try:
                 items.append(queue.popleft())
             except IndexError:
-                # Another consumer drained it in the meantime
                 break
 
         if not items:
