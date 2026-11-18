@@ -1593,12 +1593,12 @@ def test_coding_agent_hint_not_shown_without_dsn(run_app):
         (
             {"CLAUDECODE": "1"},
             "enable_logs=True",
-            "Sentry will get errors and logs from this app but not the request trace around an error. The checklist shows what to change.",
+            "Sentry will get errors from this app but not the request trace around them. The checklist shows what to change.",
         ),
         (
             {"CLAUDECODE": "1"},
             "traces_sample_rate=0.1",
-            "Sentry will get errors and traces from this app, and its logs only as breadcrumbs. The checklist shows what to change.",
+            "Sentry will get errors from this app but its logs only as breadcrumbs. The checklist shows what to change.",
         ),
         (
             {"CODEX_THREAD_ID": "1"},

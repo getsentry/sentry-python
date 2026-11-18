@@ -345,15 +345,13 @@ _MISSING_PRODUCTS = {
         "them",
     ),
     (False, True): (
-        "Sentry will get errors and logs from this app but not the request trace "
-        "around an error.",
+        "Sentry will get errors from this app but not the request trace around them.",
         "Tracing is off, so Sentry gets errors and logs but no traces.",
         "it's",
         "it",
     ),
     (True, False): (
-        "Sentry will get errors and traces from this app, and its logs only as "
-        "breadcrumbs.",
+        "Sentry will get errors from this app but its logs only as breadcrumbs.",
         "Logs are off, so Sentry gets errors and traces but no logs.",
         "it's",
         "it",
