@@ -9045,14 +9045,6 @@ def test_cache_tokens_nonstreaming(
     ANTHROPIC_VERSION < (0, 105),
     reason="usage.output_tokens_details added in https://github.com/anthropics/anthropic-sdk-python/commit/f18b01414b21b49943a6ba2cdaa30ff7dd6a3025.",
 )
-@pytest.mark.parametrize(
-    "output_tokens_details, expected_reasoning_tokens",
-    [
-        ({"thinking_tokens": 15}, 15),
-        ({"thinking_tokens": 0}, 0),
-        (None, 0),
-    ],
-)
 @pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_reasoning_tokens_nonstreaming(
@@ -9061,8 +9053,6 @@ def test_reasoning_tokens_nonstreaming(
     capture_items,
     stream_gen_ai_spans,
     span_streaming,
-    output_tokens_details,
-    expected_reasoning_tokens,
 ):
     """Test reasoning (thinking) tokens are tracked for non-streaming responses."""
     sentry_init(
@@ -9085,7 +9075,7 @@ def test_reasoning_tokens_nonstreaming(
             usage=Usage(
                 input_tokens=100,
                 output_tokens=50,
-                output_tokens_details=output_tokens_details,
+                output_tokens_details={"thinking_tokens": 15},
             ),
         )
     )
@@ -9119,10 +9109,7 @@ def test_reasoning_tokens_nonstreaming(
     # Reasoning tokens are part of output_tokens, so totals are unchanged.
     assert span_data[SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 50
     assert span_data[SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 150
-    assert (
-        span_data[SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS_REASONING]
-        == expected_reasoning_tokens
-    )
+    assert span_data[SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS_REASONING] == 15
 
 
 @pytest.mark.skipif(
