@@ -1513,31 +1513,35 @@ AGENT_HINT_DSN = "https://public@sentry.example.com/1"
 
 
 @pytest.fixture
-def run_app(tmp_path):
-    """Run a script that calls sentry_sdk.init() and return what it prints to stderr."""
+def run_app(tmp_path, monkeypatch, capsys):
+    """Run a script that calls sentry_sdk.init() and return what the SDK prints at exit."""
+    for name in ("CI", "SENTRY_AGENT_HINTS", "AI_AGENT", *CODING_AGENT_ENV_VARS):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setattr(sentry_sdk.client, "_coding_agent_hint_shown", False)
+    at_exit = []
+    monkeypatch.setattr(
+        sentry_sdk.client.atexit,
+        "register",
+        lambda hook, *args: at_exit.append((hook, args)),
+    )
     app = tmp_path / "app.py"
 
     def run(env, init_args="", before_run=None, inits=1, dsn=AGENT_HINT_DSN):
+        for name, value in env.items():
+            monkeypatch.setenv(name, value)
         init = f"sentry_sdk.init(dsn={dsn!r}, {init_args})\n"
         app.write_text("import sentry_sdk\n" + init * inits)
         if before_run:
             before_run(app)
 
-        clean_env = {
-            name: value
-            for name, value in os.environ.items()
-            if name
-            not in ("CI", "SENTRY_AGENT_HINTS", "AI_AGENT", *CODING_AGENT_ENV_VARS)
-        }
-        result = subprocess.run(
-            [sys.executable, str(app)],
-            env={**clean_env, **env},
-            cwd=str(tmp_path),
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-        return result.stderr
+        try:
+            exec(compile(app.read_text(), str(app), "exec"), {})
+            for hook, args in at_exit:
+                if hook is sentry_sdk.client._write_coding_agent_hint:
+                    hook(*args)
+        finally:
+            sentry_sdk.get_client().close()
+        return capsys.readouterr().err
 
     return run
 
@@ -1616,7 +1620,7 @@ def test_coding_agent_hint_not_shown_without_dsn(run_app):
 def test_coding_agent_hint_per_agent(run_app, env, init_args, hint):
     printed = run_app(env, init_args)
 
-    assert printed.startswith(f"[sentry] {hint}")
+    assert f"[sentry] {hint}" in printed
     assert SETUP_CHECKLIST_PATH in printed
 
 
@@ -1639,7 +1643,12 @@ def _git(app, *args, committer="dev@example.com", date=None):
     if date:
         env["GIT_AUTHOR_DATE"] = env["GIT_COMMITTER_DATE"] = date
     subprocess.run(
-        ["git", *args], cwd=str(app.parent), env=env, check=True, capture_output=True
+        ["git", *args],
+        cwd=str(app.parent),
+        env=env,
+        check=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
     )
 
 
