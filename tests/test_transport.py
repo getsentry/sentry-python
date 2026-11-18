@@ -44,6 +44,7 @@ from sentry_sdk.transport import (
     AsyncHttpTransport,
     HttpTransport,
     _parse_rate_limits,
+    _RateLimits,
 )
 
 server = None
@@ -473,6 +474,22 @@ def test_parse_rate_limits(input, expected):
     assert dict(_parse_rate_limits(input, now=NOW)) == expected
 
 
+def test_rate_limits_keep_longest_deadline():
+    rate_limits = _RateLimits()
+    now = datetime.now(timezone.utc)
+
+    rate_limits.update("error", now - timedelta(seconds=1))
+    assert not rate_limits.is_active("error")
+
+    # A longer deadline replaces a shorter one.
+    rate_limits.update("error", now + timedelta(hours=1))
+    assert rate_limits.is_active("error")
+
+    # A shorter deadline does not replace a longer one.
+    rate_limits.update("error", now - timedelta(seconds=1))
+    assert rate_limits.is_active("error")
+
+
 def test_envelope_too_large_response(capturing_server, make_client):
     client = make_client()
 
@@ -511,7 +528,7 @@ def test_simple_rate_limits(capturing_server, make_client):
     assert capturing_server.captured[0].path == "/api/132/envelope/"
     capturing_server.clear_captured()
 
-    assert set(client.transport._disabled_until) == set([None])
+    assert client.transport._disabled_until.is_active(None)
 
     client.capture_event({"type": "transaction"})
     client.capture_event({"type": "event"})
@@ -547,7 +564,9 @@ def test_data_category_limits(
     assert capturing_server.captured[0].path == "/api/132/envelope/"
     capturing_server.clear_captured()
 
-    assert set(client.transport._disabled_until) == set(["transaction"])
+    rate_limits = client.transport._disabled_until
+    assert rate_limits.is_active("transaction")
+    assert not rate_limits.is_active(None)
 
     client.capture_event({"type": "transaction"})
     client.capture_event({"type": "transaction"})
@@ -600,7 +619,10 @@ def test_data_category_limits_reporting(
     assert capturing_server.captured[0].path == "/api/132/envelope/"
     capturing_server.clear_captured()
 
-    assert set(client.transport._disabled_until) == set(["attachment", "transaction"])
+    rate_limits = client.transport._disabled_until
+    assert rate_limits.is_active("attachment")
+    assert rate_limits.is_active("transaction")
+    assert not rate_limits.is_active(None)
 
     client.capture_event({"type": "transaction"})
     client.capture_event({"type": "transaction"})
@@ -694,7 +716,7 @@ def test_complex_limits_without_data_category(
     assert capturing_server.captured[0].path == "/api/132/envelope/"
     capturing_server.clear_captured()
 
-    assert set(client.transport._disabled_until) == set([None])
+    assert client.transport._disabled_until.is_active(None)
 
     client.capture_event({"type": "transaction"})
     client.capture_event({"type": "transaction"})
@@ -826,7 +848,9 @@ def test_log_item_limits(capturing_server, response_code, item, make_client):
     assert capturing_server.captured[0].path == "/api/132/envelope/"
     capturing_server.clear_captured()
 
-    assert set(client.transport._disabled_until) == {"log_item"}
+    rate_limits = client.transport._disabled_until
+    assert rate_limits.is_active("log_item")
+    assert not rate_limits.is_active(None)
 
     client.transport.capture_envelope(envelope)
     client.capture_event({"type": "transaction"})
