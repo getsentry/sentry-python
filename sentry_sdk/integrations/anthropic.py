@@ -167,6 +167,7 @@ class _RecordedUsage:
     input_tokens: int = 0
     cache_write_input_tokens: "Optional[int]" = 0
     cache_read_input_tokens: "Optional[int]" = 0
+    output_tokens_reasoning: "Optional[int]" = 0
 
 
 class _StreamSpanContext:
@@ -330,15 +331,16 @@ def _capture_exception(exc: "Any") -> None:
     sentry_sdk.capture_event(event, hint=hint)
 
 
-def _get_token_usage(result: "Messages") -> "tuple[int, int, int, int]":
+def _get_token_usage(result: "Messages") -> "tuple[int, int, int, int, int]":
     """
     Get token usage from the Anthropic response.
-    Returns: (input_tokens, output_tokens, cache_read_input_tokens, cache_write_input_tokens)
+    Returns: (input_tokens, output_tokens, cache_read_input_tokens, cache_write_input_tokens, output_tokens_reasoning)
     """
     input_tokens = 0
     output_tokens = 0
     cache_read_input_tokens = 0
     cache_write_input_tokens = 0
+    output_tokens_reasoning = 0
     if hasattr(result, "usage"):
         usage = result.usage
         if hasattr(usage, "input_tokens") and isinstance(usage.input_tokens, int):
@@ -353,6 +355,11 @@ def _get_token_usage(result: "Messages") -> "tuple[int, int, int, int]":
             usage.cache_creation_input_tokens, int
         ):
             cache_write_input_tokens = usage.cache_creation_input_tokens
+        if hasattr(usage, "output_tokens_details"):
+            reasoning = getattr(usage.output_tokens_details, "thinking_tokens", None)
+            if isinstance(reasoning, int):
+                output_tokens_reasoning = reasoning
+
 
     # Anthropic's input_tokens excludes cached/cache_write tokens.
     # Normalize to total input tokens so downstream cost calculations
@@ -364,6 +371,7 @@ def _get_token_usage(result: "Messages") -> "tuple[int, int, int, int]":
         output_tokens,
         cache_read_input_tokens,
         cache_write_input_tokens,
+        output_tokens_reasoning,
     )
 
 
@@ -726,6 +734,7 @@ def _set_output_data(
     content_blocks: "list[dict[str, Any]]",
     response_id: "str | None" = None,
     finish_reason: "str | None" = None,
+    output_tokens_reasoning: "int | None" = None,
 ) -> None:
     """
     Set output data for the span based on the AI response."""
@@ -788,6 +797,9 @@ def _set_output_data(
 
     if output_tokens is not None:
         set_on_span(SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS, output_tokens)
+
+    if output_tokens_reasoning is not None:
+        set_on_span(SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS_REASONING, output_tokens_reasoning)
 
     if input_tokens is not None and output_tokens is not None:
         set_on_span(SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, input_tokens + output_tokens)
@@ -867,6 +879,7 @@ def _sentry_patched_create_sync(f: "Any", *args: "Any", **kwargs: "Any") -> "Any
                 output_tokens,
                 cache_read_input_tokens,
                 cache_write_input_tokens,
+                output_tokens_reasoning,
             ) = _get_token_usage(result)
 
             content_blocks = []
@@ -886,6 +899,7 @@ def _sentry_patched_create_sync(f: "Any", *args: "Any", **kwargs: "Any") -> "Any
                 output_tokens=output_tokens,
                 cache_read_input_tokens=cache_read_input_tokens,
                 cache_write_input_tokens=cache_write_input_tokens,
+                output_tokens_reasoning=output_tokens_reasoning,
                 content_blocks=content_blocks,
                 response_id=getattr(result, "id", None),
                 finish_reason=getattr(result, "stop_reason", None),
@@ -974,6 +988,7 @@ async def _sentry_patched_create_async(
                 output_tokens,
                 cache_read_input_tokens,
                 cache_write_input_tokens,
+                output_tokens_reasoning,
             ) = _get_token_usage(result)
 
             content_blocks = []
@@ -993,6 +1008,7 @@ async def _sentry_patched_create_async(
                 output_tokens=output_tokens,
                 cache_read_input_tokens=cache_read_input_tokens,
                 cache_write_input_tokens=cache_write_input_tokens,
+                output_tokens_reasoning=output_tokens_reasoning,
                 content_blocks=content_blocks,
                 response_id=getattr(result, "id", None),
                 finish_reason=getattr(result, "stop_reason", None),
