@@ -145,16 +145,14 @@ class LockFreeMetricsBatcher:
 
         limit = self._limits.get(item["name"])
         if limit is None:
-            self._add_to_queue(item)
-        else:
-            self._add_to_window(item, window, limit)
+            self._queue.append(item)
+            if len(self._queue) < self.MAX_BEFORE_FLUSH or self._flush_event.is_set():
+                return
 
-    def _add_to_queue(self, item: "Metric") -> None:
-        self._queue.append(item)
-        if len(self._queue) < self.MAX_BEFORE_FLUSH or self._flush_event.is_set():
+            self._flush_event.set()
             return
 
-        self._flush_event.set()
+        self._add_to_window(item, window, limit)
 
     def _add_to_window(self, item: "Metric", window: "_Window", limit: int) -> None:
         state = window.threads[threading.get_ident()]
