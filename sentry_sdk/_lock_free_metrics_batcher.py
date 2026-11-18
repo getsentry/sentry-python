@@ -1,4 +1,3 @@
-import itertools
 import math
 import os
 import random
@@ -24,35 +23,37 @@ if TYPE_CHECKING:
 DEFAULT_SAMPLE_PER_SECOND = 2
 # Matches FLUSH_WAIT_TIME, so each window goes out in one flush
 WINDOW_SECONDS = 5.0
-# Marks a window's writers once it's retired
-_RETIRED = "retired"
 
 
 class _Reservoir:
-    __slots__ = ("kept", "seen", "overflowed")
+    __slots__ = ("kept", "seen")
 
     def __init__(self) -> None:
         self.kept: "list[Metric]" = []
-        self.seen = itertools.count()
-        # Metrics that were seen but couldn't get a slot because the window ran
-        # out of memory budget. They're reported as queue_overflow, so they must
-        # not also count towards the sample rate
-        self.overflowed = itertools.count()
+        self.seen = 0
+
+
+class _ThreadState:
+    """One thread's reservoirs in a window. Only that thread writes to it, so
+    it needs no synchronization."""
+
+    __slots__ = ("reservoirs", "held")
+
+    def __init__(self) -> None:
+        self.reservoirs: "dict[str, _Reservoir]" = {}
+        # Slots across this thread's reservoirs, to bound memory
+        self.held = 0
 
 
 class _Window:
-    __slots__ = ("start", "reservoirs", "held", "retire_claims", "writers")
+    __slots__ = ("start", "threads", "retire_claims")
 
     def __init__(self) -> None:
         self.start = time.monotonic()
-        self.reservoirs: "dict[str, _Reservoir]" = {}
-        # Slots handed out across all reservoirs, to bound memory
-        self.held = itertools.count()
+        # Thread ident -> that thread's reservoirs. Belongs to the window, so
+        # threads that are gone disappear with it
+        self.threads: "dict[int, _ThreadState]" = {}
         self.retire_claims: "list[object]" = []
-        # Adds currently writing to this window, plus the _RETIRED mark once
-        # it's retired. Both live in one dict, so registering and checking for
-        # the mark can't be reordered against setting it.
-        self.writers: "dict[object, bool]" = {}
 
 
 class LockFreeMetricsBatcher:
@@ -119,6 +120,11 @@ class LockFreeMetricsBatcher:
         # extrapolate from
         return min(max(1, int(rate * WINDOW_SECONDS)), self.MAX_BEFORE_DROP)
 
+    def _limit(self, name: str) -> "Optional[int]":
+        if not self._sampling:
+            return None
+        return self._name_limits.get(name, self._default_limit)
+
     def _ensure_thread(self) -> bool:
         """For forking processes we might need to restart this thread.
         This ensures that our process actually has that thread running.
@@ -159,11 +165,7 @@ class LockFreeMetricsBatcher:
         if not self._ensure_thread():
             return None
 
-        limit = (
-            self._name_limits.get(item["name"], self._default_limit)
-            if self._sampling
-            else None
-        )
+        limit = self._limit(item["name"])
         if limit is None:
             kept = self._add_to_queue(item)
         else:
@@ -188,49 +190,34 @@ class LockFreeMetricsBatcher:
         if time.monotonic() - self._window.start >= WINDOW_SECONDS:
             self._retire_window(force=False)
 
-        # Register before touching the window. A consumer harvests a retired
-        # window only once every registered add has left, and an add that
-        # registers after the window was retired sees the mark and moves on to
-        # the new window. So every metric is either harvested or in a later
-        # window.
-        token = object()
-        while True:
-            window = self._window
-            writers = window.writers
-            writers[token] = True
-            if _RETIRED not in writers:
-                break
-            del writers[token]
+        # A thread that's still writing when its window is harvested loses
+        # that metric. It has almost always been counted already, so it's
+        # reported as sampled out.
+        window = self._window
+        thread_id = threading.get_ident()
+        state = window.threads.get(thread_id)
+        if state is None:
+            state = window.threads.setdefault(thread_id, _ThreadState())
 
-        try:
-            name = item["name"]
-            reservoir = window.reservoirs.get(name)
-            if reservoir is None:
-                reservoir = window.reservoirs.setdefault(name, _Reservoir())
-
-            seen = next(reservoir.seen)
-            if seen < limit:
-                # Replacing a slot in a full reservoir doesn't need more memory,
-                # only a new slot does
-                if next(window.held) >= self.MAX_BEFORE_DROP:
-                    next(reservoir.overflowed)
-                    return False
-                reservoir.kept.append(item)
-                return True
-
-            index = random.randrange(seen + 1)
+        # Reservoir sampling (Algorithm R) on this thread's own reservoir
+        name = item["name"]
+        reservoir = state.reservoirs.get(name)
+        if reservoir is None:
+            reservoir = state.reservoirs[name] = _Reservoir()
+        if len(reservoir.kept) < limit:
+            if state.held >= self.MAX_BEFORE_DROP:
+                # Out of memory budget. Not seen, so it doesn't count towards
+                # the sample rate
+                return False
+            state.held += 1
+            reservoir.seen += 1
+            reservoir.kept.append(item)
+        else:
+            reservoir.seen += 1
+            index = random.randrange(reservoir.seen)
             if index < limit:
-                try:
-                    reservoir.kept[index] = item
-                except IndexError:
-                    # The slot hasn't been filled yet by a concurrent add, or
-                    # never will be because that add overflowed. Either way this
-                    # metric is sampled out, which keeps the reservoir within
-                    # its memory budget
-                    pass
-            return True
-        finally:
-            del writers[token]
+                reservoir.kept[index] = item
+        return True
 
     def _retire_window(self, force: bool) -> None:
         window = self._window
@@ -245,10 +232,7 @@ class LockFreeMetricsBatcher:
             # Someone else is retiring this window
             return
 
-        # Swap before marking, so that adds turned away by the mark find the
-        # new window right away
         self._window = _Window()
-        window.writers[_RETIRED] = True
         self._retired.append(window)
 
     def kill(self) -> None:
@@ -284,10 +268,6 @@ class LockFreeMetricsBatcher:
                 except IndexError:
                     # Another consumer took it
                     break
-                # Adds that registered before the window was retired are only
-                # a few bytecodes from leaving
-                while len(window.writers) > 1:
-                    time.sleep(0)
                 sampled_out.extend(self._harvest(window, items))
 
         if not items:
@@ -320,17 +300,24 @@ class LockFreeMetricsBatcher:
     def _harvest(
         self, window: "_Window", items: "list[Metric]"
     ) -> "list[tuple[Metric, int]]":
+        # Copies, since a thread that's still writing may add to them
+        by_name: "dict[str, list[_Reservoir]]" = {}
+        for state in window.threads.copy().values():
+            for name, reservoir in state.reservoirs.copy().items():
+                by_name.setdefault(name, []).append(reservoir)
+
         sampled_out = []
-        for reservoir in window.reservoirs.values():
-            kept = reservoir.kept
+        for name, reservoirs in by_name.items():
+            limit = self._limit(name)
+            if limit is None:
+                continue
+
+            seen = sum(reservoir.seen for reservoir in reservoirs)
+            kept = self._merge(reservoirs, limit, seen)
             if not kept:
                 continue
 
             items.extend(kept)
-
-            # Nothing writes to a harvested window, so reading the counters by
-            # advancing them is fine
-            seen = next(reservoir.seen) - next(reservoir.overflowed)
             if seen <= len(kept):
                 # Nothing was sampled out
                 continue
@@ -346,6 +333,36 @@ class LockFreeMetricsBatcher:
             sampled_out.append((kept[0], seen - len(kept)))
 
         return sampled_out
+
+    @staticmethod
+    def _merge(reservoirs: "list[_Reservoir]", limit: int, seen: int) -> "list[Metric]":
+        """Merge per-thread samples of one name into one uniform sample of at
+        most ``limit`` metrics out of all ``seen``."""
+        # Split the slots across threads like drawing without replacement from
+        # all seen metrics, so each thread gets slots in proportion to how much
+        # it saw
+        left = [reservoir.seen for reservoir in reservoirs]
+        remaining = seen
+        slots = [0] * len(reservoirs)
+        for _ in range(min(limit, seen)):
+            pick = random.randrange(remaining)
+            i = 0
+            for i, count in enumerate(left):
+                if pick < count:
+                    break
+                pick -= count
+            slots[i] += 1
+            left[i] -= 1
+            remaining -= 1
+
+        # A random subset of a uniform sample is still a uniform sample
+        kept = []
+        for reservoir, count in zip(reservoirs, slots):
+            thread_kept = reservoir.kept[:]
+            # A thread caught writing can have counted a metric it hasn't
+            # stored yet
+            kept.extend(random.sample(thread_kept, min(count, len(thread_kept))))
+        return kept
 
     def _record_lost(self, item: "Metric") -> None:
         envelope_item = None

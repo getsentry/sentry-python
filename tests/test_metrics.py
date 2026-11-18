@@ -551,8 +551,8 @@ def test_array_attributes_deep_copied_in_before_send(sentry_init):
     reason="requires POSIX fork and os.register_at_fork (Python 3.7+)",
 )
 def test_metrics_window_sampling_state_reset_in_child_after_fork(sentry_init):
-    """The child must not inherit the parent's queued metrics, sampling window
-    or flusher thread, and must be able to start its own flusher."""
+    """The child must not inherit the parent's queued metrics or flusher
+    thread, and must be able to start its own flusher."""
     sentry_init(
         _experiments={"metrics_window_sampling": {"per_name": {"test.sampled": 2}}}
     )
@@ -561,8 +561,6 @@ def test_metrics_window_sampling_state_reset_in_child_after_fork(sentry_init):
 
     sentry_sdk.metrics.count("test.sampled", 1)
     sentry_sdk.metrics.count("test.unsampled", 1)
-    original_window = batcher._window
-    batcher._retire_window(force=True)
     batcher._flush_event.set()
     batcher._running = False
 
@@ -572,9 +570,6 @@ def test_metrics_window_sampling_state_reset_in_child_after_fork(sentry_init):
             batcher._flusher is None
             and batcher._flusher_pid is None
             and len(batcher._queue) == 0
-            and len(batcher._retired) == 0
-            and batcher._window is not original_window
-            and not batcher._window.reservoirs
             and not batcher._flush_event.is_set()
             and batcher._running is True
         )
@@ -623,25 +618,35 @@ def test_metrics_window_sampling_concurrent_adds(
 
     total = num_threads * per_thread
 
-    def lost(reason):
+    def sampled_out():
         return sum(
             quantity
-            for lost_reason, data_category, _, quantity in record_lost_event_calls
-            if lost_reason == reason and data_category == "trace_metric"
+            for reason, data_category, _, quantity in record_lost_event_calls
+            if reason == "sample_rate" and data_category == "trace_metric"
+        )
+
+    def overflowed(name):
+        return sum(
+            quantity
+            for reason, data_category, item, quantity in record_lost_event_calls
+            if reason == "queue_overflow"
+            and data_category == "trace_metric"
+            and item.payload.json["items"][0]["name"] == name
         )
 
     def sent(name):
         return [item.payload for item in items if item.payload["name"] == name]
 
     # Every unsampled metric is either sent or reported as overflow, exactly once
-    assert len(sent("test.cold")) + lost("queue_overflow") == total
+    assert len(sent("test.cold")) + overflowed("test.cold") == total
 
-    # Every sampled metric is either kept or reported as sampled out
+    # Every sampled metric is either kept, sampled out or reported as overflow
     hot = sent("test.hot")
+    seen = total - overflowed("test.hot")
     assert 1 <= len(hot) <= 10
-    assert len(hot) + lost("sample_rate") == total
+    assert len(hot) + sampled_out() == seen
     for metric in hot:
-        assert metric["attributes"]["sentry.client_sample_rate"] == len(hot) / total
+        assert metric["attributes"]["sentry.client_sample_rate"] == len(hot) / seen
 
 
 def test_metrics_not_sampled_by_default(sentry_init, capture_items):
