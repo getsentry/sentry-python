@@ -1,11 +1,13 @@
 import os
 import sys
+import time
 from unittest import mock
 
 import pytest
 
 import sentry_sdk
 from sentry_sdk import get_client
+from sentry_sdk._metrics_batcher import MetricsBatcher
 from sentry_sdk.consts import SPANDATA, VERSION
 
 
@@ -574,3 +576,235 @@ def test_metrics_batcher_lock_reset_in_child_after_fork(sentry_init):
     original_lock.release()
     _, status = os.waitpid(pid, 0)
     assert os.WIFEXITED(status) and os.WEXITSTATUS(status) == 0
+
+
+def test_metrics_not_sampled_by_default(sentry_init, capture_items):
+    sentry_init()
+    items = capture_items("trace_metric")
+
+    for _ in range(100):
+        sentry_sdk.metrics.count("test.counter", 1)
+
+    get_client().flush()
+
+    metrics = [item.payload for item in items]
+    assert len(metrics) == 100
+
+    for metric in metrics:
+        assert "sentry.client_sample_rate" not in metric["attributes"]
+
+
+def test_metrics_window_sampling_basics(
+    sentry_init, capture_items, capture_record_lost_event_calls
+):
+    sentry_init(_experiments={"metrics_window_sampling": True})
+    items = capture_items("trace_metric")
+    record_lost_event_calls = capture_record_lost_event_calls()
+
+    for _ in range(200):
+        sentry_sdk.metrics.count("test.hot", 1)
+    for _ in range(3):
+        sentry_sdk.metrics.count("test.cold", 1)
+
+    get_client().flush()
+
+    metrics = [item.payload for item in items]
+    assert len(metrics) == 13
+
+    hot = [metric for metric in metrics if metric["name"] == "test.hot"]
+    assert len(hot) == 10
+    for metric in hot:
+        assert metric["attributes"]["sentry.client_sample_rate"] == 0.05
+
+    cold = [metric for metric in metrics if metric["name"] == "test.cold"]
+    assert len(cold) == 3
+    for metric in cold:
+        assert "sentry.client_sample_rate" not in metric["attributes"]
+
+    assert record_lost_event_calls == [
+        ("sample_rate", "trace_metric", None, 190),
+        ("sample_rate", "trace_metric_byte", None, mock.ANY),
+    ]
+
+
+@pytest.mark.parametrize(
+    "sample_per_second,expected_count",
+    [
+        (4, 20),
+        (0.2, 1),
+        (0.05, 1),
+        (float("inf"), 10),
+        (float("nan"), 10),
+        (0, 10),
+        (-1, 10),
+        ("fast", 10),
+    ],
+)
+def test_metrics_window_sampling_sample_per_second(
+    sentry_init, capture_items, sample_per_second, expected_count
+):
+    sentry_init(
+        _experiments={
+            "metrics_window_sampling": {"sample_per_second": sample_per_second}
+        }
+    )
+    items = capture_items("trace_metric")
+
+    for _ in range(200):
+        sentry_sdk.metrics.count("test.counter", 1)
+
+    get_client().flush()
+
+    assert len(items) == expected_count
+
+
+def test_metrics_window_sampling_per_name(sentry_init, capture_items):
+    sentry_init(
+        _experiments={"metrics_window_sampling": {"per_name": {"test.hot": 0.2}}}
+    )
+    items = capture_items("trace_metric")
+
+    for _ in range(200):
+        sentry_sdk.metrics.count("test.hot", 1)
+        sentry_sdk.metrics.count("test.other", 1)
+
+    get_client().flush()
+
+    metrics = [item.payload for item in items]
+    assert len(metrics) == 11
+
+    (hot,) = [metric for metric in metrics if metric["name"] == "test.hot"]
+    assert hot["attributes"]["sentry.client_sample_rate"] == 1 / 200
+
+    other = [metric for metric in metrics if metric["name"] == "test.other"]
+    assert len(other) == 10
+    for metric in other:
+        assert metric["attributes"]["sentry.client_sample_rate"] == 0.05
+
+
+@pytest.mark.parametrize(
+    "client_sample_rate,expected_sample_rate",
+    [
+        (0.5, 0.05),
+        (5, 0.1),
+        (0, 0.1),
+        (-1, 0.1),
+        (float("nan"), 0.1),
+        ("0.5", 0.1),
+    ],
+)
+def test_metrics_window_sampling_multiplies_client_sample_rate(
+    sentry_init, capture_items, client_sample_rate, expected_sample_rate
+):
+    sentry_init(_experiments={"metrics_window_sampling": True})
+    items = capture_items("trace_metric")
+
+    for _ in range(100):
+        sentry_sdk.metrics.count(
+            "test.counter",
+            1,
+            attributes={"sentry.client_sample_rate": client_sample_rate},
+        )
+
+    get_client().flush()
+
+    metrics = [item.payload for item in items]
+    assert len(metrics) == 10
+
+    for metric in metrics:
+        assert metric["attributes"]["sentry.client_sample_rate"] == expected_sample_rate
+
+
+def test_metrics_window_sampling_new_window(sentry_init, capture_items, monkeypatch):
+    # Shorten the window so that the test doesn't have to wait 5 seconds for it
+    # to close
+    monkeypatch.setattr(sentry_sdk._metrics_batcher, "WINDOW_SECONDS", 1.0)
+
+    sentry_init(_experiments={"metrics_window_sampling": {"sample_per_second": 10}})
+    items = capture_items("trace_metric")
+
+    for _ in range(30):
+        sentry_sdk.metrics.count("test.counter", 1)
+    time.sleep(1.1)
+    for _ in range(30):
+        sentry_sdk.metrics.count("test.counter", 1)
+
+    get_client().flush()
+
+    metrics = [item.payload for item in items]
+    assert len(metrics) == 20
+
+    for metric in metrics:
+        assert metric["attributes"]["sentry.client_sample_rate"] == 1 / 3
+
+
+def test_metrics_window_sampling_does_not_cap_names(sentry_init, capture_items):
+    sentry_init(_experiments={"metrics_window_sampling": True})
+    items = capture_items("trace_metric")
+
+    for i in range(600):
+        sentry_sdk.metrics.count(f"test.counter{i}", 1)
+        sentry_sdk.metrics.count(f"test.counter{i}", 1)
+
+    get_client().flush()
+
+    assert len(items) == 1200
+
+
+def test_metrics_window_sampling_drops_after_max_reached(
+    sentry_init, capture_items, capture_record_lost_event_calls, monkeypatch
+):
+    monkeypatch.setattr(MetricsBatcher, "MAX_BEFORE_DROP", 25)
+
+    sentry_init(_experiments={"metrics_window_sampling": True})
+    items = capture_items("trace_metric")
+    record_lost_event_calls = capture_record_lost_event_calls()
+
+    for name in ("test.a", "test.b", "test.c"):
+        for _ in range(10):
+            sentry_sdk.metrics.count(name, 1)
+
+    get_client().flush()
+
+    metrics = [item.payload for item in items]
+    assert len(metrics) == 25
+
+    # No name went over its limit, so nothing was sampled and the only loss is
+    # the overflow
+    for metric in metrics:
+        assert "sentry.client_sample_rate" not in metric["attributes"]
+
+    assert len(record_lost_event_calls) == 5
+    for lost_event_call in record_lost_event_calls:
+        reason, data_category, item, quantity = lost_event_call
+
+        assert reason == "queue_overflow"
+        assert data_category == "trace_metric"
+        assert quantity == 1
+        assert item.payload.json["items"][0]["name"] == "test.c"
+
+
+def test_metrics_window_sampling_after_before_send_metric(sentry_init, capture_items):
+    before_send_metric_calls = 0
+
+    def _before_metric(record, hint):
+        nonlocal before_send_metric_calls
+        before_send_metric_calls += 1
+        return record
+
+    sentry_init(
+        before_send_metric=_before_metric,
+        _experiments={"metrics_window_sampling": True},
+    )
+    items = capture_items("trace_metric")
+
+    for _ in range(200):
+        sentry_sdk.metrics.count("test.counter", 1)
+
+    get_client().flush()
+
+    # Sampling happens after before_send_metric, so it still sees every metric
+    assert before_send_metric_calls == 200
+
+    metrics = [item.payload for item in items]
+    assert len(metrics) == 10
