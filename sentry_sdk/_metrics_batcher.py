@@ -31,6 +31,7 @@ class MetricsBatcher(Batcher["Metric"]):
         capture_func: "Callable[[Envelope], None]",
         record_lost_func: "Callable[..., None]",
         window_sampling: "Union[bool, MetricWindowSamplingOptions, None]" = None,
+        sample_early: bool = False,
     ) -> None:
         self._default_limit: "Optional[int]" = None
         self._name_limits: "Dict[str, int]" = {}
@@ -46,6 +47,9 @@ class MetricsBatcher(Batcher["Metric"]):
                     options.get("sample_per_second", DEFAULT_SAMPLE_PER_SECOND)
                 )
         self._sampling = bool(self._name_limits) or self._default_limit is not None
+        # before_send_metric has to see every metric, so we can't sample before
+        # it runs
+        self._sample_early = self._sampling and sample_early
 
         self._reset_sampling_state()
         super().__init__(capture_func, record_lost_func)
@@ -56,7 +60,7 @@ class MetricsBatcher(Batcher["Metric"]):
 
     def _reset_sampling_state(self) -> None:
         self._window_start = time.monotonic()
-        self._reservoirs: "Dict[str, List[Metric]]" = {}
+        self._reservoirs: "Dict[str, List[Optional[Metric]]]" = {}
         self._seen: "Dict[str, int]" = {}
         # Reservoirs count against MAX_BEFORE_DROP together with the buffer, so
         # memory stays bounded no matter how many names there are
@@ -81,9 +85,38 @@ class MetricsBatcher(Batcher["Metric"]):
         # extrapolate from
         return min(max(1, int(rate * WINDOW_SECONDS)), self.MAX_BEFORE_DROP)
 
+    def should_capture(self, name: str) -> bool:
+        # This runs before the metric is built, so sampled out metrics stay cheap
+        if not self._sample_early:
+            return True
+        self._active.reserved = None
+        if getattr(self._active, "flag", False):
+            return True
+
+        limit = self._name_limits.get(name, self._default_limit)
+        if limit is None:
+            return True
+
+        with capture_internal_exceptions(), self._lock:
+            sample = self._sample(name, limit)
+            if sample is None:
+                # Let add() drop the metric, since that's where we record
+                # queue_overflow
+                return True
+            reservoir, index = sample
+            if index is None:
+                return False
+            self._active.reserved = (name, reservoir, index)
+        return True
+
     def _add_locked(self, item: "Metric") -> bool:
         if not self._sampling:
             return super()._add_locked(item)
+
+        reserved: "Optional[Tuple[str, List[Optional[Metric]], int]]" = getattr(
+            self._active, "reserved", None
+        )
+        self._active.reserved = None
 
         name = item["name"]
         limit = self._name_limits.get(name, self._default_limit)
@@ -92,27 +125,49 @@ class MetricsBatcher(Batcher["Metric"]):
                 return False
             return super()._add_locked(item)
 
+        if reserved is not None and reserved[0] == name:
+            _, reservoir, index = reserved
+            # If the window closed in the meantime, it already counted this
+            # metric as sampled out
+            if self._reservoirs.get(name) is reservoir:
+                reservoir[index] = item
+            return True
+
+        sample = self._sample(name, limit)
+        if sample is None:
+            return False
+        reservoir, index = sample
+        if index is not None:
+            reservoir[index] = item
+        return True
+
+    def _sample(
+        self, name: str, limit: int
+    ) -> "Optional[Tuple[List[Optional[Metric]], Optional[int]]]":
         if time.monotonic() - self._window_start >= WINDOW_SECONDS:
             self._close_window()
 
         reservoir = self._reservoirs.setdefault(name, [])
         seen = self._seen.get(name, 0) + 1
-        if len(reservoir) < limit:
-            # Replacing a slot in a full reservoir doesn't need more memory, only
-            # a new slot does
-            if len(self._buffer) + self._held >= self.MAX_BEFORE_DROP:
-                return False
-            reservoir.append(item)
-            self._held += 1
-        else:
+        if len(reservoir) >= limit:
+            self._seen[name] = seen
             index = random.randrange(seen)
-            if index < limit:
-                reservoir[index] = item
+            return reservoir, index if index < limit else None
+
+        # Replacing a slot in a full reservoir doesn't need more memory, only a
+        # new slot does
+        if len(self._buffer) + self._held >= self.MAX_BEFORE_DROP:
+            return None
         self._seen[name] = seen
-        return True
+        self._held += 1
+        # We hold the slot with None so that should_capture can decide before
+        # add() has the metric
+        reservoir.append(None)
+        return reservoir, len(reservoir) - 1
 
     def _close_window(self) -> None:
-        for name, kept in self._reservoirs.items():
+        for name, reservoir in self._reservoirs.items():
+            kept = [item for item in reservoir if item is not None]
             seen = self._seen.get(name, 0)
             if kept and seen > len(kept):
                 rate = len(kept) / seen
