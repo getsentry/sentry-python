@@ -1,5 +1,3 @@
-"""A line for coding agents that points to the setup checklist while Sentry is being set up."""
-
 import atexit
 import os
 import subprocess
