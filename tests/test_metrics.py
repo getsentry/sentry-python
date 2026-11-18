@@ -652,43 +652,10 @@ def test_metrics_window_sampling_unlisted_names(sentry_init, capture_items):
         assert "sentry.client_sample_rate" not in metric["attributes"]
 
 
-@pytest.mark.parametrize(
-    "client_sample_rate,expected_sample_rate",
-    [
-        (0.5, 0.05),
-        (5, 0.1),
-        (0, 0.1),
-        (-1, 0.1),
-        (float("nan"), 0.1),
-        ("0.5", 0.1),
-    ],
-)
-def test_metrics_window_sampling_multiplies_client_sample_rate(
-    sentry_init, capture_items, client_sample_rate, expected_sample_rate
-):
-    sentry_init(_experiments={"metrics_window_sampling": {"test.counter": 2}})
-    items = capture_items("trace_metric")
-
-    for _ in range(100):
-        sentry_sdk.metrics.count(
-            "test.counter",
-            1,
-            attributes={"sentry.client_sample_rate": client_sample_rate},
-        )
-
-    get_client().flush()
-
-    metrics = [item.payload for item in items]
-    assert len(metrics) == 10
-
-    for metric in metrics:
-        assert metric["attributes"]["sentry.client_sample_rate"] == expected_sample_rate
-
-
 def test_metrics_window_sampling_new_window(sentry_init, capture_items, monkeypatch):
     # Shorten the window so that the test doesn't have to wait 5 seconds for it
     # to close
-    monkeypatch.setattr(sentry_sdk._lock_free_metrics_batcher, "WINDOW_SECONDS", 1.0)
+    monkeypatch.setattr(LockFreeMetricsBatcher, "WINDOW_SECONDS", 1.0)
 
     sentry_init(_experiments={"metrics_window_sampling": {"test.counter": 10}})
     items = capture_items("trace_metric")
