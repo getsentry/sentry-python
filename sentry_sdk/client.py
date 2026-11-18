@@ -331,19 +331,22 @@ def _running_under_coding_agent() -> bool:
 
 _MISSING_PRODUCTS = {
     (False, False): (
-        "Sentry will get errors from this app but not the request or logs around them.",
+        "Sentry will get errors from this app but not the request trace around them, "
+        "and its logs only as breadcrumbs.",
         "Tracing and logs are off, so Sentry only gets errors.",
         "they're",
         "them",
     ),
     (False, True): (
-        "Sentry will get errors and logs from this app but not the request around an error.",
+        "Sentry will get errors and logs from this app but not the request trace "
+        "around an error.",
         "Tracing is off, so Sentry gets errors and logs but no traces.",
         "it's",
         "it",
     ),
     (True, False): (
-        "Sentry will get errors and traces from this app but not the logs around an error.",
+        "Sentry will get errors and traces from this app, and its logs only as "
+        "breadcrumbs.",
         "Logs are off, so Sentry gets errors and traces but no logs.",
         "it's",
         "it",
