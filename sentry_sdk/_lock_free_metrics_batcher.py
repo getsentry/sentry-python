@@ -86,8 +86,6 @@ class LockFreeMetricsBatcher:
             return None
 
         queue = self._queue
-        # Checking and appending isn't atomic.
-        # The queue can go over the limit by at most one metric per concurrently adding thread.
         if len(queue) >= self.MAX_BEFORE_DROP:
             self._record_lost(item)
             return None
