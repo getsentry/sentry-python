@@ -74,8 +74,11 @@ class LockFreeMetricsBatcher:
         self._capture_func = capture_func
         self._record_lost_func = record_lost_func
 
+        # Metric name -> metrics kept per window. Never below 1, so there's
+        # always at least one metric per name to extrapolate from
         self._limits = {
-            name: self._parse_limit(rate) for name, rate in window_sampling.items()
+            name: min(max(1, int(rate * self.FLUSH_WAIT_TIME)), self.MAX_BEFORE_DROP)
+            for name, rate in window_sampling.items()
         }
 
         self._reset_thread_state()
@@ -90,14 +93,6 @@ class LockFreeMetricsBatcher:
         self._flusher_pid: "Optional[int]" = None
         # Holds the claim of the one thread that gets to start the flusher.
         self._flusher_claim: "dict[str, object]" = {}
-
-    def _parse_limit(self, rate: float) -> int:
-        # Never go below 1, so we always keep at least one metric per name to
-        # extrapolate from
-        return min(max(1, int(rate * self.FLUSH_WAIT_TIME)), self.MAX_BEFORE_DROP)
-
-    def _limit(self, name: str) -> "Optional[int]":
-        return self._limits.get(name)
 
     def _ensure_thread(self) -> bool:
         """For forking processes we might need to restart this thread.
@@ -139,7 +134,7 @@ class LockFreeMetricsBatcher:
         if not self._ensure_thread():
             return None
 
-        limit = self._limit(item["name"])
+        limit = self._limits.get(item["name"])
         if limit is None:
             kept = self._add_to_queue(item)
         else:
@@ -254,7 +249,7 @@ class LockFreeMetricsBatcher:
 
         sampled_out = []
         for name, reservoirs in by_name.items():
-            limit = self._limit(name)
+            limit = self._limits.get(name)
             if limit is None:
                 continue
 

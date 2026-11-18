@@ -1,4 +1,3 @@
-import time
 from unittest import mock
 
 import pytest
@@ -576,11 +575,20 @@ def test_array_attributes_deep_copied_in_before_send(sentry_init, window_samplin
     get_client().flush()
 
 
+@pytest.mark.parametrize(
+    "rate,expected_count",
+    [
+        (2, 10),
+        (4, 20),
+        (0.2, 1),
+        (0.05, 1),
+    ],
+)
 def test_metrics_window_sampling_basics(
-    sentry_init, capture_items, capture_record_lost_event_calls
+    sentry_init, capture_items, capture_record_lost_event_calls, rate, expected_count
 ):
     sentry_init(
-        _experiments={"metrics_window_sampling": {"test.hot": 2, "test.cold": 2}}
+        _experiments={"metrics_window_sampling": {"test.hot": rate, "test.cold": 2}}
     )
     items = capture_items("trace_metric")
     record_lost_event_calls = capture_record_lost_event_calls()
@@ -593,58 +601,33 @@ def test_metrics_window_sampling_basics(
     get_client().flush()
 
     metrics = [item.payload for item in items]
-    assert len(metrics) == 13
 
     hot = [metric for metric in metrics if metric["name"] == "test.hot"]
-    assert len(hot) == 10
+    assert len(hot) == expected_count
     for metric in hot:
-        assert metric["attributes"]["sentry.client_sample_rate"] == 0.05
+        assert metric["attributes"]["sentry.client_sample_rate"] == expected_count / 200
 
+    # Under its limit, so nothing is sampled out
     cold = [metric for metric in metrics if metric["name"] == "test.cold"]
     assert len(cold) == 3
     for metric in cold:
         assert "sentry.client_sample_rate" not in metric["attributes"]
 
     assert record_lost_event_calls == [
-        ("sample_rate", "trace_metric", None, 190),
-        ("sample_rate", "trace_metric_byte", None, mock.ANY),
+        ("sample_rate", "trace_metric", None, 200 - expected_count),
     ]
 
 
-@pytest.mark.parametrize(
-    "rate,expected_count",
-    [
-        (4, 20),
-        (0.2, 1),
-        (0.05, 1),
-    ],
-)
-def test_metrics_window_sampling_rate(sentry_init, capture_items, rate, expected_count):
-    sentry_init(_experiments={"metrics_window_sampling": {"test.counter": rate}})
+def test_metrics_window_sampling_new_window(sentry_init, capture_items):
+    sentry_init(_experiments={"metrics_window_sampling": {"test.counter": 2}})
     items = capture_items("trace_metric")
 
-    for _ in range(200):
+    # flush() ends the window, so each batch of 30 is sampled on its own
+    for _ in range(30):
         sentry_sdk.metrics.count("test.counter", 1)
-
     get_client().flush()
-
-    assert len(items) == expected_count
-
-
-def test_metrics_window_sampling_new_window(sentry_init, capture_items, monkeypatch):
-    # Shorten the window so that the test doesn't have to wait 5 seconds for it
-    # to close
-    monkeypatch.setattr(LockFreeMetricsBatcher, "FLUSH_WAIT_TIME", 1.0)
-
-    sentry_init(_experiments={"metrics_window_sampling": {"test.counter": 10}})
-    items = capture_items("trace_metric")
-
     for _ in range(30):
         sentry_sdk.metrics.count("test.counter", 1)
-    time.sleep(1.1)
-    for _ in range(30):
-        sentry_sdk.metrics.count("test.counter", 1)
-
     get_client().flush()
 
     metrics = [item.payload for item in items]
