@@ -169,6 +169,7 @@ class _RecordedUsage:
     cache_read_input_tokens: "Optional[int]" = 0
     output_tokens_reasoning: int = 0
 
+
 class _StreamSpanContext:
     """
     Sets accumulated data on the stream's span and finishes the span on exit.
@@ -464,7 +465,9 @@ def _collect_ai_data(
                 output_tokens_details = getattr(
                     event.usage, "output_tokens_details", None
                 )
-                thinking_tokens = getattr(output_tokens_details, "thinking_tokens", None)
+                thinking_tokens = getattr(
+                    output_tokens_details, "thinking_tokens", None
+                )
                 if thinking_tokens is not None:
                     usage.output_tokens_reasoning = thinking_tokens
                 # TODO: Record event.usage.server_tool_use

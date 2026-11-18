@@ -9827,6 +9827,7 @@ def test_stream_messages_cache_tokens(
         assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 80
         assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 20
 
+
 @pytest.mark.skipif(
     ANTHROPIC_VERSION < (0, 105),
     reason="usage.output_tokens_details added in https://github.com/anthropics/anthropic-sdk-python/commit/f18b01414b21b49943a6ba2cdaa30ff7dd6a3025.",
