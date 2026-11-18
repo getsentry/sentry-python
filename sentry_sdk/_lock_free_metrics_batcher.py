@@ -1,21 +1,40 @@
 """
-Experimental lock-free metrics batcher.
+Experimental lock-free metrics batcher with window sampling, enabled with the
+``metrics_window_sampling`` experiment.
 
 Producers (``add``) and consumers (the flusher thread and explicit ``flush``)
 never take a lock. Shared state is only changed through operations that are
 atomic on builtin containers, both with the GIL and on free-threaded CPython:
 
 - ``deque.append`` / ``deque.popleft``
-- ``dict.setdefault``
+- ``list.append`` and storing to an existing list index
+- ``dict.get`` / ``dict.setdefault`` / ``dict.copy``
+- ``next()`` on an ``itertools.count``
 - rebinding an attribute
 
-This is independent of ``Batcher`` on purpose, so it can evolve (e.g. gain
-sampling) without affecting the other batchers.
+Anything that needs several of these to happen together (starting the flusher
+thread, retiring a sampling window) is decided by a "first one wins" claim
+instead of a lock.
+
+Window sampling keeps at most ``limit`` metrics per metric name per window with
+reservoir sampling (Algorithm R), where every step is one of the atomic
+operations above. A window is retired by rebinding ``self._window`` to a new
+one. A thread may still hold a reference to the old window and be about to
+write to it, so retired windows are only harvested after a grace period, giving
+those writes time to land (the same idea as RCU). An explicit ``flush``
+harvests immediately, since it's used at shutdown and by callers who want
+everything sent now.
+
+This is independent of ``Batcher`` on purpose, so it can evolve without
+affecting the other batchers.
 """
 
+import itertools
+import math
 import os
 import random
 import threading
+import time
 import weakref
 from collections import deque
 from datetime import datetime, timezone
@@ -25,13 +44,45 @@ from sentry_sdk.envelope import Envelope, Item, PayloadRef
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     format_timestamp,
+    logger,
     serialize_attribute,
 )
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Deque, Dict, List, Optional
+    from typing import Any, Callable, Deque, Dict, List, Optional, Tuple, Union
 
-    from sentry_sdk._types import Metric
+    from sentry_sdk._types import Metric, MetricWindowSamplingOptions
+
+DEFAULT_SAMPLE_PER_SECOND = 2
+# Matches FLUSH_WAIT_TIME, so each window goes out in one flush
+WINDOW_SECONDS = 5.0
+# How long a retired window is left alone before it's harvested, so that adds
+# which picked it up right before it was retired can finish writing to it
+RETIRE_GRACE_SECONDS = 1.0
+
+
+class _Reservoir:
+    __slots__ = ("kept", "seen", "overflowed")
+
+    def __init__(self) -> None:
+        self.kept: "List[Metric]" = []
+        self.seen = itertools.count()
+        # Metrics that were seen but couldn't get a slot because the window ran
+        # out of memory budget. They're reported as queue_overflow, so they must
+        # not also count towards the sample rate
+        self.overflowed = itertools.count()
+
+
+class _Window:
+    __slots__ = ("start", "reservoirs", "held", "retired_at", "retire_claims")
+
+    def __init__(self) -> None:
+        self.start = time.monotonic()
+        self.reservoirs: "Dict[str, _Reservoir]" = {}
+        # Slots handed out across all reservoirs, to bound memory
+        self.held = itertools.count()
+        self.retired_at = math.inf
+        self.retire_claims: "List[object]" = []
 
 
 class LockFreeMetricsBatcher:
@@ -47,9 +98,26 @@ class LockFreeMetricsBatcher:
         self,
         capture_func: "Callable[[Envelope], None]",
         record_lost_func: "Callable[..., None]",
+        window_sampling: "Union[bool, MetricWindowSamplingOptions, None]" = None,
     ) -> None:
         self._capture_func = capture_func
         self._record_lost_func = record_lost_func
+
+        self._default_limit: "Optional[int]" = None
+        self._name_limits: "Dict[str, int]" = {}
+        if window_sampling:
+            options = window_sampling if isinstance(window_sampling, dict) else {}
+            per_name = options.get("per_name")
+            if isinstance(per_name, dict):
+                self._name_limits = {
+                    name: self._parse_limit(rate) for name, rate in per_name.items()
+                }
+            if "sample_per_second" in options or not self._name_limits:
+                self._default_limit = self._parse_limit(
+                    options.get("sample_per_second", DEFAULT_SAMPLE_PER_SECOND)
+                )
+        self._sampling = bool(self._name_limits) or self._default_limit is not None
+
         self._reset_thread_state()
 
         # See https://github.com/getsentry/sentry-python/blob/051cc01640a29bfd64b1f1e2e3414c02f027dd1b/sentry_sdk/monitor.py#L41-L50
@@ -65,6 +133,8 @@ class LockFreeMetricsBatcher:
 
     def _reset_thread_state(self) -> None:
         self._queue: "Deque[Metric]" = deque()
+        self._window = _Window()
+        self._retired: "Deque[_Window]" = deque()
         self._running = True
         self._active: "threading.local" = threading.local()
         self._flush_event: "threading.Event" = threading.Event()
@@ -73,6 +143,24 @@ class LockFreeMetricsBatcher:
         # pid -> token of the thread that gets to start the flusher in that
         # process
         self._flusher_claims: "Dict[int, object]" = {}
+
+    def _parse_limit(self, value: float) -> int:
+        try:
+            rate = float(value)
+        except (TypeError, ValueError):
+            rate = math.nan
+
+        if not (math.isfinite(rate) and rate > 0):
+            logger.warning(
+                "[Metrics] Given window sampling rate is invalid. It must be a positive number. Got %r, using %s instead.",
+                value,
+                DEFAULT_SAMPLE_PER_SECOND,
+            )
+            rate = DEFAULT_SAMPLE_PER_SECOND
+
+        # Never go below 1, so we always keep at least one metric per name to
+        # extrapolate from
+        return min(max(1, int(rate * WINDOW_SECONDS)), self.MAX_BEFORE_DROP)
 
     def _ensure_thread(self) -> bool:
         """For forking processes we might need to restart this thread.
@@ -134,18 +222,66 @@ class LockFreeMetricsBatcher:
             if not self._ensure_thread():
                 return None
 
-            queue = self._queue
-            # Checking and appending isn't atomic, so the queue can go over the
-            # limit by at most one metric per concurrently adding thread
-            if len(queue) >= self.MAX_BEFORE_DROP:
-                self._record_lost(item)
-                return None
+            limit = (
+                self._name_limits.get(item["name"], self._default_limit)
+                if self._sampling
+                else None
+            )
+            if limit is None:
+                kept = self._add_to_queue(item)
+            else:
+                kept = self._add_to_window(item, limit)
 
-            queue.append(item)
-            if len(queue) >= self.MAX_BEFORE_FLUSH and not self._flush_event.is_set():
-                self._flush_event.set()
+            # Record the loss outside of the hot path, since this serializes
+            # the metric to report lost bytes
+            if not kept:
+                self._record_lost(item)
         finally:
             self._active.flag = False
+
+    def _add_to_queue(self, item: "Metric") -> bool:
+        queue = self._queue
+        # Checking and appending isn't atomic, so the queue can go over the
+        # limit by at most one metric per concurrently adding thread
+        if len(queue) >= self.MAX_BEFORE_DROP:
+            return False
+
+        queue.append(item)
+        if len(queue) >= self.MAX_BEFORE_FLUSH and not self._flush_event.is_set():
+            self._flush_event.set()
+        return True
+
+    def _add_to_window(self, item: "Metric", limit: int) -> bool:
+        now = time.monotonic()
+        if now - self._window.start >= WINDOW_SECONDS:
+            self._retire_window(now, force=False)
+
+        window = self._window
+        name = item["name"]
+        reservoir = window.reservoirs.get(name)
+        if reservoir is None:
+            reservoir = window.reservoirs.setdefault(name, _Reservoir())
+
+        seen = next(reservoir.seen)
+        if seen < limit:
+            # Replacing a slot in a full reservoir doesn't need more memory, only
+            # a new slot does
+            if next(window.held) >= self.MAX_BEFORE_DROP:
+                next(reservoir.overflowed)
+                return False
+            reservoir.kept.append(item)
+            return True
+
+        index = random.randrange(seen + 1)
+        if index < limit:
+            try:
+                reservoir.kept[index] = item
+            except IndexError:
+                # The slot hasn't been filled yet by a concurrent add, or never
+                # will be because that add overflowed. Either way this metric is
+                # sampled out, which keeps the reservoir within its memory budget
+                pass
+        return True
 
     def kill(self) -> None:
         if self._flusher is None:
@@ -159,11 +295,75 @@ class LockFreeMetricsBatcher:
         was_active = getattr(self._active, "flag", False)
         self._active.flag = True
         try:
-            self._flush()
+            self._flush(force=True)
         finally:
             self._active.flag = was_active
 
-    def _flush(self) -> "Optional[Envelope]":
+    def _retire_window(self, now: float, force: bool) -> None:
+        window = self._window
+        if not force and now - window.start < WINDOW_SECONDS:
+            # Early flushes leave the window open, so a name can't go over its
+            # rate
+            return
+
+        claim = object()
+        window.retire_claims.append(claim)
+        if window.retire_claims[0] is not claim:
+            # Someone else is retiring this window
+            return
+
+        self._window = _Window()
+        window.retired_at = now
+        self._retired.append(window)
+
+    def _take_retired_windows(self, now: float, force: bool) -> "List[_Window]":
+        ready = []
+        waiting = []
+        while True:
+            try:
+                window = self._retired.popleft()
+            except IndexError:
+                break
+            if force or now - window.retired_at >= RETIRE_GRACE_SECONDS:
+                ready.append(window)
+            else:
+                waiting.append(window)
+
+        # Put back the windows that are still in their grace period, oldest first
+        self._retired.extendleft(reversed(waiting))
+        return ready
+
+    def _harvest(
+        self, window: "_Window", items: "List[Metric]"
+    ) -> "List[Tuple[Metric, int]]":
+        sampled_out = []
+        for reservoir in window.reservoirs.copy().values():
+            kept = reservoir.kept
+            if not kept:
+                continue
+
+            items.extend(kept)
+
+            # The counters are dead once a window is harvested, so reading them
+            # by advancing them is fine
+            seen = next(reservoir.seen) - next(reservoir.overflowed)
+            if seen <= len(kept):
+                # Nothing was sampled out
+                continue
+
+            rate = len(kept) / seen
+            for item in kept:
+                attributes = item["attributes"]
+                client_rate = attributes.get("sentry.client_sample_rate")
+                if isinstance(client_rate, (int, float)) and 0 < client_rate <= 1:
+                    attributes["sentry.client_sample_rate"] = rate * client_rate
+                else:
+                    attributes["sentry.client_sample_rate"] = rate
+            sampled_out.append((kept[0], seen - len(kept)))
+
+        return sampled_out
+
+    def _flush(self, force: bool = False) -> "Optional[Envelope]":
         items: "List[Metric]" = []
         queue = self._queue
         for _ in range(len(queue)):
@@ -173,14 +373,41 @@ class LockFreeMetricsBatcher:
                 # Drained concurrently by another flush
                 break
 
-        if not items:
-            return None
+        sampled_out: "List[Tuple[Metric, int]]" = []
+        if self._sampling:
+            now = time.monotonic()
+            # Take the already retired windows before retiring the current one,
+            # so a window always gets its grace period unless forced
+            ready = self._take_retired_windows(now, force)
+            self._retire_window(now, force)
+            if force:
+                ready.extend(self._take_retired_windows(now, force))
+            for window in ready:
+                sampled_out.extend(self._harvest(window, items))
 
-        envelope = Envelope(
-            headers={"sent_at": format_timestamp(datetime.now(timezone.utc))}
-        )
-        envelope.add_item(self._to_envelope_item(items))
-        self._capture_func(envelope)
+        envelope = None
+        if items:
+            envelope = Envelope(
+                headers={"sent_at": format_timestamp(datetime.now(timezone.utc))}
+            )
+            envelope.add_item(self._to_envelope_item(items))
+            self._capture_func(envelope)
+
+        for item, count in sampled_out:
+            self._record_lost_func(
+                reason="sample_rate",
+                data_category=self.CLIENT_REPORT_TYPE,
+                quantity=count,
+            )
+            # Serializing every sampled out metric would cost as much as we saved
+            # by sampling, so we estimate from one
+            with capture_internal_exceptions():
+                self._record_lost_func(
+                    reason="sample_rate",
+                    data_category="trace_metric_byte",
+                    quantity=count * len(self._to_envelope_item([item]).get_bytes()),
+                )
+
         return envelope
 
     def _record_lost(self, item: "Metric") -> None:

@@ -9,6 +9,7 @@ from importlib import import_module
 from typing import TYPE_CHECKING, Dict, cast, overload
 
 from sentry_sdk._compat import check_uwsgi_thread_support
+from sentry_sdk._lock_free_metrics_batcher import LockFreeMetricsBatcher
 from sentry_sdk._log_batcher import LogBatcher
 from sentry_sdk._metrics_batcher import MetricsBatcher
 from sentry_sdk._span_batcher import SpanBatcher
@@ -160,7 +161,7 @@ class BaseClient:
         self.transport: "Optional[Transport]" = None
         self.monitor: "Optional[Monitor]" = None
         self.log_batcher: "Optional[LogBatcher]" = None
-        self.metrics_batcher: "Optional[MetricsBatcher]" = None
+        self.metrics_batcher: "Optional[Union[MetricsBatcher, LockFreeMetricsBatcher]]" = None
         self.span_batcher: "Optional[SpanBatcher]" = None
         self.integrations: "dict[str, Integration]" = {}
 
@@ -379,10 +380,20 @@ class _Client(BaseClient):
                 record_lost_func=_record_lost_event,
             )
 
-            self.metrics_batcher = MetricsBatcher(
-                capture_func=_capture_envelope,
-                record_lost_func=_record_lost_event,
+            window_sampling = self.options["_experiments"].get(
+                "metrics_window_sampling"
             )
+            if window_sampling:
+                self.metrics_batcher = LockFreeMetricsBatcher(
+                    capture_func=_capture_envelope,
+                    record_lost_func=_record_lost_event,
+                    window_sampling=window_sampling,
+                )
+            else:
+                self.metrics_batcher = MetricsBatcher(
+                    capture_func=_capture_envelope,
+                    record_lost_func=_record_lost_event,
+                )
 
             self.span_batcher = SpanBatcher(
                 capture_func=_capture_envelope,
