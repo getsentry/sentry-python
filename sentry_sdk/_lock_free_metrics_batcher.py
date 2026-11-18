@@ -14,11 +14,10 @@ from sentry_sdk.utils import (
 )
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Optional, Union
+    from typing import Any, Callable, Optional
 
-    from sentry_sdk._types import Metric, MetricWindowSamplingOptions
+    from sentry_sdk._types import Metric
 
-DEFAULT_SAMPLE_PER_SECOND = 2
 # Matches FLUSH_WAIT_TIME, so each window goes out in one flush
 WINDOW_SECONDS = 5.0
 
@@ -32,17 +31,17 @@ class _Reservoir:
 
 
 class _Window:
-    __slots__ = ("start", "threads", "slots", "retire_claims")
+    __slots__ = ("start", "threads", "size", "size_lock", "retire_claims")
 
     def __init__(self) -> None:
         self.start = time.monotonic()
-        # Thread ident -> that thread's reservoirs by name. Only that thread
-        # writes to its reservoirs, so they need no synchronization. Belongs to
-        # the window, so threads that are gone disappear with it
+        # Thread identifier mapping to the thread's reservoir.
         self.threads: "dict[int, dict[str, _Reservoir]]" = {}
-        # One entry per reservoir slot taken in this window, across all
-        # threads. len() and append() are atomic, so this counts exactly
-        self.slots: "list[None]" = []
+        # Metrics stored in reservoirs in this window, across all threads
+        self.size = 0
+        # Keeps concurrent increments of size from getting lost. The only lock
+        # adds take, and only when a reservoir takes a new slot
+        self.size_lock = threading.Lock()
         self.retire_claims: "list[object]" = []
 
 
@@ -59,23 +58,16 @@ class LockFreeMetricsBatcher:
         self,
         capture_func: "Callable[[Envelope], None]",
         record_lost_func: "Callable[..., None]",
-        window_sampling: "Union[bool, MetricWindowSamplingOptions]",
+        window_sampling: "dict[str, float]",
     ) -> None:
         self._capture_func = capture_func
         self._record_lost_func = record_lost_func
 
-        self._default_limit: "Optional[int]" = None
-        self._name_limits: "dict[str, int]" = {}
-        options = window_sampling if isinstance(window_sampling, dict) else {}
-        per_name = options.get("per_name")
-        if isinstance(per_name, dict):
-            self._name_limits = {
-                name: self._parse_limit(rate) for name, rate in per_name.items()
-            }
-        if "sample_per_second" in options or not self._name_limits:
-            self._default_limit = self._parse_limit(
-                options.get("sample_per_second", DEFAULT_SAMPLE_PER_SECOND)
-            )
+        # Metric name -> metrics kept per window. Names not in here aren't
+        # sampled
+        self._limits = {
+            name: self._parse_limit(rate) for name, rate in window_sampling.items()
+        }
 
         self._reset_thread_state()
 
@@ -96,7 +88,7 @@ class LockFreeMetricsBatcher:
         return min(max(1, int(rate * WINDOW_SECONDS)), self.MAX_BEFORE_DROP)
 
     def _limit(self, name: str) -> "Optional[int]":
-        return self._name_limits.get(name, self._default_limit)
+        return self._limits.get(name)
 
     def _ensure_thread(self) -> bool:
         """For forking processes we might need to restart this thread.
@@ -148,14 +140,13 @@ class LockFreeMetricsBatcher:
             self._record_lost(item)
 
     def _add_to_queue(self, item: "Metric") -> bool:
-        queue = self._queue
         # Checking and appending isn't atomic.
         # The queue can go over the limit by at most one metric per concurrently adding thread.
-        if len(queue) + len(self._window.slots) >= self.MAX_BEFORE_DROP:
+        if len(self._queue) + self._window.size >= self.MAX_BEFORE_DROP:
             return False
 
-        queue.append(item)
-        if len(queue) >= self.MAX_BEFORE_FLUSH and not self._flush_event.is_set():
+        self._queue.append(item)
+        if len(self._queue) >= self.MAX_BEFORE_FLUSH and not self._flush_event.is_set():
             self._flush_event.set()
         return True
 
@@ -178,13 +169,14 @@ class LockFreeMetricsBatcher:
         if reservoir is None:
             reservoir = reservoirs[name] = _Reservoir()
         if len(reservoir.kept) < limit:
-            # Queued metrics and reservoir slots share one memory budget. Like
-            # the queue, this can go over by one slot per concurrently adding
-            # thread
-            if len(self._queue) + len(window.slots) >= self.MAX_BEFORE_DROP:
+            # Queued metrics and reservoir metrics share one memory budget.
+            # Checking and incrementing isn't atomic, so this can go over by
+            # one slot per concurrently adding thread
+            if len(self._queue) + window.size >= self.MAX_BEFORE_DROP:
                 # Not seen, so it doesn't count towards the sample rate
                 return False
-            window.slots.append(None)
+            with window.size_lock:
+                window.size += 1
             reservoir.seen += 1
             reservoir.kept.append(item)
         else:

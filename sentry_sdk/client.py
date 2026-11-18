@@ -132,36 +132,32 @@ def _get_options(*args: "Optional[str]", **kwargs: "Any") -> "Dict[str, Any]":
     rv["data_collection"] = _resolve_data_collection(rv)
 
     window_sampling = rv["_experiments"].get("metrics_window_sampling")
-    if isinstance(window_sampling, dict):
+    if window_sampling is not None:
         # Copy, so the options the user passed aren't changed
-        window_sampling = dict(window_sampling)
-        rates: "list[tuple[Dict[str, Any], str]]" = [
-            (window_sampling, "sample_per_second")
-        ]
-        if isinstance(window_sampling.get("per_name"), dict):
-            per_name = window_sampling["per_name"] = dict(window_sampling["per_name"])
-            rates.extend((per_name, name) for name in per_name)
-
-        for options, key in rates:
-            if key not in options:
-                continue
-            rate = options[key]
-            if not (
-                isinstance(rate, (int, float))
-                and not isinstance(rate, bool)
-                and math.isfinite(rate)
-                and rate > 0
-            ):
-                logger.warning(
-                    "[Metrics] Given window sampling rate is invalid. It must be a positive number. Got %r, ignoring it.",
-                    rate,
-                )
-                del options[key]
-
+        valid_rates = {}
+        if isinstance(window_sampling, dict):
+            for name, rate in window_sampling.items():
+                if (
+                    isinstance(rate, (int, float))
+                    and not isinstance(rate, bool)
+                    and math.isfinite(rate)
+                    and rate > 0
+                ):
+                    valid_rates[name] = rate
+                else:
+                    logger.warning(
+                        "[Metrics] Given window sampling rate for %r is invalid. It must be a positive number. Got %r, not sampling it.",
+                        name,
+                        rate,
+                    )
+        else:
+            logger.warning(
+                "[Metrics] metrics_window_sampling must map metric names to rates. Got %r, not sampling.",
+                window_sampling,
+            )
         rv["_experiments"] = {
             **rv["_experiments"],
-            # Dropping every invalid rate must not turn sampling off
-            "metrics_window_sampling": window_sampling or True,
+            "metrics_window_sampling": valid_rates,
         }
 
     if rv["socket_options"] and not isinstance(rv["socket_options"], list):

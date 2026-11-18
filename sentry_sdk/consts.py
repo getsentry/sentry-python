@@ -54,7 +54,6 @@ if TYPE_CHECKING:
         IgnoreSpansConfig,
         Log,
         Metric,
-        MetricWindowSamplingOptions,
         SpanJSON,
         TracesSampler,
     )
@@ -74,9 +73,9 @@ if TYPE_CHECKING:
             "transport_num_pools": Optional[int],
             "transport_http2": Optional[bool],
             "transport_async": Optional[bool],
-            "metrics_window_sampling": Optional[
-                Union[bool, MetricWindowSamplingOptions]
-            ],
+            # Metric name -> metrics per second to keep. Names not in here
+            # aren't sampled
+            "metrics_window_sampling": Optional[Dict[str, float]],
         },
         total=False,
     )

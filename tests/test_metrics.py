@@ -9,7 +9,7 @@ from sentry_sdk._lock_free_metrics_batcher import LockFreeMetricsBatcher
 from sentry_sdk.consts import SPANDATA, VERSION
 
 
-@pytest.mark.parametrize("window_sampling", [None, True])
+@pytest.mark.parametrize("window_sampling", [None, {"test.sampled": 2}])
 def test_metrics_basics(sentry_init, window_sampling, capture_items):
     sentry_init(_experiments={"metrics_window_sampling": window_sampling})
     items = capture_items("trace_metric")
@@ -41,7 +41,7 @@ def test_metrics_basics(sentry_init, window_sampling, capture_items):
     assert metrics[2]["unit"] == "second"
 
 
-@pytest.mark.parametrize("window_sampling", [None, True])
+@pytest.mark.parametrize("window_sampling", [None, {"test.sampled": 2}])
 def test_metrics_with_attributes(sentry_init, window_sampling, capture_items):
     sentry_init(
         release="1.0.0",
@@ -70,7 +70,7 @@ def test_metrics_with_attributes(sentry_init, window_sampling, capture_items):
     assert metrics[0]["attributes"]["sentry.sdk.version"] == VERSION
 
 
-@pytest.mark.parametrize("window_sampling", [None, True])
+@pytest.mark.parametrize("window_sampling", [None, {"test.sampled": 2}])
 def test_metrics_with_user(sentry_init, window_sampling, capture_items):
     sentry_init(
         data_collection={"user_info": True},
@@ -93,7 +93,7 @@ def test_metrics_with_user(sentry_init, window_sampling, capture_items):
     assert metrics[0]["attributes"]["user.name"] == "testuser"
 
 
-@pytest.mark.parametrize("window_sampling", [None, True])
+@pytest.mark.parametrize("window_sampling", [None, {"test.sampled": 2}])
 def test_metrics_no_user_if_user_info_off(sentry_init, window_sampling, capture_items):
     sentry_init(
         data_collection={"user_info": False},
@@ -116,7 +116,7 @@ def test_metrics_no_user_if_user_info_off(sentry_init, window_sampling, capture_
     assert "user.name" not in metrics[0]["attributes"]
 
 
-@pytest.mark.parametrize("window_sampling", [None, True])
+@pytest.mark.parametrize("window_sampling", [None, {"test.sampled": 2}])
 def test_metrics_with_span(sentry_init, window_sampling, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
@@ -137,7 +137,7 @@ def test_metrics_with_span(sentry_init, window_sampling, capture_items):
     assert metrics[0]["span_id"] == segment.span_id
 
 
-@pytest.mark.parametrize("window_sampling", [None, True])
+@pytest.mark.parametrize("window_sampling", [None, {"test.sampled": 2}])
 def test_metrics_tracing_without_performance(
     sentry_init, window_sampling, capture_items
 ):
@@ -161,7 +161,7 @@ def test_metrics_tracing_without_performance(
     assert "span_id" not in metrics[0]
 
 
-@pytest.mark.parametrize("window_sampling", [None, True])
+@pytest.mark.parametrize("window_sampling", [None, {"test.sampled": 2}])
 def test_metrics_before_send(sentry_init, window_sampling, capture_items):
     before_metric_called = False
 
@@ -203,7 +203,7 @@ def test_metrics_before_send(sentry_init, window_sampling, capture_items):
 
 
 @pytest.mark.tests_internal_exceptions
-@pytest.mark.parametrize("window_sampling", [None, True])
+@pytest.mark.parametrize("window_sampling", [None, {"test.sampled": 2}])
 def test_metrics_before_send_raises_does_not_crash_application(
     sentry_init, window_sampling, capture_items
 ):
@@ -227,7 +227,7 @@ def test_metrics_before_send_raises_does_not_crash_application(
 
 
 @pytest.mark.tests_internal_exceptions
-@pytest.mark.parametrize("window_sampling", [None, True])
+@pytest.mark.parametrize("window_sampling", [None, {"test.sampled": 2}])
 def test_metrics_before_send_raises_records_callback_error(
     sentry_init, window_sampling, capture_items, capture_record_lost_event_calls
 ):
@@ -257,7 +257,7 @@ def test_metrics_before_send_raises_records_callback_error(
     assert item.payload.json["items"][0]["name"] == "test.keep"
 
 
-@pytest.mark.parametrize("window_sampling", [None, True])
+@pytest.mark.parametrize("window_sampling", [None, {"test.sampled": 2}])
 def test_metrics_before_send_returns_none_records_before_send(
     sentry_init, window_sampling, capture_items, capture_record_lost_event_calls
 ):
@@ -287,7 +287,7 @@ def test_metrics_before_send_returns_none_records_before_send(
     assert item.payload.json["items"][0]["name"] == "test.drop"
 
 
-@pytest.mark.parametrize("window_sampling", [None, True])
+@pytest.mark.parametrize("window_sampling", [None, {"test.sampled": 2}])
 def test_transport_format(sentry_init, window_sampling, capture_envelopes):
     sentry_init(
         server_name="test-server",
@@ -391,7 +391,7 @@ def test_batcher_drops_metrics(sentry_init, monkeypatch):
         assert item.payload.json["items"][0]["name"] == "test.counter"
 
 
-@pytest.mark.parametrize("window_sampling", [None, True])
+@pytest.mark.parametrize("window_sampling", [None, {"test.sampled": 2}])
 def test_metric_gets_attributes_from_scopes(
     sentry_init, window_sampling, capture_items
 ):
@@ -420,7 +420,7 @@ def test_metric_gets_attributes_from_scopes(
     assert "current.attribute" not in metric2["attributes"]
 
 
-@pytest.mark.parametrize("window_sampling", [None, True])
+@pytest.mark.parametrize("window_sampling", [None, {"test.sampled": 2}])
 def test_metric_attributes_override_scope_attributes(
     sentry_init, window_sampling, capture_items
 ):
@@ -442,7 +442,7 @@ def test_metric_attributes_override_scope_attributes(
     assert metric["attributes"]["temp.attribute"] == "value2"
 
 
-@pytest.mark.parametrize("window_sampling", [None, True])
+@pytest.mark.parametrize("window_sampling", [None, {"test.sampled": 2}])
 def test_log_array_attributes(sentry_init, window_sampling, capture_envelopes):
     """Test homogeneous list and tuple attributes, and fallback for inhomogeneous collections."""
 
@@ -499,7 +499,7 @@ def test_log_array_attributes(sentry_init, window_sampling, capture_envelopes):
     }
 
 
-@pytest.mark.parametrize("window_sampling", [None, True])
+@pytest.mark.parametrize("window_sampling", [None, {"test.sampled": 2}])
 def test_attributes_preserialized_in_before_send(
     sentry_init, window_sampling, capture_items
 ):
@@ -546,7 +546,7 @@ def test_attributes_preserialized_in_before_send(
     assert isinstance(metric["attributes"]["dictionary"], str)
 
 
-@pytest.mark.parametrize("window_sampling", [None, True])
+@pytest.mark.parametrize("window_sampling", [None, {"test.sampled": 2}])
 def test_array_attributes_deep_copied_in_before_send(sentry_init, window_sampling):
     """We don't surface user-held references to objects in attributes."""
 
@@ -579,7 +579,9 @@ def test_array_attributes_deep_copied_in_before_send(sentry_init, window_samplin
 def test_metrics_window_sampling_basics(
     sentry_init, capture_items, capture_record_lost_event_calls
 ):
-    sentry_init(_experiments={"metrics_window_sampling": True})
+    sentry_init(
+        _experiments={"metrics_window_sampling": {"test.hot": 2, "test.cold": 2}}
+    )
     items = capture_items("trace_metric")
     record_lost_event_calls = capture_record_lost_event_calls()
 
@@ -610,21 +612,15 @@ def test_metrics_window_sampling_basics(
 
 
 @pytest.mark.parametrize(
-    "sample_per_second,expected_count",
+    "rate,expected_count",
     [
         (4, 20),
         (0.2, 1),
         (0.05, 1),
     ],
 )
-def test_metrics_window_sampling_sample_per_second(
-    sentry_init, capture_items, sample_per_second, expected_count
-):
-    sentry_init(
-        _experiments={
-            "metrics_window_sampling": {"sample_per_second": sample_per_second}
-        }
-    )
+def test_metrics_window_sampling_rate(sentry_init, capture_items, rate, expected_count):
+    sentry_init(_experiments={"metrics_window_sampling": {"test.counter": rate}})
     items = capture_items("trace_metric")
 
     for _ in range(200):
@@ -635,10 +631,8 @@ def test_metrics_window_sampling_sample_per_second(
     assert len(items) == expected_count
 
 
-def test_metrics_window_sampling_per_name(sentry_init, capture_items):
-    sentry_init(
-        _experiments={"metrics_window_sampling": {"per_name": {"test.hot": 0.2}}}
-    )
+def test_metrics_window_sampling_unlisted_names(sentry_init, capture_items):
+    sentry_init(_experiments={"metrics_window_sampling": {"test.hot": 0.2}})
     items = capture_items("trace_metric")
 
     for _ in range(200):
@@ -672,7 +666,7 @@ def test_metrics_window_sampling_per_name(sentry_init, capture_items):
 def test_metrics_window_sampling_multiplies_client_sample_rate(
     sentry_init, capture_items, client_sample_rate, expected_sample_rate
 ):
-    sentry_init(_experiments={"metrics_window_sampling": True})
+    sentry_init(_experiments={"metrics_window_sampling": {"test.counter": 2}})
     items = capture_items("trace_metric")
 
     for _ in range(100):
@@ -696,7 +690,7 @@ def test_metrics_window_sampling_new_window(sentry_init, capture_items, monkeypa
     # to close
     monkeypatch.setattr(sentry_sdk._lock_free_metrics_batcher, "WINDOW_SECONDS", 1.0)
 
-    sentry_init(_experiments={"metrics_window_sampling": {"sample_per_second": 10}})
+    sentry_init(_experiments={"metrics_window_sampling": {"test.counter": 10}})
     items = capture_items("trace_metric")
 
     for _ in range(30):
@@ -715,7 +709,11 @@ def test_metrics_window_sampling_new_window(sentry_init, capture_items, monkeypa
 
 
 def test_metrics_window_sampling_does_not_cap_names(sentry_init, capture_items):
-    sentry_init(_experiments={"metrics_window_sampling": True})
+    sentry_init(
+        _experiments={
+            "metrics_window_sampling": {f"test.counter{i}": 2 for i in range(600)}
+        }
+    )
     items = capture_items("trace_metric")
 
     for i in range(600):
@@ -732,11 +730,12 @@ def test_metrics_window_sampling_drops_after_max_reached(
 ):
     monkeypatch.setattr(LockFreeMetricsBatcher, "MAX_BEFORE_DROP", 25)
 
-    sentry_init(_experiments={"metrics_window_sampling": True})
+    names = ("test.a", "test.b", "test.c")
+    sentry_init(_experiments={"metrics_window_sampling": dict.fromkeys(names, 2)})
     items = capture_items("trace_metric")
     record_lost_event_calls = capture_record_lost_event_calls()
 
-    for name in ("test.a", "test.b", "test.c"):
+    for name in names:
         for _ in range(10):
             sentry_sdk.metrics.count(name, 1)
 
@@ -770,7 +769,7 @@ def test_metrics_window_sampling_after_before_send_metric(sentry_init, capture_i
 
     sentry_init(
         before_send_metric=_before_metric,
-        _experiments={"metrics_window_sampling": True},
+        _experiments={"metrics_window_sampling": {"test.counter": 2}},
     )
     items = capture_items("trace_metric")
 
