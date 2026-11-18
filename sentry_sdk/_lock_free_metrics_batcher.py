@@ -134,52 +134,47 @@ class LockFreeMetricsBatcher:
         if not self._ensure_thread():
             return None
 
-        limit = self._limits.get(item["name"])
-        if limit is None:
-            kept = self._add_to_queue(item)
-        else:
-            kept = self._add_to_window(item, limit)
-
-        if not kept:
-            self._record_lost(item)
-
-    def _add_to_queue(self, item: "Metric") -> bool:
-        if len(self._queue) + self._window.size() >= self.MAX_BEFORE_DROP:
-            return False
-
-        self._queue.append(item)
-        if len(self._queue) >= self.MAX_BEFORE_FLUSH and not self._flush_event.is_set():
-            self._flush_event.set()
-        return True
-
-    def _add_to_window(self, item: "Metric", limit: int) -> bool:
         window = self._window
         if time.monotonic() - window.start >= self.FLUSH_WAIT_TIME:
             self._retire_window(window)
             window = self._window
 
-        window_size = window.size()
+        if len(self._queue) + window.size() >= self.MAX_BEFORE_DROP:
+            self._record_lost(item)
+            return None
+
+        limit = self._limits.get(item["name"])
+        if limit is None:
+            self._add_to_queue(item)
+        else:
+            self._add_to_window(item, window, limit)
+
+    def _add_to_queue(self, item: "Metric") -> None:
+        self._queue.append(item)
+        if len(self._queue) < self.MAX_BEFORE_FLUSH or self._flush_event.is_set():
+            return
+
+        self._flush_event.set()
+
+    def _add_to_window(self, item: "Metric", window: "_Window", limit: int) -> None:
         state = window.threads[threading.get_ident()]
         reservoir = state.reservoirs[item["name"]]
-
-        if len(self._queue) + window_size >= self.MAX_BEFORE_DROP:
-            return False
-
         reservoir.seen += 1
         if len(reservoir.kept) < limit:
             state.size += 1
             reservoir.kept.append(item)
-        else:
-            index = random.randrange(reservoir.seen)
-            if index < limit:
-                reservoir.kept[index] = item
-        return True
+            return
+
+        index = random.randrange(reservoir.seen)
+        if index >= limit:
+            return
+
+        reservoir.kept[index] = item
 
     def _retire_window(self, window: "_Window") -> None:
         claim = object()
         window.retire_claims.append(claim)
         if window.retire_claims[0] is not claim:
-            # Someone else is retiring this window
             return
 
         self._window = _Window()
@@ -204,7 +199,6 @@ class LockFreeMetricsBatcher:
             try:
                 items.append(queue.popleft())
             except IndexError:
-                # Another consumer drained it in the meantime
                 break
 
         sampled_out: "list[tuple[Metric, int]]" = []
