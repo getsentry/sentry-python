@@ -1,6 +1,8 @@
 import logging
 import sys
 
+import pytest
+
 from sentry_sdk import capture_event, capture_exception, start_span, start_transaction
 from sentry_sdk.scrubber import EventScrubber
 from sentry_sdk.utils import event_from_exception
@@ -336,3 +338,43 @@ def test_recursive_scrubber_does_not_override_original(sentry_init, capture_even
     (frame,) = frames
     assert data["csrf"] == "secret"
     assert frame["vars"]["data"]["csrf"] == "[Filtered]"
+
+
+@pytest.mark.parametrize("send_default_pii", [False, True])
+def test_hyphenated_header_scrubbing(sentry_init, capture_events, send_default_pii):
+    """Header keys are hyphenated, while denylist entries such as x_csrftoken
+    and x_api_key use underscores. Both spellings must match."""
+    sentry_init(send_default_pii=send_default_pii)
+    events = capture_events()
+
+    capture_event(
+        {
+            "request": {
+                "headers": {
+                    "X-Csrftoken": "secret",
+                    "x-api-key": "secret",
+                    "Set-Cookie": "secret",
+                    "Origin": "google.com",
+                },
+            }
+        }
+    )
+
+    (event,) = events
+    assert event["request"]["headers"] == {
+        "X-Csrftoken": "[Filtered]",
+        "x-api-key": "[Filtered]",
+        "Set-Cookie": "[Filtered]",
+        "Origin": "google.com",
+    }
+
+
+def test_custom_denylist_matches_either_spelling(sentry_init, capture_events):
+    sentry_init(event_scrubber=EventScrubber(denylist=["x-custom-token"]))
+    events = capture_events()
+
+    capture_event({"extra": {"x_custom_token": "secret", "X-Custom-Token": "secret"}})
+
+    (event,) = events
+    assert event["extra"]["x_custom_token"] == "[Filtered]"
+    assert event["extra"]["X-Custom-Token"] == "[Filtered]"
