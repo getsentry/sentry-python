@@ -9826,3 +9826,209 @@ def test_stream_messages_cache_tokens(
         assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 210
         assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 80
         assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 20
+
+@pytest.mark.skipif(
+    ANTHROPIC_VERSION < (0, 105),
+    reason="usage.output_tokens_details added in https://github.com/anthropics/anthropic-sdk-python/commit/f18b01414b21b49943a6ba2cdaa30ff7dd6a3025.",
+)
+@pytest.mark.parametrize(
+    "start_output_tokens_details, delta_output_tokens_details, expected_reasoning_tokens",
+    [
+        (None, {"thinking_tokens": 15}, 15),
+        ({"thinking_tokens": 5}, None, 5),
+        (None, None, 0),
+    ],
+)
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+def test_reasoning_tokens_streaming(
+    sentry_init,
+    capture_events,
+    capture_items,
+    get_model_response,
+    server_side_event_chunks,
+    stream_gen_ai_spans,
+    span_streaming,
+    start_output_tokens_details,
+    delta_output_tokens_details,
+    expected_reasoning_tokens,
+):
+    """Test reasoning (thinking) tokens are tracked for streaming responses."""
+    client = Anthropic(api_key="z")
+
+    response = get_model_response(
+        server_side_event_chunks(
+            [
+                MessageStartEvent(
+                    type="message_start",
+                    message=Message(
+                        id="id",
+                        model="claude-opus-4-8",
+                        role="assistant",
+                        content=[],
+                        type="message",
+                        usage=Usage(
+                            input_tokens=100,
+                            output_tokens=0,
+                            output_tokens_details=start_output_tokens_details,
+                        ),
+                    ),
+                ),
+                MessageDeltaEvent(
+                    type="message_delta",
+                    delta=Delta(stop_reason="end_turn"),
+                    usage=MessageDeltaUsage(
+                        output_tokens=50,
+                        output_tokens_details=delta_output_tokens_details,
+                    ),
+                ),
+            ]
+        )
+    )
+
+    sentry_init(
+        integrations=[AnthropicIntegration()],
+        disabled_integrations=[StdlibIntegration],
+        traces_sample_rate=1.0,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
+
+    if span_streaming or stream_gen_ai_spans:
+        items = capture_items("span")
+
+        with mock.patch.object(
+            client._client,
+            "send",
+            return_value=response,
+        ) as _, start_transaction(name="anthropic"):
+            for _ in client.messages.create(
+                max_tokens=1024,
+                messages=[{"role": "user", "content": "Hello"}],
+                model="claude-opus-4-8",
+                stream=True,
+            ):
+                pass
+
+        sentry_sdk.flush()
+        (span,) = (item.payload for item in items)
+        span_data = span["attributes"]
+    else:
+        events = capture_events()
+
+        with mock.patch.object(
+            client._client,
+            "send",
+            return_value=response,
+        ) as _, start_transaction(name="anthropic"):
+            for _ in client.messages.create(
+                max_tokens=1024,
+                messages=[{"role": "user", "content": "Hello"}],
+                model="claude-opus-4-8",
+                stream=True,
+            ):
+                pass
+
+        (span,) = events[0]["spans"]
+        span_data = span["data"]
+
+    # Reasoning tokens are part of output_tokens, so totals are unchanged.
+    assert span_data[SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 50
+    assert span_data[SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 150
+    assert (
+        span_data[SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS_REASONING]
+        == expected_reasoning_tokens
+    )
+
+
+@pytest.mark.skipif(
+    ANTHROPIC_VERSION < (0, 105),
+    reason="usage.output_tokens_details added in https://github.com/anthropics/anthropic-sdk-python/commit/f18b01414b21b49943a6ba2cdaa30ff7dd6a3025.",
+)
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+def test_stream_messages_reasoning_tokens(
+    sentry_init,
+    capture_events,
+    capture_items,
+    get_model_response,
+    server_side_event_chunks,
+    stream_gen_ai_spans,
+    span_streaming,
+):
+    """Test reasoning (thinking) tokens are tracked for messages.stream()."""
+    client = Anthropic(api_key="z")
+
+    response = get_model_response(
+        server_side_event_chunks(
+            [
+                MessageStartEvent(
+                    type="message_start",
+                    message=Message(
+                        id="id",
+                        model="claude-opus-4-8",
+                        role="assistant",
+                        content=[],
+                        type="message",
+                        usage=Usage(input_tokens=100, output_tokens=0),
+                    ),
+                ),
+                MessageDeltaEvent(
+                    type="message_delta",
+                    delta=Delta(stop_reason="end_turn"),
+                    usage=MessageDeltaUsage(
+                        output_tokens=50,
+                        output_tokens_details={"thinking_tokens": 15},
+                    ),
+                ),
+            ]
+        )
+    )
+
+    sentry_init(
+        integrations=[AnthropicIntegration()],
+        disabled_integrations=[StdlibIntegration],
+        traces_sample_rate=1.0,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
+
+    if span_streaming or stream_gen_ai_spans:
+        items = capture_items("span")
+
+        with mock.patch.object(
+            client._client,
+            "send",
+            return_value=response,
+        ) as _, start_transaction(name="anthropic"), client.messages.stream(
+            max_tokens=1024,
+            messages=[{"role": "user", "content": "Hello"}],
+            model="claude-opus-4-8",
+        ) as stream:
+            for event in stream:
+                pass
+
+        sentry_sdk.flush()
+        (span,) = (item.payload for item in items)
+        span_data = span["attributes"]
+    else:
+        events = capture_events()
+
+        with mock.patch.object(
+            client._client,
+            "send",
+            return_value=response,
+        ) as _, start_transaction(name="anthropic"), client.messages.stream(
+            max_tokens=1024,
+            messages=[{"role": "user", "content": "Hello"}],
+            model="claude-opus-4-8",
+        ) as stream:
+            for event in stream:
+                pass
+
+        (span,) = events[0]["spans"]
+        span_data = span["data"]
+
+    assert span_data[SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 50
+    assert span_data[SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 150
+    assert span_data[SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS_REASONING] == 15
