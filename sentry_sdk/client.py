@@ -4,7 +4,9 @@ import os
 import platform
 import random
 import socket
+import subprocess
 import sys
+import time
 import uuid
 import warnings
 from collections.abc import Iterable, Mapping
@@ -108,6 +110,9 @@ CODING_AGENT_ENV_VARS = (
     "CURSOR_AGENT",
     "GEMINI_CLI",
 )
+
+# How long after a change to the file that calls init() the setup counts as in progress.
+SETUP_IN_PROGRESS_SECONDS = 60 * 60
 
 _coding_agent_hint_shown = False
 
@@ -354,7 +359,67 @@ _MISSING_PRODUCTS = {
 }
 
 
-def _write_coding_agent_hint(not_shown: str, off: str, its: str, it: str) -> None:
+def _init_call_site() -> "Optional[str]":
+    """The file that called sentry_sdk.init()."""
+    sdk_dir = os.path.dirname(__file__) + os.sep
+    frame = sys._getframe()
+    while frame is not None:
+        filename = frame.f_code.co_filename
+        if not filename.startswith(sdk_dir):
+            return filename if os.path.isfile(filename) else None
+        frame = frame.f_back
+    return None
+
+
+def _git(cwd: str, *args: str) -> "Optional[str]":
+    """A git command's output, or None when git has no answer."""
+    startupinfo = None
+    if sys.platform == "win32" or sys.platform == "cygwin":
+        # Don't let a command prompt window pop up.
+        startupinfo = subprocess.STARTUPINFO()
+        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+    try:
+        result = subprocess.run(
+            ["git", *args],
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            timeout=2,
+            startupinfo=startupinfo,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return result.stdout.strip() if result.returncode == 0 else None
+
+
+def _setup_in_progress(init_file: str) -> bool:
+    """Whether this user changed the file that calls init() a short time ago."""
+    cutoff = time.time() - SETUP_IN_PROGRESS_SECONDS
+    try:
+        if os.stat(init_file).st_mtime < cutoff:
+            return False
+    except OSError:
+        return False
+
+    cwd = os.path.dirname(init_file)
+    status = _git(cwd, "status", "--porcelain", "--", init_file)
+    if status is None or status:
+        return True
+
+    # A checkout also gives a clean file a new mtime, so only count a commit
+    # that was made here.
+    committer = _git(
+        cwd, "log", "-1", f"--since={int(cutoff)}", "--format=%ce", "--", init_file
+    )
+    return bool(committer) and committer == _git(cwd, "config", "user.email")
+
+
+def _write_coding_agent_hint(
+    init_file: str, not_shown: str, off: str, its: str, it: str
+) -> None:
+    if not _setup_in_progress(init_file):
+        return
+
     codex = "codex" in (os.environ.get("AI_AGENT") or "").lower() or any(
         os.environ.get(name) for name in ("CODEX_THREAD_ID", "CODEX_SANDBOX")
     )
@@ -381,7 +446,7 @@ def _write_coding_agent_hint(not_shown: str, off: str, its: str, it: str) -> Non
 
 
 def _show_coding_agent_hint(options: "Dict[str, Any]") -> None:
-    """Point a coding agent at the setup checklist when tracing or logs are off."""
+    """Point a coding agent at the setup checklist while Sentry is being set up."""
     global _coding_agent_hint_shown
 
     rate = options["traces_sample_rate"]
@@ -396,9 +461,15 @@ def _show_coding_agent_hint(options: "Dict[str, Any]") -> None:
     ):
         return
 
+    init_file = _init_call_site()
+    if init_file is None:
+        return
+
     _coding_agent_hint_shown = True
     # Agents often cut a command's output with `| tail`, so the hint goes last.
-    atexit.register(_write_coding_agent_hint, *_MISSING_PRODUCTS[(tracing_on, logs_on)])
+    atexit.register(
+        _write_coding_agent_hint, init_file, *_MISSING_PRODUCTS[(tracing_on, logs_on)]
+    )
 
 
 def _get_options(*args: "Optional[str]", **kwargs: "Any") -> "Dict[str, Any]":

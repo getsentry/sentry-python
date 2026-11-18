@@ -1,6 +1,7 @@
 import contextlib
 import json
 import os
+import shutil
 import subprocess
 import sys
 import time
@@ -1512,125 +1513,177 @@ AGENT_HINT_DSN = "https://public@sentry.example.com/1"
 
 
 @pytest.fixture
-def coding_agent_hint(monkeypatch, capsys):
-    for name in ("CI", "SENTRY_AGENT_HINTS", "AI_AGENT", *CODING_AGENT_ENV_VARS):
-        monkeypatch.delenv(name, raising=False)
-    monkeypatch.setattr(sentry_sdk.client, "_coding_agent_hint_shown", False)
-    registered = []
-    monkeypatch.setattr(
-        sentry_sdk.client.atexit,
-        "register",
-        lambda hook, *args: registered.append((hook, args)),
-    )
+def run_app(tmp_path):
+    """Run a script that calls sentry_sdk.init() and return what it prints to stderr."""
+    app = tmp_path / "app.py"
 
-    def printed_at_exit():
-        for hook, args in registered:
-            hook(*args)
-        return capsys.readouterr().err
+    def run(env, init_args="", before_run=None, inits=1, dsn=AGENT_HINT_DSN):
+        init = f"sentry_sdk.init(dsn={dsn!r}, {init_args})\n"
+        app.write_text("import sentry_sdk\n" + init * inits)
+        if before_run:
+            before_run(app)
 
-    monkeypatch.printed_at_exit = printed_at_exit
-    return monkeypatch
+        clean_env = {
+            name: value
+            for name, value in os.environ.items()
+            if name
+            not in ("CI", "SENTRY_AGENT_HINTS", "AI_AGENT", *CODING_AGENT_ENV_VARS)
+        }
+        result = subprocess.run(
+            [sys.executable, str(app)],
+            env={**clean_env, **env},
+            cwd=str(tmp_path),
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        return result.stderr
+
+    return run
 
 
 @pytest.mark.parametrize(
-    "env, options",
+    "env, init_args",
     [
-        ({"AI_AGENT": "claude-code"}, {"traces_sample_rate": 0}),
-        ({"CLAUDECODE": "1"}, {}),
-        ({"CODEX_THREAD_ID": "abc"}, {"traces_sample_rate": 0.0}),
-        ({"CODEX_SANDBOX": "seatbelt"}, {"traces_sample_rate": 0.1}),
-        ({"CLAUDECODE": "1"}, {"enable_logs": True}),
+        ({"AI_AGENT": "claude-code"}, "traces_sample_rate=0"),
+        ({"CLAUDECODE": "1"}, ""),
+        ({"CODEX_THREAD_ID": "abc"}, "traces_sample_rate=0.0"),
+        ({"CODEX_SANDBOX": "seatbelt"}, "traces_sample_rate=0.1"),
+        ({"CLAUDECODE": "1"}, "enable_logs=True"),
     ],
 )
-def test_coding_agent_hint(sentry_init, coding_agent_hint, env, options):
-    for name, value in env.items():
-        coding_agent_hint.setenv(name, value)
-
-    sentry_init(dsn=AGENT_HINT_DSN, **options)
-
-    assert SETUP_CHECKLIST_PATH in coding_agent_hint.printed_at_exit()
+def test_coding_agent_hint(run_app, env, init_args):
+    assert SETUP_CHECKLIST_PATH in run_app(env, init_args)
 
 
 @pytest.mark.parametrize(
-    "env, options",
+    "env, init_args",
     [
-        ({}, {"traces_sample_rate": 0}),
-        ({"AI_AGENT": "claude-code"}, {"traces_sample_rate": 0.1, "enable_logs": True}),
-        (
-            {"AI_AGENT": "claude-code"},
-            {"traces_sampler": lambda _: 1.0, "enable_logs": True},
-        ),
-        ({"AI_AGENT": "claude-code"}, {"agent_setup_complete": True}),
-        ({"AI_AGENT": "0"}, {"traces_sample_rate": 0}),
-        ({"AI_AGENT": "claude-code", "CI": "true"}, {"traces_sample_rate": 0}),
-        ({"CLAUDECODE": "1", "SENTRY_AGENT_HINTS": "0"}, {"traces_sample_rate": 0}),
-        ({"AI_AGENT": "claude-code"}, {"dsn": None, "traces_sample_rate": 0}),
+        ({}, "traces_sample_rate=0"),
+        ({"AI_AGENT": "claude-code"}, "traces_sample_rate=0.1, enable_logs=True"),
+        ({"AI_AGENT": "claude-code"}, "traces_sampler=lambda _: 1.0, enable_logs=True"),
+        ({"AI_AGENT": "claude-code"}, "agent_setup_complete=True"),
+        ({"AI_AGENT": "0"}, "traces_sample_rate=0"),
+        ({"AI_AGENT": "claude-code", "CI": "true"}, "traces_sample_rate=0"),
+        ({"CLAUDECODE": "1", "SENTRY_AGENT_HINTS": "0"}, "traces_sample_rate=0"),
     ],
 )
-def test_coding_agent_hint_not_shown(sentry_init, coding_agent_hint, env, options):
-    for name, value in env.items():
-        coding_agent_hint.setenv(name, value)
+def test_coding_agent_hint_not_shown(run_app, env, init_args):
+    assert "[sentry]" not in run_app(env, init_args)
 
-    sentry_init(**{"dsn": AGENT_HINT_DSN, **options})
 
-    assert "[sentry]" not in coding_agent_hint.printed_at_exit()
+def test_coding_agent_hint_not_shown_without_dsn(run_app):
+    env = {"AI_AGENT": "claude-code", "SENTRY_DSN": ""}
+
+    assert "[sentry]" not in run_app(env, "traces_sample_rate=0", dsn=None)
 
 
 @pytest.mark.parametrize(
-    "env, options, hint",
+    "env, init_args, hint",
     [
         (
             {"CLAUDECODE": "1"},
-            {},
+            "",
             "Sentry will get errors from this app but not the request trace around them, and its logs only as breadcrumbs. The checklist shows what to change. If you're setting up Sentry, it is strongly recommended",
         ),
         (
             {"CLAUDECODE": "1"},
-            {"enable_logs": True},
+            "enable_logs=True",
             "Sentry will get errors and logs from this app but not the request trace around an error. The checklist shows what to change.",
         ),
         (
             {"CLAUDECODE": "1"},
-            {"traces_sample_rate": 0.1},
+            "traces_sample_rate=0.1",
             "Sentry will get errors and traces from this app, and its logs only as breadcrumbs. The checklist shows what to change.",
         ),
         (
             {"CODEX_THREAD_ID": "1"},
-            {},
+            "",
             "Tracing and logs are off, so Sentry only gets errors. If you leave them off, tell the user they're off and that you can turn them on if they want.",
         ),
         (
             {"AI_AGENT": "codex"},
-            {"enable_logs": True},
+            "enable_logs=True",
             "Tracing is off, so Sentry gets errors and logs but no traces. If you leave it off, tell the user it's off and that you can turn it on if they want.",
         ),
         (
             {"AI_AGENT": "codex"},
-            {"traces_sample_rate": 0.1},
+            "traces_sample_rate=0.1",
             "Logs are off, so Sentry gets errors and traces but no logs. If you leave it off, tell the user it's off",
         ),
     ],
 )
-def test_coding_agent_hint_per_agent(
-    sentry_init, coding_agent_hint, env, options, hint
-):
-    for name, value in env.items():
-        coding_agent_hint.setenv(name, value)
+def test_coding_agent_hint_per_agent(run_app, env, init_args, hint):
+    printed = run_app(env, init_args)
 
-    sentry_init(dsn=AGENT_HINT_DSN, **options)
-
-    printed = coding_agent_hint.printed_at_exit()
     assert printed.startswith(f"[sentry] {hint}")
     assert SETUP_CHECKLIST_PATH in printed
 
 
-def test_coding_agent_hint_shown_once(sentry_init, coding_agent_hint):
-    coding_agent_hint.setenv("AI_AGENT", "claude-code")
+def test_coding_agent_hint_shown_once(run_app):
+    printed = run_app({"AI_AGENT": "claude-code"}, "traces_sample_rate=0", inits=2)
 
-    sentry_init(dsn=AGENT_HINT_DSN, traces_sample_rate=0)
-    sentry_init(dsn=AGENT_HINT_DSN, traces_sample_rate=0)
+    assert printed.count(SETUP_CHECKLIST_PATH) == 1
 
-    assert coding_agent_hint.printed_at_exit().count(SETUP_CHECKLIST_PATH) == 1
+
+def _git(app, *args, committer="dev@example.com", date=None):
+    env = {
+        **os.environ,
+        "GIT_CONFIG_GLOBAL": os.devnull,
+        "GIT_CONFIG_SYSTEM": os.devnull,
+        "GIT_AUTHOR_NAME": "Dev",
+        "GIT_AUTHOR_EMAIL": committer,
+        "GIT_COMMITTER_NAME": "Dev",
+        "GIT_COMMITTER_EMAIL": committer,
+    }
+    if date:
+        env["GIT_AUTHOR_DATE"] = env["GIT_COMMITTER_DATE"] = date
+    subprocess.run(
+        ["git", *args], cwd=str(app.parent), env=env, check=True, capture_output=True
+    )
+
+
+def _commit(app, **kwargs):
+    _git(app, "init", "-q")
+    _git(app, "config", "user.email", "dev@example.com")
+    _git(app, "add", app.name)
+    _git(app, "commit", "-q", "-m", "Set up Sentry", **kwargs)
+
+
+def _changed_two_hours_ago(app):
+    two_hours_ago = time.time() - 2 * 60 * 60
+    os.utime(app, (two_hours_ago, two_hours_ago))
+
+
+def _committed_and_edited(app):
+    _commit(app, date="2020-01-01T00:00:00")
+    app.write_text(app.read_text() + "\n")
+
+
+@pytest.mark.skipif(shutil.which("git") is None, reason="needs git")
+@pytest.mark.parametrize(
+    "before_run, shown",
+    [
+        pytest.param(None, True, id="new file, no git repo"),
+        pytest.param(_changed_two_hours_ago, False, id="changed two hours ago"),
+        pytest.param(_committed_and_edited, True, id="uncommitted change"),
+        pytest.param(_commit, True, id="committed here a moment ago"),
+        pytest.param(
+            lambda app: _commit(app, committer="teammate@example.com"),
+            False,
+            id="a teammate's new commit",
+        ),
+        pytest.param(
+            lambda app: _commit(app, date="2020-01-01T00:00:00"),
+            False,
+            id="fresh checkout of an old commit",
+        ),
+    ],
+)
+def test_coding_agent_hint_only_during_setup(run_app, before_run, shown):
+    printed = run_app({"AI_AGENT": "claude-code"}, before_run=before_run)
+
+    assert (SETUP_CHECKLIST_PATH in printed) is shown
 
 
 def test_setup_checklist_ships_with_the_package():
