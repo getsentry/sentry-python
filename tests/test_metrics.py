@@ -9,7 +9,28 @@ import pytest
 import sentry_sdk
 from sentry_sdk import get_client
 from sentry_sdk._lock_free_metrics_batcher import LockFreeMetricsBatcher
+from sentry_sdk._metrics_batcher import MetricsBatcher
 from sentry_sdk.consts import SPANDATA, VERSION
+
+
+@pytest.fixture(params=["locked", "lock_free"])
+def sentry_init(request, sentry_init):
+    """Run every test in this file against both metrics batchers."""
+
+    def inner(*a, **kw):
+        sentry_init(*a, **kw)
+        client = sentry_sdk.get_client()
+        batcher = client.metrics_batcher
+        if request.param == "lock_free" and isinstance(batcher, MetricsBatcher):
+            client.metrics_batcher = LockFreeMetricsBatcher(
+                capture_func=batcher._capture_func,
+                record_lost_func=batcher._record_lost_func,
+            )
+            batcher.kill()
+        elif request.param == "locked" and isinstance(batcher, LockFreeMetricsBatcher):
+            pytest.skip("Window sampling always uses the lock-free batcher")
+
+    return inner
 
 
 def test_metrics_basics(sentry_init, capture_items):
@@ -323,7 +344,7 @@ def test_batcher_drops_metrics(sentry_init, monkeypatch):
     sentry_init()
     client = sentry_sdk.get_client()
 
-    def no_op_flush():
+    def no_op_flush(*args, **kwargs):
         pass
 
     monkeypatch.setattr(client.metrics_batcher, "_flush", no_op_flush)
@@ -541,8 +562,7 @@ def test_metrics_window_sampling_state_reset_in_child_after_fork(sentry_init):
     sentry_sdk.metrics.count("test.sampled", 1)
     sentry_sdk.metrics.count("test.unsampled", 1)
     original_window = batcher._window
-    batcher._retire_window(time.monotonic(), force=True)
-    batcher._active.flag = True
+    batcher._retire_window(force=True)
     batcher._flush_event.set()
     batcher._running = False
 
@@ -555,7 +575,6 @@ def test_metrics_window_sampling_state_reset_in_child_after_fork(sentry_init):
             and len(batcher._retired) == 0
             and batcher._window is not original_window
             and not batcher._window.reservoirs
-            and not getattr(batcher._active, "flag", False)
             and not batcher._flush_event.is_set()
             and batcher._running is True
         )

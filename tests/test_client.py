@@ -1,7 +1,6 @@
 import contextlib
 import json
 import os
-import signal
 import subprocess
 import sys
 import time
@@ -1635,35 +1634,79 @@ async def test_async_socks_proxy(testcase):
     or not hasattr(os, "register_at_fork"),
     reason="requires POSIX fork and os.register_at_fork (Python 3.7+)",
 )
-def test_batchers_work_in_child_after_fork(sentry_init):
+def test_batchers_reset_in_child_after_fork(sentry_init):
     """Regression test for the batcher fork-deadlock fix.
 
     If os.fork() runs while another thread holds a batcher's lock, the child
-    inherits the lock locked. The holding thread doesn't exist in the child, so
-    the lock can never be released and the next add() deadlocks forever. The
-    client's after-fork hook must reset every batcher in the child.
+    inherits the lock locked. The holding thread does not exist in the child,
+    so the lock can never be released and _ensure_thread deadlocks forever.
+    The client's after-fork hook must replace each batcher's lock with a fresh
+    one in the child and reset its buffers, _flusher / _flusher_pid, _active,
+    _flush_event and _running.
     """
     sentry_init(traces_sample_rate=1.0)
     client = sentry_sdk.get_client()
-    assert client._batchers
+    log_batcher = client.log_batcher
+    metrics_batcher = client.metrics_batcher
+    span_batcher = client.span_batcher
+    assert log_batcher is not None
+    assert metrics_batcher is not None
+    assert span_batcher is not None
+    batchers = (log_batcher, metrics_batcher, span_batcher)
 
-    # Fork while every batcher that has a lock is holding it
-    locks = [b._lock for b in client._batchers if hasattr(b, "_lock")]
-    for lock in locks:
+    original_locks = [batcher._lock for batcher in batchers]
+    for lock in original_locks:
         lock.acquire()
+
+    log_batcher._buffer.append(object())
+    metrics_batcher._buffer.append(object())
+    span_batcher._span_buffer["test-trace-id"].append(object())
+    span_batcher._running_size["test-trace-id"] = 42
+    for batcher in batchers:
+        batcher._active.flag = True
+        batcher._flush_event.set()
+        batcher._running = False
 
     pid = os.fork()
     if pid == 0:
-        # A deadlock kills the child instead of hanging the test
-        signal.alarm(5)
-        sentry_sdk.logger.warning("log from the child")
-        sentry_sdk.metrics.count("test.counter", 1)
-        with sentry_sdk.start_span(name="span from the child"):
-            pass
-        client.flush(timeout=2)
-        os._exit(0)
+        locks_replaced = all(
+            batcher._lock is not original_lock
+            for batcher, original_lock in zip(batchers, original_locks)
+        )
+        locks_unheld = all(
+            batcher._lock.acquire(blocking=False) for batcher in batchers
+        )
 
-    for lock in locks:
+        flushers_reset = all(
+            batcher._flusher is None and batcher._flusher_pid is None
+            for batcher in batchers
+        )
+        buffers_reset = (
+            len(log_batcher._buffer) == 0
+            and len(metrics_batcher._buffer) == 0
+            and len(span_batcher._span_buffer) == 0
+            and len(span_batcher._running_size) == 0
+        )
+
+        active_reset = all(
+            not getattr(batcher._active, "flag", False) for batcher in batchers
+        )
+        events_reset = all(not batcher._flush_event.is_set() for batcher in batchers)
+        running_reset = all(batcher._running is True for batcher in batchers)
+
+        os._exit(
+            0
+            if locks_replaced
+            and locks_unheld
+            and flushers_reset
+            and buffers_reset
+            and active_reset
+            and events_reset
+            and running_reset
+            else 1
+        )
+
+    for lock in original_locks:
         lock.release()
     _, status = os.waitpid(pid, 0)
     assert os.WIFEXITED(status) and os.WEXITSTATUS(status) == 0
