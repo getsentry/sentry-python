@@ -35,23 +35,22 @@ class MetricsBatcher(Batcher["Metric"]):
         sample_early: bool = False,
     ) -> None:
         # Experimental: keep at most this many metrics per name per chunk,
-        # picked by reservoir sampling. Names without a limit are not sampled.
-        self._default_limit: "Optional[int]" = None
+        # picked by reservoir sampling. per_name overrides the default.
+        self._sampling = bool(window_sampling)
+        self._default_limit = 0
         self._name_limits: "Dict[str, int]" = {}
         # Only safe without before_send_metric, which must see every metric
         self._sample_early = sample_early
-        if window_sampling:
+        if self._sampling:
             options = window_sampling if isinstance(window_sampling, dict) else {}
             per_name = options.get("per_name")
             if isinstance(per_name, dict):
                 self._name_limits = {
                     name: self._parse_limit(rate) for name, rate in per_name.items()
                 }
-            if "sample_per_second" in options or not self._name_limits:
-                self._default_limit = self._parse_limit(
-                    options.get("sample_per_second", DEFAULT_SAMPLE_PER_SECOND)
-                )
-        self._sampling = bool(self._name_limits) or self._default_limit is not None
+            self._default_limit = self._parse_limit(
+                options.get("sample_per_second", DEFAULT_SAMPLE_PER_SECOND)
+            )
 
         self._reset_sampling_state()
         super().__init__(capture_func, record_lost_func)
@@ -72,7 +71,7 @@ class MetricsBatcher(Batcher["Metric"]):
         rate = _parse_rate(value)
         return min(max(1, int(rate * CHUNK_SECONDS)), self.MAX_BEFORE_DROP)
 
-    def _limit_for(self, name: str) -> "Optional[int]":
+    def _limit_for(self, name: str) -> int:
         return self._name_limits.get(name, self._default_limit)
 
     def should_capture(self, name: str) -> bool:
@@ -84,9 +83,6 @@ class MetricsBatcher(Batcher["Metric"]):
             return True
 
         limit = self._limit_for(name)
-        if limit is None:
-            return True
-
         with capture_internal_exceptions():
             in_sampled_span = _in_sampled_span()
             with self._lock:
@@ -102,8 +98,7 @@ class MetricsBatcher(Batcher["Metric"]):
         return True
 
     def _add_locked(self, item: "Metric") -> bool:
-        limit = self._limit_for(item["name"]) if self._sampling else None
-        if limit is None:
+        if not self._sampling:
             if len(self._buffer) + self._held >= self.MAX_BEFORE_DROP:
                 return False
             return super()._add_locked(item)
@@ -122,7 +117,7 @@ class MetricsBatcher(Batcher["Metric"]):
                     stratum.kept[index] = item
                 return True
 
-            chunk = self._get_chunk(name, limit)
+            chunk = self._get_chunk(name, self._limit_for(name))
             stratum = chunk.sampled if _in_sampled_span() else chunk.other
             if not self._has_room(chunk, stratum):
                 return False

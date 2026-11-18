@@ -771,13 +771,13 @@ def test_metrics_window_sampling_per_name(sentry_init, capture_items):
     get_client().flush()
     metrics = [item.payload for item in items]
 
-    # Only the listed name is sampled, at one per 5s chunk
+    # The listed name keeps one per 5s chunk, other names get the default 2/s
     (hot,) = [m for m in metrics if m["name"] == "test.hot"]
     assert hot["attributes"]["sentry.client_sample_rate"] == 1 / 200
 
     other = [m for m in metrics if m["name"] == "test.other"]
-    assert len(other) == 200
-    assert all("sentry.client_sample_rate" not in m["attributes"] for m in other)
+    assert len(other) == 10
+    assert all(m["attributes"]["sentry.client_sample_rate"] == 10 / 200 for m in other)
 
 
 def test_metrics_window_sampling_before_send_metric(sentry_init, capture_items):
