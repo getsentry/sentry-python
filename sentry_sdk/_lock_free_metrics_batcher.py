@@ -42,7 +42,7 @@ class _ThreadState:
 class _Window:
     """
     One time window in which multiple threads concurrently capture metrics.
-    Only the thread with the given identifier should change it's local state.
+    Only the thread with the given identifier should change its local state.
     """
 
     __slots__ = ("start", "threads", "retire_claims")
