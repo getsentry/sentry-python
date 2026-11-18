@@ -223,7 +223,7 @@ class LockFreeMetricsBatcher:
             envelope.add_item(self._to_envelope_item(items))
             self._capture_func(envelope)
 
-        for item, count in sampled_out:
+        for count in sampled_out.values():
             self._record_lost_func(
                 reason="sample_rate",
                 data_category=self.CLIENT_REPORT_TYPE,
