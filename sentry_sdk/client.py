@@ -1,3 +1,4 @@
+import math
 import os
 import random
 import socket
@@ -129,6 +130,39 @@ def _get_options(*args: "Optional[str]", **kwargs: "Any") -> "Dict[str, Any]":
         rv["project_root"] = project_root
 
     rv["data_collection"] = _resolve_data_collection(rv)
+
+    window_sampling = rv["_experiments"].get("metrics_window_sampling")
+    if isinstance(window_sampling, dict):
+        # Copy, so the options the user passed aren't changed
+        window_sampling = dict(window_sampling)
+        rates: "list[tuple[Dict[str, Any], str]]" = [
+            (window_sampling, "sample_per_second")
+        ]
+        if isinstance(window_sampling.get("per_name"), dict):
+            per_name = window_sampling["per_name"] = dict(window_sampling["per_name"])
+            rates.extend((per_name, name) for name in per_name)
+
+        for options, key in rates:
+            if key not in options:
+                continue
+            rate = options[key]
+            if not (
+                isinstance(rate, (int, float))
+                and not isinstance(rate, bool)
+                and math.isfinite(rate)
+                and rate > 0
+            ):
+                logger.warning(
+                    "[Metrics] Given window sampling rate is invalid. It must be a positive number. Got %r, ignoring it.",
+                    rate,
+                )
+                del options[key]
+
+        rv["_experiments"] = {
+            **rv["_experiments"],
+            # Dropping every invalid rate must not turn sampling off
+            "metrics_window_sampling": window_sampling or True,
+        }
 
     if rv["socket_options"] and not isinstance(rv["socket_options"], list):
         logger.warning(

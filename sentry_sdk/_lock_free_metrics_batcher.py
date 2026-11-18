@@ -1,4 +1,3 @@
-import math
 import os
 import random
 import threading
@@ -11,7 +10,6 @@ from sentry_sdk.envelope import Envelope, Item, PayloadRef
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     format_timestamp,
-    logger,
     serialize_attribute,
 )
 
@@ -33,26 +31,18 @@ class _Reservoir:
         self.seen = 0
 
 
-class _ThreadState:
-    """One thread's reservoirs in a window. Only that thread writes to it, so
-    it needs no synchronization."""
-
-    __slots__ = ("reservoirs", "held")
-
-    def __init__(self) -> None:
-        self.reservoirs: "dict[str, _Reservoir]" = {}
-        # Slots across this thread's reservoirs, to bound memory
-        self.held = 0
-
-
 class _Window:
-    __slots__ = ("start", "threads", "retire_claims")
+    __slots__ = ("start", "threads", "slots", "retire_claims")
 
     def __init__(self) -> None:
         self.start = time.monotonic()
-        # Thread ident -> that thread's reservoirs. Belongs to the window, so
-        # threads that are gone disappear with it
-        self.threads: "dict[int, _ThreadState]" = {}
+        # Thread ident -> that thread's reservoirs by name. Only that thread
+        # writes to its reservoirs, so they need no synchronization. Belongs to
+        # the window, so threads that are gone disappear with it
+        self.threads: "dict[int, dict[str, _Reservoir]]" = {}
+        # One entry per reservoir slot taken in this window, across all
+        # threads. len() and append() are atomic, so this counts exactly
+        self.slots: "list[None]" = []
         self.retire_claims: "list[object]" = []
 
 
@@ -102,20 +92,7 @@ class LockFreeMetricsBatcher:
         # Holds the claim of the one thread that gets to start the flusher.
         self._flusher_claim: "dict[str, object]" = {}
 
-    def _parse_limit(self, value: float) -> int:
-        try:
-            rate = float(value)
-        except (TypeError, ValueError):
-            rate = math.nan
-
-        if not (math.isfinite(rate) and rate > 0):
-            logger.warning(
-                "[Metrics] Given window sampling rate is invalid. It must be a positive number. Got %r, using %s instead.",
-                value,
-                DEFAULT_SAMPLE_PER_SECOND,
-            )
-            rate = DEFAULT_SAMPLE_PER_SECOND
-
+    def _parse_limit(self, rate: float) -> int:
         # Never go below 1, so we always keep at least one metric per name to
         # extrapolate from
         return min(max(1, int(rate * WINDOW_SECONDS)), self.MAX_BEFORE_DROP)
@@ -178,7 +155,7 @@ class LockFreeMetricsBatcher:
         queue = self._queue
         # Checking and appending isn't atomic.
         # The queue can go over the limit by at most one metric per concurrently adding thread.
-        if len(queue) >= self.MAX_BEFORE_DROP:
+        if len(queue) + len(self._window.slots) >= self.MAX_BEFORE_DROP:
             return False
 
         queue.append(item)
@@ -195,21 +172,23 @@ class LockFreeMetricsBatcher:
         # reported as sampled out.
         window = self._window
         thread_id = threading.get_ident()
-        state = window.threads.get(thread_id)
-        if state is None:
-            state = window.threads.setdefault(thread_id, _ThreadState())
+        reservoirs = window.threads.get(thread_id)
+        if reservoirs is None:
+            reservoirs = window.threads.setdefault(thread_id, {})
 
         # Reservoir sampling (Algorithm R) on this thread's own reservoir
         name = item["name"]
-        reservoir = state.reservoirs.get(name)
+        reservoir = reservoirs.get(name)
         if reservoir is None:
-            reservoir = state.reservoirs[name] = _Reservoir()
+            reservoir = reservoirs[name] = _Reservoir()
         if len(reservoir.kept) < limit:
-            if state.held >= self.MAX_BEFORE_DROP:
-                # Out of memory budget. Not seen, so it doesn't count towards
-                # the sample rate
+            # Queued metrics and reservoir slots share one memory budget. Like
+            # the queue, this can go over by one slot per concurrently adding
+            # thread
+            if len(self._queue) + len(window.slots) >= self.MAX_BEFORE_DROP:
+                # Not seen, so it doesn't count towards the sample rate
                 return False
-            state.held += 1
+            window.slots.append(None)
             reservoir.seen += 1
             reservoir.kept.append(item)
         else:
@@ -302,8 +281,8 @@ class LockFreeMetricsBatcher:
     ) -> "list[tuple[Metric, int]]":
         # Copies, since a thread that's still writing may add to them
         by_name: "dict[str, list[_Reservoir]]" = {}
-        for state in window.threads.copy().values():
-            for name, reservoir in state.reservoirs.copy().items():
+        for reservoirs in window.threads.copy().values():
+            for name, reservoir in reservoirs.copy().items():
                 by_name.setdefault(name, []).append(reservoir)
 
         sampled_out = []
