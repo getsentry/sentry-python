@@ -167,7 +167,6 @@ class _RecordedUsage:
     input_tokens: int = 0
     cache_write_input_tokens: "Optional[int]" = 0
     cache_read_input_tokens: "Optional[int]" = 0
-    output_tokens_reasoning: "Optional[int]" = 0
 
 
 class _StreamSpanContext:
@@ -359,7 +358,6 @@ def _get_token_usage(result: "Messages") -> "tuple[int, int, int, int, int]":
             reasoning = getattr(usage.output_tokens_details, "thinking_tokens", None)
             if isinstance(reasoning, int):
                 output_tokens_reasoning = reasoning
-
 
     # Anthropic's input_tokens excludes cached/cache_write tokens.
     # Normalize to total input tokens so downstream cost calculations
@@ -799,7 +797,9 @@ def _set_output_data(
         set_on_span(SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS, output_tokens)
 
     if output_tokens_reasoning is not None:
-        set_on_span(SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS_REASONING, output_tokens_reasoning)
+        set_on_span(
+            SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS_REASONING, output_tokens_reasoning
+        )
 
     if input_tokens is not None and output_tokens is not None:
         set_on_span(SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, input_tokens + output_tokens)
