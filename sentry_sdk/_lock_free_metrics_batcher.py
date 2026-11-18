@@ -113,7 +113,7 @@ class LockFreeMetricsBatcher:
         if self._flusher_pid == pid:
             return True
 
-        # dict.setdefault is atomic, so exactly one thread gets to start the flusher
+        # dict.setdefault is atomic, so exactly one thread gets to start the flusher.
         claim = object()
         if self._flusher_claim.setdefault("flusher", claim) is not claim:
             return True
