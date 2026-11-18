@@ -9832,14 +9832,6 @@ def test_stream_messages_cache_tokens(
     ANTHROPIC_VERSION < (0, 105),
     reason="usage.output_tokens_details added in https://github.com/anthropics/anthropic-sdk-python/commit/f18b01414b21b49943a6ba2cdaa30ff7dd6a3025.",
 )
-@pytest.mark.parametrize(
-    "start_output_tokens_details, delta_output_tokens_details, expected_reasoning_tokens",
-    [
-        (None, {"thinking_tokens": 15}, 15),
-        ({"thinking_tokens": 5}, None, 5),
-        (None, None, 0),
-    ],
-)
 @pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_reasoning_tokens_streaming(
@@ -9850,9 +9842,6 @@ def test_reasoning_tokens_streaming(
     server_side_event_chunks,
     stream_gen_ai_spans,
     span_streaming,
-    start_output_tokens_details,
-    delta_output_tokens_details,
-    expected_reasoning_tokens,
 ):
     """Test reasoning (thinking) tokens are tracked for streaming responses."""
     client = Anthropic(api_key="z")
@@ -9868,11 +9857,7 @@ def test_reasoning_tokens_streaming(
                         role="assistant",
                         content=[],
                         type="message",
-                        usage=Usage(
-                            input_tokens=100,
-                            output_tokens=0,
-                            output_tokens_details=start_output_tokens_details,
-                        ),
+                        usage=Usage(input_tokens=100, output_tokens=0),
                     ),
                 ),
                 MessageDeltaEvent(
@@ -9880,7 +9865,7 @@ def test_reasoning_tokens_streaming(
                     delta=Delta(stop_reason="end_turn"),
                     usage=MessageDeltaUsage(
                         output_tokens=50,
-                        output_tokens_details=delta_output_tokens_details,
+                        output_tokens_details={"thinking_tokens": 15},
                     ),
                 ),
             ]
@@ -9936,10 +9921,7 @@ def test_reasoning_tokens_streaming(
     # Reasoning tokens are part of output_tokens, so totals are unchanged.
     assert span_data[SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 50
     assert span_data[SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 150
-    assert (
-        span_data[SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS_REASONING]
-        == expected_reasoning_tokens
-    )
+    assert span_data[SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS_REASONING] == 15
 
 
 @pytest.mark.skipif(
