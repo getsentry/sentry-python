@@ -359,6 +359,12 @@ if TYPE_CHECKING:
         },
     )
 
+    MetricWindowSamplingOptions = TypedDict(
+        "MetricWindowSamplingOptions",
+        {"sample_per_second": float, "per_name": Dict[str, float]},
+        total=False,
+    )
+
     SpanJSON = TypedDict(
         "SpanJSON",
         {
