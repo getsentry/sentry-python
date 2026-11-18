@@ -184,13 +184,11 @@ def asgi3_app_with_span():
 
 
 def test_invalid_transaction_style(asgi3_app):
-    with pytest.raises(ValueError) as exp:
+    with pytest.raises(
+        ValueError,
+        match=r"Invalid value for transaction_style: URL \(must be in \('endpoint', 'url'\)\)",
+    ):
         SentryAsgiMiddleware(asgi3_app, transaction_style="URL")
-
-    assert (
-        str(exp.value)
-        == "Invalid value for transaction_style: URL (must be in ('endpoint', 'url'))"
-    )
 
 
 @pytest.mark.asyncio
@@ -281,7 +279,7 @@ async def test_capture_transaction_with_error(
     asgi3_app_with_error,
     capture_events,
     capture_items,
-    DictionaryContaining,  # noqa: N803
+    DictionaryContaining,
     span_streaming,
 ):
     sentry_init(
@@ -552,7 +550,7 @@ async def test_websocket(
 
     request_url = "/ws"
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Oh no"):
         client = TestClient(asgi3_ws_app)
         if span_streaming:
             items = capture_items("event", "span")

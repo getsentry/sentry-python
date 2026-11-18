@@ -227,10 +227,10 @@ def test_tracing_in_ray_tasks(sentry_init, task_options, task, span_streaming):
                 shutil.rmtree(ray_temp_dir, ignore_errors=True)
 
         sentry_sdk.flush()
-        client_envelope = sentry_sdk.get_client().transport.envelopes[0]
         client_spans = [
             span
-            for item in client_envelope.items
+            for envelope in sentry_sdk.get_client().transport.envelopes
+            for item in envelope.items
             for span in item.payload.json["items"]
         ]
         assert client_spans[1]["name"] == "ray test parent"
@@ -446,10 +446,10 @@ def test_tracing_in_ray_actors(sentry_init, remote_kwargs, span_streaming):
                 shutil.rmtree(ray_temp_dir, ignore_errors=True)
 
         sentry_sdk.flush()
-        client_envelope = sentry_sdk.get_client().transport.envelopes[0]
         client_spans = [
             span
-            for item in client_envelope.items
+            for envelope in sentry_sdk.get_client().transport.envelopes
+            for item in envelope.items
             for span in item.payload.json["items"]
         ]
 

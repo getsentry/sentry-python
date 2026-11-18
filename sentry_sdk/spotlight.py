@@ -118,7 +118,7 @@ try:
         def __init__(self: "Self", get_response: "Callable[..., HttpResponse]") -> None:
             super().__init__(get_response)
 
-            import sentry_sdk.api
+            import sentry_sdk.api  # noqa: PLC0415
 
             self.sentry_sdk = sentry_sdk.api
 
@@ -134,10 +134,10 @@ try:
         @property
         def spotlight_script(self: "Self") -> "Optional[str]":
             if self._spotlight_url is not None and self._spotlight_script is None:
+                spotlight_js_url = urllib.parse.urljoin(
+                    self._spotlight_url, SPOTLIGHT_JS_ENTRY_PATH
+                )
                 try:
-                    spotlight_js_url = urllib.parse.urljoin(
-                        self._spotlight_url, SPOTLIGHT_JS_ENTRY_PATH
-                    )
                     req = urllib.request.Request(
                         spotlight_js_url,
                         method="HEAD",

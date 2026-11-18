@@ -43,7 +43,7 @@ import certifi
 import urllib3
 
 import sentry_sdk
-from sentry_sdk.consts import EndpointType
+from sentry_sdk.consts import VERSION, EndpointType
 from sentry_sdk.envelope import Envelope, Item, PayloadRef
 from sentry_sdk.utils import (
     Dsn,
@@ -73,10 +73,10 @@ if TYPE_CHECKING:
 
 KEEP_ALIVE_SOCKET_OPTIONS = []
 for option in [
-    (socket.SOL_SOCKET, lambda: getattr(socket, "SO_KEEPALIVE"), 1),  # noqa: B009
-    (socket.SOL_TCP, lambda: getattr(socket, "TCP_KEEPIDLE"), 45),  # noqa: B009
-    (socket.SOL_TCP, lambda: getattr(socket, "TCP_KEEPINTVL"), 10),  # noqa: B009
-    (socket.SOL_TCP, lambda: getattr(socket, "TCP_KEEPCNT"), 6),  # noqa: B009
+    (socket.SOL_SOCKET, lambda: getattr(socket, "SO_KEEPALIVE"), 1),
+    (socket.SOL_TCP, lambda: getattr(socket, "TCP_KEEPIDLE"), 45),
+    (socket.SOL_TCP, lambda: getattr(socket, "TCP_KEEPINTVL"), 10),
+    (socket.SOL_TCP, lambda: getattr(socket, "TCP_KEEPCNT"), 6),
 ]:
     try:
         KEEP_ALIVE_SOCKET_OPTIONS.append((option[0], option[1](), option[2]))
@@ -217,8 +217,6 @@ class HttpTransportCore(Transport):
     TIMEOUT = 30  # seconds
 
     def __init__(self: "Self", options: "Dict[str, Any]") -> None:
-        from sentry_sdk.consts import VERSION
-
         Transport.__init__(self, options)
         assert self.parsed_dsn is not None
         self.options: "Dict[str, Any]" = options
@@ -818,21 +816,17 @@ class HttpTransport(BaseHttpTransport):
                 opts["proxy_headers"] = proxy_headers
 
             if proxy.startswith("socks"):
-                use_socks_proxy = True
                 try:
                     # Check if PySocks dependency is available
-                    from urllib3.contrib.socks import SOCKSProxyManager
+                    from urllib3.contrib.socks import SOCKSProxyManager  # noqa: PLC0415
                 except ImportError:
-                    use_socks_proxy = False
                     logger.warning(
                         "You have configured a SOCKS proxy (%s) but support for SOCKS proxies is not installed. Disabling proxy support. Please add `PySocks` (or `urllib3` with the `[socks]` extra) to your dependencies.",
                         proxy,
                     )
-
-                if use_socks_proxy:
-                    return SOCKSProxyManager(proxy, **opts)
-                else:
                     return urllib3.PoolManager(**opts)
+
+                return SOCKSProxyManager(proxy, **opts)
             else:
                 return urllib3.ProxyManager(proxy, **opts)
         else:

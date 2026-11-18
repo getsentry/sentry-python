@@ -129,7 +129,7 @@ def patch_middlewares() -> None:
 
 def enable_span_for_middleware(middleware: "Middleware") -> "Middleware":
     if (
-        not hasattr(middleware, "__call__")  # noqa: B004
+        not hasattr(middleware, "__call__")
         or middleware is SentryStarliteASGIMiddleware
     ):
         return middleware
@@ -246,6 +246,7 @@ def patch_http_route_handle() -> None:
 
         route_handler = scope.get("route_handler")
 
+        name = None
         func = None
         if route_handler.name is not None:
             name = route_handler.name

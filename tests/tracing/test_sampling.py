@@ -405,7 +405,7 @@ def test_passes_parent_sampling_decision_in_sampling_context(
 
 def test_passes_custom_sampling_context_from_start_transaction_to_traces_sampler(
     sentry_init,
-    DictionaryContaining,  # noqa: N803
+    DictionaryContaining,
 ):
     traces_sampler = mock.Mock()
     sentry_init(traces_sampler=traces_sampler)
@@ -498,7 +498,7 @@ def test_sample_rate_affects_errors(sentry_init, capture_events):
 def test_warns_and_sets_sampled_to_false_on_invalid_traces_sampler_return_value(
     sentry_init,
     traces_sampler_return_value,
-    StringContaining,  # noqa: N803
+    StringContaining,
 ):
     sentry_init(traces_sampler=mock.Mock(return_value=traces_sampler_return_value))
 
@@ -521,7 +521,7 @@ def test_warns_and_sets_sampled_to_false_on_invalid_traces_sampler_return_value(
 def test_warns_and_sets_sampled_to_false_on_invalid_traces_sampler_return_value_span_streaming(
     sentry_init,
     traces_sampler_return_value,
-    StringContaining,  # noqa: N803
+    StringContaining,
 ):
     sentry_init(
         traces_sampler=mock.Mock(return_value=traces_sampler_return_value),

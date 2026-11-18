@@ -37,26 +37,27 @@ jobs:
       - name: Setup Test Env
         run: |
           uv sync
-      - name: Test grpc
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-grpc"
-      - name: Test httpx0
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-httpx0"
-      - name: Test httpx2
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-httpx2"
-      - name: Test pyreqwest
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-pyreqwest"
-      - name: Test requests
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-requests"
+      - parallel:
+          - name: Test grpc
+            run: |
+              set -x # print commands that are executed
+              ./scripts/runtox.sh "py${{ matrix.python-version }}-grpc"
+          - name: Test httpx0
+            run: |
+              set -x # print commands that are executed
+              ./scripts/runtox.sh "py${{ matrix.python-version }}-httpx0"
+          - name: Test httpx2
+            run: |
+              set -x # print commands that are executed
+              ./scripts/runtox.sh "py${{ matrix.python-version }}-httpx2"
+          - name: Test pyreqwest
+            run: |
+              set -x # print commands that are executed
+              ./scripts/runtox.sh "py${{ matrix.python-version }}-pyreqwest"
+          - name: Test requests
+            run: |
+              set -x # print commands that are executed
+              ./scripts/runtox.sh "py${{ matrix.python-version }}-requests"
       - name: Upload coverage data
         if: ${{ !cancelled() }}
         continue-on-error: true

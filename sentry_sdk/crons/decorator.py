@@ -26,7 +26,7 @@ if TYPE_CHECKING:
     R = TypeVar("R")
 
 
-class monitor:  # noqa: N801
+class monitor:
     """
     Decorator/context manager to capture checkin events for a monitor.
 
