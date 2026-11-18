@@ -199,7 +199,7 @@ class LockFreeMetricsBatcher:
             except IndexError:
                 break
 
-        sampled_out: "list[tuple[Metric, int]]" = []
+        sampled_out = 0
 
         window = self._window
         if force or time.monotonic() - window.start >= self.FLUSH_WAIT_TIME:
@@ -209,7 +209,7 @@ class LockFreeMetricsBatcher:
                 window = self._retired.popleft()
             except IndexError:
                 break
-            sampled_out.extend(self._harvest(window, items))
+            sampled_out += self._harvest(window, items)
 
         if not items:
             return None
@@ -221,24 +221,23 @@ class LockFreeMetricsBatcher:
             envelope.add_item(self._to_envelope_item(items))
             self._capture_func(envelope)
 
-        for count in sampled_out.values():
+        if sampled_out:
             self._record_lost_func(
                 reason="sample_rate",
                 data_category=self.CLIENT_REPORT_TYPE,
-                quantity=count,
+                quantity=sampled_out,
             )
 
         return envelope
 
-    def _harvest(
-        self, window: "_Window", items: "list[Metric]"
-    ) -> "list[tuple[Metric, int]]":
+    def _harvest(self, window: "_Window", items: "list[Metric]") -> int:
+        """Uniformly gather metrics from the window and append to `items`."""
         by_name: "dict[str, list[_Reservoir]]" = {}
         for state in window.threads.copy().values():
             for name, reservoir in state.reservoirs.copy().items():
                 by_name.setdefault(name, []).append(reservoir)
 
-        sampled_out = []
+        sampled_out = 0
         for name, reservoirs in by_name.items():
             limit = self._limits.get(name)
             if limit is None:
@@ -256,7 +255,7 @@ class LockFreeMetricsBatcher:
             rate = len(kept) / seen
             for item in kept:
                 item["attributes"]["sentry.client_sample_rate"] = rate
-            sampled_out.append((kept[0], seen - len(kept)))
+            sampled_out += seen - len(kept)
 
         return sampled_out
 
