@@ -39,7 +39,6 @@ class LockFreeMetricsBatcher:
     def _reset_thread_state(self) -> None:
         self._queue: "Deque[Metric]" = deque()
         self._running = True
-        self._active: "threading.local" = threading.local()
         self._flush_event: "threading.Event" = threading.Event()
         self._flusher: "Optional[threading.Thread]" = None
         self._flusher_pid: "Optional[int]" = None
@@ -58,13 +57,9 @@ class LockFreeMetricsBatcher:
         if self._flusher_pid == pid:
             return True
 
-        # A plain attribute can't be claimed safely, since checking and setting
-        # it are two steps. dict.setdefault does both atomically, so exactly one
-        # thread gets to start the flusher
+        # dict.setdefault is atomic, so exactly one thread gets to start the flusher
         claim = object()
         if self._flusher_claim.setdefault("flusher", claim) is not claim:
-            # Another thread is starting the flusher. Metrics are queued until
-            # it's up, so there's no need to wait for it
             return True
 
         flusher = threading.Thread(target=self._flush_loop)
@@ -82,41 +77,28 @@ class LockFreeMetricsBatcher:
         return True
 
     def _flush_loop(self) -> None:
-        # Mark the flush-loop thread as active for its entire lifetime so that
-        # any re-entrant add() triggered while flushing is dropped instead of
-        # feeding back into the batcher.
-        self._active.flag = True
         while self._running:
             self._flush_event.wait(self.FLUSH_WAIT_TIME + random.random())
             self._flush_event.clear()
             self._flush()
 
     def add(self, item: "Metric") -> None:
-        # Bail out if the current thread is already executing batcher code,
-        # e.g. a metric emitted from inside a flush.
-        if getattr(self._active, "flag", False):
+        # Not checking self._flusher here: a thread that lost the race to start
+        # the flusher sees it unset for a moment, and its metric should still be
+        # queued
+        if not self._ensure_thread():
             return None
 
-        self._active.flag = True
-        try:
-            # Not checking self._flusher here: a thread that lost the race to
-            # start the flusher sees it unset for a moment, and its metric should
-            # still be queued
-            if not self._ensure_thread():
-                return None
+        queue = self._queue
+        # Checking and appending isn't atomic, so the queue can go over the
+        # limit by at most one metric per concurrently adding thread
+        if len(queue) >= self.MAX_BEFORE_DROP:
+            self._record_lost(item)
+            return None
 
-            queue = self._queue
-            # Checking and appending isn't atomic, so the queue can go over the
-            # limit by at most one metric per concurrently adding thread
-            if len(queue) >= self.MAX_BEFORE_DROP:
-                self._record_lost(item)
-                return None
-
-            queue.append(item)
-            if len(queue) >= self.MAX_BEFORE_FLUSH and not self._flush_event.is_set():
-                self._flush_event.set()
-        finally:
-            self._active.flag = False
+        queue.append(item)
+        if len(queue) >= self.MAX_BEFORE_FLUSH and not self._flush_event.is_set():
+            self._flush_event.set()
 
     def kill(self) -> None:
         if self._flusher is None:
@@ -127,12 +109,7 @@ class LockFreeMetricsBatcher:
         self._flusher = None
 
     def flush(self) -> None:
-        was_active = getattr(self._active, "flag", False)
-        self._active.flag = True
-        try:
-            self._flush()
-        finally:
-            self._active.flag = was_active
+        self._flush()
 
     def _flush(self) -> "Optional[Envelope]":
         # Called by both the flusher thread and flush(). Each popleft hands a
