@@ -7,20 +7,19 @@ free-threaded CPython:
 
 - ``deque.append`` / ``deque.popleft``
 - ``dict.setdefault``
-- ``next()`` on an ``itertools.count``
 - rebinding an attribute
 
 The flusher thread is the only consumer: it's the only thread that removes
-metrics from the queue, so the front of the queue only moves when it pops.
-That lets batches be defined by position. Every add takes the next position,
-and the add that completes a batch of ``MAX_BEFORE_FLUSH`` registers its
-position and wakes the flusher. The flusher knows how many metrics it has
-removed so far, so it removes exactly the ones up to that position. Metrics
-added in the meantime wait for the next batch.
+items from the queue, so the queue can't shrink under it. Each pass removes
+as many items as the queue held when the pass started. Items added in the
+meantime wait for the next pass, so a pass always ends, even under constant
+load.
 
-An explicit ``flush()`` doesn't drain the queue itself. It asks the flusher to
-send everything and waits for it to finish, so when it returns, everything
-added before it has been handed to the transport.
+An explicit ``flush()`` doesn't drain the queue itself. It appends a sentinel
+(a ``threading.Event``) to the queue, wakes the flusher and waits. Everything
+the calling thread added before ``flush()`` is ahead of the sentinel, so once
+the flusher has sent the pass that contained it and set it, those metrics have
+been handed to the transport. Concurrent flushes are answered by the same pass.
 
 This is independent of ``Batcher`` on purpose, so it can evolve (e.g. gain
 sampling) without affecting the other batchers.
@@ -29,7 +28,6 @@ Like the other batchers, it doesn't register its own fork hook. Its owner must
 call ``_reset_thread_state()`` in a forked child.
 """
 
-import itertools
 import os
 import random
 import threading
@@ -45,7 +43,7 @@ from sentry_sdk.utils import (
 )
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Deque, Dict, List, Optional
+    from typing import Any, Callable, Deque, Dict, List, Optional, Union
 
     from sentry_sdk._types import Metric
 
@@ -71,16 +69,9 @@ class LockFreeMetricsBatcher:
         self._reset_thread_state()
 
     def _reset_thread_state(self) -> None:
-        self._queue: "Deque[Metric]" = deque()
-        # Positions handed out to adds, in the order they were added
-        self._positions = itertools.count()
-        # Positions that completed a batch, for the flusher to flush up to
-        self._flush_targets: "Deque[int]" = deque()
-        # Explicit flushes waiting for the flusher to send everything
-        self._flush_requests: "Deque[threading.Event]" = deque()
-        # How many metrics have been removed from the queue. Only the consumer
-        # writes it, so it doesn't need to be atomic
-        self._drained = 0
+        # Metrics, and sentinels of explicit flushes waiting for the metrics
+        # ahead of them to be sent
+        self._queue: "Deque[Union[Metric, threading.Event]]" = deque()
         self._running = True
         self._active: "threading.local" = threading.local()
         self._flush_event: "threading.Event" = threading.Event()
@@ -131,31 +122,14 @@ class LockFreeMetricsBatcher:
         self._active.flag = True
         while self._running:
             self._flush_event.wait(self.FLUSH_WAIT_TIME + random.random())
-            # Clear before reading the requests and targets, so that one
-            # registered after this point wakes the next iteration
+            # Clear before the pass reads the queue's length, so that a metric
+            # or sentinel added after that point wakes the next iteration
             self._flush_event.clear()
+            self._flush()
 
-            requests = _drain(self._flush_requests)
-            targets = _drain(self._flush_targets)
-            try:
-                # A failure to serialize or send one batch must not kill the
-                # flusher thread, or every later metric would be dropped.
-                with capture_internal_exceptions():
-                    if requests or not targets:
-                        # Explicit flush, or woken by the timer: send everything
-                        self._flush(until=None)
-                    else:
-                        # Woken by a full batch: send up to the add that
-                        # completed it
-                        self._flush(until=max(targets))
-            finally:
-                for request in requests:
-                    request.set()
-
-        # Don't leave flush() calls that came in while stopping waiting for
-        # their timeout
-        for request in _drain(self._flush_requests):
-            request.set()
+        # Answer the flush() calls that came in while stopping, instead of
+        # leaving them waiting for their timeout
+        self._flush()
 
     def add(self, item: "Metric") -> None:
         # Bail out if the current thread is already executing batcher code,
@@ -178,12 +152,8 @@ class LockFreeMetricsBatcher:
                 self._record_lost(item)
                 return None
 
-            position = next(self._positions)
             queue.append(item)
-            if (position + 1) % self.MAX_BEFORE_FLUSH == 0:
-                # Positions are unique, so exactly one add completes each batch.
-                # It registers the batch and leaves the sending to the flusher
-                self._flush_targets.append(position + 1)
+            if len(queue) >= self.MAX_BEFORE_FLUSH and not self._flush_event.is_set():
                 self._flush_event.set()
         finally:
             self._active.flag = False
@@ -208,41 +178,55 @@ class LockFreeMetricsBatcher:
             was_active = getattr(self._active, "flag", False)
             self._active.flag = True
             try:
-                self._flush(until=None)
+                self._flush()
             finally:
                 self._active.flag = was_active
             return
 
         done = threading.Event()
-        self._flush_requests.append(done)
+        # Append before waking the flusher, so the pass it wakes for either
+        # sees the sentinel or is followed by another one that does
+        self._queue.append(done)
         self._flush_event.set()
         done.wait(self.FLUSH_TIMEOUT)
 
-    def _flush(self, until: "Optional[int]") -> "Optional[Envelope]":
-        """Send the queued metrics up to position ``until``, or all of them.
+    def _flush(self) -> "Optional[Envelope]":
+        """Send the metrics that were queued when this pass started, then
+        answer the flush() calls among them.
 
         Must only be called by the consumer."""
         queue = self._queue
-        count = len(queue) if until is None else until - self._drained
-
         items: "List[Metric]" = []
-        for _ in range(count):
+        requests: "List[threading.Event]" = []
+        for _ in range(len(queue)):
             try:
-                items.append(queue.popleft())
+                item = queue.popleft()
             except IndexError:
-                # An add took its position but hasn't appended yet. Its metric
-                # goes out with the next batch
+                # Drained by a flush() from a thread that took over after the
+                # flusher was killed
                 break
-        self._drained += len(items)
+            if isinstance(item, threading.Event):
+                requests.append(item)
+            else:
+                items.append(item)
 
-        if not items:
-            return None
+        envelope = None
+        try:
+            # A failure to serialize or send one batch must not kill the
+            # flusher thread, or every later metric would be dropped.
+            with capture_internal_exceptions():
+                if items:
+                    envelope = Envelope(
+                        headers={
+                            "sent_at": format_timestamp(datetime.now(timezone.utc))
+                        }
+                    )
+                    envelope.add_item(self._to_envelope_item(items))
+                    self._capture_func(envelope)
+        finally:
+            for request in requests:
+                request.set()
 
-        envelope = Envelope(
-            headers={"sent_at": format_timestamp(datetime.now(timezone.utc))}
-        )
-        envelope.add_item(self._to_envelope_item(items))
-        self._capture_func(envelope)
         return envelope
 
     def _record_lost(self, item: "Metric") -> None:
@@ -296,12 +280,3 @@ class LockFreeMetricsBatcher:
             res["unit"] = item["unit"]
 
         return res
-
-
-def _drain(items: "Deque[Any]") -> "List[Any]":
-    drained = []
-    while True:
-        try:
-            drained.append(items.popleft())
-        except IndexError:
-            return drained
