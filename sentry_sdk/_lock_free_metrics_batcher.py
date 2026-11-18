@@ -59,25 +59,23 @@ class LockFreeMetricsBatcher:
         self,
         capture_func: "Callable[[Envelope], None]",
         record_lost_func: "Callable[..., None]",
-        window_sampling: "Union[bool, MetricWindowSamplingOptions, None]" = None,
+        window_sampling: "Union[bool, MetricWindowSamplingOptions]",
     ) -> None:
         self._capture_func = capture_func
         self._record_lost_func = record_lost_func
 
         self._default_limit: "Optional[int]" = None
         self._name_limits: "dict[str, int]" = {}
-        if window_sampling:
-            options = window_sampling if isinstance(window_sampling, dict) else {}
-            per_name = options.get("per_name")
-            if isinstance(per_name, dict):
-                self._name_limits = {
-                    name: self._parse_limit(rate) for name, rate in per_name.items()
-                }
-            if "sample_per_second" in options or not self._name_limits:
-                self._default_limit = self._parse_limit(
-                    options.get("sample_per_second", DEFAULT_SAMPLE_PER_SECOND)
-                )
-        self._sampling = bool(self._name_limits) or self._default_limit is not None
+        options = window_sampling if isinstance(window_sampling, dict) else {}
+        per_name = options.get("per_name")
+        if isinstance(per_name, dict):
+            self._name_limits = {
+                name: self._parse_limit(rate) for name, rate in per_name.items()
+            }
+        if "sample_per_second" in options or not self._name_limits:
+            self._default_limit = self._parse_limit(
+                options.get("sample_per_second", DEFAULT_SAMPLE_PER_SECOND)
+            )
 
         self._reset_thread_state()
 
@@ -98,8 +96,6 @@ class LockFreeMetricsBatcher:
         return min(max(1, int(rate * WINDOW_SECONDS)), self.MAX_BEFORE_DROP)
 
     def _limit(self, name: str) -> "Optional[int]":
-        if not self._sampling:
-            return None
         return self._name_limits.get(name, self._default_limit)
 
     def _ensure_thread(self) -> bool:
@@ -237,17 +233,16 @@ class LockFreeMetricsBatcher:
                 break
 
         sampled_out: "list[tuple[Metric, int]]" = []
-        if self._sampling:
-            # Retire before taking the retired windows, so a flush() sends the
-            # window it just retired
-            self._retire_window(force)
-            for _ in range(len(self._retired)):
-                try:
-                    window = self._retired.popleft()
-                except IndexError:
-                    # Another consumer took it
-                    break
-                sampled_out.extend(self._harvest(window, items))
+        # Retire before taking the retired windows, so a flush() sends the
+        # window it just retired
+        self._retire_window(force)
+        for _ in range(len(self._retired)):
+            try:
+                window = self._retired.popleft()
+            except IndexError:
+                # Another consumer took it
+                break
+            sampled_out.extend(self._harvest(window, items))
 
         if not items:
             return None
@@ -340,7 +335,11 @@ class LockFreeMetricsBatcher:
             thread_kept = reservoir.kept[:]
             # A thread caught writing can have counted a metric it hasn't
             # stored yet
-            kept.extend(random.sample(thread_kept, min(count, len(thread_kept))))
+            if count >= len(thread_kept):
+                # Keep the order metrics were added in when all of them stay
+                kept.extend(thread_kept)
+            else:
+                kept.extend(random.sample(thread_kept, count))
         return kept
 
     def _record_lost(self, item: "Metric") -> None:

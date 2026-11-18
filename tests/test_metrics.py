@@ -6,18 +6,12 @@ import pytest
 import sentry_sdk
 from sentry_sdk import get_client
 from sentry_sdk._lock_free_metrics_batcher import LockFreeMetricsBatcher
-from sentry_sdk._metrics_batcher import MetricsBatcher
 from sentry_sdk.consts import SPANDATA, VERSION
 
 
-@pytest.mark.parametrize("batcher_cls", [MetricsBatcher, LockFreeMetricsBatcher])
-def test_metrics_basics(sentry_init, batcher_cls, capture_items):
-    sentry_init()
-    client = get_client()
-    client.metrics_batcher = batcher_cls(
-        capture_func=client.metrics_batcher._capture_func,
-        record_lost_func=client.metrics_batcher._record_lost_func,
-    )
+@pytest.mark.parametrize("window_sampling", [None, True])
+def test_metrics_basics(sentry_init, window_sampling, capture_items):
+    sentry_init(_experiments={"metrics_window_sampling": window_sampling})
     items = capture_items("trace_metric")
 
     sentry_sdk.metrics.count("test.counter", 1)
@@ -47,13 +41,13 @@ def test_metrics_basics(sentry_init, batcher_cls, capture_items):
     assert metrics[2]["unit"] == "second"
 
 
-@pytest.mark.parametrize("batcher_cls", [MetricsBatcher, LockFreeMetricsBatcher])
-def test_metrics_with_attributes(sentry_init, batcher_cls, capture_items):
-    sentry_init(release="1.0.0", environment="test", server_name="test-server")
-    client = get_client()
-    client.metrics_batcher = batcher_cls(
-        capture_func=client.metrics_batcher._capture_func,
-        record_lost_func=client.metrics_batcher._record_lost_func,
+@pytest.mark.parametrize("window_sampling", [None, True])
+def test_metrics_with_attributes(sentry_init, window_sampling, capture_items):
+    sentry_init(
+        release="1.0.0",
+        environment="test",
+        server_name="test-server",
+        _experiments={"metrics_window_sampling": window_sampling},
     )
     items = capture_items("trace_metric")
 
@@ -76,13 +70,11 @@ def test_metrics_with_attributes(sentry_init, batcher_cls, capture_items):
     assert metrics[0]["attributes"]["sentry.sdk.version"] == VERSION
 
 
-@pytest.mark.parametrize("batcher_cls", [MetricsBatcher, LockFreeMetricsBatcher])
-def test_metrics_with_user(sentry_init, batcher_cls, capture_items):
-    sentry_init(data_collection={"user_info": True})
-    client = get_client()
-    client.metrics_batcher = batcher_cls(
-        capture_func=client.metrics_batcher._capture_func,
-        record_lost_func=client.metrics_batcher._record_lost_func,
+@pytest.mark.parametrize("window_sampling", [None, True])
+def test_metrics_with_user(sentry_init, window_sampling, capture_items):
+    sentry_init(
+        data_collection={"user_info": True},
+        _experiments={"metrics_window_sampling": window_sampling},
     )
     items = capture_items("trace_metric")
 
@@ -101,13 +93,11 @@ def test_metrics_with_user(sentry_init, batcher_cls, capture_items):
     assert metrics[0]["attributes"]["user.name"] == "testuser"
 
 
-@pytest.mark.parametrize("batcher_cls", [MetricsBatcher, LockFreeMetricsBatcher])
-def test_metrics_no_user_if_user_info_off(sentry_init, batcher_cls, capture_items):
-    sentry_init(data_collection={"user_info": False})
-    client = get_client()
-    client.metrics_batcher = batcher_cls(
-        capture_func=client.metrics_batcher._capture_func,
-        record_lost_func=client.metrics_batcher._record_lost_func,
+@pytest.mark.parametrize("window_sampling", [None, True])
+def test_metrics_no_user_if_user_info_off(sentry_init, window_sampling, capture_items):
+    sentry_init(
+        data_collection={"user_info": False},
+        _experiments={"metrics_window_sampling": window_sampling},
     )
     items = capture_items("trace_metric")
 
@@ -126,13 +116,11 @@ def test_metrics_no_user_if_user_info_off(sentry_init, batcher_cls, capture_item
     assert "user.name" not in metrics[0]["attributes"]
 
 
-@pytest.mark.parametrize("batcher_cls", [MetricsBatcher, LockFreeMetricsBatcher])
-def test_metrics_with_span(sentry_init, batcher_cls, capture_items):
-    sentry_init(traces_sample_rate=1.0)
-    client = get_client()
-    client.metrics_batcher = batcher_cls(
-        capture_func=client.metrics_batcher._capture_func,
-        record_lost_func=client.metrics_batcher._record_lost_func,
+@pytest.mark.parametrize("window_sampling", [None, True])
+def test_metrics_with_span(sentry_init, window_sampling, capture_items):
+    sentry_init(
+        traces_sample_rate=1.0,
+        _experiments={"metrics_window_sampling": window_sampling},
     )
     items = capture_items("trace_metric")
 
@@ -149,14 +137,11 @@ def test_metrics_with_span(sentry_init, batcher_cls, capture_items):
     assert metrics[0]["span_id"] == segment.span_id
 
 
-@pytest.mark.parametrize("batcher_cls", [MetricsBatcher, LockFreeMetricsBatcher])
-def test_metrics_tracing_without_performance(sentry_init, batcher_cls, capture_items):
-    sentry_init()
-    client = get_client()
-    client.metrics_batcher = batcher_cls(
-        capture_func=client.metrics_batcher._capture_func,
-        record_lost_func=client.metrics_batcher._record_lost_func,
-    )
+@pytest.mark.parametrize("window_sampling", [None, True])
+def test_metrics_tracing_without_performance(
+    sentry_init, window_sampling, capture_items
+):
+    sentry_init(_experiments={"metrics_window_sampling": window_sampling})
     items = capture_items("trace_metric")
 
     with sentry_sdk.isolation_scope() as isolation_scope:
@@ -176,8 +161,8 @@ def test_metrics_tracing_without_performance(sentry_init, batcher_cls, capture_i
     assert "span_id" not in metrics[0]
 
 
-@pytest.mark.parametrize("batcher_cls", [MetricsBatcher, LockFreeMetricsBatcher])
-def test_metrics_before_send(sentry_init, batcher_cls, capture_items):
+@pytest.mark.parametrize("window_sampling", [None, True])
+def test_metrics_before_send(sentry_init, window_sampling, capture_items):
     before_metric_called = False
 
     def _before_metric(record, hint):
@@ -202,11 +187,7 @@ def test_metrics_before_send(sentry_init, batcher_cls, capture_items):
 
     sentry_init(
         before_send_metric=_before_metric,
-    )
-    client = get_client()
-    client.metrics_batcher = batcher_cls(
-        capture_func=client.metrics_batcher._capture_func,
-        record_lost_func=client.metrics_batcher._record_lost_func,
+        _experiments={"metrics_window_sampling": window_sampling},
     )
     items = capture_items("trace_metric")
 
@@ -222,20 +203,16 @@ def test_metrics_before_send(sentry_init, batcher_cls, capture_items):
 
 
 @pytest.mark.tests_internal_exceptions
-@pytest.mark.parametrize("batcher_cls", [MetricsBatcher, LockFreeMetricsBatcher])
+@pytest.mark.parametrize("window_sampling", [None, True])
 def test_metrics_before_send_raises_does_not_crash_application(
-    sentry_init, batcher_cls, capture_items
+    sentry_init, window_sampling, capture_items
 ):
     def _before_metric(record, hint):
         raise ValueError("before_send_metric error")
 
     sentry_init(
         before_send_metric=_before_metric,
-    )
-    client = get_client()
-    client.metrics_batcher = batcher_cls(
-        capture_func=client.metrics_batcher._capture_func,
-        record_lost_func=client.metrics_batcher._record_lost_func,
+        _experiments={"metrics_window_sampling": window_sampling},
     )
     items = capture_items("trace_metric")
 
@@ -250,18 +227,16 @@ def test_metrics_before_send_raises_does_not_crash_application(
 
 
 @pytest.mark.tests_internal_exceptions
-@pytest.mark.parametrize("batcher_cls", [MetricsBatcher, LockFreeMetricsBatcher])
+@pytest.mark.parametrize("window_sampling", [None, True])
 def test_metrics_before_send_raises_records_callback_error(
-    sentry_init, batcher_cls, capture_items, capture_record_lost_event_calls
+    sentry_init, window_sampling, capture_items, capture_record_lost_event_calls
 ):
     def _before_metric(record, hint):
         raise ValueError("before_send_metric error")
 
-    sentry_init(before_send_metric=_before_metric)
-    client = get_client()
-    client.metrics_batcher = batcher_cls(
-        capture_func=client.metrics_batcher._capture_func,
-        record_lost_func=client.metrics_batcher._record_lost_func,
+    sentry_init(
+        before_send_metric=_before_metric,
+        _experiments={"metrics_window_sampling": window_sampling},
     )
     items = capture_items("trace_metric")
     record_lost_event_calls = capture_record_lost_event_calls()
@@ -282,18 +257,16 @@ def test_metrics_before_send_raises_records_callback_error(
     assert item.payload.json["items"][0]["name"] == "test.keep"
 
 
-@pytest.mark.parametrize("batcher_cls", [MetricsBatcher, LockFreeMetricsBatcher])
+@pytest.mark.parametrize("window_sampling", [None, True])
 def test_metrics_before_send_returns_none_records_before_send(
-    sentry_init, batcher_cls, capture_items, capture_record_lost_event_calls
+    sentry_init, window_sampling, capture_items, capture_record_lost_event_calls
 ):
     def _before_metric(record, hint):
         return None
 
-    sentry_init(before_send_metric=_before_metric)
-    client = get_client()
-    client.metrics_batcher = batcher_cls(
-        capture_func=client.metrics_batcher._capture_func,
-        record_lost_func=client.metrics_batcher._record_lost_func,
+    sentry_init(
+        before_send_metric=_before_metric,
+        _experiments={"metrics_window_sampling": window_sampling},
     )
     items = capture_items("trace_metric")
     record_lost_event_calls = capture_record_lost_event_calls()
@@ -314,13 +287,12 @@ def test_metrics_before_send_returns_none_records_before_send(
     assert item.payload.json["items"][0]["name"] == "test.drop"
 
 
-@pytest.mark.parametrize("batcher_cls", [MetricsBatcher, LockFreeMetricsBatcher])
-def test_transport_format(sentry_init, batcher_cls, capture_envelopes):
-    sentry_init(server_name="test-server", release="1.0.0")
-    client = get_client()
-    client.metrics_batcher = batcher_cls(
-        capture_func=client.metrics_batcher._capture_func,
-        record_lost_func=client.metrics_batcher._record_lost_func,
+@pytest.mark.parametrize("window_sampling", [None, True])
+def test_transport_format(sentry_init, window_sampling, capture_envelopes):
+    sentry_init(
+        server_name="test-server",
+        release="1.0.0",
+        _experiments={"metrics_window_sampling": window_sampling},
     )
 
     envelopes = capture_envelopes()
@@ -383,14 +355,9 @@ def test_transport_format(sentry_init, batcher_cls, capture_envelopes):
     }
 
 
-@pytest.mark.parametrize("batcher_cls", [MetricsBatcher, LockFreeMetricsBatcher])
-def test_batcher_drops_metrics(sentry_init, batcher_cls, monkeypatch):
+def test_batcher_drops_metrics(sentry_init, monkeypatch):
     sentry_init()
-    client = get_client()
-    client.metrics_batcher = batcher_cls(
-        capture_func=client.metrics_batcher._capture_func,
-        record_lost_func=client.metrics_batcher._record_lost_func,
-    )
+    client = sentry_sdk.get_client()
 
     def no_op_flush(*args, **kwargs):
         pass
@@ -424,14 +391,11 @@ def test_batcher_drops_metrics(sentry_init, batcher_cls, monkeypatch):
         assert item.payload.json["items"][0]["name"] == "test.counter"
 
 
-@pytest.mark.parametrize("batcher_cls", [MetricsBatcher, LockFreeMetricsBatcher])
-def test_metric_gets_attributes_from_scopes(sentry_init, batcher_cls, capture_items):
-    sentry_init()
-    client = get_client()
-    client.metrics_batcher = batcher_cls(
-        capture_func=client.metrics_batcher._capture_func,
-        record_lost_func=client.metrics_batcher._record_lost_func,
-    )
+@pytest.mark.parametrize("window_sampling", [None, True])
+def test_metric_gets_attributes_from_scopes(
+    sentry_init, window_sampling, capture_items
+):
+    sentry_init(_experiments={"metrics_window_sampling": window_sampling})
 
     items = capture_items("trace_metric")
 
@@ -456,16 +420,11 @@ def test_metric_gets_attributes_from_scopes(sentry_init, batcher_cls, capture_it
     assert "current.attribute" not in metric2["attributes"]
 
 
-@pytest.mark.parametrize("batcher_cls", [MetricsBatcher, LockFreeMetricsBatcher])
+@pytest.mark.parametrize("window_sampling", [None, True])
 def test_metric_attributes_override_scope_attributes(
-    sentry_init, batcher_cls, capture_items
+    sentry_init, window_sampling, capture_items
 ):
-    sentry_init()
-    client = get_client()
-    client.metrics_batcher = batcher_cls(
-        capture_func=client.metrics_batcher._capture_func,
-        record_lost_func=client.metrics_batcher._record_lost_func,
-    )
+    sentry_init(_experiments={"metrics_window_sampling": window_sampling})
 
     items = capture_items("trace_metric")
 
@@ -483,16 +442,11 @@ def test_metric_attributes_override_scope_attributes(
     assert metric["attributes"]["temp.attribute"] == "value2"
 
 
-@pytest.mark.parametrize("batcher_cls", [MetricsBatcher, LockFreeMetricsBatcher])
-def test_log_array_attributes(sentry_init, batcher_cls, capture_envelopes):
+@pytest.mark.parametrize("window_sampling", [None, True])
+def test_log_array_attributes(sentry_init, window_sampling, capture_envelopes):
     """Test homogeneous list and tuple attributes, and fallback for inhomogeneous collections."""
 
-    sentry_init()
-    client = get_client()
-    client.metrics_batcher = batcher_cls(
-        capture_func=client.metrics_batcher._capture_func,
-        record_lost_func=client.metrics_batcher._record_lost_func,
-    )
+    sentry_init(_experiments={"metrics_window_sampling": window_sampling})
 
     envelopes = capture_envelopes()
 
@@ -545,9 +499,9 @@ def test_log_array_attributes(sentry_init, batcher_cls, capture_envelopes):
     }
 
 
-@pytest.mark.parametrize("batcher_cls", [MetricsBatcher, LockFreeMetricsBatcher])
+@pytest.mark.parametrize("window_sampling", [None, True])
 def test_attributes_preserialized_in_before_send(
-    sentry_init, batcher_cls, capture_items
+    sentry_init, window_sampling, capture_items
 ):
     """We don't surface user-held references to objects in attributes."""
 
@@ -559,11 +513,9 @@ def test_attributes_preserialized_in_before_send(
 
         return metric
 
-    sentry_init(before_send_metric=before_send_metric)
-    client = get_client()
-    client.metrics_batcher = batcher_cls(
-        capture_func=client.metrics_batcher._capture_func,
-        record_lost_func=client.metrics_batcher._record_lost_func,
+    sentry_init(
+        before_send_metric=before_send_metric,
+        _experiments={"metrics_window_sampling": window_sampling},
     )
 
     items = capture_items("trace_metric")
@@ -594,8 +546,8 @@ def test_attributes_preserialized_in_before_send(
     assert isinstance(metric["attributes"]["dictionary"], str)
 
 
-@pytest.mark.parametrize("batcher_cls", [MetricsBatcher, LockFreeMetricsBatcher])
-def test_array_attributes_deep_copied_in_before_send(sentry_init, batcher_cls):
+@pytest.mark.parametrize("window_sampling", [None, True])
+def test_array_attributes_deep_copied_in_before_send(sentry_init, window_sampling):
     """We don't surface user-held references to objects in attributes."""
 
     strings = ["value1", "value2"]
@@ -607,11 +559,9 @@ def test_array_attributes_deep_copied_in_before_send(sentry_init, batcher_cls):
 
         return metric
 
-    sentry_init(before_send_metric=before_send_metric)
-    client = get_client()
-    client.metrics_batcher = batcher_cls(
-        capture_func=client.metrics_batcher._capture_func,
-        record_lost_func=client.metrics_batcher._record_lost_func,
+    sentry_init(
+        before_send_metric=before_send_metric,
+        _experiments={"metrics_window_sampling": window_sampling},
     )
 
     sentry_sdk.metrics.count(
