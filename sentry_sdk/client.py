@@ -112,7 +112,9 @@ CODING_AGENT_ENV_VARS = (
 )
 
 # How long after a change to the file that calls init() the setup counts as in progress.
+# Without git we can't tell whose change it is, so the window is shorter.
 SETUP_IN_PROGRESS_SECONDS = 60 * 60
+SETUP_IN_PROGRESS_SECONDS_WITHOUT_GIT = 10 * 60
 
 _coding_agent_hint_shown = False
 
@@ -394,16 +396,20 @@ def _git(cwd: str, *args: str) -> "Optional[str]":
 
 def _setup_in_progress(init_file: str) -> bool:
     """Whether this user changed the file that calls init() a short time ago."""
-    cutoff = time.time() - SETUP_IN_PROGRESS_SECONDS
+    now = time.time()
+    cutoff = now - SETUP_IN_PROGRESS_SECONDS
     try:
-        if os.stat(init_file).st_mtime < cutoff:
-            return False
+        changed = os.stat(init_file).st_mtime
     except OSError:
+        return False
+    if changed < cutoff:
         return False
 
     cwd = os.path.dirname(init_file)
     status = _git(cwd, "status", "--porcelain", "--", init_file)
-    if status is None or status:
+    if status is None:
+        return changed >= now - SETUP_IN_PROGRESS_SECONDS_WITHOUT_GIT
+    if status:
         return True
 
     # A checkout also gives a clean file a new mtime, so only count a commit

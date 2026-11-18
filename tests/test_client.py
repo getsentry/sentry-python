@@ -1650,14 +1650,15 @@ def _commit(app, **kwargs):
     _git(app, "commit", "-q", "-m", "Set up Sentry", **kwargs)
 
 
-def _changed_two_hours_ago(app):
-    two_hours_ago = time.time() - 2 * 60 * 60
-    os.utime(app, (two_hours_ago, two_hours_ago))
+def _changed_minutes_ago(app, minutes):
+    changed = time.time() - minutes * 60
+    os.utime(app, (changed, changed))
 
 
-def _committed_and_edited(app):
+def _committed_and_edited(app, minutes_ago=0):
     _commit(app, date="2020-01-01T00:00:00")
     app.write_text(app.read_text() + "\n")
+    _changed_minutes_ago(app, minutes_ago)
 
 
 @pytest.mark.skipif(shutil.which("git") is None, reason="needs git")
@@ -1665,8 +1666,22 @@ def _committed_and_edited(app):
     "before_run, shown",
     [
         pytest.param(None, True, id="new file, no git repo"),
-        pytest.param(_changed_two_hours_ago, False, id="changed two hours ago"),
+        pytest.param(
+            lambda app: _changed_minutes_ago(app, 20),
+            False,
+            id="no git repo, changed 20 minutes ago",
+        ),
         pytest.param(_committed_and_edited, True, id="uncommitted change"),
+        pytest.param(
+            lambda app: _committed_and_edited(app, minutes_ago=20),
+            True,
+            id="uncommitted change, 20 minutes ago",
+        ),
+        pytest.param(
+            lambda app: _committed_and_edited(app, minutes_ago=120),
+            False,
+            id="uncommitted change, two hours ago",
+        ),
         pytest.param(_commit, True, id="committed here a moment ago"),
         pytest.param(
             lambda app: _commit(app, committer="teammate@example.com"),
