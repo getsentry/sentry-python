@@ -144,8 +144,6 @@ class LockFreeMetricsBatcher:
             self._record_lost(item)
 
     def _add_to_queue(self, item: "Metric") -> bool:
-        # Checking and appending isn't atomic.
-        # The queue can go over the limit by at most one metric per concurrently adding thread.
         if len(self._queue) + self._window.size() >= self.MAX_BEFORE_DROP:
             return False
 
@@ -160,17 +158,18 @@ class LockFreeMetricsBatcher:
             self._retire_window(window)
             window = self._window
 
+        window_size = window.size()
         state = window.threads[threading.get_ident()]
         reservoir = state.reservoirs[item["name"]]
+
+        if len(self._queue) + window_size >= self.MAX_BEFORE_DROP:
+            return False
+
+        reservoir.seen += 1
         if len(reservoir.kept) < limit:
-            # The size is off by at most one per adding thread.
-            if len(self._queue) + window.size() >= self.MAX_BEFORE_DROP:
-                return False
             state.size += 1
-            reservoir.seen += 1
             reservoir.kept.append(item)
         else:
-            reservoir.seen += 1
             index = random.randrange(reservoir.seen)
             if index < limit:
                 reservoir.kept[index] = item

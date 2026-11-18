@@ -1,3 +1,4 @@
+import time
 from unittest import mock
 
 import pytest
@@ -637,35 +638,83 @@ def test_metrics_window_sampling_new_window(sentry_init, capture_items):
         assert metric["attributes"]["sentry.client_sample_rate"] == 1 / 3
 
 
+def test_metrics_window_sampling_flushes_queue_at_max_before_flush(
+    sentry_init, capture_items, monkeypatch
+):
+    """Reaching MAX_BEFORE_FLUSH sends the unsampled metrics, but leaves the
+    window open, so sampled metrics wait for it to end."""
+    monkeypatch.setattr(LockFreeMetricsBatcher, "MAX_BEFORE_FLUSH", 5)
+    # Set the time-based flush and the window to something huge, so that
+    # neither ends during the test
+    monkeypatch.setattr(LockFreeMetricsBatcher, "FLUSH_WAIT_TIME", 100000)
+
+    # The huge window would make the limit huge too, so use a tiny rate to
+    # keep it at 1
+    sentry_init(_experiments={"metrics_window_sampling": {"test.sampled": 1e-6}})
+    items = capture_items("trace_metric")
+
+    for _ in range(3):
+        for _ in range(20):
+            sentry_sdk.metrics.count("test.sampled", 1)
+        for _ in range(5):
+            sentry_sdk.metrics.count("test.unsampled", 1)
+
+        time.sleep(0.1)
+
+        assert [item.payload["name"] for item in items] == ["test.unsampled"] * 5
+
+        # Ends the window
+        get_client().flush()
+
+        (sampled,) = [
+            item.payload for item in items if item.payload["name"] == "test.sampled"
+        ]
+        assert sampled["attributes"]["sentry.client_sample_rate"] == 1 / 20
+
+        items.clear()
+
+
 def test_metrics_window_sampling_drops_after_max_reached(
     sentry_init, capture_items, capture_record_lost_event_calls, monkeypatch
 ):
-    monkeypatch.setattr(LockFreeMetricsBatcher, "MAX_BEFORE_DROP", 25)
+    """Sampled and unsampled metrics share MAX_BEFORE_DROP, which starts over
+    in every window."""
+    monkeypatch.setattr(LockFreeMetricsBatcher, "MAX_BEFORE_DROP", 15)
 
-    names = ("test.a", "test.b", "test.c")
-    sentry_init(_experiments={"metrics_window_sampling": dict.fromkeys(names, 2)})
+    sentry_init(_experiments={"metrics_window_sampling": {"test.sampled": 2}})
     items = capture_items("trace_metric")
     record_lost_event_calls = capture_record_lost_event_calls()
 
-    for name in names:
+    for _ in range(3):
         for _ in range(10):
-            sentry_sdk.metrics.count(name, 1)
+            sentry_sdk.metrics.count("test.unsampled", 1)
+        # Gets the 5 left in the budget, the other 15 are dropped
+        for _ in range(20):
+            sentry_sdk.metrics.count("test.sampled", 1)
+        # The budget is full, so these are dropped
+        for _ in range(5):
+            sentry_sdk.metrics.count("test.unsampled", 1)
 
-    get_client().flush()
+        # Ends the window
+        get_client().flush()
 
-    metrics = [item.payload for item in items]
-    assert len(metrics) == 25
+        metrics = [item.payload for item in items]
+        names = sorted(metric["name"] for metric in metrics)
+        assert names == ["test.sampled"] * 5 + ["test.unsampled"] * 10
 
-    # No name went over its limit, so nothing was sampled and the only loss is
-    # the overflow
-    for metric in metrics:
-        assert "sentry.client_sample_rate" not in metric["attributes"]
+        # Dropped metrics aren't counted as seen, so nothing was sampled out
+        for metric in metrics:
+            assert "sentry.client_sample_rate" not in metric["attributes"]
 
-    assert len(record_lost_event_calls) == 5
-    for lost_event_call in record_lost_event_calls:
-        reason, data_category, item, quantity = lost_event_call
+        dropped = sorted(
+            item.payload.json["items"][0]["name"]
+            for reason, data_category, item, quantity in record_lost_event_calls
+            if reason == "queue_overflow" and data_category == "trace_metric"
+        )
+        assert dropped == ["test.sampled"] * 15 + ["test.unsampled"] * 5
+        assert not [
+            call for call in record_lost_event_calls if call[0] == "sample_rate"
+        ]
 
-        assert reason == "queue_overflow"
-        assert data_category == "trace_metric"
-        assert quantity == 1
-        assert item.payload.json["items"][0]["name"] == "test.c"
+        items.clear()
+        record_lost_event_calls.clear()
