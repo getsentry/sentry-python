@@ -13,7 +13,7 @@ from sentry_sdk.utils import (
 )
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Deque, List, Optional
+    from typing import Any, Callable, Optional
 
     from sentry_sdk._types import Metric
 
@@ -37,7 +37,7 @@ class LockFreeMetricsBatcher:
         self._reset_thread_state()
 
     def _reset_thread_state(self) -> None:
-        self._queue: "Deque[Metric]" = deque()
+        self._queue: "deque[Metric]" = deque()
         self._running = True
         self._flush_event: "threading.Event" = threading.Event()
         self._flusher: "Optional[threading.Thread]" = None
@@ -109,7 +109,7 @@ class LockFreeMetricsBatcher:
 
     def _flush(self) -> "Optional[Envelope]":
         queue = self._queue
-        items: "List[Metric]" = []
+        items: "list[Metric]" = []
         # Only take what's queued now. Producers can keep enqueuing (no locks).
         for _ in range(len(queue)):
             try:
@@ -143,7 +143,7 @@ class LockFreeMetricsBatcher:
             )
 
     @classmethod
-    def _to_envelope_item(cls, items: "List[Metric]") -> "Item":
+    def _to_envelope_item(cls, items: "list[Metric]") -> "Item":
         return Item(
             type=cls.TYPE,
             content_type=cls.CONTENT_TYPE,
