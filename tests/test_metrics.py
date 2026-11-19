@@ -631,10 +631,10 @@ def test_metrics_window_sampling_drops_after_max_reached(
     sentry_init(_experiments={"metrics_window_sampling": {"test.sampled": 2}})
     batcher = sentry_sdk.get_client().metrics_batcher
 
-    def no_op_flush(*args, **kwargs):
+    def no_op_flush_loop(*args, **kwargs):
         pass
 
-    monkeypatch.setattr(batcher, "_flush", no_op_flush)
+    monkeypatch.setattr(batcher, "_flush_loop", no_op_flush_loop)
 
     lost_event_calls = []
 
