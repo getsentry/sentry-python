@@ -1,0 +1,73 @@
+name: PR classifiers
+
+on:
+  pull_request_target:
+    # Keep `edited`: it is the only event fired when the base branch changes. The action
+    # itself skips title and description edits.
+    types: [opened, synchronize, reopened, ready_for_review, edited, converted_to_draft]
+
+permissions: {}
+
+concurrency:
+  # Two groups per pull request. Runs started by a title or description edit ("text") must
+  # never share a group with the runs that score a revision ("score"): GitHub keeps only one
+  # pending run per group, so a pending text edit would replace the pending run for a new
+  # commit, and the action would then skip the edit because the previous commit's label is
+  # still on the PR. Do not simplify this expression.
+  group: pr-classifiers-${{ github.event.pull_request.number }}-${{ github.event.action == 'edited' && !github.event.changes.base && 'text' || 'score' }}
+  # Every started run must reach its label clear; an overtaken run ends as `pr_changed`.
+  cancel-in-progress: false
+
+jobs:
+  classify:
+    name: PR classifiers
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: write   # this job only; needed to publish the risk label and the summary comment
+    steps:
+      # This job must never check out or run code from the pull request. The only checkout
+      # is the classifiers repository, at a pinned commit.
+      - name: Get a token for the classifiers repository
+        id: app
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          # The app's client ID, not its numeric App ID (`app-id` is deprecated in this action).
+          client-id: ${{ vars.CLASSIFIERS_APP_CLIENT_ID }}
+          private-key: ${{ secrets.CLASSIFIERS_APP_KEY }}
+          repositories: classifiers
+          # The token can read this one repository's contents and nothing else.
+          permission-contents: read
+
+      - name: Fetch the classifiers
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: getsentry/classifiers
+          ref: 36adf4011f0488e00274b5f21098bf5121cec95d
+          token: ${{ steps.app.outputs.token }}
+          path: .classifiers
+          persist-credentials: false
+
+      - name: Classify the pull request
+        id: classify
+        uses: ./.classifiers/actions/pr
+        env:
+          # On this step only, never at job or workflow level.
+          AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
+        with:
+          repo: ${{ github.repository }}
+          pr-number: ${{ github.event.pull_request.number }}
+          expected-head-sha: ${{ github.event.pull_request.head.sha }}
+          result-path: pr-classifiers-result.json
+          publish-label: true
+          publish-comment: true
+
+      - name: Upload the result
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: pr-classifiers-${{ github.event.pull_request.number }}
+          path: pr-classifiers-result.json
+          if-no-files-found: warn
+          retention-days: 30
