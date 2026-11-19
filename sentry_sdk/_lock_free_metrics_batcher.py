@@ -8,7 +8,8 @@ from collections import defaultdict, deque
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
-from sentry_sdk.envelope import Envelope, Item, PayloadRef
+from sentry_sdk._batcher import Batcher
+from sentry_sdk.envelope import Envelope
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     format_timestamp,
@@ -56,7 +57,7 @@ class _Window:
         return sum(state.size for state in self.threads.copy().values())
 
 
-class LockFreeMetricsBatcher:
+class LockFreeMetricsBatcher(Batcher["Metric"]):
     MAX_BEFORE_FLUSH = 1000
     MAX_BEFORE_DROP = 10_000
     FLUSH_WAIT_TIME = 5.0
@@ -71,8 +72,7 @@ class LockFreeMetricsBatcher:
         record_lost_func: "Callable[..., None]",
         window_sampling: "dict[str, float]",
     ) -> None:
-        self._capture_func = capture_func
-        self._record_lost_func = record_lost_func
+        super().__init__(capture_func, record_lost_func)
 
         # Metric name -> metrics kept per window. Never below 1, so there's
         # always at least one metric per name to extrapolate from
@@ -81,18 +81,18 @@ class LockFreeMetricsBatcher:
             for name, rate in window_sampling.items()
         }
 
-        self._reset_thread_state()
-
-    def _reset_thread_state(self) -> None:
         self._queue: "deque[Metric]" = deque()
         self._window = _Window()
         self._retired: "deque[_Window]" = deque()
-        self._running = True
-        self._flush_event: "threading.Event" = threading.Event()
-        self._flusher: "Optional[threading.Thread]" = None
-        self._flusher_pid: "Optional[int]" = None
         # Holds the claim of the one thread that gets to start the flusher.
         self._flusher_claim: "dict[str, object]" = {}
+
+    def _reset_thread_state(self) -> None:
+        super()._reset_thread_state()
+        self._queue = deque()
+        self._window = _Window()
+        self._retired = deque()
+        self._flusher_claim = {}
 
     def _ensure_thread(self) -> bool:
         """For forking processes we might need to restart this thread.
@@ -123,12 +123,6 @@ class LockFreeMetricsBatcher:
         self._flusher = flusher
         self._flusher_pid = pid
         return True
-
-    def _flush_loop(self) -> None:
-        while self._running:
-            self._flush_event.wait(self.FLUSH_WAIT_TIME + random.random())
-            self._flush_event.clear()
-            self._flush()
 
     def add(self, item: "Metric") -> None:
         if not self._ensure_thread():
@@ -178,18 +172,12 @@ class LockFreeMetricsBatcher:
         self._window = _Window()
         self._retired.append(window)
 
-    def kill(self) -> None:
-        if self._flusher is None:
-            return
-
-        self._running = False
-        self._flush_event.set()
-        self._flusher = None
-
     def flush(self) -> None:
-        self._flush(force=True)
+        # Explicit flushes send the current window regardless of its age.
+        self._retire_window(self._window)
+        super().flush()
 
-    def _flush(self, force: bool = False) -> "Optional[Envelope]":
+    def _flush(self) -> "Optional[Envelope]":
         queue = self._queue
         items: "list[Metric]" = []
         # Only take what's queued now. Producers can keep enqueuing (no locks).
@@ -202,7 +190,7 @@ class LockFreeMetricsBatcher:
         sampled_out = 0
 
         window = self._window
-        if force or time.monotonic() - window.start >= self.FLUSH_WAIT_TIME:
+        if time.monotonic() - window.start >= self.FLUSH_WAIT_TIME:
             self._retire_window(window)
         for _ in range(len(self._retired)):
             try:
@@ -272,35 +260,6 @@ class LockFreeMetricsBatcher:
             thread_kept = reservoir.kept[:]
             kept.extend(random.sample(thread_kept, min(count, len(thread_kept))))
         return kept
-
-    def _record_lost(self, item: "Metric") -> None:
-        envelope_item = None
-        with capture_internal_exceptions():
-            envelope_item = self._to_envelope_item([item])
-
-        if envelope_item:
-            self._record_lost_func(
-                reason="queue_overflow",
-                data_category=self.CLIENT_REPORT_TYPE,
-                item=envelope_item,
-                quantity=1,
-            )
-
-    @classmethod
-    def _to_envelope_item(cls, items: "list[Metric]") -> "Item":
-        return Item(
-            type=cls.TYPE,
-            content_type=cls.CONTENT_TYPE,
-            headers={
-                "item_count": len(items),
-            },
-            payload=PayloadRef(
-                json={
-                    "version": 2,
-                    "items": [cls._to_transport_format(item) for item in items],
-                }
-            ),
-        )
 
     @staticmethod
     def _to_transport_format(item: "Metric") -> "Any":
