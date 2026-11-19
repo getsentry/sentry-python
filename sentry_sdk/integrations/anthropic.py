@@ -167,6 +167,7 @@ class _RecordedUsage:
     input_tokens: int = 0
     cache_write_input_tokens: "Optional[int]" = 0
     cache_read_input_tokens: "Optional[int]" = 0
+    output_tokens_reasoning: int = 0
 
 
 class _StreamSpanContext:
@@ -423,6 +424,15 @@ def _collect_ai_data(
                     incoming_usage, "cache_read_input_tokens", None
                 )
 
+                output_tokens_details = getattr(
+                    incoming_usage, "output_tokens_details", None
+                )
+                thinking_tokens = getattr(
+                    output_tokens_details, "thinking_tokens", None
+                )
+                if thinking_tokens is not None:
+                    usage.output_tokens_reasoning = thinking_tokens
+
                 return (
                     model,
                     usage,
@@ -451,6 +461,15 @@ def _collect_ai_data(
                 )
                 if cache_read_input_tokens is not None:
                     usage.cache_read_input_tokens = cache_read_input_tokens
+
+                output_tokens_details = getattr(
+                    event.usage, "output_tokens_details", None
+                )
+                thinking_tokens = getattr(
+                    output_tokens_details, "thinking_tokens", None
+                )
+                if thinking_tokens is not None:
+                    usage.output_tokens_reasoning = thinking_tokens
                 # TODO: Record event.usage.server_tool_use
 
                 if event.delta.stop_reason is not None:
@@ -1097,6 +1116,7 @@ def _set_streaming_output_data(
         output_tokens=usage.output_tokens,
         cache_read_input_tokens=usage.cache_read_input_tokens,
         cache_write_input_tokens=usage.cache_write_input_tokens,
+        output_tokens_reasoning=usage.output_tokens_reasoning,
         content_blocks=content_blocks,
         response_id=response_id,
         finish_reason=finish_reason,
