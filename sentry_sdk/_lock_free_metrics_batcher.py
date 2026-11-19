@@ -173,7 +173,6 @@ class LockFreeMetricsBatcher(Batcher["Metric"]):
         self._retired.append(window)
 
     def flush(self) -> None:
-        # Explicit flushes send the current window regardless of its age.
         self._retire_window(self._window)
         super().flush()
 
@@ -231,35 +230,30 @@ class LockFreeMetricsBatcher(Batcher["Metric"]):
             if limit is None:
                 continue
 
-            seen = sum(reservoir.seen for reservoir in reservoirs)
-            kept = self._merge(reservoirs, limit, seen)
+            bounds = list(
+                itertools.accumulate(reservoir.seen for reservoir in reservoirs)
+            )
+            slots = [0] * len(reservoirs)
+            for position in random.sample(range(bounds[-1]), min(limit, bounds[-1])):
+                slots[bisect.bisect_right(bounds, position)] += 1
+
+            kept: "list[Metric]" = []
+            for reservoir, count in zip(reservoirs, slots):
+                thread_kept = reservoir.kept[:]
+                kept.extend(random.sample(thread_kept, min(count, len(thread_kept))))
             if not kept:
                 continue
 
             items.extend(kept)
-            if seen <= len(kept):
+            if bounds[-1] <= len(kept):
                 continue
 
-            rate = len(kept) / seen
+            rate = len(kept) / bounds[-1]
             for item in kept:
                 item["attributes"]["sentry.client_sample_rate"] = rate
-            sampled_out += seen - len(kept)
+            sampled_out += bounds[-1] - len(kept)
 
         return sampled_out
-
-    @staticmethod
-    def _merge(reservoirs: "list[_Reservoir]", limit: int, seen: int) -> "list[Metric]":
-        """Draw uniform sample of at most `limit` metrics out of all `seen`."""
-        bounds = list(itertools.accumulate(reservoir.seen for reservoir in reservoirs))
-        slots = [0] * len(reservoirs)
-        for position in random.sample(range(seen), min(limit, seen)):
-            slots[bisect.bisect_right(bounds, position)] += 1
-
-        kept = []
-        for reservoir, count in zip(reservoirs, slots):
-            thread_kept = reservoir.kept[:]
-            kept.extend(random.sample(thread_kept, min(count, len(thread_kept))))
-        return kept
 
     @staticmethod
     def _to_transport_format(item: "Metric") -> "Any":
