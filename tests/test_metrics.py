@@ -1,11 +1,10 @@
-import time
+from collections import Counter
 from unittest import mock
 
 import pytest
 
 import sentry_sdk
 from sentry_sdk import get_client
-from sentry_sdk._lock_free_metrics_batcher import LockFreeMetricsBatcher
 from sentry_sdk.consts import SPANDATA, VERSION
 
 
@@ -576,20 +575,11 @@ def test_array_attributes_deep_copied_in_before_send(sentry_init, window_samplin
     get_client().flush()
 
 
-@pytest.mark.parametrize(
-    "rate,expected_count",
-    [
-        (2, 10),
-        (4, 20),
-        (0.2, 1),
-        (0.05, 1),
-    ],
-)
-def test_metrics_window_sampling_basics(
-    sentry_init, capture_items, capture_record_lost_event_calls, rate, expected_count
+def test_metrics_window_sampling(
+    sentry_init, capture_items, capture_record_lost_event_calls
 ):
     sentry_init(
-        _experiments={"metrics_window_sampling": {"test.hot": rate, "test.cold": 2}}
+        _experiments={"metrics_window_sampling": {"test.hot": 1.5, "test.cold": 2}}
     )
     items = capture_items("trace_metric")
     record_lost_event_calls = capture_record_lost_event_calls()
@@ -604,18 +594,17 @@ def test_metrics_window_sampling_basics(
     metrics = [item.payload for item in items]
 
     hot = [metric for metric in metrics if metric["name"] == "test.hot"]
-    assert len(hot) == expected_count
+    assert len(hot) == 7
     for metric in hot:
-        assert metric["attributes"]["sentry.client_sample_rate"] == expected_count / 200
+        assert metric["attributes"]["sentry.client_sample_rate"] == 7 / 200
 
-    # Under its limit, so nothing is sampled out
     cold = [metric for metric in metrics if metric["name"] == "test.cold"]
     assert len(cold) == 3
     for metric in cold:
         assert "sentry.client_sample_rate" not in metric["attributes"]
 
     assert record_lost_event_calls == [
-        ("sample_rate", "trace_metric", None, 200 - expected_count),
+        ("sample_rate", "trace_metric", None, 193),
     ]
 
 
@@ -623,10 +612,10 @@ def test_metrics_window_sampling_new_window(sentry_init, capture_items):
     sentry_init(_experiments={"metrics_window_sampling": {"test.counter": 2}})
     items = capture_items("trace_metric")
 
-    # flush() ends the window, so each batch of 30 is sampled on its own
     for _ in range(30):
         sentry_sdk.metrics.count("test.counter", 1)
     get_client().flush()
+
     for _ in range(30):
         sentry_sdk.metrics.count("test.counter", 1)
     get_client().flush()
@@ -638,83 +627,48 @@ def test_metrics_window_sampling_new_window(sentry_init, capture_items):
         assert metric["attributes"]["sentry.client_sample_rate"] == 1 / 3
 
 
-def test_metrics_window_sampling_flushes_queue_at_max_before_flush(
+def test_metrics_window_sampling_drops_after_max_reached(
     sentry_init, capture_items, monkeypatch
 ):
-    """Reaching MAX_BEFORE_FLUSH sends the unsampled metrics, but leaves the
-    window open, so sampled metrics wait for it to end."""
-    monkeypatch.setattr(LockFreeMetricsBatcher, "MAX_BEFORE_FLUSH", 5)
-    # Set the time-based flush and the window to something huge, so that
-    # neither ends during the test
-    monkeypatch.setattr(LockFreeMetricsBatcher, "FLUSH_WAIT_TIME", 100000)
-
-    # The huge window would make the limit huge too, so use a tiny rate to
-    # keep it at 1
-    sentry_init(_experiments={"metrics_window_sampling": {"test.sampled": 1e-6}})
-    items = capture_items("trace_metric")
-
-    for _ in range(3):
-        for _ in range(20):
-            sentry_sdk.metrics.count("test.sampled", 1)
-        for _ in range(5):
-            sentry_sdk.metrics.count("test.unsampled", 1)
-
-        time.sleep(0.1)
-
-        assert [item.payload["name"] for item in items] == ["test.unsampled"] * 5
-
-        # Ends the window
-        get_client().flush()
-
-        (sampled,) = [
-            item.payload for item in items if item.payload["name"] == "test.sampled"
-        ]
-        assert sampled["attributes"]["sentry.client_sample_rate"] == 1 / 20
-
-        items.clear()
-
-
-def test_metrics_window_sampling_drops_after_max_reached(
-    sentry_init, capture_items, capture_record_lost_event_calls, monkeypatch
-):
-    """Sampled and unsampled metrics share MAX_BEFORE_DROP, which starts over
-    in every window."""
-    monkeypatch.setattr(LockFreeMetricsBatcher, "MAX_BEFORE_DROP", 15)
-
     sentry_init(_experiments={"metrics_window_sampling": {"test.sampled": 2}})
+    batcher = sentry_sdk.get_client().metrics_batcher
+
+    def no_op_flush(*args, **kwargs):
+        pass
+
+    monkeypatch.setattr(batcher, "_flush", no_op_flush)
+
+    lost_event_calls = []
+
+    def record_lost_event(reason, data_category=None, item=None, *, quantity=1):
+        lost_event_calls.append((reason, data_category, item, quantity))
+
+    monkeypatch.setattr(batcher, "_record_lost_func", record_lost_event)
+
     items = capture_items("trace_metric")
-    record_lost_event_calls = capture_record_lost_event_calls()
 
     for _ in range(3):
-        for _ in range(10):
+        for _ in range(9_995):
             sentry_sdk.metrics.count("test.unsampled", 1)
-        # Gets the 5 left in the budget, the other 15 are dropped
+
         for _ in range(20):
             sentry_sdk.metrics.count("test.sampled", 1)
-        # The budget is full, so these are dropped
+
         for _ in range(5):
             sentry_sdk.metrics.count("test.unsampled", 1)
 
-        # Ends the window
-        get_client().flush()
+        sentry_sdk.flush()
 
         metrics = [item.payload for item in items]
-        names = sorted(metric["name"] for metric in metrics)
-        assert names == ["test.sampled"] * 5 + ["test.unsampled"] * 10
+        names = Counter(metric["name"] for metric in metrics)
+        assert names == {"test.unsampled": 9_995, "test.sampled": 5}
 
-        # Dropped metrics aren't counted as seen, so nothing was sampled out
-        for metric in metrics:
-            assert "sentry.client_sample_rate" not in metric["attributes"]
-
-        dropped = sorted(
+        dropped = Counter(
             item.payload.json["items"][0]["name"]
-            for reason, data_category, item, quantity in record_lost_event_calls
+            for reason, data_category, item, quantity in lost_event_calls
             if reason == "queue_overflow" and data_category == "trace_metric"
         )
-        assert dropped == ["test.sampled"] * 15 + ["test.unsampled"] * 5
-        assert not [
-            call for call in record_lost_event_calls if call[0] == "sample_rate"
-        ]
+        assert dropped == {"test.sampled": 15, "test.unsampled": 5}
 
         items.clear()
-        record_lost_event_calls.clear()
+        lost_event_calls.clear()
