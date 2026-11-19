@@ -31,7 +31,6 @@ DEFAULT_DENYLIST = [
     "sessionid",
     # wsgi
     "x_csrftoken",
-    "x_forwarded_for",
     "set_cookie",
     "cookie",
     "authorization",
@@ -84,8 +83,12 @@ class EventScrubber:
             )
             self.denylist += pii_denylist
 
-        self.denylist = [x.lower() for x in self.denylist]
+        self.denylist = [self._normalize_key(x) for x in self.denylist]
         self.recursive = recursive
+
+    @staticmethod
+    def _normalize_key(key: str) -> str:
+        return key.lower().replace("-", "_")
 
     def scrub_list(self, lst: object) -> None:
         """
@@ -114,7 +117,7 @@ class EventScrubber:
         for k, v in d.items():
             # The cast is needed because mypy is not smart enough to figure out that k must be a
             # string after the isinstance check.
-            if isinstance(k, str) and k.lower() in self.denylist:
+            if isinstance(k, str) and self._normalize_key(k) in self.denylist:
                 d[k] = AnnotatedValue.substituted_because_contains_sensitive_data()
             elif self.recursive:
                 self.scrub_dict(v)  # no-op unless v is a dict
